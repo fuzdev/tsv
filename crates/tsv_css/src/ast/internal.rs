@@ -12,9 +12,9 @@ use tsv_lang::Span;
 /// This matches the TS/Svelte pattern and enables efficient range queries
 /// using `comments_in_range()` from tsv_lang.
 #[derive(Debug, Clone)]
-pub struct CssStyleSheet {
+pub struct CssStyleSheet<'arena> {
     /// CSS nodes (rules, at-rules) - no longer includes Comment variant
-    pub nodes: Vec<CssNode>,
+    pub nodes: &'arena [CssNode<'arena>],
 
     /// All comments sorted by span.start (top-level and value comments)
     ///
@@ -30,27 +30,18 @@ pub struct CssStyleSheet {
     pub line_breaks: Vec<u32>,
 }
 
-impl CssStyleSheet {
+impl<'arena> CssStyleSheet<'arena> {
     /// Create a new empty stylesheet
     pub fn new() -> Self {
         Self {
-            nodes: Vec::new(),
-            comments: Vec::new(),
-            line_breaks: Vec::new(),
-        }
-    }
-
-    /// Create a stylesheet with nodes (no comments)
-    pub fn with_nodes(nodes: Vec<CssNode>) -> Self {
-        Self {
-            nodes,
+            nodes: &[],
             comments: Vec::new(),
             line_breaks: Vec::new(),
         }
     }
 }
 
-impl Default for CssStyleSheet {
+impl Default for CssStyleSheet<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -60,12 +51,12 @@ impl Default for CssStyleSheet {
 ///
 /// Comments are stored separately in `CssStyleSheet.comments` and looked up by position.
 #[derive(Debug, Clone)]
-pub enum CssNode {
-    Rule(CssRule),
-    Atrule(CssAtrule), // @media, @keyframes, @supports, etc.
+pub enum CssNode<'arena> {
+    Rule(CssRule<'arena>),
+    Atrule(CssAtrule<'arena>), // @media, @keyframes, @supports, etc.
 }
 
-impl CssNode {
+impl CssNode<'_> {
     pub fn span(&self) -> Span {
         match self {
             CssNode::Rule(rule) => rule.span,
@@ -76,11 +67,11 @@ impl CssNode {
 
 /// CSS Rule - selector with declaration block
 #[derive(Debug, Clone)]
-pub struct CssRule {
-    pub selector: SelectorList,
-    pub block_span: Span,                 // Span of the block including braces
-    pub declarations: Vec<CssBlockChild>, // Declarations and comments
-    pub span: Span,                       // Full rule span
+pub struct CssRule<'arena> {
+    pub selector: SelectorList<'arena>,
+    pub block_span: Span, // Span of the block including braces
+    pub declarations: &'arena [CssBlockChild<'arena>], // Declarations and comments
+    pub span: Span,       // Full rule span
 }
 
 //
@@ -101,24 +92,24 @@ pub struct CssRule {
 
 /// Selector list - comma-separated selectors
 #[derive(Debug, Clone)]
-pub struct SelectorList {
-    pub selectors: Vec<ComplexSelector>,
+pub struct SelectorList<'arena> {
+    pub selectors: &'arena [ComplexSelector<'arena>],
     pub span: Span,
 }
 
 /// Complex selector - one or more relative selectors connected by combinators
 #[derive(Debug, Clone)]
-pub struct ComplexSelector {
-    pub children: Vec<RelativeSelector>,
+pub struct ComplexSelector<'arena> {
+    pub children: &'arena [RelativeSelector<'arena>],
     pub span: Span,
 }
 
 /// Relative selector - combinator + simple selectors
 #[derive(Debug, Clone)]
-pub struct RelativeSelector {
+pub struct RelativeSelector<'arena> {
     pub combinator: Option<Combinator>,
     pub combinator_span: Option<Span>, // Position of the combinator symbol
-    pub selectors: Vec<SimpleSelector>,
+    pub selectors: &'arena [SimpleSelector<'arena>],
     pub span: Span,
 }
 
@@ -149,40 +140,47 @@ impl Combinator {
 
 /// Simple selector - the atomic units that make up a complex selector
 #[derive(Debug, Clone)]
-pub enum SimpleSelector {
+pub enum SimpleSelector<'arena> {
     Type {
-        namespace: Option<String>,
-        name: String,
+        /// Presence of a namespace prefix (`svg|rect`). The prefix text is kept only
+        /// for the rare namespaced form; the element name is recovered from `span` at
+        /// print time, so no separate `name` copy is stored (span-for-verbatim).
+        namespace: Option<&'arena str>,
         span: Span,
     },
     Universal {
-        namespace: Option<String>,
+        namespace: Option<&'arena str>,
         span: Span,
     },
-    Class {
-        name: String,
-        span: Span,
-    },
-    Id {
-        name: String,
-        span: Span,
-    },
+    /// Class selector. Name (including the `.`) recovered verbatim from `span`.
+    Class { span: Span },
+    /// Id selector. Name (including the `#`) recovered verbatim from `span`.
+    Id { span: Span },
     Attribute {
-        namespace: Option<String>,
-        name: String,
+        namespace: Option<&'arena str>,
+        /// Span of the attribute name only (the `attr` in `[ns|attr op 'value' flags]`),
+        /// verbatim. The name carries no decoded copy: the printer emits it raw from source
+        /// (escapes preserved — `[f\oo]` stays `[f\oo]`, never `[foo]`) and convert
+        /// half-decodes it via `raw_selector_name`, matching Svelte's `read_identifier`
+        /// (see convert/mod.rs). `value`/`flags` stay owned strings — they are
+        /// processed/re-quoted, not verbatim source slices.
+        name_span: Span,
         matcher: Option<AttributeMatcher>,
-        value: Option<String>,
-        flags: Option<String>, // i (case-insensitive), s (case-sensitive)
+        value: Option<&'arena str>,
+        flags: Option<&'arena str>, // i (case-insensitive), s (case-sensitive)
         span: Span,
     },
+    // Pseudo selectors carry no `name` field: the name is recovered verbatim from `span`
+    // (the printer reads `source` directly; convert half-decodes via `raw_selector_name`,
+    // matching Svelte's `read_identifier` — see convert/mod.rs). Storing a decoded name would
+    // be a redundant copy that, for identity escapes (`:f\oo`), disagrees with the public
+    // (Svelte) form anyway.
     PseudoClass {
-        name: String,
-        args: Option<PseudoClassArgs>,
+        args: Option<PseudoClassArgs<'arena>>,
         span: Span,
     },
     PseudoElement {
-        name: String,
-        args: Option<PseudoClassArgs>,
+        args: Option<PseudoClassArgs<'arena>>,
         span: Span,
     },
     Nesting {
@@ -200,7 +198,8 @@ pub enum SimpleSelector {
     ///
     /// Examples: `.` (incomplete class), `[` (incomplete attribute), etc.
     Invalid {
-        raw: String, // Raw selector text as written
+        // Raw selector text as written — recovered verbatim from `span` (trimmed) at
+        // print time (span-for-verbatim); convert filters Invalid selectors out.
         span: Span,
     },
 }
@@ -210,15 +209,15 @@ pub enum SimpleSelector {
 /// Stores semantic data (what the args mean), not output structure.
 /// Conversion layer generates Svelte's wrapper format.
 #[derive(Debug, Clone)]
-pub enum PseudoClassArgs {
+pub enum PseudoClassArgs<'arena> {
     /// Nth expression for :nth-child(), :nth-of-type(), :nth-last-child(), :nth-last-of-type()
     ///
     /// Values: "2n + 1", "odd", "even", "3", "-n+6", etc.
     /// Optional selector list for `:nth-child(An+B of S)` syntax (CSS Selectors Level 4)
     /// Span covers the argument content (inside the parentheses)
     Nth {
-        value: String,
-        of_selector: Option<SelectorList>,
+        value: &'arena str,
+        of_selector: Option<SelectorList<'arena>>,
         span: Span,
     },
 
@@ -226,7 +225,10 @@ pub enum PseudoClassArgs {
     ///
     /// Contains a full SelectorList that can include multiple complex selectors.
     /// Used for logical combinations and relational selectors.
-    SelectorList { selectors: SelectorList, span: Span },
+    SelectorList {
+        selectors: SelectorList<'arena>,
+        span: Span,
+    },
 
     /// Compound selector for ::slotted() pseudo-element
     ///
@@ -236,7 +238,7 @@ pub enum PseudoClassArgs {
     /// Examples: `*`, `div`, `.foo`, `div.foo#bar:hover`, `[slot]`
     /// Invalid: `div span` (combinator), `div > span` (combinator)
     Slotted {
-        selectors: Vec<SimpleSelector>, // Compound selector (no combinators)
+        selectors: &'arena [SimpleSelector<'arena>], // Compound selector (no combinators)
         span: Span,
     },
 
@@ -250,7 +252,7 @@ pub enum PseudoClassArgs {
     ///
     /// Examples: `label`, `tab`, `tab active`, `button primary`
     Part {
-        idents: Vec<String>, // Space-separated part names
+        idents: &'arena [&'arena str], // Space-separated part names
         span: Span,
     },
 
@@ -263,12 +265,12 @@ pub enum PseudoClassArgs {
     ///
     /// Note: Svelte's parser treats these as selectors in public AST (quirk applied at conversion)
     Identifier {
-        value: String, // Identifier value (without quotes or parentheses)
+        value: &'arena str, // Identifier value (without quotes or parentheses)
         span: Span,
     },
 }
 
-impl PseudoClassArgs {
+impl PseudoClassArgs<'_> {
     /// Get the span of the pseudo-class/pseudo-element arguments
     pub fn span(&self) -> Span {
         match self {
@@ -314,16 +316,24 @@ impl AttributeMatcher {
 /// - `value`: Rich semantic AST for manipulation, formatting, linting
 /// - Source text extracted via span when needed (e.g., for JSON output)
 #[derive(Debug, Clone)]
-pub struct CssDeclaration {
-    pub property: String,
-    pub value: CssValue, // Semantic representation (normalized)
+pub struct CssDeclaration<'arena> {
+    /// Property name, **escape-decoded** (spec-canonical `<ident-token>` value, e.g. `\63 olor`
+    /// → `color`; CSS Syntax §4.3.11). This is NOT a verbatim slice of `span`, so it is kept as
+    /// an arena string rather than recovered from a span (a span would silently un-decode it).
+    /// Used internally for the `--`-prefix check, keyword matches (`grid*`), and inline-width
+    /// math. The printer's *output* and the public AST both emit the **raw** property text from
+    /// source instead (`extract_property_name` / convert), preserving escapes — a documented
+    /// Svelte quirk. So decoded(internal) / raw(output+public) is intentional; see the `(c)`
+    /// follow-up in the bumpalo arena lore for the spec-vs-Svelte encoding map.
+    pub property: &'arena str,
+    pub value: CssValue<'arena>, // Semantic representation (normalized)
     /// End position including !important (span.end excludes it for the formatter).
     /// `None` means no !important. Use `is_important()` for the bool check.
     pub important_end: Option<u32>,
     pub span: Span,
 }
 
-impl CssDeclaration {
+impl CssDeclaration<'_> {
     pub fn is_important(&self) -> bool {
         self.important_end.is_some()
     }
@@ -342,49 +352,102 @@ impl CssDeclaration {
 //   - Minification (removing unnecessary spaces)
 //   - Pretty-printing with correct precedence
 
+/// The decoded value of a CSS string literal, mirroring `tsv_ts`'s `StringCooked`.
+///
+/// `Verbatim` (the common no-escape case) carries **no allocation** — the decoded
+/// value equals the inner source slice (the literal's `span` minus the two quote
+/// bytes). Only strings with escape sequences own arena bytes.
+#[derive(Debug, Clone)]
+pub enum StringCooked<'arena> {
+    /// Decoded value == the inner source slice (no escapes to decode).
+    Verbatim,
+    /// Escapes were decoded into a value distinct from the raw inner text.
+    Decoded(&'arena str),
+}
+
+impl<'arena> StringCooked<'arena> {
+    /// The decoded string value. `span` is the owning [`CssValue::String`]'s span
+    /// (the quoted literal); `source` is the host document. `Verbatim` slices the
+    /// inner text (zero-copy); `Decoded` returns the arena bytes.
+    #[inline]
+    pub fn resolve<'s>(&'s self, span: Span, source: &'s str) -> &'s str {
+        match self {
+            StringCooked::Verbatim => {
+                let raw = span.extract(source);
+                &raw[1..raw.len() - 1]
+            }
+            StringCooked::Decoded(decoded) => decoded,
+        }
+    }
+}
+
 /// CSS value - right-hand side of a declaration
 ///
 /// Internal representation optimized for traversal and manipulation.
-/// Converted to public JSON AST via the convert layer (see ast/convert.rs).
+/// Converted to public JSON AST via the convert layer (see ast/convert/mod.rs).
 /// Never serialized directly - serde not needed!
 #[derive(Debug, Clone)]
-pub enum CssValue {
+pub enum CssValue<'arena> {
     /// Identifier: auto, bold, inherit, currentColor, etc.
-    Identifier { name: String, span: Span },
+    ///
+    /// The text is recovered verbatim from `span` at print time
+    /// (`build_identifier_doc`, escapes preserved) — span-for-verbatim, so no copied
+    /// string is stored. An empty/whitespace-only `span` marks the empty-identifier
+    /// sentinel (`var(--a,)`'s trailing fallback, an empty custom-property value).
+    Identifier { span: Span },
 
-    /// String literal: "Arial", 'font.woff'
-    /// Content includes decoded escape sequences (internal representation)
+    /// String literal: `"Arial"`, `'font.woff'`.
+    ///
+    /// The printed text is recovered verbatim from `span` (escapes preserved, quote
+    /// normalized) — span-for-verbatim, like `Identifier`. The quote char is the
+    /// first byte of `span` (`source[span.start]`), not stored. `content` carries the
+    /// *decoded* value for the defensive span-unavailable fallback only: `Verbatim`
+    /// for no-escape strings (zero alloc), `Decoded` when escapes were applied.
     String {
-        content: String, // string content without quotes (decoded)
-        quote: char,     // original quote character (' or ")
+        content: StringCooked<'arena>,
         span: Span,
     },
 
     /// Number with optional unit: 10, 10px, 1.5em, 50%, etc.
-    Dimension {
-        value: f64,
-        unit: String, // empty string for unitless numbers, "px", "%", etc.
-        span: Span,
-    },
+    ///
+    /// The variant tag classifies the token as a dimension (vs an identifier) so the
+    /// printer applies number normalization; the numeric value and unit text are
+    /// recovered verbatim from `span` at print time (`build_dimension_doc`), so they
+    /// are not stored — span-for-verbatim (see the arena string-representation idiom).
+    Dimension { value: f64, span: Span },
 
     /// Color - various formats (rgb, hsl, hex, named)
     Color { color: Color, span: Span },
 
     /// Function call: calc(), var(), rgb(), url(), etc.
+    ///
+    /// `name` is a **verbatim** source slice (the text before `(`, never escape-decoded —
+    /// the value subtree is source-faithful, never re-serialized; see `convert/mod.rs`). It is a
+    /// candidate for the span-for-verbatim idiom (a dedicated `name_span` would drop this
+    /// copy), but the exact name span needs trim-aware arithmetic (`s[..paren].trim()`) plus
+    /// base-offset alignment across callers — deferred as a perf-neutral additive (see the
+    /// `(c)` follow-up in the bumpalo arena lore). Not a decoded identifier, unlike
+    /// `CssAtrule.name` / `CssDeclaration.property`.
     Function {
-        name: String,
-        args: Vec<CssValue>,
+        name: &'arena str,
+        args: &'arena [CssValue<'arena>],
         span: Span,
     },
 
     /// Space-separated list of values
-    List { values: Vec<CssValue>, span: Span },
+    List {
+        values: &'arena [CssValue<'arena>],
+        span: Span,
+    },
 
     /// Comma-separated list of values
-    CommaSeparated { values: Vec<CssValue>, span: Span },
+    CommaSeparated {
+        values: &'arena [CssValue<'arena>],
+        span: Span,
+    },
 }
 
-impl CssValue {
+impl CssValue<'_> {
     /// Get the span of this value
     pub fn span(&self) -> Span {
         match self {
@@ -440,13 +503,17 @@ impl AngleUnit {
 }
 
 /// Internal representation - converted to JSON via convert layer.
+///
+/// `Named`/`Hex` carry no text: it is recovered verbatim from the enclosing
+/// `CssValue::Color.span` at print time (span-for-verbatim), so `Color` holds no
+/// arena reference and needs no lifetime.
 #[derive(Debug, Clone)]
 pub enum Color {
     /// Named color: red, blue, currentColor, etc.
-    Named(String),
+    Named,
 
     /// Hex color: #ff0000, #f00, etc.
-    Hex(String),
+    Hex,
 
     /// RGB color: rgb(255, 0, 0) or rgb(255 0 0 / 1) or rgb(100% 0% 0%)
     /// Supports CSS Color 4: numbers, percentages, none, alpha as percentage
@@ -496,10 +563,13 @@ pub enum Color {
 /// - @media, @container: raw condition strings
 /// - @keyframes: raw animation name
 #[derive(Debug, Clone)]
-pub enum PreludeValue {
+pub enum PreludeValue<'arena> {
     /// Structured values (for @import)
     /// Example: `url('styles.css') layer(base)` → [Function(url), Function(layer)]
-    Values { values: Vec<CssValue>, span: Span },
+    Values {
+        values: &'arena [CssValue<'arena>],
+        span: Span,
+    },
 
     /// Raw prelude (for `@keyframes`, `@layer`, `@namespace`, `@page`, … — at-rules with
     /// no `property: value` / media-query grammar). `content` is the **printer-facing**
@@ -508,30 +578,34 @@ pub enum PreludeValue {
     /// whitespace-normalized to match postcss). The public AST is reproduced separately
     /// from `span` (source-verbatim), so `content` never feeds the AST.
     /// Example: `@layer` → `a , b`; `@keyframes` → `my-anim`.
-    Raw { content: String, span: Span },
+    Raw { content: &'arena str, span: Span },
 
     /// Selector lists (for @scope)
     /// Example: `@scope (.card) to (.footer)` → root: [.card], limit: Some([.footer])
     Selectors {
-        root: SelectorList,
-        limit: Option<SelectorList>,
+        root: SelectorList<'arena>,
+        limit: Option<SelectorList<'arena>>,
         span: Span,
     },
 
     /// @supports condition (structured for line-width wrapping)
     /// Example: `(display: grid) and (flex: 1)` → parts connected by `and`/`or`
     Supports {
-        condition: ConditionQuery,
+        condition: ConditionQuery<'arena>,
         span: Span,
     },
 
     /// @container query (structured for line-width wrapping)
     /// Example: `sidebar (min-width: 100px) and (max-width: 200px)`
     Container {
-        /// Optional container name (e.g., "sidebar")
-        name: Option<String>,
+        /// Optional container name (e.g., "sidebar"), **escape-decoded** (spec-canonical
+        /// `<ident-token>`). Printer-only — convert emits the whole prelude from `span`
+        /// (raw), not this field. Kept as an arena string (not a span) because the span
+        /// holds the raw escaped form, which would diverge from the decoded value; same
+        /// category as `CssAtrule.name`.
+        name: Option<&'arena str>,
         /// The condition parts connected by `and`/`or`
-        condition: ConditionQuery,
+        condition: ConditionQuery<'arena>,
         span: Span,
     },
 
@@ -543,7 +617,7 @@ pub enum PreludeValue {
     ///
     /// Fully structuring preludes (vs. this raw form) is a deferred design option
     /// — see docs/architecture.md § "Red-Green Trees (Deferred)".
-    Media { content: String, span: Span },
+    Media { content: &'arena str, span: Span },
 }
 
 /// A boolean condition query — the structured prelude shared by `@supports`
@@ -552,19 +626,19 @@ pub enum PreludeValue {
 /// at `and`/`or` boundaries, keeping the keyword on the current line and the
 /// condition on the next.
 #[derive(Debug, Clone)]
-pub struct ConditionQuery {
+pub struct ConditionQuery<'arena> {
     /// The condition parts connected by `and`/`or`
-    pub parts: Vec<ConditionPart>,
+    pub parts: &'arena [ConditionPart<'arena>],
 }
 
 /// A single part of a `ConditionQuery` (one `(prop: val)` term, optionally
 /// `not`-prefixed or function-style like `selector(...)`).
 #[derive(Debug, Clone)]
-pub struct ConditionPart {
+pub struct ConditionPart<'arena> {
     /// The connector before this part (None for first part)
     pub connector: Option<ConditionConnector>,
     /// The condition content (e.g., "(display: grid)" or "not (color: red)")
-    pub content: String,
+    pub content: &'arena str,
     pub span: Span,
 }
 
@@ -575,7 +649,7 @@ pub enum ConditionConnector {
     Or,
 }
 
-impl PreludeValue {
+impl PreludeValue<'_> {
     pub fn span(&self) -> Span {
         match self {
             PreludeValue::Values { span, .. } => *span,
@@ -603,42 +677,49 @@ impl PreludeValue {
 
 /// At-rule (@media, @keyframes, @supports, @import, @layer, @font-face, etc.)
 #[derive(Debug, Clone)]
-pub struct CssAtrule {
-    /// At-rule name without @ (e.g., "media", "keyframes")
-    pub name: String,
+pub struct CssAtrule<'arena> {
+    /// At-rule name without `@` (e.g., "media", "keyframes"), **escape-decoded**
+    /// (spec-canonical `<at-keyword-token>`, CSS Syntax §4.3.3; Svelte's parser also decodes
+    /// it — `@\6d edia` → `"media"`). Both the printer (`@` + this) and convert emit the
+    /// decoded form, matching Svelte + spec. Kept as an arena string, NOT recovered from
+    /// `span`: the span covers `@name …` and holds the raw escaped bytes, so a span-drop would
+    /// silently un-decode the name and diverge from Svelte/spec for escaped names. Same
+    /// category as `CssDeclaration.property` / `Container.name`; see the `(c)` follow-up in
+    /// the bumpalo arena lore.
+    pub name: &'arena str,
 
     /// Prelude value (structured for @import, raw string for others)
-    pub prelude: PreludeValue,
+    pub prelude: PreludeValue<'arena>,
 
     /// Block contents (Some for conditional/descriptor, None for statement at-rules)
-    pub block: Option<CssAtruleBlock>,
+    pub block: Option<CssAtruleBlock<'arena>>,
 
     pub span: Span,
 }
 
 /// At-rule block - can contain rules, declarations, or nested at-rules
 #[derive(Debug, Clone)]
-pub struct CssAtruleBlock {
+pub struct CssAtruleBlock<'arena> {
     /// Block children - mixture depends on at-rule type
     ///
     /// @media, @supports, @layer: Vec<CssNode> (rules + nested at-rules)
     /// @font-face, @page: Vec<CssDeclaration> (declarations only)
     ///
     /// We store as Vec<CssBlockChild> to support both:
-    pub children: Vec<CssBlockChild>,
+    pub children: &'arena [CssBlockChild<'arena>],
     pub span: Span,
 }
 
 /// At-rule block child - can be rule, declaration, or nested at-rule
 #[derive(Debug, Clone)]
-pub enum CssBlockChild {
-    Rule(CssRule),
-    Declaration(CssDeclaration),
-    Atrule(CssAtrule),
+pub enum CssBlockChild<'arena> {
+    Rule(CssRule<'arena>),
+    Declaration(CssDeclaration<'arena>),
+    Atrule(CssAtrule<'arena>),
     Comment(Comment),
 }
 
-impl CssBlockChild {
+impl CssBlockChild<'_> {
     pub fn span(&self) -> Span {
         match self {
             CssBlockChild::Rule(rule) => rule.span,

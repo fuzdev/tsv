@@ -372,15 +372,18 @@ Implementation oddities in Svelte's parser that tsv replicates for AST compatibi
 
 ### CSS Compat Behaviors
 
-- Backslash doubling in values — raw source extraction in `crates/tsv_css/src/ast/convert.rs`
-- Unicode escape first-digit duplication — raw source extraction in `crates/tsv_css/src/ast/convert.rs`
-- Comment-before-colon in declaration value — `crates/tsv_css/src/ast/convert.rs`
-- Block-comment stripping in declaration value — `strip_css_comments` in `crates/tsv_css/src/ast/convert.rs`
-- Block-comment stripping in at-rule prelude — `strip_css_comments` in `crates/tsv_css/src/ast/convert.rs`
-- ::slotted()/::part() span truncation — `crates/tsv_css/src/ast/convert.rs`
-- :dir()/:lang()/::highlight() identifier wrapping — `crates/tsv_css/src/ast/convert.rs`
+- Backslash doubling in values — raw source extraction in `crates/tsv_css/src/ast/convert/mod.rs`
+- Unicode escape first-digit duplication — raw source extraction in `crates/tsv_css/src/ast/convert/mod.rs`
+- Comment-before-colon in declaration value — `crates/tsv_css/src/ast/convert/mod.rs`
+- Block-comment stripping in declaration value — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
+- Block-comment stripping in at-rule prelude — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
+- ::slotted()/::part() span truncation — `crates/tsv_css/src/ast/convert/mod.rs`
+- :dir()/:lang()/::highlight() identifier wrapping — `crates/tsv_css/src/ast/convert/mod.rs`
+- Selector-name half-decoding (class/id/type, pseudo-class/element, **and** attribute names) — `raw_selector_name` in `crates/tsv_css/src/ast/convert/mod.rs`
 
 Backslash doubling and unicode-escape duplication are inherited "for free" by extracting raw bytes (`source[span]`) into the public JSON value — Svelte's parser embeds those quirks in its span, so reproducing the bytes reproduces the quirks. No quirk-specific encoder runs.
+
+**Selector-name half-decoding.** Svelte's `read_identifier` decodes a selector name only *half*-way: a **hex** escape (`\3A `, `\1F600`, with an optional single-whitespace terminator) decodes to its codepoint, but an **identity** escape (a backslash before a non-hex char — `\?`, `\@`, `:f\oo`) keeps the backslash. tsv's internal lexer fully decodes (the spec-canonical `<ident-token>` value, e.g. `:f\oo` → `foo`), so the public `name` is reconstructed half-decoded from the raw span by `raw_selector_name` for **every** selector kind — class/id/type, pseudo-class/element, and attribute. (For class/id/type and pseudo names the formatter already emitted the raw source from the span, so formatting was unaffected; **attribute** names additionally needed the formatter fixed — it had reconstructed the selector from the *decoded* `name`, so `[f\oo]` printed as `[foo]` and even `[\41 b]` as `[Ab]`, silently dropping escapes. The internal `Attribute` selector now carries a `name_span` (the name token within `[ns|name op 'value' flags]`); the printer emits it raw and convert half-decodes it, so escapes are preserved in output and the AST matches Svelte.) **Why match the half-form and not the spec:** the public AST's contract is byte-for-byte parity with Svelte's `parseCss` (tsv is a drop-in for it), so where Svelte's scan-based decode diverges from the CSS Syntax spec's full ident decode, tsv mirrors Svelte. Pinned by [css/selectors/escaped_names](../tests/fixtures/css/selectors/escaped_names/) (class/id/type identity escapes), [css/selectors/pseudo_escaped_identity](../tests/fixtures/css/selectors/pseudo_escaped_identity/) (pseudo identity escapes — `:f\oo` → `"f\\oo"`, never `"foo"`), and [css/selectors/attribute/escaped_identity](../tests/fixtures/css/selectors/attribute/escaped_identity/) (attribute names — both the AST half-decode and the formatter preserving the raw escape).
 
 **Block-comment stripping** (added in Svelte 5.55.x): the public `Declaration.value` and `Atrule.prelude` strings have `/* … */` comments removed in place (surrounding whitespace preserved) and the result trimmed. tsv applies this in `strip_css_comments` at the conversion boundary; the helper is string- and `url()`-aware so `/*` sequences inside `"…"`, `'…'`, or `url(…)` are kept verbatim.
 

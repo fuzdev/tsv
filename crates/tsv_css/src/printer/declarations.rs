@@ -18,7 +18,7 @@ impl<'a> Printer<'a> {
     /// comments around it (`blue /* a */ !important /* b */;`) — is invisible to the
     /// value printers. Re-emit it from source here with comments preserved in place
     /// (like prettier) and `!`/`important` normalized to a single ` !important`.
-    fn write_declaration_end(&mut self, decl: &internal::CssDeclaration) {
+    fn write_declaration_end(&mut self, decl: &internal::CssDeclaration<'_>) {
         if decl.is_important() {
             let bytes = self.source.as_bytes();
             let mut i = decl.span.end_usize();
@@ -57,7 +57,7 @@ impl<'a> Printer<'a> {
     /// `write_declaration_end` re-emits both — preserving a comment *after* the bang
     /// (`blue !important /* y */;`) that a hand-rolled synthetic ` !important` would drop.
     /// Shared by the rule and at-rule block loops.
-    pub(super) fn write_format_ignore_declaration(&mut self, decl: &internal::CssDeclaration) {
+    pub(super) fn write_format_ignore_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write_indent();
         self.write(decl.span.extract(self.source));
         self.write_declaration_end(decl);
@@ -70,11 +70,11 @@ impl<'a> Printer<'a> {
     ///
     /// Returns true if any value is a space-separated list (box-shadow, text-shadow, etc.)
     /// Functions are NOT checked here - they use doc-based wrapping with group/softline.
-    fn any_value_needs_own_line(&self, values: &[CssValue]) -> bool {
+    fn any_value_needs_own_line(&self, values: &[CssValue<'_>]) -> bool {
         values.iter().any(|v| matches!(v, CssValue::List { .. }))
     }
 
-    fn should_use_multiline(&self, decl: &internal::CssDeclaration) -> bool {
+    fn should_use_multiline(&self, decl: &internal::CssDeclaration<'_>) -> bool {
         // Only apply to comma-separated values with multiple items
         let values = match &decl.value {
             CssValue::CommaSeparated { values, .. } if values.len() > 1 => values,
@@ -113,7 +113,7 @@ impl<'a> Printer<'a> {
     /// - Long space-separated lists (transform chains, filter chains, etc.)
     ///
     /// Returns (needs_wrapping, is_comma_separated)
-    fn should_wrap_value_width_based(&self, value: &CssValue, property: &str) -> (bool, bool) {
+    fn should_wrap_value_width_based(&self, value: &CssValue<'_>, property: &str) -> (bool, bool) {
         match value {
             CssValue::CommaSeparated { values, .. } => {
                 let doc = self.build_separated_values_doc(values, ", ");
@@ -164,7 +164,7 @@ impl<'a> Printer<'a> {
     fn should_wrap_function_with_offset(
         &self,
         name: &str,
-        args: &[CssValue],
+        args: &[CssValue<'_>],
         context_offset: usize,
     ) -> bool {
         if !has_wrappable_args(args) {
@@ -193,7 +193,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Format a CSS declaration (property: value;)
-    pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration) {
+    pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write_indent();
 
         // Extract property name from source to preserve escape sequences
@@ -207,22 +207,22 @@ impl<'a> Printer<'a> {
         } else if self.should_use_multiline(decl) {
             self.print_decl_multiline(decl);
         } else if let (true, is_comma) =
-            self.should_wrap_value_width_based(&decl.value, &decl.property)
+            self.should_wrap_value_width_based(&decl.value, decl.property)
         {
             self.print_decl_width_wrapped(decl, is_comma);
         } else if let CssValue::Function { name, args, span } = &decl.value {
             self.print_decl_function(decl, decl_source, name, args, *span);
         } else if self.has_value_comments_in_decl(decl) {
             self.print_decl_with_comments(decl, decl_source);
-        } else if let CssValue::String { quote, .. } = &decl.value {
-            self.print_decl_string(decl, decl_source, *quote);
+        } else if matches!(&decl.value, CssValue::String { .. }) {
+            self.print_decl_string(decl, decl_source);
         } else {
             self.print_decl_default(decl, &property_normalized);
         }
     }
 
     /// Print declaration with multiline formatting (structure-based)
-    fn print_decl_multiline(&mut self, decl: &internal::CssDeclaration) {
+    fn print_decl_multiline(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write(":\n");
         self.indent_level += 1;
         self.print_css_value_multiline(&decl.value);
@@ -231,7 +231,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print declaration with width-based wrapping
-    fn print_decl_width_wrapped(&mut self, decl: &internal::CssDeclaration, is_comma: bool) {
+    fn print_decl_width_wrapped(&mut self, decl: &internal::CssDeclaration<'_>, is_comma: bool) {
         if is_comma {
             // Comma-separated: property:\n\titem1, item2
             self.write(":\n");
@@ -251,10 +251,10 @@ impl<'a> Printer<'a> {
     /// Print declaration with function value
     fn print_decl_function(
         &mut self,
-        decl: &internal::CssDeclaration,
+        decl: &internal::CssDeclaration<'_>,
         decl_source: &str,
         name: &str,
-        args: &[CssValue],
+        args: &[CssValue<'_>],
         span: tsv_lang::Span,
     ) {
         let has_comments = self.has_value_comments_in_decl(decl);
@@ -271,10 +271,10 @@ impl<'a> Printer<'a> {
     /// Check if a function needs wrapping
     fn function_needs_wrapping(
         &self,
-        decl: &internal::CssDeclaration,
+        decl: &internal::CssDeclaration<'_>,
         has_comments: bool,
         name: &str,
-        args: &[CssValue],
+        args: &[CssValue<'_>],
         span: tsv_lang::Span,
     ) -> bool {
         if has_comments {
@@ -292,10 +292,10 @@ impl<'a> Printer<'a> {
     /// Print wrapped function: func(\n\targ1,\n\targ2\n)
     fn print_wrapped_function(
         &mut self,
-        decl: &internal::CssDeclaration,
+        decl: &internal::CssDeclaration<'_>,
         has_comments: bool,
         name: &str,
-        args: &[CssValue],
+        args: &[CssValue<'_>],
     ) {
         self.write(": ");
         self.write(name);
@@ -315,7 +315,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print function args with semantic formatting and wrapping
-    fn print_function_args_semantic_wrapped(&mut self, args: &[CssValue]) {
+    fn print_function_args_semantic_wrapped(&mut self, args: &[CssValue<'_>]) {
         for (i, arg) in args.iter().enumerate() {
             self.write_indent();
             if let CssValue::List { values, .. } = arg
@@ -335,7 +335,12 @@ impl<'a> Printer<'a> {
     }
 
     /// Print inline function (no wrapping)
-    fn print_inline_function(&mut self, decl_source: &str, has_comments: bool, value: &CssValue) {
+    fn print_inline_function(
+        &mut self,
+        decl_source: &str,
+        has_comments: bool,
+        value: &CssValue<'_>,
+    ) {
         self.write(": ");
         if has_comments
             && let Some(normalized) = value_normalization::extract_value_with_comments(decl_source)
@@ -347,7 +352,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print declaration with comments in value (non-function)
-    fn print_decl_with_comments(&mut self, decl: &internal::CssDeclaration, decl_source: &str) {
+    fn print_decl_with_comments(&mut self, decl: &internal::CssDeclaration<'_>, decl_source: &str) {
         self.write(": ");
         if let Some(normalized) = value_normalization::extract_value_with_comments(decl_source) {
             self.write(&normalized);
@@ -358,12 +363,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Print declaration with string value
-    fn print_decl_string(
-        &mut self,
-        decl: &internal::CssDeclaration,
-        decl_source: &str,
-        quote: char,
-    ) {
+    fn print_decl_string(&mut self, decl: &internal::CssDeclaration<'_>, decl_source: &str) {
+        // The original quote is the first byte of the string value's span (recovered
+        // from source, not stored).
+        let quote = self.source.as_bytes()[decl.value.span().start_usize()] as char;
         self.write(": ");
         if let Some(formatted) = value_normalization::extract_string_value(decl_source, quote) {
             self.write(&formatted);
@@ -375,7 +378,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print declaration with default formatting
-    fn print_decl_default(&mut self, decl: &internal::CssDeclaration, property: &str) {
+    fn print_decl_default(&mut self, decl: &internal::CssDeclaration<'_>, property: &str) {
         // Property with comment: `color /* comment */` → ` : `
         // Property without comment: `color` → `: `
         if property.contains("/*") {
@@ -387,7 +390,7 @@ impl<'a> Printer<'a> {
         // separator already supplies the single space, so emit `!important` without the
         // extra leading space `write_declaration_end` adds — avoids `--a:  !important;`.
         if decl.is_important()
-            && matches!(&decl.value, CssValue::Identifier { name, .. } if name.is_empty())
+            && matches!(&decl.value, CssValue::Identifier { span } if span.extract(self.source).trim().is_empty())
         {
             self.write("!important;\n");
             return;
@@ -403,8 +406,8 @@ impl<'a> Printer<'a> {
     /// (comma-separated-value-group.js lines 421-436): if consecutive values
     /// are on different source lines, wrap each to its own line.
     /// Properties: `grid-template-areas`, `grid-template*`, `grid`
-    fn is_grid_multirow_value(&self, decl: &internal::CssDeclaration) -> bool {
-        let prop = &decl.property;
+    fn is_grid_multirow_value(&self, decl: &internal::CssDeclaration<'_>) -> bool {
+        let prop = decl.property;
         let is_grid_prop = prop == "grid" || prop.starts_with("grid-template");
         if !is_grid_prop {
             return false;
@@ -433,7 +436,7 @@ impl<'a> Printer<'a> {
     /// Print grid property with multiple row strings, one per line
     ///
     /// Format: `property:\n\t'row1'\n\t'row2'\n\t'row3';`
-    fn print_decl_grid_multirow(&mut self, decl: &internal::CssDeclaration) {
+    fn print_decl_grid_multirow(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write(":\n");
         if let CssValue::List { values, .. } = &decl.value {
             self.indent_level += 1;
@@ -456,7 +459,7 @@ impl<'a> Printer<'a> {
     ///
     /// Exception: Properties with space-separated items (like box-shadow, text-shadow)
     /// or wrappable functions (like gradients) use true one-per-line formatting.
-    fn print_css_value_multiline(&mut self, value: &CssValue) {
+    fn print_css_value_multiline(&mut self, value: &CssValue<'_>) {
         let CssValue::CommaSeparated { values, .. } = value else {
             // Fallback to regular formatting
             self.print_nested_value(value);
@@ -499,7 +502,7 @@ impl<'a> Printer<'a> {
     /// Breaks long comma-separated lists intelligently to fit within print width.
     /// Uses doc::fill() for greedy packing (pack as many items per line as fit).
     /// Pattern: property:\n\titem1, item2,\n\titem3;
-    fn print_comma_list_wrapped(&mut self, value: &CssValue) {
+    fn print_comma_list_wrapped(&mut self, value: &CssValue<'_>) {
         let CssValue::CommaSeparated { values, .. } = value else {
             self.print_nested_value(value);
             return;
@@ -523,7 +526,7 @@ impl<'a> Printer<'a> {
     /// `group(indent(fill([sub1, line, sub2, ...])))` so fill can break within
     /// items with continuation indent. This matches prettier's
     /// `printCommaSeparatedValueGroup` which returns `group(indent(fill(parts)))`.
-    fn build_comma_fill_doc(&self, values: &[CssValue]) -> DocId {
+    fn build_comma_fill_doc(&self, values: &[CssValue<'_>]) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
         for (i, val) in values.iter().enumerate() {
@@ -565,7 +568,7 @@ impl<'a> Printer<'a> {
     /// Uses doc::fill() for greedy packing (pack as many items per line as fit).
     /// Pattern: property: item1 item2\n\titem3;
     /// Note: First line stays inline with property, subsequent lines are indented
-    fn print_space_list_wrapped(&mut self, value: &CssValue) {
+    fn print_space_list_wrapped(&mut self, value: &CssValue<'_>) {
         let CssValue::List { values, .. } = value else {
             self.print_nested_value(value);
             return;
@@ -583,7 +586,7 @@ impl<'a> Printer<'a> {
     ///
     /// Returns `[val1, line, val2, line, val3]` — suitable for `d.fill()`.
     /// Used by both declaration wrapping and function arg wrapping.
-    pub(super) fn build_space_fill_parts(&self, values: &[CssValue]) -> Vec<DocId> {
+    pub(super) fn build_space_fill_parts(&self, values: &[CssValue<'_>]) -> Vec<DocId> {
         let d = self.d();
         let mut parts = Vec::with_capacity(values.len() * 2);
         for (i, val) in values.iter().enumerate() {
@@ -602,7 +605,7 @@ impl<'a> Printer<'a> {
     /// - When broken: `item1 item2\n  item3 item4\n  item5`
     ///
     /// `trailing_reserve` accounts for characters after the list (comma, semicolon).
-    fn build_space_fill_doc(&self, values: &[CssValue], trailing_reserve: usize) -> DocId {
+    fn build_space_fill_doc(&self, values: &[CssValue<'_>], trailing_reserve: usize) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
         let context = DocContext {
@@ -617,7 +620,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used to decide whether to use continuation-based fill printing.
     /// `trailing_reserve` accounts for characters after the list (comma, paren, semicolon).
-    fn space_list_exceeds_width(&self, values: &[CssValue], trailing_reserve: usize) -> bool {
+    fn space_list_exceeds_width(&self, values: &[CssValue<'_>], trailing_reserve: usize) -> bool {
         let list_doc = self.build_separated_values_doc(values, " ");
         let available = doc::available_width(self.effective_indent(), 0, trailing_reserve);
         !doc::arena_fits::<dyn doc::TextResolver>(
@@ -635,9 +638,9 @@ impl<'a> Printer<'a> {
     /// Extracts each argument from the source string to preserve comments.
     fn print_function_args_from_source(
         &mut self,
-        decl: &internal::CssDeclaration,
+        decl: &internal::CssDeclaration<'_>,
         func_name: &str,
-        args: &[CssValue],
+        args: &[CssValue<'_>],
     ) {
         let decl_source = decl.span.extract(self.source);
 
@@ -737,7 +740,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print function arguments semantically (fallback when source extraction fails)
-    fn print_function_args_semantic(&mut self, args: &[CssValue]) {
+    fn print_function_args_semantic(&mut self, args: &[CssValue<'_>]) {
         for (i, arg) in args.iter().enumerate() {
             self.write_indent();
             self.print_nested_value(arg);

@@ -36,6 +36,10 @@ parse = [
 tsv_svelte.workspace = true
 tsv_ts.workspace = true
 tsv_css.workspace = true
+tsv_lang.workspace = true
+# Bump arena for the per-call AST (caller-owns-Bump): each entry point creates a
+# local Bump, parses into it, and returns an owned String — the arena never escapes.
+bumpalo.workspace = true
 # gitignore-style discovery matcher, exposed as `IgnoreStack` for the JS CLI
 # and VS Code extension. Format-only — pulled in by the `format` feature.
 tsv_ignore = { workspace = true, optional = true }

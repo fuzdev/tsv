@@ -5,6 +5,8 @@
 
 use crate::ast::internal::CssValue;
 use crate::parser::value::cursor::ValueCursor;
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 
 /// Position-tracking parser for CSS values
@@ -120,25 +122,24 @@ impl<'a> ValueParser<'a> {
     /// Main parse entry point
     ///
     /// Determines the type of value and delegates to appropriate parser.
-    pub fn parse(&self) -> CssValue {
+    pub fn parse<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
         let trimmed = text.trim();
 
         // Empty value
         if trimmed.is_empty() {
             return CssValue::Identifier {
-                name: String::new(),
                 span: self.absolute_span(),
             };
         }
 
         // Check what kind of value we have (use trimmed for detection)
         if super::lists::contains_comma(trimmed) {
-            self.parse_comma_separated()
+            self.parse_comma_separated(arena)
         } else if super::lists::contains_space_separator(trimmed) {
-            self.parse_space_separated()
+            self.parse_space_separated(arena)
         } else {
-            self.parse_single()
+            self.parse_single(arena)
         }
     }
 
@@ -146,10 +147,10 @@ impl<'a> ValueParser<'a> {
     ///
     /// Uses same-source recursion - all parsed values point to ranges
     /// in the SAME source string, avoiding position drift.
-    fn parse_comma_separated(&self) -> CssValue {
+    fn parse_comma_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
         let mut cursor = ValueCursor::new(text);
-        let mut values = Vec::new();
+        let mut values = BumpVec::new_in(arena);
 
         loop {
             cursor.skip_whitespace();
@@ -163,7 +164,7 @@ impl<'a> ValueParser<'a> {
             if value_end > value_start {
                 // Non-empty value
                 let sub_parser = self.sub_parser(value_start, value_end);
-                values.push(sub_parser.parse()); // Recursive, but same source!
+                values.push(sub_parser.parse(arena)); // Recursive, but same source!
             }
 
             cursor.set_position(value_end_raw);
@@ -173,7 +174,7 @@ impl<'a> ValueParser<'a> {
         }
 
         CssValue::CommaSeparated {
-            values,
+            values: values.into_bump_slice(),
             span: self.absolute_span(),
         }
     }
@@ -182,10 +183,10 @@ impl<'a> ValueParser<'a> {
     ///
     /// Uses same-source recursion - all parsed values point to ranges
     /// in the SAME source string, avoiding position drift.
-    fn parse_space_separated(&self) -> CssValue {
+    fn parse_space_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
         let mut cursor = ValueCursor::new(text);
-        let mut values = Vec::new();
+        let mut values = BumpVec::new_in(arena);
 
         loop {
             cursor.skip_whitespace();
@@ -199,7 +200,7 @@ impl<'a> ValueParser<'a> {
             if value_end > value_start {
                 // Non-empty value
                 let sub_parser = self.sub_parser(value_start, value_end);
-                values.push(sub_parser.parse()); // Recursive, but same source!
+                values.push(sub_parser.parse(arena)); // Recursive, but same source!
             }
 
             cursor.set_position(value_end_raw);
@@ -207,7 +208,7 @@ impl<'a> ValueParser<'a> {
         }
 
         CssValue::List {
-            values,
+            values: values.into_bump_slice(),
             span: self.absolute_span(),
         }
     }
@@ -216,15 +217,13 @@ impl<'a> ValueParser<'a> {
     ///
     /// Delegates to existing single-value parsers.
     /// Trims whitespace before parsing.
-    fn parse_single(&self) -> CssValue {
+    fn parse_single<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text().trim();
         let span = self.absolute_span();
 
-        // Delegate to existing single-value parsers
-        super::parse_single_value(text, span).unwrap_or_else(|| CssValue::Identifier {
-            name: text.to_string(),
-            span,
-        })
+        // Delegate to existing single-value parsers (identifier text recovered from
+        // `span` at print time, so the fallback stores no copied string).
+        super::parse_single_value(text, span, arena).unwrap_or(CssValue::Identifier { span })
     }
 }
 
@@ -383,10 +382,11 @@ mod tests {
         let span = Span { start: 0, end: 4 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::Identifier { .. }));
-        if let CssValue::Identifier { name, .. } = value {
-            assert_eq!(name, "auto");
+        if let CssValue::Identifier { span } = value {
+            assert_eq!(span.extract(source), "auto");
         }
     }
 
@@ -399,7 +399,8 @@ mod tests {
         };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
             assert_eq!(values.len(), 3);
@@ -412,7 +413,8 @@ mod tests {
         let span = Span { start: 0, end: 14 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::List { .. }));
         if let CssValue::List { values, .. } = value {
             assert_eq!(values.len(), 3);
@@ -429,7 +431,8 @@ mod tests {
         };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
             assert_eq!(values.len(), 2);
@@ -446,7 +449,8 @@ mod tests {
         let span = Span { start: 0, end: 28 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::List { .. }));
         if let CssValue::List { values, .. } = value {
             assert_eq!(values.len(), 4); // "0", "2px", "4px", "rgba(...)"
@@ -462,7 +466,8 @@ mod tests {
         let span = Span { start: 0, end: 42 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::Function { .. }));
         if let CssValue::Function { name, args, .. } = value {
             assert_eq!(name, "linear-gradient");
@@ -478,7 +483,8 @@ mod tests {
         let span = Span { start: 0, end: 4 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
             // Empty values should be skipped
@@ -492,7 +498,8 @@ mod tests {
         let span = Span { start: 0, end: 14 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
             assert_eq!(values.len(), 2);
@@ -506,10 +513,11 @@ mod tests {
         let span = Span { start: 0, end: 8 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::Identifier { .. }));
-        if let CssValue::Identifier { name, .. } = value {
-            assert_eq!(name, "auto");
+        if let CssValue::Identifier { span } = value {
+            assert_eq!(span.extract(source).trim(), "auto");
         }
     }
 
@@ -535,7 +543,8 @@ mod tests {
         let span = Span { start: 0, end: 7 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
 
         if let CssValue::CommaSeparated { values, .. } = value {
@@ -560,7 +569,8 @@ mod tests {
         let span = Span { start: 0, end: 63 };
         let parser = ValueParser::new(source, span);
 
-        let value = parser.parse();
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
 
         if let CssValue::CommaSeparated { values, .. } = value {

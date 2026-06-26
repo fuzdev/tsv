@@ -22,7 +22,7 @@ use tsv_lang::{InfallibleResolve, LocationTracker, Span};
 /// clause, but emits `[]` for an empty `with {}`. Shared by the import and the
 /// two re-export hosts.
 fn convert_attributes(
-    attributes: Option<&[internal::ImportAttribute]>,
+    attributes: Option<&[internal::ImportAttribute<'_>]>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -59,7 +59,7 @@ fn find_export_start(source: &str, span_start: u32, offset: usize) -> u32 {
 
 /// Main statement conversion dispatcher
 pub(in crate::ast) fn convert_statement(
-    stmt: &internal::Statement,
+    stmt: &internal::Statement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -135,7 +135,7 @@ pub(in crate::ast) fn convert_statement(
             };
             // `attributes`: see `convert_attributes` (None = no `with` clause).
             let attributes = convert_attributes(
-                export_decl.attributes.as_deref(),
+                export_decl.attributes,
                 source,
                 loc,
                 interner,
@@ -143,7 +143,7 @@ pub(in crate::ast) fn convert_statement(
                 schema,
             );
             let export_start = if let Some(internal::Statement::ClassDeclaration(class)) =
-                export_decl.declaration.as_deref()
+                export_decl.declaration
             {
                 if class.decorators.is_some() {
                     find_export_start(source, export_decl.span.start, offset)
@@ -224,7 +224,7 @@ pub(in crate::ast) fn convert_statement(
             };
             // `attributes`: see `convert_attributes` (None = no `with` clause).
             let attributes = convert_attributes(
-                export_decl.attributes.as_deref(),
+                export_decl.attributes,
                 source,
                 loc,
                 interner,
@@ -272,7 +272,7 @@ pub(in crate::ast) fn convert_statement(
                 internal::ImportKind::Type => Some("type".to_string()),
             };
             let attributes = convert_attributes(
-                import_decl.attributes.as_deref(),
+                import_decl.attributes,
                 source,
                 loc,
                 interner,
@@ -382,7 +382,7 @@ pub(in crate::ast) fn convert_statement(
 
 /// Convert TypeScript module/namespace declaration
 pub(in crate::ast) fn convert_module_declaration(
-    decl: &internal::TSModuleDeclaration,
+    decl: &internal::TSModuleDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -405,7 +405,7 @@ pub(in crate::ast) fn convert_module_declaration(
 
 /// Convert module/namespace name (identifier or string literal)
 fn convert_module_name(
-    name: &internal::TSModuleName,
+    name: &internal::TSModuleName<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -423,7 +423,7 @@ fn convert_module_name(
 
 /// Convert module declaration body
 fn convert_module_declaration_body(
-    body: &internal::TSModuleDeclarationBody,
+    body: &internal::TSModuleDeclarationBody<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -445,7 +445,7 @@ fn convert_module_declaration_body(
 
 /// Convert module block
 fn convert_module_block(
-    block: &internal::TSModuleBlock,
+    block: &internal::TSModuleBlock<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -466,7 +466,7 @@ fn convert_module_block(
 }
 
 pub(in crate::ast) fn convert_block_statement(
-    block: &internal::BlockStatement,
+    block: &internal::BlockStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -487,7 +487,7 @@ pub(in crate::ast) fn convert_block_statement(
 }
 
 pub fn convert_variable_declaration(
-    var_decl: &internal::VariableDeclaration,
+    var_decl: &internal::VariableDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -509,7 +509,7 @@ pub fn convert_variable_declaration(
 }
 
 pub(in crate::ast) fn convert_variable_declarator(
-    declarator: &internal::VariableDeclarator,
+    declarator: &internal::VariableDeclarator<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -531,7 +531,7 @@ pub(in crate::ast) fn convert_variable_declarator(
 }
 
 pub(in crate::ast) fn convert_identifier(
-    id: &internal::Identifier,
+    id: &internal::Identifier<'_>,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -549,7 +549,7 @@ pub(in crate::ast) fn convert_identifier(
 }
 
 fn convert_import_equals_declaration(
-    decl: &internal::TSImportEqualsDeclaration,
+    decl: &internal::TSImportEqualsDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -577,7 +577,7 @@ fn convert_import_equals_declaration(
 }
 
 fn convert_module_reference(
-    module_ref: &internal::TSModuleReference,
+    module_ref: &internal::TSModuleReference<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

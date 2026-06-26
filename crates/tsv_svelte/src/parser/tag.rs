@@ -9,11 +9,11 @@ use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 
-impl<'a> SvelteParser<'a> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a template tag starting with {@
     ///
     /// Dispatches to specific tag parsers based on the keyword.
-    pub(crate) fn parse_template_tag(&mut self) -> Result<FragmentNode, ParseError> {
+    pub(crate) fn parse_template_tag(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
         let start = self.current_start;
 
         // We're at {@, consume it
@@ -34,7 +34,7 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse an html tag: {@html expression}
-    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_html_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -59,7 +59,7 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse a const tag: {@const name = expression}
-    fn parse_const_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_const_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -119,7 +119,7 @@ impl<'a> SvelteParser<'a> {
     /// At a `{` (`LeftBrace`), parse either a `{const}`/`{let}` declaration tag
     /// or an ordinary `{expr}` mustache, whichever the lookahead indicates.
     /// Shared by the root, element-children, and block-children fragment loops.
-    pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode, ParseError> {
+    pub(crate) fn parse_brace_tag(&mut self) -> Result<FragmentNode<'arena>, ParseError> {
         if self.opens_declaration_tag() {
             self.parse_declaration_tag(self.current_start)
         } else {
@@ -135,7 +135,7 @@ impl<'a> SvelteParser<'a> {
     pub(crate) fn parse_declaration_tag(
         &mut self,
         start: usize,
-    ) -> Result<FragmentNode, ParseError> {
+    ) -> Result<FragmentNode<'arena>, ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -190,7 +190,7 @@ impl<'a> SvelteParser<'a> {
         decl_str: &'a str,
         decl_offset: usize,
         eq_pos: usize,
-    ) -> Result<(tsv_ts::Expression, tsv_ts::Expression), ParseError> {
+    ) -> Result<(tsv_ts::Expression<'arena>, tsv_ts::Expression<'arena>), ParseError> {
         let id_str = decl_str[..eq_pos].trim();
         let init_str = decl_str[eq_pos + 1..].trim();
 
@@ -221,7 +221,7 @@ impl<'a> SvelteParser<'a> {
     ///
     /// Unlike Prettier (which strips comments), we preserve TS comments in debug tags.
     /// Comments are extracted and stored in Root.comments for lookup by span.
-    fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_debug_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 
@@ -242,7 +242,7 @@ impl<'a> SvelteParser<'a> {
         // Returns content with comments replaced by spaces (positions preserved)
         let cleaned_idents = self.extract_ts_comments(idents_str, idents_offset);
 
-        let mut identifiers = Vec::new();
+        let mut identifiers = self.bvec();
         if !cleaned_idents.trim().is_empty() {
             // Parse comma-separated identifiers from the cleaned content
             // Since comments are replaced with equal-length spaces, positions are preserved
@@ -263,7 +263,7 @@ impl<'a> SvelteParser<'a> {
         let end = after_close;
 
         Ok(FragmentNode::DebugTag(DebugTag {
-            identifiers,
+            identifiers: identifiers.into_bump_slice(),
             span: Span {
                 start: start as u32,
                 end: end as u32,
@@ -272,7 +272,7 @@ impl<'a> SvelteParser<'a> {
     }
 
     /// Parse a render tag: {@render fn()} or {@render fn?.()}
-    fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode, ParseError> {
+    fn parse_render_tag(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         let tag_content_start = self.current_end;
         let (tag_content, after_close) = self.scan_block_tag_content(tag_content_start)?;
 

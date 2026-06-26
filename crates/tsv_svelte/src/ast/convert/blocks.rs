@@ -14,7 +14,7 @@ use tsv_lang::LocationTracker;
 use super::{convert_fragment, convert_pattern_expression};
 
 pub(super) fn convert_if_block(
-    block: &internal::IfBlock,
+    block: &internal::IfBlock<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -36,7 +36,7 @@ pub(super) fn convert_if_block(
 }
 
 pub(super) fn convert_each_block(
-    block: &internal::EachBlock,
+    block: &internal::EachBlock<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -59,7 +59,7 @@ pub(super) fn convert_each_block(
         expression,
         body: convert_fragment(&block.body, source, loc, interner),
         context,
-        index: block.index.clone(),
+        index: block.index.map(str::to_string),
         key,
         fallback: block
             .fallback
@@ -69,7 +69,7 @@ pub(super) fn convert_each_block(
 }
 
 pub(super) fn convert_await_block(
-    block: &internal::AwaitBlock,
+    block: &internal::AwaitBlock<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -110,7 +110,7 @@ pub(super) fn convert_await_block(
 }
 
 pub(super) fn convert_key_block(
-    block: &internal::KeyBlock,
+    block: &internal::KeyBlock<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -128,7 +128,7 @@ pub(super) fn convert_key_block(
 }
 
 pub(super) fn convert_snippet_block(
-    block: &internal::SnippetBlock,
+    block: &internal::SnippetBlock<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -150,6 +150,6 @@ pub(super) fn convert_snippet_block(
         expression,
         parameters,
         body: convert_fragment(&block.body, source, loc, interner),
-        type_params: block.type_params_raw.clone(),
+        type_params: block.type_params_raw.map(str::to_string),
     }
 }

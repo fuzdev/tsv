@@ -14,7 +14,7 @@ use tsv_lang::source_scan::skip_comment;
 ///
 /// Block, expression, break, continue, return, throw, and empty statements stay inline.
 /// Other statements (if, for, while, etc.) go on a new line with indent.
-fn is_inline_consequent(stmt: &Statement) -> bool {
+fn is_inline_consequent(stmt: &Statement<'_>) -> bool {
     matches!(
         stmt,
         Statement::BlockStatement(_)
@@ -30,7 +30,7 @@ fn is_inline_consequent(stmt: &Statement) -> bool {
 /// Check if a statement can be printed inline after `else` without a newline.
 ///
 /// Same as `is_inline_consequent` but also allows IfStatement for else-if chains.
-fn is_inline_alternate(stmt: &Statement) -> bool {
+fn is_inline_alternate(stmt: &Statement<'_>) -> bool {
     is_inline_consequent(stmt) || matches!(stmt, Statement::IfStatement(_))
 }
 
@@ -43,7 +43,7 @@ impl<'a> Printer<'a> {
     fn append_else_body_doc(
         &self,
         parts: &mut DocBuf,
-        alternate: &Statement,
+        alternate: &Statement<'_>,
         comment_forced: bool,
     ) {
         if let Statement::BlockStatement(block) = alternate {
@@ -60,7 +60,7 @@ impl<'a> Printer<'a> {
     ///
     /// Handles EmptyStatement alternate (`else;`), inline alternate (`else expr;`),
     /// block alternate (`else { ... }`), and non-inline alternate (indented).
-    fn append_newline_else_clause(&self, parts: &mut DocBuf, alternate: &Statement) {
+    fn append_newline_else_clause(&self, parts: &mut DocBuf, alternate: &Statement<'_>) {
         let d = self.d();
         parts.push(d.hardline());
         if matches!(alternate, Statement::EmptyStatement(_)) {
@@ -87,7 +87,7 @@ impl<'a> Printer<'a> {
     fn build_head_body_else_clause(
         &self,
         parts: &mut DocBuf,
-        alternate: &Statement,
+        alternate: &Statement<'_>,
         consequent_end: u32,
     ) {
         let d = self.d();
@@ -177,7 +177,7 @@ impl<'a> Printer<'a> {
     ///   adjustClause(consequent),  // body handling
     /// ])
     /// ```
-    fn build_if_statement_with_wrapping_doc(&self, stmt: &internal::IfStatement) -> DocId {
+    fn build_if_statement_with_wrapping_doc(&self, stmt: &internal::IfStatement<'_>) -> DocId {
         let d = self.d();
         // Find paren positions for comment handling
         let open_paren = self.find_open_paren_after(stmt.span.start);
@@ -195,7 +195,7 @@ impl<'a> Printer<'a> {
             self.build_condition_group(&stmt.test)
         };
 
-        if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
+        if let Statement::BlockStatement(block) = stmt.consequent {
             // Block consequent: group(["if (" + condition + ") " + block])
             // Outer group controls whether the whole if statement breaks
             let mut parts = smallvec![d.text("if")];
@@ -218,7 +218,7 @@ impl<'a> Printer<'a> {
 
             // Outer group for the whole if statement
             d.group(d.concat(&parts))
-        } else if matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
+        } else if matches!(stmt.consequent, Statement::EmptyStatement(_)) {
             // Empty statement: `if (cond);` or `if (cond) /* comment */ ;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let empty_start = stmt.consequent.span().start;
@@ -248,7 +248,7 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `if (cond)\n\ta;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.consequent.span().start;
-            let consequent_doc = self.build_statement_doc(&stmt.consequent);
+            let consequent_doc = self.build_statement_doc(stmt.consequent);
 
             let mut head_parts: DocBuf = smallvec![d.text("if")];
             if let Some(kc) = keyword_comments {
@@ -276,7 +276,7 @@ impl<'a> Printer<'a> {
 
     pub(in crate::printer::statements) fn build_if_statement_doc(
         &self,
-        stmt: &internal::IfStatement,
+        stmt: &internal::IfStatement<'_>,
     ) -> DocId {
         // Check for comments between consequent and alternate that need special handling
         let has_if_else_comments = stmt.alternate.as_ref().is_some_and(|alt| {
@@ -295,7 +295,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build if statement doc with comments between consequent and alternate
-    fn build_if_statement_with_comments_doc(&self, stmt: &internal::IfStatement) -> DocId {
+    fn build_if_statement_with_comments_doc(&self, stmt: &internal::IfStatement<'_>) -> DocId {
         let d = self.d();
         // Build condition group (same as build_if_statement_with_wrapping_doc)
         let open_paren = self.find_open_paren_after(stmt.span.start);
@@ -317,16 +317,16 @@ impl<'a> Printer<'a> {
 
         // Build consequent (with head-body comment extraction)
         let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
-        if let Statement::BlockStatement(block) = stmt.consequent.as_ref() {
+        if let Statement::BlockStatement(block) = stmt.consequent {
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
             parts.push(self.build_block_statement_expand_empty_doc(block));
-        } else if matches!(stmt.consequent.as_ref(), Statement::EmptyStatement(_)) {
+        } else if matches!(stmt.consequent, Statement::EmptyStatement(_)) {
             let empty_start = stmt.consequent.span().start;
             self.append_close_paren_empty_stmt_with_comments(&mut parts, paren_end, empty_start);
         } else {
             // Non-block consequent: handle head-body comments between ) and body
             let body_start = stmt.consequent.span().start;
-            let consequent_doc = self.build_statement_doc(&stmt.consequent);
+            let consequent_doc = self.build_statement_doc(stmt.consequent);
 
             if self.has_comments_between(paren_end, body_start) {
                 let has_line = self.has_line_comments_between(paren_end, body_start);
@@ -348,7 +348,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(" "));
                     parts.push(consequent_doc);
                 }
-            } else if is_inline_consequent(&stmt.consequent) {
+            } else if is_inline_consequent(stmt.consequent) {
                 parts.push(d.text(") "));
                 parts.push(consequent_doc);
             } else {
@@ -386,14 +386,13 @@ impl<'a> Printer<'a> {
                 );
 
                 let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
-                let is_block_consequent =
-                    matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_));
+                let is_block_consequent = matches!(stmt.consequent, Statement::BlockStatement(_));
                 if is_block_consequent && all_own_line.is_empty() && !has_inline_line_comment {
                     parts.push(d.text(" "));
                 } else {
                     parts.push(d.hardline());
                 }
-            } else if matches!(stmt.consequent.as_ref(), Statement::BlockStatement(_)) {
+            } else if matches!(stmt.consequent, Statement::BlockStatement(_)) {
                 // Block body: `} else` on same line
                 parts.push(d.text(" "));
             } else {
@@ -402,7 +401,7 @@ impl<'a> Printer<'a> {
             }
 
             // Comments between "else" and alternate body
-            if matches!(alternate.as_ref(), Statement::EmptyStatement(_)) {
+            if matches!(alternate, Statement::EmptyStatement(_)) {
                 // Empty alternate: `else;`, `else /* c */ ;`, or `else // c\n;`
                 if let Some(else_e) = else_end
                     && self.has_comments_between(else_e, alternate_start)
@@ -426,7 +425,7 @@ impl<'a> Printer<'a> {
             {
                 let has_line = self.has_line_comments_between(else_e, alternate_start);
                 let is_non_block_non_if = !matches!(
-                    alternate.as_ref(),
+                    alternate,
                     Statement::BlockStatement(_) | Statement::IfStatement(_)
                 );
                 parts.push(d.text("else"));

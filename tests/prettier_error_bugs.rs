@@ -40,7 +40,8 @@ async fn assert_prettier_errors_ours_stable(input: &str) {
          promote this case into a fixture: {prettier_result:?}"
     );
 
-    let ast = tsv_svelte::parse(input).expect("parse failed");
+    let arena = bumpalo::Bump::new();
+    let ast = tsv_svelte::parse(input, &arena).expect("parse failed");
     let output = tsv_svelte::format(&ast, input);
     assert_eq!(output, input, "Our printer should keep the input stable");
 }

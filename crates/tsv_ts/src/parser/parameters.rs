@@ -6,12 +6,12 @@ use tsv_lang::{ParseError, Span};
 
 use super::Parser;
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse a simple parameter: identifier with optional `?`, type annotation, and default value.
     ///
     /// Accepts both regular identifiers and contextual keywords (`from`, `as`, etc.).
     /// Does NOT handle parameter property modifiers (`public`, `private`, `readonly`).
-    fn parse_simple_param(&mut self) -> Result<Expression, ParseError> {
+    fn parse_simple_param(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (param_start, param_end) = self.current_pos();
         let symbol = self
             .try_intern_param_name()
@@ -36,11 +36,19 @@ impl<'a> Parser<'a> {
             (None, param_end)
         };
 
+        // Build binding extra only when a type annotation is present (decorators,
+        // if any, are attached later by the parameter-list caller).
+        let extra = type_annotation.map(|ta| {
+            self.alloc(IdentifierParamExtra {
+                type_annotation: Some(ta),
+                decorators: None,
+            })
+        });
+
         let mut param = Expression::Identifier(Identifier {
             name: symbol,
             optional,
-            type_annotation,
-            decorators: None,
+            extra,
             span: Span::new(param_start as u32, id_end as u32),
         });
 
@@ -51,12 +59,46 @@ impl<'a> Parser<'a> {
             // prev_token_end covers a parenthesized default's closing `)`
             let assign_end = self.prev_token_end() as u32;
             param = Expression::AssignmentPattern(AssignmentPattern {
-                left: Box::new(param),
-                right: Box::new(default_value),
+                left: self.alloc(param),
+                right: self.alloc(default_value),
                 span: Span::new(param_start as u32, assign_end),
             });
         }
         Ok(param)
+    }
+
+    /// Attach parameter decorators to the binding identifier of a freshly-parsed
+    /// parameter, merging them into the identifier's `extra` (preserving any type
+    /// annotation already present). The identifier may be the parameter directly
+    /// or the `left` of an `AssignmentPattern` default (`@dec x = 1`).
+    fn attach_param_decorators(
+        &self,
+        mut param: Expression<'arena>,
+        decorators: &'arena [Decorator<'arena>],
+    ) -> Expression<'arena> {
+        let arena = self.arena;
+        match &mut param {
+            Expression::Identifier(id) => {
+                let type_annotation = id.type_annotation().cloned();
+                id.extra = Some(arena.alloc(IdentifierParamExtra {
+                    type_annotation,
+                    decorators: Some(decorators),
+                }));
+                param
+            }
+            Expression::AssignmentPattern(ap) => {
+                if let Expression::Identifier(id) = ap.left {
+                    let mut new_id = id.clone();
+                    new_id.extra = Some(arena.alloc(IdentifierParamExtra {
+                        type_annotation: id.type_annotation().cloned(),
+                        decorators: Some(decorators),
+                    }));
+                    ap.left = arena.alloc(Expression::Identifier(new_id));
+                }
+                param
+            }
+            _ => param,
+        }
     }
 
     /// Parse a destructuring binding (`[a, b]` / `{a, b}`) with an optional
@@ -64,7 +106,7 @@ impl<'a> Parser<'a> {
     ///
     /// Current token must be `[` or `{`. Shared by parameter lists and
     /// variable declarators; default values are handled by the caller.
-    pub(super) fn parse_destructured_binding(&mut self) -> Result<Expression, ParseError> {
+    pub(super) fn parse_destructured_binding(&mut self) -> Result<Expression<'arena>, ParseError> {
         let expr = if self.check(&TokenKind::BracketOpen) {
             self.parse_array_expression()?
         } else {
@@ -95,10 +137,12 @@ impl<'a> Parser<'a> {
     ///
     /// Used by function declarations, method shorthand, and arrow functions.
     /// Consumes both opening and closing parentheses.
-    pub(super) fn parse_parameter_list(&mut self) -> Result<Vec<Expression>, ParseError> {
+    pub(super) fn parse_parameter_list(
+        &mut self,
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
         self.expect(&TokenKind::ParenOpen)?;
 
-        let mut params = Vec::new();
+        let mut params = self.bvec();
         if !self.check(&TokenKind::ParenClose) {
             loop {
                 // Parse parameter: identifier, array pattern, or object pattern
@@ -106,7 +150,7 @@ impl<'a> Parser<'a> {
                     // Parameter decorators: @dec1 @dec2 identifier
                     TokenKind::At => {
                         // Parse decorators
-                        let mut decorators = Vec::new();
+                        let mut decorators = self.bvec();
                         while self.check(&TokenKind::At) {
                             let start = self.current_pos().0;
                             self.advance()?; // consume '@'
@@ -118,21 +162,11 @@ impl<'a> Parser<'a> {
                                 span: Span::new(start as u32, end as u32),
                             });
                         }
-                        // After decorators, parse parameter and attach decorators
-                        let mut param = self.parse_simple_param()?;
-                        // Attach decorators to the identifier (possibly inside AssignmentPattern)
-                        match &mut param {
-                            Expression::Identifier(id) => {
-                                id.decorators = Some(decorators);
-                            }
-                            Expression::AssignmentPattern(ap) => {
-                                if let Expression::Identifier(id) = ap.left.as_mut() {
-                                    id.decorators = Some(decorators);
-                                }
-                            }
-                            _ => {}
-                        }
-                        param
+                        let decorators: &'arena [Decorator<'arena>] = decorators.into_bump_slice();
+                        // After decorators, parse parameter and attach decorators to the
+                        // identifier (possibly inside an AssignmentPattern default).
+                        let param = self.parse_simple_param()?;
+                        self.attach_param_decorators(param, decorators)
                     }
                     TokenKind::Identifier => {
                         let param_start = self.current_pos().0;
@@ -178,7 +212,7 @@ impl<'a> Parser<'a> {
                                 accessibility,
                                 readonly,
                                 r#override: is_override,
-                                parameter: Box::new(parameter),
+                                parameter: self.alloc(parameter),
                                 span: Span::new(param_start as u32, param_end),
                             })
                         } else {
@@ -206,8 +240,8 @@ impl<'a> Parser<'a> {
                             // prev_token_end covers a parenthesized default's closing `)`
                             let assign_end = self.prev_token_end() as u32;
                             Expression::AssignmentPattern(AssignmentPattern {
-                                left: Box::new(pattern),
-                                right: Box::new(default_value),
+                                left: self.alloc(pattern),
+                                right: self.alloc(default_value),
                                 span: Span::new(pattern_start, assign_end),
                             })
                         } else {
@@ -236,14 +270,13 @@ impl<'a> Parser<'a> {
                         let argument = Expression::Identifier(Identifier {
                             name: symbol,
                             optional: false,
-                            type_annotation: None,
-                            decorators: None,
+                            extra: None,
                             span: Span::new(id_start as u32, id_end as u32),
                         });
 
                         Expression::RestElement(RestElement {
-                            argument: Box::new(argument),
-                            type_annotation: type_annotation.map(Box::new),
+                            argument: self.alloc(argument),
+                            type_annotation,
                             span: Span::new(rest_start as u32, arg_end as u32),
                         })
                     }

@@ -149,14 +149,14 @@ impl<'a> Printer<'a> {
     /// 1. Analyze: Compute all formatting-relevant properties
     /// 2. Classify: Determine layout strategy (void, empty, hug modes, etc.)
     /// 3. Build: Construct doc based on layout
-    pub(crate) fn build_element_doc(&self, element: &internal::Element) -> DocId {
+    pub(crate) fn build_element_doc(&self, element: &internal::Element<'_>) -> DocId {
         let tag_name = self.resolve_symbol(element.name);
         let tag_sym = element.name.to_u32();
         let is_html = element.kind == internal::ElementKind::Html;
 
         // Build attribute docs (needed for all paths)
         let attr_docs = self.build_element_attrs_doc(
-            &element.attributes,
+            element.attributes,
             self.d().line(),
             element.name_span.end,
             element.open_tag_end,
@@ -171,7 +171,7 @@ impl<'a> Printer<'a> {
         // Foreign language <template> elements (e.g., <template lang="pug">)
         // preserve content raw — we can't format non-HTML template languages
         if tag_name == "template"
-            && let Some(lang) = self.get_lang_attribute(&element.attributes)
+            && let Some(lang) = self.get_lang_attribute(element.attributes)
             && lang != "html"
         {
             return self.build_foreign_template_doc(element);
@@ -228,7 +228,7 @@ impl<'a> Printer<'a> {
     /// `>` itself (see `build_expanding_construct`'s `gt_prefix`).
     pub(crate) fn build_inline_element_omit_close_gt(
         &self,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
     ) -> Option<DocId> {
         // Special-content elements (raw `<script>`/`<style>`, foreign `<template>`,
         // whitespace-sensitive `<pre>`/`<textarea>`) never participate — their closing
@@ -243,14 +243,14 @@ impl<'a> Printer<'a> {
         if always_skip
             || (is_template
                 && self
-                    .get_lang_attribute(&element.attributes)
+                    .get_lang_attribute(element.attributes)
                     .is_some_and(|lang| lang != "html"))
         {
             return None;
         }
         let is_html = element.kind == internal::ElementKind::Html;
         let attr_docs = self.build_element_attrs_doc(
-            &element.attributes,
+            element.attributes,
             self.d().line(),
             element.name_span.end,
             element.open_tag_end,
@@ -268,7 +268,7 @@ impl<'a> Printer<'a> {
             } => {
                 let trim_text = !ctx.kind.is_inline() && ctx.only_text_content;
                 let children_doc =
-                    self.build_nodes_doc_with_context(&element.fragment.nodes, trim_text);
+                    self.build_nodes_doc_with_context(element.fragment.nodes, trim_text);
                 Some(self.build_hug_both_doc(element, &ctx, &attr_docs, children_doc, true))
             }
             _ => None,
@@ -362,7 +362,7 @@ impl<'a> Printer<'a> {
     /// Build doc for element with content using boundary modes
     fn build_content_element_doc(
         &self,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
         ctx: &ElementContext,
         attr_docs: &[DocId],
         start_mode: BoundaryMode,
@@ -375,23 +375,23 @@ impl<'a> Printer<'a> {
         // Build children doc
         let children_doc = if multiline_children {
             // Multiline content: the prettier-shaped trimmed builder in `multiline` mode.
-            let breakable_exprs = Self::nodes_have_breakable_expression(&element.fragment.nodes);
+            let breakable_exprs = Self::nodes_have_breakable_expression(element.fragment.nodes);
             self.build_nodes_doc_trimmed(
-                &element.fragment.nodes,
+                element.fragment.nodes,
                 ctx.trim_boundaries,
                 breakable_exprs,
                 true,
             )
         } else if !(start_mode == BoundaryMode::Hug && end_mode == BoundaryMode::Hug) {
-            self.build_nodes_doc_trimmed(&element.fragment.nodes, ctx.trim_boundaries, false, false)
+            self.build_nodes_doc_trimmed(element.fragment.nodes, ctx.trim_boundaries, false, false)
         } else {
             // Hug both: route through the prettier-shaped trimmed builder (the convergence
             // base). When the fragment carries a break-capable expression tag, opt into the
             // hard-width divergence so a long multi-expression run breaks the expression
             // rather than overshooting printWidth (`fill_multiple_expr_long`).
-            let breakable_exprs = Self::nodes_have_breakable_expression(&element.fragment.nodes);
+            let breakable_exprs = Self::nodes_have_breakable_expression(element.fragment.nodes);
             self.build_nodes_doc_trimmed(
-                &element.fragment.nodes,
+                element.fragment.nodes,
                 ctx.trim_boundaries,
                 breakable_exprs,
                 false,
@@ -445,7 +445,7 @@ impl<'a> Printer<'a> {
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
                 } else if is_inline
-                    && Self::first_child_has_leading_ws(&element.fragment.nodes, self.source)
+                    && Self::first_child_has_leading_ws(element.fragment.nodes, self.source)
                 {
                     d.line()
                 } else {
@@ -465,7 +465,7 @@ impl<'a> Printer<'a> {
                 // handles whitespace correctly and must not be replaced with trimmed.
                 let effective_children = if is_inline && !ctx.trim_boundaries && !multiline_children
                 {
-                    self.build_nodes_doc_trimmed(&element.fragment.nodes, true, false, false)
+                    self.build_nodes_doc_trimmed(element.fragment.nodes, true, false, false)
                 } else {
                     children_doc
                 };
@@ -482,8 +482,7 @@ impl<'a> Printer<'a> {
             }
             (BoundaryMode::Hard, BoundaryMode::Hard) => {
                 // Full multiline
-                let multiline_children_doc =
-                    self.build_nodes_doc_multiline(&element.fragment.nodes);
+                let multiline_children_doc = self.build_nodes_doc_multiline(element.fragment.nodes);
                 let indent_inner = d.indent(d.concat(&[d.hardline(), multiline_children_doc]));
                 d.concat(&[
                     opening_tag,
@@ -510,7 +509,7 @@ impl<'a> Printer<'a> {
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
                 } else if is_inline
-                    && Self::first_child_has_leading_ws(&element.fragment.nodes, self.source)
+                    && Self::first_child_has_leading_ws(element.fragment.nodes, self.source)
                 {
                     d.line()
                 } else {
@@ -519,7 +518,7 @@ impl<'a> Printer<'a> {
                 let trailing_break = if end_mode == BoundaryMode::Hard {
                     d.hardline()
                 } else if is_inline
-                    && Self::last_child_has_trailing_ws(&element.fragment.nodes, self.source)
+                    && Self::last_child_has_trailing_ws(element.fragment.nodes, self.source)
                 {
                     d.line()
                 } else {
@@ -529,7 +528,7 @@ impl<'a> Printer<'a> {
                 // since line() now provides the boundary space that
                 // handle_text_child would otherwise duplicate.
                 let effective_children = if is_inline && !ctx.trim_boundaries {
-                    self.build_nodes_doc_trimmed(&element.fragment.nodes, true, false, false)
+                    self.build_nodes_doc_trimmed(element.fragment.nodes, true, false, false)
                 } else {
                     children_doc
                 };
@@ -557,7 +556,7 @@ impl<'a> Printer<'a> {
     /// onto the block-head line. See `build_inline_element_omit_close_gt`.
     fn build_hug_both_doc(
         &self,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
         ctx: &ElementContext,
         attr_docs: &[DocId],
         children_doc: DocId,
@@ -572,7 +571,7 @@ impl<'a> Printer<'a> {
         // that propagates `will_break`, so it needs no separate force term;
         // `source_has_leading_break` is impossible on the Hug/Hug path — there is no leading
         // boundary break — so it is dropped too.)
-        let force = super::helpers::has_any_expanding_blocks(&element.fragment.nodes)
+        let force = super::helpers::has_any_expanding_blocks(element.fragment.nodes)
             || ctx.block_flow_multiline
             || ctx.needs_multiline;
 
@@ -629,13 +628,13 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    fn first_child_has_leading_ws(nodes: &[FragmentNode], source: &str) -> bool {
+    fn first_child_has_leading_ws(nodes: &[FragmentNode<'_>], source: &str) -> bool {
         nodes.first().is_some_and(
             |n| matches!(n, FragmentNode::Text(t) if !t.raw(source).leading_whitespace().is_empty()),
         )
     }
 
-    fn last_child_has_trailing_ws(nodes: &[FragmentNode], source: &str) -> bool {
+    fn last_child_has_trailing_ws(nodes: &[FragmentNode<'_>], source: &str) -> bool {
         nodes.last().is_some_and(
             |n| matches!(n, FragmentNode::Text(t) if !t.raw(source).trailing_whitespace().is_empty()),
         )
@@ -648,7 +647,7 @@ impl<'a> Printer<'a> {
     /// on separate lines (matching Prettier behavior).
     fn build_empty_element_doc(
         &self,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
         opening_tag: DocId,
         has_attrs: bool,
         kind: ElementKind,
@@ -697,7 +696,7 @@ impl<'a> Printer<'a> {
 
             // State 2: Hug mode - attrs inline (space-separated), > on new line
             let hug_attrs = self.build_element_attrs_doc(
-                &element.attributes,
+                element.attributes,
                 self.d().text(" "),
                 element.name_span.end,
                 element.open_tag_end,
@@ -713,7 +712,7 @@ impl<'a> Printer<'a> {
 
             // State 3: Full multiline - attrs on separate lines, > on new line
             let multiline_attrs = self.build_element_attrs_doc(
-                &element.attributes,
+                element.attributes,
                 self.d().line(),
                 element.name_span.end,
                 element.open_tag_end,
@@ -742,14 +741,14 @@ impl<'a> Printer<'a> {
     /// Build a doc for a `<template>` element with a foreign language (e.g., `lang="pug"`).
     /// Content is preserved raw — we can't format non-HTML template languages.
     /// Format: `<template lang="pug">\n{raw content}</template>`
-    fn build_foreign_template_doc(&self, element: &internal::Element) -> DocId {
+    fn build_foreign_template_doc(&self, element: &internal::Element<'_>) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
 
         // Opening tag: <template attrs> — use space-separated attrs (no wrapping)
         // Foreign template elements are always HTML, so is_html=true
         let space_attrs = self.build_element_attrs_doc(
-            &element.attributes,
+            element.attributes,
             self.d().text(" "),
             element.name_span.end,
             element.open_tag_end,
@@ -760,7 +759,7 @@ impl<'a> Printer<'a> {
         parts.push(d.text(">"));
 
         // Raw content from fragment text nodes
-        for node in &element.fragment.nodes {
+        for node in element.fragment.nodes {
             if let FragmentNode::Text(text) = node {
                 parts.push(d.text_owned(text.raw(self.source).to_string()));
             }
@@ -781,7 +780,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_raw_content_element_doc(
         &self,
         tag_name: &str,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
@@ -810,13 +809,18 @@ impl<'a> Printer<'a> {
         };
 
         // Parse and format content based on tag type
-        // Using base_indent_offset of 0 because we'll handle indentation in the doc structure
+        // Using base_indent_offset of 0 because we'll handle indentation in the doc structure.
+        // The parse arena is a local: the parsed AST (CSS or TS) is consumed into an owned
+        // formatted `String` here, so it never escapes this call. Pre-sized to the content
+        // length to avoid the bump's chunk-doubling tail.
+        let arena =
+            bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(content.len()));
         let formatted = if tag_name == "style" {
-            tsv_css::parse(&content)
+            tsv_css::parse(&content, &arena)
                 .ok()
                 .map(|ast| tsv_css::format(&ast, &content))
         } else {
-            tsv_ts::parse(&content)
+            tsv_ts::parse(&content, &arena)
                 .ok()
                 .map(|ast| tsv_ts::format(&ast, &content))
         };
@@ -868,7 +872,7 @@ impl<'a> Printer<'a> {
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
     pub(crate) fn build_element_attrs_doc(
         &self,
-        attrs: &[internal::AttributeNode],
+        attrs: &[internal::AttributeNode<'_>],
         separator: DocId,
         name_end: u32,
         open_tag_end: u32,
@@ -891,7 +895,7 @@ impl<'a> Printer<'a> {
     pub(super) fn push_attrs_with_comments(
         &self,
         docs: &mut DocBuf,
-        attrs: &[internal::AttributeNode],
+        attrs: &[internal::AttributeNode<'_>],
         separator: DocId,
         first_range_start: u32,
         open_tag_end: u32,

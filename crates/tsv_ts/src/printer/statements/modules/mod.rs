@@ -33,7 +33,10 @@ pub(super) const MODULE_TYPE_KW_LEN: u32 = 11;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a TypeScript export assignment
-    pub(super) fn build_export_assignment_doc(&self, decl: &internal::TSExportAssignment) -> DocId {
+    pub(super) fn build_export_assignment_doc(
+        &self,
+        decl: &internal::TSExportAssignment<'_>,
+    ) -> DocId {
         let d = self.d();
         let expr_doc = self.build_expression_doc(&decl.expression);
         let argument_end = decl.expression.span().end;
@@ -54,7 +57,7 @@ impl<'a> Printer<'a> {
     /// When the line exceeds print_width (100 chars), wraps to multiline format.
     pub(super) fn build_export_named_declaration_doc(
         &self,
-        decl: &internal::ExportNamedDeclaration,
+        decl: &internal::ExportNamedDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         if let Some(declaration) = &decl.declaration {
@@ -72,14 +75,10 @@ impl<'a> Printer<'a> {
             // For decorated classes, decorators come before the export keyword —
             // find the `export` keyword position from the last decorator end
             // (decl.span.start may include decorators in the internal AST).
-            if let internal::Statement::ClassDeclaration(class) = declaration.as_ref()
+            if let internal::Statement::ClassDeclaration(class) = declaration
                 && let Some(dec_doc) = self.build_decorators_doc(
-                    class.decorators.as_deref(),
-                    self.find_keyword_after_decorators(
-                        class.decorators.as_deref(),
-                        "export",
-                        decl.span.start,
-                    ),
+                    class.decorators,
+                    self.find_keyword_after_decorators(class.decorators, "export", decl.span.start),
                 )
             {
                 let continuation = self.build_class_declaration_without_decorators_doc(class);
@@ -180,7 +179,7 @@ impl<'a> Printer<'a> {
                 // (`export /* c */ {a}`, `export type /* c */ {a}`) is always captured.
                 close_brace_end = self.push_braced_specifier_list(
                     &mut parts,
-                    &decl.specifiers,
+                    decl.specifiers,
                     kw_end,
                     bound,
                     true,
@@ -217,7 +216,7 @@ impl<'a> Printer<'a> {
                 // Import attributes: `export { x } from "y" with { type: "json" }`
                 self.push_import_attributes_clause(
                     &mut parts,
-                    decl.attributes.as_deref(),
+                    decl.attributes,
                     source.span.end,
                     decl.span.end,
                 )
@@ -231,19 +230,15 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an export default declaration
     pub(super) fn build_export_default_declaration_doc(
         &self,
-        decl: &internal::ExportDefaultDeclaration,
+        decl: &internal::ExportDefaultDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         // For decorated classes, decorators come before export keyword.
         // Find the `export` keyword position (same issue as named exports — span may include decorators).
         if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration
             && let Some(dec_doc) = self.build_decorators_doc(
-                class.decorators.as_deref(),
-                self.find_keyword_after_decorators(
-                    class.decorators.as_deref(),
-                    "export",
-                    decl.span.start,
-                ),
+                class.decorators,
+                self.find_keyword_after_decorators(class.decorators, "export", decl.span.start),
             )
         {
             return d.concat(&[
@@ -299,7 +294,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an export all declaration
     pub(super) fn build_export_all_declaration_doc(
         &self,
-        decl: &internal::ExportAllDeclaration,
+        decl: &internal::ExportAllDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         let is_type = decl.export_kind == internal::ExportKind::Type;
@@ -350,7 +345,7 @@ impl<'a> Printer<'a> {
         // pre-`;` comment scan, preserved in place.
         let content_end = self.push_import_attributes_clause(
             &mut parts,
-            decl.attributes.as_deref(),
+            decl.attributes,
             decl.source.span.end,
             decl.span.end,
         );
@@ -361,7 +356,10 @@ impl<'a> Printer<'a> {
     ///
     /// Uses d.group() for width-based wrapping of named specifiers.
     /// When the line exceeds print_width (100 chars), wraps to multiline format.
-    pub(super) fn build_import_declaration_doc(&self, decl: &internal::ImportDeclaration) -> DocId {
+    pub(super) fn build_import_declaration_doc(
+        &self,
+        decl: &internal::ImportDeclaration<'_>,
+    ) -> DocId {
         let d = self.d();
         // Check if source has empty braces (for `import {} from 'x'`)
         let has_empty_braces = self.has_empty_named_braces(decl);
@@ -375,9 +373,9 @@ impl<'a> Printer<'a> {
         let mut default_sym = 0u32;
         let mut default_spec_start = 0u32;
         let mut default_spec_end = 0u32;
-        let mut namespace_spec: Option<&internal::ImportNamespaceSpecifier> = None;
+        let mut namespace_spec: Option<&internal::ImportNamespaceSpecifier<'_>> = None;
 
-        for spec in &decl.specifiers {
+        for spec in decl.specifiers {
             match spec {
                 internal::ImportSpecifier::Default(default_spec) => {
                     has_default = true;
@@ -582,7 +580,7 @@ impl<'a> Printer<'a> {
         // Emitted outside the content group (see export above).
         let content_end = self.push_import_attributes_clause(
             &mut parts,
-            decl.attributes.as_deref(),
+            decl.attributes,
             decl.source.span.end,
             decl.span.end,
         );
@@ -592,7 +590,7 @@ impl<'a> Printer<'a> {
     /// Build doc for `import x = require("y")` or `import x = A.B`
     pub(super) fn build_import_equals_declaration_doc(
         &self,
-        decl: &internal::TSImportEqualsDeclaration,
+        decl: &internal::TSImportEqualsDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();

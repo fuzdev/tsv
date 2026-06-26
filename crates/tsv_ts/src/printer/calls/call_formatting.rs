@@ -52,14 +52,14 @@ use tsv_lang::doc::arena::DocId;
 /// ```
 pub(super) fn build_call_doc_with_wrapping(
     printer: &Printer<'_>,
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
 ) -> DocId {
     let d = printer.d();
-    let callee_doc = printer.build_expression_doc(&call.callee);
+    let callee_doc = printer.build_expression_doc(call.callee);
 
     // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
     // This must happen BEFORE adding removed-paren comments so comments stay outside
-    let callee_doc = if needs_parens(&call.callee, ParenContext::Callee) {
+    let callee_doc = if needs_parens(call.callee, ParenContext::Callee) {
         d.parens(callee_doc)
     } else {
         callee_doc
@@ -114,7 +114,7 @@ pub(super) fn build_call_doc_with_wrapping(
     if is_test_call(call, printer) {
         // Build callee as flat string (no conditionalGroup)
         // This prevents breaking at `.skip` etc. even when very long
-        let flat_callee = match callee_chain_string(&call.callee, printer) {
+        let flat_callee = match callee_chain_string(call.callee, printer) {
             Some(callee_str) => d.text_owned(callee_str),
             None => callee,
         };
@@ -205,7 +205,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // has_multiline_content, which produces the expanded form via
     // wrap_call_with_hard_breaks.
     if let Some(doc) =
-        try_hug_multiline_template_arg(printer, callee, &call.arguments, call.span.end)
+        try_hug_multiline_template_arg(printer, callee, call.arguments, call.span.end)
     {
         return doc;
     }
@@ -226,7 +226,7 @@ pub(super) fn build_call_doc_with_wrapping(
     if has_multiline {
         // Force expansion with hardlines for multiline content
         let arg_parts =
-            build_args_joined_with_comments(printer, &call.arguments, paren_open, true, |p, a| {
+            build_args_joined_with_comments(printer, call.arguments, paren_open, true, |p, a| {
                 p.build_arg_expression_doc(a)
             });
         return wrap_call_with_hard_breaks(d, callee, arg_parts);
@@ -236,11 +236,10 @@ pub(super) fn build_call_doc_with_wrapping(
     // e.g., fn(arr.map((x) => x), b) → fn(\n\tarr.map((x) => x),\n\tb,\n)
     // Prettier's isFunctionCompositionArgs: 2+ args, any arg is call with function/arrow inside
     // Skip if there are trailing comments - let the comment handling code deal with expansion
-    if is_function_composition_args(&call.arguments)
-        && !has_trailing_comments_on_args(call, printer)
+    if is_function_composition_args(call.arguments) && !has_trailing_comments_on_args(call, printer)
     {
         let arg_parts =
-            build_args_joined_with_comments(printer, &call.arguments, paren_open, true, |p, a| {
+            build_args_joined_with_comments(printer, call.arguments, paren_open, true, |p, a| {
                 p.build_arg_expression_doc(a)
             });
         return wrap_call_with_hard_breaks(d, callee, arg_parts);
@@ -249,9 +248,9 @@ pub(super) fn build_call_doc_with_wrapping(
     // "Expand first arg" pattern: when first arg is a function with block body
     // and remaining args are short, hug the function and put tail args after closing }
     // e.g., setTimeout(() => { tick(); }, 100);
-    if should_expand_first_arg(printer, &call.arguments)
+    if should_expand_first_arg(printer, call.arguments)
         && !has_trailing_comments_on_args(call, printer)
-        && !first_arg_has_any_comments(&call.arguments, printer, paren_open)
+        && !first_arg_has_any_comments(call.arguments, printer, paren_open)
     {
         let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
 
@@ -267,7 +266,7 @@ pub(super) fn build_call_doc_with_wrapping(
         if tail_parts.iter().any(|&id| d.will_break(id)) {
             let arg_parts = build_args_joined_with_comments(
                 printer,
-                &call.arguments,
+                call.arguments,
                 paren_open,
                 true,
                 // Closure required: method references cause HRTB lifetime errors
@@ -299,7 +298,7 @@ pub(super) fn build_call_doc_with_wrapping(
 
     if all_args_are_arrows && !has_trailing_comments_on_args(call, printer) {
         let arg_parts =
-            build_args_joined_with_comments(printer, &call.arguments, paren_open, true, |p, a| {
+            build_args_joined_with_comments(printer, call.arguments, paren_open, true, |p, a| {
                 p.build_expression_doc(a)
             });
         return wrap_call_with_hard_breaks(d, callee, arg_parts);
@@ -349,7 +348,7 @@ pub(super) fn build_call_doc_with_wrapping(
         // Build arguments with blank line preservation (forced expansion).
         // The shared builder's comment branches never fire here: the comment
         // handling path above returns early when any inter-arg comments exist.
-        let arg_doc = build_args_with_blank_lines(printer, &call.arguments);
+        let arg_doc = build_args_with_blank_lines(printer, call.arguments);
         return wrap_call_with_hard_breaks(d, callee, arg_doc);
     }
 
@@ -404,7 +403,7 @@ pub(super) fn build_call_doc_with_wrapping(
 /// defer to the general comment path — so the caller falls through.
 fn try_single_arg_comment_paths(
     printer: &Printer<'_>,
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     callee: DocId,
 ) -> Option<DocId> {
     let d = printer.d();
@@ -508,7 +507,7 @@ fn try_single_arg_comment_paths(
 /// through to standard wrapping.
 fn try_single_arg_hug(
     printer: &Printer<'_>,
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     callee: DocId,
 ) -> Option<DocId> {
     let d = printer.d();
@@ -673,8 +672,8 @@ fn try_single_arg_hug(
 fn build_block_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
-    arrow: &internal::ArrowFunctionExpression,
-    arg: &internal::Expression,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    arg: &internal::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
 
@@ -775,8 +774,8 @@ fn build_block_arrow_hug_states(
 fn build_ternary_arrow_hug_states(
     printer: &Printer<'_>,
     callee: DocId,
-    arrow: &internal::ArrowFunctionExpression,
-    body_expr: &internal::Expression,
+    arrow: &internal::ArrowFunctionExpression<'_>,
+    body_expr: &internal::Expression<'_>,
 ) -> DocId {
     let d = printer.d();
     let sig_doc = build_arrow_sig_doc(printer, arrow);
@@ -857,7 +856,7 @@ fn build_ternary_arrow_hug_states(
 /// arg is a non-expandable expression-body arrow (which falls through to the default path).
 fn try_expand_last_function_arg(
     printer: &Printer<'_>,
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     callee: DocId,
     paren_open: u32,
 ) -> Option<DocId> {
@@ -875,12 +874,12 @@ fn try_expand_last_function_arg(
     );
 
     if last_is_function
-        && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
+        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !any_comment_forces_expansion(call, printer, paren_open)
-        && !last_arg_has_comments(&call.arguments, printer, call.span.end, paren_open)
+        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
     {
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(&call.arguments, printer, paren_open);
+            build_args_split_last(call.arguments, printer, paren_open);
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         // When any head arg's doc will break (e.g., new Map([...multiline...])),
@@ -1013,17 +1012,17 @@ fn try_expand_last_function_arg(
 /// Returns `None` when the guard fails, so the caller falls through.
 fn try_expand_last_array_object_arg(
     printer: &Printer<'_>,
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     callee: DocId,
     paren_open: u32,
 ) -> Option<DocId> {
     let d = printer.d();
     if call.arguments.len() >= 2
-        && last_arg_is_array_or_object(&call.arguments)
+        && last_arg_is_array_or_object(call.arguments)
         && !call.arguments.last().is_some_and(is_concise_numeric_array)
-        && preceding_args_allow_expand_last(&call.arguments, printer.line_breaks)
+        && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !any_comment_forces_expansion(call, printer, paren_open)
-        && !last_arg_has_comments(&call.arguments, printer, call.span.end, paren_open)
+        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
         && !(call.arguments.len() == 2
             && matches!(
                 call.arguments.first(),
@@ -1034,11 +1033,11 @@ fn try_expand_last_array_object_arg(
                 Some(internal::Expression::ArrayExpression(_))
             ))
     {
-        if last_two_args_same_type(&call.arguments) {
+        if last_two_args_same_type(call.arguments) {
             // Same type: use 2-state conditional (inline, expand-all)
             // Don't use the "hug with bracket" state
             let (head_parts, last_arg_doc, all_args_broken) =
-                build_args_split_last(&call.arguments, printer, paren_open);
+                build_args_split_last(call.arguments, printer, paren_open);
 
             // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
             if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1066,7 +1065,7 @@ fn try_expand_last_array_object_arg(
         // Different types: check if last arg has hardlines (e.g., comments)
         // If it does, Prettier uses expand-all instead of hug
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(&call.arguments, printer, paren_open);
+            build_args_split_last(call.arguments, printer, paren_open);
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1119,7 +1118,7 @@ fn try_expand_last_array_object_arg(
 /// so the caller falls through to the blank-line / default layout.
 fn build_call_with_arg_comments(
     printer: &Printer<'_>,
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     callee: DocId,
     paren_open: u32,
     has_trailing_block_comment: bool,

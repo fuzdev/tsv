@@ -13,56 +13,59 @@ use super::{
 
 /// Expression node type
 #[derive(Debug, Clone)]
-pub enum Expression {
-    Literal(Literal),
-    Identifier(Identifier),
+pub enum Expression<'arena> {
+    Literal(Literal<'arena>),
+    Identifier(Identifier<'arena>),
     PrivateIdentifier(PrivateIdentifier),
-    ObjectExpression(ObjectExpression),
-    ArrayExpression(ArrayExpression),
-    UnaryExpression(UnaryExpression),
-    UpdateExpression(UpdateExpression),
-    BinaryExpression(BinaryExpression),
-    CallExpression(CallExpression),
-    NewExpression(NewExpression),
-    MemberExpression(MemberExpression),
-    ConditionalExpression(ConditionalExpression),
-    ArrowFunctionExpression(ArrowFunctionExpression),
-    FunctionExpression(FunctionExpression),
-    ClassExpression(ClassExpression),
-    SpreadElement(SpreadElement),
-    TemplateLiteral(TemplateLiteral),
-    TaggedTemplateExpression(TaggedTemplateExpression),
-    AwaitExpression(AwaitExpression),
-    YieldExpression(YieldExpression),
-    SequenceExpression(SequenceExpression),
+    ObjectExpression(ObjectExpression<'arena>),
+    ArrayExpression(ArrayExpression<'arena>),
+    UnaryExpression(UnaryExpression<'arena>),
+    UpdateExpression(UpdateExpression<'arena>),
+    BinaryExpression(BinaryExpression<'arena>),
+    CallExpression(CallExpression<'arena>),
+    NewExpression(NewExpression<'arena>),
+    MemberExpression(MemberExpression<'arena>),
+    ConditionalExpression(ConditionalExpression<'arena>),
+    // Inline by value: the layout favors traversal locality over node size, so
+    // fat variants are kept inline rather than arena-boxed (boxing added a
+    // pointer-chase on hot format-read paths). See TODO_BUMPALO_ARENA.md.
+    ArrowFunctionExpression(ArrowFunctionExpression<'arena>),
+    FunctionExpression(FunctionExpression<'arena>),
+    ClassExpression(ClassExpression<'arena>),
+    SpreadElement(SpreadElement<'arena>),
+    TemplateLiteral(TemplateLiteral<'arena>),
+    TaggedTemplateExpression(TaggedTemplateExpression<'arena>),
+    AwaitExpression(AwaitExpression<'arena>),
+    YieldExpression(YieldExpression<'arena>),
+    SequenceExpression(SequenceExpression<'arena>),
     RegexLiteral(RegexLiteral),
     ThisExpression(ThisExpression),
     Super(Super),
     // Assignment and patterns
-    AssignmentExpression(AssignmentExpression),
-    ObjectPattern(ObjectPattern),
-    ArrayPattern(ArrayPattern),
-    AssignmentPattern(AssignmentPattern),
-    RestElement(RestElement),
+    AssignmentExpression(AssignmentExpression<'arena>),
+    ObjectPattern(ObjectPattern<'arena>),
+    ArrayPattern(ArrayPattern<'arena>),
+    AssignmentPattern(AssignmentPattern<'arena>),
+    RestElement(RestElement<'arena>),
     // TypeScript type assertions
-    TSTypeAssertion(TSTypeAssertion),
-    TSAsExpression(TSAsExpression),
-    TSSatisfiesExpression(TSSatisfiesExpression),
+    TSTypeAssertion(TSTypeAssertion<'arena>),
+    TSAsExpression(TSAsExpression<'arena>),
+    TSSatisfiesExpression(TSSatisfiesExpression<'arena>),
     // TypeScript instantiation expression: f<T>
-    TSInstantiationExpression(TSInstantiationExpression),
+    TSInstantiationExpression(TSInstantiationExpression<'arena>),
     // TypeScript non-null assertion: expr!
-    TSNonNullExpression(TSNonNullExpression),
+    TSNonNullExpression(TSNonNullExpression<'arena>),
     // TypeScript parameter property: constructor(public x)
-    TSParameterProperty(TSParameterProperty),
+    TSParameterProperty(TSParameterProperty<'arena>),
     // Dynamic import: import('...')
-    ImportExpression(ImportExpression),
-    // Meta property: import.meta, new.target
-    MetaProperty(MetaProperty),
+    ImportExpression(ImportExpression<'arena>),
+    // Meta property: import.meta, new.target (two inline Identifiers)
+    MetaProperty(MetaProperty<'arena>),
     // JSDoc type cast: `/** @type {T} */ (inner)` — internal-only, never serialized
-    JsdocCast(JsdocCast),
+    JsdocCast(JsdocCast<'arena>),
 }
 
-impl Expression {
+impl<'arena> Expression<'arena> {
     pub fn span(&self) -> Span {
         match self {
             Expression::Literal(lit) => lit.span,
@@ -155,25 +158,25 @@ impl Expression {
 /// is opaque to layout heuristics (expand-last etc.), mirroring how acorn's
 /// `ParenthesizedExpression` hides the inner type in prettier-plugin-svelte.
 #[derive(Debug, Clone)]
-pub struct JsdocCast {
-    pub inner: Box<Expression>,
+pub struct JsdocCast<'arena> {
+    pub inner: &'arena Expression<'arena>,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
-pub struct ObjectExpression {
-    pub properties: Vec<ObjectProperty>,
+pub struct ObjectExpression<'arena> {
+    pub properties: &'arena [ObjectProperty<'arena>],
     pub span: Span,
 }
 
 /// Object property - either a regular property or a spread element
 #[derive(Debug, Clone)]
-pub enum ObjectProperty {
-    Property(Property),
-    SpreadElement(SpreadElement),
+pub enum ObjectProperty<'arena> {
+    Property(Property<'arena>),
+    SpreadElement(SpreadElement<'arena>),
 }
 
-impl ObjectProperty {
+impl<'arena> ObjectProperty<'arena> {
     pub fn span(&self) -> Span {
         match self {
             ObjectProperty::Property(p) => p.span,
@@ -204,7 +207,7 @@ impl ObjectProperty {
     }
 
     /// Get the property as a regular Property, if it is one
-    pub fn as_property(&self) -> Option<&Property> {
+    pub fn as_property(&self) -> Option<&Property<'arena>> {
         match self {
             ObjectProperty::Property(p) => Some(p),
             ObjectProperty::SpreadElement(_) => None,
@@ -212,7 +215,7 @@ impl ObjectProperty {
     }
 
     /// Get the spread element, if it is one
-    pub fn as_spread(&self) -> Option<&SpreadElement> {
+    pub fn as_spread(&self) -> Option<&SpreadElement<'arena>> {
         match self {
             ObjectProperty::Property(_) => None,
             ObjectProperty::SpreadElement(s) => Some(s),
@@ -225,8 +228,8 @@ impl ObjectProperty {
 /// Elements are wrapped in Option to support sparse arrays like `[1,,3]`
 /// where missing elements are represented as None.
 #[derive(Debug, Clone)]
-pub struct ArrayExpression {
-    pub elements: Vec<Option<Expression>>,
+pub struct ArrayExpression<'arena> {
+    pub elements: &'arena [Option<Expression<'arena>>],
     pub span: Span,
 }
 
@@ -254,9 +257,9 @@ impl UpdateOperator {
 /// indicates whether the operator appears before (true) or after (false)
 /// the argument.
 #[derive(Debug, Clone)]
-pub struct UpdateExpression {
+pub struct UpdateExpression<'arena> {
     pub operator: UpdateOperator,
-    pub argument: Box<Expression>,
+    pub argument: &'arena Expression<'arena>,
     pub prefix: bool, // true for `++x`/`--x`, false for `x++`/`x--`
     pub span: Span,
 }
@@ -300,9 +303,9 @@ impl UnaryOperator {
 
 /// Unary expression: `-x`, `+x`, `!x`, etc.
 #[derive(Debug, Clone)]
-pub struct UnaryExpression {
+pub struct UnaryExpression<'arena> {
     pub operator: UnaryOperator,
-    pub argument: Box<Expression>,
+    pub argument: &'arena Expression<'arena>,
     pub prefix: bool, // always true for now (prefix operators)
     pub span: Span,
 }
@@ -415,19 +418,19 @@ impl BinaryOperator {
 
 /// Binary expression: `a + b`, `x && y`, etc.
 #[derive(Debug, Clone)]
-pub struct BinaryExpression {
-    pub left: Box<Expression>,
+pub struct BinaryExpression<'arena> {
+    pub left: &'arena Expression<'arena>,
     pub operator: BinaryOperator,
-    pub right: Box<Expression>,
+    pub right: &'arena Expression<'arena>,
     pub span: Span,
 }
 
 /// Call expression: `foo()`, `obj.method(arg1, arg2)`, `fn<T>()`
 #[derive(Debug, Clone)]
-pub struct CallExpression {
-    pub callee: Box<Expression>,
-    pub type_arguments: Option<TSTypeParameterInstantiation>,
-    pub arguments: Vec<Expression>,
+pub struct CallExpression<'arena> {
+    pub callee: &'arena Expression<'arena>,
+    pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    pub arguments: &'arena [Expression<'arena>],
     pub optional: bool, // true for `foo?.()` (optional chaining)
     pub span: Span,
 }
@@ -438,37 +441,37 @@ pub struct CallExpression {
 /// identifier or member expression, and arguments are optional.
 /// Type arguments like `new Map<K, V>()` are stored in `type_arguments`.
 #[derive(Debug, Clone)]
-pub struct NewExpression {
-    pub callee: Box<Expression>,
-    pub type_arguments: Option<TSTypeParameterInstantiation>,
-    pub arguments: Vec<Expression>,
+pub struct NewExpression<'arena> {
+    pub callee: &'arena Expression<'arena>,
+    pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    pub arguments: &'arena [Expression<'arena>],
     pub span: Span,
 }
 
 /// Dynamic import expression: `import('module')` or `import('module', options)`
 #[derive(Debug, Clone)]
-pub struct ImportExpression {
-    pub source: Box<Expression>,
+pub struct ImportExpression<'arena> {
+    pub source: &'arena Expression<'arena>,
     /// Optional second argument for import attributes: `{with: {type: 'json'}}`
-    pub options: Option<Box<Expression>>,
+    pub options: Option<&'arena Expression<'arena>>,
     pub span: Span,
 }
 
 /// Meta property: `import.meta`, `new.target`
 #[derive(Debug, Clone)]
-pub struct MetaProperty {
+pub struct MetaProperty<'arena> {
     /// The keyword: "import" or "new"
-    pub meta: Identifier,
+    pub meta: Identifier<'arena>,
     /// The property: "meta" or "target"
-    pub property: Identifier,
+    pub property: Identifier<'arena>,
     pub span: Span,
 }
 
 /// Member expression: `obj.prop`, `arr[0]`
 #[derive(Debug, Clone)]
-pub struct MemberExpression {
-    pub object: Box<Expression>,
-    pub property: Box<Expression>,
+pub struct MemberExpression<'arena> {
+    pub object: &'arena Expression<'arena>,
+    pub property: &'arena Expression<'arena>,
     pub computed: bool, // true for `arr[0]`, false for `obj.prop`
     pub optional: bool, // true for `obj?.prop` (optional chaining)
     pub span: Span,
@@ -476,10 +479,10 @@ pub struct MemberExpression {
 
 /// Conditional (ternary) expression: `a ? b : c`
 #[derive(Debug, Clone)]
-pub struct ConditionalExpression {
-    pub test: Box<Expression>,
-    pub consequent: Box<Expression>,
-    pub alternate: Box<Expression>,
+pub struct ConditionalExpression<'arena> {
+    pub test: &'arena Expression<'arena>,
+    pub consequent: &'arena Expression<'arena>,
+    pub alternate: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -489,14 +492,14 @@ pub struct ConditionalExpression {
 /// - Expression body: `x => x + 1` (body is Expression)
 /// - Block body: `x => { return x + 1; }` (body is BlockStatement)
 #[derive(Debug, Clone)]
-pub struct ArrowFunctionExpression {
+pub struct ArrowFunctionExpression<'arena> {
     /// Type parameters (TypeScript generics): `<T>() => ...`
-    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: Vec<Expression>,
-    pub body: ArrowFunctionBody,
+    pub params: &'arena [Expression<'arena>],
+    pub body: ArrowFunctionBody<'arena>,
     /// Return type annotation (TypeScript): (): number => ...
-    pub return_type: Option<TSTypeAnnotation>,
+    pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Whether this is an async arrow function: `async () => ...`
     pub r#async: bool,
     /// Position of opening paren for params, if parenthesized.
@@ -507,14 +510,14 @@ pub struct ArrowFunctionExpression {
 
 /// Arrow function body - either an expression or a block statement
 #[derive(Debug, Clone)]
-pub enum ArrowFunctionBody {
+pub enum ArrowFunctionBody<'arena> {
     /// Expression body: `() => expr`
-    Expression(Box<Expression>),
+    Expression(&'arena Expression<'arena>),
     /// Block body: `() => { stmts }`
-    BlockStatement(BlockStatement),
+    BlockStatement(BlockStatement<'arena>),
 }
 
-impl ArrowFunctionBody {
+impl<'arena> ArrowFunctionBody<'arena> {
     pub fn span(&self) -> Span {
         match self {
             ArrowFunctionBody::Expression(expr) => expr.span(),
@@ -535,17 +538,17 @@ impl ArrowFunctionBody {
 /// - Anonymous function expressions: `const f = function() {}`
 /// - Named function expressions: `const f = function name() {}`
 #[derive(Debug, Clone)]
-pub struct FunctionExpression {
+pub struct FunctionExpression<'arena> {
     /// Optional function name (for named function expressions)
-    pub id: Option<Identifier>,
+    pub id: Option<Identifier<'arena>>,
     /// Type parameters (TypeScript generics): `function<T>() {}`
-    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     /// Function parameters (Identifier, ArrayPattern, ObjectPattern, or AssignmentPattern for defaults)
-    pub params: Vec<Expression>,
+    pub params: &'arena [Expression<'arena>],
     /// Return type annotation (e.g., `: number` in `function fn(): number {}`)
-    pub return_type: Option<TSTypeAnnotation>,
+    pub return_type: Option<TSTypeAnnotation<'arena>>,
     /// Function body (block statement with statements)
-    pub body: BlockStatement,
+    pub body: BlockStatement<'arena>,
     /// Whether this is a generator function (`function*`)
     pub generator: bool,
     /// Whether this is an async function (`async function`)
@@ -559,8 +562,8 @@ pub struct FunctionExpression {
 ///
 /// Used in array literals (`[...arr]`) and object literals (`{...obj}`)
 #[derive(Debug, Clone)]
-pub struct SpreadElement {
-    pub argument: Box<Expression>,
+pub struct SpreadElement<'arena> {
+    pub argument: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -586,9 +589,9 @@ impl PropertyKind {
 }
 
 #[derive(Debug, Clone)]
-pub struct Property {
-    pub key: Expression,
-    pub value: Expression,
+pub struct Property<'arena> {
+    pub key: Expression<'arena>,
+    pub value: Expression<'arena>,
     pub kind: PropertyKind, // init, get, or set
     pub shorthand: bool,    // true for `{ prop }`, false for `{ prop: value }`
     pub computed: bool,     // true for `{ [expr]: value }`, false for `{ prop: value }`
@@ -606,9 +609,9 @@ pub struct Property {
 /// - quasis: ["a ", " c ", " e"]
 /// - expressions: [b, d]
 #[derive(Debug, Clone)]
-pub struct TemplateLiteral {
-    pub quasis: Vec<TemplateElement>,
-    pub expressions: Vec<Expression>,
+pub struct TemplateLiteral<'arena> {
+    pub quasis: &'arena [TemplateElement<'arena>],
+    pub expressions: &'arena [Expression<'arena>],
     pub span: Span,
 }
 
@@ -616,13 +619,13 @@ pub struct TemplateLiteral {
 ///
 /// The common no-escape case (`Verbatim`) carries no allocation: the cooked
 /// text equals the raw source slice, recovered via the element's `raw_span`.
-/// Only genuinely decoded values (escapes present) own a `String`.
+/// Only genuinely decoded values (escapes present) hold an arena-allocated str.
 #[derive(Debug, Clone)]
-pub enum TemplateCooked {
+pub enum TemplateCooked<'arena> {
     /// Cooked value == the raw source slice (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw text.
-    Decoded(String),
+    Decoded(&'arena str),
     /// No cooked value — an invalid escape in a tagged template (acorn emits
     /// `null`). Reserved for that feature; not produced today.
     Invalid,
@@ -635,7 +638,7 @@ pub enum TemplateCooked {
 /// - cooked: The decoded value (escapes interpreted); text via `cooked(source)`
 /// - tail: true for the last element in the template
 #[derive(Debug, Clone)]
-pub struct TemplateElement {
+pub struct TemplateElement<'arena> {
     /// Span of the raw source text (escape sequences NOT decoded), delimiters
     /// excluded. The raw content is a verbatim sub-slice of source, so it is
     /// stored as a span and recovered on demand via `raw(source)` rather than
@@ -644,7 +647,7 @@ pub struct TemplateElement {
     pub raw_span: Span,
     /// The decoded value. `Verbatim` (the common no-escape case) costs no
     /// allocation — its text equals `raw(source)`; recover via `cooked(source)`.
-    pub cooked: TemplateCooked,
+    pub cooked: TemplateCooked<'arena>,
     /// Whether the raw text contains a newline (precomputed so newline checks
     /// stay O(1) and source-free, matching `Comment::multiline`).
     pub has_newline: bool,
@@ -653,7 +656,7 @@ pub struct TemplateElement {
     pub span: Span,
 }
 
-impl TemplateElement {
+impl<'arena> TemplateElement<'arena> {
     /// The raw source text (escape sequences NOT decoded), a delimiter-stripped
     /// sub-slice of `source` (the host document the spans were recorded against).
     #[inline]
@@ -663,11 +666,10 @@ impl TemplateElement {
 
     /// The decoded ("cooked") value as text, or `None` for an invalid escape.
     /// The no-escape case borrows the raw source slice (no owned string); the
-    /// returned slice borrows from either `self` (`Decoded`) or `source`
-    /// (`Verbatim`), so both share the lifetime `'a`.
+    /// `Decoded` arm borrows from the arena (`'arena: 's` via `&'s self`).
     #[inline]
-    pub fn cooked<'a>(&'a self, source: &'a str) -> Option<&'a str> {
-        match &self.cooked {
+    pub fn cooked<'s>(&'s self, source: &'s str) -> Option<&'s str> {
+        match self.cooked {
             TemplateCooked::Verbatim => Some(self.raw(source)),
             TemplateCooked::Decoded(decoded) => Some(decoded),
             TemplateCooked::Invalid => None,
@@ -681,10 +683,10 @@ impl TemplateElement {
 /// When the tag has type arguments (e.g., `tag<T>\`content\``), they are stored
 /// separately rather than wrapping the tag in `TSInstantiationExpression`.
 #[derive(Debug, Clone)]
-pub struct TaggedTemplateExpression {
-    pub tag: Box<Expression>,
-    pub type_arguments: Option<TSTypeParameterInstantiation>,
-    pub quasi: TemplateLiteral,
+pub struct TaggedTemplateExpression<'arena> {
+    pub tag: &'arena Expression<'arena>,
+    pub type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    pub quasi: TemplateLiteral<'arena>,
     pub span: Span,
 }
 
@@ -693,8 +695,8 @@ pub struct TaggedTemplateExpression {
 /// Used in async functions to wait for a Promise to resolve.
 /// The argument is the expression being awaited.
 #[derive(Debug, Clone)]
-pub struct AwaitExpression {
-    pub argument: Box<Expression>,
+pub struct AwaitExpression<'arena> {
+    pub argument: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -705,9 +707,9 @@ pub struct AwaitExpression {
 /// - `yield value` yields the given value
 /// - `yield* iterable` delegates to another generator/iterable
 #[derive(Debug, Clone)]
-pub struct YieldExpression {
+pub struct YieldExpression<'arena> {
     /// The value to yield (None for `yield` with no argument)
-    pub argument: Option<Box<Expression>>,
+    pub argument: Option<&'arena Expression<'arena>>,
     /// Whether this is a delegating yield: `yield*`
     pub delegate: bool,
     pub span: Span,
@@ -718,8 +720,8 @@ pub struct YieldExpression {
 /// Evaluates all expressions left to right, returns the last value.
 /// Created by the comma operator at expression level.
 #[derive(Debug, Clone)]
-pub struct SequenceExpression {
-    pub expressions: Vec<Expression>,
+pub struct SequenceExpression<'arena> {
+    pub expressions: &'arena [Expression<'arena>],
     pub span: Span,
 }
 
@@ -783,11 +785,11 @@ pub struct Super {
 ///
 /// Example: `<string>someValue`, `<T>a`
 #[derive(Debug, Clone)]
-pub struct TSTypeAssertion {
+pub struct TSTypeAssertion<'arena> {
     /// The target type
-    pub type_annotation: Box<TSType>,
+    pub type_annotation: &'arena TSType<'arena>,
     /// The expression being type-asserted
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
@@ -798,11 +800,11 @@ pub struct TSTypeAssertion {
 ///
 /// Note: `as const` is represented as a type reference with name "const".
 #[derive(Debug, Clone)]
-pub struct TSAsExpression {
+pub struct TSAsExpression<'arena> {
     /// The expression being type-asserted
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
     /// The target type
-    pub type_annotation: Box<TSType>,
+    pub type_annotation: &'arena TSType<'arena>,
     pub span: Span,
 }
 
@@ -814,11 +816,11 @@ pub struct TSAsExpression {
 /// Example: `{ a: 1 } satisfies Record<string, number>` keeps type `{ a: number }`
 /// but verifies it's compatible with `Record<string, number>`.
 #[derive(Debug, Clone)]
-pub struct TSSatisfiesExpression {
+pub struct TSSatisfiesExpression<'arena> {
     /// The expression being checked
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
     /// The type to satisfy
-    pub type_annotation: Box<TSType>,
+    pub type_annotation: &'arena TSType<'arena>,
     pub span: Span,
 }
 
@@ -830,11 +832,11 @@ pub struct TSSatisfiesExpression {
 ///
 /// Example: `const boundF = f<number>;` gives `f` with type parameter bound to `number`.
 #[derive(Debug, Clone)]
-pub struct TSInstantiationExpression {
+pub struct TSInstantiationExpression<'arena> {
     /// The expression being instantiated
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
     /// The type arguments: <T, U>
-    pub type_arguments: TSTypeParameterInstantiation,
+    pub type_arguments: TSTypeParameterInstantiation<'arena>,
     pub span: Span,
 }
 
@@ -845,13 +847,13 @@ pub struct TSInstantiationExpression {
 ///
 /// Example: `document.getElementById("app")!`
 #[derive(Debug, Clone)]
-pub struct TSNonNullExpression {
+pub struct TSNonNullExpression<'arena> {
     /// The expression being asserted non-null
-    pub expression: Box<Expression>,
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
-impl TSNonNullExpression {
+impl<'arena> TSNonNullExpression<'arena> {
     /// True when this non-null assertion seals a **parenthesized** optional chain
     /// (`(a?.b)!` — the `!` outside the source parens). The grouping parens are
     /// stripped, so the only signal is the span gap: this node's span starts before
@@ -874,13 +876,13 @@ impl TSNonNullExpression {
 /// - Destructuring: `{a, b} = obj`, `[x, y] = arr`
 /// - Compound assignment: `x += 1` (uses AssignmentOperator)
 #[derive(Debug, Clone)]
-pub struct AssignmentExpression {
+pub struct AssignmentExpression<'arena> {
     /// The assignment target (identifier, member expression, or pattern)
-    pub left: Box<Expression>,
+    pub left: &'arena Expression<'arena>,
     /// The operator: "=" for simple, "+=", "-=", etc. for compound
     pub operator: AssignmentOperator,
     /// The value being assigned
-    pub right: Box<Expression>,
+    pub right: &'arena Expression<'arena>,
     pub span: Span,
 }
 

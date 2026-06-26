@@ -65,7 +65,7 @@ fn build_groups_flat_docs<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printe
 
 /// Check if a single-arg call has an object/array that will break
 fn call_has_breaking_single_arg<P: ChainPrinter>(
-    call: &crate::ast::internal::CallExpression,
+    call: &crate::ast::internal::CallExpression<'_>,
     printer: &P,
 ) -> bool {
     if call.arguments.len() != 1 {

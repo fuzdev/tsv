@@ -1,0 +1,121 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 399,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 337,
+					"end": 342,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 337,
+							"end": 342,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "f\\oo",
+											"args": null,
+											"start": 337,
+											"end": 342
+										}
+									],
+									"start": 337,
+									"end": 342
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 343,
+					"end": 361,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 347,
+							"end": 357,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 337,
+				"end": 361
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 363,
+					"end": 370,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 363,
+							"end": 370,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "b\\gar",
+											"start": 363,
+											"end": 370
+										}
+									],
+									"start": 363,
+									"end": 370
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 371,
+					"end": 390,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 375,
+							"end": 386,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 363,
+				"end": 390
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 391,
+			"styles": "\n\t/* Identity escapes (a backslash before a non-hex char) are kept verbatim in the\n\t   selector-name AST, matching Svelte's read_identifier half-decode: hex escapes\n\t   decode, identity escapes keep the backslash. The formatter preserves the raw\n\t   source either way. Mirrors class/id/type in escaped_names, now for pseudos. */\n\t:f\\oo {\n\t\tcolor: red;\n\t}\n\t::b\\gar {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 400,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

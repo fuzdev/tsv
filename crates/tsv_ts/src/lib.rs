@@ -85,10 +85,11 @@ fn make_doc_printer<'a>(
 /// # Example
 ///
 /// ```rust,ignore
-/// let ast = tsv_ts::parse("const x = 42;")?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_ts::parse("const x = 42;", &arena)?;
 /// ```
-pub fn parse(source: &str) -> Result<Program> {
-    parser::parse_typescript(source).map_err(|e| e.with_context(source))
+pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
+    parser::parse_typescript(source, arena).map_err(|e| e.with_context(source))
 }
 
 /// Format a TypeScript AST back to source code
@@ -105,11 +106,12 @@ pub fn parse(source: &str) -> Result<Program> {
 ///
 /// ```rust,ignore
 /// let source = "const x=42;";
-/// let ast = tsv_ts::parse(source)?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_ts::parse(source, &arena)?;
 /// let formatted = tsv_ts::format(&ast, source);
 /// assert_eq!(formatted, "const x = 42;\n");
 /// ```
-pub fn format(program: &Program, source: &str) -> String {
+pub fn format(program: &Program<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);
     let inputs = PrinterInputs {
         source,
@@ -137,12 +139,13 @@ pub fn format(program: &Program, source: &str) -> String {
 ///
 /// ```rust,ignore
 /// let source = "const x: number = 42;";
-/// let ast = tsv_ts::parse(source)?;
+/// let arena = bumpalo::Bump::new();
+/// let ast = tsv_ts::parse(source, &arena)?;
 /// let public_ast = tsv_ts::convert_ast(&ast, source);
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```
 #[cfg(feature = "convert")]
-pub fn convert_ast(program: &Program, source: &str) -> ast::public::Program {
+pub fn convert_ast(program: &Program<'_>, source: &str) -> ast::public::Program {
     let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
     ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn)
 }
@@ -156,7 +159,7 @@ pub fn convert_ast(program: &Program, source: &str) -> ast::public::Program {
 /// This is the preferred function for producing JSON AST output.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json(program: &Program, source: &str) -> serde_json::Value {
+pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Value {
     let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
     let public_ast =
         ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn);
@@ -177,7 +180,7 @@ pub fn convert_ast_json(program: &Program, source: &str) -> serde_json::Value {
 /// hot path for the FFI/WASM parse bindings and the CLI's compact output.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json_string(program: &Program, source: &str) -> String {
+pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
     let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
     let mut public_ast =
         ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn);
@@ -205,12 +208,13 @@ pub fn convert_ast_json_string(program: &Program, source: &str) -> String {
 ///
 /// * `Ok(Program)` - The parsed AST
 /// * `Err(ParseError)` - If parsing fails
-pub fn parse_with_interner(
+pub fn parse_with_interner<'arena>(
     source: &str,
     base_offset: usize,
     interner: SharedInterner,
-) -> Result<Program> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    arena: &'arena bumpalo::Bump,
+) -> Result<Program<'arena>> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     parser.parse().map_err(|e| e.with_context(source))
 }
 
@@ -218,12 +222,13 @@ pub fn parse_with_interner(
 ///
 /// This is used when parsing expressions in contexts where comments need to be
 /// preserved (e.g., Svelte expression tags `{/* comment */ expr}`).
-pub fn parse_expression_with_comments(
+pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     interner: SharedInterner,
-) -> Result<(Expression, Vec<ast::Comment>)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    arena: &'arena bumpalo::Bump,
+) -> Result<(Expression<'arena>, Vec<ast::Comment>)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     parser
         .parse_expression_with_comments()
         .map_err(|e| e.with_context(source))
@@ -237,7 +242,7 @@ pub fn parse_expression_with_comments(
 /// lines (method chains, multiline arrays) indent relative to the surrounding
 /// context.
 pub fn format_expression(
-    expression: &Expression,
+    expression: &Expression<'_>,
     inputs: &PrinterInputs<'_>,
     embed: EmbedContext,
 ) -> String {
@@ -273,12 +278,13 @@ pub fn format_expression(
 ///
 /// Used in Svelte block contexts (`{:then}`, `{:catch}`) where patterns
 /// may have type annotations (e.g., `{:then num: number}`).
-pub fn parse_pattern_with_comments(
+pub fn parse_pattern_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     interner: SharedInterner,
-) -> Result<(Expression, Vec<ast::Comment>)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    arena: &'arena bumpalo::Bump,
+) -> Result<(Expression<'arena>, Vec<ast::Comment>)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let expr = parser
         .parse_expression_public()
         .map_err(|e| e.with_context(source))?;
@@ -292,7 +298,13 @@ pub fn parse_pattern_with_comments(
             .parse_type_annotation_public()
             .map_err(|e| e.with_context(source))?;
         if let Expression::Identifier(id) = &mut pattern {
-            id.type_annotation = Some(ta);
+            // Re-bind the identifier's binding extra with the parsed type
+            // annotation (preserving any decorators already present).
+            let decorators = id.decorators();
+            id.extra = Some(arena.alloc(ast::internal::IdentifierParamExtra {
+                type_annotation: Some(ta),
+                decorators,
+            }));
         }
     }
     let comments = parser.take_comments();
@@ -304,12 +316,13 @@ pub fn parse_pattern_with_comments(
 /// Used in Svelte block contexts where patterns may have type annotations
 /// after simple identifiers (e.g., `{#each items as x: number}`).
 /// The source must start with `:`.
-pub fn parse_type_annotation_partial(
+pub fn parse_type_annotation_partial<'arena>(
     source: &str,
     base_offset: usize,
     interner: SharedInterner,
-) -> Result<(TSTypeAnnotation, usize)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    arena: &'arena bumpalo::Bump,
+) -> Result<(TSTypeAnnotation<'arena>, usize)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let ta = parser
         .parse_type_annotation_public()
         .map_err(|e| e.with_context(source))?;
@@ -325,12 +338,13 @@ pub fn parse_type_annotation_partial(
 /// pattern from the index variable. Uses assignment-expression parsing which
 /// stops at top-level commas (but handles commas inside objects/arrays/calls
 /// correctly).
-pub fn parse_expression_partial_with_comments(
+pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     interner: SharedInterner,
-) -> Result<(Expression, usize, Vec<ast::Comment>)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    arena: &'arena bumpalo::Bump,
+) -> Result<(Expression<'arena>, usize, Vec<ast::Comment>)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let (expr, end_pos) = parser
         .parse_assignment_expression_partial()
         .map_err(|e| e.with_context(source))?;
@@ -343,12 +357,13 @@ pub fn parse_expression_partial_with_comments(
 /// Used by embedders whose host syntax wraps a statement — e.g. Svelte's
 /// `{const …}` / `{let …}` tags, which are a `VariableDeclaration` (no trailing
 /// `;`). The statement's `span().end` is the byte offset just past it.
-pub fn parse_statement_with_comments(
+pub fn parse_statement_with_comments<'arena>(
     source: &str,
     base_offset: usize,
     interner: SharedInterner,
-) -> Result<(Statement, Vec<ast::Comment>)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner)?;
+    arena: &'arena bumpalo::Bump,
+) -> Result<(Statement<'arena>, Vec<ast::Comment>)> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
     let stmt = parser
         .parse_statement()
         .map_err(|e| e.with_context(source))?;
@@ -363,7 +378,7 @@ pub fn parse_statement_with_comments(
 /// no comments need to be preserved.
 pub fn build_variable_declaration_doc_with_comments(
     arena: &DocArena,
-    decl: &VariableDeclaration,
+    decl: &VariableDeclaration<'_>,
     inputs: &PrinterInputs<'_>,
     embed: &EmbedContext,
     emit_semicolon: bool,
@@ -377,7 +392,7 @@ pub fn build_variable_declaration_doc_with_comments(
 /// Set `inputs.comments` to `&[]` when no comments need to be preserved.
 pub fn build_expression_doc_with_comments(
     arena: &DocArena,
-    expression: &Expression,
+    expression: &Expression<'_>,
     inputs: &PrinterInputs<'_>,
     embed: &EmbedContext,
 ) -> DocId {
@@ -396,7 +411,7 @@ pub fn build_expression_doc_with_comments(
 /// Used by `tsv_svelte` for `{#snippet}` parameters.
 pub fn build_function_params_doc_with_comments(
     arena: &DocArena,
-    params: &[Expression],
+    params: &[Expression<'_>],
     params_start: Option<u32>,
     trailing_comments_end: Option<u32>,
     inputs: &PrinterInputs<'_>,
@@ -416,7 +431,7 @@ pub fn build_function_params_doc_with_comments(
 /// for `{#snippet}` generics.
 pub fn build_type_parameters_doc_with_comments(
     arena: &DocArena,
-    type_parameters: &TSTypeParameterDeclaration,
+    type_parameters: &TSTypeParameterDeclaration<'_>,
     inputs: &PrinterInputs<'_>,
     embed: &EmbedContext,
 ) -> DocId {
@@ -430,7 +445,7 @@ pub fn build_type_parameters_doc_with_comments(
 /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
 pub fn build_program_doc(
     arena: &DocArena,
-    program: &Program,
+    program: &Program<'_>,
     source: &str,
     embed: EmbedContext,
 ) -> DocId {

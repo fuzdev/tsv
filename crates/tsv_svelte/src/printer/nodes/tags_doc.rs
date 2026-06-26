@@ -19,7 +19,7 @@ const AT_CONST_TAG_OPEN: &str = "{@const ";
 
 impl<'a> Printer<'a> {
     /// Build a doc for {@html expr}
-    pub(crate) fn build_html_tag_doc(&self, tag: &internal::HtmlTag) -> DocId {
+    pub(crate) fn build_html_tag_doc(&self, tag: &internal::HtmlTag<'_>) -> DocId {
         let d = self.d();
         // Build expression doc with surrounding comments
         // Span range: after "{@html " to before "}"
@@ -40,7 +40,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@const declaration}
-    pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag) -> DocId {
+    pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag<'_>) -> DocId {
         self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, &tag.id, &tag.init, tag.span)
     }
 
@@ -49,7 +49,7 @@ impl<'a> Printer<'a> {
     /// comments) is delegated to `tsv_ts`. The `}` terminates the tag, so the
     /// trailing `;` is dropped — except for a bare single declarator (`{let a}` →
     /// `{let a;}`), which prettier keeps.
-    pub(crate) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag) -> DocId {
+    pub(crate) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag<'_>) -> DocId {
         let d = self.d();
         let decl = &tag.declaration;
         let emit_semicolon = decl.declarations.len() == 1 && decl.declarations[0].init.is_none();
@@ -73,8 +73,8 @@ impl<'a> Printer<'a> {
     fn build_assignment_tag_doc(
         &self,
         prefix: &'static str,
-        id: &tsv_ts::Expression,
-        init: &tsv_ts::Expression,
+        id: &tsv_ts::Expression<'_>,
+        init: &tsv_ts::Expression<'_>,
         span: tsv_lang::Span,
     ) -> DocId {
         let d = self.d();
@@ -133,7 +133,7 @@ impl<'a> Printer<'a> {
     /// that appear in @const tags, delegating to tsv_ts's predicates so the
     /// rules can't drift from our own assignment printer.
     /// Prettier ref: assignment.js:196-226
-    fn const_should_break_after_op(expr: &tsv_ts::Expression) -> bool {
+    fn const_should_break_after_op(expr: &tsv_ts::Expression<'_>) -> bool {
         match expr {
             // Binary expressions break after `=`, UNLESS it's a logical expression
             // with a self-expanding RHS (non-empty object/array). In that case, the
@@ -158,7 +158,7 @@ impl<'a> Printer<'a> {
     /// assignment layout handles indentation; ContinuationIndent would stack.
     fn build_const_init_doc(
         &self,
-        expr: &tsv_ts::Expression,
+        expr: &tsv_ts::Expression<'_>,
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -194,7 +194,7 @@ impl<'a> Printer<'a> {
     /// a cataloged divergence (`tags/debug/debug_comment_prettier_divergence`).
     /// Comments are looked up from `Root.comments` by span and interleaved with
     /// the identifiers, matching the (former) buffer printer's placement.
-    pub(crate) fn build_debug_tag_doc(&self, tag: &internal::DebugTag) -> DocId {
+    pub(crate) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
         let d = self.d();
 
         // Comments within the tag's content (after "{@debug" and before "}").
@@ -238,7 +238,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@render snippet(args)}
-    pub(crate) fn build_render_tag_doc(&self, tag: &internal::RenderTag) -> DocId {
+    pub(crate) fn build_render_tag_doc(&self, tag: &internal::RenderTag<'_>) -> DocId {
         let d = self.d();
         // Build expression doc with surrounding comments
         // Span range: after "{@render " to before "}"

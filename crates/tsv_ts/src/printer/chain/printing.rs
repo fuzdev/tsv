@@ -26,26 +26,36 @@ pub trait ChainPrinter: SymbolLookup {
     fn arena(&self) -> &DocArena;
 
     /// Print an expression as a DocId
-    fn print_expression(&self, expr: &Expression) -> DocId;
+    fn print_expression(&self, expr: &Expression<'_>) -> DocId;
 
     /// Build inner doc for logical binary in parenthesized chain base
-    fn build_parenthesized_base_inner_logical(&self, binary: &internal::BinaryExpression) -> DocId;
+    fn build_parenthesized_base_inner_logical(
+        &self,
+        binary: &internal::BinaryExpression<'_>,
+    ) -> DocId;
 
     /// Build inner doc for arithmetic binary in parenthesized chain base
-    fn build_parenthesized_base_inner_binary(&self, binary: &internal::BinaryExpression) -> DocId;
+    fn build_parenthesized_base_inner_binary(
+        &self,
+        binary: &internal::BinaryExpression<'_>,
+    ) -> DocId;
 
     /// Print call arguments: () or (arg1, arg2)
-    fn print_call_args(&self, call: &internal::CallExpression, optional: bool) -> DocId;
+    fn print_call_args(&self, call: &internal::CallExpression<'_>, optional: bool) -> DocId;
 
     /// Print call arguments with forced expansion (hardlines)
     /// Used for the "args broken, chain inline" state in conditionalGroup
-    fn print_call_args_expanded(&self, call: &internal::CallExpression, optional: bool) -> DocId;
+    fn print_call_args_expanded(
+        &self,
+        call: &internal::CallExpression<'_>,
+        optional: bool,
+    ) -> DocId;
 
     /// Print call arguments with standard forced expansion (hardlines, no arrow hugging)
     /// Always uses `(\n  args,\n)`, never `(sig =>\n  body,\n)`
     fn print_call_args_standard_expanded(
         &self,
-        call: &internal::CallExpression,
+        call: &internal::CallExpression<'_>,
         optional: bool,
     ) -> DocId;
 
@@ -63,7 +73,7 @@ pub trait ChainPrinter: SymbolLookup {
     ) -> DocId;
 
     /// Get the span for a given expression
-    fn get_property_span(&self, expr: &Expression) -> Span;
+    fn get_property_span(&self, expr: &Expression<'_>) -> Span;
 
     /// Check if the chain is the direct child of an ExpressionStatement
     ///

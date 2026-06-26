@@ -16,25 +16,25 @@ use super::{
 /// Represents a class declaration with optional superclass.
 /// For `export default class {}`, the name is optional.
 #[derive(Debug, Clone)]
-pub struct ClassDeclaration {
+pub struct ClassDeclaration<'arena> {
     /// Decorators applied to this class
-    pub decorators: Option<Vec<Decorator>>,
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     /// Class name (required for declarations, optional for export default)
-    pub id: Option<Identifier>,
+    pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
-    pub super_class: Option<Box<Expression>>,
+    pub super_class: Option<&'arena Expression<'arena>>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
-    pub super_type_parameters: Option<TSTypeParameterInstantiation>,
+    pub super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
     /// Implements clause for declare class: `implements Foo, Bar`
-    pub implements: Vec<TSInterfaceHeritage>,
+    pub implements: &'arena [TSInterfaceHeritage<'arena>],
     /// Class body containing methods and properties
-    pub body: ClassBody,
+    pub body: ClassBody<'arena>,
     /// Whether this is a declare class (ambient declaration)
     pub declare: bool,
     /// Whether this is an abstract class
     pub r#abstract: bool,
     /// Type parameters (e.g., `<T>` in `class Foo<T>`)
-    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     pub span: Span,
 }
 
@@ -43,23 +43,23 @@ pub struct ClassDeclaration {
 /// Same as ClassDeclaration but used in expression position.
 /// The name is always optional.
 #[derive(Debug, Clone)]
-pub struct ClassExpression {
+pub struct ClassExpression<'arena> {
     /// Decorators applied to this class
-    pub decorators: Option<Vec<Decorator>>,
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     /// Class name (always optional for expressions)
-    pub id: Option<Identifier>,
+    pub id: Option<Identifier<'arena>>,
     /// Optional superclass expression (for `extends`)
-    pub super_class: Option<Box<Expression>>,
+    pub super_class: Option<&'arena Expression<'arena>>,
     /// Type arguments for superclass (e.g., `<T>` in `extends Base<T>`)
-    pub super_type_parameters: Option<TSTypeParameterInstantiation>,
+    pub super_type_parameters: Option<TSTypeParameterInstantiation<'arena>>,
     /// Implements clause: `implements Foo, Bar`
-    pub implements: Vec<TSInterfaceHeritage>,
+    pub implements: &'arena [TSInterfaceHeritage<'arena>],
     /// Class body containing methods and properties
-    pub body: ClassBody,
+    pub body: ClassBody<'arena>,
     /// Whether this is an abstract class
     pub r#abstract: bool,
     /// Type parameters (e.g., `<T>` in `class Foo<T>`)
-    pub type_parameters: Option<TSTypeParameterDeclaration>,
+    pub type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
     pub span: Span,
 }
 
@@ -67,21 +67,21 @@ pub struct ClassExpression {
 ///
 /// Contains the methods and properties of a class.
 #[derive(Debug, Clone)]
-pub struct ClassBody {
-    pub body: Vec<ClassMember>,
+pub struct ClassBody<'arena> {
+    pub body: &'arena [ClassMember<'arena>],
     pub span: Span,
 }
 
 /// Class member - method definition, property definition, or static block
 #[derive(Debug, Clone)]
-pub enum ClassMember {
-    MethodDefinition(MethodDefinition),
-    PropertyDefinition(PropertyDefinition),
-    StaticBlock(StaticBlock),
-    IndexSignature(TSIndexSignature),
+pub enum ClassMember<'arena> {
+    MethodDefinition(MethodDefinition<'arena>),
+    PropertyDefinition(PropertyDefinition<'arena>),
+    StaticBlock(StaticBlock<'arena>),
+    IndexSignature(TSIndexSignature<'arena>),
 }
 
-impl ClassMember {
+impl<'arena> ClassMember<'arena> {
     pub fn span(&self) -> Span {
         match self {
             ClassMember::MethodDefinition(m) => m.span,
@@ -94,8 +94,8 @@ impl ClassMember {
 
 /// Static initialization block in a class: `static { ... }` (ES2022)
 #[derive(Debug, Clone)]
-pub struct StaticBlock {
-    pub body: Vec<Statement>,
+pub struct StaticBlock<'arena> {
+    pub body: &'arena [Statement<'arena>],
     pub span: Span,
 }
 
@@ -141,7 +141,7 @@ impl Accessibility {
 
 /// TypeScript parameter property in constructor: `constructor(public x: number)`
 #[derive(Debug, Clone)]
-pub struct TSParameterProperty {
+pub struct TSParameterProperty<'arena> {
     /// Accessibility modifier: public, private, protected
     pub accessibility: Option<Accessibility>,
     /// Whether the parameter is readonly
@@ -149,20 +149,20 @@ pub struct TSParameterProperty {
     /// Whether the parameter property carries the `override` modifier
     pub r#override: bool,
     /// The actual parameter - can be Identifier or AssignmentPattern (with default value)
-    pub parameter: Box<Expression>,
+    pub parameter: &'arena Expression<'arena>,
     pub span: Span,
 }
 
 /// Method definition in a class body: `method() { ... }` or `get x() { ... }`
 #[derive(Debug, Clone)]
 #[allow(clippy::struct_excessive_bools)] // independent flags, not a state machine
-pub struct MethodDefinition {
+pub struct MethodDefinition<'arena> {
     /// Decorators applied to this method
-    pub decorators: Option<Vec<Decorator>>,
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     /// Method name (key)
-    pub key: Expression,
+    pub key: Expression<'arena>,
     /// Method implementation (value)
-    pub value: FunctionExpression,
+    pub value: FunctionExpression<'arena>,
     /// Method kind (constructor, method, get, set)
     pub kind: MethodKind,
     /// Accessibility modifier (public, private, protected)
@@ -201,15 +201,15 @@ pub enum PropertyModifier {
 /// Unlike methods, properties use `=` for initialization.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
-pub struct PropertyDefinition {
+pub struct PropertyDefinition<'arena> {
     /// Decorators applied to this property
-    pub decorators: Option<Vec<Decorator>>,
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     /// Property name (key)
-    pub key: Expression,
+    pub key: Expression<'arena>,
     /// Type annotation (e.g., `: number` in `a: number = 0;`)
-    pub type_annotation: Option<TSTypeAnnotation>,
+    pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     /// Optional initial value
-    pub value: Option<Expression>,
+    pub value: Option<Expression<'arena>>,
     /// Accessibility modifier (public, private, protected)
     pub accessibility: Option<Accessibility>,
     /// Whether this is a static property

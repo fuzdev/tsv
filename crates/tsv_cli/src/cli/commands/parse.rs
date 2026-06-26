@@ -58,9 +58,13 @@ fn parse_to_json(source: &str, pretty: bool, parser_type: ParserType) -> Result<
     // Compact output uses the convert_ast_json_string hot path (skips the
     // intermediate serde_json::Value when eligible); pretty-printing needs
     // the Value for tab-indented serialization.
+    // The arena owns the internal AST; convert produces owned JSON, so nothing
+    // borrowed escapes this function. Pre-sized to the source to avoid the
+    // bump's chunk-doubling tail on the parse.
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
     macro_rules! emit {
         ($lang:ident) => {{
-            let ast = $lang::parse(source).map_err(|e| e.to_string())?;
+            let ast = $lang::parse(source, &arena).map_err(|e| e.to_string())?;
             if pretty {
                 to_json_with_tabs(&$lang::convert_ast_json(&ast, source))
                     .map_err(|e| format!("JSON serialization failed: {e}"))?

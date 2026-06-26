@@ -168,7 +168,7 @@ impl<'a> Printer<'a> {
     /// not by the spread doc itself.
     pub(crate) fn spread_own_line_block_comments(
         &self,
-        expr: &internal::Expression,
+        expr: &internal::Expression<'_>,
     ) -> Vec<&tsv_lang::Comment> {
         if let internal::Expression::SpreadElement(spread) = expr {
             let arg_end = spread.argument.span().end;
@@ -235,7 +235,7 @@ impl<'a> Printer<'a> {
     /// Used for variable init, assignment RHS, and ternary branches.
     pub(crate) fn build_expression_doc_with_paren_comments(
         &self,
-        expr: &internal::Expression,
+        expr: &internal::Expression<'_>,
         boundary_end: u32,
     ) -> DocId {
         let expr_end = expr.span().end;
@@ -267,7 +267,7 @@ impl<'a> Printer<'a> {
     /// the user wrote it.
     pub(crate) fn build_expression_doc_keep_paren_comments(
         &self,
-        expr: &internal::Expression,
+        expr: &internal::Expression<'_>,
         boundary_end: u32,
     ) -> DocId {
         let d = self.d();

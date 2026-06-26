@@ -99,23 +99,28 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 const ALLOW: &[Allow] = &[
     // ── tsv_css ──────────────────────────────────────────────────────────────
     (
-        "tsv_css/src/ast/convert.rs",
+        "tsv_css/src/ast/convert/mod.rs",
         "if let Some(comment_idx) = before_colon.find(\"/*\") {",
         "comment-marker",
     ),
     (
-        "tsv_css/src/ast/convert.rs",
+        "tsv_css/src/ast/convert/mod.rs",
         "if let Some(end_rel) = rest[2..].find(\"*/\") {",
         "comment-marker",
     ),
     (
-        "tsv_css/src/ast/convert.rs",
+        "tsv_css/src/ast/convert/mod.rs",
         ".find(\"*/\")",
         "comment-marker",
     ),
     (
-        "tsv_css/src/ast/convert.rs",
+        "tsv_css/src/ast/convert/mod.rs",
         "raw.find('(').map_or(span.end, |i| span.start + i as u32)",
+        "css-value",
+    ),
+    (
+        "tsv_css/src/ast/convert/mod.rs",
+        "let prefix = raw.find('|').map_or(0, |i| i + 1);",
         "css-value",
     ),
     (

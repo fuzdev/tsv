@@ -19,7 +19,7 @@ impl<'a> Printer<'a> {
     /// Non-breaking spaces (U+00A0 / U+202F) are content, not collapsible
     /// whitespace, so a leading nbsp still hugs (matching prettier-plugin-svelte's
     /// `STARTS_WITH_HTML_COLLAPSE_WHITESPACE_RE = /^[\t\n\f\r ]/`).
-    pub(crate) fn should_hug_start(&self, element: &internal::Element, is_block: bool) -> bool {
+    pub(crate) fn should_hug_start(&self, element: &internal::Element<'_>, is_block: bool) -> bool {
         if is_block {
             return false;
         }
@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
     ///
     /// Non-breaking spaces are content, so a trailing nbsp still hugs (matching
     /// `ENDS_WITH_HTML_COLLAPSE_WHITESPACE_RE = /[\t\n\f\r ]$/`).
-    pub(crate) fn should_hug_end(&self, element: &internal::Element, is_block: bool) -> bool {
+    pub(crate) fn should_hug_end(&self, element: &internal::Element<'_>, is_block: bool) -> bool {
         if is_block {
             return false;
         }

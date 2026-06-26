@@ -31,7 +31,7 @@ impl<'a> Printer<'a> {
     /// (`: A /* c */`).
     pub(crate) fn build_property_signature_member_doc(
         &self,
-        prop: &internal::TSPropertySignature,
+        prop: &internal::TSPropertySignature<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
@@ -132,7 +132,7 @@ impl<'a> Printer<'a> {
     /// emitted twice. Then `>`→`(` and signature end→`;`.
     pub(crate) fn build_method_signature_member_doc(
         &self,
-        method: &internal::TSMethodSignature,
+        method: &internal::TSMethodSignature<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
@@ -207,7 +207,7 @@ impl<'a> Printer<'a> {
             self.append_type_params_to_paren_comments(&mut parts, tp_end, paren_pos);
         }
 
-        parts.push(self.build_signature_params_doc(&method.params, paren_pos));
+        parts.push(self.build_signature_params_doc(method.params, paren_pos));
         if let Some(return_type) = &method.return_type {
             parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
         }
@@ -226,11 +226,11 @@ impl<'a> Printer<'a> {
     /// printers (the interface caller appends `;`).
     pub(crate) fn build_call_signature_member_doc(
         &self,
-        call: &internal::TSCallSignatureDeclaration,
+        call: &internal::TSCallSignatureDeclaration<'_>,
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
             call.type_parameters.as_ref(),
-            &call.params,
+            call.params,
             call.return_type.as_ref(),
             call.span.start,
             call.span.end,
@@ -243,11 +243,11 @@ impl<'a> Printer<'a> {
     /// type-element printers (the interface caller appends `;`).
     pub(crate) fn build_construct_signature_member_doc(
         &self,
-        ctor: &internal::TSConstructSignatureDeclaration,
+        ctor: &internal::TSConstructSignatureDeclaration<'_>,
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
             ctor.type_parameters.as_ref(),
-            &ctor.params,
+            ctor.params,
             ctor.return_type.as_ref(),
             ctor.span.start,
             ctor.span.end,
@@ -268,9 +268,9 @@ impl<'a> Printer<'a> {
     /// trailing space and line comments a hardline.
     fn build_call_or_construct_signature_doc(
         &self,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
-        params: &[internal::Expression],
-        return_type: Option<&internal::TSTypeAnnotation>,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        params: &[internal::Expression<'_>],
+        return_type: Option<&internal::TSTypeAnnotation<'_>>,
         span_start: u32,
         span_end: u32,
         new_keyword_end: Option<u32>,
@@ -340,7 +340,7 @@ impl<'a> Printer<'a> {
 
     /// Build doc for a type member without its trailing `;` — the type-literal
     /// printer is responsible for the separator and any surrounding comments.
-    pub(super) fn build_type_member_doc_inner(&self, member: &TSTypeElement) -> DocId {
+    pub(super) fn build_type_member_doc_inner(&self, member: &TSTypeElement<'_>) -> DocId {
         match member {
             TSTypeElement::PropertySignature(prop) => {
                 self.build_property_signature_member_doc(prop)
@@ -383,7 +383,7 @@ impl<'a> Printer<'a> {
     /// — is delegated to the shared `build_type_annotation_doc`.
     pub(in crate::printer) fn build_index_signature_member_doc(
         &self,
-        idx: &internal::TSIndexSignature,
+        idx: &internal::TSIndexSignature<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
@@ -423,7 +423,7 @@ impl<'a> Printer<'a> {
             .iter()
             .map(|param| {
                 let mut param_parts: DocBuf = smallvec![d.symbol(param.name.to_u32())];
-                if let Some(type_ann) = &param.type_annotation {
+                if let Some(type_ann) = param.type_annotation() {
                     // The `: keyType` annotation, handling a before-`:` comment between
                     // the key name and `:` — line → indented continuation (the hardline
                     // also breaks the bracket group), block → inline (`[key /* c */ : T]`).

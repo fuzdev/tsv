@@ -217,14 +217,18 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_json_fn(source: &str) -> Result<String, JsError> {
-            let ast = $lang::parse(source).map_err(err)?;
+            let arena =
+                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+            let ast = $lang::parse(source, &arena).map_err(err)?;
             Ok($lang::convert_ast_json_string(&ast, source))
         }
 
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_internal_fn(source: &str) -> Result<(), JsError> {
-            let ast = $lang::parse(source).map_err(err)?;
+            let arena =
+                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+            let ast = $lang::parse(source, &arena).map_err(err)?;
             std::hint::black_box(ast);
             Ok(())
         }
@@ -232,7 +236,9 @@ macro_rules! lang_bindings {
         #[cfg(feature = "format")]
         #[wasm_bindgen]
         pub fn $format_fn(source: &str) -> Result<String, JsError> {
-            let ast = $lang::parse(source).map_err(err)?;
+            let arena =
+                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+            let ast = $lang::parse(source, &arena).map_err(err)?;
             Ok($lang::format(&ast, source))
         }
     };

@@ -21,14 +21,20 @@ use tsv_lang::printing::format_string_literal;
 ///
 /// Extracts the raw string from source, strips quotes, and formats it
 /// according to the literal's quote style.
-pub(crate) fn format_string_literal_from_ast(literal: &internal::Literal, source: &str) -> String {
+pub(crate) fn format_string_literal_from_ast(
+    literal: &internal::Literal<'_>,
+    source: &str,
+) -> String {
     let raw_literal = literal.span.extract(source);
     let raw_content = &raw_literal[1..raw_literal.len() - 1];
 
-    let quote = match &literal.value {
-        LiteralValue::String { quote, .. } => *quote,
-        _ => unreachable!("format_string_literal_from_ast called on non-string literal"),
-    };
+    debug_assert!(
+        matches!(&literal.value, LiteralValue::String(_)),
+        "format_string_literal_from_ast called on non-string literal"
+    );
+    // The quote char is recovered from source (the byte at the span start) rather
+    // than stored on the literal.
+    let quote = literal.string_quote(source) as char;
 
     format_string_literal(raw_content, quote)
 }
@@ -226,7 +232,7 @@ pub fn sort_regex_flags(flags: &str) -> String {
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a literal
-    pub(in crate::printer) fn build_literal_doc(&self, literal: &internal::Literal) -> DocId {
+    pub(in crate::printer) fn build_literal_doc(&self, literal: &internal::Literal<'_>) -> DocId {
         let d = self.d();
         match &literal.value {
             LiteralValue::Number(_) => {
@@ -234,10 +240,10 @@ impl<'a> Printer<'a> {
                 let raw = literal.span.extract(self.source);
                 d.text_owned(normalize_number_literal(raw))
             }
-            LiteralValue::String { .. } => {
+            LiteralValue::String(_) => {
                 d.text_owned(format_string_literal_from_ast(literal, self.source))
             }
-            LiteralValue::BigInt(_) => {
+            LiteralValue::BigInt => {
                 // Extract raw literal and normalize it (lowercases hex digits)
                 let raw = literal.span.extract(self.source);
                 d.text_owned(normalize_number_literal(raw))
@@ -255,7 +261,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an identifier
-    pub(in crate::printer) fn build_identifier_doc(&self, id: &internal::Identifier) -> DocId {
+    pub(in crate::printer) fn build_identifier_doc(&self, id: &internal::Identifier<'_>) -> DocId {
         self.build_identifier_doc_inner(id, false)
     }
 
@@ -265,13 +271,17 @@ impl<'a> Printer<'a> {
     /// break internally (e.g., `let x: Map<LongA, LongB>` breaks inside `<>`).
     pub(in crate::printer) fn build_identifier_doc_with_wrapping_type(
         &self,
-        id: &internal::Identifier,
+        id: &internal::Identifier<'_>,
     ) -> DocId {
         self.build_identifier_doc_inner(id, true)
     }
 
     /// Inner implementation for identifier doc building.
-    fn build_identifier_doc_inner(&self, id: &internal::Identifier, wrap_type_args: bool) -> DocId {
+    fn build_identifier_doc_inner(
+        &self,
+        id: &internal::Identifier<'_>,
+        wrap_type_args: bool,
+    ) -> DocId {
         let d = self.d();
 
         // Fast path for the common bare identifier (no decorators, optional
@@ -279,14 +289,14 @@ impl<'a> Printer<'a> {
         // Skips the single-element `parts` Vec the slow path heap-allocates and
         // the name-end scan that only the modifier/annotation branches consume.
         // Returns the exact DocId the `parts.len() == 1` tail would.
-        if id.decorators.is_none() && !id.optional && id.type_annotation.is_none() {
+        if id.decorators().is_none() && !id.optional && id.type_annotation().is_none() {
             return d.symbol(id.name.to_u32());
         }
 
         let mut parts = DocBuf::new();
 
         // Handle decorators (for parameter decorators)
-        if let Some(decorators) = &id.decorators {
+        if let Some(decorators) = id.decorators() {
             for decorator in decorators {
                 parts.push(d.text("@"));
                 parts.push(self.build_decorator_expression_doc(decorator));
@@ -298,10 +308,7 @@ impl<'a> Printer<'a> {
         parts.push(d.symbol(id.name.to_u32()));
 
         // Compute name_end for comment extraction (used by optional and type annotation)
-        let search_end = id
-            .type_annotation
-            .as_ref()
-            .map_or(id.span.end, |ta| ta.span.start);
+        let search_end = id.type_annotation().map_or(id.span.end, |ta| ta.span.start);
         let raw_name_end = analysis::skip_identifier_at(
             self.source.as_bytes(),
             id.span.start as usize,
@@ -318,7 +325,7 @@ impl<'a> Printer<'a> {
 
         // Type annotation, handling a before-`:` comment between the name (and any
         // `?`) and `:` — line → indented continuation, block → inline before `:`.
-        if let Some(type_annotation) = &id.type_annotation {
+        if let Some(type_annotation) = id.type_annotation() {
             parts.push(self.build_binding_type_annotation_doc(
                 after_modifier,
                 type_annotation,
@@ -345,15 +352,18 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a spread element
-    pub(in crate::printer) fn build_spread_doc(&self, spread: &internal::SpreadElement) -> DocId {
+    pub(in crate::printer) fn build_spread_doc(
+        &self,
+        spread: &internal::SpreadElement<'_>,
+    ) -> DocId {
         let d = self.d();
         let needs_parens =
-            super::needs_parens(&spread.argument, super::ParenContext::SpreadArgument);
+            super::needs_parens(spread.argument, super::ParenContext::SpreadArgument);
         // A binaryish spread argument indents its continuation when it breaks
         // (`...(a &&\n\tb && {…})`), matching Prettier — a `SpreadElement` parent is
         // not in binaryish.js's `shouldNotIndent` set, so the logical/binary chain
         // gets the continuation indent. Non-binary arguments are unaffected.
-        let arg_doc = self.build_expression_doc_with_indent_on_break(&spread.argument);
+        let arg_doc = self.build_expression_doc_with_indent_on_break(spread.argument);
 
         // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)
         let dots_end = spread.span.start + "...".len() as u32;

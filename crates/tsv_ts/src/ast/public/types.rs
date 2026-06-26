@@ -1,6 +1,6 @@
 //! TypeScript type definitions for public AST
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::{Expression, Identifier, Literal, SourceLocation, TemplateElement, is_false};
 
@@ -18,7 +18,7 @@ use super::{Expression, Identifier, Literal, SourceLocation, TemplateElement, is
 /// ```
 ///
 /// Note the nested `typeAnnotation` field uses camelCase for JSON compatibility.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeAnnotation {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -33,7 +33,7 @@ pub struct TSTypeAnnotation {
 ///
 /// Uses serde's untagged enum to serialize each variant based on its structure.
 /// Each variant serializes to a flat object with its own `type` field.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSType {
     TSNumberKeyword(TSNumberKeyword),
@@ -73,7 +73,7 @@ pub enum TSType {
 }
 
 /// TypeScript array type: `number[]`, `string[]`, etc.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSArrayType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -85,7 +85,7 @@ pub struct TSArrayType {
 }
 
 /// TypeScript indexed access type: `T[K]`, `Obj["key"]`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSIndexedAccessType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -99,7 +99,7 @@ pub struct TSIndexedAccessType {
 }
 
 /// TypeScript `number` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSNumberKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -109,7 +109,7 @@ pub struct TSNumberKeyword {
 }
 
 /// TypeScript `string` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSStringKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -119,7 +119,7 @@ pub struct TSStringKeyword {
 }
 
 /// TypeScript `boolean` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSBooleanKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -129,7 +129,7 @@ pub struct TSBooleanKeyword {
 }
 
 /// TypeScript `any` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSAnyKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -139,7 +139,7 @@ pub struct TSAnyKeyword {
 }
 
 /// TypeScript `void` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSVoidKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -149,7 +149,7 @@ pub struct TSVoidKeyword {
 }
 
 /// TypeScript `undefined` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSUndefinedKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -159,7 +159,7 @@ pub struct TSUndefinedKeyword {
 }
 
 /// TypeScript `null` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSNullKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -169,7 +169,7 @@ pub struct TSNullKeyword {
 }
 
 /// TypeScript `never` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSNeverKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -179,7 +179,7 @@ pub struct TSNeverKeyword {
 }
 
 /// TypeScript `unknown` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSUnknownKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -189,7 +189,7 @@ pub struct TSUnknownKeyword {
 }
 
 /// TypeScript `object` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSObjectKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -199,7 +199,7 @@ pub struct TSObjectKeyword {
 }
 
 /// TypeScript `symbol` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSSymbolKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -209,7 +209,7 @@ pub struct TSSymbolKeyword {
 }
 
 /// TypeScript `bigint` type keyword
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSBigIntKeyword {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -219,7 +219,7 @@ pub struct TSBigIntKeyword {
 }
 
 /// TypeScript type alias declaration: `type X = T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeAliasDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -236,7 +236,7 @@ pub struct TSTypeAliasDeclaration {
 }
 
 /// TypeScript literal type: `type X = 'hello'` or `type X = \`template\``
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSLiteralType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -247,7 +247,7 @@ pub struct TSLiteralType {
 }
 
 /// The literal value inside a TSLiteralType
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSLiteralTypeLiteral {
     TemplateLiteral(TemplateLiteralType),
@@ -258,7 +258,7 @@ pub enum TSLiteralTypeLiteral {
 }
 
 /// Template literal used as a type (same structure as TemplateLiteral but expressions are TSType)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TemplateLiteralType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -270,7 +270,7 @@ pub struct TemplateLiteralType {
 }
 
 /// Entity name: `Foo` or `Foo.Bar.Baz`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSEntityName {
     Identifier(Identifier),
@@ -278,7 +278,7 @@ pub enum TSEntityName {
 }
 
 /// Qualified name: `Foo.Bar`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSQualifiedName {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -290,7 +290,7 @@ pub struct TSQualifiedName {
 }
 
 /// Type parameter instantiation: `<T, U>`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeParameterInstantiation {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -301,7 +301,7 @@ pub struct TSTypeParameterInstantiation {
 }
 
 /// Type parameter declaration: `<T extends U = V>`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeParameterDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -314,7 +314,7 @@ pub struct TSTypeParameterDeclaration {
 }
 
 /// Extra metadata for type parameter declarations (trailing comma position)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeParameterExtra {
     #[serde(rename = "trailingComma")]
     pub trailing_comma: u32,
@@ -322,7 +322,7 @@ pub struct TSTypeParameterExtra {
 
 /// Single type parameter: `T extends U = V`
 /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeParameter {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -346,7 +346,7 @@ pub struct TSTypeParameter {
 }
 
 /// Type element - member of a type literal or interface
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSTypeElement {
     PropertySignature(TSPropertySignature),
@@ -357,7 +357,7 @@ pub enum TSTypeElement {
 }
 
 /// Interface body: `{ members }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSInterfaceBody {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -368,7 +368,7 @@ pub struct TSInterfaceBody {
 }
 
 /// Property signature: `prop: T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSPropertySignature {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -388,7 +388,7 @@ pub struct TSPropertySignature {
 }
 
 /// Method signature: `method(): T` or `method<T>(x: T): T` or `get x(): T` or `set x(v: T)`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSMethodSignature {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -411,7 +411,7 @@ pub struct TSMethodSignature {
 }
 
 /// Call signature: `(): T` or `<T>(): T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSCallSignatureDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -427,7 +427,7 @@ pub struct TSCallSignatureDeclaration {
 }
 
 /// Construct signature: `new (): T` or `new <T>(): T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSConstructSignatureDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -443,7 +443,7 @@ pub struct TSConstructSignatureDeclaration {
 }
 
 /// Index signature: `[key: string]: T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSIndexSignature {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -461,7 +461,7 @@ pub struct TSIndexSignature {
 }
 
 /// Union type: `A | B | C`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSUnionType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -472,7 +472,7 @@ pub struct TSUnionType {
 }
 
 /// Intersection type: `A & B & C`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSIntersectionType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -483,7 +483,7 @@ pub struct TSIntersectionType {
 }
 
 /// Type reference: `SomeType` or `Array<T>`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeReference {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -497,7 +497,7 @@ pub struct TSTypeReference {
 }
 
 /// Type literal (object type): `{ prop: T }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeLiteral {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -508,7 +508,7 @@ pub struct TSTypeLiteral {
 }
 
 /// Function type: `(x: T) => U` or `<T>(x: T) => U`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSFunctionType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -524,7 +524,7 @@ pub struct TSFunctionType {
 }
 
 /// Constructor type: `new () => T` or `abstract new <T>() => T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSConstructorType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -542,7 +542,7 @@ pub struct TSConstructorType {
 }
 
 /// Tuple type: `[T, U, V]`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTupleType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -554,7 +554,7 @@ pub struct TSTupleType {
 }
 
 /// Rest type in tuples: `...T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSRestType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -566,7 +566,7 @@ pub struct TSRestType {
 }
 
 /// Optional type in tuples: `T?`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSOptionalType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -578,7 +578,7 @@ pub struct TSOptionalType {
 }
 
 /// Named tuple member: `label: T` or `label?: T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSNamedTupleMember {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -592,7 +592,7 @@ pub struct TSNamedTupleMember {
 }
 
 /// Infer type: `infer U` (in conditional types)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSInferType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -604,7 +604,7 @@ pub struct TSInferType {
 }
 
 /// This type: `this` in type position
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSThisType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -614,7 +614,7 @@ pub struct TSThisType {
 }
 
 /// Parenthesized type: `(T)`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSParenthesizedType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -626,7 +626,7 @@ pub struct TSParenthesizedType {
 }
 
 /// TypeScript type predicate: `x is T` or `asserts x is T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypePredicate {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -641,7 +641,7 @@ pub struct TSTypePredicate {
 }
 
 /// Either an Identifier or TSThisType for the parameter name in a type predicate
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSTypePredicateParameterName {
     Identifier(Identifier),
@@ -649,7 +649,7 @@ pub enum TSTypePredicateParameterName {
 }
 
 /// TypeScript conditional type: `T extends U ? V : W`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSConditionalType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -667,7 +667,7 @@ pub struct TSConditionalType {
 }
 
 /// Mapped type: `{ [K in keyof T]: V }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSMappedType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -691,7 +691,7 @@ pub struct TSMappedType {
 }
 
 /// Type parameter in a mapped type: `K in keyof T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSMappedTypeParameter {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -726,51 +726,8 @@ impl Serialize for TSMappedTypeModifier {
     }
 }
 
-impl<'de> Deserialize<'de> for TSMappedTypeModifier {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::{self, Visitor};
-
-        struct ModifierVisitor;
-
-        impl<'de> Visitor<'de> for ModifierVisitor {
-            type Value = TSMappedTypeModifier;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("true, \"+\", or \"-\"")
-            }
-
-            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                if value {
-                    Ok(TSMappedTypeModifier::True)
-                } else {
-                    Err(E::custom("expected true, not false"))
-                }
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                match value {
-                    "+" => Ok(TSMappedTypeModifier::Plus),
-                    "-" => Ok(TSMappedTypeModifier::Minus),
-                    _ => Err(E::custom(format!("expected '+' or '-', got '{value}'"))),
-                }
-            }
-        }
-
-        deserializer.deserialize_any(ModifierVisitor)
-    }
-}
-
 /// Type operator: `keyof T`, `unique symbol`, `readonly T`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeOperator {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -785,7 +742,7 @@ pub struct TSTypeOperator {
 }
 
 /// Import type: `import('module')` or `import('module', {with: {...}}).Qualifier<T>`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSImportType {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -811,7 +768,7 @@ pub struct TSImportType {
 /// - `Identifier` for `typeof x`
 /// - `TSQualifiedName` for `typeof Foo.bar`
 /// - `TSImportType` for `typeof import("module")`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSTypeQueryExprName {
     Identifier(Identifier),
@@ -822,7 +779,7 @@ pub enum TSTypeQueryExprName {
 /// Type query: `typeof x`, `typeof Foo.bar`, `typeof import("module")`, `typeof Array<T>`
 ///
 /// Gets the type of a value expression.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSTypeQuery {
     #[serde(rename = "type")]
     pub node_type: String,

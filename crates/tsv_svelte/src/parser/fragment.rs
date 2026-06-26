@@ -5,7 +5,7 @@ use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 
-impl<'a> SvelteParser<'a> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse text content between nodes
     ///
     /// Stores the original source text; HTML entities decode lazily via

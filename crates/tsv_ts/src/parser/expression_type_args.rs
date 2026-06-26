@@ -5,7 +5,7 @@ use super::Parser;
 use super::expression_lookahead::{is_function_type_start, scan_for_closing_angle_bracket};
 use super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
 
-impl<'a> Parser<'a> {
+impl<'a, 'arena> Parser<'a, 'arena> {
     /// Check if current position starts type arguments: `<Type, ...>`
     ///
     /// Uses lookahead to distinguish from comparison operator.

@@ -9,11 +9,11 @@ use tsv_lang::{ParseError, Span};
 /// other raw at-rule — `@layer`, `@namespace`, `@keyframes`, …) preserves internal
 /// whitespace verbatim, matching prettier and Svelte. `url()` inner whitespace is trimmed
 /// in both modes (a spec-mandated `<url-token>` normalization).
-pub(super) fn parse_raw_prelude_content(
-    parser: &mut CssParser<'_>,
+pub(super) fn parse_raw_prelude_content<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
     is_selector_list_prelude: bool,
     normalize_whitespace: bool,
-) -> Result<(String, Span), ParseError> {
+) -> Result<(&'arena str, Span), ParseError> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
     let prelude_start = parser.base_offset() + parser.current_start;
     let mut prelude_parts = Vec::new();
@@ -229,7 +229,8 @@ pub(super) fn parse_raw_prelude_content(
         }
     }
 
-    let content = prelude_parts.join("").trim().to_string();
+    let joined = prelude_parts.join("");
+    let content = parser.alloc_str_in(joined.trim());
     let prelude_end = parser.base_offset() + parser.current_start;
     let span = Span {
         start: prelude_start as u32,

@@ -21,7 +21,7 @@ impl<'a> Printer<'a> {
     ///   Matches Prettier's approach where these types keep their doc structure.
     pub(super) fn build_template_literal_doc(
         &self,
-        template: &crate::ast::internal::TemplateLiteral,
+        template: &crate::ast::internal::TemplateLiteral<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = Vec::new();
@@ -215,7 +215,7 @@ impl<'a> Printer<'a> {
     /// Non-qualifying types (CallExpression, ArrowFunctionExpression,
     /// TemplateLiteral, etc.): have internal break points or their own
     /// visual formatting. `${}` hugs while the expression breaks internally.
-    fn is_template_softline_expression(expr: &Expression, has_comments: bool) -> bool {
+    fn is_template_softline_expression(expr: &Expression<'_>, has_comments: bool) -> bool {
         if has_comments {
             return true;
         }
@@ -324,7 +324,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a tagged template expression
     pub(super) fn build_tagged_template_doc(
         &self,
-        tagged: &crate::ast::internal::TaggedTemplateExpression,
+        tagged: &crate::ast::internal::TaggedTemplateExpression<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -333,12 +333,12 @@ impl<'a> Printer<'a> {
         // non-null assertion that seals a parenthesized chain (`` (a?.b)!`x` ``) keeps
         // the parens via the sealed-base rendering. This must happen BEFORE adding
         // removed-paren comments so comments stay outside.
-        let tag_doc = if let Some(sealed) = self.build_sealed_non_null_paren_doc(&tagged.tag) {
+        let tag_doc = if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
             sealed
-        } else if needs_parens(&tagged.tag, ParenContext::TaggedTemplateTag) {
-            d.parens(self.build_expression_doc(&tagged.tag))
+        } else if needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
+            d.parens(self.build_expression_doc(tagged.tag))
         } else {
-            self.build_expression_doc(&tagged.tag)
+            self.build_expression_doc(tagged.tag)
         };
 
         // Check for comments between removed parentheses and tag

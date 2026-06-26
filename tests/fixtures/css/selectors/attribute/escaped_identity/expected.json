@@ -1,0 +1,126 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 565,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 412,
+					"end": 419,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 412,
+							"end": 419,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 412,
+											"end": 419,
+											"name": "Ab",
+											"matcher": null,
+											"value": null,
+											"flags": null
+										}
+									],
+									"start": 412,
+									"end": 419
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 420,
+					"end": 438,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 424,
+							"end": 434,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 412,
+				"end": 438
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 524,
+					"end": 536,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 524,
+							"end": 536,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "AttributeSelector",
+											"start": 524,
+											"end": 536,
+											"name": "f\\oo",
+											"matcher": "=",
+											"value": "baz",
+											"flags": null
+										}
+									],
+									"start": 524,
+									"end": 536
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 537,
+					"end": 556,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 541,
+							"end": 552,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 524,
+				"end": 556
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 557,
+			"styles": "\n\t/* Attribute-selector names preserve escapes verbatim in the FORMATTED output (the\n\t   formatter must not decode them), and the AST `name` is half-decoded like Svelte's\n\t   read_identifier: hex escapes decode, identity escapes keep the `\\`. Mirrors\n\t   class/id/type (escaped_names) and pseudos (pseudo_escaped_identity). */\n\n\t/* hex escape: AST name decodes to \"Ab\"; formatter keeps the raw source */\n\t[\\41 b] {\n\t\tcolor: red;\n\t}\n\n\t/* identity escape: AST name keeps the backslash (\"f\\oo\"); formatter keeps raw */\n\t[f\\oo='baz'] {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 566,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

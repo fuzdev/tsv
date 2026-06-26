@@ -2,7 +2,7 @@
 
 > Production CLI for `tsv` — pure Rust, no Deno
 
-Ships the `tsv` binary (defined in `Cargo.toml` `[[bin]]`). Depends on `tsv_ts`, `tsv_css`, and `tsv_svelte` (each with `convert` features), `tsv_ignore` (discovery ignore-file matching) and `tsv_discover` (the per-directory prune/descend policy over it), plus `argh`, `serde`, and `serde_json` — nothing else. `tsv_debug` depends on this crate and reuses its `cli::` library surface for its own command set; keep that surface stable.
+Ships the `tsv` binary (defined in `Cargo.toml` `[[bin]]`). Depends on `tsv_ts`, `tsv_css`, and `tsv_svelte` (each with `convert` features), `tsv_lang` (the `estimated_ast_arena_capacity` parse-arena pre-size), `tsv_ignore` (discovery ignore-file matching) and `tsv_discover` (the per-directory prune/descend policy over it), plus `argh`, `serde`, and `serde_json` — nothing else. `tsv_debug` depends on this crate and reuses its `cli::` library surface for its own command set; keep that surface stable.
 
 For end-user invocation syntax see the [root CLAUDE.md §CLI Usage](../../CLAUDE.md#cli-usage---parse--format). For pattern background see [`docs/cli.md`](../../docs/cli.md).
 
@@ -16,7 +16,7 @@ For end-user invocation syntax see the [root CLAUDE.md §CLI Usage](../../CLAUDE
 **Library (`tsv_cli::cli`, `tsv_cli::json_utils`)** — re-exported via `lib.rs` for `tsv_debug` to build its own commands on the same plumbing. The stable items:
 
 - `cli::input::{Input, InputArgs, ParserType}` — unified file / `--content` / `--stdin` plumbing + extension auto-detect; `ParserType::name()` is the canonical lowercase name (`--parser` values, sidecar tool keys)
-- `cli::format_source::format_source()` — the in-process parse+format entry point keyed by `ParserType`; the single definition of "format with tsv" shared by the `format` command and `tsv_debug` (`compare`, `ast_diff`, fixture validation)
+- `cli::format_source::{format_source, format_source_in}()` — the in-process parse+format entry point keyed by `ParserType`; the single definition of "format with tsv". `format_source_in(source, parser_type, &Bump)` is the shared implementation (the AST is bump-allocated into the caller's arena, nothing borrowed escapes); `format_source` is the single-shot wrapper that allocates a fresh source-pre-sized arena per call. The `format` command's parallel workers call `format_source_in` so each worker reuses one `Bump` (`reset()` between files); `tsv_debug` (`compare`, `ast_diff`, fixture validation) and the `--content`/`--stdin` path use `format_source`
 - `cli::discover::discover_files()` — file/dir expansion with the formattable-extension filter and gitignore-aware ignore evaluation via `tsv_ignore::IgnoreStack` (full two-regime rules: [root CLAUDE.md §Configuration](../../CLAUDE.md#configuration)). Returns `Discovered { files, errors, warnings }` (non-fatal traversal errors; `warnings` are stderr-only diagnostics — e.g. the heuristic-shadow no-op — that don't touch the exit code or stdout), `Err` per unresolvable arg. The FS walk + format-root resolution + ignore-file reading live here; the **pure per-entry verdict** — safety nets, the build-output heuristic + its shadow-warning text, the formattable-extension check — is delegated to `tsv_discover` (`classify_dir`/`should_format_file`), shared with the WASM CLI and the VS Code extension so all three agree by construction
 - `json_utils::to_json_with_tabs()` — tab-indented `serde_json` (matches workspace style)
 

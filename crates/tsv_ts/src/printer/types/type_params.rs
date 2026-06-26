@@ -22,7 +22,7 @@ impl<'a> Printer<'a> {
     /// Non-wrapping version - always inline, unless expanding comments force multiline
     pub(in crate::printer) fn build_type_parameter_declaration_doc(
         &self,
-        decl: &TSTypeParameterDeclaration,
+        decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
         if self.has_expanding_comments_in_type_param_declaration(decl) {
             return self.build_type_parameter_declaration_doc_with_line_comments(decl);
@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
     /// When the group breaks, each param goes on its own line with trailing comma
     pub(crate) fn build_type_parameter_declaration_doc_wrapping(
         &self,
-        decl: &TSTypeParameterDeclaration,
+        decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
         self.d()
             .group(self.build_type_parameter_declaration_doc_inner(decl))
@@ -52,7 +52,7 @@ impl<'a> Printer<'a> {
     /// Used when caller wants to control the group (e.g., interface header)
     pub(in crate::printer) fn build_type_parameter_declaration_doc_inner(
         &self,
-        decl: &TSTypeParameterDeclaration,
+        decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         if decl.params.is_empty() {
@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
     /// Build doc for type parameter declaration with expanding comments
     pub(in crate::printer) fn build_type_parameter_declaration_doc_with_line_comments(
         &self,
-        decl: &TSTypeParameterDeclaration,
+        decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         let mut inner_parts = DocBuf::new();
@@ -137,7 +137,7 @@ impl<'a> Printer<'a> {
     /// `T extends // comment\n  A`). Used by both wrapping and non-wrapping paths.
     pub(in crate::printer) fn has_expanding_comments_in_type_param_declaration(
         &self,
-        decl: &TSTypeParameterDeclaration,
+        decl: &TSTypeParameterDeclaration<'_>,
     ) -> bool {
         let Some(first) = decl.params.first() else {
             return false;
@@ -149,8 +149,8 @@ impl<'a> Printer<'a> {
         // entirely (content loss). Own-line block comments in this gap are already
         // handled by `has_own_line_block_comments_in_bracket_list`.
         self.has_line_comments_between(decl.span.start + 1, first.span.start)
-            || self.has_line_comments_in_delimited_list(&decl.params, |p| p.span, decl.span.end - 1)
-            || self.has_own_line_block_comments_in_bracket_list(decl.span, &decl.params, |p| p.span)
+            || self.has_line_comments_in_delimited_list(decl.params, |p| p.span, decl.span.end - 1)
+            || self.has_own_line_block_comments_in_bracket_list(decl.span, decl.params, |p| p.span)
             || decl
                 .params
                 .iter()
@@ -166,7 +166,7 @@ impl<'a> Printer<'a> {
     /// after it rather than relocated before (prettier relocates; see conformance_prettier.md).
     fn build_type_parameter_docs_with_comments(
         &self,
-        decl: &TSTypeParameterDeclaration,
+        decl: &TSTypeParameterDeclaration<'_>,
     ) -> (DocBuf, DocId) {
         let d = self.d();
         let mut prev_end = decl.span.start + 1; // After `<`
@@ -246,7 +246,7 @@ impl<'a> Printer<'a> {
     /// `>` terminates it), so the flag is off there.
     pub(in crate::printer) fn build_type_parameter_doc(
         &self,
-        param: &TSTypeParameter,
+        param: &TSTypeParameter<'_>,
         infer_constraint: bool,
     ) -> DocId {
         let d = self.d();
@@ -292,13 +292,13 @@ impl<'a> Printer<'a> {
             // comment inside the parens as if it were between `extends` and the
             // constraint so it forces the indent-and-break layout (matching
             // prettier's paren stripping).
-            let (value_search_end, value_type): (u32, &TSType) = if let TSType::Parenthesized(p) =
-                constraint.as_ref()
+            let (value_search_end, value_type): (u32, &TSType<'_>) = if let TSType::Parenthesized(p) =
+                constraint
                 && self.paren_has_leading_line_comment(p)
             {
-                (p.type_annotation.span().start, p.type_annotation.as_ref())
+                (p.type_annotation.span().start, p.type_annotation)
             } else {
-                (constraint.span().start, constraint.as_ref())
+                (constraint.span().start, constraint)
             };
             self.append_keyword_value_with_comments(
                 &mut parts,
@@ -332,7 +332,7 @@ impl<'a> Printer<'a> {
                 &mut parts,
                 eq_end,
                 default.span().start,
-                default.as_ref(),
+                default,
                 GroupId::TypeParameterDefault,
                 // a default value is never an infer constraint
                 false,
@@ -362,7 +362,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         keyword_end: u32,
         value_start: u32,
-        value_type: &TSType,
+        value_type: &TSType<'_>,
         group_id: GroupId,
         infer_constraint: bool,
     ) {
@@ -455,7 +455,7 @@ impl<'a> Printer<'a> {
     /// ```
     pub(in crate::printer) fn build_type_parameter_instantiation_doc(
         &self,
-        inst: &internal::TSTypeParameterInstantiation,
+        inst: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let d = self.d();
         if inst.params.is_empty() {
@@ -471,13 +471,13 @@ impl<'a> Printer<'a> {
         });
         if has_leading_line_comment
             || self.has_line_comments_in_delimited_list(
-                &inst.params,
+                inst.params,
                 TSType::span,
                 inst.span.end - 1,
             )
             || self.has_own_line_block_comments_in_bracket_list(
                 inst.span,
-                &inst.params,
+                inst.params,
                 TSType::span,
             )
         {
@@ -553,7 +553,7 @@ impl<'a> Printer<'a> {
     /// Build type parameter instantiation with line comments
     fn build_type_parameter_instantiation_doc_with_line_comments(
         &self,
-        inst: &internal::TSTypeParameterInstantiation,
+        inst: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -642,7 +642,7 @@ impl<'a> Printer<'a> {
     /// `<{ ... }>` that overflows breaks block-style (members on their own lines)
     /// rather than spilling an inner union/intersection — matching the type-reference
     /// type-argument path (`build_type_arguments_doc_wrapping`).
-    fn try_build_hugging_curly_type_doc(&self, ty: &TSType) -> Option<DocId> {
+    fn try_build_hugging_curly_type_doc(&self, ty: &TSType<'_>) -> Option<DocId> {
         match ty {
             // Object type literal: { a: number; b: string } or { /* comment */ }
             // Hug if it has members OR comments inside. Standard (not hugging) mode

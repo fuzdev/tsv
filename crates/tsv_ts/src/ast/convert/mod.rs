@@ -286,7 +286,7 @@ pub(super) fn json_number_from_f64(n: f64) -> serde_json::Number {
 /// use `Schema::SvelteScript` for Svelte non-`lang="ts"` `<script>` blocks where
 /// the JSON shape must follow Svelte's parser quirks.
 pub fn convert_program(
-    program: &internal::Program,
+    program: &internal::Program<'_>,
     source: &str,
     loc: &LocationTracker,
     schema: Schema,

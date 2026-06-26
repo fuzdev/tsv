@@ -2,6 +2,9 @@ use crate::ast::internal::{AngleUnit, Color, ColorChannel};
 use phf::phf_set;
 
 /// Parse a color value: hex, named, rgb(), hsl(), etc.
+///
+/// `Hex`/`Named` carry no text — their source is recovered from the value's span at
+/// print time — so this only classifies and needs no arena.
 pub fn parse_color(s: &str) -> Option<Color> {
     // Hex color: #RGB, #RGBA, #RRGGBB, or #RRGGBBAA
     // Length includes the # prefix:
@@ -10,18 +13,20 @@ pub fn parse_color(s: &str) -> Option<Color> {
     // - 7: #RRGGBB (6-digit)
     // - 9: #RRGGBBAA (8-digit with alpha)
     if s.starts_with('#') && matches!(s.len(), 4 | 5 | 7 | 9) {
-        return Some(Color::Hex(s.to_string()));
+        return Some(Color::Hex);
     }
 
     // Named color
     if is_named_color(s) {
-        return Some(Color::Named(s.to_string()));
+        return Some(Color::Named);
     }
 
     None
 }
 
 /// Parse color function: rgb(r, g, b), rgba(r, g, b, a), hsl(...), hsla(...)
+///
+/// Only constructs the `Rgb`/`Hsl` variants.
 pub fn parse_color_function(name: &str, args_str: &str) -> Option<Color> {
     match name {
         "rgb" | "rgba" => parse_rgb(args_str),

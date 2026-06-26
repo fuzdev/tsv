@@ -22,23 +22,30 @@ mod tag;
 // Re-export parser implementation
 use parser_impl::SvelteParser;
 
-/// Parse a Svelte file and return a Root AST node
-pub fn parse_svelte(source: &str) -> Result<Root, ParseError> {
-    let mut parser = SvelteParser::new(source)?;
+/// Parse a Svelte file and return a Root AST node.
+///
+/// `arena` owns the entire parsed graph (the template AST plus the embedded TS
+/// `<script>`/`{expr}` ASTs, which share this one `Bump`); the returned
+/// `Root<'arena>` borrows from it.
+pub fn parse_svelte<'arena>(
+    source: &str,
+    arena: &'arena bumpalo::Bump,
+) -> Result<Root<'arena>, ParseError> {
+    let mut parser = SvelteParser::new(source, arena)?;
     parser.parse_root()
 }
 
-impl<'a> SvelteParser<'a> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse the root node of a Svelte file
     ///
     /// Script and style tags can appear in any order, before/after/between markup.
     /// This parser handles all orderings by parsing linearly and categorizing nodes.
-    pub(crate) fn parse_root(&mut self) -> Result<Root, ParseError> {
+    pub(crate) fn parse_root(&mut self) -> Result<Root<'arena>, ParseError> {
         let mut instance = None;
         let mut module = None;
         let mut css = None;
         let mut options = None;
-        let mut fragment_nodes = Vec::new();
+        let mut fragment_nodes = self.bvec();
         // Start gap tracking at lexer's initial position (accounts for BOM skip)
         let mut last_end = self.initial_position();
         let mut root_start = None;
@@ -79,13 +86,13 @@ impl<'a> SvelteParser<'a> {
                         if module.is_some() {
                             return Err(self.error_duplicate("module script"));
                         }
-                        module = Some(Box::new(script));
+                        module = Some(self.alloc(script));
                     }
                     ScriptContext::Default => {
                         if instance.is_some() {
                             return Err(self.error_duplicate("instance script"));
                         }
-                        instance = Some(Box::new(script));
+                        instance = Some(self.alloc(script));
                     }
                 }
             } else if self.check(TokenKind::LeftAngle) && self.is_next_tag("style")? {
@@ -99,7 +106,7 @@ impl<'a> SvelteParser<'a> {
                 if css.is_some() {
                     return Err(self.error_duplicate("style tag"));
                 }
-                css = Some(Box::new(style));
+                css = Some(self.alloc(style));
             } else {
                 // Regular markup: capture text and parse elements/expressions/comments
 
@@ -156,7 +163,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         let fragment = Fragment {
-            nodes: fragment_nodes,
+            nodes: fragment_nodes.into_bump_slice(),
         };
 
         // Root span calculation: Skip leading/trailing whitespace-only text nodes
@@ -207,12 +214,12 @@ impl<'a> SvelteParser<'a> {
 
         // Collect all comments from scripts and template expressions
         let mut comments = Vec::new();
-        if let Some(ref script) = instance {
+        if let Some(script) = instance {
             for ts_comment in &script.content.comments {
                 comments.push(ts_comment.clone());
             }
         }
-        if let Some(ref script) = module {
+        if let Some(script) = module {
             for ts_comment in &script.content.comments {
                 comments.push(ts_comment.clone());
             }
@@ -241,7 +248,7 @@ impl<'a> SvelteParser<'a> {
     ///
     /// svelte:options is always self-closing and has no children.
     /// It configures component behavior via attributes like `runes`, `customElement`, etc.
-    fn parse_svelte_options(&mut self) -> Result<SvelteOptions, ParseError> {
+    fn parse_svelte_options(&mut self) -> Result<SvelteOptions<'arena>, ParseError> {
         let start = self.current_start;
 
         // Parse opening: <svelte:options
@@ -272,7 +279,7 @@ impl<'a> SvelteParser<'a> {
         }
 
         Ok(SvelteOptions {
-            attributes,
+            attributes: attributes.into_bump_slice(),
             span: Span {
                 start: start as u32,
                 end,

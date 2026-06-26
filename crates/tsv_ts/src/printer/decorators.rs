@@ -20,7 +20,7 @@ impl<'a> Printer<'a> {
     /// `canDecoratorExpressionUnparenthesized` in parentheses/parent-needs-parentheses.js.
     pub(in crate::printer) fn build_decorator_expression_doc(
         &self,
-        decorator: &internal::Decorator,
+        decorator: &internal::Decorator<'_>,
     ) -> DocId {
         let d = self.d();
         let expr_doc = self.build_expression_doc(&decorator.expression);
@@ -38,7 +38,7 @@ impl<'a> Printer<'a> {
     /// Used for class-level decorators which always go on their own line.
     pub(in crate::printer) fn build_decorators_doc(
         &self,
-        decorators: Option<&[internal::Decorator]>,
+        decorators: Option<&[internal::Decorator<'_>]>,
         next_token_start: u32,
     ) -> Option<DocId> {
         let decorators = decorators?;
@@ -82,7 +82,7 @@ impl<'a> Printer<'a> {
     /// uses `hasNewlineBetweenOrAfterDecorators` to decide `hardline` vs `line`.
     pub(in crate::printer) fn build_class_member_decorators_doc(
         &self,
-        decorators: Option<&[internal::Decorator]>,
+        decorators: Option<&[internal::Decorator<'_>]>,
         next_token_start: u32,
     ) -> Option<DocId> {
         let decorators = decorators?;
@@ -215,14 +215,14 @@ impl<'a> Printer<'a> {
 
 /// Whether `expr` is a bare-decorator member chain: an identifier, or a
 /// non-computed, non-optional member chain of identifiers down to one.
-fn is_decorator_member_expression(expr: &internal::Expression) -> bool {
+fn is_decorator_member_expression(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::Identifier(_) => true,
         internal::Expression::MemberExpression(member) => {
             !member.computed
                 && !member.optional
-                && matches!(&*member.property, internal::Expression::Identifier(_))
-                && is_decorator_member_expression(&member.object)
+                && matches!(member.property, internal::Expression::Identifier(_))
+                && is_decorator_member_expression(member.object)
         }
         _ => false,
     }
@@ -230,10 +230,10 @@ fn is_decorator_member_expression(expr: &internal::Expression) -> bool {
 
 /// Whether a decorator expression is valid without parens (see
 /// `Printer::build_decorator_expression_doc`).
-fn can_decorator_expression_unparenthesized(expr: &internal::Expression) -> bool {
+fn can_decorator_expression_unparenthesized(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::CallExpression(call) => {
-            !call.optional && is_decorator_member_expression(&call.callee)
+            !call.optional && is_decorator_member_expression(call.callee)
         }
         _ => is_decorator_member_expression(expr),
     }

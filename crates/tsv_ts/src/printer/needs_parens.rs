@@ -109,7 +109,7 @@ pub enum ParenContext {
 /// Determines if an expression needs parentheses in a given context.
 ///
 /// This is the central entry point for all parenthesization decisions.
-pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
+pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext) -> bool {
     match ctx {
         // Assignment as value needs parens: `const x = (y = z);`
         ParenContext::VariableInit => matches!(expr, Expression::AssignmentExpression(_)),
@@ -296,7 +296,7 @@ pub fn needs_parens(expr: &Expression, ctx: ParenContext) -> bool {
 //
 
 /// `await x` or `yield x` - always need parens together in most contexts
-fn is_await_or_yield(expr: &Expression) -> bool {
+fn is_await_or_yield(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
         Expression::AwaitExpression(_) | Expression::YieldExpression(_)
@@ -305,7 +305,7 @@ fn is_await_or_yield(expr: &Expression) -> bool {
 
 /// Lower precedence expressions that need parens in chain/spread/non-null contexts
 /// Combines: await/yield + type assertions + binary/conditional/assignment
-fn is_lower_precedence(expr: &Expression) -> bool {
+fn is_lower_precedence(expr: &Expression<'_>) -> bool {
     is_await_or_yield(expr)
         || is_type_assertion(expr)
         || matches!(
@@ -317,7 +317,7 @@ fn is_lower_precedence(expr: &Expression) -> bool {
 }
 
 /// `x as T`, `x satisfies T`, or `<T>x` - TypeScript type assertions
-fn is_type_assertion(expr: &Expression) -> bool {
+fn is_type_assertion(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
         Expression::TSAsExpression(_)
@@ -327,7 +327,7 @@ fn is_type_assertion(expr: &Expression) -> bool {
 }
 
 /// Arrow function or function expression
-fn is_function_like(expr: &Expression) -> bool {
+fn is_function_like(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
         Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)
@@ -342,7 +342,7 @@ fn is_function_like(expr: &Expression) -> bool {
 /// `++x!` is `++(x!)`). `UpdateExpression` is easy to omit when adding such a
 /// context (it was missed for `ChainBase` and `NonNull`); routing every
 /// postfix/access-precedence arm through this predicate keeps them in lockstep.
-fn is_unary_or_update(expr: &Expression) -> bool {
+fn is_unary_or_update(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
         Expression::UnaryExpression(_) | Expression::UpdateExpression(_)
@@ -356,18 +356,18 @@ fn is_unary_or_update(expr: &Expression) -> bool {
 /// `NewExpression` callee rule (needs-parens.js). Member access walks the
 /// object (the call must be to the left of `new`'s argument list to be
 /// captured), so `new a[b]()` — no inner call — stays unparenthesized.
-fn new_callee_has_call(expr: &Expression) -> bool {
+fn new_callee_has_call(expr: &Expression<'_>) -> bool {
     match expr {
         Expression::CallExpression(_) => true,
-        Expression::MemberExpression(member) => new_callee_has_call(&member.object),
-        Expression::TSNonNullExpression(non_null) => new_callee_has_call(&non_null.expression),
+        Expression::MemberExpression(member) => new_callee_has_call(member.object),
+        Expression::TSNonNullExpression(non_null) => new_callee_has_call(non_null.expression),
         _ => false,
     }
 }
 
 /// Numeric literal - needs parens in chain base context because `0.toString()` is invalid.
 /// Prettier normalizes `0..toString()` to `(0).toString()`.
-fn is_numeric_literal(expr: &Expression) -> bool {
+fn is_numeric_literal(expr: &Expression<'_>) -> bool {
     matches!(
         expr,
         Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
@@ -384,7 +384,7 @@ fn is_numeric_literal(expr: &Expression) -> bool {
 /// declaration, or class declaration. `({...});`, `(function () {});`,
 /// `(class {});` — matches prettier's "statement starts with `{`/`function`/`class`"
 /// rule (parentheses/needs-parentheses.js).
-fn needs_parens_expression_statement(expr: &Expression) -> bool {
+fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
     match expr {
         // Object expression: `({...});` needs parens to avoid being parsed as a block
         Expression::ObjectExpression(_) => true,
@@ -394,7 +394,7 @@ fn needs_parens_expression_statement(expr: &Expression) -> bool {
         Expression::FunctionExpression(_) | Expression::ClassExpression(_) => true,
         // Object pattern assignment: `({a, b} = obj);` needs parens
         Expression::AssignmentExpression(assign) => {
-            matches!(assign.left.as_ref(), Expression::ObjectPattern(_))
+            matches!(assign.left, Expression::ObjectPattern(_))
         }
         // Sequence: check the first expression
         Expression::SequenceExpression(seq) => seq
@@ -413,45 +413,45 @@ fn needs_parens_expression_statement(expr: &Expression) -> bool {
 /// wraps the class, not the whole member expression. Recurses through the
 /// positions that print first (`.left`, `.object`, `.callee`, `.test`, …) and
 /// stops at IIFE callees/tags (already parenthesized) to match prettier.
-pub(crate) fn leftmost_no_lookahead(expr: &Expression) -> &Expression {
+pub(crate) fn leftmost_no_lookahead<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
     match expr {
         // Binary and logical share `BinaryExpression` here — recurse into `.left`.
-        Expression::BinaryExpression(b) => leftmost_no_lookahead(&b.left),
-        Expression::AssignmentExpression(a) => leftmost_no_lookahead(&a.left),
-        Expression::MemberExpression(m) => leftmost_no_lookahead(&m.object),
-        Expression::ConditionalExpression(c) => leftmost_no_lookahead(&c.test),
+        Expression::BinaryExpression(b) => leftmost_no_lookahead(b.left),
+        Expression::AssignmentExpression(a) => leftmost_no_lookahead(a.left),
+        Expression::MemberExpression(m) => leftmost_no_lookahead(m.object),
+        Expression::ConditionalExpression(c) => leftmost_no_lookahead(c.test),
         Expression::SequenceExpression(s) => {
             s.expressions.first().map_or(expr, leftmost_no_lookahead)
         }
         // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
         // parenthesized by their callee/tag, so prettier stops the walk there.
         Expression::CallExpression(call) => {
-            if matches!(call.callee.as_ref(), Expression::FunctionExpression(_)) {
+            if matches!(call.callee, Expression::FunctionExpression(_)) {
                 expr
             } else {
-                leftmost_no_lookahead(&call.callee)
+                leftmost_no_lookahead(call.callee)
             }
         }
         Expression::TaggedTemplateExpression(t) => {
-            if matches!(t.tag.as_ref(), Expression::FunctionExpression(_)) {
+            if matches!(t.tag, Expression::FunctionExpression(_)) {
                 expr
             } else {
-                leftmost_no_lookahead(&t.tag)
+                leftmost_no_lookahead(t.tag)
             }
         }
         // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
-        Expression::UpdateExpression(u) if !u.prefix => leftmost_no_lookahead(&u.argument),
-        Expression::TSAsExpression(e) => leftmost_no_lookahead(&e.expression),
-        Expression::TSSatisfiesExpression(e) => leftmost_no_lookahead(&e.expression),
-        Expression::TSNonNullExpression(e) => leftmost_no_lookahead(&e.expression),
-        Expression::TSInstantiationExpression(e) => leftmost_no_lookahead(&e.expression),
+        Expression::UpdateExpression(u) if !u.prefix => leftmost_no_lookahead(u.argument),
+        Expression::TSAsExpression(e) => leftmost_no_lookahead(e.expression),
+        Expression::TSSatisfiesExpression(e) => leftmost_no_lookahead(e.expression),
+        Expression::TSNonNullExpression(e) => leftmost_no_lookahead(e.expression),
+        Expression::TSInstantiationExpression(e) => leftmost_no_lookahead(e.expression),
         _ => expr,
     }
 }
 
 /// Binary operand: `<expr> op y` or `x op <expr>`
 fn needs_parens_binary_operand(
-    expr: &Expression,
+    expr: &Expression<'_>,
     parent_op: BinaryOperator,
     is_right: bool,
 ) -> bool {

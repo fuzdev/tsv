@@ -12,7 +12,7 @@ use tsv_lang::doc::arena::DocId;
 /// Check if an expression is a nullish coalescing expression (`??`)
 ///
 /// Prettier wraps `??` in parens when inside a ternary for clarity.
-pub(in crate::printer) fn is_nullish_coalescing(expr: &internal::Expression) -> bool {
+pub(in crate::printer) fn is_nullish_coalescing(expr: &internal::Expression<'_>) -> bool {
     matches!(
         expr,
         internal::Expression::BinaryExpression(bin)
@@ -25,7 +25,7 @@ pub(in crate::printer) fn is_nullish_coalescing(expr: &internal::Expression) -> 
 /// When a template literal contains embedded newlines in its quasi strings,
 /// it should be treated as "multiline" for formatting purposes. This is used
 /// to force ternaries to break when their consequent or alternate is multiline.
-fn is_multiline_template_literal(expr: &internal::Expression) -> bool {
+fn is_multiline_template_literal(expr: &internal::Expression<'_>) -> bool {
     matches!(expr, internal::Expression::TemplateLiteral(t) if template_literal_has_newlines(t))
 }
 
@@ -33,7 +33,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a conditional expression with wrapping support
     pub(in crate::printer) fn build_conditional_doc_with_wrapping(
         &self,
-        cond: &internal::ConditionalExpression,
+        cond: &internal::ConditionalExpression<'_>,
     ) -> DocId {
         self.build_conditional_doc_impl(cond, false, false)
     }
@@ -46,7 +46,7 @@ impl<'a> Printer<'a> {
     /// exempts binaries from indent only when the grandparent is NOT one of these types.
     pub(in crate::printer) fn build_conditional_doc_with_binary_test_indent(
         &self,
-        cond: &internal::ConditionalExpression,
+        cond: &internal::ConditionalExpression<'_>,
     ) -> DocId {
         self.build_conditional_doc_impl(cond, false, true)
     }
@@ -62,7 +62,7 @@ impl<'a> Printer<'a> {
     /// indent (matching Prettier's shouldNotIndent = false for these grandparents).
     fn build_conditional_doc_impl(
         &self,
-        cond: &internal::ConditionalExpression,
+        cond: &internal::ConditionalExpression<'_>,
         is_chained: bool,
         indent_binary_test: bool,
     ) -> DocId {
@@ -79,9 +79,9 @@ impl<'a> Printer<'a> {
         // Check for multiline template literals in test, consequent, or alternate
         // Template literals with embedded newlines should force the ternary to break,
         // even though those newlines don't appear in the doc structure.
-        let has_multiline_template = is_multiline_template_literal(&cond.test)
-            || is_multiline_template_literal(&cond.consequent)
-            || is_multiline_template_literal(&cond.alternate);
+        let has_multiline_template = is_multiline_template_literal(cond.test)
+            || is_multiline_template_literal(cond.consequent)
+            || is_multiline_template_literal(cond.alternate);
 
         // If there are line comments or multiline template literals, use a breaking layout.
         // Block comments after ? or : are handled inline in the non-breaking path.
@@ -97,7 +97,7 @@ impl<'a> Printer<'a> {
         //
         // In embedded contexts (Svelte attributes), the grandparent is a template
         // node (none of the above), so shouldNotIndent = true → no indent.
-        let test = if let internal::Expression::BinaryExpression(binary) = &*cond.test {
+        let test = if let internal::Expression::BinaryExpression(binary) = cond.test {
             if self.embed.is_embedded() {
                 // Embedded: shouldNotIndent = true (grandparent is Svelte template node)
                 self.build_binary_chain_doc(binary)
@@ -109,16 +109,16 @@ impl<'a> Printer<'a> {
                 self.build_binary_chain_doc(binary)
             }
         } else {
-            self.build_expression_doc(&cond.test)
+            self.build_expression_doc(cond.test)
         };
         // Several test-position expressions get parens (Prettier: needs-parentheses.js).
         // For arrow/yield it is semantic: without parens the body absorbs the ternary
         // (`() => 1 ? x : y` parses as `() => (1 ? x : y)`; `yield 1 ? x : y` as
         // `yield (1 ? x : y)`). For `as`/`satisfies` it is clarity parens (same AST —
         // they bind tighter than `?:`), matching the consequent/alternate arms below.
-        let test = if is_nullish_coalescing(&cond.test)
+        let test = if is_nullish_coalescing(cond.test)
             || matches!(
-                &*cond.test,
+                cond.test,
                 internal::Expression::AssignmentExpression(_)
                     | internal::Expression::AwaitExpression(_)
                     | internal::Expression::ArrowFunctionExpression(_)
@@ -138,11 +138,8 @@ impl<'a> Printer<'a> {
         // Bound the consequent's own paren-comment scan at its end — the
         // consequent-to-`:` comment is emitted by `comments_before_colon` below, so a
         // wider boundary would double-emit it.
-        let consequent = self.build_ternary_branch_expr_doc(
-            &cond.consequent,
-            indent_binary_test,
-            consequent_end,
-        );
+        let consequent =
+            self.build_ternary_branch_expr_doc(cond.consequent, indent_binary_test, consequent_end);
 
         // Split comments around ? and : operators.
         // Comments before ? go after test, comments after ? go before consequent,
@@ -187,7 +184,7 @@ impl<'a> Printer<'a> {
         // (like arrow block bodies) gets proper nesting. Exception: nested
         // conditionals handle their own indentation, so no extra wrapper.
         let consequent_doc =
-            if let internal::Expression::ConditionalExpression(nested) = &*cond.consequent {
+            if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
                 // Broken version: continue chain without parens
                 let broken_consequent =
                     self.build_conditional_doc_impl(nested, true, indent_binary_test);
@@ -204,11 +201,11 @@ impl<'a> Printer<'a> {
                     d.if_break(broken_consequent, flat_consequent)
                 }
             } else if matches!(
-                &*cond.consequent,
+                cond.consequent,
                 internal::Expression::TSAsExpression(_)
                     | internal::Expression::TSSatisfiesExpression(_)
                     | internal::Expression::AssignmentExpression(_)
-            ) || is_nullish_coalescing(&cond.consequent)
+            ) || is_nullish_coalescing(cond.consequent)
             {
                 d.indent(d.parens(consequent))
             } else {
@@ -221,22 +218,22 @@ impl<'a> Printer<'a> {
         // - `as`/`satisfies` need parens to avoid `:` ambiguity: `a ? b : (c as T)`
         // - `??` needs parens for clarity: `a ? b : (c ?? d)`
         let alternate_doc =
-            if let internal::Expression::ConditionalExpression(nested) = &*cond.alternate {
+            if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
                 // Recursively build as chained (no group wrapper, no parens)
                 // No indent wrapper - nested conditional has its own structure
                 self.build_conditional_doc_impl(nested, true, indent_binary_test)
             } else {
                 let alternate = self.build_ternary_branch_expr_doc(
-                    &cond.alternate,
+                    cond.alternate,
                     indent_binary_test,
                     cond.span.end,
                 );
                 let alternate = if matches!(
-                    &*cond.alternate,
+                    cond.alternate,
                     internal::Expression::TSAsExpression(_)
                         | internal::Expression::TSSatisfiesExpression(_)
                         | internal::Expression::AssignmentExpression(_)
-                ) || is_nullish_coalescing(&cond.alternate)
+                ) || is_nullish_coalescing(cond.alternate)
                 {
                     d.parens(alternate)
                 } else {
@@ -279,7 +276,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_conditional_doc_with_line_comments(
         &self,
-        cond: &internal::ConditionalExpression,
+        cond: &internal::ConditionalExpression<'_>,
         _is_chained: bool,
     ) -> DocId {
         let d = self.d();
@@ -289,10 +286,10 @@ impl<'a> Printer<'a> {
         let alternate_start = cond.alternate.span().start;
 
         // Build test expression with parens if needed (same logic as non-breaking path)
-        let test = self.build_expression_doc(&cond.test);
-        let test = if is_nullish_coalescing(&cond.test)
+        let test = self.build_expression_doc(cond.test);
+        let test = if is_nullish_coalescing(cond.test)
             || matches!(
-                &*cond.test,
+                cond.test,
                 internal::Expression::AssignmentExpression(_)
                     | internal::Expression::AwaitExpression(_)
             ) {
@@ -351,11 +348,11 @@ impl<'a> Printer<'a> {
         // group stays flat (content fits on one line), but Prettier cascades
         // the break from the parent to the entire ternary chain.
         let (consequent, is_nested_cond) =
-            if let internal::Expression::ConditionalExpression(nested) = &*cond.consequent {
+            if let internal::Expression::ConditionalExpression(nested) = cond.consequent {
                 let chained = self.build_conditional_doc_impl(nested, true, false);
                 (d.group_break(chained), true)
             } else {
-                (self.build_expression_doc(&cond.consequent), false)
+                (self.build_expression_doc(cond.consequent), false)
             };
         if has_line_comment_before_consequent {
             // Line comment — consequent on new line
@@ -414,12 +411,12 @@ impl<'a> Printer<'a> {
 
         // Alternate expression - nested conditionals cascade the break without extra indent
         let alternate_doc =
-            if let internal::Expression::ConditionalExpression(nested) = &*cond.alternate {
+            if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
                 // Recursively use breaking layout - no indent wrapper (has its own structure)
                 self.build_conditional_doc_with_line_comments(nested, true)
             } else {
                 // Regular expressions get indent wrapper
-                d.indent(self.build_expression_doc(&cond.alternate))
+                d.indent(self.build_expression_doc(cond.alternate))
             };
 
         if has_line_comment_before_alternate {
@@ -502,7 +499,7 @@ impl<'a> Printer<'a> {
     /// shouldNotIndent=false for these contexts (binaryish.js:109-113).
     fn build_ternary_branch_expr_doc(
         &self,
-        expr: &internal::Expression,
+        expr: &internal::Expression<'_>,
         indent_binary: bool,
         boundary_end: u32,
     ) -> DocId {

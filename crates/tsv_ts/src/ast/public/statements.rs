@@ -1,6 +1,6 @@
 //! Statement types for public AST
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::classes::ClassDeclaration;
 use super::declarations::{
@@ -13,7 +13,7 @@ use super::modules::{
 use super::types::{TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration};
 use super::{Expression, Identifier, SourceLocation, is_false};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum Statement {
     ExpressionStatement(ExpressionStatement),
@@ -50,7 +50,7 @@ pub enum Statement {
     DebuggerStatement(DebuggerStatement),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ExpressionStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -65,7 +65,7 @@ pub struct ExpressionStatement {
 }
 
 /// Block statement (function body with braces)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BlockStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -77,7 +77,7 @@ pub struct BlockStatement {
 
 /// Function declaration: `function foo(x) { return x + 1; }`
 /// For `export default function() {}`, id is null.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FunctionDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -102,7 +102,7 @@ pub struct FunctionDeclaration {
 }
 
 /// Return statement: `return expr;` or `return;`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ReturnStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -117,7 +117,7 @@ pub struct ReturnStatement {
 //
 
 /// If statement: `if (test) consequent` or `if (test) consequent else alternate`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IfStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -130,7 +130,7 @@ pub struct IfStatement {
 }
 
 /// For statement: `for (init; test; update) body`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ForStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -144,7 +144,7 @@ pub struct ForStatement {
 }
 
 /// For statement initialization
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ForInit {
     VariableDeclaration(VariableDeclaration),
@@ -152,7 +152,7 @@ pub enum ForInit {
 }
 
 /// For-in statement: `for (left in right) body`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ForInStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -165,7 +165,7 @@ pub struct ForInStatement {
 }
 
 /// For-of statement: `for (left of right) body`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ForOfStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -180,7 +180,7 @@ pub struct ForOfStatement {
 }
 
 /// Left side of for-in/for-of
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ForInOfLeft {
     VariableDeclaration(VariableDeclaration),
@@ -188,7 +188,7 @@ pub enum ForInOfLeft {
 }
 
 /// While statement: `while (test) body`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct WhileStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -200,7 +200,7 @@ pub struct WhileStatement {
 }
 
 /// Do-while statement: `do body while (test)`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DoWhileStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -212,7 +212,7 @@ pub struct DoWhileStatement {
 }
 
 /// Switch statement: `switch (discriminant) { cases }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SwitchStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -224,7 +224,7 @@ pub struct SwitchStatement {
 }
 
 /// Switch case: `case test: consequent` or `default: consequent`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SwitchCase {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -236,7 +236,7 @@ pub struct SwitchCase {
 }
 
 /// Try statement: `try { block } catch { handler } finally { finalizer }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TryStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -249,7 +249,7 @@ pub struct TryStatement {
 }
 
 /// Catch clause: `catch (param) { body }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CatchClause {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -261,7 +261,7 @@ pub struct CatchClause {
 }
 
 /// Throw statement: `throw argument`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ThrowStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -272,7 +272,7 @@ pub struct ThrowStatement {
 }
 
 /// Break statement: `break` or `break label`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BreakStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -283,7 +283,7 @@ pub struct BreakStatement {
 }
 
 /// Continue statement: `continue` or `continue label`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ContinueStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -294,7 +294,7 @@ pub struct ContinueStatement {
 }
 
 /// Labeled statement: `label: statement`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LabeledStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -306,7 +306,7 @@ pub struct LabeledStatement {
 }
 
 /// Empty statement: `;`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EmptyStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -316,7 +316,7 @@ pub struct EmptyStatement {
 }
 
 /// Debugger statement: `debugger;`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DebuggerStatement {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -325,7 +325,7 @@ pub struct DebuggerStatement {
     pub loc: SourceLocation,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct VariableDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -338,7 +338,7 @@ pub struct VariableDeclaration {
     pub declare: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct VariableDeclarator {
     #[serde(rename = "type")]
     pub node_type: String,

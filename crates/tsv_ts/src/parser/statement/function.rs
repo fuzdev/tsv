@@ -6,8 +6,8 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 
-impl<'a> Parser<'a> {
-    pub(super) fn parse_return_statement(&mut self) -> Result<Statement, ParseError> {
+impl<'a, 'arena> Parser<'a, 'arena> {
+    pub(super) fn parse_return_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'return' keyword
@@ -38,7 +38,7 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    pub(super) fn parse_function_declaration(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_function_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         self.parse_function_or_overload(false)
     }
 
@@ -50,7 +50,10 @@ impl<'a> Parser<'a> {
     /// function check(x: unknown): x is number;  // overload - TSDeclareFunction
     /// function check(x: unknown) { ... }         // implementation - FunctionDeclaration
     /// ```
-    fn parse_function_or_overload(&mut self, is_async: bool) -> Result<Statement, ParseError> {
+    fn parse_function_or_overload(
+        &mut self,
+        is_async: bool,
+    ) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'function' keyword
@@ -85,7 +88,7 @@ impl<'a> Parser<'a> {
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list
-        let params = self.parse_parameter_list()?;
+        let params: &'arena [Expression<'arena>] = self.parse_parameter_list()?.into_bump_slice();
 
         // Check for return type annotation
         let return_type = self.parse_optional_return_type()?;
@@ -126,7 +129,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse async function declaration: `async function foo() {}` or `async function* foo() {}`
-    pub(super) fn parse_async_function_declaration(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_async_function_declaration(
+        &mut self,
+    ) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'async' keyword
@@ -139,7 +144,8 @@ impl<'a> Parser<'a> {
         // Parse the function (which may be an overload signature or implementation)
         let mut stmt = self.parse_function_or_overload(true)?;
 
-        // Update span to include 'async' keyword
+        // Update span to include 'async' keyword. Both variants are inline, so
+        // mutate the owned node's span in place.
         match &mut stmt {
             Statement::FunctionDeclaration(func) => {
                 func.span = Span::new(start as u32, func.span.end);
@@ -160,7 +166,7 @@ impl<'a> Parser<'a> {
         &mut self,
         name_required: bool,
         is_async: bool,
-    ) -> Result<ExportFunctionDeclaration, ParseError> {
+    ) -> Result<ExportFunctionDeclaration<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'function' keyword
@@ -201,7 +207,7 @@ impl<'a> Parser<'a> {
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list
-        let params = self.parse_parameter_list()?;
+        let params: &'arena [Expression<'arena>] = self.parse_parameter_list()?.into_bump_slice();
 
         // Check for return type annotation
         let return_type = self.parse_optional_return_type()?;
@@ -249,7 +255,7 @@ impl<'a> Parser<'a> {
     /// Function expressions are similar to function declarations but:
     /// - The name is always optional
     /// - They appear in expression position
-    pub fn parse_function_expression(&mut self) -> Result<Expression, ParseError> {
+    pub fn parse_function_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.parse_function_expression_inner(start, false)
     }
@@ -260,7 +266,7 @@ impl<'a> Parser<'a> {
     pub fn parse_async_function_expression(
         &mut self,
         start: usize,
-    ) -> Result<Expression, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError> {
         self.parse_function_expression_inner(start, true)
     }
 
@@ -269,7 +275,7 @@ impl<'a> Parser<'a> {
         &mut self,
         start: usize,
         is_async: bool,
-    ) -> Result<Expression, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError> {
         // Consume 'function' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -306,7 +312,7 @@ impl<'a> Parser<'a> {
         let (params_start, _) = self.current_pos();
 
         // Parse parameter list
-        let params = self.parse_parameter_list()?;
+        let params: &'arena [Expression<'arena>] = self.parse_parameter_list()?.into_bump_slice();
 
         // Check for return type annotation
         let return_type = self.parse_optional_return_type()?;

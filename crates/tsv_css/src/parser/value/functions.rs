@@ -1,5 +1,7 @@
 use super::parser::ValueParser;
 use crate::ast::internal::CssValue;
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 
 /// Parse function arguments as comma-separated values
@@ -12,12 +14,16 @@ use tsv_lang::Span;
 /// * `parent_span` - The span of the arguments in the full CSS document
 ///
 /// # Returns
-/// Vector of parsed argument values
-pub fn parse_function_arguments(args_str: &str, parent_span: Span) -> Vec<CssValue> {
+/// Arena-allocated slice of parsed argument values
+pub fn parse_function_arguments<'arena>(
+    args_str: &str,
+    parent_span: Span,
+    arena: &'arena Bump,
+) -> &'arena [CssValue<'arena>] {
     let trimmed = args_str.trim();
 
     if trimmed.is_empty() {
-        return vec![];
+        return &[];
     }
 
     // Calculate adjusted span for trimmed args (same logic as parse_value_from_source)
@@ -29,12 +35,17 @@ pub fn parse_function_arguments(args_str: &str, parent_span: Span) -> Vec<CssVal
     };
 
     let parser = ValueParser::new(trimmed, adjusted_span);
-    let value = parser.parse();
+    let value = parser.parse(arena);
 
     // Function arguments are comma-separated, so we expect CommaSeparated
     // But if there's only one argument, it might be a single value
     match value {
+        // Already an arena slice — return it directly (zero copy)
         CssValue::CommaSeparated { values, .. } => values,
-        single => vec![single],
+        single => {
+            let mut v = BumpVec::new_in(arena);
+            v.push(single);
+            v.into_bump_slice()
+        }
     }
 }

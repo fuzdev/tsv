@@ -29,15 +29,15 @@ pub(crate) const KEY_BLOCK_OPEN: &str = "{#key ";
 ///
 /// Returns `(body_doc, has_trailing)` — the indented body doc and whether the
 /// fragment had trailing whitespace (needed for section separator logic).
-fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment) -> (DocId, bool) {
+fn build_await_section_body(printer: &Printer<'_>, fragment: &Fragment<'_>) -> (DocId, bool) {
     let has_leading = printer.fragment_has_leading_ws(fragment);
     let has_trailing = printer.fragment_has_trailing_ws(fragment);
-    let force_break = printer.fragment_should_force_break_content(&fragment.nodes);
+    let force_break = printer.fragment_should_force_break_content(fragment.nodes);
     let is_inline = !has_leading && !has_trailing && !force_break;
     let body_doc = if is_inline {
         printer.build_fragment_doc(fragment)
     } else {
-        printer.build_nodes_doc_multiline(&fragment.nodes)
+        printer.build_nodes_doc_multiline(fragment.nodes)
     };
     (indent_body(printer, body_doc, has_leading), has_trailing)
 }
@@ -100,20 +100,20 @@ fn split_raw_params_at_commas(raw: &str) -> Vec<&str> {
 /// `}` continue on it. A binary/logical chain (last line is an operand), a
 /// multi-segment member chain (last line is a `.method(...)` segment, not a bare
 /// `)`), or anything else breaks the clause + `}` to their own line at base.
-fn clause_hugs_expr(expr: &tsv_ts::Expression) -> bool {
+fn clause_hugs_expr(expr: &tsv_ts::Expression<'_>) -> bool {
     use tsv_ts::Expression as E;
     // A callee with no nested call means the only `(` belongs to this call, so its
     // `)` lands at the tag base when the args wrap (vs. a chain, whose segments indent).
-    fn callee_has_no_call(e: &E) -> bool {
+    fn callee_has_no_call(e: &E<'_>) -> bool {
         match e {
             E::Identifier(_) | E::ThisExpression(_) | E::Super(_) => true,
-            E::MemberExpression(m) => callee_has_no_call(&m.object),
+            E::MemberExpression(m) => callee_has_no_call(m.object),
             _ => false,
         }
     }
     match expr {
-        E::CallExpression(c) => callee_has_no_call(&c.callee),
-        E::NewExpression(n) => callee_has_no_call(&n.callee),
+        E::CallExpression(c) => callee_has_no_call(c.callee),
+        E::NewExpression(n) => callee_has_no_call(n.callee),
         _ => false,
     }
 }
@@ -132,7 +132,7 @@ enum AwaitShorthand {
 }
 
 /// Classify an await block's head shorthand. See [`AwaitShorthand`].
-fn await_shorthand(block: &internal::AwaitBlock) -> AwaitShorthand {
+fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthand {
     if block.pending.is_some() {
         AwaitShorthand::None
     } else if block.then.is_some() {
@@ -269,7 +269,7 @@ impl<'a> Printer<'a> {
     fn build_block_head(
         &self,
         open: &'static str,
-        expr: &tsv_ts::Expression,
+        expr: &tsv_ts::Expression<'_>,
         expr_doc: DocId,
         clause: Option<DocId>,
         comment_end: u32,
@@ -374,7 +374,7 @@ impl<'a> Printer<'a> {
 
     /// Whether every if-block branch (consequent, each `{:else if}` consequent,
     /// `{:else}`) is inline-authored — the precondition for the body-expand fast path.
-    fn if_branches_all_inline(&self, block: &internal::IfBlock, imc: bool) -> bool {
+    fn if_branches_all_inline(&self, block: &internal::IfBlock<'_>, imc: bool) -> bool {
         let mut all_inline = self.fragment_inline_authored(&block.consequent, imc);
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
@@ -406,7 +406,7 @@ impl<'a> Printer<'a> {
     /// inline (`multiline = false`) or expanded (`multiline = true`) form, for
     /// `build_expanding_construct`. Each `{:else if}` keeps its own head (with dangle),
     /// so a long else-if head still wraps within the expanded form.
-    fn build_if_tail(&self, block: &internal::IfBlock, multiline: bool) -> DocId {
+    fn build_if_tail(&self, block: &internal::IfBlock<'_>, multiline: bool) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
         let cons = self.build_fragment_doc(&block.consequent);
@@ -424,7 +424,7 @@ impl<'a> Printer<'a> {
     /// Build the alternate part of an if tail (`{:else if …}` chains / `{:else}`),
     /// recursively, in inline or expanded form. Excludes the closing `{/if}` (added by
     /// `build_if_tail`).
-    fn build_if_alternate_tail(&self, alt: &Fragment, multiline: bool) -> DocId {
+    fn build_if_alternate_tail(&self, alt: &Fragment<'_>, multiline: bool) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
         if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
@@ -453,7 +453,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.hardline());
             }
             parts.push(d.text("{:else}"));
-            let body = self.build_nodes_doc(&alt.nodes);
+            let body = self.build_nodes_doc(alt.nodes);
             parts.push(self.indent_body_expand(body, multiline));
         }
         d.concat(&parts)
@@ -469,7 +469,7 @@ impl<'a> Printer<'a> {
     /// passed for the expanding path (see `block_sibling_gt_dangle_eligible`).
     pub(super) fn build_if_block_doc_with_full_context(
         &self,
-        block: &internal::IfBlock,
+        block: &internal::IfBlock<'_>,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -494,7 +494,7 @@ impl<'a> Printer<'a> {
             self.fragment_ws_status(&block.consequent, in_multiline_context);
         // Force non-inline when block elements among multiple children
         // (matches prettier's forceBreakContent + breakParent)
-        let force_break = self.fragment_should_force_break_content(&block.consequent.nodes);
+        let force_break = self.fragment_should_force_break_content(block.consequent.nodes);
         let is_inline = !has_leading && !has_trailing && !force_break;
 
         // For inline: use regular fragment doc (preserves spaces)
@@ -502,7 +502,7 @@ impl<'a> Printer<'a> {
         let body_doc = if is_inline {
             self.build_fragment_doc(&block.consequent)
         } else {
-            self.build_nodes_doc_multiline(&block.consequent.nodes)
+            self.build_nodes_doc_multiline(block.consequent.nodes)
         };
 
         // Always wrap body in indent() for proper internal break indentation
@@ -569,13 +569,15 @@ impl<'a> Printer<'a> {
     /// content, or a block-form `{:else}{#if}{/if}` (`elseif: false`): that form is
     /// preserved verbatim rather than collapsed — matching prettier, which keeps the
     /// two distinct (collapsing would be information loss).
-    pub(super) fn get_flattenable_else_if<'f>(
-        alt: &'f Fragment,
+    pub(super) fn get_flattenable_else_if<'arena>(
+        alt: &Fragment<'arena>,
         source: &str,
-    ) -> Option<&'f internal::IfBlock> {
-        let mut if_block: Option<&internal::IfBlock> = None;
+    ) -> Option<&'arena internal::IfBlock<'arena>> {
+        // The boxed `IfBlock` variant is a `&'arena` pointer, so the returned
+        // reference is tied to the arena, not to `alt`.
+        let mut if_block: Option<&'arena internal::IfBlock<'arena>> = None;
 
-        for node in &alt.nodes {
+        for node in alt.nodes {
             match node {
                 FragmentNode::IfBlock(b) => {
                     if if_block.is_some() {
@@ -606,7 +608,7 @@ impl<'a> Printer<'a> {
     /// chars past the opening-tag span.
     pub(super) fn build_else_if_expr_doc(
         &self,
-        else_if: &internal::IfBlock,
+        else_if: &internal::IfBlock<'_>,
         in_multiline_context: bool,
     ) -> DocId {
         self.build_block_head_expr(
@@ -629,7 +631,7 @@ impl<'a> Printer<'a> {
     /// the last branch of this alternate chain has trailing whitespace.
     fn build_if_alternate_doc(
         &self,
-        alt: &Fragment,
+        alt: &Fragment<'_>,
         parent_has_leading: bool,
         parent_has_trailing: bool,
         in_multiline_context: bool,
@@ -643,7 +645,7 @@ impl<'a> Printer<'a> {
             // Check this branch's own leading/trailing whitespace
             let (has_leading, has_trailing) =
                 self.fragment_ws_status(&else_if.consequent, in_multiline_context);
-            let force_break = self.fragment_should_force_break_content(&else_if.consequent.nodes);
+            let force_break = self.fragment_should_force_break_content(else_if.consequent.nodes);
             let is_inline = !has_leading && !has_trailing && !force_break;
             let parent_inline = !parent_has_leading && !parent_has_trailing;
             let is_both_inline = is_inline && parent_inline;
@@ -653,7 +655,7 @@ impl<'a> Printer<'a> {
             let body_doc = if is_both_inline {
                 self.build_fragment_doc(&else_if.consequent)
             } else {
-                self.build_nodes_doc_multiline(&else_if.consequent.nodes)
+                self.build_nodes_doc_multiline(else_if.consequent.nodes)
             };
 
             let indented_body = indent_body(self, body_doc, has_leading);
@@ -689,7 +691,7 @@ impl<'a> Printer<'a> {
 
         // Plain {:else}
         let (has_leading, has_trailing) = self.fragment_ws_status(alt, in_multiline_context);
-        let force_break = self.fragment_should_force_break_content(&alt.nodes);
+        let force_break = self.fragment_should_force_break_content(alt.nodes);
         let is_inline = !has_leading && !has_trailing && !force_break;
         let parent_inline = !parent_has_leading && !parent_has_trailing;
         let is_both_inline = is_inline && parent_inline;
@@ -697,9 +699,9 @@ impl<'a> Printer<'a> {
         // For inline: use regular fragment doc (preserves spaces)
         // For multiline: use multiline doc
         let body_doc = if is_both_inline {
-            self.build_nodes_doc(&alt.nodes)
+            self.build_nodes_doc(alt.nodes)
         } else {
-            self.build_nodes_doc_multiline(&alt.nodes)
+            self.build_nodes_doc_multiline(alt.nodes)
         };
 
         let indented_body = indent_body(self, body_doc, has_leading);
@@ -713,7 +715,7 @@ impl<'a> Printer<'a> {
     /// whether it has trailing whitespace (for placing `{/if}`).
     fn get_final_branch_trailing(
         &self,
-        block: &internal::IfBlock,
+        block: &internal::IfBlock<'_>,
         in_multiline_context: bool,
     ) -> bool {
         // If no alternate, use the consequent's trailing
@@ -736,7 +738,7 @@ impl<'a> Printer<'a> {
 
     /// Whether the each block's body and its optional `{:else}` fallback are both
     /// inline-authored — the precondition for the body-expand fast path.
-    fn each_branches_all_inline(&self, block: &internal::EachBlock, imc: bool) -> bool {
+    fn each_branches_all_inline(&self, block: &internal::EachBlock<'_>, imc: bool) -> bool {
         let mut all_inline = self.fragment_inline_authored(&block.body, imc);
         if let Some(fallback) = &block.fallback {
             all_inline &= self.fragment_inline_authored(fallback, imc);
@@ -746,7 +748,7 @@ impl<'a> Printer<'a> {
 
     /// Build the each-block tail (body + optional `{:else}` fallback + `{/each}`) in
     /// inline or expanded form, for `build_expanding_construct`.
-    fn build_each_tail(&self, block: &internal::EachBlock, multiline: bool) -> DocId {
+    fn build_each_tail(&self, block: &internal::EachBlock<'_>, multiline: bool) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
         let body = self.build_fragment_doc(&block.body);
@@ -771,7 +773,7 @@ impl<'a> Printer<'a> {
     /// `gt_prefix`: see `build_if_block_doc_with_full_context`.
     pub(super) fn build_each_block_doc_with_full_context(
         &self,
-        block: &internal::EachBlock,
+        block: &internal::EachBlock<'_>,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -813,9 +815,9 @@ impl<'a> Printer<'a> {
         let (head_expr, clause) = if let Some(context) = &block.context {
             let mut clause_parts: DocBuf = smallvec![d.text("as ")];
             clause_parts.push(self.build_pattern_doc(context));
-            if let Some(index) = &block.index {
+            if let Some(index) = block.index {
                 clause_parts.push(d.text(", "));
-                clause_parts.push(d.text_owned(index.clone()));
+                clause_parts.push(d.text_owned(index.to_string()));
             }
             if let Some(kd) = key_doc {
                 clause_parts.push(d.text(" ("));
@@ -826,9 +828,9 @@ impl<'a> Printer<'a> {
         } else {
             // No `as`: any index/key is degenerate — keep it hugging the expression.
             let mut e: DocBuf = smallvec![expr_doc];
-            if let Some(index) = &block.index {
+            if let Some(index) = block.index {
                 e.push(d.text(", "));
-                e.push(d.text_owned(index.clone()));
+                e.push(d.text_owned(index.to_string()));
             }
             if let Some(kd) = key_doc {
                 e.push(d.text(" ("));
@@ -843,7 +845,7 @@ impl<'a> Printer<'a> {
         let (has_leading, has_trailing) =
             self.fragment_ws_status(&block.body, in_multiline_context);
         // Force non-inline when block elements among multiple children
-        let force_break = self.fragment_should_force_break_content(&block.body.nodes);
+        let force_break = self.fragment_should_force_break_content(block.body.nodes);
         let is_inline = !has_leading && !has_trailing && !force_break;
 
         // For inline: use regular fragment doc (preserves inline spacing)
@@ -851,7 +853,7 @@ impl<'a> Printer<'a> {
         let body_doc = if is_inline {
             self.build_fragment_doc(&block.body)
         } else {
-            self.build_nodes_doc_multiline(&block.body.nodes)
+            self.build_nodes_doc_multiline(block.body.nodes)
         };
 
         let indented_body = indent_body(self, body_doc, has_leading);
@@ -891,7 +893,7 @@ impl<'a> Printer<'a> {
 
             let (fallback_has_leading, fallback_has_trailing) =
                 self.fragment_ws_status(fallback, in_multiline_context);
-            let fallback_force_break = self.fragment_should_force_break_content(&fallback.nodes);
+            let fallback_force_break = self.fragment_should_force_break_content(fallback.nodes);
             let fallback_inline =
                 !fallback_has_leading && !fallback_has_trailing && !fallback_force_break;
             let is_both_inline = fallback_inline && is_inline;
@@ -903,7 +905,7 @@ impl<'a> Printer<'a> {
             let fallback_doc = if is_both_inline {
                 self.build_fragment_doc(fallback)
             } else {
-                self.build_nodes_doc_multiline(&fallback.nodes)
+                self.build_nodes_doc_multiline(fallback.nodes)
             };
 
             let indented_fallback =
@@ -930,21 +932,21 @@ impl<'a> Printer<'a> {
     /// the same `fragment_ws_status` the non-fast-path `is_inline` uses, so space-only
     /// / newline-authored fragments fall through to the existing whitespace-respecting
     /// paths.
-    fn fragment_inline_authored(&self, frag: &Fragment, in_multiline_context: bool) -> bool {
+    fn fragment_inline_authored(&self, frag: &Fragment<'_>, in_multiline_context: bool) -> bool {
         let (has_leading, has_trailing) = self.fragment_ws_status(frag, in_multiline_context);
-        !has_leading && !has_trailing && !self.fragment_should_force_break_content(&frag.nodes)
+        !has_leading && !has_trailing && !self.fragment_should_force_break_content(frag.nodes)
     }
 
     /// Build one await section body, indented; in multiline mode it drops to its own
     /// line (leading `hardline`), matching the other blocks' body-expand.
-    fn await_section_body_expand(&self, frag: &Fragment, multiline: bool) -> DocId {
+    fn await_section_body_expand(&self, frag: &Fragment<'_>, multiline: bool) -> DocId {
         self.indent_body_expand(self.build_fragment_doc(frag), multiline)
     }
 
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
     /// `{:then}` if the then-section has content, else `None`. Whether to emit it is the
     /// caller's decision: a `then`-shorthand carries it in the head instead.
-    fn await_then_keyword(&self, block: &internal::AwaitBlock) -> Option<DocId> {
+    fn await_then_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
         let d = self.d();
         if let Some(value) = &block.value {
             Some(d.concat(&[
@@ -962,7 +964,7 @@ impl<'a> Printer<'a> {
     /// The `{:catch …}` keyword doc — `{:catch error}` if an error binds, else `{:catch}`
     /// if the catch-section has content, else `None`. A `catch`-shorthand carries it in the
     /// head instead.
-    fn await_catch_keyword(&self, block: &internal::AwaitBlock) -> Option<DocId> {
+    fn await_catch_keyword(&self, block: &internal::AwaitBlock<'_>) -> Option<DocId> {
         let d = self.d();
         if let Some(error) = &block.error {
             Some(d.concat(&[
@@ -980,7 +982,7 @@ impl<'a> Printer<'a> {
     /// Which shorthand carries its clause in the head, so the tail omits that keyword:
     /// `(then-shorthand, catch-shorthand)`. Derived from [`await_shorthand`] so it can't drift
     /// from the head-clause builder.
-    fn await_shorthand_flags(block: &internal::AwaitBlock) -> (bool, bool) {
+    fn await_shorthand_flags(block: &internal::AwaitBlock<'_>) -> (bool, bool) {
         match await_shorthand(block) {
             AwaitShorthand::Then => (true, false),
             AwaitShorthand::Catch => (false, true),
@@ -994,7 +996,7 @@ impl<'a> Printer<'a> {
     /// `{/await}` is on its own line; otherwise they hug. Feeds
     /// `build_expanding_construct`, so a wrapped await head expands all sections like
     /// the other blocks.
-    fn build_await_tail(&self, block: &internal::AwaitBlock, multiline: bool) -> DocId {
+    fn build_await_tail(&self, block: &internal::AwaitBlock<'_>, multiline: bool) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
@@ -1031,12 +1033,12 @@ impl<'a> Printer<'a> {
     /// separated by `line()` docs, so the whole construct breaks together as a unit under
     /// the caller's `group`. Mirrors `build_await_tail`, but with `line()` separators and
     /// soft-indented bodies (the head is prepended + grouped by the caller).
-    fn build_await_tail_space_only(&self, block: &internal::AwaitBlock) -> DocId {
+    fn build_await_tail_space_only(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
         if let Some(pending) = &block.pending {
-            let body = self.build_nodes_doc_multiline(&pending.nodes);
+            let body = self.build_nodes_doc_multiline(pending.nodes);
             parts.push(indent_body_soft(self, body));
         }
         if !is_then_shorthand && let Some(kw) = self.await_then_keyword(block) {
@@ -1044,7 +1046,7 @@ impl<'a> Printer<'a> {
             parts.push(kw);
         }
         if let Some(then_block) = &block.then {
-            let body = self.build_nodes_doc_multiline(&then_block.nodes);
+            let body = self.build_nodes_doc_multiline(then_block.nodes);
             parts.push(indent_body_soft(self, body));
         }
         if !is_catch_shorthand && let Some(kw) = self.await_catch_keyword(block) {
@@ -1052,7 +1054,7 @@ impl<'a> Printer<'a> {
             parts.push(kw);
         }
         if let Some(catch_block) = &block.catch {
-            let body = self.build_nodes_doc_multiline(&catch_block.nodes);
+            let body = self.build_nodes_doc_multiline(catch_block.nodes);
             parts.push(indent_body_soft(self, body));
         }
         parts.push(d.line());
@@ -1066,7 +1068,7 @@ impl<'a> Printer<'a> {
     /// trailing whitespace. Mirrors `build_await_tail`, but respects authored trailing
     /// whitespace instead of a uniform `multiline` flag (the head is prepended by the
     /// caller).
-    fn build_await_tail_newline(&self, block: &internal::AwaitBlock) -> DocId {
+    fn build_await_tail_newline(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         let d = self.d();
         let (is_then_shorthand, is_catch_shorthand) = Self::await_shorthand_flags(block);
         let mut parts: DocBuf = DocBuf::new();
@@ -1108,7 +1110,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for an await block (no preceding context / sibling `>`).
     ///
     /// Uses same inline/multiline pattern as if blocks.
-    pub(crate) fn build_await_block_doc(&self, block: &internal::AwaitBlock) -> DocId {
+    pub(crate) fn build_await_block_doc(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         self.build_await_block_doc_with_full_context(block, false, false, None)
     }
 
@@ -1119,7 +1121,7 @@ impl<'a> Printer<'a> {
     /// the expanding path (see `build_block_node_doc_with_gt`).
     pub(super) fn build_await_block_doc_with_full_context(
         &self,
-        block: &internal::AwaitBlock,
+        block: &internal::AwaitBlock<'_>,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -1233,7 +1235,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a key block (no preceding context / sibling `>`).
     ///
     /// Uses same inline/multiline pattern as if blocks.
-    pub(crate) fn build_key_block_doc(&self, block: &internal::KeyBlock) -> DocId {
+    pub(crate) fn build_key_block_doc(&self, block: &internal::KeyBlock<'_>) -> DocId {
         self.build_key_block_doc_with_full_context(block, false, false, None)
     }
 
@@ -1242,7 +1244,7 @@ impl<'a> Printer<'a> {
     /// `gt_prefix`: see `build_if_block_doc_with_full_context`.
     pub(super) fn build_key_block_doc_with_full_context(
         &self,
-        block: &internal::KeyBlock,
+        block: &internal::KeyBlock<'_>,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -1262,7 +1264,7 @@ impl<'a> Printer<'a> {
         // Space-only whitespace (no newlines) also triggers expansion to match prettier.
         let (has_leading, has_trailing) = self.fragment_ws_status(&block.fragment, false);
         // Force non-inline when block elements among multiple children
-        let force_break = self.fragment_should_force_break_content(&block.fragment.nodes);
+        let force_break = self.fragment_should_force_break_content(block.fragment.nodes);
         let is_inline = !has_leading && !has_trailing && !force_break;
 
         // For inline: use regular fragment doc (preserves inline spacing)
@@ -1270,7 +1272,7 @@ impl<'a> Printer<'a> {
         let body_doc = if is_inline {
             self.build_fragment_doc(&block.fragment)
         } else {
-            self.build_nodes_doc_multiline(&block.fragment.nodes)
+            self.build_nodes_doc_multiline(block.fragment.nodes)
         };
 
         let indented_body = indent_body(self, body_doc, has_leading);
@@ -1302,7 +1304,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for a snippet block (no preceding context / sibling `>`).
-    pub(crate) fn build_snippet_block_doc(&self, block: &internal::SnippetBlock) -> DocId {
+    pub(crate) fn build_snippet_block_doc(&self, block: &internal::SnippetBlock<'_>) -> DocId {
         self.build_snippet_block_doc_with_full_context(block, false, false, None)
     }
 
@@ -1315,7 +1317,7 @@ impl<'a> Printer<'a> {
     /// (`can_wrap` false) and drops in the multiline-fragment path.
     pub(crate) fn build_snippet_block_doc_with_full_context(
         &self,
-        block: &internal::SnippetBlock,
+        block: &internal::SnippetBlock<'_>,
         in_multiline_context: bool,
         has_preceding_breakable: bool,
         gt_prefix: Option<DocId>,
@@ -1332,7 +1334,7 @@ impl<'a> Printer<'a> {
         // Check leading/trailing whitespace, considering space-only patterns.
         // Space-only whitespace (no newlines) also triggers expansion to match prettier.
         let (has_leading, has_trailing) = self.fragment_ws_status(&block.body, false);
-        let force_break = self.fragment_should_force_break_content(&block.body.nodes);
+        let force_break = self.fragment_should_force_break_content(block.body.nodes);
         let is_inline = !has_leading && !has_trailing && !force_break;
 
         // Type parameters (generics). Parsed nodes route through tsv_ts's type-parameter
@@ -1342,8 +1344,8 @@ impl<'a> Printer<'a> {
         // verbatim between `<` and `>`.
         let type_params_part = if let Some(decl) = &block.type_parameters {
             tsv_ts::build_type_parameters_doc_with_comments(d, decl, &self.ts_inputs(), &self.embed)
-        } else if let Some(raw) = &block.type_params_raw {
-            d.concat(&[d.text("<"), d.text_owned(raw.clone()), d.text(">")])
+        } else if let Some(raw) = block.type_params_raw {
+            d.concat(&[d.text("<"), d.text_owned(raw.to_string()), d.text(">")])
         } else {
             d.empty()
         };
@@ -1382,7 +1384,7 @@ impl<'a> Printer<'a> {
             match block.params_paren {
                 Some(paren) => tsv_ts::build_function_params_doc_with_comments(
                     d,
-                    &block.parameters,
+                    block.parameters,
                     Some(paren.start),
                     Some(paren.end),
                     &self.ts_inputs(),
@@ -1417,7 +1419,7 @@ impl<'a> Printer<'a> {
         let body_doc = if is_inline {
             self.build_fragment_doc(&block.body)
         } else {
-            self.build_nodes_doc_multiline(&block.body.nodes)
+            self.build_nodes_doc_multiline(block.body.nodes)
         };
 
         // Inline-authored body: expand the body + `{/snippet}` onto their own lines

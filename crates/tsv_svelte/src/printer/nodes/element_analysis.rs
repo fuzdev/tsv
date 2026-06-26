@@ -47,7 +47,7 @@ impl<'a> Printer<'a> {
     /// When true, the expression can break internally before the containing element
     /// needs to break its tags. This enables the "hug mode" divergence where we keep
     /// `<tag>` together and let expressions break, reducing indentation drift.
-    pub(super) fn expression_has_break_points(expr: &Expression) -> bool {
+    pub(super) fn expression_has_break_points(expr: &Expression<'_>) -> bool {
         match expr {
             // Ternary always has break points
             Expression::ConditionalExpression(_) => true,
@@ -67,14 +67,12 @@ impl<'a> Printer<'a> {
             // Assignment expressions have break points
             Expression::AssignmentExpression(_) => true,
             // Wrapping expressions: check inner
-            Expression::JsdocCast(cast) => Self::expression_has_break_points(&cast.inner),
-            Expression::TSAsExpression(e) => Self::expression_has_break_points(&e.expression),
-            Expression::TSSatisfiesExpression(e) => {
-                Self::expression_has_break_points(&e.expression)
-            }
-            Expression::TSNonNullExpression(e) => Self::expression_has_break_points(&e.expression),
-            Expression::TSTypeAssertion(e) => Self::expression_has_break_points(&e.expression),
-            Expression::AwaitExpression(e) => Self::expression_has_break_points(&e.argument),
+            Expression::JsdocCast(cast) => Self::expression_has_break_points(cast.inner),
+            Expression::TSAsExpression(e) => Self::expression_has_break_points(e.expression),
+            Expression::TSSatisfiesExpression(e) => Self::expression_has_break_points(e.expression),
+            Expression::TSNonNullExpression(e) => Self::expression_has_break_points(e.expression),
+            Expression::TSTypeAssertion(e) => Self::expression_has_break_points(e.expression),
+            Expression::AwaitExpression(e) => Self::expression_has_break_points(e.argument),
             Expression::YieldExpression(e) => e
                 .argument
                 .as_ref()
@@ -112,7 +110,7 @@ impl<'a> Printer<'a> {
     /// spaces rather than `fill` `line`s — otherwise a `line` in fits()-Break
     /// mode short-circuits the preceding expression group's width check, leaving
     /// it flat and overshooting printWidth (the `fill_multiple_expr_long` case).
-    pub(super) fn nodes_have_breakable_expression(nodes: &[FragmentNode]) -> bool {
+    pub(super) fn nodes_have_breakable_expression(nodes: &[FragmentNode<'_>]) -> bool {
         nodes.iter().any(|n| {
             if let FragmentNode::ExpressionTag(tag) = n {
                 Self::expression_has_break_points(&tag.expression)
@@ -127,7 +125,7 @@ impl<'a> Printer<'a> {
     /// Used to detect when parent elements need multiline formatting due to
     /// block-level children. Components and control flow blocks don't trigger
     /// this - only actual HTML block elements like `<div>`, `<p>`, etc.
-    fn is_block_element_child(&self, node: &FragmentNode) -> bool {
+    fn is_block_element_child(&self, node: &FragmentNode<'_>) -> bool {
         match node {
             // Defer to the one block-element adapter (component + script/style overlay).
             FragmentNode::Element(el) => self.is_block_element(el),
@@ -144,7 +142,7 @@ impl<'a> Printer<'a> {
     /// - **Inline**: Exclude boundary whitespace newlines (they normalize to spaces)
     fn has_source_breaks_in_content(
         &self,
-        nodes: &[FragmentNode],
+        nodes: &[FragmentNode<'_>],
         kind: ElementKind,
         source_has_leading_break: bool,
         source_has_trailing_break: bool,
@@ -237,7 +235,7 @@ impl<'a> Printer<'a> {
     /// Analyze an element to compute all formatting-relevant properties
     pub(super) fn analyze_element(
         &self,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
         attr_docs: &[DocId],
     ) -> ElementContext {
         // Resolve the tag once inside the borrow and derive everything that needs
@@ -334,7 +332,7 @@ impl<'a> Printer<'a> {
         // Compute trim_boundaries
         let will_go_multiline = element.attributes.len() > 1
             || block_flow_multiline
-            || super::helpers::has_nested_block_flow(&element.fragment.nodes)
+            || super::helpers::has_nested_block_flow(element.fragment.nodes)
             || has_multiline_attr;
         let trim_boundaries = !kind.is_inline() || will_go_multiline;
 
@@ -358,7 +356,7 @@ impl<'a> Printer<'a> {
     /// Compute whether children need multiline formatting
     fn compute_needs_multiline(
         &self,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
         inputs: MultilineInputs,
     ) -> bool {
         let MultilineInputs {
@@ -411,7 +409,7 @@ impl<'a> Printer<'a> {
         // based on whether the joined text fits inline.
         if !only_text_content
             && self.has_source_breaks_in_content(
-                &element.fragment.nodes,
+                element.fragment.nodes,
                 kind,
                 source_has_leading_break,
                 source_has_trailing_break,
@@ -426,7 +424,7 @@ impl<'a> Printer<'a> {
         // Load-bearing for the component case (`components/multi_expressions_multiline`): without
         // it such a `<Comp>` would stay inline. The only remaining use of
         // `should_split_expressions_in_nodes` now that the sibling-break caller is retired.
-        let should_split = self.should_split_expressions_in_nodes(&element.fragment.nodes);
+        let should_split = self.should_split_expressions_in_nodes(element.fragment.nodes);
         let has_trailing_ws = !hug_end;
         if source_has_leading_break && has_trailing_ws && should_split {
             return true;
@@ -438,7 +436,7 @@ impl<'a> Printer<'a> {
         // the children are *built* multiline (one node per line) keeps the expanding block from
         // overshooting printWidth when authored compactly (it would otherwise flow inline).
         // Note: await blocks alone do NOT force expansion.
-        if super::helpers::has_any_expanding_blocks(&element.fragment.nodes) {
+        if super::helpers::has_any_expanding_blocks(element.fragment.nodes) {
             return true;
         }
 
@@ -446,7 +444,7 @@ impl<'a> Printer<'a> {
         // follow a sibling, so their body-drop matches if/each (via the multiline path) and
         // the sibling-`>` dangle / block-on-own-line separation resolves in one pass.
         if kind.is_block()
-            && super::helpers::has_control_flow_after_sibling(&element.fragment.nodes, self.source)
+            && super::helpers::has_control_flow_after_sibling(element.fragment.nodes, self.source)
         {
             return true;
         }
@@ -467,7 +465,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if block flow children force parent to multiline
-    fn block_flow_forces_multiline(&self, element: &internal::Element) -> bool {
+    fn block_flow_forces_multiline(&self, element: &internal::Element<'_>) -> bool {
         // Check if any block has non-inline content
         let has_non_inline_block = element.fragment.nodes.iter().any(|n| match n {
             FragmentNode::IfBlock(b) => !self.is_inline_fragment(&b.consequent),
@@ -505,7 +503,7 @@ impl<'a> Printer<'a> {
     /// Check if text content has internal newlines
     fn text_has_internal_newlines(
         &self,
-        element: &internal::Element,
+        element: &internal::Element<'_>,
         source_has_leading_break: bool,
     ) -> bool {
         let source = self.source;

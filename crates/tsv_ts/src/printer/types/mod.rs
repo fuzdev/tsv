@@ -53,7 +53,7 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a Doc for a TypeScript type expression
-    pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType) -> DocId {
+    pub(in crate::printer) fn build_type_doc(&self, ts_type: &TSType<'_>) -> DocId {
         self.build_type_doc_inner(ts_type, false)
     }
 
@@ -63,14 +63,14 @@ impl<'a> Printer<'a> {
     /// internally (e.g., `Promise<LongType | null>` breaks inside `<>`).
     pub(in crate::printer) fn build_type_doc_with_wrapping_type_args(
         &self,
-        ts_type: &TSType,
+        ts_type: &TSType<'_>,
     ) -> DocId {
         self.build_type_doc_inner(ts_type, true)
     }
 
     /// Inner implementation for type doc building.
     /// When `wrap_type_args` is true, TypeReference uses wrapping type arguments.
-    pub(super) fn build_type_doc_inner(&self, ts_type: &TSType, wrap_type_args: bool) -> DocId {
+    pub(super) fn build_type_doc_inner(&self, ts_type: &TSType<'_>, wrap_type_args: bool) -> DocId {
         let d = self.d();
         match ts_type {
             TSType::Keyword(kw) => d.text_owned(kw.kind.as_str().to_string()),
@@ -194,14 +194,14 @@ impl<'a> Printer<'a> {
             }
             TSType::Mapped(m) => self.build_mapped_type_doc(m),
             TSType::TypeOperator(o) => {
-                let needs_parens = type_needs_parens_for_prefix_operator(&o.type_annotation);
+                let needs_parens = type_needs_parens_for_prefix_operator(o.type_annotation);
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
                 let operand_start = o.type_annotation.span().start;
                 // A line comment after the operator stays trailing it, with the
                 // operand on the next line (matches prettier).
                 if self.has_line_comments_between(keyword_end, operand_start) {
-                    let operand_doc = self.build_type_doc(&o.type_annotation);
+                    let operand_doc = self.build_type_doc(o.type_annotation);
                     let value_doc = if needs_parens {
                         d.parens(operand_doc)
                     } else {
@@ -216,7 +216,7 @@ impl<'a> Printer<'a> {
                     );
                     return d.concat(&parts);
                 }
-                let operand_doc = self.build_type_doc(&o.type_annotation);
+                let operand_doc = self.build_type_doc(o.type_annotation);
                 let comments_doc = self.build_comments_between(
                     keyword_end,
                     operand_start,
@@ -290,8 +290,8 @@ impl<'a> Printer<'a> {
                 d.concat(&parts)
             }
             TSType::IndexedAccess(i) => {
-                let object_doc = self.build_type_doc(&i.object_type);
-                let needs_parens = type_needs_parens_for_indexed_access_object(&i.object_type);
+                let object_doc = self.build_type_doc(i.object_type);
+                let needs_parens = type_needs_parens_for_indexed_access_object(i.object_type);
                 let index_type_start = i.index_type.span().start;
                 let bracket_area_start = i.object_type.span().end;
                 // The access `[`, located outside comments so a `[` glyph inside a
@@ -307,7 +307,7 @@ impl<'a> Printer<'a> {
                 let index_comments = bracket_open.map(|bp| {
                     self.build_comments_between(bp + 1, index_type_start, CommentSpacing::Trailing)
                 });
-                let index_doc = self.build_type_doc(&i.index_type);
+                let index_doc = self.build_type_doc(i.index_type);
                 let mut parts: DocBuf = if needs_parens {
                     smallvec![d.text("("), object_doc, d.text(")")]
                 } else {
@@ -332,12 +332,12 @@ impl<'a> Printer<'a> {
                 d.concat(&[
                     d.text("..."),
                     comments_doc,
-                    self.build_type_doc(&r.type_annotation),
+                    self.build_type_doc(r.type_annotation),
                 ])
             }
             TSType::Optional(o) => {
                 let inner = self.build_type_doc_maybe_parens(
-                    &o.type_annotation,
+                    o.type_annotation,
                     type_needs_parens_for_optional_element,
                 );
                 d.concat(&[inner, d.text("?")])
@@ -380,7 +380,7 @@ impl<'a> Printer<'a> {
                 );
                 // A long union/intersection element hangs after `:` (redundant parens
                 // stripped first); everything else stays inline after `: `.
-                match self.unwrap_redundant_parens(&n.element_type) {
+                match self.unwrap_redundant_parens(n.element_type) {
                     TSType::Union(u) => {
                         let type_doc = self.build_union_type_doc(u, false);
                         parts.push(d.text(":"));
@@ -394,7 +394,7 @@ impl<'a> Printer<'a> {
                     _ => {
                         parts.push(d.text(": "));
                         parts.push(comments_doc);
-                        parts.push(self.build_type_doc(&n.element_type));
+                        parts.push(self.build_type_doc(n.element_type));
                     }
                 }
                 d.concat(&parts)
@@ -425,7 +425,7 @@ impl<'a> Printer<'a> {
     /// line comment needs to be relocated.
     pub(in crate::printer) fn paren_has_leading_line_comment(
         &self,
-        p: &TSParenthesizedType,
+        p: &TSParenthesizedType<'_>,
     ) -> bool {
         self.has_line_comments_between(p.span.start + 1, p.type_annotation.span().start)
     }
@@ -435,7 +435,7 @@ impl<'a> Printer<'a> {
     /// only apply to line comments.
     pub(in crate::printer) fn paren_leading_line_comments(
         &self,
-        p: &TSParenthesizedType,
+        p: &TSParenthesizedType<'_>,
     ) -> Vec<&tsv_lang::Comment> {
         comments_in_range(
             self.comments,
@@ -450,7 +450,7 @@ impl<'a> Printer<'a> {
     /// optional `.qualifier` and `<type args>`, preserving comments at each
     /// boundary. Shared by `TSType::Import` and the `typeof import(...)` form
     /// (`TSTypeQueryExprName::Import`), which must format identically.
-    pub(in crate::printer) fn build_import_type_doc(&self, i: &TSImportType) -> DocId {
+    pub(in crate::printer) fn build_import_type_doc(&self, i: &TSImportType<'_>) -> DocId {
         let d = self.d();
         // Closing `)` of the `import(...)` call, skipping any inside comments.
         let after_args = i
@@ -501,7 +501,7 @@ impl<'a> Printer<'a> {
     /// - leading line / own-line block comment → break the parens multiline
     /// - inline block comment → stay inline (`import(/* c */ 'a')`)
     /// - trailing line comment → break multiline; trailing block → inline
-    fn build_import_type_call_doc(&self, i: &TSImportType, paren_close: u32) -> DocId {
+    fn build_import_type_call_doc(&self, i: &TSImportType<'_>, paren_close: u32) -> DocId {
         let d = self.d();
         let open_paren_end = i.span.start + "import(".len() as u32;
         let arg_start = i.argument.span.start;
@@ -561,7 +561,7 @@ impl<'a> Printer<'a> {
     /// when they can't.
     pub(in crate::printer) fn paren_inner_comment_flags(
         &self,
-        p: &TSParenthesizedType,
+        p: &TSParenthesizedType<'_>,
     ) -> (bool, bool) {
         let inner = p.type_annotation.span();
         (
@@ -578,10 +578,13 @@ impl<'a> Printer<'a> {
     /// form (leading `| ` for unions, hanging indent for intersections) rather
     /// than hanging inline. Stops at a paren that carries comments — those are
     /// preserved in place by `build_parenthesized_type_unwrap_doc`.
-    pub(in crate::printer) fn unwrap_redundant_parens<'t>(&self, ty: &'t TSType) -> &'t TSType {
+    pub(in crate::printer) fn unwrap_redundant_parens<'t>(
+        &self,
+        ty: &'t TSType<'t>,
+    ) -> &'t TSType<'t> {
         match ty {
             TSType::Parenthesized(p) if self.paren_inner_comment_flags(p) == (false, false) => {
-                self.unwrap_redundant_parens(p.type_annotation.as_ref())
+                self.unwrap_redundant_parens(p.type_annotation)
             }
             other => other,
         }
@@ -594,7 +597,7 @@ impl<'a> Printer<'a> {
     /// plus `break_parent` to force the enclosing union/intersection group to break:
     /// `(a // comment\n) | b` → `| a // comment\n| b`
     /// `(a // comment\n) & b` → `a & // comment\nb`
-    fn build_parenthesized_type_unwrap_doc(&self, p: &TSParenthesizedType) -> DocId {
+    fn build_parenthesized_type_unwrap_doc(&self, p: &TSParenthesizedType<'_>) -> DocId {
         let d = self.d();
         let paren_open = p.span.start;
         let inner_start = p.type_annotation.span().start;
@@ -602,7 +605,7 @@ impl<'a> Printer<'a> {
         let paren_close = p.span.end;
         let (has_leading, has_trailing) = self.paren_inner_comment_flags(p);
         if !has_leading && !has_trailing {
-            return self.build_type_doc(&p.type_annotation);
+            return self.build_type_doc(p.type_annotation);
         }
 
         let mut parts: DocBuf = DocBuf::new();
@@ -626,7 +629,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(self.build_type_doc(&p.type_annotation));
+        parts.push(self.build_type_doc(p.type_annotation));
 
         // Trailing comments: between inner type and `)`
         if has_trailing {

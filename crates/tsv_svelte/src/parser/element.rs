@@ -1,5 +1,7 @@
 // Element parsing
 
+use bumpalo::collections::Vec as BumpVec;
+
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
@@ -14,20 +16,20 @@ fn is_component(name: &str) -> bool {
     last_segment.chars().next().is_some_and(char::is_uppercase)
 }
 
-/// Result type for parsing elements - either a regular element or a special element
-pub(crate) enum ParsedElement {
-    Element(Element),
-    SpecialElement(SpecialElement),
+/// Result type for parsing elements - either a regular element or a special element.
+pub(crate) enum ParsedElement<'arena> {
+    Element(Element<'arena>),
+    SpecialElement(SpecialElement<'arena>),
 }
 
 /// Result of parsing special element attributes: (attributes, tag_expr for svelte:element, component_expr for svelte:component)
-type SpecialElementAttrs = (
-    Vec<AttributeNode>,
-    Option<tsv_ts::ast::internal::Expression>,
-    Option<tsv_ts::ast::internal::Expression>,
+type SpecialElementAttrs<'arena> = (
+    BumpVec<'arena, AttributeNode<'arena>>,
+    Option<tsv_ts::ast::internal::Expression<'arena>>,
+    Option<tsv_ts::ast::internal::Expression<'arena>>,
 );
 
-impl<'a> SvelteParser<'a> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse an element or special element: <tag></tag> or <tag/> or <void>
     ///
     /// Detects special elements (svelte:*, slot) and parses them appropriately.
@@ -35,7 +37,7 @@ impl<'a> SvelteParser<'a> {
     pub(crate) fn parse_element_or_special(
         &mut self,
         in_svelte_head: bool,
-    ) -> Result<ParsedElement, ParseError> {
+    ) -> Result<ParsedElement<'arena>, ParseError> {
         let start = self.current_start;
 
         // Parse opening tag: <tag>
@@ -84,7 +86,7 @@ impl<'a> SvelteParser<'a> {
         kind: ElementKind,
         name_span: Span,
         in_svelte_head: bool,
-    ) -> Result<ParsedElement, ParseError> {
+    ) -> Result<ParsedElement<'arena>, ParseError> {
         // Parse attributes
         let attributes = self.parse_attributes()?;
 
@@ -106,8 +108,8 @@ impl<'a> SvelteParser<'a> {
             return Ok(ParsedElement::Element(Element {
                 name: tag_symbol,
                 kind,
-                attributes,
-                fragment: Fragment { nodes: Vec::new() },
+                attributes: attributes.into_bump_slice(),
+                fragment: Fragment { nodes: &[] },
                 span: Span {
                     start: start as u32,
                     end: opening_tag_end as u32,
@@ -125,8 +127,10 @@ impl<'a> SvelteParser<'a> {
             return Ok(ParsedElement::Element(Element {
                 name: tag_symbol,
                 kind,
-                attributes,
-                fragment: Fragment { nodes: child_nodes },
+                attributes: attributes.into_bump_slice(),
+                fragment: Fragment {
+                    nodes: child_nodes.into_bump_slice(),
+                },
                 span: Span {
                     start: start as u32,
                     end,
@@ -145,8 +149,10 @@ impl<'a> SvelteParser<'a> {
         Ok(ParsedElement::Element(Element {
             name: tag_symbol,
             kind,
-            attributes,
-            fragment: Fragment { nodes: child_nodes },
+            attributes: attributes.into_bump_slice(),
+            fragment: Fragment {
+                nodes: child_nodes.into_bump_slice(),
+            },
             span: Span {
                 start: start as u32,
                 end,
@@ -162,7 +168,7 @@ impl<'a> SvelteParser<'a> {
         start: usize,
         name_span: Span,
         tag: SpecialElementTag,
-    ) -> Result<ParsedElement, ParseError> {
+    ) -> Result<ParsedElement<'arena>, ParseError> {
         let tag_name = tag.tag_name();
         let in_svelte_head = tag == SpecialElementTag::SvelteHead;
 
@@ -170,7 +176,7 @@ impl<'a> SvelteParser<'a> {
         let (attributes, tag_expr, component_expr) = self.parse_special_element_attributes(tag)?;
 
         // Construct the final SpecialElementKind with associated data
-        let kind = Self::build_special_element_kind(tag, tag_expr, component_expr);
+        let kind = self.build_special_element_kind(tag, tag_expr, component_expr);
 
         // Check for self-closing tag
         let self_closing = self.check(TokenKind::Slash);
@@ -186,8 +192,8 @@ impl<'a> SvelteParser<'a> {
         if self_closing {
             return Ok(ParsedElement::SpecialElement(SpecialElement {
                 kind,
-                attributes,
-                fragment: Fragment { nodes: Vec::new() },
+                attributes: attributes.into_bump_slice(),
+                fragment: Fragment { nodes: &[] },
                 span: Span {
                     start: start as u32,
                     end: opening_tag_end as u32,
@@ -205,8 +211,10 @@ impl<'a> SvelteParser<'a> {
 
         Ok(ParsedElement::SpecialElement(SpecialElement {
             kind,
-            attributes,
-            fragment: Fragment { nodes: child_nodes },
+            attributes: attributes.into_bump_slice(),
+            fragment: Fragment {
+                nodes: child_nodes.into_bump_slice(),
+            },
             span: Span {
                 start: start as u32,
                 end,
@@ -218,23 +226,26 @@ impl<'a> SvelteParser<'a> {
 
     /// Build the final SpecialElementKind from the tag and extracted expressions
     fn build_special_element_kind(
+        &self,
         tag: SpecialElementTag,
-        tag_expr: Option<tsv_ts::ast::internal::Expression>,
-        component_expr: Option<tsv_ts::ast::internal::Expression>,
-    ) -> SpecialElementKind {
+        tag_expr: Option<tsv_ts::ast::internal::Expression<'arena>>,
+        component_expr: Option<tsv_ts::ast::internal::Expression<'arena>>,
+    ) -> SpecialElementKind<'arena> {
         match tag {
             SpecialElementTag::SvelteElement => {
                 // For svelte:element, we need the `this` attribute
-                // If missing, create a placeholder (parser should have validated)
-                let tag = tag_expr.unwrap_or(tsv_ts::ast::internal::Expression::Literal(
-                    tsv_ts::ast::internal::Literal {
-                        value: tsv_ts::ast::internal::LiteralValue::String {
-                            content: String::new(),
-                            quote: '"',
-                        },
+                // If missing, create a placeholder (parser should have validated).
+                // Use a `Decoded("")` empty-string cooked value so `resolve` reads
+                // the arena bytes directly (a `Verbatim` form would slice the span
+                // minus quotes and underflow on this zero-length placeholder span).
+                let tag = tag_expr.unwrap_or_else(|| {
+                    tsv_ts::ast::internal::Expression::Literal(tsv_ts::ast::internal::Literal {
+                        value: tsv_ts::ast::internal::LiteralValue::String(
+                            tsv_ts::ast::internal::StringCooked::Decoded(self.alloc_str_in("")),
+                        ),
                         span: Span { start: 0, end: 0 },
-                    },
-                ));
+                    })
+                });
                 SpecialElementKind::SvelteElement { tag }
             }
             SpecialElementTag::SvelteComponent => {
@@ -263,10 +274,10 @@ impl<'a> SvelteParser<'a> {
     fn parse_special_element_attributes(
         &mut self,
         tag: SpecialElementTag,
-    ) -> Result<SpecialElementAttrs, ParseError> {
-        let mut attributes = Vec::new();
-        let mut tag_expr: Option<tsv_ts::ast::internal::Expression> = None;
-        let mut component_expr: Option<tsv_ts::ast::internal::Expression> = None;
+    ) -> Result<SpecialElementAttrs<'arena>, ParseError> {
+        let mut attributes = self.bvec();
+        let mut tag_expr: Option<tsv_ts::ast::internal::Expression<'arena>> = None;
+        let mut component_expr: Option<tsv_ts::ast::internal::Expression<'arena>> = None;
 
         // Parse all attributes
         let all_attrs = self.parse_attributes()?;
@@ -284,18 +295,23 @@ impl<'a> SvelteParser<'a> {
                     if attr_name == "this" {
                         if tag == SpecialElementTag::SvelteElement {
                             // Extract expression from the attribute value
-                            if let Some(ref values) = a.value {
+                            if let Some(values) = a.value {
                                 if let Some(AttributeValue::ExpressionTag(et)) = values.first() {
                                     tag_expr = Some(et.expression.clone());
                                     continue; // Don't add to attributes
                                 } else if let Some(AttributeValue::Text(t)) = values.first() {
-                                    // String value: create a literal expression
+                                    // String value: create a literal expression. The
+                                    // decoded text is copied once into the arena as a
+                                    // `Decoded` cooked value (the source slice carries
+                                    // entities / no quotes, so it is not `Verbatim`).
+                                    let content = self.alloc_str_in(&t.data(self.source));
                                     tag_expr = Some(tsv_ts::ast::internal::Expression::Literal(
                                         tsv_ts::ast::internal::Literal {
-                                            value: tsv_ts::ast::internal::LiteralValue::String {
-                                                content: t.data(self.source).into_owned(),
-                                                quote: '"',
-                                            },
+                                            value: tsv_ts::ast::internal::LiteralValue::String(
+                                                tsv_ts::ast::internal::StringCooked::Decoded(
+                                                    content,
+                                                ),
+                                            ),
                                             span: t.span,
                                         },
                                     ));
@@ -303,7 +319,7 @@ impl<'a> SvelteParser<'a> {
                                 }
                             }
                         } else if tag == SpecialElementTag::SvelteComponent
-                            && let Some(ref values) = a.value
+                            && let Some(values) = a.value
                             && let Some(AttributeValue::ExpressionTag(et)) = values.first()
                         {
                             // Extract expression from the attribute value
@@ -327,8 +343,8 @@ impl<'a> SvelteParser<'a> {
         opening_tag_end: usize,
         start: usize,
         in_svelte_head: bool,
-    ) -> Result<Vec<FragmentNode>, ParseError> {
-        let mut child_nodes = Vec::new();
+    ) -> Result<BumpVec<'arena, FragmentNode<'arena>>, ParseError> {
+        let mut child_nodes = self.bvec();
         let mut last_end = opening_tag_end;
 
         #[allow(unused_assignments)]
@@ -412,7 +428,7 @@ impl<'a> SvelteParser<'a> {
         tag_name: &str,
         content_start: usize,
         element_start: usize,
-    ) -> Result<Vec<FragmentNode>, ParseError> {
+    ) -> Result<BumpVec<'arena, FragmentNode<'arena>>, ParseError> {
         // Build the closing tag pattern: </style> or </script>
         let closing_pattern = format!("</{tag_name}>");
         let closing_bytes = closing_pattern.as_bytes();
@@ -448,11 +464,13 @@ impl<'a> SvelteParser<'a> {
             start: content_start as u32,
             end: content_end as u32,
         };
-        Ok(vec![FragmentNode::Text(Text {
+        let mut nodes = self.bvec();
+        nodes.push(FragmentNode::Text(Text {
             raw_span: span,
             decoding: TextDecoding::Raw,
             span,
-        })])
+        }));
+        Ok(nodes)
     }
 }
 

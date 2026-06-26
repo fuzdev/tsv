@@ -20,11 +20,11 @@ pub mod doc;
 mod error;
 mod escapes;
 mod interner;
-mod json;
 mod location;
 mod output;
 mod parser;
 pub mod printing;
+mod sizing;
 pub mod source_scan;
 mod span;
 
@@ -37,8 +37,8 @@ pub use comment::{
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
-pub use json::estimated_json_capacity;
 pub use location::{ByteToCharMap, LocationTracker, Position, SourceLocation};
 pub use output::{OutputBuffer, write_indent};
 pub use parser::PeekData;
+pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};
 pub use span::Span;

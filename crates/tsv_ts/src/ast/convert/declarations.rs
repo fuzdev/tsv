@@ -11,7 +11,7 @@ use tsv_lang::{InfallibleResolve, LocationTracker, Span};
 
 /// Convert a decorator from internal to public AST
 pub(super) fn convert_decorator(
-    decorator: &internal::Decorator,
+    decorator: &internal::Decorator<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -57,7 +57,7 @@ fn strip_decorator_spine_optional(expression: &mut public::Expression) {
 }
 
 pub(in crate::ast) fn convert_type_alias_declaration(
-    type_alias: &internal::TSTypeAliasDeclaration,
+    type_alias: &internal::TSTypeAliasDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -79,7 +79,7 @@ pub(in crate::ast) fn convert_type_alias_declaration(
 }
 
 pub(in crate::ast) fn convert_function_declaration(
-    func_decl: &internal::FunctionDeclaration,
+    func_decl: &internal::FunctionDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -115,7 +115,7 @@ pub(in crate::ast) fn convert_function_declaration(
 }
 
 pub(in crate::ast) fn convert_class_declaration(
-    class_decl: &internal::ClassDeclaration,
+    class_decl: &internal::ClassDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -178,7 +178,7 @@ pub(in crate::ast) fn convert_class_declaration(
 }
 
 pub(in crate::ast) fn convert_class_expression(
-    class_expr: &internal::ClassExpression,
+    class_expr: &internal::ClassExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -286,7 +286,7 @@ fn maybe_wrap_super_class(
 }
 
 pub(in crate::ast) fn convert_class_body(
-    body: &internal::ClassBody,
+    body: &internal::ClassBody<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -306,7 +306,7 @@ pub(in crate::ast) fn convert_class_body(
 }
 
 fn convert_class_member(
-    member: &internal::ClassMember,
+    member: &internal::ClassMember<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -329,7 +329,7 @@ fn convert_class_member(
 }
 
 fn convert_index_signature(
-    sig: &internal::TSIndexSignature,
+    sig: &internal::TSIndexSignature<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -352,7 +352,7 @@ fn convert_index_signature(
                     loc: create_location(p.span, loc, offset),
                     name,
                     optional: p.optional,
-                    type_annotation: p.type_annotation.as_ref().map(|ta| {
+                    type_annotation: p.type_annotation().map(|ta| {
                         convert_type_annotation_from_types(ta, source, loc, interner, offset)
                     }),
                     decorators: Vec::new(),
@@ -372,7 +372,7 @@ fn convert_index_signature(
 }
 
 fn convert_static_block(
-    block: &internal::StaticBlock,
+    block: &internal::StaticBlock<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -393,7 +393,7 @@ fn convert_static_block(
 }
 
 fn convert_method_definition(
-    method: &internal::MethodDefinition,
+    method: &internal::MethodDefinition<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -493,7 +493,7 @@ fn convert_method_definition(
 }
 
 fn convert_property_definition(
-    prop: &internal::PropertyDefinition,
+    prop: &internal::PropertyDefinition<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -533,7 +533,7 @@ fn convert_property_definition(
 
 /// Convert type parameter declaration: `<T extends U = V>`
 pub(in crate::ast) fn convert_type_parameter_declaration(
-    params: &internal::TSTypeParameterDeclaration,
+    params: &internal::TSTypeParameterDeclaration<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -559,7 +559,7 @@ pub(in crate::ast) fn convert_type_parameter_declaration(
 
 /// Convert single type parameter: `T extends U = V`
 pub(in crate::ast) fn convert_type_parameter(
-    param: &internal::TSTypeParameter,
+    param: &internal::TSTypeParameter<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -587,7 +587,7 @@ pub(in crate::ast) fn convert_type_parameter(
 
 /// Convert type parameter instantiation: `<T, U>`
 pub(in crate::ast) fn convert_type_parameter_instantiation(
-    params: &internal::TSTypeParameterInstantiation,
+    params: &internal::TSTypeParameterInstantiation<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -608,7 +608,7 @@ pub(in crate::ast) fn convert_type_parameter_instantiation(
 
 /// Convert TSInterfaceHeritage to TSExpressionWithTypeArguments (for implements clause)
 fn convert_expression_with_type_arguments(
-    heritage: &internal::TSInterfaceHeritage,
+    heritage: &internal::TSInterfaceHeritage<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -632,7 +632,7 @@ fn convert_expression_with_type_arguments(
 
 /// Convert TSEntityName to Expression (Identifier or MemberExpression)
 fn convert_entity_name_to_expression(
-    entity: &internal::TSEntityName,
+    entity: &internal::TSEntityName<'_>,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,

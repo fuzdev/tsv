@@ -19,11 +19,11 @@ use tsv_lang::{ParseError, Span};
 /// - `(display: grid) and (flex: 1)` - conjunction
 /// - `not (color: red)` - negation
 /// - `(a) and (b) or (c)` - mixed (parsed left-to-right)
-pub(super) fn parse_condition_query(
-    parser: &mut CssParser<'_>,
-) -> Result<(ConditionQuery, Span), ParseError> {
+pub(super) fn parse_condition_query<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<(ConditionQuery<'arena>, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
-    let mut parts = Vec::new();
+    let mut parts = parser.bvec();
     let mut current_connector: Option<ConditionConnector> = None;
     let mut end_pos = start;
 
@@ -238,11 +238,12 @@ pub(super) fn parse_condition_query(
         }
 
         // Build the part
-        let content = part_content.join("").trim().to_string();
+        let joined = part_content.join("");
+        let content = joined.trim();
         if !content.is_empty() {
             parts.push(ConditionPart {
                 connector: current_connector.take(),
-                content,
+                content: parser.alloc_str_in(content),
                 span: Span {
                     start: part_start as u32,
                     end: end_pos as u32,
@@ -256,7 +257,12 @@ pub(super) fn parse_condition_query(
         end: end_pos as u32,
     };
 
-    Ok((ConditionQuery { parts }, span))
+    Ok((
+        ConditionQuery {
+            parts: parts.into_bump_slice(),
+        },
+        span,
+    ))
 }
 
 /// Parse @container prelude into structured condition parts with optional name
@@ -269,9 +275,9 @@ pub(super) fn parse_condition_query(
 /// - `(min-width: 100px) and (max-width: 200px)` - no name, conjunction
 /// - `sidebar (min-width: 100px)` - named container
 /// - `sidebar (min-width: 100px) and (max-width: 200px)` - named container with conjunction
-pub(super) fn parse_container_prelude(
-    parser: &mut CssParser<'_>,
-) -> Result<(Option<String>, ConditionQuery, Span), ParseError> {
+pub(super) fn parse_container_prelude<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<(Option<&'arena str>, ConditionQuery<'arena>, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Check for optional container name (identifier before first '(')
@@ -280,16 +286,17 @@ pub(super) fn parse_container_prelude(
     let container_name = if parser.check(TokenKind::Identifier) {
         let ident = parser
             .current_identifier()
-            .unwrap_or_else(|| parser.current_value())
-            .to_string();
+            .unwrap_or_else(|| parser.current_value());
         // Check if this is actually a name (not 'not' or 'and' or 'or')
         // Also check it's not a function call (identifier directly followed by '(')
         let is_function_call =
             parser.source.get(parser.current_end..=parser.current_end) == Some("(");
-        if !matches!(ident.as_str(), "not" | "and" | "or") && !is_function_call {
+        if !matches!(ident, "not" | "and" | "or") && !is_function_call {
+            // Copy into the arena only on the path that stores the name as a node.
+            let name = parser.alloc_str_in(ident);
             parser.advance()?;
             parser.skip_whitespace()?;
-            Some(ident)
+            Some(name)
         } else {
             None
         }
@@ -319,9 +326,9 @@ pub(super) fn parse_container_prelude(
 /// - `(.card)` - scope root only
 /// - `(.card) to (.footer)` - scope root and limit
 /// - `(article > header)` - with combinator
-pub(super) fn parse_scope_prelude(
-    parser: &mut CssParser<'_>,
-) -> Result<(SelectorList, Option<SelectorList>, Span), ParseError> {
+pub(super) fn parse_scope_prelude<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<(SelectorList<'arena>, Option<SelectorList<'arena>>, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Expect opening paren
@@ -401,11 +408,11 @@ pub(super) fn parse_scope_prelude(
 /// - `url('tabs.css') layer(framework)`
 /// - `url('override.css') layer`
 /// - `url('narrow.css') supports(display: flex) screen`
-pub(super) fn parse_import_prelude(
-    parser: &mut CssParser<'_>,
-) -> Result<(Vec<CssValue>, Span), ParseError> {
+pub(super) fn parse_import_prelude<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<(&'arena [CssValue<'arena>], Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
-    let mut values = Vec::new();
+    let mut values = parser.bvec();
 
     // Register a leading comment between `@import` and the url()/string (e.g.
     // `@import /* c */ url(...)`). Svelte strips it from the prelude; the printer
@@ -422,15 +429,13 @@ pub(super) fn parse_import_prelude(
     if is_function {
         // url() function
         values.push(parse_function_value(parser)?);
-    } else if let TokenKind::String { quote } = &parser.current_kind {
-        // Bare string
+    } else if let TokenKind::String { .. } = &parser.current_kind {
+        // Bare string — the inner text is recovered verbatim from `span` at print time
+        // (span-for-verbatim, zero alloc); the quote char from `source[span.start]`.
         let value_start = (parser.base_offset() + parser.current_start) as u32;
         let value_end = (parser.base_offset() + parser.current_end) as u32;
-        // Extract content without quotes
-        let content = parser.source()[parser.current_start + 1..parser.current_end - 1].to_string();
         values.push(CssValue::String {
-            content,
-            quote: *quote,
+            content: StringCooked::Verbatim,
             span: Span {
                 start: value_start,
                 end: value_end,
@@ -458,15 +463,14 @@ pub(super) fn parse_import_prelude(
             // Check for bare "layer" keyword or media query
             let ident = parser
                 .current_identifier()
-                .unwrap_or_else(|| parser.current_value())
-                .to_string();
+                .unwrap_or_else(|| parser.current_value());
 
             if ident == "layer" {
-                // Bare "layer" keyword (without function call)
+                // Bare "layer" keyword (without function call); text recovered from
+                // `span` at print time (span-for-verbatim).
                 let value_start = (parser.base_offset() + parser.current_start) as u32;
                 let value_end = (parser.base_offset() + parser.current_end) as u32;
                 values.push(CssValue::Identifier {
-                    name: ident,
                     span: Span {
                         start: value_start,
                         end: value_end,
@@ -488,11 +492,10 @@ pub(super) fn parse_import_prelude(
                 }
 
                 let media_end = (parser.base_offset() + media_local_end) as u32;
-                let name = parser.source()[media_local_start..media_local_end].to_string();
 
-                if !name.is_empty() {
+                // Media-query text recovered verbatim from `span` at print time.
+                if media_local_end > media_local_start {
                     values.push(CssValue::Identifier {
-                        name,
                         span: Span {
                             start: media_start,
                             end: media_end,
@@ -509,7 +512,7 @@ pub(super) fn parse_import_prelude(
     let end = values.last().map_or(start as u32, |v| v.span().end);
 
     Ok((
-        values,
+        values.into_bump_slice(),
         Span {
             start: start as u32,
             end,
@@ -518,15 +521,18 @@ pub(super) fn parse_import_prelude(
 }
 
 /// Parse a function value (e.g., url(), layer(), supports())
-fn parse_function_value(parser: &mut CssParser<'_>) -> Result<CssValue, ParseError> {
+fn parse_function_value<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<CssValue<'arena>, ParseError> {
     let value_start = (parser.base_offset() + parser.current_start) as u32;
 
     // Get function name (current token should be identifier)
     let name = if parser.check(TokenKind::Identifier) {
-        parser
-            .current_identifier()
-            .unwrap_or_else(|| parser.current_value())
-            .to_string()
+        parser.alloc_str_in(
+            parser
+                .current_identifier()
+                .unwrap_or_else(|| parser.current_value()),
+        )
     } else {
         return Err(parser.error_expected("function name"));
     };
@@ -541,20 +547,18 @@ fn parse_function_value(parser: &mut CssParser<'_>) -> Result<CssValue, ParseErr
     parser.advance()?; // consume '('
 
     // For @import functions (url, layer, supports), parse arguments based on function type
-    let mut args = Vec::new();
+    let mut args = parser.bvec();
 
     if name == "url" {
         // url() - parse the URL argument (string or bare URL)
         parser.skip_whitespace()?;
-        if let TokenKind::String { quote } = &parser.current_kind {
+        if let TokenKind::String { .. } = &parser.current_kind {
             let arg_start = (parser.base_offset() + parser.current_start) as u32;
             let arg_end = (parser.base_offset() + parser.current_end) as u32;
-            // Extract content without quotes
-            let content =
-                parser.source()[parser.current_start + 1..parser.current_end - 1].to_string();
+            // Bare string arg — inner text recovered verbatim from `span` at print
+            // time (span-for-verbatim, zero alloc); quote char from `source[span.start]`.
             args.push(CssValue::String {
-                content,
-                quote: *quote,
+                content: StringCooked::Verbatim,
                 span: Span {
                     start: arg_start,
                     end: arg_end,
@@ -576,12 +580,8 @@ fn parse_function_value(parser: &mut CssParser<'_>) -> Result<CssValue, ParseErr
         if parser.check(TokenKind::Identifier) {
             let arg_start = (parser.base_offset() + parser.current_start) as u32;
             let arg_end = (parser.base_offset() + parser.current_end) as u32;
-            let ident = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value())
-                .to_string();
+            // Identifier text recovered verbatim from `span` at print time.
             args.push(CssValue::Identifier {
-                name: ident,
                 span: Span {
                     start: arg_start,
                     end: arg_end,
@@ -676,11 +676,12 @@ fn parse_function_value(parser: &mut CssParser<'_>) -> Result<CssValue, ParseErr
             }
         }
 
-        // Store the normalized condition text as an identifier
-        let condition_text = condition_parts.join("").trim().to_string();
+        // Condition text recovered verbatim from `span` at print time; the join is
+        // only used to decide whether there's any content to push.
+        let joined = condition_parts.join("");
+        let condition_text = joined.trim();
         if !condition_text.is_empty() {
             args.push(CssValue::Identifier {
-                name: condition_text,
                 span: Span {
                     start: condition_start,
                     end: condition_end,
@@ -705,7 +706,7 @@ fn parse_function_value(parser: &mut CssParser<'_>) -> Result<CssValue, ParseErr
 
     Ok(CssValue::Function {
         name,
-        args,
+        args: args.into_bump_slice(),
         span: Span {
             start: value_start,
             end: value_end,

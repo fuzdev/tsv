@@ -25,18 +25,17 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 ///
 /// Note: Only TypeLiteral is handled specially. Mapped types (`{ [K in T]: V }`)
 /// also pass `is_huggable_type` but use standard param formatting.
-fn get_type_literal_from_identifier(
-    expr: &internal::Expression,
+fn get_type_literal_from_identifier<'a>(
+    expr: &'a internal::Expression<'a>,
 ) -> Option<(
-    &internal::Identifier,
-    &internal::TSTypeAnnotation,
-    &internal::TSTypeLiteral,
+    &'a internal::Identifier<'a>,
+    &'a internal::TSTypeAnnotation<'a>,
+    &'a internal::TSTypeLiteral<'a>,
 )> {
     match expr {
         internal::Expression::Identifier(id) => {
-            id.type_annotation
-                .as_ref()
-                .and_then(|ann| match ann.type_annotation.as_ref() {
+            id.type_annotation()
+                .and_then(|ann| match ann.type_annotation {
                     TSType::TypeLiteral(t) => Some((id, ann, t)),
                     _ => None,
                 })
@@ -50,7 +49,7 @@ fn get_type_literal_from_identifier(
 /// Returns true when there are 0 type params, or exactly 1 without constraints/defaults.
 /// Shared between function declarations and function/constructor types.
 pub(in crate::printer) fn type_params_allow_grouping(
-    type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
 ) -> bool {
     let Some(tp) = type_parameters else {
         return true;
@@ -68,12 +67,12 @@ pub(in crate::printer) fn type_params_allow_grouping(
 /// Returns true when the return type is an object type (TypeLiteral/Mapped)
 /// or the return type doc will break across lines.
 pub(in crate::printer) fn return_type_triggers_grouping(
-    return_type: &internal::TSTypeAnnotation,
+    return_type: &internal::TSTypeAnnotation<'_>,
     return_type_doc: DocId,
     d: &DocArena,
 ) -> bool {
     matches!(
-        &*return_type.type_annotation,
+        return_type.type_annotation,
         TSType::TypeLiteral(_) | TSType::Mapped(_)
     ) || d.will_break(return_type_doc)
 }
@@ -103,7 +102,7 @@ impl<'a> Printer<'a> {
     /// + hardline, so `=>` starts the next line flush — `() // c\n=> void`).
     fn build_function_type_return_doc(
         &self,
-        return_type: &internal::TSTypeAnnotation,
+        return_type: &internal::TSTypeAnnotation<'_>,
         leading_space: bool,
     ) -> DocId {
         let d = self.d();
@@ -119,7 +118,7 @@ impl<'a> Printer<'a> {
         // types get the same hanging layout as the bare form (prettier strips them
         // too). Only union/intersection are unwrapped; other parenthesized types
         // keep the match-on-original fall-through below.
-        let value_type = self.unwrap_redundant_parens(return_type.type_annotation.as_ref());
+        let value_type = self.unwrap_redundant_parens(return_type.type_annotation);
         if let TSType::Union(u) = value_type {
             let type_doc = self.build_union_type_doc(u, false);
             return d.concat(&[
@@ -136,7 +135,7 @@ impl<'a> Printer<'a> {
                 d.group(d.indent(type_doc)),
             ]);
         }
-        match return_type.type_annotation.as_ref() {
+        match return_type.type_annotation {
             // TypeReference with complex type args (like Promise<Result<...>>):
             // Build with wrapping type args so it can break inside the <...>
             TSType::TypeReference(r)
@@ -146,13 +145,13 @@ impl<'a> Printer<'a> {
             {
                 // Use build_type_doc_inner with wrap_type_args=true to enable
                 // wrapping inside the type reference's type arguments
-                let type_doc = self.build_type_doc_inner(&return_type.type_annotation, true);
+                let type_doc = self.build_type_doc_inner(return_type.type_annotation, true);
                 d.concat(&[d.text_owned(format!("{sp}=> ")), comments_doc, type_doc])
             }
             _ => d.concat(&[
                 d.text_owned(format!("{sp}=> ")),
                 comments_doc,
-                self.build_type_doc(&return_type.type_annotation),
+                self.build_type_doc(return_type.type_annotation),
             ]),
         }
     }
@@ -167,13 +166,13 @@ impl<'a> Printer<'a> {
     /// Applies `shouldGroupFunctionParameters` when there's 1 param and the
     /// return type is an object type or will break — params are wrapped in
     /// their own group so they stay flat when the outer group breaks.
-    pub(super) fn build_function_type_doc(&self, f: &TSFunctionType) -> DocId {
+    pub(super) fn build_function_type_doc(&self, f: &TSFunctionType<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         self.append_type_params_and_signature(
             &mut parts,
             f.type_parameters.as_ref(),
-            &f.params,
+            f.params,
             &f.return_type,
             f.span.start,
         );
@@ -186,9 +185,9 @@ impl<'a> Printer<'a> {
     fn append_type_params_and_signature(
         &self,
         parts: &mut DocBuf,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
-        params: &[internal::Expression],
-        return_type: &internal::TSTypeAnnotation,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        params: &[internal::Expression<'_>],
+        return_type: &internal::TSTypeAnnotation<'_>,
         span_start: u32,
     ) {
         if let Some(type_params) = type_parameters {
@@ -218,7 +217,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for a constructor type: `new () => T` or `abstract new <T>() => T`
-    pub(super) fn build_constructor_type_doc(&self, c: &TSConstructorType) -> DocId {
+    pub(super) fn build_constructor_type_doc(&self, c: &TSConstructorType<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
 
@@ -268,7 +267,7 @@ impl<'a> Printer<'a> {
         self.append_type_params_and_signature(
             &mut parts,
             c.type_parameters.as_ref(),
-            &c.params,
+            c.params,
             &c.return_type,
             c.span.start,
         );
@@ -283,10 +282,10 @@ impl<'a> Printer<'a> {
     /// wraps params in their own group so they stay flat when the outer group breaks.
     fn build_grouped_params_and_return_type(
         &self,
-        params: &[internal::Expression],
+        params: &[internal::Expression<'_>],
         paren_search_start: u32,
-        return_type: &internal::TSTypeAnnotation,
-        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
+        return_type: &internal::TSTypeAnnotation<'_>,
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
     ) -> [DocId; 2] {
         let d = self.d();
 
@@ -422,7 +421,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_signature_return_type_doc(
         &self,
         paren_pos: Option<u32>,
-        return_type: &internal::TSTypeAnnotation,
+        return_type: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
         let d = self.d();
         let prefix = self.build_paren_to_return_type_comments(paren_pos, return_type.span.start);
@@ -436,7 +435,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_function_return_type_doc(
         &self,
         paren_pos: Option<u32>,
-        return_type: &internal::TSTypeAnnotation,
+        return_type: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
         let d = self.d();
         let prefix = self.build_paren_to_return_type_comments(paren_pos, return_type.span.start);
@@ -455,7 +454,7 @@ impl<'a> Printer<'a> {
     /// TypeLiteral and interface contexts.
     pub(in crate::printer) fn build_signature_params_doc(
         &self,
-        params: &[internal::Expression],
+        params: &[internal::Expression<'_>],
         paren_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
@@ -590,7 +589,7 @@ impl<'a> Printer<'a> {
     /// break at print width (e.g., `param: Map<LongA, LongB>` breaks inside `<>`).
     pub(super) fn build_function_type_param_expression_doc(
         &self,
-        expr: &internal::Expression,
+        expr: &internal::Expression<'_>,
     ) -> DocId {
         let d = self.d();
         match expr {
@@ -606,7 +605,7 @@ impl<'a> Printer<'a> {
                 let mut parts = vec![
                     d.text("..."),
                     comments_doc,
-                    self.build_function_type_param_expression_doc(&rest.argument),
+                    self.build_function_type_param_expression_doc(rest.argument),
                 ];
                 if let Some(ta) = &rest.type_annotation {
                     parts.push(self.build_type_annotation_doc(ta));
@@ -621,7 +620,7 @@ impl<'a> Printer<'a> {
     /// Returns docs that should be pushed to a parts vector
     fn build_function_params_doc(
         &self,
-        params: &[internal::Expression],
+        params: &[internal::Expression<'_>],
         paren_search_start: u32,
     ) -> DocBuf {
         let d = self.d();
@@ -794,7 +793,7 @@ impl<'a> Printer<'a> {
     /// Build function params with line comments between them (forces multiline)
     fn build_function_params_doc_with_line_comments(
         &self,
-        params: &[internal::Expression],
+        params: &[internal::Expression<'_>],
         paren_pos: Option<u32>,
     ) -> DocBuf {
         let d = self.d();

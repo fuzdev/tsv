@@ -1,6 +1,8 @@
 use super::CssParser;
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{ParseError, Span};
 
 /// Parse a complex selector list: `div, span > a, .class#id`
@@ -21,7 +23,7 @@ use tsv_lang::{ParseError, Span};
 ///
 /// Not needed by `parse_forgiving_selector_list`, whose terminator is `)` (not `{`); it can
 /// skip comments unconditionally before its comma check.
-fn skip_comments_before_comma(parser: &mut CssParser<'_>) -> Result<(), ParseError> {
+fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), ParseError> {
     if matches!(&parser.current_kind, TokenKind::Comment)
         && parser.peek_past_whitespace()? == TokenKind::Comma
     {
@@ -30,11 +32,11 @@ fn skip_comments_before_comma(parser: &mut CssParser<'_>) -> Result<(), ParseErr
     Ok(())
 }
 
-pub(crate) fn parse_complex_selector_list(
-    parser: &mut CssParser<'_>,
-) -> Result<SelectorList, ParseError> {
+pub(crate) fn parse_complex_selector_list<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<SelectorList<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start();
-    let mut selectors = Vec::new();
+    let mut selectors = parser.bvec();
 
     // Parse first complex selector
     let first = parse_complex_selector(parser)?;
@@ -55,7 +57,7 @@ pub(crate) fn parse_complex_selector_list(
     }
 
     Ok(SelectorList {
-        selectors,
+        selectors: selectors.into_bump_slice(),
         span: Span {
             start: start as u32,
             end,
@@ -88,11 +90,11 @@ pub(crate) fn parse_complex_selector_list(
 /// Public AST conversion filters them out for Svelte compatibility.
 ///
 /// See: CSS Selectors Level 4 - <<forgiving-selector-list>>
-pub(crate) fn parse_forgiving_selector_list(
-    parser: &mut CssParser<'_>,
-) -> Result<SelectorList, ParseError> {
+pub(crate) fn parse_forgiving_selector_list<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<SelectorList<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start();
-    let mut selectors = Vec::new();
+    let mut selectors = parser.bvec();
 
     loop {
         let selector_start = parser.base_offset() + parser.current_start();
@@ -104,11 +106,12 @@ pub(crate) fn parse_forgiving_selector_list(
                 selectors.push(selector);
             }
             Err(_) => {
-                // Parse error - extract raw text and wrap as Invalid
-                let raw = extract_selector_until_comma_or_end(parser, source_start)?;
+                // Parse error - advance past the invalid selector and wrap as Invalid
+                // (its raw text is recovered from the span at print time).
+                extract_selector_until_comma_or_end(parser, source_start)?;
                 let selector_end = parser.base_offset() + parser.current_start();
 
-                let invalid = create_invalid_selector(raw, selector_start, selector_end);
+                let invalid = create_invalid_selector(parser.arena, selector_start, selector_end);
                 selectors.push(invalid);
             }
         }
@@ -128,7 +131,7 @@ pub(crate) fn parse_forgiving_selector_list(
     let end = selectors.last().map_or(start as u32, |s| s.span.end);
 
     Ok(SelectorList {
-        selectors,
+        selectors: selectors.into_bump_slice(),
         span: Span {
             start: start as u32,
             end,
@@ -136,23 +139,30 @@ pub(crate) fn parse_forgiving_selector_list(
     })
 }
 
-/// Create an Invalid ComplexSelector from raw text and span positions
-fn create_invalid_selector(raw: String, start: usize, end: usize) -> ComplexSelector {
+/// Create an Invalid ComplexSelector from span positions (the raw text is
+/// recovered verbatim from `span` at print time).
+fn create_invalid_selector<'arena>(
+    arena: &'arena Bump,
+    start: usize,
+    end: usize,
+) -> ComplexSelector<'arena> {
     let span = Span {
         start: start as u32,
         end: end as u32,
     };
 
+    let mut simple = BumpVec::new_in(arena);
+    simple.push(SimpleSelector::Invalid { span });
+    let mut children = BumpVec::new_in(arena);
+    children.push(RelativeSelector {
+        combinator: None,
+        combinator_span: None,
+        selectors: simple.into_bump_slice(),
+        span,
+    });
+
     ComplexSelector {
-        children: vec![RelativeSelector {
-            combinator: None,
-            combinator_span: None,
-            selectors: vec![SimpleSelector::Invalid {
-                raw: raw.trim().to_string(),
-                span,
-            }],
-            span,
-        }],
+        children: children.into_bump_slice(),
         span,
     }
 }
@@ -169,10 +179,10 @@ fn create_invalid_selector(raw: String, start: usize, end: usize) -> ComplexSele
 /// - Comma at depth 0 (next selector in list)
 /// - Right paren at depth 0 (end of pseudo-class args)
 /// - EOF (unexpected but handled)
-fn extract_selector_until_comma_or_end(
-    parser: &mut CssParser<'_>,
+fn extract_selector_until_comma_or_end<'a>(
+    parser: &mut CssParser<'a, '_>,
     start_pos: usize,
-) -> Result<String, ParseError> {
+) -> Result<&'a str, ParseError> {
     let mut depth = 0; // Track nesting depth for parens/brackets
 
     loop {
@@ -210,7 +220,7 @@ fn extract_selector_until_comma_or_end(
 
     // Extract raw text from source (from start_pos to current position)
     let end_pos = parser.current_start;
-    let raw = parser.source()[start_pos..end_pos].to_string();
+    let raw = &parser.source()[start_pos..end_pos];
     Ok(raw)
 }
 
@@ -227,11 +237,11 @@ fn extract_selector_until_comma_or_end(
 /// Only :has() uses relative selectors because it needs to express relationships from the element.
 ///
 /// See: CSS Selectors Level 4 - <<relative-selector-list>>
-pub(crate) fn parse_relative_selector_list(
-    parser: &mut CssParser<'_>,
-) -> Result<SelectorList, ParseError> {
+pub(crate) fn parse_relative_selector_list<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<SelectorList<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start();
-    let mut selectors = Vec::new();
+    let mut selectors = parser.bvec();
 
     // Parse first relative complex selector
     let first = parse_relative_complex_selector(parser)?;
@@ -252,7 +262,7 @@ pub(crate) fn parse_relative_selector_list(
     }
 
     Ok(SelectorList {
-        selectors,
+        selectors: selectors.into_bump_slice(),
         span: Span {
             start: start as u32,
             end,
@@ -273,11 +283,11 @@ pub(crate) fn parse_relative_selector_list(
 /// - `div > span` - combinator in middle (relative or regular)
 ///
 /// See: CSS Selectors Level 4 - <<relative-selector>> vs <<complex-selector>>
-fn parse_relative_complex_selector(
-    parser: &mut CssParser<'_>,
-) -> Result<ComplexSelector, ParseError> {
+fn parse_relative_complex_selector<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<ComplexSelector<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start();
-    let mut children = Vec::new();
+    let mut children = parser.bvec();
 
     // Check if we start with an EXPLICIT combinator (>, +, ~, ||)
     // Note: We use parse_explicit_combinator here, NOT parse_combinator,
@@ -318,7 +328,7 @@ fn parse_relative_complex_selector(
     }
 
     Ok(ComplexSelector {
-        children,
+        children: children.into_bump_slice(),
         span: Span {
             start: start as u32,
             end,
@@ -327,11 +337,11 @@ fn parse_relative_complex_selector(
 }
 
 /// Parse a complex selector: `div > span + .class`
-pub(crate) fn parse_complex_selector(
-    parser: &mut CssParser<'_>,
-) -> Result<ComplexSelector, ParseError> {
+pub(crate) fn parse_complex_selector<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<ComplexSelector<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start();
-    let mut children = Vec::new();
+    let mut children = parser.bvec();
 
     // First relative selector has no combinator
     let first = parse_relative_selector(parser, None, None)?;
@@ -363,7 +373,7 @@ pub(crate) fn parse_complex_selector(
     }
 
     Ok(ComplexSelector {
-        children,
+        children: children.into_bump_slice(),
         span: Span {
             start: start as u32,
             end,
@@ -377,7 +387,7 @@ pub(crate) fn parse_complex_selector(
 ///
 /// This is different from `parse_combinator()` which also returns Descendant for whitespace.
 pub(crate) fn parse_explicit_combinator(
-    parser: &mut CssParser<'_>,
+    parser: &mut CssParser<'_, '_>,
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
     parser.skip_whitespace()?;
 
@@ -411,7 +421,7 @@ pub(crate) fn parse_explicit_combinator(
 /// Parse a combinator: `>`, `+`, `~`, `||`, or whitespace (descendant)
 /// Returns (combinator type, combinator span)
 pub(crate) fn parse_combinator(
-    parser: &mut CssParser<'_>,
+    parser: &mut CssParser<'_, '_>,
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
     // Capture position before skipping whitespace for descendant combinator
     let whitespace_start = parser.base_offset() + parser.current_start();
@@ -468,7 +478,7 @@ pub(crate) fn parse_combinator(
 }
 
 /// Check if current token could start a selector
-fn is_selector_start(parser: &CssParser<'_>) -> bool {
+fn is_selector_start(parser: &CssParser<'_, '_>) -> bool {
     matches!(
         parser.current_kind,
         TokenKind::Identifier
@@ -482,17 +492,17 @@ fn is_selector_start(parser: &CssParser<'_>) -> bool {
 }
 
 /// Parse a relative selector: combinator + simple selectors
-fn parse_relative_selector(
-    parser: &mut CssParser<'_>,
+fn parse_relative_selector<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
     combinator: Option<Combinator>,
     combinator_span: Option<Span>,
-) -> Result<RelativeSelector, ParseError> {
+) -> Result<RelativeSelector<'arena>, ParseError> {
     // Start position is either the combinator start (if present) or the current selector start
     let start = combinator_span.map_or_else(
         || parser.base_offset() + parser.current_start(),
         |s| s.start_usize(),
     );
-    let mut selectors = Vec::new();
+    let mut selectors = parser.bvec();
 
     // Parse one or more simple selectors
     loop {
@@ -514,7 +524,7 @@ fn parse_relative_selector(
     Ok(RelativeSelector {
         combinator,
         combinator_span,
-        selectors,
+        selectors: selectors.into_bump_slice(),
         span: Span {
             start: start as u32,
             end: end as u32,
@@ -528,7 +538,7 @@ fn parse_relative_selector(
 /// appear mid-compound (`&__a`, `div&`, `&&`, `*&`) — a space yields a `Whitespace` token and ends
 /// the chain. Type-not-first compounds (`&div`, `a&b`) are grammar-invalid per Selectors 4 but
 /// parsed for parity with Svelte's `parseCss` (validity is the future diagnostics layer's job).
-fn is_simple_selector_chain(parser: &CssParser<'_>) -> bool {
+fn is_simple_selector_chain(parser: &CssParser<'_, '_>) -> bool {
     matches!(
         parser.current_kind,
         TokenKind::Dot
@@ -542,52 +552,54 @@ fn is_simple_selector_chain(parser: &CssParser<'_>) -> bool {
 }
 
 /// Parse a simple selector: type, class, id, attribute, pseudo-class, pseudo-element
-pub(crate) fn parse_simple_selector(
-    parser: &mut CssParser<'_>,
-) -> Result<SimpleSelector, ParseError> {
+pub(crate) fn parse_simple_selector<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<SimpleSelector<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start();
 
     match &parser.current_kind {
         TokenKind::Identifier => {
-            // Type selector: div, span, etc.
-            // Could also be namespace prefix: svg|rect, *|div
-            let name = parser
-                .current_identifier()
-                .ok_or_else(|| parser.error_expected("identifier"))?
-                .to_string();
-            parser.advance()?;
-
-            // Check for namespace: identifier|element
-            if parser.check(TokenKind::Pipe) {
-                let namespace = Some(name); // Store the namespace prefix
-                parser.advance()?; // consume pipe
+            // Type selector: div, span, etc. Could also be a namespace prefix:
+            // svg|rect, *|div. Peek for the `|` before allocating — only the rare
+            // namespaced form copies the prefix into the arena; a bare type selector
+            // recovers its text verbatim from `span` at print time.
+            if matches!(parser.peek()?, TokenKind::Pipe) {
+                // Namespace prefix: identifier|element
+                let namespace = Some(
+                    parser.alloc_str_in(
+                        parser
+                            .current_identifier()
+                            .ok_or_else(|| parser.error_expected("identifier"))?,
+                    ),
+                );
+                parser.advance()?; // consume the namespace identifier
+                parser.advance()?; // consume the pipe
 
                 // Must be followed by an identifier (element name)
                 if !parser.check(TokenKind::Identifier) {
                     return Err(parser.error_expected_after("element name", "namespace prefix"));
                 }
-
-                let element_name = parser
-                    .current_identifier()
-                    .ok_or_else(|| parser.error_expected("identifier"))?
-                    .to_string();
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
 
                 Ok(SimpleSelector::Type {
                     namespace,
-                    name: element_name,
                     span: Span {
                         start: start as u32,
                         end: end as u32,
                     },
                 })
             } else {
-                // No namespace, just a regular type selector
+                // No namespace, just a regular type selector. Validate the identifier
+                // (matches the prior path); its text is recovered from `span` at print
+                // time, so nothing is copied into the arena.
+                parser
+                    .current_identifier()
+                    .ok_or_else(|| parser.error_expected("identifier"))?;
+                parser.advance()?;
                 let end = parser.base_offset() + parser.current_start();
                 Ok(SimpleSelector::Type {
                     namespace: None,
-                    name,
                     span: Span {
                         start: start as u32,
                         end: end as u32,
@@ -601,14 +613,14 @@ pub(crate) fn parse_simple_selector(
             if !parser.check(TokenKind::Identifier) {
                 return Err(parser.error_expected_after("class name", "."));
             }
-            let name = parser
+            // Validate an identifier follows; its text is recovered from `span` at
+            // print time, so nothing is copied into the arena.
+            parser
                 .current_identifier()
-                .ok_or_else(|| parser.error_expected("identifier"))?
-                .to_string();
+                .ok_or_else(|| parser.error_expected("identifier"))?;
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Class {
-                name,
                 span: Span {
                     start: start as u32,
                     end: end as u32,
@@ -621,14 +633,14 @@ pub(crate) fn parse_simple_selector(
             if !parser.check(TokenKind::Identifier) {
                 return Err(parser.error_expected_after("ID name", "#"));
             }
-            let name = parser
+            // Validate an identifier follows; its text is recovered from `span` at
+            // print time, so nothing is copied into the arena.
+            parser
                 .current_identifier()
-                .ok_or_else(|| parser.error_expected("identifier"))?
-                .to_string();
+                .ok_or_else(|| parser.error_expected("identifier"))?;
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Id {
-                name,
                 span: Span {
                     start: start as u32,
                     end: end as u32,
@@ -651,16 +663,16 @@ pub(crate) fn parse_simple_selector(
                     );
                 }
 
-                let element_name = parser
+                // Validate an element identifier follows; its text is recovered from
+                // `span` at print time, so nothing is copied into the arena.
+                parser
                     .current_identifier()
-                    .ok_or_else(|| parser.error_expected("identifier"))?
-                    .to_string();
+                    .ok_or_else(|| parser.error_expected("identifier"))?;
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
 
                 Ok(SimpleSelector::Type {
-                    namespace: Some("*".to_string()), // Universal namespace
-                    name: element_name,
+                    namespace: Some("*"), // Universal namespace
                     span: Span {
                         start: start as u32,
                         end: end as u32,
@@ -721,16 +733,16 @@ pub(crate) fn parse_simple_selector(
 
             // Must be followed by an identifier (element name) or asterisk (universal)
             if parser.check(TokenKind::Identifier) {
-                let element_name = parser
+                // Validate an element identifier follows; its text is recovered from
+                // `span` at print time, so nothing is copied into the arena.
+                parser
                     .current_identifier()
-                    .ok_or_else(|| parser.error_expected("identifier"))?
-                    .to_string();
+                    .ok_or_else(|| parser.error_expected("identifier"))?;
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
 
                 Ok(SimpleSelector::Type {
-                    namespace: Some(String::new()), // Empty string = explicit no namespace
-                    name: element_name,
+                    namespace: Some(""), // Empty string = explicit no namespace
                     span: Span {
                         start: start as u32,
                         end: end as u32,
@@ -742,7 +754,7 @@ pub(crate) fn parse_simple_selector(
                 parser.advance()?;
 
                 Ok(SimpleSelector::Universal {
-                    namespace: Some(String::new()), // Empty string = explicit no namespace
+                    namespace: Some(""), // Empty string = explicit no namespace
                     span: Span {
                         start: start as u32,
                         end: end as u32,

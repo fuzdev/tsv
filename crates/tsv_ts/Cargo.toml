@@ -12,6 +12,7 @@ convert = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
 tsv_lang.workspace = true
+bumpalo.workspace = true
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 smallvec.workspace = true

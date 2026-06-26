@@ -20,7 +20,10 @@ impl<'a> Printer<'a> {
     /// - Inline children: `<slot name="x">text</slot>`
     /// - Hug mode: attrs fit, children force break
     /// - Full multiline: attrs wrapped, children on new lines
-    pub(crate) fn build_special_element_doc(&self, element: &internal::SpecialElement) -> DocId {
+    pub(crate) fn build_special_element_doc(
+        &self,
+        element: &internal::SpecialElement<'_>,
+    ) -> DocId {
         let d = self.d();
 
         let tag_name = element.kind.tag_name();
@@ -180,8 +183,7 @@ impl<'a> Printer<'a> {
         // These force hug mode (not full multiline) for inline special elements like <slot>
         // BUT only when there's no whitespace around the blocks
         // NOTE: svelte:boundary NEVER uses hug mode - it always uses normal multiline for expanding blocks
-        let has_expanding_blocks =
-            super::helpers::has_any_expanding_blocks(&element.fragment.nodes);
+        let has_expanding_blocks = super::helpers::has_any_expanding_blocks(element.fragment.nodes);
         // Check if there's whitespace around expanding blocks
         // e.g., `<slot> {#if c}...{/if} </slot>` has whitespace, should use normal multiline
         let has_ws_around_expanding = has_expanding_blocks
@@ -211,9 +213,9 @@ impl<'a> Printer<'a> {
         // Build children doc based on formatting mode
         // Special elements are block-level, so always trim boundaries
         let children_doc_tree = if needs_multiline {
-            self.build_nodes_doc_multiline(&element.fragment.nodes)
+            self.build_nodes_doc_multiline(element.fragment.nodes)
         } else if is_simple_content {
-            self.build_nodes_doc_trimmed(&element.fragment.nodes, true, false, false)
+            self.build_nodes_doc_trimmed(element.fragment.nodes, true, false, false)
         } else {
             self.build_fragment_doc(&element.fragment)
         };
@@ -387,7 +389,7 @@ impl<'a> Printer<'a> {
     /// (line-separated) layout, `d.text(" ")` for hug mode (space-separated).
     pub(crate) fn build_special_element_attrs_doc(
         &self,
-        element: &internal::SpecialElement,
+        element: &internal::SpecialElement<'_>,
         separator: DocId,
     ) -> DocBuf {
         // Pre-allocate: 2 docs per attr (separator + attr), plus potential this={} attr
@@ -415,7 +417,7 @@ impl<'a> Printer<'a> {
         let normalize_class = matches!(element.kind, SpecialElementKind::SvelteElement { .. });
         self.push_attrs_with_comments(
             &mut docs,
-            &element.attributes,
+            element.attributes,
             separator,
             element.name_span.end,
             element.open_tag_end,
@@ -426,7 +428,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for this={expression} attribute (for inline doc building)
-    fn build_this_attr_doc_for_inline(&self, expr: &tsv_ts::Expression) -> DocId {
+    fn build_this_attr_doc_for_inline(&self, expr: &tsv_ts::Expression<'_>) -> DocId {
         let d = self.d();
         use tsv_ts::ast::internal::{Expression, LiteralValue};
 
@@ -435,10 +437,11 @@ impl<'a> Printer<'a> {
         // - Plain string: span covers `hello` (no quote at span start)
         // - Expression: span covers `"hello"` (quote char at span start)
         if let Expression::Literal(lit) = expr
-            && let LiteralValue::String { content, .. } = &lit.value
+            && let LiteralValue::String(cooked) = &lit.value
         {
             let first_byte = self.source.as_bytes().get(lit.span.start as usize).copied();
             if first_byte != Some(b'"') && first_byte != Some(b'\'') {
+                let content = cooked.resolve(lit.span, self.source);
                 return d.text_owned(format!("this=\"{content}\""));
             }
         }
@@ -449,7 +452,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if special element should hug the start (no leading whitespace)
-    fn should_hug_start_special(&self, element: &internal::SpecialElement) -> bool {
+    fn should_hug_start_special(&self, element: &internal::SpecialElement<'_>) -> bool {
         if element.fragment.nodes.is_empty() {
             return true;
         }
@@ -460,7 +463,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if special element should hug the end (no trailing whitespace)
-    fn should_hug_end_special(&self, element: &internal::SpecialElement) -> bool {
+    fn should_hug_end_special(&self, element: &internal::SpecialElement<'_>) -> bool {
         if element.fragment.nodes.is_empty() {
             return true;
         }

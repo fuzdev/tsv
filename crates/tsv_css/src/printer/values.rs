@@ -15,7 +15,7 @@
 //! specialized doc builders for each value type.
 
 use super::{Printer, has_wrappable_args, value_normalization};
-use crate::ast::internal::CssValue;
+use crate::ast::internal::{CssValue, StringCooked};
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
 
@@ -23,7 +23,7 @@ impl<'a> Printer<'a> {
     /// Format a CSS value
     ///
     /// Uses the doc builder which handles source fidelity and proper formatting.
-    pub(super) fn print_css_value(&mut self, value: &CssValue) {
+    pub(super) fn print_css_value(&mut self, value: &CssValue<'_>) {
         let doc = self.build_css_value_doc(value);
         self.write_arena_doc(doc);
     }
@@ -32,7 +32,7 @@ impl<'a> Printer<'a> {
     ///
     /// Alias for `print_css_value` - kept for semantic clarity in call sites.
     #[inline]
-    pub(super) fn print_nested_value(&mut self, value: &CssValue) {
+    pub(super) fn print_nested_value(&mut self, value: &CssValue<'_>) {
         self.print_css_value(value);
     }
 
@@ -45,14 +45,10 @@ impl<'a> Printer<'a> {
     /// Main entry point for value formatting. Dispatches to specialized doc
     /// builders for each value type. Handles source fidelity by extracting
     /// from source where appropriate.
-    pub(super) fn build_css_value_doc(&self, value: &CssValue) -> DocId {
+    pub(super) fn build_css_value_doc(&self, value: &CssValue<'_>) -> DocId {
         match value {
-            CssValue::Identifier { name, span } => self.build_identifier_doc(name, *span),
-            CssValue::String {
-                content,
-                quote,
-                span,
-            } => self.build_string_doc(content, *quote, *span),
+            CssValue::Identifier { span } => self.build_identifier_doc(*span),
+            CssValue::String { content, span } => self.build_string_doc(content, *span),
             CssValue::Dimension { span, .. } => self.build_dimension_doc(*span),
             CssValue::Color { color, span } => self.build_color_doc(color, *span),
             CssValue::Function { name, args, span } => {
@@ -71,9 +67,9 @@ impl<'a> Printer<'a> {
     /// for parenthesized expressions (like calc sub-expressions).
     /// Parenthesized groups like `(100vw - var(--a) - var(--b))` get fill-based
     /// wrapping so they can break at operator boundaries when exceeding print width.
-    fn build_identifier_doc(&self, name: &str, span: Span) -> DocId {
+    fn build_identifier_doc(&self, span: Span) -> DocId {
         let d = self.d();
-        // Try source extraction first to preserve any escapes
+        // The identifier text is recovered from source (escapes preserved verbatim).
         if span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
             if !raw.is_empty() {
@@ -95,9 +91,10 @@ impl<'a> Printer<'a> {
                 return d.text_owned(normalized);
             }
         }
-        // Fallback: semantic formatting
-        let formatted = value_normalization::format_identifier_value(name);
-        d.text_owned(formatted)
+        // Empty / whitespace-only span (the empty-identifier sentinel) or an
+        // out-of-range span (never in practice — spans index the printer's source):
+        // nothing to emit.
+        d.text("")
     }
 
     /// Build a doc for a parenthesized group with fill-based wrapping
@@ -131,26 +128,35 @@ impl<'a> Printer<'a> {
     ///
     /// Source-extracts the raw string so escape sequences are preserved verbatim
     /// (`\a`, `\41`, `\\`, line continuations), normalizing only the quote char
-    /// (`"` → `'`) to match prettier. The internal `content` is fully *decoded*
-    /// (`parse_string_literal`), so re-serializing it would corrupt escapes — e.g.
-    /// emit `\a` as a literal newline (content loss). Mirrors `build_identifier_doc`
-    /// and the plain-declaration-value path (`extract_string_value`); the decoded
-    /// `content` is only the fallback when the span is unavailable.
-    fn build_string_doc(&self, content: &str, quote: char, span: Span) -> DocId {
+    /// (`"` → `'`) to match prettier. Re-serializing the *decoded* `content` would
+    /// corrupt escapes — e.g. emit `\a` as a literal newline (content loss). Mirrors
+    /// `build_identifier_doc` and the plain-declaration-value path
+    /// (`extract_string_value`); the decoded `content` is only the fallback when the
+    /// span is unavailable.
+    fn build_string_doc(&self, content: &StringCooked<'_>, span: Span) -> DocId {
         if span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
             // The span covers the full literal including quotes (see
             // `parse_string_literal`); strip them and re-emit with quote normalization.
+            // The original quote is the first byte of the span (recovered from source,
+            // not stored).
             if raw.len() >= 2 && (raw.starts_with('\'') || raw.starts_with('"')) {
+                let quote = raw.as_bytes()[0] as char;
                 let inner = &raw[1..raw.len() - 1];
                 return self
                     .d()
                     .text_owned(value_normalization::format_string_value(inner, quote));
             }
         }
-        // Fallback: semantic formatting from decoded content (span unavailable)
-        let formatted = value_normalization::format_string_value(content, quote);
-        self.d().text_owned(formatted)
+        // Fallback: span unavailable (never in practice — spans index the printer's
+        // source). Re-emit the decoded content; a `Verbatim` value has no recoverable
+        // text without its span, so emit nothing (mirrors `build_identifier_doc`).
+        match content {
+            StringCooked::Decoded(s) => self
+                .d()
+                .text_owned(value_normalization::format_string_value(s, '\'')),
+            StringCooked::Verbatim => self.d().text(""),
+        }
     }
 
     /// Build a doc for a dimension value (number + unit)
@@ -179,7 +185,7 @@ impl<'a> Printer<'a> {
     /// - Multi-arg functions: wrap each arg on its own line when exceeds width
     /// - Single-arg List (e.g., drop-shadow): wrap on space separators
     /// - Single-arg non-List (e.g., url): never wraps
-    fn build_value_function_doc(&self, name: &str, args: &[CssValue], span: Span) -> DocId {
+    fn build_value_function_doc(&self, name: &str, args: &[CssValue<'_>], span: Span) -> DocId {
         let d = self.d();
         // For functions with no parsed args (like supports()), extract from source
         if args.is_empty() && span.end_usize() <= self.source.len() {
@@ -229,7 +235,7 @@ impl<'a> Printer<'a> {
         // var-specific handling). `var(--a, red)` keeps the normal `, ` separator.
         if name.eq_ignore_ascii_case("var")
             && args.len() >= 2
-            && matches!(args.last(), Some(CssValue::Identifier { name: n, .. }) if n.is_empty())
+            && matches!(args.last(), Some(CssValue::Identifier { span }) if span.extract(self.source).trim().is_empty())
         {
             let name_doc = d.text_owned(name.to_string());
             let open = d.text("(");
@@ -296,7 +302,7 @@ impl<'a> Printer<'a> {
     ///     (100vw - var(--a))
     /// )
     /// ```
-    fn build_space_fill_value_doc(&self, values: &[CssValue]) -> DocId {
+    fn build_space_fill_value_doc(&self, values: &[CssValue<'_>]) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
         d.group(d.indent(d.fill(&parts)))
@@ -307,7 +313,7 @@ impl<'a> Printer<'a> {
     /// (`CssValue::CommaSeparated`).
     pub(crate) fn build_separated_values_doc(
         &self,
-        values: &[CssValue],
+        values: &[CssValue<'_>],
         sep: &'static str,
     ) -> DocId {
         self.d()

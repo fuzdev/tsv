@@ -24,6 +24,7 @@ use tsv_lang::INDENT;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::{SymbolResolver, SymbolToU32};
 
 impl<'a> Printer<'a> {
     //
@@ -34,7 +35,7 @@ impl<'a> Printer<'a> {
     /// This is used for nested conditionals which should inherit breaking from their parent.
     ///
     /// Structure: `check extends extends_type [indent: line, "? ", true_type, line, ": ", false_type]`
-    pub(super) fn build_conditional_type_doc_inner(&self, c: &TSConditionalType) -> DocId {
+    pub(super) fn build_conditional_type_doc_inner(&self, c: &TSConditionalType<'_>) -> DocId {
         let d = self.d();
 
         let extends_type_end = c.extends_type.span().end;
@@ -55,17 +56,17 @@ impl<'a> Printer<'a> {
         // (e.g., `a extends (// c\n  b)`) — these are relocated to trail
         // extends_type and force breaking.
         let extends_paren_has_leading_line_comment = matches!(
-            c.extends_type.as_ref(),
+            c.extends_type,
             TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
         );
         // Same for true_type / false_type: leading line comments inside their
         // parens get relocated to trail extends_type / true_type respectively.
         let true_paren_has_leading_line_comment = matches!(
-            c.true_type.as_ref(),
+            c.true_type,
             TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
         );
         let false_paren_has_leading_line_comment = matches!(
-            c.false_type.as_ref(),
+            c.false_type,
             TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
         );
         let has_breaking_comments_around_question = self
@@ -95,30 +96,29 @@ impl<'a> Printer<'a> {
 
         // Build true_type doc: if it's a conditional (possibly wrapped in parens), don't wrap in group
         // Add parens for readability only when flat (single-line), not when broken (multi-line)
-        let true_type_doc =
-            if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type.as_ref()) {
-                // Nested conditional in true position:
-                // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
-                // - Broken: no parens (the line breaks provide clarity)
-                let inner_doc = self.build_conditional_type_doc_inner(inner);
-                if d.will_break(inner_doc) {
-                    // Inner doc forces breaking — use broken layout directly
-                    inner_doc
-                } else {
-                    d.if_break(inner_doc, d.parens(inner_doc))
-                }
+        let true_type_doc = if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
+            // Nested conditional in true position:
+            // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
+            // - Broken: no parens (the line breaks provide clarity)
+            let inner_doc = self.build_conditional_type_doc_inner(inner);
+            if d.will_break(inner_doc) {
+                // Inner doc forces breaking — use broken layout directly
+                inner_doc
             } else {
-                self.build_type_doc(&c.true_type)
-            };
+                d.if_break(inner_doc, d.parens(inner_doc))
+            }
+        } else {
+            self.build_type_doc(c.true_type)
+        };
 
         // Build false_type doc: if it's a conditional, don't wrap in group
         // No parens needed for nested conditionals in false position (right-associative)
-        let false_type_doc =
-            if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type.as_ref()) {
-                self.build_conditional_type_doc_inner(inner)
-            } else {
-                self.build_type_doc(&c.false_type)
-            };
+        let false_type_doc = if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type)
+        {
+            self.build_conditional_type_doc_inner(inner)
+        } else {
+            self.build_type_doc(c.false_type)
+        };
 
         // Comments trailing on true_type (between true_type and :)
         // These stay with the true branch, preserving user intent.
@@ -147,21 +147,21 @@ impl<'a> Printer<'a> {
 
         let true_arm = self.build_conditional_arm_doc(
             "?",
-            &c.true_type,
+            c.true_type,
             true_type_doc,
             question_pos,
             true_type_start,
         );
         let false_arm = self.build_conditional_arm_doc(
             ":",
-            &c.false_type,
+            c.false_type,
             false_type_doc,
             colon_pos,
             false_type_start,
         );
 
         d.concat(&[
-            self.build_conditional_check_doc(&c.check_type),
+            self.build_conditional_check_doc(c.check_type),
             comments_before_extends,
             d.text(" extends"),
             extends_type_doc,
@@ -179,7 +179,7 @@ impl<'a> Printer<'a> {
     /// `build_type_doc_maybe_parens` form (which still parenthesizes
     /// function/constructor/nested-conditional checks). Redundant comment-free
     /// parens are stripped via the shared `unwrap_redundant_parens`.
-    fn build_conditional_check_doc(&self, check: &TSType) -> DocId {
+    fn build_conditional_check_doc(&self, check: &TSType<'_>) -> DocId {
         let d = self.d();
         match self.unwrap_redundant_parens(check) {
             TSType::Union(u) if !should_hug_union_type(u) => {
@@ -198,7 +198,7 @@ impl<'a> Printer<'a> {
     fn build_conditional_arm_doc(
         &self,
         op: &'static str,
-        branch_type: &TSType,
+        branch_type: &TSType<'_>,
         branch_doc: DocId,
         op_pos: Option<u32>,
         branch_start: u32,
@@ -229,7 +229,7 @@ impl<'a> Printer<'a> {
     /// fresh line instead — one level in, two for union members.
     fn build_conditional_branch_tail_doc(
         &self,
-        branch_type: &TSType,
+        branch_type: &TSType<'_>,
         branch_doc: DocId,
         on_new_line: bool,
     ) -> DocId {
@@ -270,7 +270,7 @@ impl<'a> Printer<'a> {
     /// `extends_kw_end` is the position after the `extends` keyword (caller already found it).
     fn build_conditional_type_extends_doc(
         &self,
-        c: &TSConditionalType,
+        c: &TSConditionalType<'_>,
         extends_kw_end: u32,
     ) -> DocId {
         let d = self.d();
@@ -282,7 +282,7 @@ impl<'a> Printer<'a> {
         // by the comment's hardline).
         if self.has_line_comments_between(extends_kw_end, extends_type_start) {
             let value_doc = self.build_type_doc_maybe_parens(
-                &c.extends_type,
+                c.extends_type,
                 type_needs_parens_for_conditional_extends,
             );
             let mut parts = smallvec![];
@@ -306,18 +306,18 @@ impl<'a> Printer<'a> {
         // comment inside the parens (e.g., `extends (// c\n  b)`). Strip the
         // parens, build the inner type, and append the line comment as trailing
         // on the inner type — matching prettier's relocation.
-        if let TSType::Parenthesized(p) = c.extends_type.as_ref()
+        if let TSType::Parenthesized(p) = c.extends_type
             && self.paren_has_leading_line_comment(p)
         {
             let mut parts: DocBuf = smallvec![d.text(" "), comments_after_extends];
-            parts.push(self.build_type_doc(&p.type_annotation));
+            parts.push(self.build_type_doc(p.type_annotation));
             for comment in self.paren_leading_line_comments(p) {
                 parts.push(self.build_trailing_line_comment_doc(comment));
             }
             return d.concat(&parts);
         }
 
-        if let TSType::Union(union) = c.extends_type.as_ref() {
+        if let TSType::Union(union) = c.extends_type {
             if union.types.is_empty() {
                 d.text(" ")
             } else {
@@ -342,7 +342,7 @@ impl<'a> Printer<'a> {
                 d.text(" "),
                 comments_after_extends,
                 self.build_type_doc_maybe_parens(
-                    &c.extends_type,
+                    c.extends_type,
                     type_needs_parens_for_conditional_extends,
                 ),
             ])
@@ -352,7 +352,7 @@ impl<'a> Printer<'a> {
     /// Build conditional type doc when comments force a breaking layout.
     /// This handles: line comments, multiline block comments, and comments
     /// before `?` or `:` operators.
-    fn build_conditional_type_doc_with_line_comments(&self, c: &TSConditionalType) -> DocId {
+    fn build_conditional_type_doc_with_line_comments(&self, c: &TSConditionalType<'_>) -> DocId {
         let d = self.d();
 
         let extends_type_end = c.extends_type.span().end;
@@ -363,11 +363,11 @@ impl<'a> Printer<'a> {
         // Detect leading line comments inside parens around true_type / false_type
         // for relocation: prettier moves them to trail extends_type / true_type
         // (e.g., `extends b ? (// c\n  C) : D` → `extends b // c\n  ? C\n  : D`).
-        let true_paren = match c.true_type.as_ref() {
+        let true_paren = match c.true_type {
             TSType::Parenthesized(p) => Some(p),
             _ => None,
         };
-        let false_paren = match c.false_type.as_ref() {
+        let false_paren = match c.false_type {
             TSType::Parenthesized(p) => Some(p),
             _ => None,
         };
@@ -383,21 +383,21 @@ impl<'a> Printer<'a> {
         // build the inner type directly so the relocated comments aren't emitted twice.
         let true_type_doc =
             if let Some(p) = true_paren.filter(|_| !true_paren_leading_line_comments.is_empty()) {
-                self.build_type_doc(&p.type_annotation)
-            } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type.as_ref()) {
+                self.build_type_doc(p.type_annotation)
+            } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
                 self.build_conditional_type_doc_inner(inner)
             } else {
-                self.build_type_doc(&c.true_type)
+                self.build_type_doc(c.true_type)
             };
 
         let false_type_doc = if let Some(p) =
             false_paren.filter(|_| !false_paren_leading_line_comments.is_empty())
         {
-            self.build_type_doc(&p.type_annotation)
-        } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type.as_ref()) {
+            self.build_type_doc(p.type_annotation)
+        } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
             self.build_conditional_type_doc_inner(inner)
         } else {
-            self.build_type_doc(&c.false_type)
+            self.build_type_doc(c.false_type)
         };
 
         // Find `extends` keyword position (reused for both extends_type_doc and comments_before_extends)
@@ -450,7 +450,7 @@ impl<'a> Printer<'a> {
             }
         }
         q_parts.push(self.build_conditional_branch_tail_doc(
-            &c.true_type,
+            c.true_type,
             true_type_doc,
             needs_indent_before_true,
         ));
@@ -490,7 +490,7 @@ impl<'a> Printer<'a> {
             prev_was_line_comment = !comment.is_block;
         }
         q_parts.push(self.build_conditional_branch_tail_doc(
-            &c.false_type,
+            c.false_type,
             false_type_doc,
             needs_indent_before_false,
         ));
@@ -506,7 +506,7 @@ impl<'a> Printer<'a> {
         };
 
         d.concat(&[
-            self.build_conditional_check_doc(&c.check_type),
+            self.build_conditional_check_doc(c.check_type),
             comments_before_extends,
             d.text(" extends"),
             extends_type_doc,
@@ -525,7 +525,7 @@ impl<'a> Printer<'a> {
     /// - Source one-line, fits: `{[K in keyof T]: T[K]}`
     /// - Source one-line, long: `{\n\t[K in keyof T]: T[K];\n}`
     /// - Source multi-line: `{\n\t[K in keyof T]: T[K];\n}` (always)
-    pub(super) fn build_mapped_type_doc(&self, m: &TSMappedType) -> DocId {
+    pub(super) fn build_mapped_type_doc(&self, m: &TSMappedType<'_>) -> DocId {
         let d = self.d();
         // Check if source was multi-line (preserve author's formatting choice)
         let source_is_multiline = super::super::is_brace_block_multiline(self.source, m.span);
@@ -563,9 +563,10 @@ impl<'a> Printer<'a> {
             }
         }
 
-        body_parts.push(d.text_owned(m.type_parameter.name.clone()));
+        body_parts.push(d.symbol(m.type_parameter.name.to_u32()));
         // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
-        let name_end = m.type_parameter.span.start + m.type_parameter.name.len() as u32;
+        let name_len = self.with_resolved_symbol(m.type_parameter.name, str::len);
+        let name_end = m.type_parameter.span.start + name_len as u32;
         let constraint_start = m.type_parameter.constraint.span().start;
         // Find `i` of `in` keyword, skipping comments before it
         let in_start = find_char_skipping_comments(
@@ -585,7 +586,7 @@ impl<'a> Printer<'a> {
             constraint_start,
             CommentSpacing::Trailing,
         ));
-        body_parts.push(self.build_type_doc(&m.type_parameter.constraint));
+        body_parts.push(self.build_type_doc(m.type_parameter.constraint));
 
         // as clause: `as NewKeyType`
         // Track the end of the last element inside brackets (for bracket-close comments)
@@ -676,7 +677,7 @@ impl<'a> Printer<'a> {
                 // the value are stripped first (prettier does the same). A hugging union
                 // (`{ ... } | null`) keeps its inline `: ` since the object owns its own
                 // expansion.
-                match self.unwrap_redundant_parens(type_ann.as_ref()) {
+                match self.unwrap_redundant_parens(type_ann) {
                     TSType::Union(u) => {
                         let type_doc = self.build_union_type_doc(u, false);
                         // A hugging union (`{ ... } | null`) without forcing line comments
@@ -758,7 +759,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a tuple type: `[A, B, C]`
     ///
     /// Uses width-aware breaking: inline if fits, one element per line if not.
-    pub(super) fn build_tuple_type_doc(&self, t: &TSTupleType) -> DocId {
+    pub(super) fn build_tuple_type_doc(&self, t: &TSTupleType<'_>) -> DocId {
         let d = self.d();
         if t.element_types.is_empty() {
             return self.build_empty_brackets_with_comments_doc(t.span);
@@ -772,13 +773,13 @@ impl<'a> Printer<'a> {
         });
         if has_leading_line_comment
             || self.has_line_comments_in_delimited_list(
-                &t.element_types,
+                t.element_types,
                 TSType::span,
                 t.span.end - 1,
             )
             || self.has_own_line_block_comments_in_bracket_list(
                 t.span,
-                &t.element_types,
+                t.element_types,
                 TSType::span,
             )
         {
@@ -831,7 +832,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build tuple type with expanding comments (line comments or own-line block comments)
-    fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType) -> DocId {
+    fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType<'_>) -> DocId {
         let d = self.d();
         // A comment trailing the opening `[` on its own line is kept on the `[`
         // line when the tuple expands (divergence from prettier, which relocates
@@ -888,10 +889,10 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a Doc for an array type (e.g., `number[]`)
-    pub(super) fn build_array_type_doc(&self, arr: &TSArrayType) -> DocId {
+    pub(super) fn build_array_type_doc(&self, arr: &TSArrayType<'_>) -> DocId {
         let d = self.d();
-        let needs_parens = type_needs_parens_for_array_element(&arr.element_type);
-        let element_doc = self.build_type_doc(&arr.element_type);
+        let needs_parens = type_needs_parens_for_array_element(arr.element_type);
+        let element_doc = self.build_type_doc(arr.element_type);
         if needs_parens {
             d.concat(&[d.text("("), element_doc, d.text(")[]")])
         } else {
@@ -906,7 +907,7 @@ impl<'a> Printer<'a> {
     /// Build doc for type query expression name
     pub(super) fn build_type_query_expr_name_doc(
         &self,
-        expr_name: &internal::TSTypeQueryExprName,
+        expr_name: &internal::TSTypeQueryExprName<'_>,
     ) -> DocId {
         match expr_name {
             internal::TSTypeQueryExprName::EntityName(entity) => self.build_entity_name_doc(entity),

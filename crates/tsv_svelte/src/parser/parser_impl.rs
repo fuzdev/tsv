@@ -2,6 +2,8 @@
 
 use crate::ast::internal::FragmentNode;
 use crate::lexer::{Lexer, TokenKind};
+use bumpalo::Bump;
+use bumpalo::collections::Vec as BumpVec;
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
@@ -9,7 +11,16 @@ use tsv_lang::{Comment, ParseError, SharedInterner, Span};
 
 use super::PeekData;
 
-pub(crate) struct SvelteParser<'a> {
+pub(crate) struct SvelteParser<'a, 'arena> {
+    /// Bump arena that owns every AST node this parser allocates — the template
+    /// AST and (via the embedding APIs that receive `&'arena Bump`) the embedded
+    /// TS `<script>`/`{expr}` ASTs. Supplied by the caller; the returned
+    /// `Root<'arena>` borrows from it. `&'arena Bump` is `Copy`, so `self.alloc(owned)`
+    /// and `self.arena.alloc(self.parse_x()?)` (even while `&mut self` is held — the
+    /// field read borrows the `Bump`, not `self`) both work directly; lift it into a
+    /// local (`let arena = self.arena;`) only when several allocations in one method
+    /// share it.
+    pub(crate) arena: &'arena Bump,
     pub(crate) source: &'a str, // Full original source
     pub(crate) lexer: Lexer<'a>,
     pub(crate) current_kind: TokenKind,
@@ -22,8 +33,8 @@ pub(crate) struct SvelteParser<'a> {
     pub(crate) expression_comments: Vec<Comment>,
 }
 
-impl<'a> SvelteParser<'a> {
-    pub(crate) fn new(source: &'a str) -> Result<Self, ParseError> {
+impl<'a, 'arena> SvelteParser<'a, 'arena> {
+    pub(crate) fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         // Extract token data immediately to avoid keeping token alive
         let (kind, start, end) = {
@@ -32,6 +43,7 @@ impl<'a> SvelteParser<'a> {
         };
         let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
         Ok(Self {
+            arena,
             source,
             lexer,
             current_kind: kind,
@@ -42,6 +54,31 @@ impl<'a> SvelteParser<'a> {
             base_offset: 0,
             expression_comments: Vec::new(),
         })
+    }
+
+    /// Allocate a single AST node in the arena, returning a shared `&'arena`
+    /// reference (replaces `Box::new`). Zero-copy: `Bump::alloc` moves the value
+    /// into arena memory.
+    #[inline]
+    pub(crate) fn alloc<T>(&self, val: T) -> &'arena T {
+        self.arena.alloc(val)
+    }
+
+    /// A growable vector that builds AST-node collections **directly in the
+    /// arena**. Build it in the parse loop, then `.into_bump_slice()` to store
+    /// the field (zero-copy). Carries its own `Copy` `&'arena Bump`, so pushing
+    /// into it inside a `&mut self` method does NOT borrow `self`.
+    #[inline]
+    pub(crate) fn bvec<T>(&self) -> BumpVec<'arena, T> {
+        BumpVec::new_in(self.arena)
+    }
+
+    /// Allocate a string (raw or decoded) in the arena as `&'arena str` — used
+    /// for the Svelte directive names / modifiers / raw parameter text that were
+    /// owned `String`s pre-arena. One copy into the arena.
+    #[inline]
+    pub(crate) fn alloc_str_in(&self, s: &str) -> &'arena str {
+        self.arena.alloc_str(s)
     }
 
     /// Returns the lexer's initial position (after BOM skip).
@@ -139,7 +176,7 @@ impl<'a> SvelteParser<'a> {
     pub(crate) fn capture_text_if_gap(
         &self,
         last_end: usize,
-        nodes: &mut Vec<FragmentNode>,
+        nodes: &mut BumpVec<'arena, FragmentNode<'arena>>,
     ) -> Result<(), ParseError> {
         if self.current_start > last_end {
             let text = self.parse_text(last_end, self.current_start)?;
@@ -433,9 +470,13 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<tsv_ts::Expression, ParseError> {
-        let (expr, comments) =
-            tsv_ts::parse_expression_with_comments(source, base_offset, Rc::clone(&self.interner))?;
+    ) -> Result<tsv_ts::Expression<'arena>, ParseError> {
+        let (expr, comments) = tsv_ts::parse_expression_with_comments(
+            source,
+            base_offset,
+            Rc::clone(&self.interner),
+            self.arena,
+        )?;
         self.expression_comments.extend(comments);
         Ok(expr)
     }
@@ -447,11 +488,12 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<(tsv_ts::Expression, usize), ParseError> {
+    ) -> Result<(tsv_ts::Expression<'arena>, usize), ParseError> {
         let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
             source,
             base_offset,
             Rc::clone(&self.interner),
+            self.arena,
         )?;
         self.expression_comments.extend(comments);
         Ok((expr, end_pos))
@@ -463,9 +505,13 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<tsv_ts::Expression, ParseError> {
-        let (pattern, comments) =
-            tsv_ts::parse_pattern_with_comments(source, base_offset, Rc::clone(&self.interner))?;
+    ) -> Result<tsv_ts::Expression<'arena>, ParseError> {
+        let (pattern, comments) = tsv_ts::parse_pattern_with_comments(
+            source,
+            base_offset,
+            Rc::clone(&self.interner),
+            self.arena,
+        )?;
         self.expression_comments.extend(comments);
         Ok(pattern)
     }
@@ -476,9 +522,13 @@ impl<'a> SvelteParser<'a> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<tsv_ts::Statement, ParseError> {
-        let (stmt, comments) =
-            tsv_ts::parse_statement_with_comments(source, base_offset, Rc::clone(&self.interner))?;
+    ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
+        let (stmt, comments) = tsv_ts::parse_statement_with_comments(
+            source,
+            base_offset,
+            Rc::clone(&self.interner),
+            self.arena,
+        )?;
         self.expression_comments.extend(comments);
         Ok(stmt)
     }

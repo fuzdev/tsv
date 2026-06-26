@@ -10,15 +10,15 @@ use tsv_lang::{ParseError, Span};
 use super::super::Parser;
 
 /// End offset of a module declaration body (block or nested declaration).
-fn module_body_end(body: &TSModuleDeclarationBody) -> u32 {
+fn module_body_end(body: &TSModuleDeclarationBody<'_>) -> u32 {
     match body {
         TSModuleDeclarationBody::TSModuleBlock(b) => b.span.end,
         TSModuleDeclarationBody::TSModuleDeclaration(n) => n.span.end,
     }
 }
 
-impl<'a> Parser<'a> {
-    pub(super) fn parse_type_alias_declaration(&mut self) -> Result<Statement, ParseError> {
+impl<'a, 'arena> Parser<'a, 'arena> {
+    pub(super) fn parse_type_alias_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'type' contextual keyword
@@ -33,7 +33,7 @@ impl<'a> Parser<'a> {
     fn parse_type_alias_declaration_with_start(
         &mut self,
         start: usize,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'type' contextual keyword
         debug_assert!(self.current_value() == "type");
         self.advance()?;
@@ -48,7 +48,7 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_type_alias_declaration_inner(
         &mut self,
         type_start: usize,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         let decl = self.parse_type_alias_declaration_body(type_start, false)?;
         Ok(Statement::TSTypeAliasDeclaration(decl))
     }
@@ -58,7 +58,7 @@ impl<'a> Parser<'a> {
         &mut self,
         start: usize,
         declare: bool,
-    ) -> Result<TSTypeAliasDeclaration, ParseError> {
+    ) -> Result<TSTypeAliasDeclaration<'arena>, ParseError> {
         // Parse type name (identifier)
         if !matches!(self.current_kind(), TokenKind::Identifier) {
             return Err(self.error_expected_after("type name", "type"));
@@ -94,7 +94,7 @@ impl<'a> Parser<'a> {
     //
 
     /// Parse interface declaration: `interface Foo { ... }` or `interface Foo extends Bar { ... }`
-    pub(super) fn parse_interface_declaration(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_interface_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.parse_interface_declaration_body(start, false)
     }
@@ -103,7 +103,7 @@ impl<'a> Parser<'a> {
     fn parse_interface_declaration_with_start(
         &mut self,
         start: usize,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         self.parse_interface_declaration_body(start, true)
     }
 
@@ -112,7 +112,7 @@ impl<'a> Parser<'a> {
         &mut self,
         start: usize,
         declare: bool,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'interface' contextual keyword
         debug_assert!(self.current_value() == "interface");
         self.advance()?;
@@ -132,12 +132,13 @@ impl<'a> Parser<'a> {
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional extends clause
-        let extends = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
-            self.advance()?;
-            self.parse_interface_heritage_list()?
-        } else {
-            Vec::new()
-        };
+        let extends: &'arena [TSInterfaceHeritage<'arena>] =
+            if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
+                self.advance()?;
+                self.parse_interface_heritage_list()?.into_bump_slice()
+            } else {
+                &[]
+            };
 
         // Parse interface body
         let body = self.parse_interface_body()?;
@@ -156,8 +157,8 @@ impl<'a> Parser<'a> {
     /// Parse interface heritage list: `Foo, Bar<T>`
     pub(in crate::parser) fn parse_interface_heritage_list(
         &mut self,
-    ) -> Result<Vec<TSInterfaceHeritage>, ParseError> {
-        let mut heritages = Vec::new();
+    ) -> Result<bumpalo::collections::Vec<'arena, TSInterfaceHeritage<'arena>>, ParseError> {
+        let mut heritages = self.bvec();
 
         loop {
             let start = self.current_pos().0;
@@ -190,7 +191,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse interface body: `{ members }`
-    fn parse_interface_body(&mut self) -> Result<TSInterfaceBody, ParseError> {
+    fn parse_interface_body(&mut self) -> Result<TSInterfaceBody<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::BraceOpen)?;
 
@@ -200,7 +201,7 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::BraceClose)?;
 
         Ok(TSInterfaceBody {
-            body,
+            body: body.into_bump_slice(),
             span: Span::new(start as u32, end as u32),
         })
     }
@@ -210,7 +211,7 @@ impl<'a> Parser<'a> {
     //
 
     /// Parse declare statement: `declare function`, `declare class`, `declare enum`, `declare const enum`, `declare namespace`, `declare global`, `declare var/let/const`
-    pub(super) fn parse_declare_statement(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_declare_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Consume 'declare' contextual keyword
@@ -271,7 +272,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse declare variable: `declare const x: T;`, `declare let x: T;`, `declare var x: T;`
-    fn parse_declare_variable(&mut self, start: usize) -> Result<Statement, ParseError> {
+    fn parse_declare_variable(&mut self, start: usize) -> Result<Statement<'arena>, ParseError> {
         // Parse as a variable declaration but mark as declare
         let mut decl = self.parse_variable_declaration()?;
 
@@ -287,14 +288,16 @@ impl<'a> Parser<'a> {
     /// Parse declare function: `declare function foo(): void`
     ///
     /// Called from `parse_declare_statement` where `declare` keyword is already consumed.
-    fn parse_declare_function(&mut self, start: usize) -> Result<Statement, ParseError> {
+    fn parse_declare_function(&mut self, start: usize) -> Result<Statement<'arena>, ParseError> {
         self.parse_declare_function_inner(start, true)
     }
 
     /// Parse function declaration in ambient context (inside `declare namespace`)
     ///
     /// These functions don't have bodies: `function foo(x: number): void;`
-    pub(super) fn parse_ambient_function_declaration(&mut self) -> Result<Statement, ParseError> {
+    pub(super) fn parse_ambient_function_declaration(
+        &mut self,
+    ) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.parse_declare_function_inner(start, false)
     }
@@ -307,7 +310,7 @@ impl<'a> Parser<'a> {
         &mut self,
         start: usize,
         print_declare: bool,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'function' keyword
         self.advance()?;
 
@@ -326,7 +329,7 @@ impl<'a> Parser<'a> {
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse parameters
-        let params = self.parse_parameter_list()?;
+        let params = self.parse_parameter_list()?.into_bump_slice();
 
         // Parse return type (may be a type predicate)
         let return_type = self.parse_optional_return_type()?;
@@ -350,7 +353,7 @@ impl<'a> Parser<'a> {
     /// (type predicates included via `parse_return_type_annotation`).
     pub(in crate::parser) fn parse_optional_return_type(
         &mut self,
-    ) -> Result<Option<TSTypeAnnotation>, ParseError> {
+    ) -> Result<Option<TSTypeAnnotation<'arena>>, ParseError> {
         if self.check(&TokenKind::Colon) {
             Ok(Some(self.parse_return_type_annotation()?))
         } else {
@@ -363,7 +366,7 @@ impl<'a> Parser<'a> {
     /// This expects the colon to NOT be consumed yet.
     pub(in crate::parser) fn parse_return_type_annotation(
         &mut self,
-    ) -> Result<TSTypeAnnotation, ParseError> {
+    ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
         self.parse_return_type_inner(start as u32)
@@ -375,7 +378,7 @@ impl<'a> Parser<'a> {
     pub(in crate::parser) fn parse_return_type_inner(
         &mut self,
         start: u32,
-    ) -> Result<TSTypeAnnotation, ParseError> {
+    ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
         // The predicate itself starts at the first token after `:`, not at `:`
         let predicate_start = self.current_pos().0 as u32;
 
@@ -409,13 +412,13 @@ impl<'a> Parser<'a> {
 
                 let predicate = TSTypePredicate {
                     parameter_name,
-                    type_annotation: Some(Box::new(type_node)),
+                    type_annotation: Some(self.alloc(type_node)),
                     asserts,
                     span: Span::new(predicate_start, end),
                 };
 
                 return Ok(TSTypeAnnotation {
-                    type_annotation: Box::new(TSType::TypePredicate(predicate)),
+                    type_annotation: self.alloc(TSType::TypePredicate(predicate)),
                     span: Span::new(start, end),
                 });
             }
@@ -436,7 +439,7 @@ impl<'a> Parser<'a> {
                 };
 
                 return Ok(TSTypeAnnotation {
-                    type_annotation: Box::new(TSType::TypePredicate(predicate)),
+                    type_annotation: self.alloc(TSType::TypePredicate(predicate)),
                     span: Span::new(start, id_end as u32),
                 });
             }
@@ -450,7 +453,7 @@ impl<'a> Parser<'a> {
         let end = type_node.span().end;
 
         Ok(TSTypeAnnotation {
-            type_annotation: Box::new(type_node),
+            type_annotation: self.alloc(type_node),
             span: Span::new(start, end),
         })
     }
@@ -466,7 +469,7 @@ impl<'a> Parser<'a> {
         &mut self,
         start: usize,
         is_abstract: bool,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         let class =
             self.parse_class_declaration_inner_with_start(true, is_abstract, start, true)?;
         Ok(Statement::ClassDeclaration(class))
@@ -487,7 +490,7 @@ impl<'a> Parser<'a> {
         &mut self,
         is_const: bool,
         is_declare: bool,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.parse_enum_declaration_with_start(is_const, is_declare, start)
     }
@@ -497,7 +500,7 @@ impl<'a> Parser<'a> {
         is_const: bool,
         is_declare: bool,
         start: usize,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'const' if present
         if is_const {
             self.expect(&TokenKind::Keyword(KeywordKind::Const))?;
@@ -520,7 +523,7 @@ impl<'a> Parser<'a> {
         // Parse enum body: { members }
         self.expect(&TokenKind::BraceOpen)?;
 
-        let mut members = Vec::new();
+        let mut members = self.bvec();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
             members.push(self.parse_enum_member()?);
 
@@ -538,7 +541,7 @@ impl<'a> Parser<'a> {
 
         Ok(Statement::TSEnumDeclaration(TSEnumDeclaration {
             id,
-            members,
+            members: members.into_bump_slice(),
             r#const: is_const,
             declare: is_declare,
             span: Span::new(start as u32, end as u32),
@@ -546,7 +549,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a single enum member: `A`, `A = 1`, `A = "value"`, `"computed" = 1`
-    fn parse_enum_member(&mut self) -> Result<TSEnumMember, ParseError> {
+    fn parse_enum_member(&mut self) -> Result<TSEnumMember<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Parse member id: can be identifier or string literal
@@ -600,7 +603,7 @@ impl<'a> Parser<'a> {
         &mut self,
         declare: bool,
         global: bool,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.parse_module_declaration_with_start(declare, global, start)
     }
@@ -610,7 +613,7 @@ impl<'a> Parser<'a> {
         declare: bool,
         global: bool,
         start: usize,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         // Capture which keyword was used: 'namespace' or 'module'
         debug_assert!(
             matches!(self.current_kind(), TokenKind::Identifier)
@@ -668,7 +671,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse declare global: `declare global { ... }`
-    fn parse_declare_global(&mut self, start: usize) -> Result<Statement, ParseError> {
+    fn parse_declare_global(&mut self, start: usize) -> Result<Statement<'arena>, ParseError> {
         // Consume 'global' keyword
         debug_assert!(self.current_value() == "global");
         let (global_start, global_end) = self.current_pos();
@@ -698,16 +701,16 @@ impl<'a> Parser<'a> {
     fn parse_nested_module_declaration(
         &mut self,
         start: u32,
-        outer_id: Identifier,
+        outer_id: Identifier<'arena>,
         declare: bool,
         kind: TSModuleDeclarationKind,
-    ) -> Result<Statement, ParseError> {
+    ) -> Result<Statement<'arena>, ParseError> {
         self.advance()?; // consume '.'
 
         // Parse the inner declaration recursively
         let nested_start = self.current_pos().0;
         let nested = self.parse_module_declaration_inner(nested_start as u32, false, kind)?;
-        let body = TSModuleDeclarationBody::TSModuleDeclaration(Box::new(nested));
+        let body = TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested));
         let end = module_body_end(&body);
 
         Ok(Statement::TSModuleDeclaration(TSModuleDeclaration {
@@ -726,7 +729,7 @@ impl<'a> Parser<'a> {
         start: u32,
         declare: bool,
         kind: TSModuleDeclarationKind,
-    ) -> Result<TSModuleDeclaration, ParseError> {
+    ) -> Result<TSModuleDeclaration<'arena>, ParseError> {
         // Parse namespace name (identifier for nested parts)
         if !matches!(self.current_kind(), TokenKind::Identifier) {
             return Err(self.error_expected("identifier for namespace name"));
@@ -744,7 +747,7 @@ impl<'a> Parser<'a> {
             // Nested parts inherit the same kind (namespace vs module)
             let nested_start = self.current_pos().0;
             let nested = self.parse_module_declaration_inner(nested_start as u32, false, kind)?;
-            TSModuleDeclarationBody::TSModuleDeclaration(Box::new(nested))
+            TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested))
         } else {
             // Parse block body: `{ statements }`
             // For `declare namespace`, we're in ambient context
@@ -771,7 +774,7 @@ impl<'a> Parser<'a> {
     fn parse_module_block(
         &mut self,
         is_ambient: bool,
-    ) -> Result<TSModuleDeclarationBody, ParseError> {
+    ) -> Result<TSModuleDeclarationBody<'arena>, ParseError> {
         // Expect opening brace
         if !matches!(self.current_kind(), TokenKind::BraceOpen) {
             return Err(self.error_expected("'{' to open namespace body"));
@@ -786,7 +789,7 @@ impl<'a> Parser<'a> {
         }
 
         // Parse statements until '}'
-        let mut body = Vec::new();
+        let mut body = self.bvec();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
             let stmt = self.parse_statement()?;
             body.push(stmt);
@@ -803,7 +806,7 @@ impl<'a> Parser<'a> {
         self.advance()?; // consume '}'
 
         Ok(TSModuleDeclarationBody::TSModuleBlock(TSModuleBlock {
-            body,
+            body: body.into_bump_slice(),
             span: Span::new(block_start as u32, block_end as u32),
         }))
     }

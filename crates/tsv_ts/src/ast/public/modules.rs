@@ -1,13 +1,13 @@
 //! Import/Export declarations for public AST
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use super::declarations::TSDeclareFunction;
 use super::types::TSEntityName;
 use super::{Expression, Identifier, Literal, SourceLocation, Statement};
 
 /// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ExportNamedDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -29,7 +29,7 @@ pub struct ExportNamedDeclaration {
 }
 
 /// Export default declaration: `export default x`, `export default function() {}`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ExportDefaultDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -44,7 +44,7 @@ pub struct ExportDefaultDeclaration {
 }
 
 /// Value of export default - can be expression or declaration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ExportDefaultValue {
     Expression(Expression),
@@ -55,7 +55,7 @@ pub enum ExportDefaultValue {
 }
 
 /// Export all declaration: `export * from "y"` or `export * as ns from "y"`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ExportAllDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -76,7 +76,7 @@ pub struct ExportAllDeclaration {
 }
 
 /// TypeScript export assignment: `export = value;`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSExportAssignment {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -87,7 +87,7 @@ pub struct TSExportAssignment {
 }
 
 /// Export specifier: `export { x }` or `export { x as y }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ExportSpecifier {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -104,7 +104,7 @@ pub struct ExportSpecifier {
 }
 
 /// Import declaration: `import x from "y"`, `import { a, b } from "y"`, etc.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ImportDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -122,7 +122,7 @@ pub struct ImportDeclaration {
 }
 
 /// Import specifier: default, named, or namespace
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ImportSpecifier {
     Default(ImportDefaultSpecifier),
@@ -131,7 +131,7 @@ pub enum ImportSpecifier {
 }
 
 /// Default import: `import x from "y"`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ImportDefaultSpecifier {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -142,7 +142,7 @@ pub struct ImportDefaultSpecifier {
 }
 
 /// Named import: `import { a } from "y"` or `import { a as b } from "y"`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ImportNamedSpecifier {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -157,7 +157,7 @@ pub struct ImportNamedSpecifier {
 }
 
 /// Namespace import: `import * as ns from "y"`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ImportNamespaceSpecifier {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -168,7 +168,7 @@ pub struct ImportNamespaceSpecifier {
 }
 
 /// Import attribute: `{ type: "json" }` or `{ "resolution-mode": "import" }`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ImportAttribute {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -182,7 +182,7 @@ pub struct ImportAttribute {
 /// Import attribute key: a bare `Identifier` (`type`) or a `Literal` string
 /// (`"resolution-mode"`). Acorn emits whichever the source used; serialized
 /// untagged (each variant carries its own `type` discriminator).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ImportAttributeKey {
     Identifier(Identifier),
@@ -192,7 +192,7 @@ pub enum ImportAttributeKey {
 /// Module export name: a bare `Identifier` or a `Literal` string. Acorn emits
 /// whichever the source used; serialized untagged (each variant carries its own
 /// `type` discriminator). Per ecma262 `ModuleExportName : IdentifierName | StringLiteral`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum ModuleExportName {
     Identifier(Identifier),
@@ -200,7 +200,7 @@ pub enum ModuleExportName {
 }
 
 /// TypeScript import equals declaration: `import x = require("y")` or `import x = A.B`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSImportEqualsDeclaration {
     #[serde(rename = "type")]
     pub node_type: String,
@@ -217,7 +217,7 @@ pub struct TSImportEqualsDeclaration {
 }
 
 /// Module reference: either external module reference or entity name
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum TSModuleReference {
     ExternalModuleReference(TSExternalModuleReference),
@@ -225,7 +225,7 @@ pub enum TSModuleReference {
 }
 
 /// External module reference: `require("module")`
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TSExternalModuleReference {
     #[serde(rename = "type")]
     pub node_type: String,

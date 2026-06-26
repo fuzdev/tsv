@@ -10,7 +10,7 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
 pub(in crate::ast) fn convert_arrow_function_expression(
-    arrow: &internal::ArrowFunctionExpression,
+    arrow: &internal::ArrowFunctionExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -53,7 +53,7 @@ pub(in crate::ast) fn convert_arrow_function_expression(
 }
 
 pub(in crate::ast) fn convert_function_expression(
-    func: &internal::FunctionExpression,
+    func: &internal::FunctionExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -95,7 +95,7 @@ pub(in crate::ast) fn convert_function_expression(
 }
 
 pub(in crate::ast) fn convert_new_expression(
-    new_expr: &internal::NewExpression,
+    new_expr: &internal::NewExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -107,7 +107,7 @@ pub(in crate::ast) fn convert_new_expression(
         end: new_expr.span.end,
         loc: create_location(new_expr.span, loc, offset),
         callee: Box::new(convert_expression(
-            &new_expr.callee,
+            new_expr.callee,
             source,
             loc,
             interner,
@@ -129,15 +129,14 @@ pub(in crate::ast) fn convert_new_expression(
 /// When `in_chain` is true, uses `convert_expression_inner` with `in_chain=true`
 /// for the callee so nested chain expressions don't get double-wrapped.
 pub(in crate::ast) fn convert_call_expression(
-    call: &internal::CallExpression,
+    call: &internal::CallExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
     in_chain: bool,
 ) -> public::CallExpression {
-    let mut callee =
-        convert_expression_inner(&call.callee, source, loc, interner, offset, in_chain);
+    let mut callee = convert_expression_inner(call.callee, source, loc, interner, offset, in_chain);
     // acorn-typescript's `?.<T>(...)` path marks the callee node itself optional
     // (its parseSubscript sets `base.optional = true` before parsing the type args)
     if call.optional && call.type_arguments.is_some() {
@@ -181,7 +180,7 @@ pub(in crate::ast) fn convert_call_expression(
 /// When `in_chain` is true, uses `convert_expression_inner` with `in_chain=true`
 /// for the object so nested chain expressions don't get double-wrapped.
 pub(in crate::ast) fn convert_member_expression(
-    member: &internal::MemberExpression,
+    member: &internal::MemberExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -194,7 +193,7 @@ pub(in crate::ast) fn convert_member_expression(
         end: member.span.end,
         loc: create_location(member.span, loc, offset),
         object: Box::new(convert_expression_inner(
-            &member.object,
+            member.object,
             source,
             loc,
             interner,
@@ -202,7 +201,7 @@ pub(in crate::ast) fn convert_member_expression(
             in_chain,
         )),
         property: Box::new(convert_expression(
-            &member.property,
+            member.property,
             source,
             loc,
             interner,
@@ -214,7 +213,7 @@ pub(in crate::ast) fn convert_member_expression(
 }
 
 pub(in crate::ast) fn convert_conditional_expression(
-    cond: &internal::ConditionalExpression,
+    cond: &internal::ConditionalExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -225,18 +224,16 @@ pub(in crate::ast) fn convert_conditional_expression(
         start: cond.span.start,
         end: cond.span.end,
         loc: create_location(cond.span, loc, offset),
-        test: Box::new(convert_expression(
-            &cond.test, source, loc, interner, offset,
-        )),
+        test: Box::new(convert_expression(cond.test, source, loc, interner, offset)),
         consequent: Box::new(convert_expression(
-            &cond.consequent,
+            cond.consequent,
             source,
             loc,
             interner,
             offset,
         )),
         alternate: Box::new(convert_expression(
-            &cond.alternate,
+            cond.alternate,
             source,
             loc,
             interner,
@@ -246,7 +243,7 @@ pub(in crate::ast) fn convert_conditional_expression(
 }
 
 pub(in crate::ast) fn convert_await_expression(
-    await_expr: &internal::AwaitExpression,
+    await_expr: &internal::AwaitExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -258,7 +255,7 @@ pub(in crate::ast) fn convert_await_expression(
         end: await_expr.span.end,
         loc: create_location(await_expr.span, loc, offset),
         argument: Box::new(convert_expression(
-            &await_expr.argument,
+            await_expr.argument,
             source,
             loc,
             interner,
@@ -268,7 +265,7 @@ pub(in crate::ast) fn convert_await_expression(
 }
 
 pub(in crate::ast) fn convert_yield_expression(
-    yield_expr: &internal::YieldExpression,
+    yield_expr: &internal::YieldExpression<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

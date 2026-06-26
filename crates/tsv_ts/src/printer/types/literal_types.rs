@@ -36,7 +36,7 @@ struct Interpolation {
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a literal type
-    pub(super) fn build_literal_type_doc(&self, lit: &TSLiteralType) -> DocId {
+    pub(super) fn build_literal_type_doc(&self, lit: &TSLiteralType<'_>) -> DocId {
         let d = self.d();
         match lit {
             TSLiteralType::TemplateLiteral(template) => {
@@ -48,7 +48,7 @@ impl<'a> Printer<'a> {
             TSLiteralType::UnaryExpression(unary) => {
                 // For negative number types like `-1`
                 let op = d.text(unary.operator.as_str());
-                let arg = self.build_expression_doc(&unary.argument);
+                let arg = self.build_expression_doc(unary.argument);
                 d.concat(&[op, arg])
             }
         }
@@ -64,7 +64,10 @@ impl<'a> Printer<'a> {
     /// would exceed print width in flat mode, then break all of those. This ensures consistent
     /// formatting - types that would exceed at their original positions break, even if earlier
     /// breaks would have given them more room.
-    pub(super) fn build_template_literal_type_doc(&self, template: &TemplateLiteralType) -> DocId {
+    pub(super) fn build_template_literal_type_doc(
+        &self,
+        template: &TemplateLiteralType<'_>,
+    ) -> DocId {
         let d = self.d();
 
         // First pass: render each type flat and decide its break at its flat position.
@@ -122,7 +125,7 @@ impl<'a> Printer<'a> {
         let mut parts = vec![d.text("`")];
         let mut interp_iter = interps.into_iter();
 
-        for quasi in &template.quasis {
+        for quasi in template.quasis {
             parts.push(d.text_owned(quasi.raw(self.source).to_string()));
             if let Some(Interpolation {
                 type_doc,

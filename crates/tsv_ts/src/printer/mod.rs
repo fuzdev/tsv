@@ -331,7 +331,7 @@ impl<'a> Printer<'a> {
     ///
     /// Wraps templates and arrow-with-template-body in `isolated_group` to prevent
     /// internal breaks from forcing parent calls/arrays to break (enables hugging).
-    pub(crate) fn build_huggable_expression_doc(&self, expr: &internal::Expression) -> DocId {
+    pub(crate) fn build_huggable_expression_doc(&self, expr: &internal::Expression<'_>) -> DocId {
         let d = self.d();
         let base_doc = self.build_arg_expression_doc(expr);
         if needs_isolation_for_hugging(expr) {
@@ -348,19 +348,19 @@ impl<'a> Printer<'a> {
     /// - At least one type param has nested generics OR is a conditional type
     ///
     /// Example: `Map<string, Array<number>>` - Map has 2 params, second has nested generic
-    pub(crate) fn id_has_complex_type_annotation(&self, expr: &internal::Expression) -> bool {
+    pub(crate) fn id_has_complex_type_annotation(&self, expr: &internal::Expression<'_>) -> bool {
         let type_ann = match expr {
-            internal::Expression::Identifier(id) => id.type_annotation.as_ref(),
+            internal::Expression::Identifier(id) => id.type_annotation(),
             internal::Expression::ObjectPattern(obj) => obj.type_annotation.as_ref(),
             internal::Expression::ArrayPattern(arr) => arr.type_annotation.as_ref(),
             _ => None,
         };
 
-        type_ann.is_some_and(|ann| self.type_has_complex_annotation(&ann.type_annotation))
+        type_ann.is_some_and(|ann| self.type_has_complex_annotation(ann.type_annotation))
     }
 
     /// Check if a type has complex nested type parameters
-    fn type_has_complex_annotation(&self, ts_type: &internal::TSType) -> bool {
+    fn type_has_complex_annotation(&self, ts_type: &internal::TSType<'_>) -> bool {
         match ts_type {
             internal::TSType::TypeReference(type_ref) => {
                 // Must have >1 type argument
@@ -383,7 +383,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a type has nested type parameters or is a conditional type
-    fn type_has_nested_generics(&self, ts_type: &internal::TSType) -> bool {
+    fn type_has_nested_generics(&self, ts_type: &internal::TSType<'_>) -> bool {
         match ts_type {
             internal::TSType::TypeReference(type_ref) => {
                 // Has type arguments means nested generics
@@ -403,7 +403,7 @@ impl<'a> Printer<'a> {
     /// Example: `type Foo<T extends string, U = number> = ...`
     pub(crate) fn type_alias_has_complex_params(
         &self,
-        type_params: Option<&internal::TSTypeParameterDeclaration>,
+        type_params: Option<&internal::TSTypeParameterDeclaration<'_>>,
     ) -> bool {
         let params = match type_params {
             Some(p) => &p.params,
@@ -427,7 +427,7 @@ impl<'a> Printer<'a> {
     /// - At least one property has a default value OR is not shorthand
     ///
     /// Example: `const { a, b = 1, c } = obj` - 3 properties, one has default
-    pub(crate) fn id_has_complex_destructuring(&self, expr: &internal::Expression) -> bool {
+    pub(crate) fn id_has_complex_destructuring(&self, expr: &internal::Expression<'_>) -> bool {
         let internal::Expression::ObjectPattern(obj) = expr else {
             return false;
         };
@@ -489,7 +489,7 @@ impl<'a> Printer<'a> {
     /// (`...( /* c */ x )`), the spread span extends past the inner argument, so
     /// scan from the inner argument's end to find those comments; otherwise scan
     /// from the argument's own end.
-    pub(crate) fn last_arg_comment_scan_start(&self, arg: &internal::Expression) -> u32 {
+    pub(crate) fn last_arg_comment_scan_start(&self, arg: &internal::Expression<'_>) -> u32 {
         if let internal::Expression::SpreadElement(spread) = arg
             && self.has_comments_between(spread.argument.span().end, spread.span.end)
         {
@@ -689,7 +689,10 @@ impl<'a> Printer<'a> {
     ///
     /// Computes the signature end from the arrow's structure and scans for `=>`.
     /// Returns the position of `=` in `=>`, or the body start as fallback.
-    pub(crate) fn find_arrow_token_for(&self, arrow: &internal::ArrowFunctionExpression) -> u32 {
+    pub(crate) fn find_arrow_token_for(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+    ) -> u32 {
         let body_start = arrow.body.span().start;
         let sig_end = if let Some(rt) = &arrow.return_type {
             rt.span.end
@@ -786,7 +789,7 @@ impl<'a> Printer<'a> {
     /// Returns `fallback` if there are no decorators or the keyword isn't found.
     pub(crate) fn find_keyword_after_decorators(
         &self,
-        decorators: Option<&[internal::Decorator]>,
+        decorators: Option<&[internal::Decorator<'_>]>,
         keyword: &str,
         fallback: u32,
     ) -> u32 {

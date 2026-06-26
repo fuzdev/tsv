@@ -41,7 +41,7 @@ use tsv_lang::{
 /// Returns true if:
 /// 1. Multiple comma-separated args (linear-gradient, rgb, etc.)
 /// 2. Single arg that is a List with multiple space-separated items (drop-shadow)
-pub(crate) fn has_wrappable_args(args: &[CssValue]) -> bool {
+pub(crate) fn has_wrappable_args(args: &[CssValue<'_>]) -> bool {
     args.len() >= 2
         || (args.len() == 1
             && matches!(&args[0], CssValue::List { values, .. } if values.len() >= 2))
@@ -113,7 +113,7 @@ impl<'a> Printer<'a> {
     /// Detected by scanning the source text directly (value comments are not stored in the Vec).
     pub(crate) fn has_value_comments_in_decl(
         &self,
-        decl: &crate::ast::internal::CssDeclaration,
+        decl: &crate::ast::internal::CssDeclaration<'_>,
     ) -> bool {
         let decl_source = decl.span.extract(self.source);
         if let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) {
@@ -209,7 +209,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Print a list of CSS nodes (rules) with comments interspersed by position
-    pub(crate) fn print_css_nodes(&mut self, nodes: &[CssNode]) {
+    pub(crate) fn print_css_nodes(&mut self, nodes: &[CssNode<'_>]) {
         // Use comment index for efficient traversal (comments are sorted)
         let mut comment_idx = 0;
         let mut prev_end: u32 = 0;
@@ -438,7 +438,7 @@ impl<'a> Printer<'a> {
     /// Normalize comment spacing in raw strings
     ///
     /// Print a single CSS node
-    fn print_css_node(&mut self, node: &CssNode) {
+    fn print_css_node(&mut self, node: &CssNode<'_>) {
         match node {
             CssNode::Rule(rule) => self.print_css_rule(rule),
             CssNode::Atrule(atrule) => self.print_css_atrule(atrule),
@@ -461,7 +461,7 @@ impl<'a> Printer<'a> {
     /// This consolidates the repeated pattern across rules.rs and atrules.rs.
     pub(crate) fn try_print_inline_comments(
         &mut self,
-        children: &[CssBlockChild],
+        children: &[CssBlockChild<'_>],
         current_idx: usize,
         prev_end: u32,
     ) -> usize {
@@ -488,7 +488,7 @@ impl<'a> Printer<'a> {
     /// case where we need to remove the trailing newline before the first comment.
     pub(crate) fn try_print_inline_comments_after_decl(
         &mut self,
-        children: &[CssBlockChild],
+        children: &[CssBlockChild<'_>],
         current_idx: usize,
         prev_end: u32,
     ) -> usize {
@@ -518,7 +518,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if previous sibling is a comment
-    pub(crate) fn prev_is_comment(children: &[CssBlockChild], index: usize) -> bool {
+    pub(crate) fn prev_is_comment(children: &[CssBlockChild<'_>], index: usize) -> bool {
         index > 0 && matches!(children.get(index - 1), Some(CssBlockChild::Comment(_)))
     }
 
@@ -543,7 +543,7 @@ impl<'a> Printer<'a> {
     /// previous sibling's trailing `;` (not included in declaration spans).
     pub(crate) fn has_blank_line_before_child(
         &self,
-        children: &[CssBlockChild],
+        children: &[CssBlockChild<'_>],
         index: usize,
     ) -> bool {
         let Some(prev) = children.get(index.wrapping_sub(1)) else {
@@ -562,21 +562,21 @@ impl<'a> Printer<'a> {
 
 /// Format CSS stylesheet to a string
 /// Requires source for blank line preservation and raw value extraction
-pub(crate) fn format_css(stylesheet: &CssStyleSheet, source: &str) -> String {
+pub(crate) fn format_css(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
     let mut printer = Printer::new(source, &stylesheet.comments, &stylesheet.line_breaks);
-    printer.print_css_nodes(&stylesheet.nodes);
+    printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()
 }
 
 /// Format a CSS stylesheet embedded in another language (e.g., Svelte), using
 /// `embed.base_indent_offset` to account for the host's wrapper indentation.
 pub(crate) fn format_css_embedded(
-    stylesheet: &CssStyleSheet,
+    stylesheet: &CssStyleSheet<'_>,
     source: &str,
     embed: EmbedContext,
 ) -> String {
     let mut printer =
         Printer::with_embed(source, &stylesheet.comments, &stylesheet.line_breaks, embed);
-    printer.print_css_nodes(&stylesheet.nodes);
+    printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()
 }

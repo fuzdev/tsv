@@ -120,7 +120,7 @@ impl<'a> Printer<'a> {
     /// Whether `node` is a control-flow block the root marked as part of a single-line inline
     /// run — see [`Printer::root_inline_run_block_starts`]. Read by `build_nodes_doc_multiline`
     /// to build the block in inline (inner-break) rather than multiline (body-drop) context.
-    pub(crate) fn is_root_inline_run_block(&self, node: &FragmentNode) -> bool {
+    pub(crate) fn is_root_inline_run_block(&self, node: &FragmentNode<'_>) -> bool {
         self.root_inline_run_block_starts
             .borrow()
             .contains(&node.span().start)
@@ -220,7 +220,7 @@ impl<'a> Printer<'a> {
     /// Uses the standard parameters: self.comments, self.embed, self.line_breaks.
     /// For calls that need a custom embed context or empty comments, use the
     /// tsv_ts functions directly.
-    pub(crate) fn build_ts_expression_doc(&self, expr: &tsv_ts::Expression) -> DocId {
+    pub(crate) fn build_ts_expression_doc(&self, expr: &tsv_ts::Expression<'_>) -> DocId {
         tsv_ts::build_expression_doc_with_comments(self.d(), expr, &self.ts_inputs(), &self.embed)
     }
 
@@ -228,7 +228,10 @@ impl<'a> Printer<'a> {
     ///
     /// Used for contexts like @const patterns or this={expr} where no comments
     /// are expected between the expression and its container.
-    pub(crate) fn build_ts_expression_doc_no_comments(&self, expr: &tsv_ts::Expression) -> DocId {
+    pub(crate) fn build_ts_expression_doc_no_comments(
+        &self,
+        expr: &tsv_ts::Expression<'_>,
+    ) -> DocId {
         let inputs = tsv_ts::PrinterInputs {
             comments: &[],
             ..self.ts_inputs()
@@ -238,7 +241,7 @@ impl<'a> Printer<'a> {
 }
 
 /// Format a Svelte AST back to source code
-pub(crate) fn format_svelte(root: &internal::Root, source: &str) -> String {
+pub(crate) fn format_svelte(root: &internal::Root<'_>, source: &str) -> String {
     let mut printer = Printer::new(source, Rc::clone(&root.interner), &root.comments);
     printer.print_root(root);
     printer.into_string()
@@ -247,9 +250,13 @@ pub(crate) fn format_svelte(root: &internal::Root, source: &str) -> String {
 impl<'a> Printer<'a> {
     /// Check if the last non-whitespace fragment node before `target_start` is
     /// a `<!-- format-ignore -->` (or `prettier-ignore`) comment.
-    fn has_format_ignore_before(&self, fragment: &internal::Fragment, target_start: u32) -> bool {
+    fn has_format_ignore_before(
+        &self,
+        fragment: &internal::Fragment<'_>,
+        target_start: u32,
+    ) -> bool {
         let mut last_comment = None;
-        for node in &fragment.nodes {
+        for node in fragment.nodes {
             let node_end = node.span().end;
             if node_end > target_start {
                 break;
@@ -277,7 +284,7 @@ impl<'a> Printer<'a> {
         &self,
         comment: &internal::HtmlComment,
         comment_idx: usize,
-        root: &internal::Root,
+        root: &internal::Root<'_>,
     ) -> CommentSection {
         // format-ignore-start/end mark ranges within the template —
         // they must stay in the fragment so the range preservation logic sees them
@@ -345,7 +352,7 @@ impl<'a> Printer<'a> {
     fn print_section_comments(
         &mut self,
         comment_indices: &[usize],
-        fragment: &internal::Fragment,
+        fragment: &internal::Fragment<'_>,
         section_start: u32,
     ) -> bool {
         if comment_indices.is_empty() {
@@ -387,7 +394,7 @@ impl<'a> Printer<'a> {
     ///
     /// Sections are ordered canonically and separated by blank lines.
     /// Comments travel with the section they immediately precede in source order.
-    pub(crate) fn print_root(&mut self, root: &internal::Root) {
+    pub(crate) fn print_root(&mut self, root: &internal::Root<'_>) {
         // Classify fragment comments by the section they should travel with.
         let mut options_comments: Vec<usize> = Vec::new();
         let mut module_comments: Vec<usize> = Vec::new();
@@ -480,14 +487,14 @@ impl<'a> Printer<'a> {
     ///
     /// Always outputs self-closing form with attributes.
     /// Uses doc-based attribute wrapping for width-aware line breaking.
-    fn print_svelte_options(&mut self, options: &internal::SvelteOptions) {
+    fn print_svelte_options(&mut self, options: &internal::SvelteOptions<'_>) {
         if options.attributes.is_empty() {
             self.write("<svelte:options />\n");
             return;
         }
 
         let d = self.d();
-        let (attr_indent, has_multiline) = self.build_indented_attrs_doc(&options.attributes);
+        let (attr_indent, has_multiline) = self.build_indented_attrs_doc(options.attributes);
         let line = d.line();
         let inner = d.concat(&[d.text("<svelte:options"), attr_indent, line, d.text("/>")]);
 
@@ -526,12 +533,12 @@ impl<'a> Printer<'a> {
     ///   split at top-level ranges: each range emits its source verbatim, the surrounding
     ///   segments go through the shared builder. (Single-node `format-ignore` is handled by
     ///   the shared builder itself.)
-    fn print_root_fragment(&mut self, fragment: &internal::Fragment, skip_indices: &[usize]) {
+    fn print_root_fragment(&mut self, fragment: &internal::Fragment<'_>, skip_indices: &[usize]) {
         // Effective template range: drop section comments (`skip_indices`) and Unicode-ws-only
         // boundary text. Both kinds only occur at the boundaries, so the kept content is a
         // contiguous slice.
         let source = self.source;
-        let skippable = |i: usize, n: &FragmentNode| {
+        let skippable = |i: usize, n: &FragmentNode<'_>| {
             skip_indices.contains(&i)
                 || matches!(n, FragmentNode::Text(t) if t.raw(source).trim().is_empty())
         };
@@ -627,7 +634,7 @@ impl<'a> Printer<'a> {
     /// [`Printer::root_inline_run_block_starts`]. A *multi-line* run (its content text spans
     /// source lines) keeps the multiline layout, so its blocks are left unmarked. Span-keyed,
     /// so only root-level run blocks are affected.
-    fn mark_root_inline_run_blocks(&self, nodes: &[FragmentNode]) {
+    fn mark_root_inline_run_blocks(&self, nodes: &[FragmentNode<'_>]) {
         let mut marks = self.root_inline_run_block_starts.borrow_mut();
         marks.clear();
         let mut i = 0;
@@ -655,7 +662,11 @@ impl<'a> Printer<'a> {
     /// whitespace immediately following the end comment (which the next segment's boundary
     /// trim would otherwise drop). A blank line → `literalline` (the un-indented blank) +
     /// `hardline`; a single newline / adjacency → `hardline`. `None` when nothing follows.
-    fn range_trailing_separator(&self, nodes: &[FragmentNode], range_end: usize) -> Option<DocId> {
+    fn range_trailing_separator(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        range_end: usize,
+    ) -> Option<DocId> {
         if range_end + 1 >= nodes.len() {
             return None;
         }
@@ -692,9 +703,13 @@ impl<'a> Printer<'a> {
     /// sequences return `None`, keeping the per-node path's behavior for them.
     ///
     /// Returns `Some(end_idx)` (inclusive) for a qualifying run, else `None`.
-    fn detect_root_inline_run(&self, nodes: &[FragmentNode], start_idx: usize) -> Option<usize> {
+    fn detect_root_inline_run(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        start_idx: usize,
+    ) -> Option<usize> {
         let source = self.source;
-        let is_content_text = |n: &FragmentNode| matches!(n, FragmentNode::Text(t) if !t.raw(source).is_whitespace_only());
+        let is_content_text = |n: &FragmentNode<'_>| matches!(n, FragmentNode::Text(t) if !t.raw(source).is_whitespace_only());
 
         // The start must be a node that can participate in a run.
         let start = &nodes[start_idx];
@@ -742,7 +757,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if a fragment node can participate in an inline run (as start or intermediate node).
-    fn is_inline_run_node(&self, node: &FragmentNode) -> bool {
+    fn is_inline_run_node(&self, node: &FragmentNode<'_>) -> bool {
         match node {
             FragmentNode::ExpressionTag(_)
             | FragmentNode::HtmlTag(_)

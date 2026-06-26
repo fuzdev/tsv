@@ -23,14 +23,14 @@ impl<'a> Printer<'a> {
     /// - EACH inner array/object has more than 1 item
     ///
     /// This matches prettier's shouldBreak logic in array.js:89-106
-    fn should_break_nested_array(&self, arr: &internal::ArrayExpression) -> bool {
+    fn should_break_nested_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
         if arr.elements.len() <= 1 {
             return false;
         }
 
         let mut expect_arrays: Option<bool> = None;
 
-        for elem in &arr.elements {
+        for elem in arr.elements {
             let Some(expr) = elem else { return false };
 
             let (is_array, inner_len) = match expr {
@@ -58,7 +58,11 @@ impl<'a> Printer<'a> {
     ///
     /// Used to find the range for trailing comments after an element.
     /// Returns the start position of the next element, or the closing bracket if this is the last element.
-    fn next_element_boundary(&self, arr: &internal::ArrayExpression, current_index: usize) -> u32 {
+    fn next_element_boundary(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        current_index: usize,
+    ) -> u32 {
         arr.elements[current_index + 1..]
             .iter()
             .find_map(|e| e.as_ref().map(|e| e.span().start))
@@ -74,7 +78,7 @@ impl<'a> Printer<'a> {
     /// leading comment).
     fn has_blank_line_at_array_boundary(
         &self,
-        arr: &internal::ArrayExpression,
+        arr: &internal::ArrayExpression<'_>,
         i: usize,
         upper: u32,
     ) -> bool {
@@ -100,7 +104,7 @@ impl<'a> Printer<'a> {
     /// Result is clamped to `<= upper`.
     fn blank_scan_start_before(
         &self,
-        arr: &internal::ArrayExpression,
+        arr: &internal::ArrayExpression<'_>,
         i: usize,
         upper: u32,
     ) -> u32 {
@@ -138,15 +142,15 @@ impl<'a> Printer<'a> {
     ///
     /// This prevents internal breaks from propagating to parent groups,
     /// enabling arrays to stay hugged (matching Prettier behavior).
-    fn build_array_element_doc(&self, expr: &Expression) -> DocId {
+    fn build_array_element_doc(&self, expr: &Expression<'_>) -> DocId {
         self.build_huggable_expression_doc(expr)
     }
 
     /// Calculate the end position of an element (or fallback for elisions)
     fn element_end_position(
         &self,
-        elem: Option<&Expression>,
-        arr: &internal::ArrayExpression,
+        elem: Option<&Expression<'_>>,
+        arr: &internal::ArrayExpression<'_>,
     ) -> u32 {
         elem.map_or(arr.span.start + 1, |e| e.span().end)
     }
@@ -170,7 +174,11 @@ impl<'a> Printer<'a> {
     /// Compute the search start for leading comments on the array element at
     /// `i`. For the first element, that's just inside `[`; for later elements,
     /// just past the comma after the previous element.
-    fn leading_comment_search_start_for(&self, arr: &internal::ArrayExpression, i: usize) -> u32 {
+    fn leading_comment_search_start_for(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        i: usize,
+    ) -> u32 {
         if i == 0 {
             arr.span.start + 1
         } else {
@@ -187,7 +195,7 @@ impl<'a> Printer<'a> {
     /// - Before the comma (not after - those are leading on next element)
     fn add_trailing_array_comments(
         &self,
-        arr: &internal::ArrayExpression,
+        arr: &internal::ArrayExpression<'_>,
         elem_end: u32,
         current_index: usize,
         parts: &mut DocBuf,
@@ -208,7 +216,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for an array with proper wrapping behavior
     pub(in crate::printer) fn build_array_doc_with_wrapping(
         &self,
-        arr: &internal::ArrayExpression,
+        arr: &internal::ArrayExpression<'_>,
     ) -> DocId {
         if arr.elements.is_empty() {
             return self.build_empty_brackets_with_comments_doc(arr.span);
@@ -252,13 +260,13 @@ impl<'a> Printer<'a> {
     ///
     /// Delegates to the generic `has_own_line_block_comments_in_bracket_list` helper,
     /// filtering out holes (elisions) from the element list.
-    fn has_own_line_block_comments_in_array(&self, arr: &internal::ArrayExpression) -> bool {
+    fn has_own_line_block_comments_in_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
         let non_null: Vec<_> = arr.elements.iter().flatten().collect();
         self.has_own_line_block_comments_in_bracket_list(arr.span, &non_null, |e| e.span())
     }
 
     /// Check if array contains only numeric literals (for fill behavior)
-    fn is_numbers_only_array(&self, arr: &internal::ArrayExpression) -> bool {
+    fn is_numbers_only_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
         arr.elements.iter().all(|elem| match elem {
             Some(Expression::Literal(lit)) => {
                 matches!(lit.value, LiteralValue::Number(_))
@@ -269,7 +277,7 @@ impl<'a> Printer<'a> {
                     unary.operator,
                     internal::UnaryOperator::Minus | internal::UnaryOperator::Plus
                 ) && matches!(
-                    unary.argument.as_ref(),
+                    unary.argument,
                     Expression::Literal(lit) if matches!(lit.value, LiteralValue::Number(_))
                 )
             }
@@ -281,7 +289,7 @@ impl<'a> Printer<'a> {
     ///
     /// Includes inline block comments between elements.
     /// Uses binary search to find comments: O(log n + k)
-    fn build_array_fill_doc(&self, arr: &internal::ArrayExpression) -> DocId {
+    fn build_array_fill_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
 
@@ -317,7 +325,7 @@ impl<'a> Printer<'a> {
     /// Uses binary search to find comments: O(log n + k)
     ///
     /// Note: Arrays with expanding comments use build_array_doc_with_expanding_comments instead.
-    fn build_array_group_doc(&self, arr: &internal::ArrayExpression) -> DocId {
+    fn build_array_group_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
 
@@ -466,7 +474,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build group doc for arrays with multiline content (forced expansion with hardlines)
-    fn build_array_group_doc_forced(&self, arr: &internal::ArrayExpression) -> DocId {
+    fn build_array_group_doc_forced(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
 
@@ -527,7 +535,10 @@ impl<'a> Printer<'a> {
     ///
     /// Used for arrays containing line comments (can't be inline) or multi-line
     /// block comments (hardlines must propagate). Always expands to multiline.
-    fn build_array_doc_with_expanding_comments(&self, arr: &internal::ArrayExpression) -> DocId {
+    fn build_array_doc_with_expanding_comments(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+    ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
 
@@ -781,7 +792,7 @@ impl<'a> Printer<'a> {
     ///
     /// Delegates to `build_array_doc_with_wrapping` to ensure multiline content
     /// triggers proper expansion even in nested contexts.
-    pub(in crate::printer) fn build_array_doc(&self, arr: &internal::ArrayExpression) -> DocId {
+    pub(in crate::printer) fn build_array_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
         // Use the same wrapping logic as top-level arrays to handle multiline content
         self.build_array_doc_with_wrapping(arr)
     }
@@ -793,7 +804,7 @@ impl<'a> Printer<'a> {
     /// Produces: `[\n  elem,\n]` with actual hardlines.
     pub(in crate::printer) fn build_array_doc_expanded(
         &self,
-        arr: &internal::ArrayExpression,
+        arr: &internal::ArrayExpression<'_>,
     ) -> DocId {
         let d = self.d();
         if arr.elements.is_empty() {

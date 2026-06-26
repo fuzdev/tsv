@@ -22,11 +22,11 @@ use super::{convert_attribute_node, convert_fragment, span_to_name_loc, to_json_
 /// omits `importKind`/`exportKind` for "value" and always includes `attributes` on
 /// import/export declarations.
 fn script_has_lang_ts(
-    script: &internal::Script,
+    script: &internal::Script<'_>,
     source: &str,
     interner: &DefaultStringInterner,
 ) -> bool {
-    for attr_node in &script.attributes {
+    for attr_node in script.attributes {
         let internal::AttributeNode::Attribute(attr) = attr_node else {
             continue;
         };
@@ -43,7 +43,7 @@ fn script_has_lang_ts(
 }
 
 pub(super) fn convert_script(
-    script: &internal::Script,
+    script: &internal::Script<'_>,
     source: &str,
     interner: &DefaultStringInterner,
     html_leading_comment: Option<&internal::HtmlComment>,
@@ -163,16 +163,16 @@ pub(super) fn convert_script(
 
 /// Convert internal SvelteOptions to public format
 /// Find a named attribute's value in `<svelte:options>` attributes.
-fn find_option_values<'a>(
-    attrs: &'a [internal::AttributeNode],
+fn find_option_values<'arena>(
+    attrs: &[internal::AttributeNode<'arena>],
     name: &str,
     interner: &DefaultStringInterner,
-) -> Option<&'a Vec<internal::AttributeValue>> {
+) -> Option<&'arena [internal::AttributeValue<'arena>]> {
     attrs.iter().find_map(|attr| {
         if let internal::AttributeNode::Attribute(attr) = attr
             && interner.resolve_infallible(attr.name) == name
         {
-            attr.value.as_ref()
+            attr.value
         } else {
             None
         }
@@ -180,7 +180,7 @@ fn find_option_values<'a>(
 }
 
 /// Extract a plain text value from attribute values.
-fn text_value(values: &[internal::AttributeValue], source: &str) -> Option<String> {
+fn text_value(values: &[internal::AttributeValue<'_>], source: &str) -> Option<String> {
     values.iter().find_map(|v| {
         if let internal::AttributeValue::Text(text) = v {
             Some(text.data(source).into_owned())
@@ -192,7 +192,7 @@ fn text_value(values: &[internal::AttributeValue], source: &str) -> Option<Strin
 
 /// Find a boolean option — shorthand (`name`) or explicit (`name={true/false}`).
 fn bool_option(
-    attrs: &[internal::AttributeNode],
+    attrs: &[internal::AttributeNode<'_>],
     name: &str,
     interner: &DefaultStringInterner,
 ) -> Option<bool> {
@@ -220,26 +220,26 @@ fn bool_option(
 }
 
 pub(super) fn convert_svelte_options(
-    options: &internal::SvelteOptions,
+    options: &internal::SvelteOptions<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::SvelteOptions {
-    let runes = bool_option(&options.attributes, "runes", interner);
-    let immutable = bool_option(&options.attributes, "immutable", interner);
-    let accessors = bool_option(&options.attributes, "accessors", interner);
-    let preserve_whitespace = bool_option(&options.attributes, "preserveWhitespace", interner);
+    let runes = bool_option(options.attributes, "runes", interner);
+    let immutable = bool_option(options.attributes, "immutable", interner);
+    let accessors = bool_option(options.attributes, "accessors", interner);
+    let preserve_whitespace = bool_option(options.attributes, "preserveWhitespace", interner);
 
     // `css` — plain text value (`css="injected"`)
-    let css = find_option_values(&options.attributes, "css", interner)
-        .and_then(|v| text_value(v, source));
+    let css =
+        find_option_values(options.attributes, "css", interner).and_then(|v| text_value(v, source));
 
     // `namespace` — plain text value
-    let namespace = find_option_values(&options.attributes, "namespace", interner)
+    let namespace = find_option_values(options.attributes, "namespace", interner)
         .and_then(|v| text_value(v, source));
 
     // `customElement` — object expression, string expression, or plain text
-    let custom_element = find_option_values(&options.attributes, "customElement", interner)
+    let custom_element = find_option_values(options.attributes, "customElement", interner)
         .and_then(|values| {
             values.iter().find_map(|v| {
                 // Expression tag: customElement={{ tag: '...', shadow: '...' }}
@@ -248,15 +248,17 @@ pub(super) fn convert_svelte_options(
                         &expr.expression
                 {
                     let mut map = serde_json::Map::new();
-                    for prop in &obj.properties {
+                    for prop in obj.properties {
                         if let tsv_ts::ast::internal::ObjectProperty::Property(p) = prop
                             && let tsv_ts::ast::internal::Expression::Identifier(key) = &p.key
                             && let tsv_ts::ast::internal::Expression::Literal(val) = &p.value
                         {
                             let key_name = interner.resolve_infallible(key.name).to_string();
                             let json_val = match &val.value {
-                                tsv_ts::ast::internal::LiteralValue::String { content, .. } => {
-                                    serde_json::Value::String(content.clone())
+                                tsv_ts::ast::internal::LiteralValue::String(cooked) => {
+                                    serde_json::Value::String(
+                                        cooked.resolve(val.span, source).to_string(),
+                                    )
                                 }
                                 tsv_ts::ast::internal::LiteralValue::Boolean(b) => {
                                     serde_json::Value::Bool(*b)
@@ -273,10 +275,9 @@ pub(super) fn convert_svelte_options(
                     internal::AttributeValue::Text(text) => Some(text.data(source).into_owned()),
                     internal::AttributeValue::ExpressionTag(expr) => {
                         if let tsv_ts::ast::internal::Expression::Literal(lit) = &expr.expression
-                            && let tsv_ts::ast::internal::LiteralValue::String { content, .. } =
-                                &lit.value
+                            && let tsv_ts::ast::internal::LiteralValue::String(cooked) = &lit.value
                         {
-                            Some(content.clone())
+                            Some(cooked.resolve(lit.span, source).to_string())
                         } else {
                             None
                         }
@@ -305,7 +306,7 @@ pub(super) fn convert_svelte_options(
 }
 
 pub(super) fn convert_style(
-    style: &internal::Style,
+    style: &internal::Style<'_>,
     source: &str,
     interner: &DefaultStringInterner,
     preceding_comment: Option<&internal::HtmlComment>,
@@ -318,7 +319,7 @@ pub(super) fn convert_style(
 
     // Delegate to tsv_css for CSS node conversion
     // Comments are stored separately in stylesheet.comments and not included in JSON output
-    let children: Vec<serde_json::Value> = style
+    let children: Vec<tsv_css::ast::public::CssNodePublic> = style
         .css_stylesheet
         .nodes
         .iter()
@@ -355,7 +356,7 @@ pub(super) fn convert_style(
 }
 
 pub(super) fn convert_special_element(
-    elem: &internal::SpecialElement,
+    elem: &internal::SpecialElement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -365,10 +366,11 @@ pub(super) fn convert_special_element(
         // For plain string attributes (this="hello"), Svelte produces a Literal
         // without loc and with single-quoted raw, rather than normal expression conversion
         if let tsv_ts::ast::internal::Expression::Literal(lit) = e
-            && let tsv_ts::ast::internal::LiteralValue::String { content, .. } = &lit.value
+            && let tsv_ts::ast::internal::LiteralValue::String(cooked) = &lit.value
         {
             let raw_source = lit.span.extract(source);
             if !raw_source.starts_with('\'') && !raw_source.starts_with('"') {
+                let content = cooked.resolve(lit.span, source);
                 return serde_json::json!({
                     "type": "Literal",
                     "value": content,

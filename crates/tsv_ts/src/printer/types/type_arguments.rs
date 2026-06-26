@@ -13,7 +13,7 @@ impl<'a> Printer<'a> {
     ///
     /// For single type arg contexts, uses normal doc (allows object types to break).
     /// For multiple type arg contexts, uses hugging (objects don't break independently).
-    fn build_type_arg_doc(&self, param: &TSType, is_multi_arg: bool) -> DocId {
+    fn build_type_arg_doc(&self, param: &TSType<'_>, is_multi_arg: bool) -> DocId {
         if is_multi_arg {
             self.build_type_doc_for_type_arg(param)
         } else {
@@ -27,20 +27,20 @@ impl<'a> Printer<'a> {
     /// inline.
     fn type_arguments_force_expansion(
         &self,
-        args: &internal::TSTypeParameterInstantiation,
+        args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> bool {
         let has_leading_line_comment = args.params.first().is_some_and(|first| {
             self.has_line_comments_between(args.span.start + 1, first.span().start)
         });
         has_leading_line_comment
             || self.has_line_comments_in_delimited_list(
-                &args.params,
+                args.params,
                 TSType::span,
                 args.span.end - 1,
             )
             || self.has_own_line_block_comments_in_bracket_list(
                 args.span,
-                &args.params,
+                args.params,
                 TSType::span,
             )
     }
@@ -51,7 +51,7 @@ impl<'a> Printer<'a> {
     /// Use `build_type_arguments_doc_wrapping` for single-arg hugging (e.g., `Array<{...}>`).
     pub(crate) fn build_type_arguments_doc(
         &self,
-        args: &internal::TSTypeParameterInstantiation,
+        args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let d = self.d();
         if args.params.is_empty() {
@@ -98,7 +98,7 @@ impl<'a> Printer<'a> {
     /// such as in property type annotations.
     pub(crate) fn build_type_arguments_doc_wrapping(
         &self,
-        args: &internal::TSTypeParameterInstantiation,
+        args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let d = self.d();
         if args.params.is_empty() {
@@ -161,7 +161,7 @@ impl<'a> Printer<'a> {
     /// for 2+ type arguments (and non-huggable single args in the wrapping variant).
     fn build_type_arguments_doc_multi_arg(
         &self,
-        args: &internal::TSTypeParameterInstantiation,
+        args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let d = self.d();
         let mut inner_parts = DocBuf::new();
@@ -214,7 +214,7 @@ impl<'a> Printer<'a> {
     /// Line comments and own-line block comments force multiline because they can't appear inline.
     fn build_type_arguments_doc_with_line_comments(
         &self,
-        args: &internal::TSTypeParameterInstantiation,
+        args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         let d = self.d();
 

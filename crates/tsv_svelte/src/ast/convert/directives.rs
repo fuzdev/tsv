@@ -12,7 +12,7 @@ use tsv_lang::LocationTracker;
 use super::{convert_attribute_value, convert_expression_tag, span_to_name_loc, to_json_value};
 
 pub(super) fn convert_on_directive(
-    d: &internal::OnDirective,
+    d: &internal::OnDirective<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -26,15 +26,15 @@ pub(super) fn convert_on_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "OnDirective".to_string(),
-        name: d.name.clone(),
-        name_loc: span_to_name_loc(d.name_span, loc),
+        name: d.name_span.extract(source).to_string(),
+        name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.clone(),
+        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
     }
 }
 
 pub(super) fn convert_bind_directive(
-    d: &internal::BindDirective,
+    d: &internal::BindDirective<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -51,15 +51,15 @@ pub(super) fn convert_bind_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "BindDirective".to_string(),
-        name: d.name.clone(),
-        name_loc: span_to_name_loc(d.name_span, loc),
+        name: d.name_span.extract(source).to_string(),
+        name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.clone(),
+        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
     }
 }
 
 pub(super) fn convert_class_directive(
-    d: &internal::ClassDirective,
+    d: &internal::ClassDirective<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -76,15 +76,15 @@ pub(super) fn convert_class_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "ClassDirective".to_string(),
-        name: d.name.clone(),
-        name_loc: span_to_name_loc(d.name_span, loc),
+        name: d.name_span.extract(source).to_string(),
+        name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.clone(),
+        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
     }
 }
 
 pub(super) fn convert_style_directive(
-    d: &internal::StyleDirective,
+    d: &internal::StyleDirective<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -122,15 +122,15 @@ pub(super) fn convert_style_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "StyleDirective".to_string(),
-        name: d.name.clone(),
-        name_loc: span_to_name_loc(d.name_span, loc),
-        modifiers: d.modifiers.clone(),
+        name: d.name_span.extract(source).to_string(),
+        name_loc: span_to_name_loc(d.head_span, loc),
+        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
         value,
     }
 }
 
 pub(super) fn convert_use_directive(
-    d: &internal::UseDirective,
+    d: &internal::UseDirective<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -144,15 +144,15 @@ pub(super) fn convert_use_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "UseDirective".to_string(),
-        name: d.name.clone(),
-        name_loc: span_to_name_loc(d.name_span, loc),
+        name: d.name_span.extract(source).to_string(),
+        name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.clone(),
+        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
     }
 }
 
 pub(super) fn convert_transition_directive(
-    d: &internal::TransitionDirective,
+    d: &internal::TransitionDirective<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -166,17 +166,17 @@ pub(super) fn convert_transition_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "TransitionDirective".to_string(),
-        name: d.name.clone(),
-        name_loc: span_to_name_loc(d.name_span, loc),
+        name: d.name_span.extract(source).to_string(),
+        name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.clone(),
+        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
         intro: d.direction.has_intro(),
         outro: d.direction.has_outro(),
     }
 }
 
 pub(super) fn convert_animate_directive(
-    d: &internal::AnimateDirective,
+    d: &internal::AnimateDirective<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -190,15 +190,15 @@ pub(super) fn convert_animate_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "AnimateDirective".to_string(),
-        name: d.name.clone(),
-        name_loc: span_to_name_loc(d.name_span, loc),
+        name: d.name_span.extract(source).to_string(),
+        name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.clone(),
+        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
     }
 }
 
 pub(super) fn convert_let_directive(
-    d: &internal::LetDirective,
+    d: &internal::LetDirective<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -212,10 +212,10 @@ pub(super) fn convert_let_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "LetDirective".to_string(),
-        name: d.name.clone(),
-        name_loc: span_to_name_loc(d.name_span, loc),
+        name: d.name_span.extract(source).to_string(),
+        name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.clone(),
+        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
     }
 }
 
@@ -225,7 +225,7 @@ pub(super) fn convert_let_directive(
 /// Identifier without `loc` and with Svelte field ordering (`start, end, type, name`).
 /// Explicit directives (`bind:value={a}`) use the normal acorn-style conversion.
 fn convert_directive_expression(
-    expr: &tsv_ts::ast::internal::Expression,
+    expr: &tsv_ts::ast::internal::Expression<'_>,
     has_expression_tag: bool,
     source: &str,
     loc: &LocationTracker,

@@ -16,7 +16,7 @@ use tsv_lang::LocationTracker;
 const SCHEMA: Schema = Schema::Acorn;
 
 pub(in crate::ast) fn convert_if_statement(
-    if_stmt: &internal::IfStatement,
+    if_stmt: &internal::IfStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -35,7 +35,7 @@ pub(in crate::ast) fn convert_if_statement(
             offset,
         )),
         consequent: Box::new(convert_statement(
-            &if_stmt.consequent,
+            if_stmt.consequent,
             source,
             loc,
             interner,
@@ -51,7 +51,7 @@ pub(in crate::ast) fn convert_if_statement(
 }
 
 pub(in crate::ast) fn convert_for_statement(
-    for_stmt: &internal::ForStatement,
+    for_stmt: &internal::ForStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -75,7 +75,7 @@ pub(in crate::ast) fn convert_for_statement(
             .as_ref()
             .map(|update| Box::new(convert_expression(update, source, loc, interner, offset))),
         body: Box::new(convert_statement(
-            &for_stmt.body,
+            for_stmt.body,
             source,
             loc,
             interner,
@@ -86,7 +86,7 @@ pub(in crate::ast) fn convert_for_statement(
 }
 
 pub(in crate::ast) fn convert_for_in_statement(
-    for_in: &internal::ForInStatement,
+    for_in: &internal::ForInStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -106,7 +106,7 @@ pub(in crate::ast) fn convert_for_in_statement(
             offset,
         )),
         body: Box::new(convert_statement(
-            &for_in.body,
+            for_in.body,
             source,
             loc,
             interner,
@@ -117,7 +117,7 @@ pub(in crate::ast) fn convert_for_in_statement(
 }
 
 pub(in crate::ast) fn convert_for_of_statement(
-    for_of: &internal::ForOfStatement,
+    for_of: &internal::ForOfStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -138,7 +138,7 @@ pub(in crate::ast) fn convert_for_of_statement(
         )),
         r#await: for_of.r#await,
         body: Box::new(convert_statement(
-            &for_of.body,
+            for_of.body,
             source,
             loc,
             interner,
@@ -149,7 +149,7 @@ pub(in crate::ast) fn convert_for_of_statement(
 }
 
 pub(in crate::ast) fn convert_while_statement(
-    while_stmt: &internal::WhileStatement,
+    while_stmt: &internal::WhileStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -168,7 +168,7 @@ pub(in crate::ast) fn convert_while_statement(
             offset,
         )),
         body: Box::new(convert_statement(
-            &while_stmt.body,
+            while_stmt.body,
             source,
             loc,
             interner,
@@ -179,7 +179,7 @@ pub(in crate::ast) fn convert_while_statement(
 }
 
 pub(in crate::ast) fn convert_do_while_statement(
-    do_while: &internal::DoWhileStatement,
+    do_while: &internal::DoWhileStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -191,7 +191,7 @@ pub(in crate::ast) fn convert_do_while_statement(
         end: do_while.span.end,
         loc: create_location(do_while.span, loc, offset),
         body: Box::new(convert_statement(
-            &do_while.body,
+            do_while.body,
             source,
             loc,
             interner,
@@ -209,7 +209,7 @@ pub(in crate::ast) fn convert_do_while_statement(
 }
 
 pub(in crate::ast) fn convert_switch_statement(
-    switch_stmt: &internal::SwitchStatement,
+    switch_stmt: &internal::SwitchStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -236,7 +236,7 @@ pub(in crate::ast) fn convert_switch_statement(
 }
 
 pub(in crate::ast) fn convert_try_statement(
-    try_stmt: &internal::TryStatement,
+    try_stmt: &internal::TryStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -260,7 +260,7 @@ pub(in crate::ast) fn convert_try_statement(
 }
 
 pub(in crate::ast) fn convert_throw_statement(
-    throw_stmt: &internal::ThrowStatement,
+    throw_stmt: &internal::ThrowStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -282,7 +282,7 @@ pub(in crate::ast) fn convert_throw_statement(
 }
 
 pub(in crate::ast) fn convert_break_statement(
-    break_stmt: &internal::BreakStatement,
+    break_stmt: &internal::BreakStatement<'_>,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -300,7 +300,7 @@ pub(in crate::ast) fn convert_break_statement(
 }
 
 pub(in crate::ast) fn convert_continue_statement(
-    continue_stmt: &internal::ContinueStatement,
+    continue_stmt: &internal::ContinueStatement<'_>,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
@@ -318,7 +318,7 @@ pub(in crate::ast) fn convert_continue_statement(
 }
 
 pub(in crate::ast) fn convert_labeled_statement(
-    labeled: &internal::LabeledStatement,
+    labeled: &internal::LabeledStatement<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -331,7 +331,7 @@ pub(in crate::ast) fn convert_labeled_statement(
         loc: create_location(labeled.span, loc, offset),
         label: super::convert_identifier(&labeled.label, loc, interner, offset),
         body: Box::new(convert_statement(
-            &labeled.body,
+            labeled.body,
             source,
             loc,
             interner,
@@ -344,7 +344,7 @@ pub(in crate::ast) fn convert_labeled_statement(
 // Helper functions
 
 fn convert_for_init(
-    init: &internal::ForInit,
+    init: &internal::ForInit<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -361,7 +361,7 @@ fn convert_for_init(
 }
 
 fn convert_for_in_of_left(
-    left: &internal::ForInOfLeft,
+    left: &internal::ForInOfLeft<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -428,7 +428,7 @@ fn expression_to_pattern(expr: public::Expression) -> public::Expression {
 }
 
 fn convert_switch_case(
-    case: &internal::SwitchCase,
+    case: &internal::SwitchCase<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
@@ -452,7 +452,7 @@ fn convert_switch_case(
 }
 
 fn convert_catch_clause(
-    clause: &internal::CatchClause,
+    clause: &internal::CatchClause<'_>,
     source: &str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,

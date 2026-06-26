@@ -17,7 +17,7 @@ use tsv_lang::{ParseError, Span};
 ///
 /// For identifiers, we need to look ahead: if next non-whitespace/comment token is `:`, it's a declaration.
 /// Custom-property identifiers (`--*`) are always declarations and bypass the lookahead.
-pub(crate) fn is_nested_rule_start(parser: &CssParser<'_>) -> Result<bool, ParseError> {
+pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
     match &parser.current_kind {
         // Unambiguous selector start tokens
         TokenKind::Ampersand
@@ -75,7 +75,7 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_>) -> Result<bool, Parse
 ///
 /// Approach: create a temporary lexer from after the identifier and scan forward,
 /// skipping parenthesized groups, until we find `{` (nested rule) or `;`/`}` (declaration).
-fn is_type_selector_with_pseudo(parser: &CssParser<'_>) -> Result<bool, ParseError> {
+fn is_type_selector_with_pseudo(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
     let remaining = &parser.source()[parser.current_end..];
     let mut temp = Lexer::new(remaining);
     let mut paren_depth: i32 = 0;
@@ -96,7 +96,10 @@ fn is_type_selector_with_pseudo(parser: &CssParser<'_>) -> Result<bool, ParseErr
 ///
 /// When `nested` is true, the selector list allows leading combinators (CSS Nesting relative selectors).
 /// For example: `> .child {}`, `+ .sibling {}`, `~ .general {}`
-pub(crate) fn parse_rule(parser: &mut CssParser<'_>, nested: bool) -> Result<CssRule, ParseError> {
+pub(crate) fn parse_rule<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    nested: bool,
+) -> Result<CssRule<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Nested rules use relative selectors (can start with combinators like `> .child`)
@@ -108,7 +111,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser<'_>, nested: bool) -> Result<Css
     };
 
     // Capture any comments after selector (before {)
-    let mut declarations = Vec::new();
+    let mut declarations = parser.bvec();
     parser.skip_whitespace()?;
     while matches!(&parser.current_kind, TokenKind::Comment) {
         let comment = parser.parse_block_comment()?;
@@ -172,7 +175,7 @@ pub(crate) fn parse_rule(parser: &mut CssParser<'_>, nested: bool) -> Result<Css
             start: block_start as u32,
             end: block_end as u32,
         },
-        declarations,
+        declarations: declarations.into_bump_slice(),
         span: Span {
             start: start as u32,
             end: block_end as u32,
@@ -181,7 +184,9 @@ pub(crate) fn parse_rule(parser: &mut CssParser<'_>, nested: bool) -> Result<Css
 }
 
 /// Parse a CSS declaration: `property: value;`
-pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<CssDeclaration, ParseError> {
+pub(crate) fn parse_declaration<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<CssDeclaration<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
     // Parse property
@@ -190,10 +195,10 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<CssDeclara
     }
     // Internal AST: use decoded value (spec-compliant)
     // Svelte quirk (raw value) will be applied in conversion layer
-    let property = parser
+    let property_ident = parser
         .current_identifier()
-        .ok_or_else(|| parser.error_expected_at("identifier", start))?
-        .to_string();
+        .ok_or_else(|| parser.error_expected_at("identifier", start))?;
+    let property = parser.alloc_str_in(property_ident);
     parser.advance()?;
 
     parser.skip_whitespace_and_comments()?;
@@ -357,12 +362,15 @@ pub(crate) fn parse_declaration(parser: &mut CssParser<'_>) -> Result<CssDeclara
 
     let value = if property.starts_with("--") && trimmed_value.starts_with(',') {
         // Leading comma is unusual syntax - preserve as raw identifier
-        CssValue::Identifier {
-            name: trimmed_value.to_string(),
-            span: value_span,
-        }
+        // (text recovered verbatim from `span` at print time)
+        CssValue::Identifier { span: value_span }
     } else {
-        super::value::parse_value_from_source(parser.source(), source_relative_span, base)
+        super::value::parse_value_from_source(
+            parser.source(),
+            source_relative_span,
+            base,
+            parser.arena,
+        )
     };
 
     // Declaration ends after the value, NOT including the semicolon

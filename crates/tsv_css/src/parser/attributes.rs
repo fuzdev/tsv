@@ -5,10 +5,10 @@ use tsv_lang::{ParseError, Span};
 
 /// Parse attribute selector: [attr], [attr="value"], [attr^="prefix"]
 /// Supports namespace prefixes: [ns|attr], [*|attr], [|attr]
-pub(crate) fn parse_attribute_selector(
-    parser: &mut CssParser<'_>,
+pub(crate) fn parse_attribute_selector<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
     start: usize,
-) -> Result<SimpleSelector, ParseError> {
+) -> Result<SimpleSelector<'arena>, ParseError> {
     parser.expect(TokenKind::LeftBracket)?;
     parser.skip_whitespace()?;
 
@@ -25,18 +25,26 @@ pub(crate) fn parse_attribute_selector(
         }
         parser.advance()?; // consume |
         parser.skip_whitespace()?;
-        Some("*".to_string())
+        Some("*")
     } else if parser.check(TokenKind::Pipe) {
         // Explicit no namespace: |attr
         parser.advance()?; // consume |
         parser.skip_whitespace()?;
-        Some(String::new())
+        Some("")
     } else if parser.check(TokenKind::Identifier) {
-        // Could be: ns|attr or just attr (or lang with |= operator)
-        let maybe_namespace = parser
-            .current_identifier()
-            .ok_or_else(|| parser.error_expected("identifier"))?
-            .to_string();
+        // Could be: ns|attr or just attr (or lang with |= operator). Capture the identifier's
+        // span before consuming it: if it turns out to be the attribute *name* (not a namespace
+        // prefix), this is the verbatim name span — the decoded string below is only needed when
+        // it's actually a namespace.
+        let maybe_namespace_span = Span {
+            start: (parser.base_offset() + parser.current_start) as u32,
+            end: (parser.base_offset() + parser.current_end) as u32,
+        };
+        let maybe_namespace = parser.alloc_str_in(
+            parser
+                .current_identifier()
+                .ok_or_else(|| parser.error_expected("identifier"))?,
+        );
         parser.advance()?;
         parser.skip_whitespace()?;
 
@@ -55,36 +63,17 @@ pub(crate) fn parse_attribute_selector(
                 // Actually, we can't easily backtrack here. Let me restructure.
 
                 // Since we've already consumed the |, we need to handle |= here
-                // and return early
-                let name = maybe_namespace;
+                // and return early. The identifier before `|=` is the attribute name —
+                // use its captured span (the decoded `maybe_namespace` was a false start).
                 parser.advance()?; // consume =
                 parser.skip_whitespace()?;
 
                 // Parse value (identifier or string)
-                let value = match &parser.current_kind {
-                    TokenKind::Identifier => Some(
-                        parser
-                            .current_identifier()
-                            .unwrap_or_else(|| parser.current_value())
-                            .to_string(),
-                    ),
-                    TokenKind::String { .. } => {
-                        // Extract content without quotes
-                        Some(
-                            parser.source()[parser.current_start + 1..parser.current_end - 1]
-                                .to_string(),
-                        )
-                    }
-                    _ => {
-                        return Err(parser.error_expected("attribute value"));
-                    }
-                };
-                parser.advance()?;
-                parser.skip_whitespace()?;
+                let value = parse_attribute_value(parser)?;
 
                 // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
                 let flags = if parser.check(TokenKind::Identifier) {
-                    let flag = parser.current_value().to_string();
+                    let flag = parser.alloc_str_in(parser.current_value());
                     let flag_lower = flag.to_lowercase();
                     if flag_lower == "i" || flag_lower == "s" {
                         parser.advance()?;
@@ -102,7 +91,7 @@ pub(crate) fn parse_attribute_selector(
 
                 return Ok(SimpleSelector::Attribute {
                     namespace: None,
-                    name,
+                    name_span: maybe_namespace_span,
                     matcher: Some(AttributeMatcher::DashMatch),
                     value,
                     flags,
@@ -116,9 +105,8 @@ pub(crate) fn parse_attribute_selector(
             // Otherwise it's a namespace prefix: ns|attr
             Some(maybe_namespace)
         } else {
-            // It's the attribute name, not a namespace
-            // Restore the identifier as the name
-            let name = maybe_namespace;
+            // It's the attribute name (no namespace) — use its captured span; the decoded
+            // `maybe_namespace` is unused here (the name is recovered from source).
 
             // Check for matcher and value: =, ~=, |=, ^=, $=, *=
             let (matcher, value) = if parser.check(TokenKind::RightBracket) {
@@ -128,34 +116,14 @@ pub(crate) fn parse_attribute_selector(
                 parser.skip_whitespace()?;
 
                 // Parse value (identifier or string)
-                let value = match &parser.current_kind {
-                    // Internal AST: use decoded value (spec-compliant)
-                    TokenKind::Identifier => Some(
-                        parser
-                            .current_identifier()
-                            .unwrap_or_else(|| parser.current_value())
-                            .to_string(),
-                    ),
-                    TokenKind::String { .. } => {
-                        // Extract content without quotes
-                        Some(
-                            parser.source()[parser.current_start + 1..parser.current_end - 1]
-                                .to_string(),
-                        )
-                    }
-                    _ => {
-                        return Err(parser.error_expected("attribute value"));
-                    }
-                };
-                parser.advance()?;
-                parser.skip_whitespace()?;
+                let value = parse_attribute_value(parser)?;
 
                 (Some(matcher), value)
             };
 
             // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
             let flags = if parser.check(TokenKind::Identifier) {
-                let flag = parser.current_value().to_string();
+                let flag = parser.alloc_str_in(parser.current_value());
                 let flag_lower = flag.to_lowercase();
                 // Accept both lowercase and uppercase flag letters
                 if flag_lower == "i" || flag_lower == "s" {
@@ -174,7 +142,7 @@ pub(crate) fn parse_attribute_selector(
 
             return Ok(SimpleSelector::Attribute {
                 namespace: None, // No namespace prefix (implicit)
-                name,
+                name_span: maybe_namespace_span,
                 matcher,
                 value,
                 flags,
@@ -193,11 +161,13 @@ pub(crate) fn parse_attribute_selector(
         return Err(parser.error_expected_after("attribute name", "namespace"));
     }
 
-    // Internal AST: use decoded value (spec-compliant)
-    let name = parser
-        .current_identifier()
-        .ok_or_else(|| parser.error_expected("identifier"))?
-        .to_string();
+    // Name recovered verbatim from its span (printer emits raw; convert half-decodes — see
+    // ast/convert/mod.rs). The `Identifier` check above guarantees a name token, so no decoded
+    // copy is stored.
+    let name_span = Span {
+        start: (parser.base_offset() + parser.current_start) as u32,
+        end: (parser.base_offset() + parser.current_end) as u32,
+    };
     parser.advance()?;
     parser.skip_whitespace()?;
 
@@ -209,31 +179,14 @@ pub(crate) fn parse_attribute_selector(
         parser.skip_whitespace()?;
 
         // Parse value (identifier or string)
-        let value = match &parser.current_kind {
-            // Internal AST: use decoded value (spec-compliant)
-            TokenKind::Identifier => Some(
-                parser
-                    .current_identifier()
-                    .unwrap_or_else(|| parser.current_value())
-                    .to_string(),
-            ),
-            TokenKind::String { .. } => {
-                // Extract content without quotes
-                Some(parser.source()[parser.current_start + 1..parser.current_end - 1].to_string())
-            }
-            _ => {
-                return Err(parser.error_expected("attribute value"));
-            }
-        };
-        parser.advance()?;
-        parser.skip_whitespace()?;
+        let value = parse_attribute_value(parser)?;
 
         (Some(matcher), value)
     };
 
     // Parse attribute flags (i/I=case-insensitive, s/S=case-sensitive) - optional
     let flags = if parser.check(TokenKind::Identifier) {
-        let flag = parser.current_value().to_string();
+        let flag = parser.alloc_str_in(parser.current_value());
         let flag_lower = flag.to_lowercase();
         // Accept both lowercase and uppercase flag letters
         if flag_lower == "i" || flag_lower == "s" {
@@ -252,7 +205,7 @@ pub(crate) fn parse_attribute_selector(
 
     Ok(SimpleSelector::Attribute {
         namespace,
-        name,
+        name_span,
         matcher,
         value,
         flags,
@@ -263,8 +216,38 @@ pub(crate) fn parse_attribute_selector(
     })
 }
 
+/// Parse an attribute selector's value (identifier or string), copying the
+/// content (quotes stripped for strings) into the arena. Advances past the
+/// value token and trailing whitespace.
+fn parse_attribute_value<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<Option<&'arena str>, ParseError> {
+    let value =
+        match &parser.current_kind {
+            // Internal AST: use decoded value (spec-compliant)
+            TokenKind::Identifier => {
+                let v = parser
+                    .current_identifier()
+                    .unwrap_or_else(|| parser.current_value());
+                Some(parser.alloc_str_in(v))
+            }
+            TokenKind::String { .. } => {
+                // Extract content without quotes
+                Some(parser.alloc_str_in(
+                    &parser.source()[parser.current_start + 1..parser.current_end - 1],
+                ))
+            }
+            _ => {
+                return Err(parser.error_expected("attribute value"));
+            }
+        };
+    parser.advance()?;
+    parser.skip_whitespace()?;
+    Ok(value)
+}
+
 /// Parse attribute matcher: =, ~=, |=, ^=, $=, *=
-fn parse_attribute_matcher(parser: &mut CssParser<'_>) -> Result<AttributeMatcher, ParseError> {
+fn parse_attribute_matcher(parser: &mut CssParser<'_, '_>) -> Result<AttributeMatcher, ParseError> {
     let matcher = match &parser.current_kind {
         TokenKind::Equals => AttributeMatcher::Exact, // =
         TokenKind::Tilde => {

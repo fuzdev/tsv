@@ -3,23 +3,18 @@
 use crate::ast::internal::{Color, ColorChannel};
 use tsv_lang::Span;
 
-/// Format a color value semantically
+/// Format a *computed* color value (`Rgb`/`Hsl`) semantically.
 ///
-/// Converts a Color AST node to its string representation.
-/// Hex colors are normalized to lowercase to match prettier's behavior.
-///
-/// # Example
-/// ```ignore
-/// let color = Color::Named("red".to_string());
-/// assert_eq!(format_color_value(&color), "red");
-///
-/// let color = Color::Hex("#FF0000".to_string());
-/// assert_eq!(format_color_value(&color), "#ff0000");
-/// ```
+/// `Named`/`Hex` are not handled here — they carry no text and are rendered from
+/// source by `format_color_from_source`.
 pub(crate) fn format_color_value(color: &Color) -> String {
     match color {
-        Color::Named(name) => name.clone(),
-        Color::Hex(hex) => hex.to_lowercase(),
+        // `Named`/`Hex` carry no text — callers with a span use
+        // `format_color_from_source`; this source-free path only handles the
+        // computed `Rgb`/`Hsl` forms.
+        Color::Named | Color::Hex => {
+            unreachable!("named/hex colors are rendered from source via format_color_from_source")
+        }
         Color::Rgb { r, g, b, alpha } => {
             let r_str = format_color_channel(r);
             let g_str = format_color_channel(g);
@@ -88,10 +83,11 @@ fn format_color_channel(channel: &ColorChannel) -> String {
 /// * `source` - The original source code
 /// * `span` - The span of the color in source
 pub(crate) fn format_color_from_source(color: &Color, source: &str, span: Span) -> String {
-    // Named and hex colors don't need syntax detection
+    // Named and hex colors are recovered verbatim from source (span-for-verbatim);
+    // hex is lowercased to match prettier, named colors keep their source casing.
     match color {
-        Color::Named(name) => return name.clone(),
-        Color::Hex(hex) => return hex.to_lowercase(),
+        Color::Named => return span.extract(source).to_string(),
+        Color::Hex => return span.extract(source).to_lowercase(),
         _ => {}
     }
 

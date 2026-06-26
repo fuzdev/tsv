@@ -22,7 +22,7 @@ use tsv_lang::doc::arena::DocId;
 /// A single-member union/intersection collapses to its member (Prettier
 /// postprocess), so the lone member needs no precedence parens of its own;
 /// 2+ members use the normal `|`/`&` precedence rule.
-fn union_member_parens(member_count: usize) -> fn(&TSType) -> bool {
+fn union_member_parens(member_count: usize) -> fn(&TSType<'_>) -> bool {
     if member_count == 1 {
         type_never_needs_parens
     } else {
@@ -39,7 +39,7 @@ fn union_member_parens(member_count: usize) -> fn(&TSType) -> bool {
 /// `build_parenthesized_intersection_trailing_object_doc`, and function /
 /// constructor / conditional parens let their inner type supply the indent and
 /// ride the closing `)` on the inner's last line (`) => void)`).
-fn is_paren_union_member(ts_type: &TSType) -> bool {
+fn is_paren_union_member(ts_type: &TSType<'_>) -> bool {
     matches!(unwrap_parenthesized(ts_type), TSType::Union(_))
 }
 
@@ -95,8 +95,8 @@ impl<'a> Printer<'a> {
     ///   constructor / conditional parens (see `is_paren_union_member`).
     fn build_union_member_offset_doc(
         &self,
-        t: &TSType,
-        member_parens: fn(&TSType) -> bool,
+        t: &TSType<'_>,
+        member_parens: fn(&TSType<'_>) -> bool,
     ) -> DocId {
         let d = self.d();
         if let TSType::TypeLiteral(obj) = t {
@@ -125,7 +125,7 @@ impl<'a> Printer<'a> {
     /// the union should break together with the parent context.
     pub(in crate::printer) fn build_union_type_doc(
         &self,
-        union: &TSUnionType,
+        union: &TSUnionType<'_>,
         wrap_in_group: bool,
     ) -> DocId {
         let d = self.d();
@@ -289,7 +289,10 @@ impl<'a> Printer<'a> {
     /// Returns `None` when the type is not an indentable union — hugging unions
     /// (`{ ... } | null`, which expand the object member inline) and non-union
     /// types use the caller's default inline layout.
-    pub(in crate::printer) fn build_union_hanging_indent_doc(&self, ty: &TSType) -> Option<DocId> {
+    pub(in crate::printer) fn build_union_hanging_indent_doc(
+        &self,
+        ty: &TSType<'_>,
+    ) -> Option<DocId> {
         let TSType::Union(union) = ty else {
             return None;
         };
@@ -310,7 +313,7 @@ impl<'a> Printer<'a> {
     /// last position) — indenting it again would double-indent the object body.
     pub(in crate::printer) fn intersection_hanging_with_indent(
         &self,
-        intersection: &TSIntersectionType,
+        intersection: &TSIntersectionType<'_>,
     ) -> DocId {
         let d = self.d();
         let type_doc = self.build_intersection_type_doc(intersection, false);
@@ -334,7 +337,7 @@ impl<'a> Printer<'a> {
     /// // comment before B
     /// | B
     /// ```
-    fn build_union_type_doc_with_line_comments(&self, union: &TSUnionType) -> DocId {
+    fn build_union_type_doc_with_line_comments(&self, union: &TSUnionType<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         let member_parens = union_member_parens(union.types.len());
@@ -438,7 +441,7 @@ impl<'a> Printer<'a> {
             if !relocated_paren_leading.is_empty()
                 && let TSType::Parenthesized(p) = t
             {
-                let inner = p.type_annotation.as_ref();
+                let inner = p.type_annotation;
                 if let TSType::Union(union) = inner {
                     // `build_parenthesized_union_doc` lays out `(`/`)` on their own
                     // lines and only emits block comments in the paren gaps (the
@@ -459,7 +462,7 @@ impl<'a> Printer<'a> {
                 }
             } else if i == 0
                 && let TSType::Parenthesized(p) = t
-                && let TSType::Union(inner_union) = p.type_annotation.as_ref()
+                && let TSType::Union(inner_union) = p.type_annotation
                 && self.paren_has_leading_line_comment(p)
             {
                 // First union member is a parenthesized union with a leading line
@@ -504,7 +507,7 @@ impl<'a> Printer<'a> {
     /// Matches prettier's `hasComment(node)` for the detached comment model:
     /// comments between member spans correspond to attached trailing/leading
     /// comments in prettier's AST.
-    fn union_has_comments_between_members(&self, union: &TSUnionType) -> bool {
+    fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
         union
             .types
             .windows(2)
@@ -515,7 +518,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used by callers (e.g., mapped types) to decide whether the union needs
     /// extra indentation wrapping, and internally to force multiline formatting.
-    pub(crate) fn union_has_line_comments_between_members(&self, union: &TSUnionType) -> bool {
+    pub(crate) fn union_has_line_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
         union
             .types
             .windows(2)
@@ -539,7 +542,7 @@ impl<'a> Printer<'a> {
     /// for the `: Type` annotation variant (shares continuation logic).
     pub(in crate::printer) fn build_intersection_type_doc(
         &self,
-        intersection: &TSIntersectionType,
+        intersection: &TSIntersectionType<'_>,
         wrap_in_group: bool,
     ) -> DocId {
         let d = self.d();
@@ -754,7 +757,7 @@ impl<'a> Printer<'a> {
     /// does not add internal indentation.
     fn build_intersection_type_doc_with_line_comments(
         &self,
-        intersection: &TSIntersectionType,
+        intersection: &TSIntersectionType<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -844,12 +847,12 @@ impl<'a> Printer<'a> {
     /// directly so we can strip its parens without re-matching.
     fn build_intersection_type_doc_with_first_paren_leading_stripped(
         &self,
-        intersection: &TSIntersectionType,
-        first_paren: &TSParenthesizedType,
+        intersection: &TSIntersectionType<'_>,
+        first_paren: &TSParenthesizedType<'_>,
     ) -> DocId {
         let d = self.d();
         let member_parens = union_member_parens(intersection.types.len());
-        let inner = first_paren.type_annotation.as_ref();
+        let inner = first_paren.type_annotation;
         let first_doc = if member_parens(inner) {
             // Re-wrap inner in parens (e.g., union in intersection: `(A | B) & C`).
             if let TSType::Union(union) = inner {
@@ -886,7 +889,7 @@ impl<'a> Printer<'a> {
     /// Used by both the normal and expanding-first-type paths.
     fn build_intersection_member_body_doc(
         &self,
-        intersection: &TSIntersectionType,
+        intersection: &TSIntersectionType<'_>,
         i: usize,
     ) -> DocBuf {
         let t = &intersection.types[i];

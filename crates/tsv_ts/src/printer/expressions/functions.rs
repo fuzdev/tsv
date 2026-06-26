@@ -37,7 +37,7 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 /// Note: Template literals are NOT included here — they need source-position-dependent
 /// handling (hug when on same line as `=>`, break when on own line). That check is
 /// done in the caller via `is_template_on_same_line` which has access to source text.
-fn should_hug_arrow_body(expr: &internal::Expression) -> bool {
+fn should_hug_arrow_body(expr: &internal::Expression<'_>) -> bool {
     matches!(
         expr,
         internal::Expression::ObjectExpression(_)
@@ -51,7 +51,7 @@ fn should_hug_arrow_body(expr: &internal::Expression) -> bool {
 /// Prettier's `isTemplateOnItsOwnLine` — hug when the backtick is on the same line
 /// as `=>` (no newline before it in source), break when the user placed it on its own line.
 /// This creates dual-stable behavior: both forms are preserved.
-fn is_template_on_same_line(source: &str, expr: &internal::Expression) -> bool {
+fn is_template_on_same_line(source: &str, expr: &internal::Expression<'_>) -> bool {
     is_multiline_template_expression(expr)
         && !has_newline_before_position(source, expr.span().start)
 }
@@ -71,7 +71,7 @@ fn is_template_on_same_line(source: &str, expr: &internal::Expression) -> bool {
 /// Returns the object's span so the printer wraps exactly that node (keyed by span,
 /// robust to a chain rebuilding its base across conditional-group variants) and never
 /// a same-shaped object nested deeper.
-fn leftmost_object_span(expr: &internal::Expression) -> Option<tsv_lang::Span> {
+fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<tsv_lang::Span> {
     if matches!(
         expr,
         internal::Expression::AssignmentExpression(_) | internal::Expression::SequenceExpression(_)
@@ -86,7 +86,7 @@ fn leftmost_object_span(expr: &internal::Expression) -> Option<tsv_lang::Span> {
 
 /// Whether an expression has an ObjectExpression at its leftmost position.
 /// See [`leftmost_object_span`].
-fn has_leftmost_object_expression(expr: &internal::Expression) -> bool {
+fn has_leftmost_object_expression(expr: &internal::Expression<'_>) -> bool {
     leftmost_object_span(expr).is_some()
 }
 
@@ -94,13 +94,13 @@ fn has_leftmost_object_expression(expr: &internal::Expression) -> bool {
 ///
 /// Prettier's `shouldHugFunctionParameters` hugs single object/array patterns,
 /// keeping `({` and `}: Type)` together while letting the pattern's content break.
-fn is_huggable_pattern(expr: &internal::Expression) -> bool {
+fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => true,
         // Assignment pattern with object/array on left: `{a, b} = default`
         internal::Expression::AssignmentPattern(ap) => {
             matches!(
-                ap.left.as_ref(),
+                ap.left,
                 internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
             )
         }
@@ -121,12 +121,11 @@ fn is_huggable_pattern(expr: &internal::Expression) -> bool {
 /// like `a: { b: T } = {}`, the `= {}` prevents hugging — prettier breaks the
 /// param list instead. Destructuring patterns with defaults (`{a, b} = {}`) are
 /// handled separately by `is_huggable_pattern`.
-fn has_huggable_type_annotation(expr: &internal::Expression) -> bool {
+fn has_huggable_type_annotation(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::Identifier(id) => id
-            .type_annotation
-            .as_ref()
-            .is_some_and(|ann| is_huggable_type(&ann.type_annotation)),
+            .type_annotation()
+            .is_some_and(|ann| is_huggable_type(ann.type_annotation)),
         _ => false,
     }
 }
@@ -181,7 +180,7 @@ impl<'a> Printer<'a> {
     /// ])
     /// " " + body
     /// ```
-    fn build_arrow_doc_wrapping(&self, arrow: &internal::ArrowFunctionExpression) -> DocId {
+    fn build_arrow_doc_wrapping(&self, arrow: &internal::ArrowFunctionExpression<'_>) -> DocId {
         // Consume the chain context (set by the enclosing assignment / call-arg /
         // binary-operand printer) so only the outermost chain arrow uses it;
         // nested arrows in the chain reset to the default layout.
@@ -271,8 +270,8 @@ impl<'a> Printer<'a> {
     fn build_arrow_expression_body(
         &self,
         parts: &mut DocBuf,
-        expr: &internal::Expression,
-        arrow: &internal::ArrowFunctionExpression,
+        expr: &internal::Expression<'_>,
+        arrow: &internal::ArrowFunctionExpression<'_>,
         arrow_end: u32,
     ) {
         let d = self.d();
@@ -458,7 +457,7 @@ impl<'a> Printer<'a> {
     fn build_arrow_block_body(
         &self,
         parts: &mut DocBuf,
-        block: &internal::BlockStatement,
+        block: &internal::BlockStatement<'_>,
         arrow_end: u32,
     ) {
         let d = self.d();
@@ -500,7 +499,7 @@ impl<'a> Printer<'a> {
     /// (`skip_arrow_chain`) routes to the default arrow layout.
     fn should_use_arrow_chain_layout(
         &self,
-        arrow: &internal::ArrowFunctionExpression,
+        arrow: &internal::ArrowFunctionExpression<'_>,
         context: ArrowChainContext,
     ) -> bool {
         if context == ArrowChainContext::None || self.skip_arrow_chain.get() {
@@ -509,7 +508,7 @@ impl<'a> Printer<'a> {
         let body_is_arrow = matches!(
             &arrow.body,
             internal::ArrowFunctionBody::Expression(b)
-                if matches!(b.as_ref(), internal::Expression::ArrowFunctionExpression(_))
+                if matches!(b, internal::Expression::ArrowFunctionExpression(_))
         );
         if !body_is_arrow {
             return false;
@@ -542,7 +541,7 @@ impl<'a> Printer<'a> {
     ///   join([" =>", line], rest)])])`).
     fn build_arrow_chain_doc(
         &self,
-        head: &internal::ArrowFunctionExpression,
+        head: &internal::ArrowFunctionExpression<'_>,
         context: ArrowChainContext,
     ) -> DocId {
         let d = self.d();
@@ -551,7 +550,7 @@ impl<'a> Printer<'a> {
         // (non-arrow) body.
         let mut sig_docs: DocBuf = DocBuf::new();
         let mut current = head;
-        let terminal: &internal::ArrowFunctionBody = loop {
+        let terminal: &internal::ArrowFunctionBody<'_> = loop {
             // Each signature is its own group so its params break independently of
             // the chain (prettier wraps each `printArrowFunctionSignature` in a
             // group): when the heads break onto separate lines, the params stay
@@ -559,7 +558,7 @@ impl<'a> Printer<'a> {
             sig_docs.push(d.group(self.build_arrow_signature_doc(current)));
             match &current.body {
                 internal::ArrowFunctionBody::Expression(b) => {
-                    if let internal::Expression::ArrowFunctionExpression(inner) = b.as_ref() {
+                    if let internal::Expression::ArrowFunctionExpression(inner) = b {
                         current = inner;
                     } else {
                         break &current.body;
@@ -624,7 +623,7 @@ impl<'a> Printer<'a> {
         // `indentIfBreak(bodyDoc, { groupId: chainGroupId })`.
         let body_part = match terminal {
             internal::ArrowFunctionBody::Expression(b) => {
-                let expr = b.as_ref();
+                let expr = b;
                 if should_hug_arrow_body(expr) || is_template_on_same_line(self.source, expr) {
                     // Object/array/template body: hugs the last head, supplies its
                     // own internal indent.
@@ -688,7 +687,7 @@ impl<'a> Printer<'a> {
     /// `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
     fn build_arrow_return_type_doc(
         &self,
-        annotation: &internal::TSTypeAnnotation,
+        annotation: &internal::TSTypeAnnotation<'_>,
         params_start: Option<u32>,
     ) -> DocId {
         let d = self.d();
@@ -700,7 +699,7 @@ impl<'a> Printer<'a> {
         // Function types need parentheses to disambiguate from the arrow's `=>`
         // Example: `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
         // Unwrap any explicit parenthesized types to check the inner type
-        let inner_type = unwrap_parenthesized(&annotation.type_annotation);
+        let inner_type = unwrap_parenthesized(annotation.type_annotation);
         if matches!(inner_type, internal::TSType::Function(_)) {
             let type_doc = self.build_type_doc(inner_type);
             return d.concat(&[comment_prefix, d.text(": ("), type_doc, d.text(")")]);
@@ -723,7 +722,7 @@ impl<'a> Printer<'a> {
     /// regardless of whether the arrow has parameters.
     fn build_type_params_doc_for_arrow(
         &self,
-        decl: &internal::TSTypeParameterDeclaration,
+        decl: &internal::TSTypeParameterDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         if decl.params.is_empty() {
@@ -767,7 +766,10 @@ impl<'a> Printer<'a> {
     ///
     /// Structure matches prettier's function-parameters.js:
     /// `[typeParams, "(", indent([softline, ...params]), ifBreak(","), softline, ")"]`
-    fn build_arrow_params_doc_ungrouped(&self, arrow: &internal::ArrowFunctionExpression) -> DocId {
+    fn build_arrow_params_doc_ungrouped(
+        &self,
+        arrow: &internal::ArrowFunctionExpression<'_>,
+    ) -> DocId {
         let params_start = arrow.params_start;
 
         // Compute trailing comments boundary for params
@@ -783,7 +785,7 @@ impl<'a> Printer<'a> {
         };
 
         // Delegate to shared implementation
-        self.build_params_doc_with_comments(&arrow.params, params_start, trailing_comments_end)
+        self.build_params_doc_with_comments(arrow.params, params_start, trailing_comments_end)
     }
 
     /// Build just the arrow function signature (async + type params + params + return type)
@@ -793,7 +795,7 @@ impl<'a> Printer<'a> {
     /// where call expressions need to build arrows with conditional parens around the body.
     pub(crate) fn build_arrow_signature_doc(
         &self,
-        arrow: &internal::ArrowFunctionExpression,
+        arrow: &internal::ArrowFunctionExpression<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -833,7 +835,7 @@ impl<'a> Printer<'a> {
     /// Check if any param has a trailing line comment or own-line block comment
     fn has_trailing_line_comment_in_params(
         &self,
-        params: &[internal::Expression],
+        params: &[internal::Expression<'_>],
         trailing_comments_end: Option<u32>,
     ) -> bool {
         params.iter().enumerate().any(|(i, param)| {
@@ -875,7 +877,7 @@ impl<'a> Printer<'a> {
     /// declaration and function expression printers.
     pub(in crate::printer) fn signature_end(
         &self,
-        return_type: Option<&internal::TSTypeAnnotation>,
+        return_type: Option<&internal::TSTypeAnnotation<'_>>,
         params_start: u32,
         body_start: u32,
     ) -> u32 {
@@ -889,7 +891,7 @@ impl<'a> Printer<'a> {
 
     fn param_trailing_end(
         &self,
-        params: &[internal::Expression],
+        params: &[internal::Expression<'_>],
         index: usize,
         trailing_comments_end: Option<u32>,
     ) -> u32 {
@@ -901,7 +903,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build doc for arrow function body expression.
-    fn build_arrow_body_doc(&self, expr: &internal::Expression) -> DocId {
+    fn build_arrow_body_doc(&self, expr: &internal::Expression<'_>) -> DocId {
         let d = self.d();
         // Object at leftmost position in arrow body needs parens to avoid block ambiguity.
         // Examples: `() => ({}) as T`, `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`.
@@ -952,7 +954,7 @@ impl<'a> Printer<'a> {
     /// ```
     fn build_arrow_body_with_comments_doc(
         &self,
-        expr: &internal::Expression,
+        expr: &internal::Expression<'_>,
         sig_end: u32,
         body_start: u32,
     ) -> DocId {
@@ -1021,7 +1023,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an arrow function (simple, non-wrapping version for nested contexts)
-    pub(super) fn build_arrow_doc(&self, arrow: &internal::ArrowFunctionExpression) -> DocId {
+    pub(super) fn build_arrow_doc(&self, arrow: &internal::ArrowFunctionExpression<'_>) -> DocId {
         // For nested contexts where we don't want independent wrapping decisions,
         // use the wrapping version which will be evaluated in context
         self.build_arrow_doc_wrapping(arrow)
@@ -1031,7 +1033,7 @@ impl<'a> Printer<'a> {
     /// Body is printed separately via imperative printer to preserve comments.
     fn build_function_expression_signature_doc(
         &self,
-        func: &internal::FunctionExpression,
+        func: &internal::FunctionExpression<'_>,
     ) -> DocId {
         let d = self.d();
         let mut sig_parts = DocBuf::new();
@@ -1076,7 +1078,7 @@ impl<'a> Printer<'a> {
     /// For standalone function expressions, use `build_function_doc` instead.
     pub(in crate::printer) fn build_function_doc_body(
         &self,
-        func: &internal::FunctionExpression,
+        func: &internal::FunctionExpression<'_>,
     ) -> DocId {
         let d = self.d();
         let sig_doc = self.build_function_expression_signature_doc(func);
@@ -1105,7 +1107,7 @@ impl<'a> Printer<'a> {
     /// - body
     pub(in crate::printer) fn build_function_doc(
         &self,
-        func: &internal::FunctionExpression,
+        func: &internal::FunctionExpression<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
@@ -1166,7 +1168,7 @@ impl<'a> Printer<'a> {
     /// (typically return type start or body start).
     pub(in crate::printer) fn build_method_params_doc_ungrouped(
         &self,
-        func: &internal::FunctionExpression,
+        func: &internal::FunctionExpression<'_>,
     ) -> DocId {
         let params = &func.params;
         let params_start = Some(func.params_start);
@@ -1185,7 +1187,7 @@ impl<'a> Printer<'a> {
     /// Used by arrow functions, function expressions, function declarations, and class methods.
     pub(crate) fn build_params_doc_with_comments(
         &self,
-        params: &[internal::Expression],
+        params: &[internal::Expression<'_>],
         params_start: Option<u32>,
         trailing_comments_end: Option<u32>,
     ) -> DocId {
@@ -1410,7 +1412,7 @@ impl<'a> Printer<'a> {
     /// Check if any param has a leading line comment on its own line
     fn has_leading_own_line_comment_in_params(
         &self,
-        params: &[internal::Expression],
+        params: &[internal::Expression<'_>],
         params_start: Option<u32>,
     ) -> bool {
         for (i, param) in params.iter().enumerate() {
@@ -1507,7 +1509,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a class expression (`class …`, named or anonymous).
     pub(in crate::printer) fn build_class_expression_doc(
         &self,
-        class_expr: &internal::ClassExpression,
+        class_expr: &internal::ClassExpression<'_>,
     ) -> DocId {
         let d = self.d();
 
@@ -1516,9 +1518,9 @@ impl<'a> Printer<'a> {
             class_expr.span.start,
             class_expr.id.as_ref(),
             class_expr.type_parameters.as_ref(),
-            class_expr.super_class.as_deref(),
+            class_expr.super_class,
             class_expr.super_type_parameters.as_ref(),
-            &class_expr.implements,
+            class_expr.implements,
         );
 
         // Determine group mode: structural reasons OR heritage comments
@@ -1530,9 +1532,9 @@ impl<'a> Printer<'a> {
                     && self.has_comments_between(ext_end, class_expr.implements[0].span.start)
             });
         let group_mode = self.should_class_group_mode(
-            class_expr.super_class.as_deref(),
+            class_expr.super_class,
             class_expr.super_type_parameters.as_ref(),
-            &class_expr.implements,
+            class_expr.implements,
         ) || has_heritage_comments;
 
         let has_heritage_line_comments = positions
@@ -1606,12 +1608,12 @@ impl<'a> Printer<'a> {
 
         // Build heritage docs (shared with the class-declaration printer).
         let extends_doc = self.build_class_extends_doc(
-            class_expr.super_class.as_deref(),
+            class_expr.super_class,
             class_expr.super_type_parameters.as_ref(),
             positions.extends_keyword_start,
         );
         let implements_doc = self.build_class_implements_doc(
-            &class_expr.implements,
+            class_expr.implements,
             group_mode,
             positions.implements_keyword_start,
         );
@@ -1628,7 +1630,7 @@ impl<'a> Printer<'a> {
             &positions,
             extends_doc,
             implements_doc,
-            &class_expr.implements,
+            class_expr.implements,
             class_expr.body.body.is_empty(),
             class_expr.body.span.start,
             group_mode,

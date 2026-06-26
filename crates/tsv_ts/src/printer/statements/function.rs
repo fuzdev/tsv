@@ -20,9 +20,9 @@ use super::super::types::function_types::{
 /// `FunctionDeclaration` (function declarations) and `FunctionExpression`
 /// (class methods) — their signature payloads are field-identical.
 fn should_group_function_parameters(
-    params: &[internal::Expression],
-    type_parameters: Option<&internal::TSTypeParameterDeclaration>,
-    return_type: Option<&internal::TSTypeAnnotation>,
+    params: &[internal::Expression<'_>],
+    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+    return_type: Option<&internal::TSTypeAnnotation<'_>>,
     return_type_doc: Option<DocId>,
     d: &DocArena,
 ) -> bool {
@@ -48,9 +48,9 @@ impl<'a> Printer<'a> {
     /// group breaks due to the return type's hardlines.
     pub(in crate::printer) fn build_callable_signature_doc(
         &self,
-        params: &[internal::Expression],
-        type_parameters: Option<&internal::TSTypeParameterDeclaration>,
-        return_type: Option<&internal::TSTypeAnnotation>,
+        params: &[internal::Expression<'_>],
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        return_type: Option<&internal::TSTypeAnnotation<'_>>,
         params_start: u32,
         body_start: u32,
     ) -> DocId {
@@ -96,7 +96,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a function declaration
     pub(super) fn build_function_declaration_doc(
         &self,
-        decl: &internal::FunctionDeclaration,
+        decl: &internal::FunctionDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -181,7 +181,7 @@ impl<'a> Printer<'a> {
 
         // Signature (params + return type) in a single group
         tail.push(self.build_callable_signature_doc(
-            &decl.params,
+            decl.params,
             decl.type_parameters.as_ref(),
             decl.return_type.as_ref(),
             decl.params_start,
