@@ -373,7 +373,7 @@ All fixtures use `input.svelte` as canonical source.
 P1–P3 anchor fixtures to the canonical parsers; P4/P5 prove tsv's two
 materialization paths agree with each other. A bug shared by BOTH paths is
 invisible to all of them — the corpus-scale external oracle for that class is
-`deno task corpus:compare:parse` (../benches/deno/CLAUDE.md §Parse
+`deno task corpus:compare:parse` (../benches/js/CLAUDE.md §Parse
 Comparison), which deep-diffs the shipped wire against the canonical parsers
 on real codebases.
 

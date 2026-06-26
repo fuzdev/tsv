@@ -49,7 +49,7 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
    - Used by: `canonical_parse`, `ast_diff`, fixture management
    - Purpose: Parse TypeScript code (matches Svelte's TS parser)
 
-Versions are pinned (exact) in `crates/tsv_debug/src/deno/sidecar.ts` — the source of truth; they are not repeated here. `benches/deno/deno.json` pins the same versions independently for the bench harness; keep the two in sync.
+Versions are pinned (exact) in `crates/tsv_debug/src/deno/sidecar.ts` — the source of truth; they are not repeated here. `benches/js/package.json` pins the same versions independently for the bench harness; keep the two in sync.
 
 ## Input Handling
 

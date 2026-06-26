@@ -189,7 +189,7 @@ pub enum Verdict {
 ///
 /// `expected` is what test262 wants (accept for positives, reject for
 /// parse-phase negatives); `tsv` is what `tsv_ts::parse` actually did. A
-/// downstream consumer (`benches/deno/diagnostics/test262_compare.ts`) runs the
+/// downstream consumer (`benches/js/diagnostics/test262_compare.ts`) runs the
 /// alternative parser over the same file and joins on `relative_path`.
 #[derive(Debug, serde::Serialize)]
 pub struct ManifestEntry {

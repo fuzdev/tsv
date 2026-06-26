@@ -1,0 +1,26 @@
+{
+	"name": "@fuzdev/tsv-benches",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "tsv benchmark harness deps — the single source of truth for the npm package versions the bench measures against. Consumed by BOTH runtimes: Deno reads it via `nodeModulesDir: \"manual\"` in deno.json, Node reads it directly. Install with `npm install` (the one installer). The jsr-only `@std/*` packages, if any, stay in deno.json.",
+	"//canonical-sync": "⚠ The 5 canonical packages (prettier, svelte, acorn, @sveltejs/acorn-typescript, prettier-plugin-svelte) are ALSO pinned as literals in crates/tsv_debug/src/deno/sidecar.ts and MUST match. Bumping any re-baselines the whole fixture corpus — see benches/js/CLAUDE.md §'Canonical baseline is coupled'. The other deps (oxc, oxfmt, biome, etc.) are free to bump independently.",
+	"dependencies": {
+		"acorn": "8.16.0",
+		"svelte": "5.56.1",
+		"@sveltejs/acorn-typescript": "1.0.10",
+		"prettier": "3.8.3",
+		"prettier-plugin-svelte": "4.1.1",
+		"@biomejs/js-api": "4.0.0",
+		"@biomejs/wasm-bundler": "2.4.16",
+		"oxc-parser": "0.134.0",
+		"oxfmt": "0.53.0",
+		"zod": "^4.4.3",
+		"@fuzdev/fuz_util": "0.64.0"
+	},
+	"//types": "@types/node is types-only and dev-only (never ships, no runtime cost). It lets the shared harness's `node:` builtins type-check under `deno check` (and editors) when an npm package's .d.ts pulls in node types in npm-resolution mode — the portable-node:-builtins architecture's one new dev dep. NOT needed by the gated `deno task test:deno` (that's the dependency-free divergence suite — `node:assert` + relative imports, no node_modules).",
+	"devDependencies": {
+		"@types/node": "^24"
+	},
+	"//oxc-wasi": "The oxc-parser WASM bench row needs @oxc-parser/binding-wasm32-wasi — pure-wasm (runtime-portable) but its metadata declares `cpu: wasm32`, so npm skips it on any non-wasm host. It is NOT listed as a dep here: declaring it errors on x64, and as an optionalDependency npm records it as known-skipped so a later `--force` reinstall no-ops. Instead `deno task bench:install` (install_deps.ts) force-fetches it at the oxc-parser version (oxc ships all bindings in lockstep), so the `oxc-parser` pin above is its single source of truth too."
+}
