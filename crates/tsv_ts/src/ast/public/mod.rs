@@ -128,7 +128,7 @@ where
 #[derive(Debug, Clone, Serialize)]
 pub struct Program {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -170,7 +170,7 @@ pub struct Position {
 #[derive(Debug, Clone, Serialize)]
 pub struct Decorator {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -181,7 +181,7 @@ pub struct Decorator {
 #[derive(Debug, Clone, Serialize)]
 pub struct Literal {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -196,7 +196,7 @@ pub struct Literal {
 #[derive(Debug, Clone, Serialize)]
 pub struct Identifier {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -218,7 +218,7 @@ pub struct Identifier {
 #[derive(Debug, Clone, Serialize)]
 pub struct PrivateIdentifier {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,

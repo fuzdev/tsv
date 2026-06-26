@@ -121,7 +121,7 @@ impl Expression {
 #[derive(Debug, Clone, Serialize)]
 pub struct ObjectExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -139,7 +139,7 @@ pub enum ObjectProperty {
 #[derive(Debug, Clone, Serialize)]
 pub struct ArrayExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -149,7 +149,7 @@ pub struct ArrayExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct UnaryExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -162,7 +162,7 @@ pub struct UnaryExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct UpdateExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -174,7 +174,7 @@ pub struct UpdateExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct BinaryExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -186,7 +186,7 @@ pub struct BinaryExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct CallExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -203,7 +203,7 @@ pub struct CallExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct NewExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -216,7 +216,7 @@ pub struct NewExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct ImportExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -230,7 +230,7 @@ pub struct ImportExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct MetaProperty {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -243,7 +243,7 @@ pub struct MetaProperty {
 #[derive(Debug, Clone, Serialize)]
 pub struct MemberExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -262,7 +262,7 @@ pub struct MemberExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct ChainExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -272,7 +272,7 @@ pub struct ChainExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct ConditionalExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -284,7 +284,7 @@ pub struct ConditionalExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct ArrowFunctionExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -313,7 +313,7 @@ pub enum ArrowFunctionBody {
 #[derive(Debug, Clone, Serialize)]
 pub struct SpreadElement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -324,7 +324,7 @@ pub struct SpreadElement {
 #[derive(Debug, Clone, Serialize)]
 pub struct TemplateLiteral {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -336,7 +336,7 @@ pub struct TemplateLiteral {
 #[derive(Debug, Clone, Serialize)]
 pub struct TemplateElement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -356,7 +356,7 @@ pub struct TemplateElementValue {
 #[derive(Debug, Clone, Serialize)]
 pub struct TaggedTemplateExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -370,7 +370,7 @@ pub struct TaggedTemplateExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct AwaitExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -381,7 +381,7 @@ pub struct AwaitExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct YieldExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -395,7 +395,7 @@ pub struct YieldExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct SequenceExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -408,7 +408,7 @@ pub struct SequenceExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct RegexLiteral {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -431,7 +431,7 @@ pub struct RegexValue {
 #[derive(Debug, Clone, Serialize)]
 pub struct ThisExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -441,7 +441,7 @@ pub struct ThisExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct Super {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -451,7 +451,7 @@ pub struct Super {
 #[derive(Debug, Clone, Serialize)]
 pub struct AssignmentExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -463,7 +463,7 @@ pub struct AssignmentExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct Property {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -481,7 +481,7 @@ pub struct Property {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeAssertion {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -496,7 +496,7 @@ pub struct TSTypeAssertion {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSAsExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -511,7 +511,7 @@ pub struct TSAsExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSSatisfiesExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -526,7 +526,7 @@ pub struct TSSatisfiesExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSInstantiationExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -541,7 +541,7 @@ pub struct TSInstantiationExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSNonNullExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,

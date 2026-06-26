@@ -41,7 +41,7 @@ pub struct Root<'src> {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub fragment: Fragment,
     pub options: Option<SvelteOptions>,
     pub comments: Vec<serde_json::Value>, // root comments as JSON values (populated in ast/convert)
@@ -55,7 +55,7 @@ pub struct Root<'src> {
 #[derive(Debug, Clone, Serialize)]
 pub struct Fragment {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub nodes: Vec<FragmentNode>,
 }
 
@@ -85,7 +85,7 @@ pub enum FragmentNode {
 #[derive(Debug, Clone, Serialize)]
 pub struct Comment {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub data: String,
@@ -95,7 +95,7 @@ pub struct Comment {
 #[derive(Debug, Clone, Serialize)]
 pub struct Element {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub name: String,
@@ -114,7 +114,7 @@ pub struct Element {
 #[derive(Debug, Clone, Serialize)]
 pub struct SpecialElement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub name: String,
@@ -165,7 +165,7 @@ pub struct SvelteOptions {
 #[derive(Debug, Clone, Serialize)]
 pub struct Attribute {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub name: String,
@@ -178,7 +178,7 @@ pub struct Attribute {
 #[derive(Debug, Clone, Serialize)]
 pub struct AttachTag {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -188,7 +188,7 @@ pub struct AttachTag {
 #[derive(Debug, Clone, Serialize)]
 pub struct SpreadAttribute {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -204,7 +204,7 @@ pub struct OnDirective {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
     pub expression: Option<Expression>,
@@ -221,7 +221,7 @@ pub struct BindDirective {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
     pub expression: serde_json::Value,
@@ -236,7 +236,7 @@ pub struct ClassDirective {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
     pub expression: serde_json::Value,
@@ -249,7 +249,7 @@ pub struct StyleDirective {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
     pub modifiers: Vec<String>,
@@ -262,7 +262,7 @@ pub struct UseDirective {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
     pub expression: Option<Expression>,
@@ -275,7 +275,7 @@ pub struct TransitionDirective {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
     pub expression: Option<Expression>,
@@ -290,7 +290,7 @@ pub struct AnimateDirective {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
     pub expression: Option<Expression>,
@@ -303,7 +303,7 @@ pub struct LetDirective {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
     pub expression: Option<Expression>,
@@ -346,7 +346,7 @@ pub struct AttributeText {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub raw: String,
     pub data: String,
 }
@@ -355,7 +355,7 @@ pub struct AttributeText {
 #[derive(Debug, Clone, Serialize)]
 pub struct Text {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub raw: String,
@@ -366,7 +366,7 @@ pub struct Text {
 #[derive(Debug, Clone, Serialize)]
 pub struct ExpressionTag {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -376,7 +376,7 @@ pub struct ExpressionTag {
 #[derive(Debug, Clone, Serialize)]
 pub struct Script {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub context: String,            // "default" or "module"
@@ -388,7 +388,7 @@ pub struct Script {
 #[derive(Debug, Clone, Serialize)]
 pub struct IfBlock {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub elseif: bool,
     pub start: u32,
     pub end: u32,
@@ -401,7 +401,7 @@ pub struct IfBlock {
 #[derive(Debug, Clone, Serialize)]
 pub struct EachBlock {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -422,7 +422,7 @@ pub struct EachBlock {
 #[derive(Debug, Clone, Serialize)]
 pub struct AwaitBlock {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -441,7 +441,7 @@ pub struct AwaitBlock {
 #[derive(Debug, Clone, Serialize)]
 pub struct KeyBlock {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -452,7 +452,7 @@ pub struct KeyBlock {
 #[derive(Debug, Clone, Serialize)]
 pub struct SnippetBlock {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -467,7 +467,7 @@ pub struct SnippetBlock {
 #[derive(Debug, Clone, Serialize)]
 pub struct HtmlTag {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,
@@ -479,7 +479,7 @@ pub struct HtmlTag {
 #[derive(Debug, Clone, Serialize)]
 pub struct ConstTag {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub declaration: serde_json::Value, // VariableDeclaration structure
@@ -492,7 +492,7 @@ pub struct ConstTag {
 #[derive(Debug, Clone, Serialize)]
 pub struct DeclarationTag {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub declaration: serde_json::Value, // VariableDeclaration structure
@@ -502,7 +502,7 @@ pub struct DeclarationTag {
 #[derive(Debug, Clone, Serialize)]
 pub struct DebugTag {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub identifiers: Vec<Expression>,
@@ -512,7 +512,7 @@ pub struct DebugTag {
 #[derive(Debug, Clone, Serialize)]
 pub struct RenderTag {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub expression: Expression,

@@ -23,7 +23,7 @@ pub(in crate::ast) fn convert_if_statement(
     offset: usize,
 ) -> public::IfStatement {
     public::IfStatement {
-        node_type: "IfStatement".to_string(),
+        node_type: "IfStatement",
         start: if_stmt.span.start,
         end: if_stmt.span.end,
         loc: create_location(if_stmt.span, loc, offset),
@@ -58,7 +58,7 @@ pub(in crate::ast) fn convert_for_statement(
     offset: usize,
 ) -> public::ForStatement {
     public::ForStatement {
-        node_type: "ForStatement".to_string(),
+        node_type: "ForStatement",
         start: for_stmt.span.start,
         end: for_stmt.span.end,
         loc: create_location(for_stmt.span, loc, offset),
@@ -93,7 +93,7 @@ pub(in crate::ast) fn convert_for_in_statement(
     offset: usize,
 ) -> public::ForInStatement {
     public::ForInStatement {
-        node_type: "ForInStatement".to_string(),
+        node_type: "ForInStatement",
         start: for_in.span.start,
         end: for_in.span.end,
         loc: create_location(for_in.span, loc, offset),
@@ -124,7 +124,7 @@ pub(in crate::ast) fn convert_for_of_statement(
     offset: usize,
 ) -> public::ForOfStatement {
     public::ForOfStatement {
-        node_type: "ForOfStatement".to_string(),
+        node_type: "ForOfStatement",
         start: for_of.span.start,
         end: for_of.span.end,
         loc: create_location(for_of.span, loc, offset),
@@ -156,7 +156,7 @@ pub(in crate::ast) fn convert_while_statement(
     offset: usize,
 ) -> public::WhileStatement {
     public::WhileStatement {
-        node_type: "WhileStatement".to_string(),
+        node_type: "WhileStatement",
         start: while_stmt.span.start,
         end: while_stmt.span.end,
         loc: create_location(while_stmt.span, loc, offset),
@@ -186,7 +186,7 @@ pub(in crate::ast) fn convert_do_while_statement(
     offset: usize,
 ) -> public::DoWhileStatement {
     public::DoWhileStatement {
-        node_type: "DoWhileStatement".to_string(),
+        node_type: "DoWhileStatement",
         start: do_while.span.start,
         end: do_while.span.end,
         loc: create_location(do_while.span, loc, offset),
@@ -216,7 +216,7 @@ pub(in crate::ast) fn convert_switch_statement(
     offset: usize,
 ) -> public::SwitchStatement {
     public::SwitchStatement {
-        node_type: "SwitchStatement".to_string(),
+        node_type: "SwitchStatement",
         start: switch_stmt.span.start,
         end: switch_stmt.span.end,
         loc: create_location(switch_stmt.span, loc, offset),
@@ -243,7 +243,7 @@ pub(in crate::ast) fn convert_try_statement(
     offset: usize,
 ) -> public::TryStatement {
     public::TryStatement {
-        node_type: "TryStatement".to_string(),
+        node_type: "TryStatement",
         start: try_stmt.span.start,
         end: try_stmt.span.end,
         loc: create_location(try_stmt.span, loc, offset),
@@ -267,7 +267,7 @@ pub(in crate::ast) fn convert_throw_statement(
     offset: usize,
 ) -> public::ThrowStatement {
     public::ThrowStatement {
-        node_type: "ThrowStatement".to_string(),
+        node_type: "ThrowStatement",
         start: throw_stmt.span.start,
         end: throw_stmt.span.end,
         loc: create_location(throw_stmt.span, loc, offset),
@@ -288,7 +288,7 @@ pub(in crate::ast) fn convert_break_statement(
     offset: usize,
 ) -> public::BreakStatement {
     public::BreakStatement {
-        node_type: "BreakStatement".to_string(),
+        node_type: "BreakStatement",
         start: break_stmt.span.start,
         end: break_stmt.span.end,
         loc: create_location(break_stmt.span, loc, offset),
@@ -306,7 +306,7 @@ pub(in crate::ast) fn convert_continue_statement(
     offset: usize,
 ) -> public::ContinueStatement {
     public::ContinueStatement {
-        node_type: "ContinueStatement".to_string(),
+        node_type: "ContinueStatement",
         start: continue_stmt.span.start,
         end: continue_stmt.span.end,
         loc: create_location(continue_stmt.span, loc, offset),
@@ -325,7 +325,7 @@ pub(in crate::ast) fn convert_labeled_statement(
     offset: usize,
 ) -> public::LabeledStatement {
     public::LabeledStatement {
-        node_type: "LabeledStatement".to_string(),
+        node_type: "LabeledStatement",
         start: labeled.span.start,
         end: labeled.span.end,
         loc: create_location(labeled.span, loc, offset),
@@ -387,7 +387,7 @@ fn expression_to_pattern(expr: public::Expression) -> public::Expression {
     match expr {
         public::Expression::ObjectExpression(obj) => {
             public::Expression::ObjectPattern(public::ObjectPattern {
-                node_type: "ObjectPattern".to_string(),
+                node_type: "ObjectPattern",
                 start: obj.start,
                 end: obj.end,
                 loc: obj.loc,
@@ -400,7 +400,7 @@ fn expression_to_pattern(expr: public::Expression) -> public::Expression {
                         }
                         public::ObjectProperty::SpreadElement(s) => {
                             public::ObjectPatternProperty::RestElement(public::RestElement {
-                                node_type: "RestElement".to_string(),
+                                node_type: "RestElement",
                                 start: s.start,
                                 end: s.end,
                                 loc: s.loc,
@@ -415,7 +415,7 @@ fn expression_to_pattern(expr: public::Expression) -> public::Expression {
         }
         public::Expression::ArrayExpression(arr) => {
             public::Expression::ArrayPattern(public::ArrayPattern {
-                node_type: "ArrayPattern".to_string(),
+                node_type: "ArrayPattern",
                 start: arr.start,
                 end: arr.end,
                 loc: arr.loc,
@@ -435,7 +435,7 @@ fn convert_switch_case(
     offset: usize,
 ) -> public::SwitchCase {
     public::SwitchCase {
-        node_type: "SwitchCase".to_string(),
+        node_type: "SwitchCase",
         start: case.span.start,
         end: case.span.end,
         loc: create_location(case.span, loc, offset),
@@ -459,7 +459,7 @@ fn convert_catch_clause(
     offset: usize,
 ) -> public::CatchClause {
     public::CatchClause {
-        node_type: "CatchClause".to_string(),
+        node_type: "CatchClause",
         start: clause.span.start,
         end: clause.span.end,
         loc: create_location(clause.span, loc, offset),

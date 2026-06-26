@@ -21,7 +21,7 @@ pub(in crate::ast) fn convert_import_specifier(
     match spec {
         internal::ImportSpecifier::Default(default_spec) => {
             public::ImportSpecifier::Default(public::ImportDefaultSpecifier {
-                node_type: "ImportDefaultSpecifier".to_string(),
+                node_type: "ImportDefaultSpecifier",
                 start: default_spec.span.start,
                 end: default_spec.span.end,
                 loc: create_location(default_spec.span, loc, offset),
@@ -40,7 +40,7 @@ pub(in crate::ast) fn convert_import_specifier(
                 internal::ImportKind::Type => Some("type".to_string()),
             };
             public::ImportSpecifier::Named(public::ImportNamedSpecifier {
-                node_type: "ImportSpecifier".to_string(),
+                node_type: "ImportSpecifier",
                 start: named_spec.span.start,
                 end: named_spec.span.end,
                 loc: create_location(named_spec.span, loc, offset),
@@ -57,7 +57,7 @@ pub(in crate::ast) fn convert_import_specifier(
         }
         internal::ImportSpecifier::Namespace(ns_spec) => {
             public::ImportSpecifier::Namespace(public::ImportNamespaceSpecifier {
-                node_type: "ImportNamespaceSpecifier".to_string(),
+                node_type: "ImportNamespaceSpecifier",
                 start: ns_spec.span.start,
                 end: ns_spec.span.end,
                 loc: create_location(ns_spec.span, loc, offset),
@@ -83,7 +83,7 @@ pub(in crate::ast) fn convert_import_attribute(
         }
     };
     public::ImportAttribute {
-        node_type: "ImportAttribute".to_string(),
+        node_type: "ImportAttribute",
         start: attr.span.start,
         end: attr.span.end,
         loc: create_location(attr.span, loc, offset),
@@ -111,7 +111,7 @@ pub(in crate::ast) fn convert_export_specifier(
         internal::ExportKind::Type => Some("type".to_string()),
     };
     public::ExportSpecifier {
-        node_type: "ExportSpecifier".to_string(),
+        node_type: "ExportSpecifier",
         start: spec.span.start,
         end: spec.span.end,
         loc: create_location(spec.span, loc, offset),
@@ -195,7 +195,7 @@ pub(in crate::ast) fn convert_literal(
     };
     let raw = lit.span.extract(source);
     public::Literal {
-        node_type: "Literal".to_string(),
+        node_type: "Literal",
         start: lit.span.start,
         end: lit.span.end,
         loc: create_location(lit.span, loc, offset),
@@ -214,7 +214,7 @@ fn convert_function_to_public(
     offset: usize,
 ) -> public::FunctionDeclaration {
     public::FunctionDeclaration {
-        node_type: "FunctionDeclaration".to_string(),
+        node_type: "FunctionDeclaration",
         start: func.span.start,
         end: func.span.end,
         loc: create_location(func.span, loc, offset),

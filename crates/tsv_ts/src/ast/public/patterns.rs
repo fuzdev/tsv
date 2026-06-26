@@ -10,7 +10,7 @@ use super::{Expression, SourceLocation};
 #[derive(Debug, Clone, Serialize)]
 pub struct ObjectPattern {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -31,7 +31,7 @@ pub enum ObjectPatternProperty {
 #[derive(Debug, Clone, Serialize)]
 pub struct ArrayPattern {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -44,7 +44,7 @@ pub struct ArrayPattern {
 #[derive(Debug, Clone, Serialize)]
 pub struct AssignmentPattern {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -56,7 +56,7 @@ pub struct AssignmentPattern {
 #[derive(Debug, Clone, Serialize)]
 pub struct RestElement {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,

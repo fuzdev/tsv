@@ -28,7 +28,7 @@ pub(super) fn convert_decorator(
         strip_decorator_spine_optional(&mut expression);
     }
     public::Decorator {
-        node_type: "Decorator".to_string(),
+        node_type: "Decorator",
         start: decorator.span.start,
         end: decorator.span.end,
         loc: create_location(decorator.span, loc, offset),
@@ -64,7 +64,7 @@ pub(in crate::ast) fn convert_type_alias_declaration(
     offset: usize,
 ) -> public::TSTypeAliasDeclaration {
     public::TSTypeAliasDeclaration {
-        node_type: "TSTypeAliasDeclaration".to_string(),
+        node_type: "TSTypeAliasDeclaration",
         start: type_alias.span.start,
         end: type_alias.span.end,
         loc: create_location(type_alias.span, loc, offset),
@@ -86,7 +86,7 @@ pub(in crate::ast) fn convert_function_declaration(
     offset: usize,
 ) -> public::FunctionDeclaration {
     public::FunctionDeclaration {
-        node_type: "FunctionDeclaration".to_string(),
+        node_type: "FunctionDeclaration",
         start: func_decl.span.start,
         end: func_decl.span.end,
         loc: create_location(func_decl.span, loc, offset),
@@ -139,7 +139,7 @@ pub(in crate::ast) fn convert_class_declaration(
     );
 
     public::ClassDeclaration {
-        node_type: "ClassDeclaration".to_string(),
+        node_type: "ClassDeclaration",
         start: class_decl.span.start,
         end: class_decl.span.end,
         loc: create_location(class_decl.span, loc, offset),
@@ -202,7 +202,7 @@ pub(in crate::ast) fn convert_class_expression(
     );
 
     public::ClassExpression {
-        node_type: "ClassExpression".to_string(),
+        node_type: "ClassExpression",
         start: class_expr.span.start,
         end: class_expr.span.end,
         loc: create_location(class_expr.span, loc, offset),
@@ -275,7 +275,7 @@ fn maybe_wrap_super_class(
     };
     *super_class = Some(Box::new(public::Expression::TSInstantiationExpression(
         public::TSInstantiationExpression {
-            node_type: "TSInstantiationExpression".to_string(),
+            node_type: "TSInstantiationExpression",
             start: combined_span.start,
             end: combined_span.end,
             loc: create_location(combined_span, loc, offset),
@@ -293,7 +293,7 @@ pub(in crate::ast) fn convert_class_body(
     offset: usize,
 ) -> public::ClassBody {
     public::ClassBody {
-        node_type: "ClassBody".to_string(),
+        node_type: "ClassBody",
         start: body.span.start,
         end: body.span.end,
         loc: create_location(body.span, loc, offset),
@@ -336,7 +336,7 @@ fn convert_index_signature(
     offset: usize,
 ) -> public::TSIndexSignature {
     public::TSIndexSignature {
-        node_type: "TSIndexSignature".to_string(),
+        node_type: "TSIndexSignature",
         start: sig.span.start,
         end: sig.span.end,
         loc: create_location(sig.span, loc, offset),
@@ -346,7 +346,7 @@ fn convert_index_signature(
             .map(|p| {
                 let name = interner.resolve_infallible(p.name).to_string();
                 public::Identifier {
-                    node_type: "Identifier".to_string(),
+                    node_type: "Identifier",
                     start: p.span.start,
                     end: p.span.end,
                     loc: create_location(p.span, loc, offset),
@@ -379,7 +379,7 @@ fn convert_static_block(
     offset: usize,
 ) -> public::StaticBlock {
     public::StaticBlock {
-        node_type: "StaticBlock".to_string(),
+        node_type: "StaticBlock",
         start: block.span.start,
         end: block.span.end,
         loc: create_location(block.span, loc, offset),
@@ -417,7 +417,7 @@ fn convert_method_definition(
         .as_ref()
         .map(|rt| convert_type_annotation(rt, source, loc, interner, offset));
     let id = func.id.as_ref().map(|id| public::Identifier {
-        node_type: "Identifier".to_string(),
+        node_type: "Identifier",
         start: id.span.start,
         end: id.span.end,
         loc: create_location(id.span, loc, offset),
@@ -435,7 +435,7 @@ fn convert_method_definition(
     let value_span = Span::new(func.params_start, func.span.end);
     let value = if is_bodyless {
         public::MethodValue::TSDeclareMethod(public::TSDeclareMethod {
-            node_type: "TSDeclareMethod".to_string(),
+            node_type: "TSDeclareMethod",
             start: func.params_start,
             end: func.span.end,
             loc: create_location(value_span, loc, offset),
@@ -448,7 +448,7 @@ fn convert_method_definition(
         })
     } else {
         public::MethodValue::FunctionExpression(public::FunctionExpression {
-            node_type: "FunctionExpression".to_string(),
+            node_type: "FunctionExpression",
             start: func.params_start,
             end: func.span.end,
             loc: create_location(value_span, loc, offset),
@@ -464,7 +464,7 @@ fn convert_method_definition(
     };
 
     public::MethodDefinition {
-        node_type: "MethodDefinition".to_string(),
+        node_type: "MethodDefinition",
         start: method.span.start,
         end: method.span.end,
         loc: create_location(method.span, loc, offset),
@@ -500,7 +500,7 @@ fn convert_property_definition(
     offset: usize,
 ) -> public::PropertyDefinition {
     public::PropertyDefinition {
-        node_type: "PropertyDefinition".to_string(),
+        node_type: "PropertyDefinition",
         start: prop.span.start,
         end: prop.span.end,
         loc: create_location(prop.span, loc, offset),
@@ -540,7 +540,7 @@ pub(in crate::ast) fn convert_type_parameter_declaration(
     offset: usize,
 ) -> public::TSTypeParameterDeclaration {
     public::TSTypeParameterDeclaration {
-        node_type: "TSTypeParameterDeclaration".to_string(),
+        node_type: "TSTypeParameterDeclaration",
         start: params.span.start,
         end: params.span.end,
         loc: create_location(params.span, loc, offset),
@@ -566,7 +566,7 @@ pub(in crate::ast) fn convert_type_parameter(
     offset: usize,
 ) -> public::TSTypeParameter {
     public::TSTypeParameter {
-        node_type: "TSTypeParameter".to_string(),
+        node_type: "TSTypeParameter",
         start: param.span.start,
         end: param.span.end,
         loc: create_location(param.span, loc, offset),
@@ -594,7 +594,7 @@ pub(in crate::ast) fn convert_type_parameter_instantiation(
     offset: usize,
 ) -> public::TSTypeParameterInstantiation {
     public::TSTypeParameterInstantiation {
-        node_type: "TSTypeParameterInstantiation".to_string(),
+        node_type: "TSTypeParameterInstantiation",
         start: params.span.start,
         end: params.span.end,
         loc: create_location(params.span, loc, offset),
@@ -618,7 +618,7 @@ fn convert_expression_with_type_arguments(
     let expression = convert_entity_name_to_expression(&heritage.expression, loc, interner, offset);
 
     public::TSExpressionWithTypeArguments {
-        node_type: "TSExpressionWithTypeArguments".to_string(),
+        node_type: "TSExpressionWithTypeArguments",
         start: heritage.span.start,
         end: heritage.span.end,
         loc: create_location(heritage.span, loc, offset),
@@ -640,7 +640,7 @@ fn convert_entity_name_to_expression(
     match entity {
         internal::TSEntityName::Identifier(id) => {
             public::Expression::Identifier(public::Identifier {
-                node_type: "Identifier".to_string(),
+                node_type: "Identifier",
                 start: id.span.start,
                 end: id.span.end,
                 loc: create_location(id.span, loc, offset),
@@ -654,13 +654,13 @@ fn convert_entity_name_to_expression(
             // For qualified names like Foo.Bar, we convert to MemberExpression
             let object = convert_entity_name_to_expression(&qn.left, loc, interner, offset);
             public::Expression::MemberExpression(public::MemberExpression {
-                node_type: "MemberExpression".to_string(),
+                node_type: "MemberExpression",
                 start: qn.span.start,
                 end: qn.span.end,
                 loc: create_location(qn.span, loc, offset),
                 object: Box::new(object),
                 property: Box::new(public::Expression::Identifier(public::Identifier {
-                    node_type: "Identifier".to_string(),
+                    node_type: "Identifier",
                     start: qn.right.span.start,
                     end: qn.right.span.end,
                     loc: create_location(qn.right.span, loc, offset),

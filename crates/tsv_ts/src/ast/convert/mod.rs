@@ -294,7 +294,7 @@ pub fn convert_program(
     let interner = program.interner.borrow();
 
     public::Program {
-        node_type: "Program".to_string(),
+        node_type: "Program",
         start: program.span.start,
         end: program.span.end,
         loc: create_location(program.span, loc, 0),

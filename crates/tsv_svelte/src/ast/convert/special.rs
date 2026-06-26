@@ -149,7 +149,7 @@ pub(super) fn convert_script(
 
     // Return program_json directly (preserves leadingComments/trailingComments)
     public::Script {
-        node_type: "Script".to_string(),
+        node_type: "Script",
         start: script.span.start,
         end: script.span.end,
         context: context.to_string(),
@@ -392,7 +392,7 @@ pub(super) fn convert_special_element(
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     public::SpecialElement {
-        node_type: elem.kind.node_type().to_string(),
+        node_type: elem.kind.node_type(),
         start: elem.span.start,
         end: elem.span.end,
         name: elem.kind.tag_name().to_string(),

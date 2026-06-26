@@ -75,7 +75,7 @@ pub(in crate::ast) fn convert_statement(
                 raw[1..raw.len() - 1].to_string()
             });
             public::Statement::ExpressionStatement(public::ExpressionStatement {
-                node_type: "ExpressionStatement".to_string(),
+                node_type: "ExpressionStatement",
                 start: expr_stmt.span.start,
                 end: expr_stmt.span.end,
                 loc: create_location(expr_stmt.span, loc, offset),
@@ -101,7 +101,7 @@ pub(in crate::ast) fn convert_statement(
         }
         internal::Statement::ReturnStatement(ret) => {
             public::Statement::ReturnStatement(public::ReturnStatement {
-                node_type: "ReturnStatement".to_string(),
+                node_type: "ReturnStatement",
                 start: ret.span.start,
                 end: ret.span.end,
                 loc: create_location(ret.span, loc, offset),
@@ -155,7 +155,7 @@ pub(in crate::ast) fn convert_statement(
             };
             let export_span = Span::new(export_start, export_decl.span.end);
             public::Statement::ExportNamedDeclaration(public::ExportNamedDeclaration {
-                node_type: "ExportNamedDeclaration".to_string(),
+                node_type: "ExportNamedDeclaration",
                 start: export_start,
                 end: export_decl.span.end,
                 loc: create_location(export_span, loc, offset),
@@ -197,7 +197,7 @@ pub(in crate::ast) fn convert_statement(
             };
             let export_span = Span::new(export_start, export_decl.span.end);
             public::Statement::ExportDefaultDeclaration(public::ExportDefaultDeclaration {
-                node_type: "ExportDefaultDeclaration".to_string(),
+                node_type: "ExportDefaultDeclaration",
                 start: export_start,
                 end: export_decl.span.end,
                 loc: create_location(export_span, loc, offset),
@@ -232,7 +232,7 @@ pub(in crate::ast) fn convert_statement(
                 schema,
             );
             public::Statement::ExportAllDeclaration(public::ExportAllDeclaration {
-                node_type: "ExportAllDeclaration".to_string(),
+                node_type: "ExportAllDeclaration",
                 start: export_decl.span.start,
                 end: export_decl.span.end,
                 loc: create_location(export_decl.span, loc, offset),
@@ -247,7 +247,7 @@ pub(in crate::ast) fn convert_statement(
         }
         internal::Statement::TSExportAssignment(export_assign) => {
             public::Statement::TSExportAssignment(public::TSExportAssignment {
-                node_type: "TSExportAssignment".to_string(),
+                node_type: "TSExportAssignment",
                 start: export_assign.span.start,
                 end: export_assign.span.end,
                 loc: create_location(export_assign.span, loc, offset),
@@ -280,7 +280,7 @@ pub(in crate::ast) fn convert_statement(
                 schema,
             );
             public::Statement::ImportDeclaration(public::ImportDeclaration {
-                node_type: "ImportDeclaration".to_string(),
+                node_type: "ImportDeclaration",
                 start: import_decl.span.start,
                 end: import_decl.span.end,
                 loc: create_location(import_decl.span, loc, offset),
@@ -343,7 +343,7 @@ pub(in crate::ast) fn convert_statement(
         ),
         internal::Statement::EmptyStatement(empty) => {
             public::Statement::EmptyStatement(public::EmptyStatement {
-                node_type: "EmptyStatement".to_string(),
+                node_type: "EmptyStatement",
                 start: empty.span.start,
                 end: empty.span.end,
                 loc: create_location(empty.span, loc, offset),
@@ -351,7 +351,7 @@ pub(in crate::ast) fn convert_statement(
         }
         internal::Statement::DebuggerStatement(dbg) => {
             public::Statement::DebuggerStatement(public::DebuggerStatement {
-                node_type: "DebuggerStatement".to_string(),
+                node_type: "DebuggerStatement",
                 start: dbg.span.start,
                 end: dbg.span.end,
                 loc: create_location(dbg.span, loc, offset),
@@ -389,7 +389,7 @@ pub(in crate::ast) fn convert_module_declaration(
     offset: usize,
 ) -> public::TSModuleDeclaration {
     public::TSModuleDeclaration {
-        node_type: "TSModuleDeclaration".to_string(),
+        node_type: "TSModuleDeclaration",
         start: decl.span.start,
         end: decl.span.end,
         loc: create_location(decl.span, loc, offset),
@@ -453,7 +453,7 @@ fn convert_module_block(
 ) -> public::TSModuleBlock {
     // TSModuleBlock is always in TypeScript context (declare namespace/module)
     public::TSModuleBlock {
-        node_type: "TSModuleBlock".to_string(),
+        node_type: "TSModuleBlock",
         start: block.span.start,
         end: block.span.end,
         loc: create_location(block.span, loc, offset),
@@ -474,7 +474,7 @@ pub(in crate::ast) fn convert_block_statement(
 ) -> public::BlockStatement {
     // BlockStatement is always in TypeScript context (function bodies, etc.)
     public::BlockStatement {
-        node_type: "BlockStatement".to_string(),
+        node_type: "BlockStatement",
         start: block.span.start,
         end: block.span.end,
         loc: create_location(block.span, loc, offset),
@@ -494,7 +494,7 @@ pub fn convert_variable_declaration(
     offset: usize,
 ) -> public::VariableDeclaration {
     public::VariableDeclaration {
-        node_type: "VariableDeclaration".to_string(),
+        node_type: "VariableDeclaration",
         start: var_decl.span.start,
         end: var_decl.span.end,
         loc: create_location(var_decl.span, loc, offset),
@@ -516,7 +516,7 @@ pub(in crate::ast) fn convert_variable_declarator(
     offset: usize,
 ) -> public::VariableDeclarator {
     public::VariableDeclarator {
-        node_type: "VariableDeclarator".to_string(),
+        node_type: "VariableDeclarator",
         start: declarator.span.start,
         end: declarator.span.end,
         loc: create_location(declarator.span, loc, offset),
@@ -537,7 +537,7 @@ pub(in crate::ast) fn convert_identifier(
     offset: usize,
 ) -> public::Identifier {
     public::Identifier {
-        node_type: "Identifier".to_string(),
+        node_type: "Identifier",
         start: id.span.start,
         end: id.span.end,
         loc: create_location(id.span, loc, offset),
@@ -556,7 +556,7 @@ fn convert_import_equals_declaration(
     offset: usize,
 ) -> public::TSImportEqualsDeclaration {
     public::TSImportEqualsDeclaration {
-        node_type: "TSImportEqualsDeclaration".to_string(),
+        node_type: "TSImportEqualsDeclaration",
         start: decl.span.start,
         end: decl.span.end,
         loc: create_location(decl.span, loc, offset),
@@ -586,7 +586,7 @@ fn convert_module_reference(
     match module_ref {
         internal::TSModuleReference::ExternalModuleReference(ext_ref) => {
             public::TSModuleReference::ExternalModuleReference(public::TSExternalModuleReference {
-                node_type: "TSExternalModuleReference".to_string(),
+                node_type: "TSExternalModuleReference",
                 start: ext_ref.span.start,
                 end: ext_ref.span.end,
                 loc: create_location(ext_ref.span, loc, offset),
