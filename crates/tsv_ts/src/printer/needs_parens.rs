@@ -104,6 +104,12 @@ pub enum ParenContext {
     /// Statement test condition: `if (<expr>)`, `while (<expr>)`, `for (;<expr>;)`, `do {} while (<expr>)`
     /// Assignment expressions need double-parens for clarity: `while ((x = y))`
     StatementTest,
+
+    /// Superclass of a class heritage clause: `class C extends <expr> {}`
+    /// Prettier wraps everything that isn't a bare identifier/member/call/literal
+    /// (incl. `new`, tagged templates, and non-null, which are valid `extends`
+    /// operands but still parenthesized for clarity).
+    SuperClass,
 }
 
 /// Determines if an expression needs parentheses in a given context.
@@ -288,6 +294,28 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext) -> bool {
         // Statement test: `while ((x = y))`, `if ((x = getValue()))`, `for (;(x = y);)`
         // Double-parens signal intentional assignment (not a typo for ==)
         ParenContext::StatementTest => matches!(expr, Expression::AssignmentExpression(_)),
+
+        // Superclass: `extends (a + b)`, `extends (a ? b : c)`, `extends (await x)`,
+        // `extends ((a) => b)`, `extends (x as T)`, `extends (-x)`. The
+        // lower-precedence and unary/update forms cover the operator cases; beyond
+        // those prettier also parenthesizes `new`, tagged templates, non-null, and a
+        // bare object (which would otherwise be read as the class body) — all valid
+        // `extends` operands it still wraps for clarity. Bare identifiers, member/call
+        // chains, literals, untagged templates, and `class`/`function` expressions
+        // stay unparenthesized. `SequenceExpression` is absent because
+        // `build_sequence_doc` already adds its own parens.
+        ParenContext::SuperClass => {
+            is_lower_precedence(expr)
+                || is_unary_or_update(expr)
+                || matches!(
+                    expr,
+                    Expression::ArrowFunctionExpression(_)
+                        | Expression::NewExpression(_)
+                        | Expression::TaggedTemplateExpression(_)
+                        | Expression::TSNonNullExpression(_)
+                        | Expression::ObjectExpression(_)
+                )
+        }
     }
 }
 
