@@ -1,11 +1,11 @@
 // Class declaration parsing
 
 use crate::ast::internal::{
-    Accessibility, BlockStatement, CallExpression, ClassBody, ClassDeclaration, ClassExpression,
-    ClassMember, Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind,
-    ExportNamedDeclaration, Expression, FunctionExpression, Identifier, IdentifierParamExtra,
-    Literal, LiteralValue, MemberExpression, MethodDefinition, MethodKind, PropertyDefinition,
-    PropertyModifier, Statement, StaticBlock, TSIndexSignature, TSTypeParameterDeclaration,
+    Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
+    Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
+    Expression, FunctionExpression, Identifier, IdentifierParamExtra, Literal, LiteralValue,
+    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Statement, StaticBlock,
+    TSIndexSignature, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -175,6 +175,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
+    /// Parse an optional `extends <super_class>` heritage clause, shared by the
+    /// class-declaration and class-expression parsers. The superclass is any
+    /// `LeftHandSideExpression` (`parse_heritage_expression`); `extends Base<T>`
+    /// splits into `Base` plus separate `super_type_parameters`. Returns
+    /// `(None, None)` when there is no `extends`.
+    fn parse_optional_extends_clause(
+        &mut self,
+    ) -> Result<
+        (
+            Option<&'arena Expression<'arena>>,
+            Option<TSTypeParameterInstantiation<'arena>>,
+        ),
+        ParseError,
+    > {
+        if !matches!(
+            self.current_kind(),
+            TokenKind::Keyword(KeywordKind::Extends)
+        ) {
+            return Ok((None, None));
+        }
+        self.advance()?; // consume 'extends'
+        let expr = self.parse_heritage_expression()?;
+        let type_args = self.parse_optional_type_arguments()?;
+        Ok((Some(self.alloc(expr)), type_args))
+    }
+
     /// Parse a class expression: `class { }` or `class Foo<T> extends Bar { }`
     ///
     /// Class expressions are similar to class declarations but:
@@ -216,22 +242,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional `extends` clause
-        let (super_class, super_type_parameters) = if matches!(
-            self.current_kind(),
-            TokenKind::Keyword(KeywordKind::Extends)
-        ) {
-            self.advance()?; // consume 'extends'
-
-            // Parse superclass expression
-            let expr = self.parse_heritage_expression()?;
-
-            // Parse optional type arguments: `extends Base<T>`
-            let type_args = self.parse_optional_type_arguments()?;
-
-            (Some(self.alloc(expr)), type_args)
-        } else {
-            (None, None)
-        };
+        let (super_class, super_type_parameters) = self.parse_optional_extends_clause()?;
 
         // Parse optional `implements` clause
         let implements: &'arena [_] = if self.eat_contextual_keyword("implements") {
@@ -317,22 +328,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let type_parameters = self.parse_optional_type_parameters()?;
 
         // Parse optional `extends` clause
-        let (super_class, super_type_parameters) = if matches!(
-            self.current_kind(),
-            TokenKind::Keyword(KeywordKind::Extends)
-        ) {
-            self.advance()?; // consume 'extends'
-
-            // Parse superclass expression (identifier or member expression like Foo.Bar)
-            let expr = self.parse_heritage_expression()?;
-
-            // Parse optional type arguments: `extends Base<T>`
-            let type_args = self.parse_optional_type_arguments()?;
-
-            (Some(self.alloc(expr)), type_args)
-        } else {
-            (None, None)
-        };
+        let (super_class, super_type_parameters) = self.parse_optional_extends_clause()?;
 
         // Parse optional `implements` clause
         let implements: &'arena [_] = if self.eat_contextual_keyword("implements") {
@@ -843,130 +839,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             modifier,
             span: Span::new(start as u32, end),
         }))
-    }
-
-    /// Check if current position has type arguments followed by a call: `<T>(`
-    /// Used for extends clause to distinguish `getMixin<T>(Base)` from `extends Base<T>`
-    fn is_type_args_followed_by_call(&self) -> bool {
-        let bytes = self.source.as_bytes();
-        let mut pos = self.current_start;
-
-        // Must start with '<'
-        if pos >= bytes.len() || bytes[pos] != b'<' {
-            return false;
-        }
-        pos += 1;
-
-        // Track nesting to find the matching '>'
-        let mut depth = 1;
-        while pos < bytes.len() && depth > 0 {
-            match bytes[pos] {
-                b'<' => depth += 1,
-                b'>' => depth -= 1,
-                b'\'' | b'"' | b'`' => {
-                    // Skip strings
-                    let quote = bytes[pos];
-                    pos += 1;
-                    while pos < bytes.len() && bytes[pos] != quote {
-                        if bytes[pos] == b'\\' {
-                            pos += 1; // skip escaped char
-                        }
-                        pos += 1;
-                    }
-                }
-                _ => {}
-            }
-            pos += 1;
-        }
-
-        // Skip whitespace after '>'
-        while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
-            pos += 1;
-        }
-
-        // Check if '(' follows
-        pos < bytes.len() && bytes[pos] == b'('
-    }
-
-    /// Parse a heritage expression for extends clause
-    /// This can be an identifier, member expression, or call expression (mixin pattern)
-    /// e.g., `Base`, `Foo.Bar`, `getMixin(Base)`, `ns.getMixin(Base)`
-    fn parse_heritage_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
-        // Start with an identifier
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
-            return Err(self.error_expected_after("class name", "extends"));
-        }
-
-        let (start, end) = self.current_pos();
-        let name = self.intern_identifier();
-        self.advance()?;
-
-        let mut expr = Expression::Identifier(Identifier::simple(
-            name,
-            Span::new(start as u32, end as u32),
-        ));
-
-        // Parse member access chain and call expressions: `.identifier`, `(args)`
-        // Keywords are valid property names in member expressions
-        loop {
-            match self.current_kind() {
-                TokenKind::Dot => {
-                    self.advance()?; // consume '.'
-
-                    if !self.current_is_identifier_or_keyword() {
-                        return Err(self.error_expected_after("property name", "."));
-                    }
-
-                    let (prop_start, prop_end) = self.current_pos();
-                    let prop_name = self.intern(self.current_property_name());
-                    self.advance()?;
-
-                    expr = Expression::MemberExpression(MemberExpression {
-                        object: self.alloc(expr),
-                        property: self.alloc(Expression::Identifier(Identifier::simple(
-                            prop_name,
-                            Span::new(prop_start as u32, prop_end as u32),
-                        ))),
-                        computed: false,
-                        optional: false,
-                        span: Span::new(start as u32, prop_end as u32),
-                    });
-                }
-                TokenKind::LessThan
-                    if self.is_type_arguments_start() && self.is_type_args_followed_by_call() =>
-                {
-                    // Type arguments on call: getMixin<T>(Base)
-                    // We've verified with lookahead that ( follows after >
-                    let type_args = self.parse_type_parameter_instantiation()?;
-                    self.advance()?; // consume '('
-                    let (arguments, paren_end) = self.parse_call_arguments()?;
-                    let arguments = arguments.into_bump_slice();
-                    expr = Expression::CallExpression(CallExpression {
-                        callee: self.alloc(expr),
-                        type_arguments: Some(type_args),
-                        arguments,
-                        optional: false,
-                        span: Span::new(start as u32, paren_end as u32),
-                    });
-                }
-                TokenKind::ParenOpen => {
-                    // Call expression: getMixin(Base) or ns.getMixin(Base)
-                    self.advance()?; // consume '('
-                    let (arguments, paren_end) = self.parse_call_arguments()?;
-                    let arguments = arguments.into_bump_slice();
-                    expr = Expression::CallExpression(CallExpression {
-                        callee: self.alloc(expr),
-                        type_arguments: None,
-                        arguments,
-                        optional: false,
-                        span: Span::new(start as u32, paren_end as u32),
-                    });
-                }
-                _ => break,
-            }
-        }
-
-        Ok(expr)
     }
 
     /// Parse an index signature: `[key: KeyType]: ValueType` or `readonly [key: KeyType]: ValueType`
