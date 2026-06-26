@@ -26,7 +26,7 @@ etc. with no post-build patcher.
 The AST crosses the JS↔WASM boundary as **one compact JSON string**:
 `parse_*` builds it with the lang crate's `convert_ast_json_string` (the
 typed direct-serialization path — no intermediate `serde_json::Value` for
-TS) and calls the engine's native `JSON.parse` from Rust via
+TS or CSS) and calls the engine's native `JSON.parse` from Rust via
 `js_sys::JSON::parse`, so the export signature stays the typed object.
 Building the JS object graph node-by-node with `serde_wasm_bindgen` is
 measurably slower.

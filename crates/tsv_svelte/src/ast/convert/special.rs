@@ -319,7 +319,7 @@ pub(super) fn convert_style(
 
     // Delegate to tsv_css for CSS node conversion
     // Comments are stored separately in stylesheet.comments and not included in JSON output
-    let children: Vec<serde_json::Value> = style
+    let children: Vec<tsv_css::ast::public::CssNodePublic> = style
         .css_stylesheet
         .nodes
         .iter()

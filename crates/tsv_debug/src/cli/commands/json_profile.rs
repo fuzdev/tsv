@@ -16,10 +16,11 @@
 //!   mutates the `Value`) → translate → to_string; the shipped fast path
 //!   (direct serialization) applies only when the source is eligible,
 //!   others take the `Value` path
-//! - **css**: convert (builds the `Value` directly — no typed-AST tree) →
-//!   translate → to_string; the direct path doesn't apply and
-//!   `convert_ast_json_string` is a plain wrapper, but the whole-call pair
-//!   is still timed and identity-checked like the other languages
+//! - **css**: same shape as typescript — convert (typed public AST) →
+//!   to_value → translate → to_string for the `Value` path; the shipped path
+//!   runs convert → typed translate (multibyte only) → direct to_string. CSS
+//!   has no `loc`/columns and no `attach` pass, so the typed walk handles
+//!   multibyte directly (like typescript, unlike svelte)
 //!
 //! Per-language fast-path eligibility is documented in
 //! `docs/architecture.md` §Closed Scope, Open Convention.
@@ -27,9 +28,9 @@
 //! The direct path must be byte-identical to the `Value` path (serde_json is
 //! built with `preserve_order`, keeping struct-field key order; the typed
 //! translation walk must match the `Value` walk). The command checks this per
-//! file and reports mismatches — for typescript on **every** file including
-//! multibyte (the typed walk runs before `direct` is captured); for svelte on
-//! ASCII files only, where a mismatch means the attach pass actually moved
+//! file and reports mismatches — for typescript and css on **every** file
+//! including multibyte (the typed walk runs before `direct` is captured); for
+//! svelte on ASCII files only, where a mismatch means the attach pass moved
 //! comments into the tree (`convert_ast_json_string` gates on this and falls
 //! back to the `Value` path). The shipped function is identity-checked against
 //! the `Value` path on **every** file, eligible or not.
@@ -117,8 +118,8 @@ impl JsonProfileCommand {
 }
 
 /// Per-file medians for each sub-step (µs). Steps not applicable to a
-/// language stay 0 (`to_value`/`attach`/`direct` for css, `attach` for ts,
-/// `typed_translate` for svelte/css).
+/// language stay 0 (`attach` for ts/css; `typed_translate` for svelte, which
+/// has no typed direct path).
 struct FileResult {
     path: PathBuf,
     size: usize,
@@ -136,15 +137,13 @@ struct FileResult {
     value_us: f64,
     shipped_us: f64,
     /// Whether the direct path's output is byte-identical to the `Value`
-    /// path's. `None` when not comparable (css always; svelte multibyte
-    /// sources, which have no typed translation walk). Comparable on every
-    /// typescript file — the typed walk translates multibyte trees before
-    /// `direct` is captured.
+    /// path's. `None` when not comparable (svelte multibyte sources, which
+    /// fall back to the `Value` path and have no typed translation walk).
+    /// Comparable on every typescript and css file — their typed walks
+    /// translate multibyte trees before `direct` is captured.
     direct_match: Option<bool>,
     /// Whether `convert_ast_json_string` (the shipped FFI path) is
-    /// byte-identical to the `Value` path. Comparable on every file (for
-    /// css the shipped fn is a plain wrapper over the same `Value` path,
-    /// so the check verifies the wrapper).
+    /// byte-identical to the `Value` path. Comparable on every file.
     shipped_match: Option<bool>,
 }
 
@@ -423,13 +422,13 @@ fn profile_svelte_once(
     Ok(())
 }
 
-/// One CSS iteration. `tsv_css::convert_ast_json` builds the `Value` directly
-/// during conversion (no typed public-AST tree), so there's no separate
-/// to_value step and no direct typed-serialization path to compare. The
-/// whole-call pair is still timed and identity-checked — the shipped
-/// `convert_ast_json_string` is a plain wrapper, so the pair documents that
-/// there's no shipped win for css and the check verifies the wrapper.
-#[allow(clippy::expect_used)] // Value serialization cannot fail
+/// One CSS iteration. Sub-steps mirror `tsv_css::convert_ast_json` (typed
+/// convert → to_value → `Value` translate → to_string); `typed_translate` +
+/// `direct` mirror the shipped typed pipeline (`convert_ast_json_string`). The
+/// typed walk mutates the public tree in place, so it runs only after
+/// `to_value` has captured the untranslated tree. CSS public nodes carry no
+/// `loc`, so there's no `LocationTracker` (unlike TS/Svelte).
+#[allow(clippy::expect_used)] // mirrors convert_ast_json's own expect on Serialize
 fn profile_css_once(
     source: &str,
     steps: &mut StepDurations,
@@ -442,8 +441,13 @@ fn profile_css_once(
     steps.parse.push(t.elapsed());
 
     let t = Instant::now();
-    let mut value = tsv_css::ast::convert::convert_css_nodes_standalone(ast.nodes, source);
+    let mut public_ast = tsv_css::ast::convert::convert_stylesheet_file(ast.nodes, source);
     steps.convert.push(t.elapsed());
+
+    let t = Instant::now();
+    let mut value =
+        serde_json::to_value(&public_ast).expect("public CSS AST serializes to a Value");
+    steps.to_value.push(t.elapsed());
 
     let t = Instant::now();
     let map = ByteToCharMap::new(source);
@@ -454,12 +458,22 @@ fn profile_css_once(
     let wire = serde_json::to_string(&value).expect("Value serialization cannot fail");
     steps.to_string.push(t.elapsed());
 
+    // Map build inside the timed region — same rationale as `profile_ts_once`.
+    let t = Instant::now();
+    let typed_map = ByteToCharMap::new(source);
+    tsv_css::ast::convert::translate_byte_to_char_offsets_typed(&mut public_ast, &typed_map);
+    steps.typed_translate.push(t.elapsed());
+
+    let t = Instant::now();
+    let direct = serde_json::to_string(&public_ast).expect("public CSS AST serializes to a Value");
+    steps.direct.push(t.elapsed());
+
     let first = meta.is_none();
     if first {
         *meta = Some(IterMeta {
             multibyte: map.has_multibyte(),
             wire_bytes: wire.len(),
-            direct_match: None,
+            direct_match: Some(wire == direct),
             shipped_match: None, // filled in by profile_whole_calls
         });
     }
@@ -468,7 +482,7 @@ fn profile_css_once(
         steps,
         meta,
         first,
-        value,
+        (public_ast, value, direct),
         wire,
         || {
             serde_json::to_string(&tsv_css::convert_ast_json(&ast, source))
@@ -501,6 +515,18 @@ struct LangAggregate {
     direct_mismatch: usize,
     shipped_match: usize,
     shipped_mismatch: usize,
+}
+
+impl LangAggregate {
+    /// Does this language run a `Value`-mutating pass between `convert` and
+    /// `to_string` (svelte's comment `attach`)? TS and CSS don't — their typed
+    /// direct path handles every file (incl. multibyte), so `direct == value`
+    /// is comparable on all files and the typed-pipeline sub-step sum is an
+    /// honest stand-in for the shipped call. Svelte does, and falls back to the
+    /// `Value` path per multibyte file, so its sub-step sum would understate it.
+    fn has_value_mutating_pass(&self) -> bool {
+        self.attach_us > 0.0
+    }
 }
 
 fn aggregate(results: &[FileResult]) -> Vec<(ParserType, LangAggregate)> {
@@ -560,8 +586,6 @@ fn print_report(
     skipped: usize,
 ) {
     for (parser_type, a) in aggregates {
-        let is_css = matches!(parser_type, ParserType::Css);
-        let is_ts = matches!(parser_type, ParserType::TypeScript);
         eprintln!(
             "{} — {} files, {} source, {} wire JSON, {} multibyte",
             lang_label(*parser_type),
@@ -582,40 +606,35 @@ fn print_report(
                 pct(us, a.materialize_us)
             );
         };
-        if is_css {
-            step("convert→Value", a.convert_us);
-        } else {
-            step("convert", a.convert_us);
-            step("to_value", a.to_value_us);
-        }
-        if a.attach_us > 0.0 {
+        step("convert", a.convert_us);
+        step("to_value", a.to_value_us);
+        if a.has_value_mutating_pass() {
             step("attach", a.attach_us);
         }
         step("translate", a.translate_us);
         step("to_string", a.to_string_us);
-        if !is_css {
+        eprintln!(
+            "  direct to_string {:>10}  (to_string(&public_ast), skips Value)",
+            format_duration(a.direct_us)
+        );
+        // The shipped typed pipeline as a sub-step sum (drops excluded) is an
+        // honest stand-in only without a Value-mutating pass (svelte's `attach`).
+        // TS and CSS have none; the typed walk early-returns on ASCII files.
+        if !a.has_value_mutating_pass() {
             eprintln!(
-                "  direct to_string {:>10}  (to_string(&public_ast), skips Value)",
-                format_duration(a.direct_us)
+                "  typed translate  {:>10}  (map build + typed walk; walk is multibyte-only)",
+                format_duration(a.typed_translate_us)
             );
-            if is_ts {
-                // The shipped typed pipeline, sub-step sum (drops excluded):
-                // the typed walk early-returns on ASCII files.
-                eprintln!(
-                    "  typed translate  {:>10}  (map build + typed walk; walk is multibyte-only)",
-                    format_duration(a.typed_translate_us)
-                );
-                let typed_pipeline = a.convert_us + a.typed_translate_us + a.direct_us;
-                eprintln!(
-                    "  typed pipeline   {:>10}  = convert + typed translate + direct → {:.2}x of materialization",
-                    format_duration(typed_pipeline),
-                    if a.materialize_us > 0.0 {
-                        typed_pipeline / a.materialize_us
-                    } else {
-                        0.0
-                    },
-                );
-            }
+            let typed_pipeline = a.convert_us + a.typed_translate_us + a.direct_us;
+            eprintln!(
+                "  typed pipeline   {:>10}  = convert + typed translate + direct → {:.2}x of materialization",
+                format_duration(typed_pipeline),
+                if a.materialize_us > 0.0 {
+                    typed_pipeline / a.materialize_us
+                } else {
+                    0.0
+                },
+            );
         }
         eprintln!(
             "  value baseline   {:>10}  = to_string(convert_ast_json) whole call, incl. drops",
@@ -630,14 +649,19 @@ fn print_report(
                 0.0
             },
         );
-        if !is_css {
-            let comparable = a.direct_match + a.direct_mismatch;
-            eprintln!(
-                "  direct == value on {}/{comparable} comparable files{}",
-                a.direct_match,
-                if is_ts { "" } else { " (ASCII only)" },
-            );
-        }
+        let comparable = a.direct_match + a.direct_mismatch;
+        eprintln!(
+            "  direct == value on {}/{comparable} comparable files{}",
+            a.direct_match,
+            // Svelte's typed direct path matches the Value path only on ASCII
+            // files (it falls back to the Value path per multibyte file); TS/CSS
+            // typed walks handle multibyte too.
+            if a.has_value_mutating_pass() {
+                " (ASCII only)"
+            } else {
+                ""
+            },
+        );
         let shipped_comparable = a.shipped_match + a.shipped_mismatch;
         eprintln!(
             "  shipped == value on {}/{shipped_comparable} files",
@@ -689,9 +713,10 @@ fn print_json(
                 "shipped_match": a.shipped_match,
                 "shipped_mismatch": a.shipped_mismatch,
             });
-            // the typed pipeline exists only for typescript — the shipped
-            // svelte path falls back per file and css has no typed tree
-            if matches!(parser_type, ParserType::TypeScript) {
+            // The typed pipeline sub-step sum is honest for TS and CSS (no
+            // `attach` pass); the shipped svelte path falls back per multibyte
+            // file, so its sum would understate the real cost.
+            if !a.has_value_mutating_pass() {
                 lang["typed_pipeline_us"] =
                     serde_json::Value::from(a.convert_us + a.typed_translate_us + a.direct_us);
             }

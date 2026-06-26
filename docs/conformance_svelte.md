@@ -372,14 +372,14 @@ Implementation oddities in Svelte's parser that tsv replicates for AST compatibi
 
 ### CSS Compat Behaviors
 
-- Backslash doubling in values — raw source extraction in `crates/tsv_css/src/ast/convert.rs`
-- Unicode escape first-digit duplication — raw source extraction in `crates/tsv_css/src/ast/convert.rs`
-- Comment-before-colon in declaration value — `crates/tsv_css/src/ast/convert.rs`
-- Block-comment stripping in declaration value — `strip_css_comments` in `crates/tsv_css/src/ast/convert.rs`
-- Block-comment stripping in at-rule prelude — `strip_css_comments` in `crates/tsv_css/src/ast/convert.rs`
-- ::slotted()/::part() span truncation — `crates/tsv_css/src/ast/convert.rs`
-- :dir()/:lang()/::highlight() identifier wrapping — `crates/tsv_css/src/ast/convert.rs`
-- Selector-name half-decoding (class/id/type, pseudo-class/element, **and** attribute names) — `raw_selector_name` in `crates/tsv_css/src/ast/convert.rs`
+- Backslash doubling in values — raw source extraction in `crates/tsv_css/src/ast/convert/mod.rs`
+- Unicode escape first-digit duplication — raw source extraction in `crates/tsv_css/src/ast/convert/mod.rs`
+- Comment-before-colon in declaration value — `crates/tsv_css/src/ast/convert/mod.rs`
+- Block-comment stripping in declaration value — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
+- Block-comment stripping in at-rule prelude — `strip_css_comments` in `crates/tsv_css/src/ast/convert/mod.rs`
+- ::slotted()/::part() span truncation — `crates/tsv_css/src/ast/convert/mod.rs`
+- :dir()/:lang()/::highlight() identifier wrapping — `crates/tsv_css/src/ast/convert/mod.rs`
+- Selector-name half-decoding (class/id/type, pseudo-class/element, **and** attribute names) — `raw_selector_name` in `crates/tsv_css/src/ast/convert/mod.rs`
 
 Backslash doubling and unicode-escape duplication are inherited "for free" by extracting raw bytes (`source[span]`) into the public JSON value — Svelte's parser embeds those quirks in its span, so reproducing the bytes reproduces the quirks. No quirk-specific encoder runs.
 

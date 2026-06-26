@@ -102,7 +102,7 @@ pub(crate) fn parse_atrule<'arena>(
         // `@namespace` is the exception: prettier re-parses its prelude as a value (see
         // postcss `parser-postcss.js`), normalizing whitespace to single spaces, so it
         // takes the normalizing path. The public AST stays source-verbatim either way
-        // (the printer-facing `content` is what differs); see `convert.rs`.
+        // (the printer-facing `content` is what differs); see `convert/mod.rs`.
         let normalize_whitespace = name == "namespace";
         let (content, span) = parse_raw_prelude_content(parser, false, normalize_whitespace)?;
         PreludeValue::Raw { content, span }

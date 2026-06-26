@@ -129,12 +129,11 @@ pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
 `convert_ast_json_string` is the hot path for compact wire output (FFI,
 WASM, CLI non-pretty): byte-identical to serializing `convert_ast_json`'s
 `Value`, but when eligible it serializes the typed public AST directly and
-skips the intermediate `Value`. Eligibility is per-language: tsv_ts always
-qualifies (ASCII sources serialize as-is; multibyte sources get a typed
-byte→char offset-translation walk first); tsv_svelte requires ASCII plus no
-template-expression comments outside `<script>`; tsv_css never qualifies
-(its conversion builds the `Value` directly). Ineligible inputs fall back
-to the `Value` path inside the same call.
+skips the intermediate `Value`. Eligibility is per-language: tsv_ts and
+tsv_css always qualify (ASCII sources serialize as-is; multibyte sources
+get a typed byte→char offset-translation walk first); tsv_svelte requires
+ASCII plus no template-expression comments outside `<script>`, otherwise it
+falls back to the `Value` path inside the same call.
 
 There is **no central `Language` trait, no plugin registry, no
 language-set enum**. Each language crate (`tsv_ts`, `tsv_css`,

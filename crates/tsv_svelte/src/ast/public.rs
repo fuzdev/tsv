@@ -29,7 +29,12 @@ pub struct NamePosition {
 /// Svelte Root node - top level of a .svelte file
 ///
 /// Serializes to match Svelte's parser output exactly.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// Serialize-only: `css` embeds `tsv_css`'s `StyleSheet`, whose typed
+/// `CssNodePublic` children can't round-trip through `Deserialize` (`&'static
+/// str` type tags). Nothing deserializes the public AST, so the (dead)
+/// `Deserialize` derive is dropped here; the rest of the tree keeps it.
+#[derive(Debug, Clone, Serialize)]
 pub struct Root {
     pub css: Option<StyleSheet>,
     pub js: Vec<serde_json::Value>, // empty array for now

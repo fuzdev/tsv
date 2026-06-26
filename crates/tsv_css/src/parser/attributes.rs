@@ -162,7 +162,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
     }
 
     // Name recovered verbatim from its span (printer emits raw; convert half-decodes — see
-    // ast/convert.rs). The `Identifier` check above guarantees a name token, so no decoded
+    // ast/convert/mod.rs). The `Identifier` check above guarantees a name token, so no decoded
     // copy is stored.
     let name_span = Span {
         start: (parser.base_offset() + parser.current_start) as u32,

@@ -18,7 +18,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 - `format(&stylesheet, source) -> String` — format with default config
 - `convert_ast(&stylesheet, source) -> StyleSheet` — internal → public JSON-ready AST (gated on `convert` feature)
 - `convert_ast_json(&stylesheet, source) -> serde_json::Value` — public AST with byte-to-char offset translation; matches Svelte's `parseCss()` JSON shape
-- `convert_ast_json_string(&stylesheet, source) -> String` — `convert_ast_json` serialized compactly into a pre-sized buffer (`tsv_lang::estimated_json_capacity`); a thin wrapper otherwise (CSS conversion builds the `Value` directly, so there's no direct-serialization fast path) kept so the FFI/WASM bindings have a uniform string entry point per language
+- `convert_ast_json_string(&stylesheet, source) -> String` — the compact-wire hot path (FFI/WASM/CLI non-pretty): serializes the typed public AST (`ast::public`, built by `convert_stylesheet_file`) directly into a pre-sized buffer (`tsv_lang::estimated_json_capacity`), never materializing the intermediate `serde_json::Value`. Multibyte sources get the typed offset-translation walk (`translate_byte_to_char_offsets_typed` in `ast/convert/translate_typed.rs`), the typed mirror of the `Value` walk in `ast/convert/mod.rs` — the two must stay byte-identical (gated by the fixture suite's string-path identity check, the CSS typed-walk parity probe, and `corpus:compare:parse --multibyte-only`). Output is byte-identical to serializing `convert_ast_json`'s `Value`
 
 **Embedding** (used by `tsv_svelte` for `<style>` blocks):
 

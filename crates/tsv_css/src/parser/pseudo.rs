@@ -25,7 +25,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
 
     // Decode the name only for parse-time argument dispatch (`:nth-child` → Nth,
     // `:is`/`:not` → SelectorList). It is NOT stored on the node: the name is recovered
-    // from `span` at convert/print time (half-decoded to match Svelte — see convert.rs),
+    // from `span` at convert/print time (half-decoded to match Svelte — see convert/mod.rs),
     // so storing a fully-decoded copy would be redundant and, for identity escapes, wrong.
     // The arena copy is needed because `current_identifier()` borrows a buffer that
     // `advance()` overwrites, and dispatch happens after the name token is consumed.

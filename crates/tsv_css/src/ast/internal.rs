@@ -162,7 +162,7 @@ pub enum SimpleSelector<'arena> {
         /// verbatim. The name carries no decoded copy: the printer emits it raw from source
         /// (escapes preserved — `[f\oo]` stays `[f\oo]`, never `[foo]`) and convert
         /// half-decodes it via `raw_selector_name`, matching Svelte's `read_identifier`
-        /// (see ../convert.rs). `value`/`flags` stay owned strings — they are
+        /// (see ../convert/mod.rs). `value`/`flags` stay owned strings — they are
         /// processed/re-quoted, not verbatim source slices.
         name_span: Span,
         matcher: Option<AttributeMatcher>,
@@ -172,7 +172,7 @@ pub enum SimpleSelector<'arena> {
     },
     // Pseudo selectors carry no `name` field: the name is recovered verbatim from `span`
     // (the printer reads `source` directly; convert half-decodes via `raw_selector_name`,
-    // matching Svelte's `read_identifier` — see ../convert.rs). Storing a decoded name would
+    // matching Svelte's `read_identifier` — see ../convert/mod.rs). Storing a decoded name would
     // be a redundant copy that, for identity escapes (`:f\oo`), disagrees with the public
     // (Svelte) form anyway.
     PseudoClass {
@@ -384,7 +384,7 @@ impl<'arena> StringCooked<'arena> {
 /// CSS value - right-hand side of a declaration
 ///
 /// Internal representation optimized for traversal and manipulation.
-/// Converted to public JSON AST via the convert layer (see ast/convert.rs).
+/// Converted to public JSON AST via the convert layer (see ast/convert/mod.rs).
 /// Never serialized directly - serde not needed!
 #[derive(Debug, Clone)]
 pub enum CssValue<'arena> {
@@ -422,7 +422,7 @@ pub enum CssValue<'arena> {
     /// Function call: calc(), var(), rgb(), url(), etc.
     ///
     /// `name` is a **verbatim** source slice (the text before `(`, never escape-decoded —
-    /// the value subtree is source-faithful, never re-serialized; see `convert.rs`). It is a
+    /// the value subtree is source-faithful, never re-serialized; see `convert/mod.rs`). It is a
     /// candidate for the span-for-verbatim idiom (a dedicated `name_span` would drop this
     /// copy), but the exact name span needs trim-aware arithmetic (`s[..paren].trim()`) plus
     /// base-offset alignment across callers — deferred as a perf-neutral additive (see the

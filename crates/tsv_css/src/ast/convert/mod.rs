@@ -17,7 +17,45 @@
 // documented divergence (docs/conformance_svelte.md), not replicated.
 
 use super::internal;
+use super::public;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
+
+mod translate_typed;
+pub use translate_typed::translate_byte_to_char_offsets_typed;
+
+/// Whether the public AST is being built for a standalone `.css` file or an
+/// embedded `<style>` block. `parseCss()` attaches constant `metadata` to
+/// `Rule`/`ComplexSelector`/`RelativeSelector` for standalone CSS but never for
+/// embedded `<style>`; the converters thread this so one typed-node pass
+/// produces both shapes — no separate metadata walk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AstScope {
+    /// Standalone `.css` file (`parseCss()` shape, `metadata` attached).
+    Standalone,
+    /// Embedded `<style>` block in a `.svelte` file (no `metadata`).
+    Embedded,
+}
+
+impl AstScope {
+    /// Standalone CSS carries `parseCss()` metadata; embedded `<style>` doesn't.
+    fn has_metadata(self) -> bool {
+        matches!(self, AstScope::Standalone)
+    }
+}
+
+fn rule_meta(meta: AstScope) -> Option<public::RuleMetadata> {
+    meta.has_metadata().then(public::RuleMetadata::default)
+}
+
+fn complex_meta(meta: AstScope) -> Option<public::ComplexSelectorMetadata> {
+    meta.has_metadata()
+        .then(public::ComplexSelectorMetadata::default)
+}
+
+fn relative_meta(meta: AstScope) -> Option<public::RelativeSelectorMetadata> {
+    meta.has_metadata()
+        .then(public::RelativeSelectorMetadata::default)
+}
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.
 ///
@@ -186,7 +224,7 @@ fn scan_to_terminator(source: &str, from: usize) -> usize {
 /// first whitespace/colon, and `value` is the raw post-colon source with block
 /// comments stripped and the ends trimmed (so `red   !   important` stays raw and
 /// `!important` is never re-serialized).
-fn convert_declaration(decl: &internal::CssDeclaration<'_>, source: &str) -> serde_json::Value {
+fn convert_declaration(decl: &internal::CssDeclaration<'_>, source: &str) -> public::Declaration {
     let content_end = decl
         .important_end
         .map_or(decl.span.end, |e| e.max(decl.span.end));
@@ -197,64 +235,78 @@ fn convert_declaration(decl: &internal::CssDeclaration<'_>, source: &str) -> ser
     // Svelte 5.55.x+ strips block comments from declaration values.
     let value = strip_css_comments(value_source);
 
-    serde_json::json!({
-        "type": "Declaration",
-        "start": decl.span.start,
-        "end": end,
-        "property": property_source.trim_end(),
-        "value": value,
-    })
+    public::Declaration {
+        node_type: "Declaration",
+        start: decl.span.start,
+        end: end as u32,
+        property: property_source.trim_end().to_string(),
+        value,
+    }
 }
 
-/// Convert PseudoClassArgs to Svelte's expected JSON structure
-///
-/// Generates the wrapper structure: SelectorList → ComplexSelector → RelativeSelector → Nth
+/// Wrap a single simple selector in Svelte's triple-wrapper
+/// (SelectorList → ComplexSelector → RelativeSelector → selector), all sharing
+/// `span`. Used for the `Nth` and identifier (`:dir(ltr)`) pseudo-class args.
+fn wrap_single_selector(
+    selector: public::SimpleSelector,
+    span: tsv_lang::Span,
+    meta: AstScope,
+) -> public::SelectorList {
+    let relative = public::RelativeSelector {
+        node_type: "RelativeSelector",
+        combinator: None,
+        selectors: vec![selector],
+        start: span.start,
+        end: span.end,
+        metadata: relative_meta(meta),
+    };
+    let complex = public::ComplexSelector {
+        node_type: "ComplexSelector",
+        start: span.start,
+        end: span.end,
+        children: vec![relative],
+        metadata: complex_meta(meta),
+    };
+    public::SelectorList {
+        node_type: "SelectorList",
+        start: span.start,
+        end: span.end,
+        children: vec![complex],
+    }
+}
+
+/// Convert PseudoClassArgs to Svelte's expected wrapper structure
+/// (SelectorList → ComplexSelector → RelativeSelector → Nth/TypeSelector). The
+/// caller boxes the result into the recursive `args`/`selector` field.
 fn convert_pseudo_class_args(
     args: &internal::PseudoClassArgs<'_>,
     source: &str,
-) -> serde_json::Value {
+    meta: AstScope,
+) -> public::SelectorList {
     match args {
         internal::PseudoClassArgs::Nth {
             value,
             of_selector,
             span,
         } => {
-            // Generate Svelte's triple-wrapper structure
             // If there's an "of <selector-list>", include it in the Nth node
-            let mut nth_node = serde_json::json!({
-                "type": "Nth",
-                "value": value,
-                "start": span.start,
-                "end": span.end
+            // (CSS Selectors Level 4: :nth-child(An+B of S)).
+            let selector = of_selector
+                .as_ref()
+                .map(|selectors| Box::new(convert_selector_list_filtered(selectors, source, meta)));
+            let nth = public::SimpleSelector::Nth(public::Nth {
+                node_type: "Nth",
+                value: (*value).to_string(),
+                start: span.start,
+                end: span.end,
+                selector,
             });
-
-            // Add selector list if present (CSS Selectors Level 4: :nth-child(An+B of S))
-            if let Some(selectors) = of_selector {
-                nth_node["selector"] = convert_selector_list_filtered(selectors, source);
-            }
-
-            serde_json::json!({
-                "type": "SelectorList",
-                "start": span.start,
-                "end": span.end,
-                "children": [{
-                    "type": "ComplexSelector",
-                    "start": span.start,
-                    "end": span.end,
-                    "children": [{
-                        "type": "RelativeSelector",
-                        "combinator": null,
-                        "selectors": [nth_node],
-                        "start": span.start,
-                        "end": span.end,
-                    }]
-                }]
-            })
+            wrap_single_selector(nth, *span, meta)
         }
         internal::PseudoClassArgs::SelectorList { selectors, .. } => {
             // For :is(), :not(), :where(), :has(), :global() - convert the nested selector list
             // Filter out Invalid selectors (from forgiving parsing)
-            convert_selector_list_filtered(selectors, source)
+            convert_selector_list_filtered(selectors, source, meta)
         }
         internal::PseudoClassArgs::Identifier { value, span } => {
             // SVELTE QUIRK: Identifier arguments (e.g., :dir(ltr), :lang(en-US)) are wrapped
@@ -265,28 +317,13 @@ fn convert_pseudo_class_args(
             //
             // Spec-compliant internal: Identifier { value: "ltr" }
             // Svelte's public quirk: TypeSelector wrapping
-            serde_json::json!({
-                "type": "SelectorList",
-                "start": span.start,
-                "end": span.end,
-                "children": [{
-                    "type": "ComplexSelector",
-                    "start": span.start,
-                    "end": span.end,
-                    "children": [{
-                        "type": "RelativeSelector",
-                        "combinator": null,
-                        "selectors": [{
-                            "type": "TypeSelector",
-                            "name": value,
-                            "start": span.start,
-                            "end": span.end
-                        }],
-                        "start": span.start,
-                        "end": span.end,
-                    }]
-                }]
-            })
+            let type_selector = public::SimpleSelector::Named(public::NamedSelector {
+                node_type: "TypeSelector",
+                name: (*value).to_string(),
+                start: span.start,
+                end: span.end,
+            });
+            wrap_single_selector(type_selector, *span, meta)
         }
         // Note: Slotted and Part args are parsed internally but NOT exposed in public AST
         // This matches Svelte's behavior (they omit pseudo-element args from JSON output)
@@ -298,90 +335,109 @@ fn convert_pseudo_class_args(
     }
 }
 
-/// Convert a CSS node to JSON representation
-pub fn convert_css_node(node: &internal::CssNode<'_>, source: &str) -> serde_json::Value {
+/// Convert a top-level CSS node (rule or at-rule) to the typed public node for
+/// the embedded `<style>` path (`tsv_svelte`'s `StyleSheet { children:
+/// Vec<CssNodePublic> }`). `AstScope::Embedded` since embedded CSS never carries
+/// `parseCss()` metadata; the standalone root uses `convert_stylesheet_file`.
+/// Both paths now build the same typed tree — no intermediate `serde_json::Value`
+/// for embedded CSS either.
+pub fn convert_css_node(node: &internal::CssNode<'_>, source: &str) -> public::CssNodePublic {
+    convert_node(node, source, AstScope::Embedded)
+}
+
+/// Convert a top-level CSS node to the typed public node.
+fn convert_node(
+    node: &internal::CssNode<'_>,
+    source: &str,
+    meta: AstScope,
+) -> public::CssNodePublic {
     match node {
-        internal::CssNode::Rule(rule) => convert_css_rule(rule, source),
-        internal::CssNode::Atrule(atrule) => convert_css_atrule(atrule, source),
+        internal::CssNode::Rule(rule) => {
+            public::CssNodePublic::Rule(convert_rule(rule, source, meta))
+        }
+        internal::CssNode::Atrule(atrule) => {
+            public::CssNodePublic::Atrule(convert_atrule(atrule, source, meta))
+        }
     }
 }
 
-/// Convert a CSS rule to JSON representation
-fn convert_css_rule(rule: &internal::CssRule<'_>, source: &str) -> serde_json::Value {
-    // Filter out comments to match Svelte's CSS parser output
-    // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
-    // Support nested rules (CSS Nesting Module) and at-rules within rule blocks
-    let declarations: Vec<serde_json::Value> = rule
-        .declarations
-        .iter()
-        .filter_map(|child| {
-            match child {
-                internal::CssBlockChild::Declaration(decl) => {
-                    Some(convert_declaration(decl, source))
-                }
-                internal::CssBlockChild::Rule(nested_rule) => {
-                    // CSS Nesting Module - recursively convert nested rules
-                    Some(convert_css_rule(nested_rule, source))
-                }
-                internal::CssBlockChild::Atrule(nested_atrule) => {
-                    // At-rules can also be nested (e.g., @media inside a rule)
-                    Some(convert_css_atrule(nested_atrule, source))
-                }
-                internal::CssBlockChild::Comment(_) => {
-                    // Filter out comments to match Svelte's CSS parser output
-                    None
-                }
-            }
-        })
-        .collect();
-
-    let prelude = convert_selector_list(&rule.selector, source);
-
-    serde_json::json!({
-        "type": "Rule",
-        "prelude": prelude,
-        "block": {
-            "type": "Block",
-            "start": rule.block_span.start,
-            "end": rule.block_span.end,
-            "children": declarations,
-        },
-        "start": rule.span.start,
-        "end": rule.span.end,
-    })
+/// Convert a block child (declaration, nested rule, or nested at-rule) to a
+/// typed node. Comments are dropped to match Svelte's CSS parser output (our
+/// internal AST keeps them for the formatter).
+fn convert_block_child(
+    child: &internal::CssBlockChild<'_>,
+    source: &str,
+    meta: AstScope,
+) -> Option<public::CssNodePublic> {
+    match child {
+        internal::CssBlockChild::Declaration(decl) => Some(public::CssNodePublic::Declaration(
+            convert_declaration(decl, source),
+        )),
+        // CSS Nesting Module - recursively convert nested rules
+        internal::CssBlockChild::Rule(rule) => Some(public::CssNodePublic::Rule(convert_rule(
+            rule, source, meta,
+        ))),
+        // At-rules can also be nested (e.g., @media inside a rule)
+        internal::CssBlockChild::Atrule(atrule) => Some(public::CssNodePublic::Atrule(
+            convert_atrule(atrule, source, meta),
+        )),
+        internal::CssBlockChild::Comment(_) => None,
+    }
 }
 
-/// Convert a CSS at-rule to JSON representation
-fn convert_css_atrule(atrule: &internal::CssAtrule<'_>, source: &str) -> serde_json::Value {
+/// Convert a CSS rule to the typed public node.
+fn convert_rule(rule: &internal::CssRule<'_>, source: &str, meta: AstScope) -> public::Rule {
+    let children = rule
+        .declarations
+        .iter()
+        .filter_map(|child| convert_block_child(child, source, meta))
+        .collect();
+
+    public::Rule {
+        node_type: "Rule",
+        prelude: convert_selector_list(&rule.selector, source, meta),
+        block: public::Block {
+            node_type: "Block",
+            start: rule.block_span.start,
+            end: rule.block_span.end,
+            children,
+        },
+        start: rule.span.start,
+        end: rule.span.end,
+        metadata: rule_meta(meta),
+    }
+}
+
+/// Convert a CSS at-rule to the typed public node.
+fn convert_atrule(
+    atrule: &internal::CssAtrule<'_>,
+    source: &str,
+    meta: AstScope,
+) -> public::Atrule {
     let block = atrule.block.as_ref().map(|b| {
-        // Filter out comments to match Svelte's CSS parser output
-        // (Our internal AST has comments for the formatter, but public JSON AST should match Svelte)
-        let children: Vec<serde_json::Value> = b
+        let children = b
             .children
             .iter()
-            .filter(|child| !matches!(child, internal::CssBlockChild::Comment(_)))
-            .map(|child| convert_atrule_block_child(child, source))
+            .filter_map(|child| convert_block_child(child, source, meta))
             .collect();
 
-        serde_json::json!({
-            "type": "Block",
-            "start": b.span.start,
-            "end": b.span.end,
-            "children": children,
-        })
+        public::Block {
+            node_type: "Block",
+            start: b.span.start,
+            end: b.span.end,
+            children,
+        }
     });
 
-    // Convert prelude to string format for Svelte compatibility
-    let prelude_string = convert_prelude_to_string(&atrule.prelude, source);
-
-    serde_json::json!({
-        "type": "Atrule",
-        "name": atrule.name,
-        "prelude": prelude_string,
-        "block": block.unwrap_or(serde_json::Value::Null),
-        "start": atrule.span.start,
-        "end": atrule.span.end,
-    })
+    public::Atrule {
+        node_type: "Atrule",
+        name: atrule.name.to_string(),
+        // Convert prelude to string format for Svelte compatibility
+        prelude: convert_prelude_to_string(&atrule.prelude, source),
+        block,
+        start: atrule.span.start,
+        end: atrule.span.end,
+    }
 }
 
 /// Convert PreludeValue to string representation for public AST
@@ -422,41 +478,24 @@ fn convert_prelude_to_string(prelude: &internal::PreludeValue<'_>, source: &str)
     }
 }
 
-/// Convert an at-rule block child to JSON representation
-///
-/// Note: Comments are filtered out before calling this function (see convert_css_atrule)
-fn convert_atrule_block_child(
-    child: &internal::CssBlockChild<'_>,
-    source: &str,
-) -> serde_json::Value {
-    match child {
-        internal::CssBlockChild::Rule(rule) => convert_css_rule(rule, source),
-        internal::CssBlockChild::Declaration(decl) => convert_declaration(decl, source),
-        internal::CssBlockChild::Atrule(atrule) => convert_css_atrule(atrule, source),
-        internal::CssBlockChild::Comment(_) => {
-            // Comments are filtered out before calling this function
-            unreachable!("Comments should be filtered in convert_css_atrule")
-        }
-    }
-}
-
-/// Convert a SelectorList to JSON
+/// Convert a SelectorList to the typed public node.
 fn convert_selector_list(
     selector_list: &internal::SelectorList<'_>,
     source: &str,
-) -> serde_json::Value {
-    let children: Vec<serde_json::Value> = selector_list
+    meta: AstScope,
+) -> public::SelectorList {
+    let children = selector_list
         .selectors
         .iter()
-        .map(|c| convert_complex_selector(c, source))
+        .map(|c| convert_complex_selector(c, source, meta))
         .collect();
 
-    serde_json::json!({
-        "type": "SelectorList",
-        "start": selector_list.span.start,
-        "end": selector_list.span.end,
-        "children": children,
-    })
+    public::SelectorList {
+        node_type: "SelectorList",
+        start: selector_list.span.start,
+        end: selector_list.span.end,
+        children,
+    }
 }
 
 /// Convert a SelectorList to JSON, filtering out Invalid selectors (from forgiving parsing).
@@ -474,20 +513,21 @@ fn convert_selector_list(
 fn convert_selector_list_filtered(
     selector_list: &internal::SelectorList<'_>,
     source: &str,
-) -> serde_json::Value {
-    let children: Vec<serde_json::Value> = selector_list
+    meta: AstScope,
+) -> public::SelectorList {
+    let children = selector_list
         .selectors
         .iter()
         .filter(|selector| !selector_contains_invalid(selector))
-        .map(|c| convert_complex_selector(c, source))
+        .map(|c| convert_complex_selector(c, source, meta))
         .collect();
 
-    serde_json::json!({
-        "type": "SelectorList",
-        "start": selector_list.span.start,
-        "end": selector_list.span.end,
-        "children": children,
-    })
+    public::SelectorList {
+        node_type: "SelectorList",
+        start: selector_list.span.start,
+        end: selector_list.span.end,
+        children,
+    }
 }
 
 /// Check if a complex selector contains Invalid simple selectors (from forgiving parsing)
@@ -502,56 +542,59 @@ fn selector_contains_invalid(complex: &internal::ComplexSelector<'_>) -> bool {
     false
 }
 
-/// Convert a ComplexSelector to JSON
+/// Convert a ComplexSelector to the typed public node.
 fn convert_complex_selector(
     complex: &internal::ComplexSelector<'_>,
     source: &str,
-) -> serde_json::Value {
-    let children: Vec<serde_json::Value> = complex
+    meta: AstScope,
+) -> public::ComplexSelector {
+    let children = complex
         .children
         .iter()
-        .map(|r| convert_relative_selector(r, source))
+        .map(|r| convert_relative_selector(r, source, meta))
         .collect();
 
-    serde_json::json!({
-        "type": "ComplexSelector",
-        "start": complex.span.start,
-        "end": complex.span.end,
-        "children": children,
-    })
+    public::ComplexSelector {
+        node_type: "ComplexSelector",
+        start: complex.span.start,
+        end: complex.span.end,
+        children,
+        metadata: complex_meta(meta),
+    }
 }
 
-/// Convert a RelativeSelector to JSON
+/// Convert a RelativeSelector to the typed public node.
 fn convert_relative_selector(
     relative: &internal::RelativeSelector<'_>,
     source: &str,
-) -> serde_json::Value {
+    meta: AstScope,
+) -> public::RelativeSelector {
     let combinator =
         if let (Some(comb), Some(span)) = (&relative.combinator, &relative.combinator_span) {
-            let name = comb.as_str();
-            serde_json::json!({
-                "type": "Combinator",
-                "name": name,
-                "start": span.start,
-                "end": span.end,
+            Some(public::Combinator {
+                node_type: "Combinator",
+                name: comb.as_str(),
+                start: span.start,
+                end: span.end,
             })
         } else {
-            serde_json::Value::Null
+            None
         };
 
-    let selectors: Vec<serde_json::Value> = relative
+    let selectors = relative
         .selectors
         .iter()
-        .map(|s| convert_simple_selector(s, source))
+        .map(|s| convert_simple_selector(s, source, meta))
         .collect();
 
-    serde_json::json!({
-        "type": "RelativeSelector",
-        "combinator": combinator,
-        "selectors": selectors,
-        "start": relative.span.start,
-        "end": relative.span.end,
-    })
+    public::RelativeSelector {
+        node_type: "RelativeSelector",
+        combinator,
+        selectors,
+        start: relative.span.start,
+        end: relative.span.end,
+        metadata: relative_meta(meta),
+    }
 }
 
 /// Extract a selector name from source, skipping `prefix_len` bytes of sigil (`.`/`#`),
@@ -620,11 +663,12 @@ fn pseudo_name_end(source: &str, span: tsv_lang::Span, has_args: bool) -> u32 {
     }
 }
 
-/// Convert a SimpleSelector to JSON
+/// Convert a SimpleSelector to the typed public node.
 fn convert_simple_selector(
     simple: &internal::SimpleSelector<'_>,
     source: &str,
-) -> serde_json::Value {
+    meta: AstScope,
+) -> public::SimpleSelector {
     match simple {
         internal::SimpleSelector::Type { namespace, span } => {
             // SVELTE QUIRK: Namespace prefixes are parsed but NOT included in the JSON AST
@@ -641,37 +685,37 @@ fn convert_simple_selector(
                 let prefix = raw.find('|').map_or(0, |i| i + 1);
                 raw_selector_name(source, *span, prefix)
             };
-            serde_json::json!({
-                "type": "TypeSelector",
-                "name": raw_name,
-                "start": span.start,
-                "end": span.end,
+            public::SimpleSelector::Named(public::NamedSelector {
+                node_type: "TypeSelector",
+                name: raw_name,
+                start: span.start,
+                end: span.end,
             })
         }
         internal::SimpleSelector::Universal { namespace: _, span } => {
             // Svelte represents universal selector as TypeSelector with name "*"
             // SVELTE QUIRK: Namespace prefixes are parsed but NOT included in the JSON AST
-            serde_json::json!({
-                "type": "TypeSelector",
-                "name": "*",
-                "start": span.start,
-                "end": span.end,
+            public::SimpleSelector::Named(public::NamedSelector {
+                node_type: "TypeSelector",
+                name: "*".to_string(),
+                start: span.start,
+                end: span.end,
             })
         }
         internal::SimpleSelector::Class { span } => {
-            serde_json::json!({
-                "type": "ClassSelector",
-                "name": raw_selector_name(source, *span, 1),
-                "start": span.start,
-                "end": span.end,
+            public::SimpleSelector::Named(public::NamedSelector {
+                node_type: "ClassSelector",
+                name: raw_selector_name(source, *span, 1),
+                start: span.start,
+                end: span.end,
             })
         }
         internal::SimpleSelector::Id { span } => {
-            serde_json::json!({
-                "type": "IdSelector",
-                "name": raw_selector_name(source, *span, 1),
-                "start": span.start,
-                "end": span.end,
+            public::SimpleSelector::Named(public::NamedSelector {
+                node_type: "IdSelector",
+                name: raw_selector_name(source, *span, 1),
+                start: span.start,
+                end: span.end,
             })
         }
         internal::SimpleSelector::Attribute {
@@ -682,34 +726,21 @@ fn convert_simple_selector(
             flags,
             span,
         } => {
-            let matcher_val = matcher.as_ref().map_or(serde_json::Value::Null, |m| {
-                serde_json::Value::String(m.as_str().to_string())
-            });
-            let value_val = value.as_ref().map_or(serde_json::Value::Null, |v| {
-                serde_json::Value::String((*v).to_string())
-            });
-            let flags_val = flags.as_ref().map_or(serde_json::Value::Null, |f| {
-                serde_json::Value::String((*f).to_string())
-            });
-
             // The name is half-decoded from its own span (`name_span` is exactly the name
             // token — no sigil prefix, so `prefix_len` is 0), matching Svelte's `read_identifier`
             // like class/id/type and pseudo names: hex escapes decode, identity escapes keep the
             // backslash (`[f\oo]` → `"f\\oo"`, not `"foo"`). See conformance_svelte.md
             // §Selector-name half-decoding.
-            let mut obj = serde_json::json!({
-                "type": "AttributeSelector",
-                "name": raw_selector_name(source, *name_span, 0),
-                "start": span.start,
-                "end": span.end,
-                "matcher": matcher_val,
-                "value": value_val,
-                "flags": flags_val,
-            });
-            if let Some(ns) = namespace {
-                obj["namespace"] = serde_json::Value::String((*ns).to_string());
-            }
-            obj
+            public::SimpleSelector::Attribute(public::AttributeSelector {
+                node_type: "AttributeSelector",
+                name: raw_selector_name(source, *name_span, 0),
+                start: span.start,
+                end: span.end,
+                matcher: matcher.as_ref().map(|m| m.as_str().to_string()),
+                value: value.as_ref().map(|v| (*v).to_string()),
+                flags: flags.as_ref().map(|f| (*f).to_string()),
+                namespace: namespace.as_ref().map(|ns| (*ns).to_string()),
+            })
         }
         // Pseudo-class/-element names are half-decoded like every other selector name
         // (`raw_selector_name`): hex escapes decode, identity escapes keep the backslash —
@@ -717,21 +748,21 @@ fn convert_simple_selector(
         // the `(` (when there are args) or the span end, so the decoded internal name is never
         // re-serialized; only `span` and `source` feed the public `name`.
         internal::SimpleSelector::PseudoClass { args, span } => {
-            let args_val = args.as_ref().map_or(serde_json::Value::Null, |a| {
-                convert_pseudo_class_args(a, source)
-            });
+            let args_val = args
+                .as_ref()
+                .map(|a| Box::new(convert_pseudo_class_args(a, source, meta)));
             let name_span = tsv_lang::Span {
                 start: span.start,
                 end: pseudo_name_end(source, *span, args.is_some()),
             };
             let name = raw_selector_name(source, name_span, 1);
 
-            serde_json::json!({
-                "type": "PseudoClassSelector",
-                "name": name,
-                "args": args_val,
-                "start": span.start,
-                "end": span.end,
+            public::SimpleSelector::PseudoClass(public::PseudoClassSelector {
+                node_type: "PseudoClassSelector",
+                name,
+                args: args_val,
+                start: span.start,
+                end: span.end,
             })
         }
         internal::SimpleSelector::PseudoElement { args, span } => {
@@ -753,19 +784,19 @@ fn convert_simple_selector(
                 2,
             );
 
-            serde_json::json!({
-                "type": "PseudoElementSelector",
-                "name": name,
-                "start": span.start,
-                "end": name_end, // Matches Svelte (name only, not including args)
+            public::SimpleSelector::PseudoElement(public::PseudoElementSelector {
+                node_type: "PseudoElementSelector",
+                name,
+                start: span.start,
+                end: name_end, // Matches Svelte (name only, not including args)
             })
         }
         internal::SimpleSelector::Nesting { span } => {
-            serde_json::json!({
-                "type": "NestingSelector",
-                "name": "&",
-                "start": span.start,
-                "end": span.end,
+            public::SimpleSelector::Named(public::NamedSelector {
+                node_type: "NestingSelector",
+                name: "&".to_string(),
+                start: span.start,
+                end: span.end,
             })
         }
         internal::SimpleSelector::Percentage { value, span } => {
@@ -775,11 +806,11 @@ fn convert_simple_selector(
             } else {
                 format!("{value}%")
             };
-            serde_json::json!({
-                "type": "Percentage",
-                "value": value_str,
-                "start": span.start,
-                "end": span.end,
+            public::SimpleSelector::Percentage(public::Percentage {
+                node_type: "Percentage",
+                value: value_str,
+                start: span.start,
+                end: span.end,
             })
         }
         internal::SimpleSelector::Invalid { .. } => {
@@ -843,12 +874,9 @@ fn translate_positions_recursive(value: &mut serde_json::Value, map: &tsv_lang::
 }
 
 /// Convert a list of CSS nodes to a typed StyleSheet structure (for Svelte embedding)
-pub fn convert_css_nodes(
-    nodes: &[internal::CssNode<'_>],
-    source: &str,
-) -> super::public::StyleSheet {
+pub fn convert_css_nodes(nodes: &[internal::CssNode<'_>], source: &str) -> public::StyleSheet {
     // Convert all nodes (comments are stored separately and not included in JSON output)
-    let children: Vec<serde_json::Value> = nodes
+    let children: Vec<public::CssNodePublic> = nodes
         .iter()
         .map(|node| convert_css_node(node, source))
         .collect();
@@ -859,13 +887,13 @@ pub fn convert_css_nodes(
         _ => (0, 0),
     };
 
-    super::public::StyleSheet {
+    public::StyleSheet {
         node_type: "StyleSheetFile".to_string(),
         start: content_start,
         end: content_end,
         attributes: Vec::new(),
         children,
-        content: super::public::StyleContent {
+        content: public::StyleContent {
             start: content_start,
             end: content_end,
             styles: source[content_start as usize..content_end as usize].to_string(),
@@ -874,99 +902,31 @@ pub fn convert_css_nodes(
     }
 }
 
-/// Convert a list of CSS nodes to a standalone StyleSheetFile JSON value
+/// Convert a list of CSS nodes to the typed standalone `StyleSheetFile` root.
 ///
-/// Unlike `convert_css_nodes` (used for Svelte `<style>` embedding which includes
+/// Unlike `convert_css_nodes` (used for Svelte `<style>` embedding, which includes
 /// `attributes` and `content` fields), this produces the minimal `StyleSheetFile`
 /// structure matching Svelte's `parseCss()` output: just `type`, `start`, `end`,
-/// and `children`.
+/// and `children`, with `metadata` on every `Rule`/`ComplexSelector`/`RelativeSelector`
+/// (`AstScope::Standalone`). It's the source for both `convert_ast_json` (via
+/// `to_value`) and `convert_ast_json_string` (serialized directly).
 ///
 /// The `end` offset is set to the full source length (not the last node's span end),
 /// matching Svelte's behavior of including trailing whitespace in the file span.
-///
-/// Also adds `metadata` fields to `Rule`, `ComplexSelector`, and `RelativeSelector`
-/// nodes, matching Svelte's `parseCss()` output (which includes these for standalone
-/// CSS but not for embedded `<style>` in `.svelte` files).
-pub fn convert_css_nodes_standalone(
+pub fn convert_stylesheet_file(
     nodes: &[internal::CssNode<'_>],
     source: &str,
-) -> serde_json::Value {
-    let children: Vec<serde_json::Value> = nodes
+) -> public::StyleSheetFile {
+    let children = nodes
         .iter()
-        .map(|node| convert_css_node(node, source))
+        .map(|node| convert_node(node, source, AstScope::Standalone))
         .collect();
 
-    let mut result = serde_json::json!({
-        "type": "StyleSheetFile",
-        "start": 0,
-        "end": source.len() as u32,
-        "children": children,
-    });
-
-    // Add metadata fields matching parseCss() output
-    add_parsecss_metadata(&mut result);
-
-    result
-}
-
-/// Add `metadata` fields to CSS AST nodes for standalone `parseCss()` output
-///
-/// Svelte's `parseCss()` includes metadata on `Rule`, `ComplexSelector`, and
-/// `RelativeSelector` nodes. These metadata fields are NOT present in Svelte's
-/// `.svelte` file parser output, so they're added as a post-processing step
-/// only for standalone CSS files.
-fn add_parsecss_metadata(value: &mut serde_json::Value) {
-    match value {
-        serde_json::Value::Object(obj) => {
-            // Add metadata based on node type
-            if let Some(node_type) = obj.get("type").and_then(|v| v.as_str()).map(String::from) {
-                match node_type.as_str() {
-                    "Rule" => {
-                        obj.insert(
-                            "metadata".to_string(),
-                            serde_json::json!({
-                                "parent_rule": null,
-                                "has_local_selectors": false,
-                                "has_global_selectors": false,
-                                "is_global_block": false,
-                            }),
-                        );
-                    }
-                    "ComplexSelector" => {
-                        obj.insert(
-                            "metadata".to_string(),
-                            serde_json::json!({
-                                "rule": null,
-                                "is_global": false,
-                                "used": false,
-                            }),
-                        );
-                    }
-                    "RelativeSelector" => {
-                        obj.insert(
-                            "metadata".to_string(),
-                            serde_json::json!({
-                                "is_global": false,
-                                "is_global_like": false,
-                                "scoped": false,
-                            }),
-                        );
-                    }
-                    _ => {}
-                }
-            }
-
-            // Recurse into all values
-            for val in obj.values_mut() {
-                add_parsecss_metadata(val);
-            }
-        }
-        serde_json::Value::Array(arr) => {
-            for item in arr {
-                add_parsecss_metadata(item);
-            }
-        }
-        _ => {}
+    public::StyleSheetFile {
+        node_type: "StyleSheetFile",
+        start: 0,
+        end: source.len() as u32,
+        children,
     }
 }
 

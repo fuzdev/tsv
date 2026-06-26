@@ -148,10 +148,15 @@ pub fn convert_ast(stylesheet: &CssStyleSheet<'_>, source: &str) -> StyleSheet {
 /// Produces a standalone `StyleSheetFile` JSON matching Svelte's `parseCss()` output
 /// (no `attributes` or `content` fields, `end` set to full source length).
 ///
-/// This is the preferred function for producing JSON AST output.
+/// Builds the typed public AST (`convert_stylesheet_file`), then materializes it
+/// into a `Value` and translates positions there — the `Value` walk stays the
+/// independent oracle the fixture suite checks `convert_ast_json_string`'s typed
+/// walk against.
 #[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
 pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_json::Value {
-    let mut json = ast::convert::convert_css_nodes_standalone(stylesheet.nodes, source);
+    let public_ast = ast::convert::convert_stylesheet_file(stylesheet.nodes, source);
+    let mut json = serde_json::to_value(&public_ast).expect("public CSS AST serializes to a Value");
     let map = tsv_lang::ByteToCharMap::new(source);
     ast::convert::translate_byte_to_char_offsets(&mut json, &map);
     json
@@ -159,15 +164,20 @@ pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_j
 
 /// Like `convert_ast_json`, serialized to a compact JSON string
 ///
-/// CSS conversion builds the `Value` directly (no typed public-AST tree), so
-/// unlike `tsv_ts`/`tsv_svelte` there is no direct-serialization fast path
-/// here. This exists so the FFI/WASM bindings have one uniform
-/// string-returning entry point per language.
+/// Serializes the typed public AST (`convert_stylesheet_file`) directly, skipping
+/// the intermediate `serde_json::Value` (matching `tsv_ts`/`tsv_svelte`). For
+/// ASCII sources byte offsets already equal char offsets; multibyte sources get
+/// the typed offset-translation walk (`translate_byte_to_char_offsets_typed`)
+/// before serialization. Byte-identical to
+/// `serde_json::to_string(&convert_ast_json(...))`; the hot path for the
+/// FFI/WASM parse bindings and the CLI's compact output.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
+    let mut public_ast = ast::convert::convert_stylesheet_file(stylesheet.nodes, source);
+    let map = tsv_lang::ByteToCharMap::new(source);
+    ast::convert::translate_byte_to_char_offsets_typed(&mut public_ast, &map);
     let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
-    serde_json::to_writer(&mut buf, &convert_ast_json(stylesheet, source))
-        .expect("Value serialization cannot fail");
+    serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
     String::from_utf8(buf).expect("serde_json emits valid UTF-8")
 }
