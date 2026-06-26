@@ -107,24 +107,26 @@ these artifacts - see [docs/architecture.md](docs/architecture.md)
 
 tsv's goal is to be an optimal toolchain for Svelte and TypeScript,
 and avoiding bloat is a key characteristic.
-The scope trade is depth over breadth: a closed language set with an expanding
-tool set, instead of more frameworks. Hard non-goals:
+The trade is depth over breadth: tsv has a closed language set with an expanding
+tool set, instead of checklisting more frameworks and languages.
+Consumers can use tsv's Rust crates to build custom tools independently.
+Hard non-goals:
 
-- other frameworks' markup - no Vue, Astro, JSX/TSX, etc (unlike Biome and friends);
+- no markup for other frameworks - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+friends);
   Svelte is the only component language (it's in the name `tsv`)
-- CSS preprocessor and vendor dialects - no SCSS, LESS, CSS Modules, or IE hacks;
-  tsv parses standard and Svelte CSS only
-- JS plugins - follows from never embedding a JS runtime; linter extensibility,
-  if any, will be WASM plugins and/or pattern-based rules
+- standard CSS and Svelte extensions only - no SCSS, CSS Modules, LESS, etc
+- no JS plugins - won't embed or integrate a JS runtime,
+  instead linter extensibility will be data-driven like with pattern-based rules;
+  possibly WASM plugins if the weight is deemed worth it
 - no style config settings, so on-disk state and caller params
   never change the output for a given input
-- full Prettier conformance - see [discussion 1](https://github.com/fuzdev/tsv/discussions/1)
+- no full Prettier conformance - see [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
 
 Deferred rather than refused:
 
+- N-API native bindings - npm is WASM-only for now
 - internal AST stabilization - not any time soon; the public JSON AST is the
   stable surface, tracking Svelte's
-- N-API native bindings - npm is WASM-only for now
 
 tsv is derived from:
 
@@ -147,7 +149,7 @@ Future features (unknown order):
 - minifier
 - LSP
 - later
-  - linter (type aware, all Rust, maybe WASM plugins and/or pattern-based rules for extensibility)
+  - linter (type aware, initially focused on declarative data plugins for extensibility, maybe plugins via wasm)
   - Svelte compiler (exact mirror)
   - bundler
   - typechecker isn't off the table
