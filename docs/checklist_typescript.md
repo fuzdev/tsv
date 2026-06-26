@@ -382,7 +382,8 @@ ES2015 module syntax with ES2024 additions.
 
 - Class declaration
 - Class expression
-- `extends` clause
+- `extends` clause — any `LeftHandSideExpression` superclass (`extends Base`,
+  `extends getMixin(B)`, `extends class {}`, `extends (a + b)`, `extends null`)
 - `constructor` method
 - Instance methods
 - Static methods
