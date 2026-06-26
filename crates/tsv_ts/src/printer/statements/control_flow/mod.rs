@@ -214,7 +214,7 @@ impl<'a> Printer<'a> {
             let has_line = self.has_line_comments_between(paren_end, body_start);
             let comment_doc =
                 self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
-            let mut parts = head_parts.to_vec();
+            let mut parts: DocBuf = SmallVec::from_slice(head_parts);
             parts.push(d.text(")"));
             if has_line {
                 // Line comment forces break: stmt (cond)\n\t// comment\n\tfn();
@@ -232,7 +232,7 @@ impl<'a> Printer<'a> {
                 d.group(d.concat(&parts))
             }
         } else {
-            let mut parts = head_parts.to_vec();
+            let mut parts: DocBuf = SmallVec::from_slice(head_parts);
             parts.push(d.text(")"));
             parts.push(d.indent_line(body_doc));
             d.group(d.concat(&parts))

@@ -600,7 +600,7 @@ impl<'a> Printer<'a> {
                 // back to the assignment-style joined group.
                 match sig_docs.split_first() {
                     Some((&sig0, rest)) => {
-                        let rest_joined = d.join_doc(rest.to_vec(), sep);
+                        let rest_joined = d.join_doc(rest.iter().copied(), sep);
                         d.group_with_id(
                             d.concat(&[
                                 sig0,
