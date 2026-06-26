@@ -4,6 +4,7 @@
 //! with `render_single_doc` in `arena_render.rs`.
 
 use crate::EmbedContext;
+use smallvec::SmallVec;
 
 use super::arena::{ArenaCommand, DocArena, DocId};
 use super::arena_fits::{arena_fits_multi, arena_fits_with_lookahead};
@@ -165,7 +166,11 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 // element's hardline and wrongly report a fit (hugging it onto the text line).
                 false
             } else if is_final_segment && !rest_commands.is_empty() {
-                let mut rest_with_sep: Vec<ArenaCommand> = rest_commands.to_vec();
+                // Inline-backed copy of the look-ahead stack plus the separator —
+                // matches the render work-list's `N = 8` so the common case stays
+                // off the heap (this rare Case-2 flow boundary still cloned a `Vec`).
+                let mut rest_with_sep: SmallVec<[ArenaCommand; 8]> =
+                    SmallVec::from_slice(rest_commands);
                 // Flow boundary (Svelte text→inline-element/component): measure the immediately
                 // following node — the top of the rest stack, the inline element — as a WHOLE flat
                 // unit (force Flat mode), so the separator breaks (dropping the element to its own

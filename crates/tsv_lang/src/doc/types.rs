@@ -32,6 +32,14 @@ pub enum GroupId {
     BlockHead,
 }
 
+impl GroupId {
+    /// Number of variants. Sizes the renderer's inline `[Option<Mode>; COUNT]`
+    /// group-mode map (indexed by `id as usize`), which replaces a per-render
+    /// `HashMap`. Keep in sync when adding a variant — a stale (too-small) value
+    /// would index out of bounds, caught immediately by the fixture suite.
+    pub(crate) const COUNT: usize = 6;
+}
+
 /// Context for doc rendering - provides hints about trailing punctuation
 /// that affect how content is rendered.
 ///
