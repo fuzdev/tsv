@@ -13,7 +13,7 @@ use super::{Decorator, Expression, Identifier, SourceLocation};
 #[derive(Debug, Clone, Serialize)]
 pub struct ClassDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -49,7 +49,7 @@ pub struct ClassDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct ClassExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -82,7 +82,7 @@ pub struct ClassExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct ClassBody {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -103,7 +103,7 @@ pub enum ClassMember {
 #[derive(Debug, Clone, Serialize)]
 pub struct StaticBlock {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -114,7 +114,7 @@ pub struct StaticBlock {
 #[derive(Debug, Clone, Serialize)]
 pub struct MethodDefinition {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -156,7 +156,7 @@ pub enum MethodValue {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSDeclareMethod {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -176,7 +176,7 @@ pub struct TSDeclareMethod {
 #[derive(Debug, Clone, Serialize)]
 pub struct PropertyDefinition {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -221,7 +221,7 @@ pub struct PropertyDefinition {
 #[derive(Debug, Clone, Serialize)]
 pub struct FunctionExpression {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -245,7 +245,7 @@ pub struct FunctionExpression {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSExpressionWithTypeArguments {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -258,7 +258,7 @@ pub struct TSExpressionWithTypeArguments {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSParameterProperty {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,

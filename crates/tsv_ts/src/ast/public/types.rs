@@ -21,7 +21,7 @@ use super::{Expression, Identifier, Literal, SourceLocation, TemplateElement, is
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeAnnotation {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -76,7 +76,7 @@ pub enum TSType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSArrayType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -88,7 +88,7 @@ pub struct TSArrayType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSIndexedAccessType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -102,7 +102,7 @@ pub struct TSIndexedAccessType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSNumberKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -112,7 +112,7 @@ pub struct TSNumberKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSStringKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -122,7 +122,7 @@ pub struct TSStringKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSBooleanKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -132,7 +132,7 @@ pub struct TSBooleanKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSAnyKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -142,7 +142,7 @@ pub struct TSAnyKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSVoidKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -152,7 +152,7 @@ pub struct TSVoidKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSUndefinedKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -162,7 +162,7 @@ pub struct TSUndefinedKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSNullKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -172,7 +172,7 @@ pub struct TSNullKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSNeverKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -182,7 +182,7 @@ pub struct TSNeverKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSUnknownKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -192,7 +192,7 @@ pub struct TSUnknownKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSObjectKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -202,7 +202,7 @@ pub struct TSObjectKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSSymbolKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -212,7 +212,7 @@ pub struct TSSymbolKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSBigIntKeyword {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -222,7 +222,7 @@ pub struct TSBigIntKeyword {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeAliasDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -239,7 +239,7 @@ pub struct TSTypeAliasDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSLiteralType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -261,7 +261,7 @@ pub enum TSLiteralTypeLiteral {
 #[derive(Debug, Clone, Serialize)]
 pub struct TemplateLiteralType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -281,7 +281,7 @@ pub enum TSEntityName {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSQualifiedName {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -293,7 +293,7 @@ pub struct TSQualifiedName {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeParameterInstantiation {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -304,7 +304,7 @@ pub struct TSTypeParameterInstantiation {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeParameterDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -325,7 +325,7 @@ pub struct TSTypeParameterExtra {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeParameter {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -360,7 +360,7 @@ pub enum TSTypeElement {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSInterfaceBody {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -371,7 +371,7 @@ pub struct TSInterfaceBody {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSPropertySignature {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -391,7 +391,7 @@ pub struct TSPropertySignature {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSMethodSignature {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -414,7 +414,7 @@ pub struct TSMethodSignature {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSCallSignatureDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -430,7 +430,7 @@ pub struct TSCallSignatureDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSConstructSignatureDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -446,7 +446,7 @@ pub struct TSConstructSignatureDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSIndexSignature {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -464,7 +464,7 @@ pub struct TSIndexSignature {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSUnionType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -475,7 +475,7 @@ pub struct TSUnionType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSIntersectionType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -486,7 +486,7 @@ pub struct TSIntersectionType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeReference {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -500,7 +500,7 @@ pub struct TSTypeReference {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeLiteral {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -511,7 +511,7 @@ pub struct TSTypeLiteral {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSFunctionType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -527,7 +527,7 @@ pub struct TSFunctionType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSConstructorType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -545,7 +545,7 @@ pub struct TSConstructorType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTupleType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -557,7 +557,7 @@ pub struct TSTupleType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSRestType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -569,7 +569,7 @@ pub struct TSRestType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSOptionalType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -581,7 +581,7 @@ pub struct TSOptionalType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSNamedTupleMember {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -595,7 +595,7 @@ pub struct TSNamedTupleMember {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSInferType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -607,7 +607,7 @@ pub struct TSInferType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSThisType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -617,7 +617,7 @@ pub struct TSThisType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSParenthesizedType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -629,7 +629,7 @@ pub struct TSParenthesizedType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypePredicate {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -652,7 +652,7 @@ pub enum TSTypePredicateParameterName {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSConditionalType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -670,7 +670,7 @@ pub struct TSConditionalType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSMappedType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -694,7 +694,7 @@ pub struct TSMappedType {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSMappedTypeParameter {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -730,7 +730,7 @@ impl Serialize for TSMappedTypeModifier {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeOperator {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -745,7 +745,7 @@ pub struct TSTypeOperator {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSImportType {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -782,7 +782,7 @@ pub enum TSTypeQueryExprName {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSTypeQuery {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,

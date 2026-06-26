@@ -23,7 +23,7 @@ pub(super) fn convert_html_tag(
         tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
 
     public::HtmlTag {
-        node_type: "HtmlTag".to_string(),
+        node_type: "HtmlTag",
         start: tag.span.start,
         end: tag.span.end,
         expression,
@@ -58,7 +58,7 @@ pub(super) fn convert_const_tag(
     });
 
     public::ConstTag {
-        node_type: "ConstTag".to_string(),
+        node_type: "ConstTag",
         start: tag.span.start,
         end: tag.span.end,
         declaration,
@@ -84,7 +84,7 @@ pub(super) fn convert_declaration_tag(
     ));
 
     public::DeclarationTag {
-        node_type: "DeclarationTag".to_string(),
+        node_type: "DeclarationTag",
         start: tag.span.start,
         end: tag.span.end,
         declaration,
@@ -104,7 +104,7 @@ pub(super) fn convert_debug_tag(
         .collect();
 
     public::DebugTag {
-        node_type: "DebugTag".to_string(),
+        node_type: "DebugTag",
         start: tag.span.start,
         end: tag.span.end,
         identifiers,
@@ -121,7 +121,7 @@ pub(super) fn convert_render_tag(
         tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
 
     public::RenderTag {
-        node_type: "RenderTag".to_string(),
+        node_type: "RenderTag",
         start: tag.span.start,
         end: tag.span.end,
         expression,

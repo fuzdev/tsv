@@ -12,7 +12,7 @@ use super::{Expression, Identifier, Literal, SourceLocation, Statement};
 #[derive(Debug, Clone, Serialize)]
 pub struct TSInterfaceDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -30,7 +30,7 @@ pub struct TSInterfaceDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSInterfaceHeritage {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -46,7 +46,7 @@ pub struct TSInterfaceHeritage {
 #[allow(clippy::struct_excessive_bools)]
 pub struct TSDeclareFunction {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -71,7 +71,7 @@ pub struct TSDeclareFunction {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSEnumDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -91,7 +91,7 @@ pub struct TSEnumDeclaration {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSEnumMember {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -114,7 +114,7 @@ pub enum TSEnumMemberId {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSModuleDeclaration {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
@@ -156,7 +156,7 @@ pub enum TSModuleDeclarationBody {
 #[derive(Debug, Clone, Serialize)]
 pub struct TSModuleBlock {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
