@@ -8,12 +8,11 @@ use serde::Serialize;
 /// Represents a <style> tag's parsed CSS content.
 /// Used when CSS is embedded in Svelte components.
 ///
-/// Serialize-only (like the standalone types below): `children` holds the typed
+/// Serialize-only (like the whole public AST): `children` holds the typed
 /// `CssNodePublic` tree directly, so the embedded `<style>` path no longer
-/// materializes an intermediate `serde_json::Value` per node. `CssNodePublic`'s
-/// `&'static str` type tags can't round-trip through `Deserialize`, and nothing
-/// deserializes the public AST, so the (dead) `Deserialize` derive is dropped
-/// here and on the containing `tsv_svelte::Root`.
+/// materializes an intermediate `serde_json::Value` per node. The public AST is
+/// an output format — nothing deserializes it — and `CssNodePublic`'s
+/// `&'static str` type tags couldn't round-trip anyway.
 #[derive(Debug, Clone, Serialize)]
 pub struct StyleSheet {
     #[serde(rename = "type")]
