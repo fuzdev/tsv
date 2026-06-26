@@ -28,9 +28,9 @@ tsv ships three WASM packages to npm (native builds will arrive with the v0.2 re
 - [`@fuzdev/tsv_parse_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_parse_wasm) - parser + JSON AST only (smallest)
 
 ```bash
-npm i @fuzdev/tsv_wasm            # or pick a subset: @fuzdev/tsv_format_wasm / @fuzdev/tsv_parse_wasm
+npm i @fuzdev/tsv_wasm
 npx tsv format src                # if installed locally
-npx @fuzdev/tsv_wasm format src   # try the formatter without installing
+npx @fuzdev/tsv_wasm format src   # or without installing first
 ```
 
 ```typescript
@@ -44,15 +44,15 @@ const ast: Root = parse_svelte('<script>const x = 1;</script>');
 ```
 
 Both halves import the same way from `@fuzdev/tsv_wasm`.
-Works without setup in Node.js/Bun/Deno (sync auto-init);
-browsers and bundlers must call `await init()` once first.
+As with other WASM packages, it works without setup in Node.js/Bun/Deno,
+but browsers must call `await init()`.
 See the package READMEs for the full API and CLI flags:
 
 - [crates/tsv_wasm/README_all.md](crates/tsv_wasm/README_all.md)
 - [crates/tsv_wasm/README_format.md](crates/tsv_wasm/README_format.md)
 - [crates/tsv_wasm/README_parse.md](crates/tsv_wasm/README_parse.md)
 
-There are no prebuilt native binaries yet - the npm packages are all WASM.
+There are no prebuilt native binaries yet, just WASM.
 For native speed today, build the C FFI library from source
 (`deno task build:ffi`, producing `target/release/libtsv_ffi.so`/`.dylib`/`.dll`) and bind it
 from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
@@ -60,13 +60,6 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
 ## Design
 
 - supports Svelte, TypeScript/JS, CSS (and planned HTML/JSON)
-- formatting is similar Prettier and prettier-plugin-svelte for the common case,
-  but intentionally diverges in some cases and fixes numerous bugs
-  (see [docs/conformance_prettier.md](docs/conformance_prettier.md))
-- tsv can generate a public JSON AST that should exactly match
-  Svelte 5's modern AST with acorn and acorn-typescript
-  (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
-  but has its own internal optimal AST
 - non-configurable: formatter settings are fixed at Prettier's defaults except
   `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
   `trailingComma: 'none'` (no trailing comma on multiline lists, matching the
@@ -74,17 +67,25 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   and there are no config files or CLI options for formatting style;
   tsv is opinionated like `gofmt` and Python's Black,
   see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
-- `tsv format` discovery is gitignore-aware, honoring `.gitignore` and `.formatignore`
-  hierarchically (nested files like git, unlike Prettier; also `.formatignore` is original to tsv)
+- formatting is similar Prettier and prettier-plugin-svelte for the common case,
+  but intentionally diverges in some cases and fixes numerous bugs
+  (see [docs/conformance_prettier.md](docs/conformance_prettier.md))
+- tsv can generate a public JSON AST that should exactly match
+  Svelte 5's modern AST with acorn and acorn-typescript
+  (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
+  and tsv has its own internal optimal AST
+- `tsv format` discovery is gitignore-aware,
+  honoring `.gitignore` and `.formatignore` (original to tsv)
+  hierarchically (supporting nested files like git, unlike `.prettierignore`)
   plus a compatible `.prettierignore`
   (but relative to repo root if available, not cwd like Prettier's default)
-  ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
+  ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format that exist today))
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
   JS reaches tsv through the WASM bindings, and native N-API bindings are not yet published
-- outputs optimal artifacts as an invariant, not a preference: runtime speed and compiled
+- architected to output optimal artifacts: runtime speed and compiled
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
-  don't regress the artifacts that exist today
+  don't regress the focused artifacts
 - JS and TS always parse as modules in strict mode - sloppy-mode-only syntax
   like `with` is rejected, while strict-mode early errors
   (e.g. duplicate params, reserved-word bindings) still parse for now, with
