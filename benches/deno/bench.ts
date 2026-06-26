@@ -30,6 +30,8 @@
  *   BENCH_WARMUP        Warmup iterations (default: 3)
  *   BENCH_STALE_OK      Set to 1 to run despite stale artifacts (default: off;
  *                       see lib/check_artifact_freshness.ts)
+ *   BENCH_FORCED_ASYNC  Set to 1 to add the `tsv-forced-async` control row
+ *                       (default: off; diagnostic — async-tax measurement)
  */
 
 // Type declaration for V8's gc function (available with --expose-gc)
@@ -207,6 +209,16 @@ const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
  * low-allocation paths. See `CLAUDE.md` → Fairness Caveats for the trade-off.
  */
 const BENCH_GC = Deno.env.get('BENCH_GC') === '1';
+
+/**
+ * Include the `tsv-forced-async` control row (default off). Same native engine
+ * as `tsv`, routed through the awaited async path, to re-confirm that the
+ * per-file await tax the async-only impls (`prettier`, `oxfmt`) pay is below the
+ * noise floor. Kept opt-in so the noise-level row stays out of the published
+ * report and the regression baseline; set `BENCH_FORCED_ASYNC=1` to enable.
+ * See `BenchmarkTaskOptions.forced_async`.
+ */
+const BENCH_FORCED_ASYNC = Deno.env.get('BENCH_FORCED_ASYNC') === '1';
 
 /**
  * Iteration corpus mode. Default `intersection`: within each group, every
@@ -509,7 +521,9 @@ async function run_preflight_group(
 	const group_name = `${operation}/${language}`;
 	log(`\n· ${group_name}`);
 
-	const tasks = get_benchmark_tasks(impls, operation, language);
+	const tasks = get_benchmark_tasks(impls, operation, language, {
+		forced_async: BENCH_FORCED_ASYNC,
+	});
 	await run_preflight(tasks, files, language);
 
 	const task_tracking = new Map<string, string>();

@@ -275,6 +275,7 @@ BENCH_DURATION=10000 deno task bench:run    # Duration per benchmark in ms (defa
 BENCH_WARMUP=10 deno task bench:run         # Set warmup iterations (default: 3)
 BENCH_MODE=union deno task bench:run        # Per-impl iteration (default: intersection)
 BENCH_STALE_OK=1 deno task bench:run        # Override the freshness guard (see below; default: off)
+BENCH_FORCED_ASYNC=1 deno task bench:run    # Add the tsv-forced-async control row (diagnostic; default: off)
 ```
 
 ## Artifact Freshness Guard
@@ -364,7 +365,18 @@ Things the published numbers measure that aren't quite what they look like:
   the FFI/WASM figure; the parse analogue is the `tsv-internal` vs `tsv-json`
   gap). (b) The async impls (`prettier`, `oxfmt`) are `await`ed per file
   (`process_corpus_async`), carrying a per-file microtask cost the sync impls
-  skip — swamped by their actual format time, but real. (c) Task return values
+  skip — swamped by their actual format time, but real. The opt-in
+  **`tsv-forced-async`** control row (`BENCH_FORCED_ASYNC=1` — the same native
+  engine as `tsv`, routed through the awaited async path) quantifies this tax
+  directly: the `tsv` vs `tsv-forced-async` delta is within the run-to-run noise
+  floor even on a fast sub-ms-per-file engine, so the per-file await does **not**
+  materially inflate the async impls' numbers — their gaps vs `tsv` are engine
+  differences, not harness tax. It's **off by default**: a noise-level delta would
+  only add a confusing duplicate-`tsv` row to the published report and feed
+  spurious flags to the regression baseline, so it's an on-demand re-confirmation
+  tool, not a standing row. (Why a control and not a real sync row: `prettier` and
+  `oxfmt` are async-only — neither ships a sync format API — so the tax can't be
+  removed, only measured.) (c) Task return values
   are discarded uniformly for all impls; the FFI/WASM/async boundaries block
   dead-code elimination, so no impl's work is optimized away.
 - **`tsv_wasm` is measured on the full build.** The WASM bench loads

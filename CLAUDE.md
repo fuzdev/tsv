@@ -293,6 +293,7 @@ BENCH_DURATION=10000 deno task bench:run  # Duration per benchmark in ms (defaul
 BENCH_WARMUP=10 deno task bench:run       # Set warmup iterations (default: 3)
 BENCH_MODE=union deno task bench:run      # Per-impl iteration (default: intersection)
 BENCH_STALE_OK=1 deno task bench:run      # Run despite stale artifacts (default: off)
+BENCH_FORCED_ASYNC=1 deno task bench:run  # Add tsv-forced-async control row (diagnostic; default: off)
 ```
 
 **Prerequisites**: `cargo install wasm-pack`

@@ -185,6 +185,21 @@ export interface BenchmarkTask {
 	run_async?: (source: string, language: Language) => Promise<unknown>;
 }
 
+/** Options controlling which optional/diagnostic tasks are included. */
+export interface BenchmarkTaskOptions {
+	/**
+	 * Include the `tsv-forced-async` control row in the format groups (default
+	 * off; opt in via `BENCH_FORCED_ASYNC=1`). Not a real impl — the same native
+	 * engine as `tsv`, routed through the awaited async path to measure the
+	 * per-file await tax the async-only impls (`prettier`, `oxfmt`) pay. That tax
+	 * sits below the run-to-run noise floor, so the row is kept OUT of the
+	 * published `report.{json,md}` and the regression baseline (where a
+	 * noise-level delta would throw spurious flags) — it's an on-demand
+	 * re-confirmation tool, not a standing measurement.
+	 */
+	forced_async?: boolean;
+}
+
 /**
  * Get all benchmark tasks for a specific operation and language.
  * Returns tasks in display order (canonical first, then alternatives).
@@ -193,6 +208,7 @@ export function get_benchmark_tasks(
 	impls: InitializedImplementations,
 	operation: 'parse' | 'format',
 	language: Language,
+	options: BenchmarkTaskOptions = {},
 ): BenchmarkTask[] {
 	const tasks: BenchmarkTask[] = [];
 	const group_name = `${operation}/${language}`;
@@ -287,6 +303,24 @@ export function get_benchmark_tasks(
 				tracking_key: `${group_name}/native`,
 				is_async: false,
 				run: (source) => impls.native!.format!(source, language),
+			});
+		}
+
+		// Forced-async control (opt-in). Same native engine as `tsv`, routed through
+		// the awaited async path so the `tsv` vs `tsv-forced-async` delta measures the
+		// per-file await tax; `Promise.resolve` wraps the already-computed result, so
+		// the only added cost is the await. Rationale + why it's off by default:
+		// `BenchmarkTaskOptions.forced_async`.
+		if (options.forced_async && impls.native?.format) {
+			tasks.push({
+				name: 'tsv-forced-async',
+				tracking_key: `${group_name}/native-forced-async`,
+				is_async: true,
+				run: () => {
+					throw new Error('Use run_async for tsv-forced-async');
+				},
+				run_async: (source, language) =>
+					Promise.resolve(impls.native!.format!(source, language)),
 			});
 		}
 
