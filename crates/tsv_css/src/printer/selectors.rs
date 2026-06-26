@@ -98,7 +98,7 @@ impl<'a> Printer<'a> {
         let current_col = self.current_column();
         let available_width = PRINT_WIDTH.saturating_sub(current_col + 3);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
-            &self.arena,
+            self.arena,
             list_doc,
             available_width,
             Mode::Flat,
@@ -195,7 +195,7 @@ impl<'a> Printer<'a> {
         let overhead = self.indent_width() + 2; // " {" or ", "
         let available_width = PRINT_WIDTH.saturating_sub(overhead);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
-            &self.arena,
+            self.arena,
             selector_doc,
             available_width,
             Mode::Flat,
@@ -657,7 +657,7 @@ impl<'a> Printer<'a> {
         let current_col = self.current_column();
         let available_width = PRINT_WIDTH.saturating_sub(current_col + 4);
         let fits = doc::arena_fits::<dyn doc::TextResolver>(
-            &self.arena,
+            self.arena,
             args_doc,
             available_width,
             Mode::Flat,
@@ -735,7 +735,7 @@ impl<'a> Printer<'a> {
                         let args_doc = self.build_pseudo_class_args_doc(args);
                         // Use a conservative width check
                         let fits = doc::arena_fits::<dyn doc::TextResolver>(
-                            &self.arena,
+                            self.arena,
                             args_doc,
                             60,
                             Mode::Flat,

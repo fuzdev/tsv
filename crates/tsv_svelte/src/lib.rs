@@ -56,6 +56,17 @@ pub fn format(root: &Root<'_>, source: &str) -> String {
     printer::format_svelte(root, source)
 }
 
+/// Format into a caller-provided doc arena.
+///
+/// Identical output to [`format`], but the doc IR is built into `arena` instead
+/// of a freshly allocated one, so a driver that formats many files can reuse one
+/// arena across them (`arena.reset()` between files retains the buffers). Nothing
+/// borrowed from `arena` escapes — the result is an owned `String`. (Embedded
+/// `<style>` blocks still format through their own per-block arena.)
+pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::DocArena) -> String {
+    printer::format_svelte_in(root, source, arena)
+}
+
 /// Convert internal AST to public JSON-compatible AST
 ///
 /// # Arguments

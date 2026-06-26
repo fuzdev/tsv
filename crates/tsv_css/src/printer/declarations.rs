@@ -123,7 +123,7 @@ impl<'a> Printer<'a> {
                     property.len() + 3, // property + ": " + ";"
                 );
                 let exceeds_width = !doc::arena_fits::<dyn doc::TextResolver>(
-                    &self.arena,
+                    self.arena,
                     doc,
                     available,
                     Mode::Flat,
@@ -139,7 +139,7 @@ impl<'a> Printer<'a> {
                     property.len() + 3, // property + ": " + ";"
                 );
                 let exceeds_width = !doc::arena_fits::<dyn doc::TextResolver>(
-                    &self.arena,
+                    self.arena,
                     doc,
                     available,
                     Mode::Flat,
@@ -183,13 +183,7 @@ impl<'a> Printer<'a> {
         let func_doc = d.concat(&[name_doc, d.parens(args_doc)]);
 
         let available = doc::available_width(self.effective_indent(), 0, context_offset);
-        !doc::arena_fits::<dyn doc::TextResolver>(
-            &self.arena,
-            func_doc,
-            available,
-            Mode::Flat,
-            None,
-        )
+        !doc::arena_fits::<dyn doc::TextResolver>(self.arena, func_doc, available, Mode::Flat, None)
     }
 
     /// Format a CSS declaration (property: value;)
@@ -623,13 +617,7 @@ impl<'a> Printer<'a> {
     fn space_list_exceeds_width(&self, values: &[CssValue<'_>], trailing_reserve: usize) -> bool {
         let list_doc = self.build_separated_values_doc(values, " ");
         let available = doc::available_width(self.effective_indent(), 0, trailing_reserve);
-        !doc::arena_fits::<dyn doc::TextResolver>(
-            &self.arena,
-            list_doc,
-            available,
-            Mode::Flat,
-            None,
-        )
+        !doc::arena_fits::<dyn doc::TextResolver>(self.arena, list_doc, available, Mode::Flat, None)
     }
 
     /// Print function arguments from source, preserving comments

@@ -8,7 +8,7 @@ Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. The **Node/Bun** sibling of the bi
 
 This is a **tsv-scoped carve-out** from the ecosystem N-API deferral — **not** an ecosystem-wide flip.
 
-Like `tsv_ffi`, the bindings hold a **per-thread reusable AST `Bump`** (`with_ast_arena`) that is `reset()` between calls rather than allocated fresh per call — the bindings are invoked once per file in tight loops, and per-call arena malloc/free churns the system allocator's heap high-water in a way that is measurable through a binding layer. The helper is currently **duplicated** from `tsv_ffi::with_ast_arena` (kept in lockstep by hand); factoring both onto one shared helper is a planned follow-up.
+Like `tsv_ffi`, the bindings hold a **per-thread reusable AST `Bump`** (`with_ast_arena`) that is `reset()` between calls rather than allocated fresh per call — the bindings are invoked once per file in tight loops, and per-call arena malloc/free churns the system allocator's heap high-water in a way that is measurable through a binding layer. The `format` path likewise holds a **per-thread reusable doc arena** (`with_doc_arena`, the same shape over `DocArena`, calling each language's `format_in`; pulls an optional `tsv_lang` dep gated to the `format` feature). Both helpers are currently **duplicated** from their `tsv_ffi` counterparts (kept in lockstep by hand); factoring them onto one shared helper is a planned follow-up.
 
 Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-bindings).
 
@@ -42,7 +42,7 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
 
 ## Files
 
-- `src/lib.rs` — All bindings: `with_ast_arena`, the `lang_bindings!` macro, the three `lang_bindings!` invocations, and a `#[cfg(test)]` module
+- `src/lib.rs` — All bindings: `with_ast_arena`, `with_doc_arena` (format-gated), the `lang_bindings!` macro, the three `lang_bindings!` invocations, and a `#[cfg(test)]` module
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (N-API generates unsafe code); deps `napi` + `napi-derive` (3.x), build-dep `napi-build` (2.x)
 
