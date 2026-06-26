@@ -2,7 +2,7 @@
 
 use crate::EmbedContext;
 use crate::config::TAB_WIDTH;
-use std::collections::HashMap;
+use smallvec::SmallVec;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
 use super::arena_fits::{arena_fits_with_lookahead, update_pos_for_text};
@@ -11,6 +11,45 @@ use super::render_config::RenderConfig;
 use super::types::{
     DocContext, GroupId, LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TextResolver, resolve_text,
 };
+
+/// Inline-backed render work-list. The renderers run many times per file (CSS
+/// per declaration/value, Svelte per template expression), each spinning up a
+/// fresh command stack from empty — so a `SmallVec` keeps the common small
+/// sub-render fully on the stack (no heap allocation), mirroring the fits path's
+/// `SmallVec<[(DocId, Mode); 16]>`. `N = 8` is the measured knee of the
+/// per-call high-water distribution (≈89% of CSS top-level renders and ≈99.7%
+/// of the high-frequency `render_single_doc_inner` calls stay inline); its
+/// 128-byte inline footprint matches the fits stack and the `DocBuf` convention.
+type CmdStack = SmallVec<[ArenaCommand; 8]>;
+
+/// Inline-backed pending `line_suffix` buffer. Line suffixes are sparse — the
+/// measured high-water never exceeds 1 — so `N = 4` is generous headroom at a
+/// 64-byte inline footprint, keeping even the rare suffix push off the heap.
+type LineSuffixBuf = SmallVec<[ArenaCommand; 4]>;
+
+/// The mode each id-bearing group resolved to, as a total map over the closed
+/// [`GroupId`] enum. Backed by a fixed inline array indexed by `id as usize`, so
+/// it never allocates (the `HashMap` it replaces allocated a table on every
+/// render that resolved at least one keyed group). `None` = not yet resolved,
+/// read as flat — identical to `HashMap::get` returning `None`. Writes are
+/// last-write-wins, matching the `HashMap` (a `GroupId` variant shared across
+/// nested groups resolves before its reader, per the variant docs).
+#[derive(Default)]
+struct GroupModeMap {
+    slots: [Option<Mode>; GroupId::COUNT],
+}
+
+impl GroupModeMap {
+    #[inline]
+    fn insert(&mut self, id: GroupId, mode: Mode) {
+        self.slots[id as usize] = Some(mode);
+    }
+
+    #[inline]
+    fn get(&self, id: GroupId) -> Option<Mode> {
+        self.slots[id as usize]
+    }
+}
 
 /// Trim trailing whitespace from only the last line of output.
 /// Interior lines are already handled by `trim_trailing_whitespace()` in `render_line_break()`.
@@ -110,7 +149,7 @@ fn render_line_break(
 /// Flush pending line suffix content.
 fn flush_line_suffix<R: TextResolver + ?Sized>(
     arena: &DocArena,
-    line_suffix: &mut Vec<ArenaCommand>,
+    line_suffix: &mut LineSuffixBuf,
     output: &mut String,
     pos: &mut usize,
     render: &RenderConfig,
@@ -142,11 +181,11 @@ fn process_indent_if_break(
     contents: DocId,
     group_id: GroupId,
     negate: bool,
-    group_mode_map: Option<&HashMap<GroupId, Mode>>,
+    group_mode_map: Option<&GroupModeMap>,
     cmd: &ArenaCommand,
 ) -> ArenaCommand {
     let group_mode = group_mode_map
-        .and_then(|map| map.get(&group_id).copied())
+        .and_then(|map| map.get(group_id))
         .unwrap_or(Mode::Flat);
 
     let should_indent = if negate {
@@ -332,14 +371,14 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     embed: &EmbedContext,
     resolver: Option<&R>,
 ) {
-    let mut commands: Vec<ArenaCommand> = vec![ArenaCommand {
+    let mut commands: CmdStack = smallvec::smallvec![ArenaCommand {
         indent: start_indent_level,
         mode: Mode::Break,
         doc,
     }];
 
-    let mut line_suffix: Vec<ArenaCommand> = Vec::new();
-    let mut group_mode_map: HashMap<GroupId, Mode> = HashMap::new();
+    let mut line_suffix: LineSuffixBuf = SmallVec::new();
+    let mut group_mode_map = GroupModeMap::default();
 
     // Hoist arena borrows out of the loop: the arena is read-only during
     // rendering, so a single immutable borrow held for the whole render
@@ -548,9 +587,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 group_id,
             } => {
                 let broke = match group_id {
-                    Some(gid) => {
-                        group_mode_map.get(gid).copied().unwrap_or(Mode::Flat) == Mode::Break
-                    }
+                    Some(gid) => group_mode_map.get(*gid).unwrap_or(Mode::Flat) == Mode::Break,
                     None => cmd.mode == Mode::Break,
                 };
                 let chosen = if broke { *break_doc } else { *flat_doc };
@@ -659,7 +696,7 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
     embed: &EmbedContext,
     resolver: Option<&R>,
 ) {
-    let mut line_suffix: Vec<ArenaCommand> = Vec::new();
+    let mut line_suffix: LineSuffixBuf = SmallVec::new();
     render_single_doc_inner(
         arena,
         doc,
@@ -695,16 +732,16 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     render: &RenderConfig,
     embed: &EmbedContext,
     resolver: Option<&R>,
-    suffix_buffer: Option<&mut Vec<ArenaCommand>>,
+    suffix_buffer: Option<&mut LineSuffixBuf>,
 ) {
-    let mut commands: Vec<ArenaCommand> = vec![ArenaCommand {
+    let mut commands: CmdStack = smallvec::smallvec![ArenaCommand {
         indent: indent_level,
         mode,
         doc,
     }];
 
     let tracking_suffix = suffix_buffer.is_some();
-    let mut dummy_suffix: Vec<ArenaCommand> = Vec::new();
+    let mut dummy_suffix: LineSuffixBuf = SmallVec::new();
     let line_suffix = suffix_buffer.unwrap_or(&mut dummy_suffix);
 
     // Hoist arena borrows out of the loop: the arena is read-only during
