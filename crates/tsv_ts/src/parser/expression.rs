@@ -1667,13 +1667,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse the source expression (usually a string literal)
         let source = self.parse_assignment_expression()?;
 
-        // Check for optional second argument (import options/attributes)
-        let options: Option<&'arena Expression<'arena>> = if self.check(&TokenKind::Comma) {
-            self.advance()?; // consume ','
-            Some(arena.alloc(self.parse_assignment_expression()?))
-        } else {
-            None
-        };
+        // The `ImportCall` grammar allows an optional trailing comma after the
+        // source (1-arg form) and after the options (2-arg form):
+        //   import ( AssignmentExpression ,opt )
+        //   import ( AssignmentExpression , AssignmentExpression ,opt )
+        // A bare trailing comma after the source leaves no options arg; a comma
+        // followed by an expression is the options arg. 3+ args are not in the
+        // grammar and still error at the `)` below — a deliberate divergence
+        // from acorn-typescript, which accepts 3+ args and rejects the trailing
+        // comma. See docs/conformance_svelte.md.
+        let mut options: Option<&'arena Expression<'arena>> = None;
+        if self.eat(TokenKind::Comma) && !self.check(&TokenKind::ParenClose) {
+            options = Some(arena.alloc(self.parse_assignment_expression()?));
+            self.eat(TokenKind::Comma); // optional trailing comma after the options
+        }
 
         // Capture end position before consuming ')'
         let (_, paren_end) = self.current_pos();

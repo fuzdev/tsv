@@ -192,6 +192,21 @@ and formatting is unaffected. Fixture:
 [expression_implements](../tests/fixtures/typescript/declarations/class/expression_implements_svelte_divergence/).
 **Upstream candidate**: acorn-typescript class-expression `id` omission.
 
+**Dynamic-import trailing comma** (`import('x',)`, `import('x', opts,)`): the
+ECMAScript `ImportCall` grammar permits an optional trailing comma after the
+source and after the options argument
+([ecma262 §16.2.4.1](https://tc39.es/ecma262/#prod-ImportCall)).
+acorn-typescript rejects it (`Unexpected token`); tsv accepts it per spec
+(prettier/babel and oxc accept it too). The comma is not format-stable — both
+tsv and prettier strip it (`trailingComma: 'none'`) — so it surfaces only on
+unformatted source; the
+[import_trailing_comma](../tests/fixtures/typescript/expressions/calls/import_trailing_comma/)
+normalization fixture pins the acceptance via an `unformatted_*` variant.
+Conversely, acorn-typescript *over-accepts* three or more arguments
+(`import('x', a, b)`), which the grammar forbids — tsv rejects them, staying
+spec-faithful in both directions. **Upstream candidate**: acorn-typescript
+`ImportCall` argument handling.
+
 ### TypeScript Parser Corrections (corpus-enforced)
 
 Intentional AST divergences from acorn-typescript that have no prettier-stable
