@@ -12,6 +12,7 @@ members = [
     "crates/tsv_debug",
     "crates/tsv_wasm",
     "crates/tsv_ffi",
+    "crates/tsv_napi",
 ]
 
 [workspace.package]
@@ -38,6 +39,13 @@ tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
 
 # External dependencies
 argh = "0.1"
+# N-API (Node.js/Bun) bindings — the native path for the `tsv_napi` crate, the
+# Node-runtime sibling of `tsv_ffi` (Deno's C-FFI path). napi/napi-derive ride
+# the 3.x line together; napi-build (build dep) is its own 2.x line. tsv-scoped
+# carve-out from the ecosystem N-API deferral — see lore TODO_NAPI_BINDINGS.md.
+napi = "3.9.4"
+napi-derive = "3.5.7"
+napi-build = "2.3.2"
 # Bump arena for the internal AST: per-parse `Bump`, nodes/collections/decoded
 # strings allocated as `&'arena ...` (no per-node heap alloc/free, better
 # traversal locality). Already present transitively (via wasm-bindgen); this

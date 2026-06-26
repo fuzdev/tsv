@@ -69,7 +69,7 @@ jobs:
           # npm fetches (prettier/svelte/acorn) since those land in DENO_DIR.
           cache: true
           # Key on the sidecar pins (fetched at runtime, not lockfile-pinned) so a
-          # bump invalidates the cached deps. NOT benches/deno/deno.lock: it governs
+          # bump invalidates the cached deps. NOT benches/js/deno.lock: it governs
           # `test:deno` but is dominated by bench-only tools (biome/oxc/oxfmt) that
           # `check` never fetches, so keying on it would bust the cache on unrelated
           # bumps. (There is no root deno.lock — the root config has no external deps.)

@@ -4,14 +4,14 @@
 // ⚠ SYNC — each canonical version below is pinned in THREE places that must stay
 // identical: (1) this VERSIONS object, (2) the static `import` specifiers just below
 // (a static import can't interpolate a const, so the literal is repeated by necessity),
-// and (3) the benches/deno/deno.json import map (read by benches/deno/lib/versions.ts).
+// and (3) benches/js/package.json (read by benches/js/lib/versions.ts).
 // These can't be DRYed: the release binary embeds this file as a string and runs it
-// WITHOUT deno.json, so it can't read the import map at runtime.
+// WITHOUT that package.json, so it can't read the bench's pins at runtime.
 //
 // Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte
 // is NOT a routine refresh — it re-baselines the entire fixture corpus (these tools define
 // every fixture's expected.json + output_prettier.*). After any bump: run
-// `deno task fixtures:update` and review the churn. See benches/deno/CLAUDE.md
+// `deno task fixtures:update` and review the churn. See benches/js/CLAUDE.md
 // §"Canonical baseline is coupled" for the full procedure.
 //
 // NOTE: Requires deno.json with "acorn": "npm:acorn@8.16.0" import map

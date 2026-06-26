@@ -192,12 +192,11 @@ See ./docs/fixture_workflow.md. Use `--prettier-only` with `fixtures:validate` d
 
 ### JS Bindings
 
-Two binding crates for different use cases:
+Three binding crates for different use cases:
 
 - `tsv_ffi` (C ABI) — target: Any FFI (Deno, Python, etc.); output: `libtsv_ffi.so` / `.dylib` / `.dll`
 - `tsv_wasm` (wasm-bindgen) — target: Browser, Deno, Node; output: `.wasm` module (format / parse / all variants via cargo features)
-
-N-API is a maybe — the decision is deferred; there is currently no `tsv_napi` crate.
+- `tsv_napi` (napi-rs) — target: Node.js / Bun native addon; output: `libtsv_napi.{so,dylib,dll}` (loaded via `process.dlopen`). Currently a **measurement-only** binding for the Node benchmark runner (single-platform local build, `deno task build:napi`); the cross-platform publish matrix as `@fuzdev/tsv_napi` is targeted for 0.2. tsv-scoped carve-out from the ecosystem N-API deferral. See ./crates/tsv_napi/CLAUDE.md.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv_format_wasm` (format only), `@fuzdev/tsv_parse_wasm` (parse only), and `@fuzdev/tsv_wasm` (everything + the `tsv` CLI). Each variant has its own output directory.
 
@@ -268,37 +267,59 @@ deno task divergence:audit         # audit divergence pattern coverage (--json f
 
 The corpus comparison builds with `--profile corpus` (release + `panic = "unwind"`) so panics in our code are caught and reported as errors instead of crashing the process. Benchmarks use `--release` (with `panic = "abort"`) for maximum performance.
 
-Divergence detection identifies known differences documented in `conformance_prettier.md` (safety checks, pattern detection, traceability). See ./benches/deno/CLAUDE.md and ./docs/divergence_detector.md.
+Divergence detection identifies known differences documented in `conformance_prettier.md` (safety checks, pattern detection, traceability). See ./benches/js/CLAUDE.md and ./docs/divergence_detector.md.
 
 ### Benchmarks
 
+**Cross-runtime.** The same harness runs under **Deno, Node, and Bun** — each emits its
+own runtime-labeled sibling report (`report.{deno,node,bun}.{json,md}`), never merged;
+`deno task bench:compose` folds them into a compact combined `report.{json,md}` (the
+cross-runtime view tsv.fuz.dev consumes). The native row differs by runtime: Deno loads the
+**FFI** library via `Deno.dlopen`, Node/Bun load the **N-API** addon (`tsv_napi`) via
+`process.dlopen`. Everything else (corpus, registry, timing, report) is runtime-neutral
+shared code using `node:` builtins.
+
 ```bash
-# Smoke test (fast sanity check that every formatter+parser produces output)
+# One-time: install the harness's npm deps (package.json is the source of truth;
+# both runtimes consume the same node_modules). Re-run after a dep bump or a plain
+# `npm install` (which prunes the oxc-parser-wasm binding — see benches/js/CLAUDE.md).
+deno task bench:install
+
+# Smoke test (Deno; fast sanity check that every formatter+parser produces output)
 deno task smoke
 
-# Run benchmarks (builds the bench artifact set — `build:bench` — automatically)
-deno task bench
+# Run benchmarks (builds the runtime's bench artifacts automatically)
+deno task bench         # ALL three + compose → report.{deno,node,bun}.* + combined report.{json,md}
+deno task bench:deno    # Deno only
+deno task bench:node    # Node only
+deno task bench:bun     # Bun only (reuses the Node artifacts)
+deno task bench:compose # Fold existing per-runtime reports → combined report.{json,md}
 
-# Run without rebuilding (if already built). Aborts if the FFI/WASM artifacts
-# are older than crate source — rebuild, or set BENCH_STALE_OK=1 to override
-deno task bench:run
+# Run without rebuilding (if already built; aborts on stale artifacts)
+deno task bench:deno:run
+deno task bench:node:run
+deno task bench:bun:run
 
 # Per-file skip detail (off by default — counts always shown, paths/errors opt-in)
-deno task bench:run -- --verbose          # Include per-file skip detail in report
+deno task bench:deno:run -- --verbose
 
-# Environment variables
-BENCH_LIMIT=10 deno task bench:run        # Limit files per language (default: all)
-BENCH_FILTER=zzz deno task bench:run      # Filter by path pattern (default: none)
-BENCH_DURATION=10000 deno task bench:run  # Duration per benchmark in ms (default: 5000)
-BENCH_WARMUP=10 deno task bench:run       # Set warmup iterations (default: 3)
-BENCH_MODE=union deno task bench:run      # Per-impl iteration (default: intersection)
-BENCH_STALE_OK=1 deno task bench:run      # Run despite stale artifacts (default: off)
-BENCH_FORCED_ASYNC=1 deno task bench:run  # Add tsv-forced-async control row (diagnostic; default: off)
+# Environment variables (apply to any runtime)
+BENCH_LIMIT=10 deno task bench:deno:run        # Limit files per language (default: all)
+BENCH_FILTER=zzz deno task bench:deno:run      # Filter by path pattern (default: none)
+BENCH_DURATION=10000 deno task bench:deno:run  # Duration per benchmark in ms (default: 5000)
+BENCH_WARMUP=10 deno task bench:deno:run       # Set warmup iterations (default: 3)
+BENCH_MODE=union deno task bench:deno:run      # Per-impl iteration (default: intersection)
+BENCH_STALE_OK=1 deno task bench:deno:run      # Run despite stale artifacts (default: off)
+BENCH_FORCED_ASYNC=1 deno task bench:deno:run  # Add tsv-forced-async control row (diagnostic; default: off)
 ```
 
-**Prerequisites**: `cargo install wasm-pack`
+**Prerequisites**: `cargo install wasm-pack`; Node ≥ 22.18 (native TS type-stripping); Bun (for `bench:bun`); `deno task bench:install` once.
 
-Compares three implementations: canonical (prettier + svelte/compiler), native (FFI), WASM. Results are saved to `benches/deno/results/report.{json,md}` (committed). To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See ./benches/deno/CLAUDE.md.
+Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node
+and Bun), WASM, and alternatives (oxc-parser, oxfmt, biome-wasm). Each runtime's results save
+to `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime`
+field), plus the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See
+./benches/js/CLAUDE.md.
 
 ### Performance Profiling
 
@@ -379,8 +400,9 @@ tsv/
 │   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast()
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
-│   ├── tsv_ffi/     # C FFI bindings
-│   └── tsv_wasm/    # WebAssembly bindings (published as @fuzdev/tsv_format_wasm + @fuzdev/tsv_parse_wasm + @fuzdev/tsv_wasm; bundles hand-maintained types/tsv_ast.d.ts; npm/cli.js is the tsv bin)
+│   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
+│   ├── tsv_wasm/    # WebAssembly bindings (published as @fuzdev/tsv_format_wasm + @fuzdev/tsv_parse_wasm + @fuzdev/tsv_wasm; bundles hand-maintained types/tsv_ast.d.ts; npm/cli.js is the tsv bin)
+│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only for the Node bench, 0.2 publish target)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   └── fixtures/    # Test fixtures organized by language/feature
@@ -659,8 +681,8 @@ cargo run -p tsv_debug test262 language/expressions  # filter by path pattern
 # triage tsv's failures (real bug vs shared limitation). See ./docs/conformance_test262.md §Differential.
 cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json   # path/expected/tsv verdict per graded test
 deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys \
-  --config benches/deno/deno.json \
-  benches/deno/diagnostics/test262_compare.ts --manifest /tmp/t262.json
+  --config benches/js/deno.json \
+  benches/js/diagnostics/test262_compare.ts --manifest /tmp/t262.json
 ```
 
 See ./docs/conformance_test262.md.
@@ -883,6 +905,8 @@ Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/
 - `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers
 - `unicode-segmentation` — Grapheme clustering for visual width measurement
 - `unicode-width` — Character display width (CJK, zero-width)
+- `bumpalo` — Bump arena for the internal AST (and the binding crates' per-thread `reset()` reuse)
+- `napi` / `napi-derive` / `napi-build` — N-API bindings for `tsv_napi` (Node/Bun native addon; tsv-scoped carve-out)
 
 ## Canonical References
 

@@ -1,0 +1,628 @@
+{
+	"version": 5,
+	"kind": "combined",
+	"generated": "2026-06-26T16:14:57.526Z",
+	"runtimes": [
+		"deno",
+		"node",
+		"bun"
+	],
+	"sources": [
+		{
+			"runtime": "deno",
+			"timestamp": "2026-06-26T15:56:20.597Z",
+			"git_commit": "e4c23f8e",
+			"tsv": "0.1.0"
+		},
+		{
+			"runtime": "node",
+			"timestamp": "2026-06-26T16:05:52.967Z",
+			"git_commit": "e4c23f8e",
+			"tsv": "0.1.0"
+		},
+		{
+			"runtime": "bun",
+			"timestamp": "2026-06-26T16:14:57.136Z",
+			"git_commit": "e4c23f8e",
+			"tsv": "0.1.0"
+		}
+	],
+	"rows": [
+		{
+			"group": "parse/svelte",
+			"name": "svelte/compiler",
+			"ops_per_second": {
+				"deno": 2.238630616724675,
+				"node": 2.171459192454959,
+				"bun": 1.3719971999128666
+			},
+			"mean_ns": {
+				"deno": 446701654.3636364,
+				"node": 460519821.6363636,
+				"bun": 728864461.2857143
+			},
+			"files_iterated": {
+				"deno": 1209,
+				"node": 1210,
+				"bun": 1210
+			}
+		},
+		{
+			"group": "parse/svelte",
+			"name": "tsv-json",
+			"ops_per_second": {
+				"deno": 1.7348541684381054,
+				"node": 1.8194660999068581,
+				"bun": 2.117882505475197
+			},
+			"mean_ns": {
+				"deno": 576417325.5555556,
+				"node": 549611779,
+				"bun": 472169724.90909094
+			},
+			"files_iterated": {
+				"deno": 1209,
+				"node": 1210,
+				"bun": 1210
+			}
+		},
+		{
+			"group": "parse/svelte",
+			"name": "tsv_wasm-json",
+			"ops_per_second": {
+				"deno": 1.654180031415882,
+				"node": 1.8438317886968851,
+				"bun": 2.0787300384189034
+			},
+			"mean_ns": {
+				"deno": 604529120.7777778,
+				"node": 542348822.7777778,
+				"bun": 481062947.8181818
+			},
+			"files_iterated": {
+				"deno": 1209,
+				"node": 1210,
+				"bun": 1210
+			}
+		},
+		{
+			"group": "parse/svelte",
+			"name": "tsv-internal",
+			"ops_per_second": {
+				"deno": 30.00127879779205,
+				"node": 35.93875569027329,
+				"bun": 38.41372651816012
+			},
+			"mean_ns": {
+				"deno": 33331912.507462688,
+				"node": 27825114.72067039,
+				"bun": 26032361.102150537
+			},
+			"files_iterated": {
+				"deno": 1209,
+				"node": 1210,
+				"bun": 1210
+			}
+		},
+		{
+			"group": "parse/svelte",
+			"name": "tsv_wasm-internal",
+			"ops_per_second": {
+				"deno": 22.32329562930429,
+				"node": 25.936879910058455,
+				"bun": 27.381700251347603
+			},
+			"mean_ns": {
+				"deno": 44796253.053571425,
+				"node": 38555138.608333334,
+				"bun": 36520741.62015504
+			},
+			"files_iterated": {
+				"deno": 1209,
+				"node": 1210,
+				"bun": 1210
+			}
+		},
+		{
+			"group": "format/svelte",
+			"name": "prettier",
+			"ops_per_second": {
+				"deno": 0.23667794345472865,
+				"node": 0.2264356250709842,
+				"bun": 0.21810325927088134
+			},
+			"mean_ns": {
+				"deno": 4225150791,
+				"node": 4416266211.142858,
+				"bun": 4584984210.428572
+			},
+			"files_iterated": {
+				"deno": 1208,
+				"node": 1209,
+				"bun": 1211
+			}
+		},
+		{
+			"group": "format/svelte",
+			"name": "tsv",
+			"ops_per_second": {
+				"deno": 2.8819502728352986,
+				"node": 4.127792696416839,
+				"bun": 3.8587202815978814
+			},
+			"mean_ns": {
+				"deno": 346987250.06666666,
+				"node": 242260228.05555555,
+				"bun": 259153275.44444445
+			},
+			"files_iterated": {
+				"deno": 1208,
+				"node": 1209,
+				"bun": 1211
+			}
+		},
+		{
+			"group": "format/svelte",
+			"name": "tsv_wasm",
+			"ops_per_second": {
+				"deno": 2.576710545344571,
+				"node": 2.8337283625922014,
+				"bun": 2.832828903462568
+			},
+			"mean_ns": {
+				"deno": 388091709.3333333,
+				"node": 352891975.53333336,
+				"bun": 353004023.21428573
+			},
+			"files_iterated": {
+				"deno": 1208,
+				"node": 1209,
+				"bun": 1211
+			}
+		},
+		{
+			"group": "format/svelte",
+			"name": "oxfmt",
+			"ops_per_second": {
+				"deno": 0.23531669038674202,
+				"node": 0.23006201546923422,
+				"bun": 0.18181135209599103
+			},
+			"mean_ns": {
+				"deno": 4249592319,
+				"node": 4346654087.857142,
+				"bun": 5500206606.857142
+			},
+			"files_iterated": {
+				"deno": 1208,
+				"node": 1209,
+				"bun": 1211
+			}
+		},
+		{
+			"group": "format/svelte",
+			"name": "biome-wasm",
+			"ops_per_second": {
+				"deno": 1.256549970281186,
+				"node": 1.4362701327134877
+			},
+			"mean_ns": {
+				"deno": 795829870.4,
+				"node": 696247855.625
+			},
+			"files_iterated": {
+				"deno": 1208,
+				"node": 1209
+			}
+		},
+		{
+			"group": "parse/typescript",
+			"name": "acorn-typescript",
+			"ops_per_second": {
+				"deno": 0.33972384153178553,
+				"node": 0.32505966965627475,
+				"bun": 0.15898909853547305
+			},
+			"mean_ns": {
+				"deno": 2943567326.6,
+				"node": 3076358260.8,
+				"bun": 6289739417.428572
+			},
+			"files_iterated": {
+				"deno": 4120,
+				"node": 4120,
+				"bun": 4120
+			}
+		},
+		{
+			"group": "parse/typescript",
+			"name": "tsv-json",
+			"ops_per_second": {
+				"deno": 0.30966010569974217,
+				"node": 0.3703073270840239,
+				"bun": 0.5098148870230883
+			},
+			"mean_ns": {
+				"deno": 3229347215.2,
+				"node": 2700459663.8,
+				"bun": 1961496271.4
+			},
+			"files_iterated": {
+				"deno": 4120,
+				"node": 4120,
+				"bun": 4120
+			}
+		},
+		{
+			"group": "parse/typescript",
+			"name": "tsv_wasm-json",
+			"ops_per_second": {
+				"deno": 0.33790933050214117,
+				"node": 0.3423814923427335,
+				"bun": 0.46423771599387137
+			},
+			"mean_ns": {
+				"deno": 2959373742.4,
+				"node": 2920718620.5,
+				"bun": 2154068843.5
+			},
+			"files_iterated": {
+				"deno": 4120,
+				"node": 4120,
+				"bun": 4120
+			}
+		},
+		{
+			"group": "parse/typescript",
+			"name": "tsv-internal",
+			"ops_per_second": {
+				"deno": 4.393287195839822,
+				"node": 4.815525788316548,
+				"bun": 5.272376675322944
+			},
+			"mean_ns": {
+				"deno": 227619992.82608697,
+				"node": 207661643.6,
+				"bun": 189667783.92
+			},
+			"files_iterated": {
+				"deno": 4120,
+				"node": 4120,
+				"bun": 4120
+			}
+		},
+		{
+			"group": "parse/typescript",
+			"name": "tsv_wasm-internal",
+			"ops_per_second": {
+				"deno": 3.0975007968920942,
+				"node": 3.7737717669487116,
+				"bun": 3.920307133301353
+			},
+			"mean_ns": {
+				"deno": 322840917.75,
+				"node": 264986878.31578946,
+				"bun": 255082055.0526316
+			},
+			"files_iterated": {
+				"deno": 4120,
+				"node": 4120,
+				"bun": 4120
+			}
+		},
+		{
+			"group": "parse/typescript",
+			"name": "oxc-parser",
+			"ops_per_second": {
+				"deno": 0.8458763500275998,
+				"node": 0.7780449976607323,
+				"bun": 1.0442646052841589
+			},
+			"mean_ns": {
+				"deno": 1182205886.2,
+				"node": 1285272706.6,
+				"bun": 957611696.25
+			},
+			"files_iterated": {
+				"deno": 4120,
+				"node": 4120,
+				"bun": 4120
+			}
+		},
+		{
+			"group": "parse/typescript",
+			"name": "oxc-parser-wasm",
+			"ops_per_second": {
+				"deno": 0.7765769385649736,
+				"node": 0.747772118968232
+			},
+			"mean_ns": {
+				"deno": 1287702416,
+				"node": 1337305811
+			},
+			"files_iterated": {
+				"deno": 4120,
+				"node": 4120
+			}
+		},
+		{
+			"group": "format/typescript",
+			"name": "prettier",
+			"ops_per_second": {
+				"deno": 0.07970672931562878,
+				"node": 0.07390887214419399,
+				"bun": 0.06404911345750294
+			},
+			"mean_ns": {
+				"deno": 12545992146.285715,
+				"node": 13530175349.571428,
+				"bun": 15613018604.285715
+			},
+			"files_iterated": {
+				"deno": 4219,
+				"node": 4219,
+				"bun": 4219
+			}
+		},
+		{
+			"group": "format/typescript",
+			"name": "tsv",
+			"ops_per_second": {
+				"deno": 1.0725580083372601,
+				"node": 1.2074651817407978,
+				"bun": 1.2414351255420437
+			},
+			"mean_ns": {
+				"deno": 932350504.3333334,
+				"node": 828181230.5,
+				"bun": 805519337.6
+			},
+			"files_iterated": {
+				"deno": 4219,
+				"node": 4219,
+				"bun": 4219
+			}
+		},
+		{
+			"group": "format/typescript",
+			"name": "tsv_wasm",
+			"ops_per_second": {
+				"deno": 0.8236856671645635,
+				"node": 0.9528432541414544,
+				"bun": 0.9578534407075834
+			},
+			"mean_ns": {
+				"deno": 1214055361,
+				"node": 1049490559.6,
+				"bun": 1044001052.25
+			},
+			"files_iterated": {
+				"deno": 4219,
+				"node": 4219,
+				"bun": 4219
+			}
+		},
+		{
+			"group": "format/typescript",
+			"name": "oxfmt",
+			"ops_per_second": {
+				"deno": 0.9232216237778202,
+				"node": 0.9584883942390313,
+				"bun": 0.7333963399702814
+			},
+			"mean_ns": {
+				"deno": 1083163537.6,
+				"node": 1043309450.6,
+				"bun": 1363519212.6
+			},
+			"files_iterated": {
+				"deno": 4219,
+				"node": 4219,
+				"bun": 4219
+			}
+		},
+		{
+			"group": "format/typescript",
+			"name": "biome-wasm",
+			"ops_per_second": {
+				"deno": 0.20314375821255962,
+				"node": 0.23656699434741207
+			},
+			"mean_ns": {
+				"deno": 4922622328.142858,
+				"node": 4227132372.2
+			},
+			"files_iterated": {
+				"deno": 4219,
+				"node": 4219
+			}
+		},
+		{
+			"group": "parse/css",
+			"name": "svelte/compiler",
+			"ops_per_second": {
+				"deno": 189.38754559028513,
+				"node": 176.21202057990953,
+				"bun": 136.16648168429685
+			},
+			"mean_ns": {
+				"deno": 5280178.255033557,
+				"node": 5674981.744769874,
+				"bun": 7343951.225225225
+			},
+			"files_iterated": {
+				"deno": 148,
+				"node": 148,
+				"bun": 148
+			}
+		},
+		{
+			"group": "parse/css",
+			"name": "tsv-json",
+			"ops_per_second": {
+				"deno": 66.4970799078557,
+				"node": 77.05402236749438,
+				"bun": 87.8934606924887
+			},
+			"mean_ns": {
+				"deno": 15038254.332155477,
+				"node": 12977907.827195467,
+				"bun": 11377410.69837587
+			},
+			"files_iterated": {
+				"deno": 148,
+				"node": 148,
+				"bun": 148
+			}
+		},
+		{
+			"group": "parse/css",
+			"name": "tsv_wasm-json",
+			"ops_per_second": {
+				"deno": 60.90767584127031,
+				"node": 65.9555718747639,
+				"bun": 71.16952761134718
+			},
+			"mean_ns": {
+				"deno": 16418291.885017421,
+				"node": 15161721.315960912,
+				"bun": 14050957.390934844
+			},
+			"files_iterated": {
+				"deno": 148,
+				"node": 148,
+				"bun": 148
+			}
+		},
+		{
+			"group": "parse/css",
+			"name": "tsv-internal",
+			"ops_per_second": {
+				"deno": 179.61417038106768,
+				"node": 207.33234728509868,
+				"bun": 220.58003846953548
+			},
+			"mean_ns": {
+				"deno": 5567489.457420925,
+				"node": 4823174.063740857,
+				"bun": 4533501.793445879
+			},
+			"files_iterated": {
+				"deno": 148,
+				"node": 148,
+				"bun": 148
+			}
+		},
+		{
+			"group": "parse/css",
+			"name": "tsv_wasm-internal",
+			"ops_per_second": {
+				"deno": 130.70208131736257,
+				"node": 150.61073385786818,
+				"bun": 150.96756743906028
+			},
+			"mean_ns": {
+				"deno": 7650987.573578595,
+				"node": 6639633.008784773,
+				"bun": 6623939.280227596
+			},
+			"files_iterated": {
+				"deno": 148,
+				"node": 148,
+				"bun": 148
+			}
+		},
+		{
+			"group": "format/css",
+			"name": "prettier",
+			"ops_per_second": {
+				"deno": 4.004403609771404,
+				"node": 3.793222204689036,
+				"bun": 3.918061399656031
+			},
+			"mean_ns": {
+				"deno": 249725077.0526316,
+				"node": 263628109.83333334,
+				"bun": 255228261.63157895
+			},
+			"files_iterated": {
+				"deno": 154,
+				"node": 154,
+				"bun": 154
+			}
+		},
+		{
+			"group": "format/css",
+			"name": "tsv",
+			"ops_per_second": {
+				"deno": 79.21000891029992,
+				"node": 101.06557130395603,
+				"bun": 105.63197034802205
+			},
+			"mean_ns": {
+				"deno": 12624667.18230563,
+				"node": 9894566.340425532,
+				"bun": 9466830.891304348
+			},
+			"files_iterated": {
+				"deno": 154,
+				"node": 154,
+				"bun": 154
+			}
+		},
+		{
+			"group": "format/css",
+			"name": "tsv_wasm",
+			"ops_per_second": {
+				"deno": 66.83676930074832,
+				"node": 77.3630631485335,
+				"bun": 77.99320050438536
+			},
+			"mean_ns": {
+				"deno": 14961824.314102564,
+				"node": 12926065.221590908,
+				"bun": 12821630.520775624
+			},
+			"files_iterated": {
+				"deno": 154,
+				"node": 154,
+				"bun": 154
+			}
+		},
+		{
+			"group": "format/css",
+			"name": "oxfmt",
+			"ops_per_second": {
+				"deno": 3.6024211048191663,
+				"node": 3.4602781656793393,
+				"bun": 2.845532359370373
+			},
+			"mean_ns": {
+				"deno": 277591089.6875,
+				"node": 288994107.4444444,
+				"bun": 351428089.26666665
+			},
+			"files_iterated": {
+				"deno": 154,
+				"node": 154,
+				"bun": 154
+			}
+		},
+		{
+			"group": "format/css",
+			"name": "biome-wasm",
+			"ops_per_second": {
+				"deno": 14.800849700236778,
+				"node": 18.248648278318363
+			},
+			"mean_ns": {
+				"deno": 67563688.5890411,
+				"node": 54798579.31111111
+			},
+			"files_iterated": {
+				"deno": 154,
+				"node": 154
+			}
+		}
+	]
+}

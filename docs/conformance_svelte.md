@@ -39,7 +39,7 @@ Cases where tsv intentionally produces different AST than Svelte. Fixtures use `
 **Corpus-scale enforcement**: `deno task corpus:compare:parse` deep-diffs tsv's
 parse output against the canonical parsers on real codebases and classifies
 diffs against this catalog (the `DOCUMENTED_MATCHERS` list in
-`benches/deno/corpus_compare_parse.ts` covers the divergences that parse on
+`benches/js/corpus_compare_parse.ts` covers the divergences that parse on
 both sides). Keep the two in sync: a new documented AST divergence gets a
 matcher, and an unmatched corpus diff group is either a bug or a missing
 catalog entry.
@@ -125,7 +125,7 @@ construct abort an otherwise-valid _standard-CSS_ file; these dialects are input
 tsv never chases regardless.
 
 Non-standard `.css` is auto-classified into `expected errors` by the corpus
-comparator (`benches/deno/lib/divergence/expected_errors.ts`).
+comparator (`benches/js/lib/divergence/expected_errors.ts`).
 
 ### Svelte Template Corrections (corpus-enforced)
 
@@ -197,7 +197,7 @@ and formatting is unaffected. Fixture:
 Intentional AST divergences from acorn-typescript that have no prettier-stable
 fixture form (prettier rewrites the triggering syntax), so the corpus parse
 differential enforces them via `DOCUMENTED_MATCHERS` in
-`benches/deno/corpus_compare_parse.ts` instead.
+`benches/js/corpus_compare_parse.ts` instead.
 
 **Rest param type-annotation end** (`rest_param_type_end`): acorn-typescript
 ends a typed `RestElement` at the binding (`(...args: Array<any>)` → `end`
