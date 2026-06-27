@@ -437,7 +437,11 @@ impl<'a> Printer<'a> {
             )
             .map_or(key_start, |p| p as u32);
             self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
-            let key_doc = self.build_expression_doc(&prop.key);
+            // Parenthesize an `in` computed key inside a for-header init
+            // (`for (C = class { [(b in c)]() {} };…)`); a no-op elsewhere. The
+            // object computed-key path applies this via `needs_parens`; class
+            // members build the key directly, so apply it here.
+            let key_doc = self.wrap_for_init_in(&prop.key, self.build_expression_doc(&prop.key));
             let (doc, end) = self.build_computed_key_bracket_doc(cursor, &prop.key, key_doc);
             key_region_end = end;
             parts.push(doc);
@@ -483,7 +487,7 @@ impl<'a> Printer<'a> {
             // relocation). Bypasses the assignment layout; value built lazily so the
             // common no-comment path is unaffected.
             let preserve = self.build_initializer_line_continuation(before_eq, eq_pos, || {
-                let value_doc = if super::needs_parens(value, super::ParenContext::DefaultValue) {
+                let value_doc = if self.needs_parens(value, super::ParenContext::DefaultValue) {
                     d.parens(self.build_expression_doc(value))
                 } else {
                     self.build_expression_doc(value)
@@ -524,7 +528,7 @@ impl<'a> Printer<'a> {
                     // built manually like object property values, since the layout
                     // chooser takes the bare expression
                     let assignment_doc =
-                        if super::needs_parens(value, super::ParenContext::DefaultValue) {
+                        if self.needs_parens(value, super::ParenContext::DefaultValue) {
                             let value_doc = d.parens(self.build_expression_doc(value));
                             let value_doc = match rhs_comments {
                                 Some(comments_doc) => d.concat(&[comments_doc, value_doc]),
@@ -638,7 +642,10 @@ impl<'a> Printer<'a> {
                 .map_or(key_start, |p| p as u32);
                 self.push_pre_name_comments_doc(&mut parts, cursor, bracket_pos);
             }
-            let key_doc = self.build_expression_doc(&method.key);
+            // Parenthesize an `in` computed key inside a for-header init (mirrors
+            // the object computed-key `needs_parens` wrap); a no-op elsewhere.
+            let key_doc =
+                self.wrap_for_init_in(&method.key, self.build_expression_doc(&method.key));
             let (doc, end) = self.build_computed_key_bracket_doc(cursor, &method.key, key_doc);
             key_region_end = end;
             parts.push(doc);

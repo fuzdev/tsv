@@ -218,6 +218,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         result
     }
 
+    /// Run `f` with the `[In]` grammar parameter forced to `[+In]` (`allow_in =
+    /// true`), restoring the prior value afterward (even on error). Used at the
+    /// grammar productions that reset `[+In]` within a for-header init — the
+    /// ternary consequent, function/class bodies, param defaults — where a bare
+    /// `in` is the binary operator, not the for-in separator. A no-op outside a
+    /// for-header init (where `allow_in` is already `true`); a nested for-header
+    /// re-disables it via `parse_expression_no_in`'s own save/restore.
+    pub(super) fn with_allow_in<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let old_allow_in = self.allow_in;
+        self.allow_in = true;
+        let result = f(self);
+        self.allow_in = old_allow_in;
+        result
+    }
+
     /// Pratt parser: parse expression with minimum binding power
     ///
     /// Returns ParsedExpr with actual end position tracking for parentheses
@@ -374,7 +392,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if min_bp <= BP_ASSIGNMENT && self.eat(TokenKind::Question) {
             // Parse consequent (then branch) - use BP_ASSIGNMENT to exclude comma operator
             // This ensures (a ? b : c, d) parses as ((a ? b : c), d) not (a ? b : (c, d))
-            let consequent = self.parse_expression_bp(BP_ASSIGNMENT)?;
+            // The consequent is `AssignmentExpression[+In]` — `in` is always the
+            // binary operator here, even inside a for-header init. The alternate
+            // is `[?In]` and inherits the outer context (so `for (a ? b : x in y;;)`
+            // still rejects).
+            let consequent = self.with_allow_in(|p| p.parse_expression_bp(BP_ASSIGNMENT))?;
 
             // Expect ':'
             self.expect(&TokenKind::Colon)?;
@@ -1800,6 +1822,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Dynamic import: import('module') or import('module', options)
         self.expect(&TokenKind::ParenOpen)?;
 
+        // The argument list is a grouping delimiter — `in` is always the binary
+        // operator inside it, even within a for-header init (the args are
+        // `AssignmentExpression[+In]`). Mirrors `parse_call_arguments`.
+        self.grouping_depth += 1;
+
         // Parse the source expression (usually a string literal)
         let source = self.parse_assignment_expression()?;
 
@@ -1821,6 +1848,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture end position before consuming ')'
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?;
+        self.grouping_depth -= 1;
 
         Ok(Expression::ImportExpression(ImportExpression {
             source: arena.alloc(source),

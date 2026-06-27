@@ -357,8 +357,7 @@ impl<'a> Printer<'a> {
         spread: &internal::SpreadElement<'_>,
     ) -> DocId {
         let d = self.d();
-        let needs_parens =
-            super::needs_parens(spread.argument, super::ParenContext::SpreadArgument);
+        let needs_parens = self.needs_parens(spread.argument, super::ParenContext::SpreadArgument);
         // A binaryish spread argument indents its continuation when it breaks
         // (`...(a &&\n\tb && {…})`), matching Prettier — a `SpreadElement` parent is
         // not in binaryish.js's `shouldNotIndent` set, so the logical/binary chain

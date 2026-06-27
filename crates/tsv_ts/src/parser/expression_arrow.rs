@@ -89,9 +89,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse arrow function body: expression or block statement
     fn parse_arrow_body(&mut self) -> Result<ArrowFunctionBody<'arena>, ParseError> {
         if self.check(&TokenKind::BraceOpen) {
-            let block = self.parse_function_body()?;
+            // A block body is a `FunctionBody` (`[+In]`) — `in` is the binary
+            // operator even when this arrow sits in a for-header init.
+            let block = self.with_allow_in(Self::parse_function_body)?;
             Ok(ArrowFunctionBody::BlockStatement(block))
         } else {
+            // A concise body is `AssignmentExpression[?In]` — it inherits the
+            // outer In context, so `for (a = () => x in y;;)` still rejects.
             // Use assignment_expression so comma doesn't consume next object property
             let expr = self.parse_assignment_expression()?;
             Ok(ArrowFunctionBody::Expression(self.alloc(expr)))

@@ -152,7 +152,9 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>]) {
         if expr.has_optional_in_chain() {
             return;
         }
-        *np = needs_parens(expr, ParenContext::Callee);
+        // Callee always parenthesizes a binary operand for precedence, so the
+        // for-init `in` rule never changes the verdict here — pass `false`.
+        *np = needs_parens(expr, ParenContext::Callee, false);
     }
 }
 
@@ -250,7 +252,9 @@ fn linearize_recursive<'a>(
 
         // Base case: expression that's not part of the chain structure
         _ => {
-            let needs_parens = needs_parens(expr, ParenContext::ChainBase);
+            // ChainBase always parenthesizes a binary base for precedence, so
+            // the for-init `in` rule never changes the verdict here — pass `false`.
+            let needs_parens = needs_parens(expr, ParenContext::ChainBase, false);
             nodes.push(ChainNode::base(expr, needs_parens));
         }
     }

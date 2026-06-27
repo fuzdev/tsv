@@ -6,7 +6,7 @@
 
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use crate::printer::comments::CommentSpacing;
-use crate::printer::{ParenContext, Printer, needs_parens};
+use crate::printer::{ParenContext, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -104,7 +104,7 @@ impl<'a> Printer<'a> {
         let argument_doc = if leading_comments_opt.is_some() || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
             let inner = self.build_expression_doc(unary.argument);
-            let needs_paren_wrap = needs_parens(unary.argument, ParenContext::UnaryArgument);
+            let needs_paren_wrap = self.needs_parens(unary.argument, ParenContext::UnaryArgument);
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {
@@ -166,7 +166,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
                 d.concat(&parts)
             }
-        } else if needs_parens(unary.argument, ParenContext::UnaryArgument) {
+        } else if self.needs_parens(unary.argument, ParenContext::UnaryArgument) {
             // Binary expressions need parens - use grouping for logical ops to allow line breaking
             if let Expression::BinaryExpression(binary) = unary.argument {
                 if binary.operator.is_logical() {
@@ -868,7 +868,7 @@ impl<'a> Printer<'a> {
         // - Embedded expression contexts (LayoutMode::Embedded): Use the grouped
         //   approach from build_binary_chain_doc_with_continuation_indent, which keeps
         //   short 2-operand binaries flat (Prettier's behavior for template expressions).
-        if needs_parens(operand, ctx) {
+        if self.needs_parens(operand, ctx) {
             if let Expression::BinaryExpression(inner_binary) = operand {
                 if self.embed.is_embedded() {
                     // Embedded expression context: use grouped approach that keeps short binaries flat
@@ -937,7 +937,7 @@ impl<'a> Printer<'a> {
             parts.push(inner);
             self.append_trailing_paren_comments(&mut parts, argument_end, await_expr.span.end);
             d.concat(&parts)
-        } else if needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
+        } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
             d.concat(&[
                 d.text("("),
                 self.build_expression_doc(await_expr.argument),
@@ -988,7 +988,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(self.build_expression_doc(arg));
                 self.append_trailing_paren_comments(&mut parts, argument_end, yield_expr.span.end);
-            } else if needs_parens(arg, ParenContext::YieldArgument) {
+            } else if self.needs_parens(arg, ParenContext::YieldArgument) {
                 // Assignment needs parens: `yield (x ??= y)`
                 parts.push(d.text("("));
                 parts.push(self.build_expression_doc(arg));

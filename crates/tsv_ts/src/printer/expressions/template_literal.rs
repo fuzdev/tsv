@@ -5,7 +5,7 @@
 
 use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
-use crate::printer::{ParenContext, Printer, needs_parens};
+use crate::printer::{ParenContext, Printer};
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -52,7 +52,7 @@ impl<'a> Printer<'a> {
                 previous_quasi_indent_size = indent_size;
 
                 // Build expression doc
-                let expr_doc = if needs_parens(expr, ParenContext::TemplateLiteralExpression) {
+                let expr_doc = if self.needs_parens(expr, ParenContext::TemplateLiteralExpression) {
                     d.parens(self.build_expression_doc(expr))
                 } else {
                     self.build_expression_doc(expr)
@@ -335,7 +335,7 @@ impl<'a> Printer<'a> {
         // removed-paren comments so comments stay outside.
         let tag_doc = if let Some(sealed) = self.build_sealed_non_null_paren_doc(tagged.tag) {
             sealed
-        } else if needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
+        } else if self.needs_parens(tagged.tag, ParenContext::TaggedTemplateTag) {
             d.parens(self.build_expression_doc(tagged.tag))
         } else {
             self.build_expression_doc(tagged.tag)

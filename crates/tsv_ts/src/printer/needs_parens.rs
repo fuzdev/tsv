@@ -112,10 +112,32 @@ pub enum ParenContext {
     SuperClass,
 }
 
+/// Whether `expr` is an `in` binary expression — the operator that must be
+/// parenthesized inside a `for` header init so it isn't read as the `for (x in
+/// y)` separator. Shared by `needs_parens` (the ambient for-init rule) and the
+/// surgical `in`-wrap at positions that build an expression without a
+/// `needs_parens` check.
+pub(crate) fn is_in_binary(expr: &Expression<'_>) -> bool {
+    matches!(expr, Expression::BinaryExpression(b) if b.operator == BinaryOperator::In)
+}
+
 /// Determines if an expression needs parentheses in a given context.
 ///
 /// This is the central entry point for all parenthesization decisions.
-pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext) -> bool {
+///
+/// `in_for_init` is the ambient "building a `for` header init clause" flag: when
+/// set, an `in` binary expression always needs parens (prettier parenthesizes
+/// every `in` lexically under the init, regardless of context). It's threaded as
+/// a parameter rather than read from a context because parenthesization is a pure
+/// function of the node and its surroundings.
+pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool) -> bool {
+    // Ambient for-init rule: an `in` binary always needs parens here. ORed ahead
+    // of the context match so it applies uniformly (call args, object values,
+    // binary operands, etc.) and never double-wraps a node a context already
+    // parenthesizes for precedence (`!(a in b)`, `(a in b).p`).
+    if in_for_init && is_in_binary(expr) {
+        return true;
+    }
     match ctx {
         // Assignment as value needs parens: `const x = (y = z);`
         ParenContext::VariableInit => matches!(expr, Expression::AssignmentExpression(_)),

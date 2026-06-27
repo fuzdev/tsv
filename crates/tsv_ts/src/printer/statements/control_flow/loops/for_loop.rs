@@ -1172,7 +1172,15 @@ impl<'a> Printer<'a> {
 
     fn build_for_init_doc(&self, init: &internal::ForInit<'_>) -> DocId {
         let d = self.d();
-        match init {
+        // The init clause is `[~In]`: an `in` binary must be parenthesized so it
+        // isn't read as the `for (x in y)` separator. Set for the whole init
+        // subtree (prettier parenthesizes every `in` lexically under the init,
+        // including inside nested function/class bodies); a nested for-header
+        // re-enables it for its own init. The `wrap_for_init_in` calls below cover
+        // the positions that build an expression without a `needs_parens` check;
+        // everything else routes through `needs_parens`, now flag-aware.
+        let saved_in_for_init = self.in_for_init.replace(true);
+        let result = match init {
             internal::ForInit::VariableDeclaration(decl) => {
                 let mut parts = vec![d.text(decl.kind.as_str()), d.text(" ")];
                 for (i, declarator) in decl.declarations.iter().enumerate() {
@@ -1189,7 +1197,7 @@ impl<'a> Printer<'a> {
                         {
                             parts.push(comments);
                         }
-                        parts.push(self.build_expression_doc(init));
+                        parts.push(self.wrap_for_init_in(init, self.build_expression_doc(init)));
                     }
                 }
                 d.concat(&parts)
@@ -1200,14 +1208,18 @@ impl<'a> Printer<'a> {
                 // Same handling as build_for_update_doc
                 if let Expression::SequenceExpression(seq) = expr {
                     d.join(
-                        seq.expressions.iter().map(|e| self.build_expression_doc(e)),
+                        seq.expressions
+                            .iter()
+                            .map(|e| self.wrap_for_init_in(e, self.build_expression_doc(e))),
                         ", ",
                     )
                 } else {
-                    self.build_expression_doc(expr)
+                    self.wrap_for_init_in(expr, self.build_expression_doc(expr))
                 }
             }
-        }
+        };
+        self.in_for_init.set(saved_in_for_init);
+        result
     }
 
     pub(in crate::printer::statements) fn build_for_in_statement_doc(

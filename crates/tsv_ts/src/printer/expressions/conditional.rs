@@ -130,6 +130,9 @@ impl<'a> Printer<'a> {
         } else {
             test
         };
+        // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
+        // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
+        let test = self.wrap_for_init_in(cond.test, test);
         // Prettier's shouldNotIndent (binaryish.js:109-113) also applies to binaries
         // in consequent/alternate positions: when parent is ConditionalExpression and
         // grandparent is ReturnStatement/ThrowStatement/CallExpression/NewExpression,
@@ -297,6 +300,9 @@ impl<'a> Printer<'a> {
         } else {
             test
         };
+        // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
+        // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
+        let test = self.wrap_for_init_in(cond.test, test);
 
         // Find the ? and : positions for proper comment categorization
         let question_pos = self.find_char_outside_comments(test_end, consequent_start, b'?');
@@ -352,7 +358,13 @@ impl<'a> Printer<'a> {
                 let chained = self.build_conditional_doc_impl(nested, true, false);
                 (d.group_break(chained), true)
             } else {
-                (self.build_expression_doc(cond.consequent), false)
+                (
+                    self.wrap_for_init_in(
+                        cond.consequent,
+                        self.build_expression_doc(cond.consequent),
+                    ),
+                    false,
+                )
             };
         if has_line_comment_before_consequent {
             // Line comment — consequent on new line
@@ -410,14 +422,17 @@ impl<'a> Printer<'a> {
         }
 
         // Alternate expression - nested conditionals cascade the break without extra indent
-        let alternate_doc =
-            if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
-                // Recursively use breaking layout - no indent wrapper (has its own structure)
-                self.build_conditional_doc_with_line_comments(nested, true)
-            } else {
-                // Regular expressions get indent wrapper
-                d.indent(self.build_expression_doc(cond.alternate))
-            };
+        let alternate_doc = if let internal::Expression::ConditionalExpression(nested) =
+            cond.alternate
+        {
+            // Recursively use breaking layout - no indent wrapper (has its own structure)
+            self.build_conditional_doc_with_line_comments(nested, true)
+        } else {
+            // Regular expressions get indent wrapper
+            d.indent(
+                self.wrap_for_init_in(cond.alternate, self.build_expression_doc(cond.alternate)),
+            )
+        };
 
         if has_line_comment_before_alternate {
             q_parts.push(d.hardline());
@@ -503,9 +518,14 @@ impl<'a> Printer<'a> {
         indent_binary: bool,
         boundary_end: u32,
     ) -> DocId {
-        if indent_binary && let internal::Expression::BinaryExpression(binary) = expr {
-            return self.build_binary_chain_doc_with_continuation_indent(binary);
-        }
-        self.build_expression_doc_with_paren_comments(expr, boundary_end)
+        let doc = if indent_binary && let internal::Expression::BinaryExpression(binary) = expr {
+            self.build_binary_chain_doc_with_continuation_indent(binary)
+        } else {
+            self.build_expression_doc_with_paren_comments(expr, boundary_end)
+        };
+        // Parenthesize an `in` consequent/alternate inside a for-header init
+        // (`for (a = c ? (b in c) : 0;…)`); a no-op elsewhere. Prettier wraps every
+        // `in` under the init; the alternate is `[~In]` so there it is load-bearing.
+        self.wrap_for_init_in(expr, doc)
     }
 }

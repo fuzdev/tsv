@@ -56,7 +56,13 @@ pub(super) fn build_import_expression_doc(
     let open_paren_end = import_expr.span.start + "import(".len() as u32;
     let source_start = import_expr.source.span().start;
 
-    let raw_source_doc = printer.build_expression_doc(import_expr.source);
+    // Parenthesize an `in` argument inside a for-header init (`for (a = import(m,
+    // (b in c));…)`); a no-op elsewhere. Dynamic-import args are hand-rolled here
+    // rather than routed through `needs_parens(Argument)`, so apply the rule directly.
+    let raw_source_doc = printer.wrap_for_init_in(
+        import_expr.source,
+        printer.build_expression_doc(import_expr.source),
+    );
     let (source_doc, leading_forces_break) =
         printer.build_paren_leading_value_doc(open_paren_end, source_start, raw_source_doc);
 
@@ -104,7 +110,7 @@ pub(super) fn build_import_expression_doc(
         return wrap_import_group(d, source_doc);
     };
 
-    let options_doc = printer.build_expression_doc(options);
+    let options_doc = printer.wrap_for_init_in(options, printer.build_expression_doc(options));
     let options_end = options.span().end;
     let options_start = options.span().start;
 

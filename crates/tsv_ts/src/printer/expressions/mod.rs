@@ -29,7 +29,7 @@ mod template_literal;
 
 use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
-use crate::printer::{ParenContext, PatternContext, Printer, chain, needs_parens};
+use crate::printer::{ParenContext, PatternContext, Printer, chain};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -247,7 +247,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_arg_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
         // Assignment expressions need parens in argument context for clarity
-        if needs_parens(expr, ParenContext::Argument) {
+        if self.needs_parens(expr, ParenContext::Argument) {
             return d.parens(self.build_expression_doc(expr));
         }
 
@@ -292,7 +292,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let expr_needs_parens =
-            needs_parens(type_assert.expression, ParenContext::AngleBracketAssertion);
+            self.needs_parens(type_assert.expression, ParenContext::AngleBracketAssertion);
         // Cast boundary positions: `<` … type … `>` … expression. The `>` is found
         // past any comment that itself contains a `>` (`<T /* > */>`).
         let open_pos = type_assert.span.start; // the `<`
@@ -469,7 +469,7 @@ impl<'a> Printer<'a> {
         is_as: bool,
     ) -> DocId {
         let d = self.d();
-        let needs_parens = needs_parens(expression, ParenContext::TypeAssertion);
+        let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion);
         let mut parts = DocBuf::new();
         if needs_parens {
             parts.push(d.text("("));
@@ -619,7 +619,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
         let needs_parens =
-            needs_parens(inst_expr.expression, ParenContext::InstantiationExpression);
+            self.needs_parens(inst_expr.expression, ParenContext::InstantiationExpression);
         if needs_parens {
             parts.push(d.text("("));
         }
@@ -654,7 +654,7 @@ impl<'a> Printer<'a> {
         non_null_expr: &crate::ast::internal::TSNonNullExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        let needs_parens = needs_parens(non_null_expr.expression, ParenContext::NonNull);
+        let needs_parens = self.needs_parens(non_null_expr.expression, ParenContext::NonNull);
 
         if needs_parens {
             // For expressions that need parens, use a special doc structure
