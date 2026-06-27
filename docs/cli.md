@@ -59,6 +59,13 @@ All content-processing commands support three input methods:
 - **Content**: `command --content <string> --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 - **Stdin**: `command --stdin --parser <type>` - Requires explicit `--parser svelte|typescript|css`
 
+`parse` and `format` also take `--goal script|module` (TypeScript only; default
+`module`). It selects the parse goal: at `script`, `await` is an ordinary identifier
+and `import`/`export`/`import.meta` are errors. It applies to `--content`/`--stdin`
+only — file paths are always formatted as modules (Svelte and CSS have no goal), and
+passing `--goal` with a path argument is a usage error (exit 2 for `format`). Both
+goals are strict; see [conformance_test262.md §Strict Mode Only, Explicit Goal Axis](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
+
 Implemented in `tsv_cli/src/cli/input.rs`
 
 ## Multi-File Formatting

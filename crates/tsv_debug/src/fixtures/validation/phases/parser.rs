@@ -1,6 +1,6 @@
 //! P-phase parser validation plus invalid-syntax checks (P* rules + input_invalid_*).
 
-use crate::deno::{parse_css, parse_svelte, parse_typescript};
+use crate::deno::{parse_css, parse_svelte, parse_typescript_with_goal};
 use crate::fixtures::{self, Fixture, FixtureFiles, InputType, read_file};
 use tsv_cli::json_utils::to_json_with_tabs;
 
@@ -96,8 +96,9 @@ pub(in crate::fixtures::validation) fn validate_typed_walk_parity(
     result: &mut FixtureValidation,
     input: &str,
     parsed: &ParsedInput<'_>,
+    goal: tsv_ts::Goal,
 ) {
-    let parity = super::super::parsed_input::typed_walk_parity_probes(input, parsed);
+    let parity = super::super::parsed_input::typed_walk_parity_probes(input, parsed, goal);
     for (probe, failure) in parity.failures {
         match failure {
             TypedWalkParityFailure::Diverged => {
@@ -207,7 +208,7 @@ pub(in crate::fixtures::validation) async fn validate_parser_external(
             return; // No expected.json to validate
         };
 
-        match parse_typescript(input).await {
+        match parse_typescript_with_goal(input, fixture.goal()).await {
             Ok(ts_ast) => {
                 let ts_ast_json = match to_json_with_tabs(&ts_ast) {
                     Ok(json) => format!("{json}\n"),
@@ -315,7 +316,7 @@ pub(in crate::fixtures::validation) async fn validate_invalid_syntax(
         let ours_failed = match input_type {
             InputType::Svelte => tsv_svelte::parse(&variant_content, &arena).is_err(),
             InputType::SvelteTs | InputType::TypeScript => {
-                tsv_ts::parse(&variant_content, &arena).is_err()
+                tsv_ts::parse_with_goal(&variant_content, fixture.goal(), &arena).is_err()
             }
             InputType::Css => tsv_css::parse(&variant_content, &arena).is_err(),
         };
@@ -324,7 +325,9 @@ pub(in crate::fixtures::validation) async fn validate_invalid_syntax(
         let canonical_failed = match input_type {
             InputType::Svelte => parse_svelte(&variant_content).await.is_err(),
             InputType::SvelteTs | InputType::TypeScript => {
-                parse_typescript(&variant_content).await.is_err()
+                parse_typescript_with_goal(&variant_content, fixture.goal())
+                    .await
+                    .is_err()
             }
             InputType::Css => parse_css(&variant_content).await.is_err(),
         };

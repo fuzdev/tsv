@@ -1,0 +1,206 @@
+{
+	"type": "Program",
+	"start": 0,
+	"end": 71,
+	"loc": {
+		"start": {
+			"line": 1,
+			"column": 0
+		},
+		"end": {
+			"line": 3,
+			"column": 0
+		}
+	},
+	"body": [
+		{
+			"type": "LabeledStatement",
+			"start": 0,
+			"end": 33,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 1,
+					"column": 33
+				}
+			},
+			"body": {
+				"type": "WhileStatement",
+				"start": 7,
+				"end": 33,
+				"loc": {
+					"start": {
+						"line": 1,
+						"column": 7
+					},
+					"end": {
+						"line": 1,
+						"column": 33
+					}
+				},
+				"test": {
+					"type": "Literal",
+					"start": 14,
+					"end": 19,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 14
+						},
+						"end": {
+							"line": 1,
+							"column": 19
+						}
+					},
+					"value": false,
+					"raw": "false"
+				},
+				"body": {
+					"type": "BreakStatement",
+					"start": 21,
+					"end": 33,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 21
+						},
+						"end": {
+							"line": 1,
+							"column": 33
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 27,
+						"end": 32,
+						"loc": {
+							"start": {
+								"line": 1,
+								"column": 27
+							},
+							"end": {
+								"line": 1,
+								"column": 32
+							}
+						},
+						"name": "await"
+					}
+				}
+			},
+			"label": {
+				"type": "Identifier",
+				"start": 0,
+				"end": 5,
+				"loc": {
+					"start": {
+						"line": 1,
+						"column": 0
+					},
+					"end": {
+						"line": 1,
+						"column": 5
+					}
+				},
+				"name": "await"
+			}
+		},
+		{
+			"type": "LabeledStatement",
+			"start": 34,
+			"end": 70,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 0
+				},
+				"end": {
+					"line": 2,
+					"column": 36
+				}
+			},
+			"body": {
+				"type": "WhileStatement",
+				"start": 41,
+				"end": 70,
+				"loc": {
+					"start": {
+						"line": 2,
+						"column": 7
+					},
+					"end": {
+						"line": 2,
+						"column": 36
+					}
+				},
+				"test": {
+					"type": "Literal",
+					"start": 48,
+					"end": 53,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 14
+						},
+						"end": {
+							"line": 2,
+							"column": 19
+						}
+					},
+					"value": false,
+					"raw": "false"
+				},
+				"body": {
+					"type": "ContinueStatement",
+					"start": 55,
+					"end": 70,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 21
+						},
+						"end": {
+							"line": 2,
+							"column": 36
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 64,
+						"end": 69,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 30
+							},
+							"end": {
+								"line": 2,
+								"column": 35
+							}
+						},
+						"name": "await"
+					}
+				}
+			},
+			"label": {
+				"type": "Identifier",
+				"start": 34,
+				"end": 39,
+				"loc": {
+					"start": {
+						"line": 2,
+						"column": 0
+					},
+					"end": {
+						"line": 2,
+						"column": 5
+					}
+				},
+				"name": "await"
+			}
+		}
+	],
+	"sourceType": "script"
+}

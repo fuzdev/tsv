@@ -2,7 +2,8 @@
 
 use crate::fixtures::Fixture;
 use crate::fixtures::{
-    AUDIT_SIGNATURE_FILENAME, PRETTIER_NONCONVERGENT_FILENAME, PRETTIER_REJECTS_FILENAME,
+    AUDIT_SIGNATURE_FILENAME, GOAL_FILENAME, PRETTIER_NONCONVERGENT_FILENAME,
+    PRETTIER_REJECTS_FILENAME,
 };
 use std::fs;
 
@@ -151,6 +152,7 @@ fn is_static_fixture_file(filename: &str) -> bool {
             | "output_prettier.css"
             | "README.md"
             | AUDIT_SIGNATURE_FILENAME
+            | GOAL_FILENAME
     )
 }
 
