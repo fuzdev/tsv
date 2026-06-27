@@ -213,9 +213,10 @@ impl Test262Command {
         );
         if summary.skipped() > 0 {
             println!(
-                "  Skipped:        {} (sloppy mode: {}, runtime: {}, resolution: {})",
+                "  Skipped:        {} (sloppy mode: {}, unimplemented feature: {}, runtime: {}, resolution: {})",
                 summary.skipped(),
                 summary.skipped_sloppy_mode,
+                summary.skipped_unimplemented_feature,
                 summary.skipped_runtime,
                 summary.skipped_resolution,
             );

@@ -39,6 +39,9 @@ pub enum SkipReason {
     NoFrontmatter,
     /// Test requires sloppy (non-strict) mode
     SloppyModeRequired,
+    /// Test requires a syntactic proposal tsv does not implement (the named
+    /// `features:` entry); see `frontmatter::UNIMPLEMENTED_FEATURES`.
+    UnimplementedFeature(&'static str),
 }
 
 /// Summary of test results.
@@ -52,6 +55,7 @@ pub struct TestSummary {
     pub skipped_resolution: usize,
     pub skipped_no_frontmatter: usize,
     pub skipped_sloppy_mode: usize,
+    pub skipped_unimplemented_feature: usize,
     pub skipped_filtered: usize,
     pub failures: Vec<(String, FailureReason)>,
 }
@@ -63,6 +67,7 @@ impl TestSummary {
             + self.skipped_resolution
             + self.skipped_no_frontmatter
             + self.skipped_sloppy_mode
+            + self.skipped_unimplemented_feature
     }
 }
 
@@ -90,6 +95,7 @@ impl TestSummary {
                 SkipReason::ResolutionPhase => self.skipped_resolution += 1,
                 SkipReason::NoFrontmatter => self.skipped_no_frontmatter += 1,
                 SkipReason::SloppyModeRequired => self.skipped_sloppy_mode += 1,
+                SkipReason::UnimplementedFeature(_) => self.skipped_unimplemented_feature += 1,
             },
         }
     }
@@ -130,8 +136,8 @@ enum Classification {
 /// Read a test's frontmatter and decide skip-vs-grade.
 ///
 /// tsv is strict-mode only, so sloppy (`noStrict`) tests are skipped, as are
-/// runtime/resolution negatives (we only test parsing) and files with no
-/// frontmatter.
+/// runtime/resolution negatives (we only test parsing), tests requiring an
+/// unimplemented syntactic proposal, and files with no frontmatter.
 fn classify(content: &str) -> Classification {
     let Some(frontmatter) = frontmatter::parse(content) else {
         return Classification::Skip(SkipReason::NoFrontmatter);
@@ -141,6 +147,13 @@ fn classify(content: &str) -> Classification {
     }
     if frontmatter.is_negative_resolution() {
         return Classification::Skip(SkipReason::ResolutionPhase);
+    }
+    // Drop tests whose syntax tsv hasn't implemented (Stage-3 import proposals)
+    // from the graded set: scoring them as parse failures measures scope, not a
+    // conformance gap. Both polarities go — we shouldn't claim credit for
+    // rejecting a negative whose feature we reject wholesale either.
+    if let Some(feature) = frontmatter.requires_unimplemented_feature() {
+        return Classification::Skip(SkipReason::UnimplementedFeature(feature));
     }
     if frontmatter.requires_sloppy_mode() {
         return Classification::Skip(SkipReason::SloppyModeRequired);
@@ -305,5 +318,41 @@ pub fn format_failure(reason: &FailureReason) -> String {
             "Expected: Parse error (phase: parse)\nGot: Parse success".to_string()
         }
         FailureReason::ReadError(e) => format!("Could not read file: {e}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A test requiring an unimplemented proposal is skipped, not graded — the
+    /// wiring from `frontmatter::requires_unimplemented_feature` through
+    /// `classify` into the skip bucket (the actual behavior change, beyond the
+    /// frontmatter predicate's own unit test).
+    #[test]
+    fn classify_skips_unimplemented_feature() {
+        // The real shape: proposal name alongside `dynamic-import`.
+        let proposal =
+            "/*---\nfeatures: [source-phase-imports, dynamic-import]\n---*/\nimport.source('x');\n";
+        assert!(matches!(
+            classify(proposal),
+            Classification::Skip(SkipReason::UnimplementedFeature("source-phase-imports"))
+        ));
+
+        // Plain dynamic import is implemented — graded, not skipped.
+        let plain = "/*---\nfeatures: [dynamic-import]\n---*/\nimport('x');\n";
+        assert!(matches!(classify(plain), Classification::Grade { .. }));
+    }
+
+    /// The feature check runs before the sloppy-mode check, so a test that is
+    /// both noStrict and a proposal attributes to the feature bucket — keeps the
+    /// `unimplemented feature:` count the true scope of the unimplemented set.
+    #[test]
+    fn classify_feature_precedes_sloppy() {
+        let both = "/*---\nfeatures: [import-defer]\nflags: [noStrict]\n---*/\n";
+        assert!(matches!(
+            classify(both),
+            Classification::Skip(SkipReason::UnimplementedFeature("import-defer"))
+        ));
     }
 }
