@@ -14,14 +14,14 @@ use super::{
     span_to_name_loc,
 };
 
-pub(super) fn convert_fragment(
+pub(super) fn convert_fragment<'src>(
     fragment: &internal::Fragment<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::Fragment {
+) -> public::Fragment<'src> {
     public::Fragment {
-        node_type: "Fragment".to_string(),
+        node_type: "Fragment",
         nodes: fragment
             .nodes
             .iter()
@@ -30,12 +30,12 @@ pub(super) fn convert_fragment(
     }
 }
 
-pub(super) fn convert_fragment_node(
+pub(super) fn convert_fragment_node<'src>(
     node: &internal::FragmentNode<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::FragmentNode {
+) -> public::FragmentNode<'src> {
     match node {
         internal::FragmentNode::Element(elem) => {
             let converted = convert_element(elem, source, loc, interner);
@@ -93,19 +93,19 @@ pub(super) fn convert_fragment_node(
 fn convert_comment(comment: &internal::HtmlComment, source: &str) -> public::Comment {
     // Note: internal uses `content`, public uses `data` (Svelte's naming)
     public::Comment {
-        node_type: "Comment".to_string(),
+        node_type: "Comment",
         start: comment.span.start,
         end: comment.span.end,
         data: comment.content(source).to_string(),
     }
 }
 
-fn convert_element(
+fn convert_element<'src>(
     elem: &internal::Element<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::Element {
+) -> public::Element<'src> {
     // Set node_type based on element kind
     let node_type = match elem.kind {
         internal::ElementKind::Component => "Component",
@@ -113,7 +113,7 @@ fn convert_element(
     };
 
     public::Element {
-        node_type: node_type.to_string(),
+        node_type,
         start: elem.span.start,
         end: elem.span.end,
         name: interner.resolve_infallible(elem.name).to_string(),
@@ -128,18 +128,18 @@ fn convert_element(
     }
 }
 
-pub(super) fn convert_expression_tag(
+pub(super) fn convert_expression_tag<'src>(
     tag: &internal::ExpressionTag<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::ExpressionTag {
+) -> public::ExpressionTag<'src> {
     // Delegate to tsv_ts for expression conversion
     let ts_expr =
         tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
 
     public::ExpressionTag {
-        node_type: "ExpressionTag".to_string(),
+        node_type: "ExpressionTag",
         start: tag.span.start,
         end: tag.span.end,
         expression: ts_expr,
@@ -150,7 +150,7 @@ pub(super) fn convert_text(text: &internal::Text, source: &str) -> public::Text 
     // raw contains original source with entities (&lt;, &#65;, etc.)
     // data contains decoded text (<, A, etc.)
     public::Text {
-        node_type: "Text".to_string(),
+        node_type: "Text",
         start: text.span.start,
         end: text.span.end,
         raw: text.raw(source).to_string(),

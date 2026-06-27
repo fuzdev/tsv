@@ -1,8 +1,19 @@
 //! Public AST types - with serde, matches Svelte's JSON structure exactly
 //!
 //! Uses u32 for positions (max 4GB file size) for memory efficiency.
+//!
+//! Dynamic text leaves (`Literal.raw`, `Identifier.name`, regex/template parts,
+//! the directive prologue) are `Cow<'src, str>` borrowed from the source the AST
+//! was converted against — no allocation when the slice is verbatim, owned only
+//! for the rare escape-decoded case. Static symbol tags (operators, kinds,
+//! `sourceType`, accessibility) are `&'static str`. The `'src` lifetime ties the
+//! whole public tree to that source; `Cow`/`&'static str` serialize
+//! byte-identically to `String`.
 
 use serde::Serialize;
+use std::borrow::Cow;
+use string_interner::{DefaultStringInterner, DefaultSymbol};
+use tsv_lang::{InfallibleResolve, Span};
 
 pub mod classes;
 pub mod declarations;
@@ -89,6 +100,31 @@ pub(crate) fn is_false(b: &bool) -> bool {
     !*b
 }
 
+/// Borrow an interned name from `source` when the span's source slice is exactly
+/// the name (the overwhelming case — a plain identifier reference); own the
+/// resolved name otherwise.
+///
+/// The slice can't be borrowed blindly: a *binding* identifier's `span` covers
+/// the whole binding, type annotation included (`x: T`), not just the name, and
+/// an escaped identifier (`\u{78}`) decodes to a name distinct from its raw
+/// source. Resolving the symbol is a cheap interner lookup (no allocation); the
+/// `String` allocation — the thing this avoids — only happens on the owned
+/// branch, where the slice and the name genuinely differ.
+pub(crate) fn name_cow<'src>(
+    span: Span,
+    source: &'src str,
+    sym: DefaultSymbol,
+    interner: &DefaultStringInterner,
+) -> Cow<'src, str> {
+    let resolved = interner.resolve_infallible(sym);
+    let raw = span.extract(source);
+    if raw == resolved {
+        Cow::Borrowed(raw)
+    } else {
+        Cow::Owned(resolved.to_string())
+    }
+}
+
 /// Serialize integral numbers the way JS's `JSON.stringify` does.
 ///
 /// JS prints an integral double below 1e21 as the expanded form of its
@@ -126,15 +162,15 @@ where
 //
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Program {
+pub struct Program<'src> {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub body: Vec<Statement>,
+    pub body: Vec<Statement<'src>>,
     #[serde(rename = "sourceType")]
-    pub source_type: String,
+    pub source_type: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -168,47 +204,47 @@ pub struct Position {
 
 /// Decorator: `@expression` applied to classes and class members
 #[derive(Debug, Clone, Serialize)]
-pub struct Decorator {
+pub struct Decorator<'src> {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
     /// The decorator expression
-    pub expression: Expression,
+    pub expression: Expression<'src>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Literal {
+pub struct Literal<'src> {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
     #[serde(serialize_with = "serialize_literal_value")]
     pub value: serde_json::Value,
-    pub raw: String,
+    pub raw: Cow<'src, str>,
     /// BigInt string value (only for BigInt literals like `1n`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bigint: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Identifier {
+pub struct Identifier<'src> {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
-    pub name: String,
+    pub name: Cow<'src, str>,
     /// Whether this is an optional parameter
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub optional: bool,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
-    pub type_annotation: Option<TSTypeAnnotation>,
+    pub type_annotation: Option<TSTypeAnnotation<'src>>,
     /// Decorators applied to this parameter (TypeScript parameter decorators)
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub decorators: Vec<Decorator>,
+    pub decorators: Vec<Decorator<'src>>,
 }
 
 /// Private identifier: `#foo` in class fields and methods
@@ -216,12 +252,12 @@ pub struct Identifier {
 /// Used for truly private class members (ES2022 private class fields).
 /// The name does NOT include the `#` prefix.
 #[derive(Debug, Clone, Serialize)]
-pub struct PrivateIdentifier {
+pub struct PrivateIdentifier<'src> {
     #[serde(rename = "type")]
-    pub node_type: String,
+    pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub loc: SourceLocation,
     /// The name without the `#` prefix (e.g., "foo" for `#foo`)
-    pub name: String,
+    pub name: Cow<'src, str>,
 }

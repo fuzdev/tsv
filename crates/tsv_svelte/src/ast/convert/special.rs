@@ -43,12 +43,12 @@ fn script_has_lang_ts(
     false
 }
 
-pub(super) fn convert_script(
+pub(super) fn convert_script<'src>(
     script: &internal::Script<'_>,
-    source: &str,
+    source: &'src str,
     interner: &DefaultStringInterner,
     html_leading_comment: Option<&internal::HtmlComment>,
-) -> public::Script {
+) -> public::Script<'src> {
     let context = script.context.as_str();
 
     // Use full source LocationTracker for absolute line/column numbers everywhere
@@ -149,7 +149,7 @@ pub(super) fn convert_script(
 
     // Return program_json directly (preserves leadingComments/trailingComments)
     public::Script {
-        node_type: "Script".to_string(),
+        node_type: "Script",
         start: script.span.start,
         end: script.span.end,
         context: context.to_string(),
@@ -220,12 +220,12 @@ fn bool_option(
     })
 }
 
-pub(super) fn convert_svelte_options(
+pub(super) fn convert_svelte_options<'src>(
     options: &internal::SvelteOptions<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::SvelteOptions {
+) -> public::SvelteOptions<'src> {
     let runes = bool_option(options.attributes, "runes", interner);
     let immutable = bool_option(options.attributes, "immutable", interner);
     let accessors = bool_option(options.attributes, "accessors", interner);
@@ -356,12 +356,12 @@ pub(super) fn convert_style<'src>(
     }
 }
 
-pub(super) fn convert_special_element(
+pub(super) fn convert_special_element<'src>(
     elem: &internal::SpecialElement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::SpecialElement {
+) -> public::SpecialElement<'src> {
     // Extract tag and expression from the kind enum
     let tag = elem.kind.tag().map(|e| {
         // For plain string attributes (this="hello"), Svelte produces a Literal
@@ -392,7 +392,7 @@ pub(super) fn convert_special_element(
         .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
 
     public::SpecialElement {
-        node_type: elem.kind.node_type().to_string(),
+        node_type: elem.kind.node_type(),
         start: elem.span.start,
         end: elem.span.end,
         name: elem.kind.tag_name().to_string(),

@@ -2,18 +2,19 @@
 
 use super::super::{internal, public};
 use super::{convert_expression, convert_type_annotation, create_location};
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{LocationTracker, Span};
 
-pub(in crate::ast) fn convert_template_literal(
+pub(in crate::ast) fn convert_template_literal<'src>(
     template: &internal::TemplateLiteral<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TemplateLiteral {
+) -> public::TemplateLiteral<'src> {
     public::TemplateLiteral {
-        node_type: "TemplateLiteral".to_string(),
+        node_type: "TemplateLiteral",
         start: template.span.start,
         end: template.span.end,
         loc: create_location(template.span, loc, offset),
@@ -30,12 +31,12 @@ pub(in crate::ast) fn convert_template_literal(
     }
 }
 
-pub(in crate::ast::convert) fn convert_template_element(
+pub(in crate::ast::convert) fn convert_template_element<'src>(
     element: &internal::TemplateElement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     offset: usize,
-) -> public::TemplateElement {
+) -> public::TemplateElement<'src> {
     // Acorn excludes delimiters from TemplateElement spans:
     // - start: skip opening ` or } (+1)
     // - end: skip closing ` (-1 if tail) or ${ (-2 if not tail)
@@ -46,28 +47,36 @@ pub(in crate::ast::convert) fn convert_template_element(
         element.span.end - 2
     };
     let adjusted_span = Span::new(adjusted_start, adjusted_end);
+    // `raw` is a verbatim source slice (borrowed). `cooked` borrows the same
+    // slice for the no-escape (`Verbatim`) case; only a genuinely decoded value
+    // owns, and an invalid escape yields `null`.
+    let cooked = match element.cooked {
+        internal::TemplateCooked::Verbatim => Some(Cow::Borrowed(element.raw(source))),
+        internal::TemplateCooked::Decoded(decoded) => Some(Cow::Owned(decoded.to_string())),
+        internal::TemplateCooked::Invalid => None,
+    };
     public::TemplateElement {
-        node_type: "TemplateElement".to_string(),
+        node_type: "TemplateElement",
         start: adjusted_start,
         end: adjusted_end,
         loc: create_location(adjusted_span, loc, offset),
         value: public::TemplateElementValue {
-            raw: element.raw(source).to_string(),
-            cooked: element.cooked(source).map(str::to_string),
+            raw: Cow::Borrowed(element.raw(source)),
+            cooked,
         },
         tail: element.tail,
     }
 }
 
-pub(in crate::ast) fn convert_object_pattern(
+pub(in crate::ast) fn convert_object_pattern<'src>(
     obj: &internal::ObjectPattern<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ObjectPattern {
+) -> public::ObjectPattern<'src> {
     public::ObjectPattern {
-        node_type: "ObjectPattern".to_string(),
+        node_type: "ObjectPattern",
         start: obj.span.start,
         end: obj.span.end,
         loc: create_location(obj.span, loc, offset),
@@ -83,13 +92,13 @@ pub(in crate::ast) fn convert_object_pattern(
     }
 }
 
-fn convert_object_pattern_property(
+fn convert_object_pattern_property<'src>(
     prop: &internal::ObjectPatternProperty<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ObjectPatternProperty {
+) -> public::ObjectPatternProperty<'src> {
     match prop {
         internal::ObjectPatternProperty::Property(p) => public::ObjectPatternProperty::Property(
             convert_property(p, source, loc, interner, offset),
@@ -104,15 +113,15 @@ fn convert_object_pattern_property(
 
 /// Convert an internal `RestElement` to its public node. Shared by the
 /// object-pattern rest (`{...r}`) and the expression rest (`[...r]` / call rest).
-pub(in crate::ast) fn convert_rest_element(
+pub(in crate::ast) fn convert_rest_element<'src>(
     rest: &internal::RestElement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::RestElement {
+) -> public::RestElement<'src> {
     public::RestElement {
-        node_type: "RestElement".to_string(),
+        node_type: "RestElement",
         start: rest.span.start,
         end: rest.span.end,
         loc: create_location(rest.span, loc, offset),
@@ -133,19 +142,19 @@ pub(in crate::ast) fn convert_rest_element(
 // TODO: Support property decorators in conversion
 // Convert decorator AST nodes from internal to public format
 // Needed when internal::Property gains decorators field
-pub(in crate::ast) fn convert_property(
+pub(in crate::ast) fn convert_property<'src>(
     prop: &internal::Property<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::Property {
+) -> public::Property<'src> {
     // TODO: Handle PropertyKind enum when refactored
     // Currently: Direct field access (method, shorthand, computed)
     // After refactor: Match on PropertyKind to extract fields
     // Also needed: Support for Get/Set property kinds (change kind: String field)
     public::Property {
-        node_type: "Property".to_string(),
+        node_type: "Property",
         start: prop.span.start,
         end: prop.span.end,
         loc: create_location(prop.span, loc, offset),
@@ -160,6 +169,6 @@ pub(in crate::ast) fn convert_property(
             interner,
             offset,
         )),
-        kind: prop.kind.as_str().to_string(),
+        kind: prop.kind.as_str(),
     }
 }

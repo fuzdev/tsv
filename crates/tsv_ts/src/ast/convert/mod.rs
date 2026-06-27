@@ -285,16 +285,16 @@ pub(super) fn json_number_from_f64(n: f64) -> serde_json::Number {
 /// Use `Schema::Acorn` for standalone TypeScript and Svelte `lang="ts"` scripts;
 /// use `Schema::SvelteScript` for Svelte non-`lang="ts"` `<script>` blocks where
 /// the JSON shape must follow Svelte's parser quirks.
-pub fn convert_program(
+pub fn convert_program<'src>(
     program: &internal::Program<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     schema: Schema,
-) -> public::Program {
+) -> public::Program<'src> {
     let interner = program.interner.borrow();
 
     public::Program {
-        node_type: "Program".to_string(),
+        node_type: "Program",
         start: program.span.start,
         end: program.span.end,
         loc: create_location(program.span, loc, 0),
@@ -303,7 +303,7 @@ pub fn convert_program(
             .iter()
             .map(|s| convert_statement(s, source, loc, &interner, 0, schema))
             .collect(),
-        source_type: "module".to_string(),
+        source_type: "module",
     }
 }
 

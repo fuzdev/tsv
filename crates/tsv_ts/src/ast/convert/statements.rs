@@ -11,8 +11,9 @@ use super::{
     convert_try_statement, convert_type_alias_declaration, convert_while_statement,
     create_location, types::convert_entity_name,
 };
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker, Span};
+use tsv_lang::{LocationTracker, Span};
 
 /// Convert an import/export declaration's import attributes to the public shape.
 ///
@@ -21,14 +22,14 @@ use tsv_lang::{InfallibleResolve, LocationTracker, Span};
 /// array (even with no clause); acorn-typescript omits it only when there is no
 /// clause, but emits `[]` for an empty `with {}`. Shared by the import and the
 /// two re-export hosts.
-fn convert_attributes(
+fn convert_attributes<'src>(
     attributes: Option<&[internal::ImportAttribute<'_>]>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
     schema: Schema,
-) -> Option<Vec<public::ImportAttribute>> {
+) -> Option<Vec<public::ImportAttribute<'src>>> {
     match attributes {
         Some(attrs) => Some(
             attrs
@@ -58,24 +59,24 @@ fn find_export_start(source: &str, span_start: u32, offset: usize) -> u32 {
 }
 
 /// Main statement conversion dispatcher
-pub(in crate::ast) fn convert_statement(
+pub(in crate::ast) fn convert_statement<'src>(
     stmt: &internal::Statement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
     schema: Schema,
-) -> public::Statement {
+) -> public::Statement<'src> {
     match stmt {
         internal::Statement::ExpressionStatement(expr_stmt) => {
             // Directive: acorn stores the raw string contents without quotes,
             // taken from the source of the directive literal expression.
             let directive = expr_stmt.is_directive.then(|| {
                 let raw = expr_stmt.expression.span().extract(source);
-                raw[1..raw.len() - 1].to_string()
+                Cow::Borrowed(&raw[1..raw.len() - 1])
             });
             public::Statement::ExpressionStatement(public::ExpressionStatement {
-                node_type: "ExpressionStatement".to_string(),
+                node_type: "ExpressionStatement",
                 start: expr_stmt.span.start,
                 end: expr_stmt.span.end,
                 loc: create_location(expr_stmt.span, loc, offset),
@@ -101,7 +102,7 @@ pub(in crate::ast) fn convert_statement(
         }
         internal::Statement::ReturnStatement(ret) => {
             public::Statement::ReturnStatement(public::ReturnStatement {
-                node_type: "ReturnStatement".to_string(),
+                node_type: "ReturnStatement",
                 start: ret.span.start,
                 end: ret.span.end,
                 loc: create_location(ret.span, loc, offset),
@@ -128,10 +129,10 @@ pub(in crate::ast) fn convert_statement(
                     if schema.is_svelte_script() {
                         None
                     } else {
-                        Some("value".to_string())
+                        Some("value")
                     }
                 }
-                internal::ExportKind::Type => Some("type".to_string()),
+                internal::ExportKind::Type => Some("type"),
             };
             // `attributes`: see `convert_attributes` (None = no `with` clause).
             let attributes = convert_attributes(
@@ -155,7 +156,7 @@ pub(in crate::ast) fn convert_statement(
             };
             let export_span = Span::new(export_start, export_decl.span.end);
             public::Statement::ExportNamedDeclaration(public::ExportNamedDeclaration {
-                node_type: "ExportNamedDeclaration".to_string(),
+                node_type: "ExportNamedDeclaration",
                 start: export_start,
                 end: export_decl.span.end,
                 loc: create_location(export_span, loc, offset),
@@ -182,7 +183,7 @@ pub(in crate::ast) fn convert_statement(
             let export_kind = if schema.is_svelte_script() {
                 None
             } else {
-                Some("value".to_string())
+                Some("value")
             };
             let export_start = if let internal::ExportDefaultValue::ClassDeclaration(class) =
                 &export_decl.declaration
@@ -197,7 +198,7 @@ pub(in crate::ast) fn convert_statement(
             };
             let export_span = Span::new(export_start, export_decl.span.end);
             public::Statement::ExportDefaultDeclaration(public::ExportDefaultDeclaration {
-                node_type: "ExportDefaultDeclaration".to_string(),
+                node_type: "ExportDefaultDeclaration",
                 start: export_start,
                 end: export_decl.span.end,
                 loc: create_location(export_span, loc, offset),
@@ -217,10 +218,10 @@ pub(in crate::ast) fn convert_statement(
                     if schema.is_svelte_script() {
                         None
                     } else {
-                        Some("value".to_string())
+                        Some("value")
                     }
                 }
-                internal::ExportKind::Type => Some("type".to_string()),
+                internal::ExportKind::Type => Some("type"),
             };
             // `attributes`: see `convert_attributes` (None = no `with` clause).
             let attributes = convert_attributes(
@@ -232,7 +233,7 @@ pub(in crate::ast) fn convert_statement(
                 schema,
             );
             public::Statement::ExportAllDeclaration(public::ExportAllDeclaration {
-                node_type: "ExportAllDeclaration".to_string(),
+                node_type: "ExportAllDeclaration",
                 start: export_decl.span.start,
                 end: export_decl.span.end,
                 loc: create_location(export_decl.span, loc, offset),
@@ -247,7 +248,7 @@ pub(in crate::ast) fn convert_statement(
         }
         internal::Statement::TSExportAssignment(export_assign) => {
             public::Statement::TSExportAssignment(public::TSExportAssignment {
-                node_type: "TSExportAssignment".to_string(),
+                node_type: "TSExportAssignment",
                 start: export_assign.span.start,
                 end: export_assign.span.end,
                 loc: create_location(export_assign.span, loc, offset),
@@ -266,10 +267,10 @@ pub(in crate::ast) fn convert_statement(
                     if schema.is_svelte_script() {
                         None
                     } else {
-                        Some("value".to_string())
+                        Some("value")
                     }
                 }
-                internal::ImportKind::Type => Some("type".to_string()),
+                internal::ImportKind::Type => Some("type"),
             };
             let attributes = convert_attributes(
                 import_decl.attributes,
@@ -280,7 +281,7 @@ pub(in crate::ast) fn convert_statement(
                 schema,
             );
             public::Statement::ImportDeclaration(public::ImportDeclaration {
-                node_type: "ImportDeclaration".to_string(),
+                node_type: "ImportDeclaration",
                 start: import_decl.span.start,
                 end: import_decl.span.end,
                 loc: create_location(import_decl.span, loc, offset),
@@ -328,11 +329,12 @@ pub(in crate::ast) fn convert_statement(
             convert_throw_statement(throw_stmt, source, loc, interner, offset),
         ),
         internal::Statement::BreakStatement(break_stmt) => public::Statement::BreakStatement(
-            convert_break_statement(break_stmt, loc, interner, offset),
+            convert_break_statement(break_stmt, source, loc, interner, offset),
         ),
         internal::Statement::ContinueStatement(continue_stmt) => {
             public::Statement::ContinueStatement(convert_continue_statement(
                 continue_stmt,
+                source,
                 loc,
                 interner,
                 offset,
@@ -343,7 +345,7 @@ pub(in crate::ast) fn convert_statement(
         ),
         internal::Statement::EmptyStatement(empty) => {
             public::Statement::EmptyStatement(public::EmptyStatement {
-                node_type: "EmptyStatement".to_string(),
+                node_type: "EmptyStatement",
                 start: empty.span.start,
                 end: empty.span.end,
                 loc: create_location(empty.span, loc, offset),
@@ -351,7 +353,7 @@ pub(in crate::ast) fn convert_statement(
         }
         internal::Statement::DebuggerStatement(dbg) => {
             public::Statement::DebuggerStatement(public::DebuggerStatement {
-                node_type: "DebuggerStatement".to_string(),
+                node_type: "DebuggerStatement",
                 start: dbg.span.start,
                 end: dbg.span.end,
                 loc: create_location(dbg.span, loc, offset),
@@ -381,15 +383,15 @@ pub(in crate::ast) fn convert_statement(
 }
 
 /// Convert TypeScript module/namespace declaration
-pub(in crate::ast) fn convert_module_declaration(
+pub(in crate::ast) fn convert_module_declaration<'src>(
     decl: &internal::TSModuleDeclaration<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSModuleDeclaration {
+) -> public::TSModuleDeclaration<'src> {
     public::TSModuleDeclaration {
-        node_type: "TSModuleDeclaration".to_string(),
+        node_type: "TSModuleDeclaration",
         start: decl.span.start,
         end: decl.span.end,
         loc: create_location(decl.span, loc, offset),
@@ -404,16 +406,16 @@ pub(in crate::ast) fn convert_module_declaration(
 }
 
 /// Convert module/namespace name (identifier or string literal)
-fn convert_module_name(
+fn convert_module_name<'src>(
     name: &internal::TSModuleName<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSModuleName {
+) -> public::TSModuleName<'src> {
     match name {
         internal::TSModuleName::Identifier(id) => {
-            public::TSModuleName::Identifier(convert_identifier(id, loc, interner, offset))
+            public::TSModuleName::Identifier(convert_identifier(id, source, loc, interner, offset))
         }
         internal::TSModuleName::Literal(lit) => {
             public::TSModuleName::Literal(convert_literal(lit, source, loc, offset))
@@ -422,13 +424,13 @@ fn convert_module_name(
 }
 
 /// Convert module declaration body
-fn convert_module_declaration_body(
+fn convert_module_declaration_body<'src>(
     body: &internal::TSModuleDeclarationBody<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSModuleDeclarationBody {
+) -> public::TSModuleDeclarationBody<'src> {
     match body {
         internal::TSModuleDeclarationBody::TSModuleBlock(block) => {
             public::TSModuleDeclarationBody::TSModuleBlock(convert_module_block(
@@ -444,16 +446,16 @@ fn convert_module_declaration_body(
 }
 
 /// Convert module block
-fn convert_module_block(
+fn convert_module_block<'src>(
     block: &internal::TSModuleBlock<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSModuleBlock {
+) -> public::TSModuleBlock<'src> {
     // TSModuleBlock is always in TypeScript context (declare namespace/module)
     public::TSModuleBlock {
-        node_type: "TSModuleBlock".to_string(),
+        node_type: "TSModuleBlock",
         start: block.span.start,
         end: block.span.end,
         loc: create_location(block.span, loc, offset),
@@ -465,16 +467,16 @@ fn convert_module_block(
     }
 }
 
-pub(in crate::ast) fn convert_block_statement(
+pub(in crate::ast) fn convert_block_statement<'src>(
     block: &internal::BlockStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::BlockStatement {
+) -> public::BlockStatement<'src> {
     // BlockStatement is always in TypeScript context (function bodies, etc.)
     public::BlockStatement {
-        node_type: "BlockStatement".to_string(),
+        node_type: "BlockStatement",
         start: block.span.start,
         end: block.span.end,
         loc: create_location(block.span, loc, offset),
@@ -486,15 +488,15 @@ pub(in crate::ast) fn convert_block_statement(
     }
 }
 
-pub fn convert_variable_declaration(
+pub fn convert_variable_declaration<'src>(
     var_decl: &internal::VariableDeclaration<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::VariableDeclaration {
+) -> public::VariableDeclaration<'src> {
     public::VariableDeclaration {
-        node_type: "VariableDeclaration".to_string(),
+        node_type: "VariableDeclaration",
         start: var_decl.span.start,
         end: var_decl.span.end,
         loc: create_location(var_decl.span, loc, offset),
@@ -503,20 +505,20 @@ pub fn convert_variable_declaration(
             .iter()
             .map(|d| convert_variable_declarator(d, source, loc, interner, offset))
             .collect(),
-        kind: var_decl.kind.as_str().to_string(),
+        kind: var_decl.kind.as_str(),
         declare: var_decl.declare,
     }
 }
 
-pub(in crate::ast) fn convert_variable_declarator(
+pub(in crate::ast) fn convert_variable_declarator<'src>(
     declarator: &internal::VariableDeclarator<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::VariableDeclarator {
+) -> public::VariableDeclarator<'src> {
     public::VariableDeclarator {
-        node_type: "VariableDeclarator".to_string(),
+        node_type: "VariableDeclarator",
         start: declarator.span.start,
         end: declarator.span.end,
         loc: create_location(declarator.span, loc, offset),
@@ -530,42 +532,43 @@ pub(in crate::ast) fn convert_variable_declarator(
     }
 }
 
-pub(in crate::ast) fn convert_identifier(
+pub(in crate::ast) fn convert_identifier<'src>(
     id: &internal::Identifier<'_>,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::Identifier {
+) -> public::Identifier<'src> {
     public::Identifier {
-        node_type: "Identifier".to_string(),
+        node_type: "Identifier",
         start: id.span.start,
         end: id.span.end,
         loc: create_location(id.span, loc, offset),
-        name: interner.resolve_infallible(id.name).to_string(),
+        name: public::name_cow(id.span, source, id.name, interner),
         optional: false,
         type_annotation: None,
         decorators: Vec::new(),
     }
 }
 
-fn convert_import_equals_declaration(
+fn convert_import_equals_declaration<'src>(
     decl: &internal::TSImportEqualsDeclaration<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSImportEqualsDeclaration {
+) -> public::TSImportEqualsDeclaration<'src> {
     public::TSImportEqualsDeclaration {
-        node_type: "TSImportEqualsDeclaration".to_string(),
+        node_type: "TSImportEqualsDeclaration",
         start: decl.span.start,
         end: decl.span.end,
         loc: create_location(decl.span, loc, offset),
         import_kind: match decl.import_kind {
-            internal::ImportKind::Value => "value".to_string(),
-            internal::ImportKind::Type => "type".to_string(),
+            internal::ImportKind::Value => "value",
+            internal::ImportKind::Type => "type",
         },
         is_export: decl.is_export,
-        id: convert_identifier(&decl.id, loc, interner, offset),
+        id: convert_identifier(&decl.id, source, loc, interner, offset),
         module_reference: convert_module_reference(
             &decl.module_reference,
             source,
@@ -576,17 +579,17 @@ fn convert_import_equals_declaration(
     }
 }
 
-fn convert_module_reference(
+fn convert_module_reference<'src>(
     module_ref: &internal::TSModuleReference<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSModuleReference {
+) -> public::TSModuleReference<'src> {
     match module_ref {
         internal::TSModuleReference::ExternalModuleReference(ext_ref) => {
             public::TSModuleReference::ExternalModuleReference(public::TSExternalModuleReference {
-                node_type: "TSExternalModuleReference".to_string(),
+                node_type: "TSExternalModuleReference",
                 start: ext_ref.span.start,
                 end: ext_ref.span.end,
                 loc: create_location(ext_ref.span, loc, offset),
@@ -596,6 +599,7 @@ fn convert_module_reference(
         internal::TSModuleReference::EntityName(entity_name) => {
             public::TSModuleReference::EntityName(convert_entity_name(
                 entity_name,
+                source,
                 loc,
                 interner,
                 offset,
