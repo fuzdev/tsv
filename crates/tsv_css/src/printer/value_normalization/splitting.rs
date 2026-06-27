@@ -143,7 +143,17 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
         result.push(ch);
     }
 
-    result.trim().to_string()
+    // The char-loop above already suppresses leading/trailing whitespace in the
+    // common case, so `trim()` is usually a no-op; return the owned buffer as-is
+    // rather than cloning it. Only the rare edge cases that preserve verbatim
+    // boundary whitespace (e.g. an unterminated string/comment) pay the copy —
+    // byte-identical to `result.trim().to_string()` either way.
+    let trimmed = result.trim();
+    if trimmed.len() == result.len() {
+        result
+    } else {
+        trimmed.to_string()
+    }
 }
 
 /// Normalize spacing in a value containing comments (alias for backward compatibility)

@@ -15,7 +15,7 @@
 use super::Printer;
 use crate::ast::internal;
 use tsv_lang::PRINT_WIDTH;
-use tsv_lang::doc::{self, Mode, arena::DocId};
+use tsv_lang::doc::{self, DocBuf, Mode, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Get the string representation of a combinator
@@ -241,7 +241,7 @@ impl<'a> Printer<'a> {
 
     /// Build a doc representation of a complex selector for width checking
     fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector<'_>) -> DocId {
-        let docs: Vec<_> = complex
+        let docs: DocBuf = complex
             .children
             .iter()
             .enumerate()
@@ -358,7 +358,7 @@ impl<'a> Printer<'a> {
         is_first: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Add combinator if present
         if let Some(combinator) = relative.combinator {
@@ -776,7 +776,7 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::PseudoClassArgs::Slotted { selectors, .. } => {
-                let sel_docs: Vec<_> = selectors
+                let sel_docs: DocBuf = selectors
                     .iter()
                     .map(|s| self.build_simple_selector_doc(s))
                     .collect();

@@ -207,6 +207,18 @@ Notes:
 - **Allocation counts are machine-load-independent** — unlike wall time, they
   are stable across machine states. **Never read wall times off a heaptrack
   run**; the instrumentation inflates them severalfold.
+- **An allocation-count cut is not automatically a wall-time win.** This is a
+  traversal-bound formatter — the doc IR is walked many times (fitting memos +
+  render), so storage **locality** and per-read cost can dominate `malloc`/`free`
+  call count. A change that reduces allocations can be wall-neutral, or even
+  *regress* format wall-time and peak memory — e.g. relocating hot,
+  repeatedly-walked storage, or trading a tight contiguous `Vec` for a sparser
+  arena that hurts cache density. Allocation count is the right gate for the
+  **WASM-format** wall (dlmalloc memcpys on every heap growth, §6) *only when
+  storage stays cache-dense*, and a churn signal for native — never a substitute
+  for the format-phase wall A/B itself (`tsv_debug profile` native rate with
+  parse as the machine-state control, plus `wasm_format_probe`). Confirm the
+  wall; don't accept an alloc-count reduction as a format win on its own.
 - Low `--iterations` is fine: attribution is ratio-based, and heaptrack
   overhead scales with allocation count.
 - Cost types are `allocations`, `temporary`, `peak`, `leaked` — there is **no
