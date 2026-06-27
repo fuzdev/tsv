@@ -62,6 +62,16 @@ impl Frontmatter {
         self.flags.iter().any(|f| f == "noStrict")
     }
 
+    /// Check if this test's source is used verbatim (`flags: [raw]`): no harness
+    /// files, no `"use strict"` transform. Per test262/INTERPRETING.md a raw test
+    /// runs **once, in non-strict mode only**. Most exercise mode-independent
+    /// syntax (hashbang, HTML-close comments, directive prologues) tsv grades
+    /// correctly anyway; the runner skips only the ones whose verdict genuinely
+    /// needs sloppy semantics (see `runner::is_sloppy_only_raw`).
+    pub fn is_raw(&self) -> bool {
+        self.flags.iter().any(|f| f == "raw")
+    }
+
     /// Check if this test requires strict mode only.
     pub fn requires_strict_mode(&self) -> bool {
         self.flags.iter().any(|f| f == "onlyStrict")

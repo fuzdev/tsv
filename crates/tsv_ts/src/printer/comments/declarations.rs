@@ -14,6 +14,33 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
+/// A heritage-clause keyword (`extends` / `implements`). Carried as an enum
+/// rather than `&str` so the keyword text and its spaced form are total — no
+/// stringly-typed fallback that needs an unreachable arm.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HeritageKeyword {
+    Extends,
+    Implements,
+}
+
+impl HeritageKeyword {
+    /// The keyword text (`"extends"` / `"implements"`).
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Extends => "extends",
+            Self::Implements => "implements",
+        }
+    }
+
+    /// The keyword text with a trailing space (`"extends "` / `"implements "`).
+    pub(crate) fn with_space(self) -> &'static str {
+        match self {
+            Self::Extends => "extends ",
+            Self::Implements => "implements ",
+        }
+    }
+}
+
 impl<'a> Printer<'a> {
     /// Emit a member keyword (modifier like `static ` / `readonly `, or
     /// accessor `get ` / `set `) preserving comments BEFORE it: the range
@@ -500,7 +527,7 @@ impl<'a> Printer<'a> {
     /// Used by both class `implements` and interface `extends` clauses.
     pub(crate) fn build_heritage_clause_doc(
         &self,
-        keyword: &'static str,
+        keyword: HeritageKeyword,
         items: &[internal::TSInterfaceHeritage<'_>],
         group_mode: bool,
         keyword_start: Option<u32>,
@@ -584,7 +611,7 @@ impl<'a> Printer<'a> {
         // Optional comments between keyword and first item: `extends /* c */ Item`
         let kw_comments = keyword_start
             .and_then(|kw_start| {
-                let kw_end = kw_start + keyword.len() as u32;
+                let kw_end = kw_start + keyword.as_str().len() as u32;
                 self.build_comments_between_filtered_opt(
                     kw_end,
                     items[0].span.start,
@@ -600,10 +627,10 @@ impl<'a> Printer<'a> {
         // as/satisfies + type-param keyword→value handling. The keyword stays
         // inline; only the items are pushed down (no whole-heritage break).
         if let Some(kw_start) = keyword_start {
-            let kw_end = kw_start + keyword.len() as u32;
+            let kw_end = kw_start + keyword.as_str().len() as u32;
             if self.has_line_comments_between(kw_end, items[0].span.start) {
                 let value_doc = d.join(item_docs, ", ");
-                let mut parts = smallvec![d.text(keyword)];
+                let mut parts = smallvec![d.text(keyword.as_str())];
                 self.append_keyword_value_line_comments(
                     &mut parts,
                     kw_end,
@@ -633,21 +660,17 @@ impl<'a> Printer<'a> {
                 }
                 let types_joined = d.concat(&joined_parts);
                 let inner = d.indent(d.concat(&[d.hardline(), kw_comments, types_joined]));
-                d.concat(&[d.text(keyword), inner])
+                d.concat(&[d.text(keyword.as_str()), inner])
             } else {
                 let comma_line = d.concat(&[d.text(","), d.line()]);
                 let types_joined = d.join_doc(item_docs, comma_line);
                 d.concat(&[
-                    d.text(keyword),
+                    d.text(keyword.as_str()),
                     hang_after_operator(d, d.concat(&[kw_comments, types_joined])),
                 ])
             }
         } else {
-            let keyword_space = match keyword {
-                "implements" => "implements ",
-                "extends" => "extends ",
-                _ => unreachable!(),
-            };
+            let keyword_space = keyword.with_space();
             d.concat(&[d.text(keyword_space), kw_comments, d.join(item_docs, ", ")])
         }
     }

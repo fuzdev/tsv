@@ -160,6 +160,7 @@ dbg_macro = "warn"
 expect_used = "warn"
 panic = "warn"
 todo = "warn"
+unreachable = "warn"
 unwrap_used = "warn"
 
 # Root package for integration tests

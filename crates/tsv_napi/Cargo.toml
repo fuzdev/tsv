@@ -50,6 +50,7 @@ missing_debug_implementations = "allow"
 trivial_casts = "warn"
 trivial_numeric_casts = "warn"
 unused_lifetimes = "warn"
+elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
 
 [lints.clippy]
@@ -116,4 +117,5 @@ dbg_macro = "warn"
 expect_used = "warn"
 panic = "warn"
 todo = "warn"
+unreachable = "warn"
 unwrap_used = "warn"

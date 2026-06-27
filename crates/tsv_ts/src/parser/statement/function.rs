@@ -148,16 +148,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse the function (which may be an overload signature or implementation)
         let mut stmt = self.parse_function_or_overload(true)?;
 
-        // Update span to include 'async' keyword. Both variants are inline, so
-        // mutate the owned node's span in place.
-        match &mut stmt {
-            Statement::FunctionDeclaration(func) => {
-                func.span = Span::new(start as u32, func.span.end);
-            }
-            Statement::TSDeclareFunction(func) => {
-                func.span = Span::new(start as u32, func.span.end);
-            }
-            _ => unreachable!(),
+        // Update span to include 'async' keyword. `parse_function_or_overload`
+        // only ever returns these two variants, both with a `span` field, so an
+        // or-pattern patches the start in place without a fallback arm.
+        if let Statement::FunctionDeclaration(FunctionDeclaration { span, .. })
+        | Statement::TSDeclareFunction(TSDeclareFunction { span, .. }) = &mut stmt
+        {
+            span.start = start as u32;
         }
 
         Ok(stmt)
