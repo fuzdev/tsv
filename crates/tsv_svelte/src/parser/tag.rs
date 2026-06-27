@@ -165,6 +165,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`{const x = v /* c */}`); only whitespace and an optional `;` may follow.
         let decl_end = declaration.span.end as usize;
         let close_brace = after_close - 1;
+        // The declaration was parsed from the content the closing `}` bounds, so it
+        // ends at or before the brace; assert it so a malformed span surfaces in
+        // tests rather than as an opaque slice-index panic (no release-build cost).
+        debug_assert!(
+            decl_end <= close_brace,
+            "declaration end must not pass the closing brace"
+        );
         if !self.source[decl_end..close_brace]
             .trim_matches(|c: char| c.is_whitespace() || c == ';')
             .is_empty()
