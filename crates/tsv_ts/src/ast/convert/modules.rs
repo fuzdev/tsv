@@ -192,7 +192,6 @@ pub(in crate::ast) fn convert_literal<'src>(
         }
         internal::LiteralValue::Boolean(b) => (serde_json::Value::Bool(*b), None),
         internal::LiteralValue::Null => (serde_json::Value::Null, None),
-        internal::LiteralValue::Undefined => (serde_json::Value::Null, None),
     };
     let raw = lit.span.extract(source);
     public::Literal {

@@ -302,8 +302,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let test = self.parse_expression()?;
         self.expect(&TokenKind::ParenClose)?;
 
-        // do-while requires semicolon (ASI applies)
-        let end = self.semicolon_end()?;
+        // A semicolon is automatically inserted after a do-while's `)`
+        // *unconditionally* (ASI rule 1, third bullet) — unlike ordinary
+        // statement termination it needs no preceding line terminator and no
+        // `}`/EOF lookahead, so this never errors. Consume an explicit `;` if
+        // present; otherwise insert one implicitly. Local to do-while, so the
+        // shared `semicolon()` helper stays restricted.
+        self.eat(TokenKind::Semicolon);
+        let end = self.prev_token_end() as u32;
 
         Ok(Statement::DoWhileStatement(DoWhileStatement {
             body,

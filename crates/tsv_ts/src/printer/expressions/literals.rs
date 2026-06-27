@@ -250,7 +250,6 @@ impl<'a> Printer<'a> {
             }
             LiteralValue::Boolean(b) => d.text(if *b { "true" } else { "false" }),
             LiteralValue::Null => d.text("null"),
-            LiteralValue::Undefined => d.text("undefined"),
         }
     }
 

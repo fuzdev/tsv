@@ -204,6 +204,8 @@ impl KeywordKind {
                 | KeywordKind::Object
                 | KeywordKind::Symbol
                 | KeywordKind::Bigint
+                // `undefined` is a global identifier, not a ReservedWord
+                | KeywordKind::Undefined
         )
     }
 
@@ -240,6 +242,10 @@ impl KeywordKind {
                 | KeywordKind::Object
                 | KeywordKind::Symbol
                 | KeywordKind::Bigint
+                // `undefined` is a global identifier, not a ReservedWord — it is
+                // a valid binding name (`var undefined;`). The strict-mode
+                // restriction on `undefined` is a runtime concern, not parse-time.
+                | KeywordKind::Undefined
         )
         // NOTE: Await, Yield, Let are NOT included - they cannot be binding names
     }
