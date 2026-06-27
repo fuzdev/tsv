@@ -329,6 +329,7 @@ Foundation for all parsing.
 - Default values (`{a = 1} = {}`)
 - Renaming (`{a: b} = obj`)
 - Rest patterns (`{...rest}`, `[...rest]`)
+- Rest parameter as a binding pattern (`function f(...[a, b]) {}`, `(...{ a }) => {}`)
 - Computed properties in patterns
 
 ### Function Declarations
@@ -427,6 +428,7 @@ ES2015 module syntax with ES2024 additions.
 **Decorators** (ES2023/TS 5.0):
 
 - Class decorators (`@decorator class C {}`)
+- Decorated class expressions (`x = @dec class {}`)
 - Method decorators
 - Property decorators
 - Accessor decorators

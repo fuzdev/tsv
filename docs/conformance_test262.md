@@ -16,10 +16,10 @@ at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,149 graded after skips).
 
-- Positive (should parse) — 41,852 passed, 47 failed
+- Positive (should parse) — 41,857 passed, 42 failed
 - Negative (should reject) — 1,157 passed, 3,093 failed
 
-- **Overall**: 43,009/46,149 (93.2%)
+- **Overall**: 43,014/46,149 (93.2%)
 - **Positive pass rate**: 99.9% — valid syntax tsv accepts
 - **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
 
@@ -31,28 +31,23 @@ import proposals (`source-phase-imports` / `import.source(…)` and `import-defe
 `Expected 'meta' after 'import.'`. They drop out of both the headline pass rate
 and the differential manifest. See [Scope](#what-we-skip).
 
-**Triaging the positive failures against the drop-in oracle.** Each of the 47 is
+**Triaging the positive failures against the drop-in oracle.** Each of the 42 is
 parsed with the canonical parser (acorn-typescript in module mode — what the
-fixtures' `expected.json` is generated from). **~4 are genuine tsv-vs-acorn bugs
-(acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~43
-are rejected by acorn too (not tsv-specific). _(Methodology: parse each
-`../test262/<path>` with `canonical_parse` and bucket on whether it yields an
-AST. An earlier triage used a wrong path prefix, so every file came back
-"not found" and was mis-bucketed as rejected — the corrected sweep below is
-authoritative.)_
+fixtures' `expected.json` is generated from). **None are genuine tsv-vs-acorn bugs:
+the drop-in backlog is closed** — all 42 are rejected by acorn too (not
+tsv-specific). _(Methodology: parse each `../test262/<path>` with `canonical_parse`
+and bucket on whether it yields an AST.)_
 
-**The ~4 real bugs**, by cluster:
-
-- **Rest parameter with a destructuring pattern (2)** — `function f(...[a, b]) {}`,
-  `function f(...{ a }) {}`. A rest element can be a `BindingPattern`, not only an
-  identifier.
-- **Singletons (2)** — `for await (… of …)` with an async LHS (`for await (async of
-  [7])`), and a decorated class *expression* (`x = @dec class {}` — decorators are
-  wired into statement position only).
-
-These are the actionable positive-conformance backlog (fixtures-first per the
-repo TDD gate). Several such gaps are now fixed: ✅ the tagged-template invalid-escape
-gap (ES2018); ✅ the `[+In]` for-header reset — the for-init disables `in`
+**The drop-in positive-conformance backlog is closed** — every gap acorn accepts and
+tsv rejected has been fixed (fixtures-first per the repo TDD gate): ✅ **rest parameter
+with a destructuring pattern** — `function f(...[a, b]) {}` / `function f(...{ a }) {}`
+(a rest element can be a `BindingPattern`, not only an identifier); ✅ **`for await`
+with an async LHS** — `for await (async of [7])` parses `async` as an
+`IdentifierReference`, while plain `for (async of …)` stays rejected (the for-of
+`[lookahead ∉ { async of }]` restriction); ✅ **a decorated class *expression*** —
+`x = @dec class {}` parses (decorators were wired into statement position only), and the
+assignment breaks after `=` with each decorator on its own line, like prettier; ✅ the
+tagged-template invalid-escape gap (ES2018); ✅ the `[+In]` for-header reset — the for-init disables `in`
 (`[~In]`), but nested sub-expressions restore `[+In]` (computed class member name,
 ternary consequent, dynamic-import argument, function/class bodies). tsv had leaked
 the for-header `[~In]` into them; now they parse, and the formatter parenthesizes an
@@ -76,7 +71,7 @@ an `Identifier` like acorn rather than a literal; and ✅ **`new import.meta()`*
 `import.meta` is a valid `new` callee (a MetaProperty), while `new import(…)` stays
 rejected.
 
-**The ~44 acorn-also-rejects** are not tsv bugs — they split into:
+**The 42 acorn-also-rejects** are not tsv bugs — they split into:
 **sloppy-mode-only** (`with`, AnnexB `f() = g()` / `for (var a = x in b)`, legacy
 octal — tsv is strict-only); **strict-*Script*-only** (top-level `await` as a
 *binding*, e.g. `var await = 1` — valid in a strict Script but not a Module;

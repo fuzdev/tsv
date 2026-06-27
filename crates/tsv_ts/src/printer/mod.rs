@@ -51,10 +51,11 @@ pub(crate) use analysis::{
 pub(crate) use comments::{CommentFilter, CommentSpacing};
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
-    arrow_chain_has_return_type, is_call_on_member_chain, is_curried_arrow_chain,
-    is_curried_arrow_with_return_type, is_literal_member_chain, is_poorly_breakable_chain,
-    is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
-    is_single_call_on_member_chain, is_type_assertion_call,
+    arrow_chain_has_return_type, class_expr_has_decorators, is_call_on_member_chain,
+    is_curried_arrow_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
+    is_poorly_breakable_chain, is_regex_root_chain, is_self_expanding_value,
+    is_simple_self_expanding, is_simple_value, is_single_call_on_member_chain,
+    is_type_assertion_call,
 };
 pub(crate) use needs_parens::{ParenContext, is_in_binary, needs_parens};
 pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
