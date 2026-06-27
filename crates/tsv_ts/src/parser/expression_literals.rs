@@ -27,6 +27,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.grouping_depth += 1;
 
         let mut properties = self.bvec();
+        // Set when a trailing comma follows a final spread property (`{...a,}`):
+        // legal in a literal, rejected by `to_assignable` in pattern context.
+        let mut spread_trailing_comma = false;
 
         // Handle empty object: `{}`
         if self.check(&TokenKind::BraceClose) {
@@ -35,6 +38,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.grouping_depth -= 1;
             return Ok(Expression::ObjectExpression(ObjectExpression {
                 properties: properties.into_bump_slice(),
+                spread_trailing_comma: false,
                 span: Span::new(start as u32, end as u32),
             }));
         }
@@ -56,8 +60,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     span: Span::new(prop_start as u32, prop_end as u32),
                 }));
 
-                // Check for comma or closing brace
+                // Check for comma or closing brace. A trailing comma right
+                // after this spread (`{...a,}`) is the rest-trailing-comma case:
+                // the separator is consumed before the `}`, so record it for
+                // `to_assignable` (the discarded comma leaves no other trace).
+                let trailing_comma = self.check(&TokenKind::Comma);
                 if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::BraceClose)? {
+                    spread_trailing_comma = trailing_comma;
                     break;
                 }
                 continue;
@@ -265,6 +274,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(Expression::ObjectExpression(ObjectExpression {
             properties: properties.into_bump_slice(),
+            spread_trailing_comma,
             span: Span::new(start as u32, end as u32),
         }))
     }
@@ -283,6 +293,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.grouping_depth += 1;
 
         let mut elements = self.bvec();
+        // Set when a trailing comma follows a final spread element (`[...a,]`):
+        // legal in a literal, rejected by `to_assignable` in pattern context.
+        let mut spread_trailing_comma = false;
 
         // Handle empty array: `[]`
         if self.check(&TokenKind::BracketClose) {
@@ -291,6 +304,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.grouping_depth -= 1;
             return Ok(Expression::ArrayExpression(ArrayExpression {
                 elements: elements.into_bump_slice(),
+                spread_trailing_comma: false,
                 span: Span::new(start as u32, end as u32),
             }));
         }
@@ -320,6 +334,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if self.eat(TokenKind::Comma) {
                 // Check for trailing comma
                 if self.check(&TokenKind::BracketClose) {
+                    // A trailing comma after a final spread (`[...a,]`) is the
+                    // rest-trailing-comma case; record it for `to_assignable`
+                    // (the discarded comma leaves no other trace).
+                    if matches!(elements.last(), Some(Some(Expression::SpreadElement(_)))) {
+                        spread_trailing_comma = true;
+                    }
                     break;
                 }
             } else if self.check(&TokenKind::BracketClose) {
@@ -339,6 +359,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(Expression::ArrayExpression(ArrayExpression {
             elements: elements.into_bump_slice(),
+            spread_trailing_comma,
             span: Span::new(start as u32, end as u32),
         }))
     }

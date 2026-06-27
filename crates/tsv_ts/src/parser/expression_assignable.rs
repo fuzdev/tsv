@@ -36,6 +36,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Convert ObjectExpression to ObjectPattern
             Expression::ObjectExpression(obj) => {
+                // `{...a,}` — trailing comma after the rest property.
+                if obj.spread_trailing_comma {
+                    let span = obj.properties.last().map_or(obj.span, ObjectProperty::span);
+                    return Err(self.rest_trailing_comma_error(span.start_usize()));
+                }
+
                 let mut properties = self.bvec();
                 let last_index = obj.properties.len().saturating_sub(1);
                 for (i, prop) in obj.properties.iter().enumerate() {
@@ -62,13 +68,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Convert ArrayExpression to ArrayPattern
-            // TODO: a trailing comma after the rest element (`[...a,] = c`) is also a
-            // syntax error, but the array/object expression parser discards the
-            // trailing comma before this conversion runs, so it is not caught here
-            // (it would need a "trailing comma after spread" flag threaded from the
-            // expression parser). Element-after-rest (`[...a, b]`) and rest-with-default
-            // (`[...a = 1]`) are caught below.
             Expression::ArrayExpression(arr) => {
+                // `[...a,]` — trailing comma after the rest element.
+                // Element-after-rest (`[...a, b]`) and rest-with-default
+                // (`[...a = 1]`) are caught in the loop below.
+                if arr.spread_trailing_comma {
+                    let span = arr
+                        .elements
+                        .last()
+                        .and_then(|e| e.as_ref())
+                        .map_or(arr.span, Expression::span);
+                    return Err(self.rest_trailing_comma_error(span.start_usize()));
+                }
+
                 let mut elements = self.bvec();
                 let last_index = arr.elements.len().saturating_sub(1);
                 for (i, elem) in arr.elements.iter().enumerate() {
@@ -123,6 +135,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Invalid assignment target
             _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
         }
+    }
+
+    /// Build the "trailing comma after a rest element" syntax error (`[...a,]` /
+    /// `{...a,}`). The literal parser records the discarded comma on
+    /// `spread_trailing_comma`; both the array and object pattern arms surface
+    /// it. acorn: "Comma is not permitted after the rest element".
+    fn rest_trailing_comma_error(&self, pos: usize) -> ParseError {
+        self.error_msg_at(
+            "A trailing comma is not permitted after a rest element",
+            pos,
+        )
     }
 
     /// Convert a `...expr` spread into a `RestElement` — the shared core of both
