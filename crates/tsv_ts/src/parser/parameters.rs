@@ -100,18 +100,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Parse a bare array/object binding pattern (no trailing `: Type`).
+    ///
+    /// Current token must be `[` or `{`. The type annotation is left for the
+    /// caller: a destructured *parameter* / *declarator* binds the type on the
+    /// pattern (`parse_destructured_binding`), whereas a rest element binds it on
+    /// the enclosing `RestElement` (`...[a, b]: T`), matching acorn.
+    pub(super) fn parse_binding_pattern(&mut self) -> Result<Expression<'arena>, ParseError> {
+        let expr = if self.check(&TokenKind::BracketOpen) {
+            self.parse_array_expression()?
+        } else {
+            self.parse_object_expression()?
+        };
+        self.to_assignable(expr)
+    }
+
     /// Parse a destructuring binding (`[a, b]` / `{a, b}`) with an optional
     /// type annotation attached to the resulting pattern.
     ///
     /// Current token must be `[` or `{`. Shared by parameter lists and
     /// variable declarators; default values are handled by the caller.
     pub(super) fn parse_destructured_binding(&mut self) -> Result<Expression<'arena>, ParseError> {
-        let expr = if self.check(&TokenKind::BracketOpen) {
-            self.parse_array_expression()?
-        } else {
-            self.parse_object_expression()?
-        };
-        let mut pattern = self.to_assignable(expr)?;
+        let mut pattern = self.parse_binding_pattern()?;
 
         // Check for type annotation: [a, b]: Type or {a, b}: Type
         if self.check(&TokenKind::Colon) {
@@ -247,36 +257,64 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         }
                     }
                     TokenKind::DotDotDot => {
-                        // Rest parameter: ...args or ...args: type
+                        // Rest parameter: ...args, ...args: type, or a
+                        // destructuring pattern (...[a, b] / ...{ a }). Per
+                        // `BindingRestElement : ... BindingPattern`, the rest
+                        // argument may itself be an array/object pattern.
                         let rest_start = self.current_pos().0;
                         self.advance()?; // consume '...'
 
-                        // Parse the identifier
-                        let (id_start, id_end) = self.current_pos();
-                        let symbol = self.intern_identifier();
-                        self.expect(&TokenKind::Identifier)?;
-
-                        // Check for type annotation: ...args: type
-                        let (type_annotation, arg_end) = if self.check(&TokenKind::Colon) {
-                            let ta = self.parse_type_annotation()?;
-                            let end = ta.span.end;
-                            (Some(ta), end as usize)
+                        if matches!(
+                            self.current_kind(),
+                            TokenKind::BracketOpen | TokenKind::BraceOpen
+                        ) {
+                            // ...[a, b] / ...{ a } — the rest argument is itself a
+                            // binding pattern. A trailing `: Type` annotates the
+                            // *rest element* (`...[a, b]: T`), not the inner pattern,
+                            // so parse the bare pattern and bind the type here
+                            // (matching acorn; `parse_destructured_binding` would
+                            // wrongly attach it to the pattern).
+                            let pattern = self.parse_binding_pattern()?;
+                            let (type_annotation, arg_end) = if self.check(&TokenKind::Colon) {
+                                let ta = self.parse_type_annotation()?;
+                                let end = ta.span.end;
+                                (Some(ta), end)
+                            } else {
+                                (None, pattern.span().end)
+                            };
+                            Expression::RestElement(RestElement {
+                                argument: self.alloc(pattern),
+                                type_annotation,
+                                span: Span::new(rest_start as u32, arg_end),
+                            })
                         } else {
-                            (None, id_end)
-                        };
+                            // ...args or ...args: type
+                            let (id_start, id_end) = self.current_pos();
+                            let symbol = self.intern_identifier();
+                            self.expect(&TokenKind::Identifier)?;
 
-                        let argument = Expression::Identifier(Identifier {
-                            name: symbol,
-                            optional: false,
-                            extra: None,
-                            span: Span::new(id_start as u32, id_end as u32),
-                        });
+                            // Check for type annotation: ...args: type
+                            let (type_annotation, arg_end) = if self.check(&TokenKind::Colon) {
+                                let ta = self.parse_type_annotation()?;
+                                let end = ta.span.end;
+                                (Some(ta), end as usize)
+                            } else {
+                                (None, id_end)
+                            };
 
-                        Expression::RestElement(RestElement {
-                            argument: self.alloc(argument),
-                            type_annotation,
-                            span: Span::new(rest_start as u32, arg_end as u32),
-                        })
+                            let argument = Expression::Identifier(Identifier {
+                                name: symbol,
+                                optional: false,
+                                extra: None,
+                                span: Span::new(id_start as u32, id_end as u32),
+                            });
+
+                            Expression::RestElement(RestElement {
+                                argument: self.alloc(argument),
+                                type_annotation,
+                                span: Span::new(rest_start as u32, arg_end as u32),
+                            })
+                        }
                     }
                     _ => {
                         return Err(

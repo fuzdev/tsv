@@ -106,6 +106,13 @@ pub fn choose_layout(
         return AssignmentLayout::BreakAfterOperator;
     }
 
+    // Decorated class expression → break after operator (`const C =\n\t@dec\n\tclass {}`).
+    if let Expression::ClassExpression(c) = right_expr
+        && class_expr_has_decorators(c)
+    {
+        return AssignmentLayout::BreakAfterOperator;
+    }
+
     // Conditional expressions with binary test → break after operator
     // Prettier ref: shouldBreakAfterOperator (assignment.js:216-219)
     if conditional_should_break_after_op(right_expr) {
@@ -139,6 +146,18 @@ pub fn choose_layout(
     AssignmentLayout::Fluid
 }
 
+/// Whether a class expression carries decorators (`@dec class {}`).
+///
+/// A decorated class expression breaks after the assignment operator (each
+/// decorator on its own line) rather than self-expanding; an undecorated one
+/// expands its body in place. Prettier ref: shouldBreakAfterOperator
+/// (assignment.js:228) `case "ClassExpression": isNonEmptyArray(decorators)`;
+/// the never-break ClassExpression case (assignment.js:189) only applies once
+/// that has ruled out a decorated class.
+pub fn class_expr_has_decorators(c: &internal::ClassExpression<'_>) -> bool {
+    c.decorators.is_some_and(|d| !d.is_empty())
+}
+
 /// Check if an expression handles its own expansion (objects, arrays, functions, classes)
 ///
 /// These values should never have a break between key: and value because they
@@ -157,8 +176,11 @@ pub fn is_self_expanding_value(expr: &Expression<'_>) -> bool {
     match expr {
         Expression::ObjectExpression(_)
         | Expression::ArrayExpression(_)
-        | Expression::FunctionExpression(_)
-        | Expression::ClassExpression(_) => true,
+        | Expression::FunctionExpression(_) => true,
+
+        // An undecorated class expression expands its body in place (`= class {…}`);
+        // a *decorated* one breaks after the operator instead (`choose_layout`).
+        Expression::ClassExpression(c) => !class_expr_has_decorators(c),
 
         // Arrow functions are self-expanding UNLESS they're curried with return type
         Expression::ArrowFunctionExpression(_) => !is_curried_arrow_with_return_type(expr),

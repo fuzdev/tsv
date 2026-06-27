@@ -1,0 +1,835 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 309,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Multiple decorators",
+			"start": 143,
+			"end": 165,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Non-assignment position: decorators render, but no break after `=`",
+			"start": 201,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 70
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 308,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 299,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 20,
+					"end": 48,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 26,
+							"end": 47,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 26,
+								"end": 27,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "C"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 32,
+								"end": 47,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 32,
+										"end": 36,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 2
+											},
+											"end": {
+												"line": 3,
+												"column": 6
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 33,
+											"end": 36,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 3
+												},
+												"end": {
+													"line": 3,
+													"column": 6
+												}
+											},
+											"name": "dec"
+										}
+									}
+								],
+								"id": null,
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 45,
+									"end": 47,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 8
+										},
+										"end": {
+											"line": 4,
+											"column": 10
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 50,
+					"end": 95,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 56,
+							"end": 94,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 56,
+								"end": 57,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "D"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 62,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 23
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 62,
+										"end": 70,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 10
+											}
+										},
+										"expression": {
+											"type": "MemberExpression",
+											"start": 63,
+											"end": 70,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 3
+												},
+												"end": {
+													"line": 6,
+													"column": 10
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 63,
+												"end": 66,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 3
+													},
+													"end": {
+														"line": 6,
+														"column": 6
+													}
+												},
+												"name": "dec"
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 67,
+												"end": 70,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 7
+													},
+													"end": {
+														"line": 6,
+														"column": 10
+													}
+												},
+												"name": "foo"
+											},
+											"computed": false
+										}
+									}
+								],
+								"id": null,
+								"superClass": {
+									"type": "Identifier",
+									"start": 87,
+									"end": 91,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 16
+										},
+										"end": {
+											"line": 7,
+											"column": 20
+										}
+									},
+									"name": "Base"
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 92,
+									"end": 94,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 21
+										},
+										"end": {
+											"line": 7,
+											"column": 23
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 97,
+					"end": 140,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 103,
+							"end": 139,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 103,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "E"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 109,
+								"end": 139,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 109,
+										"end": 115,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 8
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 110,
+											"end": 115,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 3
+												},
+												"end": {
+													"line": 9,
+													"column": 8
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 110,
+												"end": 113,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 3
+													},
+													"end": {
+														"line": 9,
+														"column": 6
+													}
+												},
+												"name": "dec"
+											},
+											"arguments": []
+										}
+									}
+								],
+								"id": null,
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 124,
+									"end": 139,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 8
+										},
+										"end": {
+											"line": 12,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "PropertyDefinition",
+											"start": 129,
+											"end": 135,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 3
+												},
+												"end": {
+													"line": 11,
+													"column": 9
+												}
+											},
+											"static": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 129,
+												"end": 130,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 3
+													},
+													"end": {
+														"line": 11,
+														"column": 4
+													}
+												},
+												"name": "a"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 133,
+												"end": 134,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 7
+													},
+													"end": {
+														"line": 11,
+														"column": 8
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 167,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 173,
+							"end": 197,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 173,
+								"end": 174,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "M"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 179,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 10
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 179,
+										"end": 181,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 4
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 180,
+											"end": 181,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 3
+												},
+												"end": {
+													"line": 16,
+													"column": 4
+												}
+											},
+											"name": "a"
+										}
+									},
+									{
+										"type": "Decorator",
+										"start": 184,
+										"end": 186,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 4
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 185,
+											"end": 186,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 3
+												},
+												"end": {
+													"line": 17,
+													"column": 4
+												}
+											},
+											"name": "b"
+										}
+									}
+								],
+								"id": null,
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 195,
+									"end": 197,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 8
+										},
+										"end": {
+											"line": 18,
+											"column": 10
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple decorators",
+							"start": 143,
+							"end": 165
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 272,
+					"end": 298,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 272,
+						"end": 297,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 272,
+							"end": 275,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "ClassExpression",
+								"start": 279,
+								"end": 294,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 10
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 279,
+										"end": 283,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 6
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 280,
+											"end": 283,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 3
+												},
+												"end": {
+													"line": 22,
+													"column": 6
+												}
+											},
+											"name": "dec"
+										}
+									}
+								],
+								"id": null,
+								"superClass": null,
+								"body": {
+									"type": "ClassBody",
+									"start": 292,
+									"end": 294,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 8
+										},
+										"end": {
+											"line": 23,
+											"column": 10
+										}
+									},
+									"body": []
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Non-assignment position: decorators render, but no break after `=`",
+							"start": 201,
+							"end": 270
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

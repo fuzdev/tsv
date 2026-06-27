@@ -1,0 +1,1171 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 403,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Rest element as an array / object binding pattern",
+			"start": 20,
+			"end": 72,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty patterns",
+			"start": 126,
+			"end": 143,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested patterns",
+			"start": 190,
+			"end": 208,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Typed: the annotation binds the rest element, not the inner pattern",
+			"start": 246,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 71
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 402,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 74,
+					"end": 98,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 25
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 83,
+						"end": 84,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 11
+							}
+						},
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "RestElement",
+							"start": 85,
+							"end": 94,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 12
+								},
+								"end": {
+									"line": 3,
+									"column": 21
+								}
+							},
+							"argument": {
+								"type": "ArrayPattern",
+								"start": 88,
+								"end": 94,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 15
+									},
+									"end": {
+										"line": 3,
+										"column": 21
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 89,
+										"end": 90,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 16
+											},
+											"end": {
+												"line": 3,
+												"column": 17
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 92,
+										"end": 93,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 19
+											},
+											"end": {
+												"line": 3,
+												"column": 20
+											}
+										},
+										"name": "b"
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 96,
+						"end": 98,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 23
+							},
+							"end": {
+								"line": 3,
+								"column": 25
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Rest element as an array / object binding pattern",
+							"start": 20,
+							"end": 72
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 100,
+					"end": 123,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 24
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 109,
+						"end": 110,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 4,
+								"column": 11
+							}
+						},
+						"name": "g"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "RestElement",
+							"start": 111,
+							"end": 119,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 12
+								},
+								"end": {
+									"line": 4,
+									"column": 20
+								}
+							},
+							"argument": {
+								"type": "ObjectPattern",
+								"start": 114,
+								"end": 119,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 15
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 116,
+										"end": 117,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 17
+											},
+											"end": {
+												"line": 4,
+												"column": 18
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 116,
+											"end": 117,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 17
+												},
+												"end": {
+													"line": 4,
+													"column": 18
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 116,
+											"end": 117,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 17
+												},
+												"end": {
+													"line": 4,
+													"column": 18
+												}
+											},
+											"name": "a"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 121,
+						"end": 123,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 22
+							},
+							"end": {
+								"line": 4,
+								"column": 24
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 145,
+					"end": 165,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 21
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 154,
+						"end": 155,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 11
+							}
+						},
+						"name": "h"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "RestElement",
+							"start": 156,
+							"end": 161,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 12
+								},
+								"end": {
+									"line": 7,
+									"column": 17
+								}
+							},
+							"argument": {
+								"type": "ArrayPattern",
+								"start": 159,
+								"end": 161,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 15
+									},
+									"end": {
+										"line": 7,
+										"column": 17
+									}
+								},
+								"elements": []
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 163,
+						"end": 165,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 19
+							},
+							"end": {
+								"line": 7,
+								"column": 21
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty patterns",
+							"start": 126,
+							"end": 143
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 167,
+					"end": 187,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 21
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 176,
+						"end": 177,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 11
+							}
+						},
+						"name": "i"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "RestElement",
+							"start": 178,
+							"end": 183,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 12
+								},
+								"end": {
+									"line": 8,
+									"column": 17
+								}
+							},
+							"argument": {
+								"type": "ObjectPattern",
+								"start": 181,
+								"end": 183,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 15
+									},
+									"end": {
+										"line": 8,
+										"column": 17
+									}
+								},
+								"properties": []
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 185,
+						"end": 187,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 19
+							},
+							"end": {
+								"line": 8,
+								"column": 21
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 210,
+					"end": 243,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 34
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 219,
+						"end": 220,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 11
+							}
+						},
+						"name": "j"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "RestElement",
+							"start": 221,
+							"end": 239,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 12
+								},
+								"end": {
+									"line": 11,
+									"column": 30
+								}
+							},
+							"argument": {
+								"type": "ArrayPattern",
+								"start": 224,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 15
+									},
+									"end": {
+										"line": 11,
+										"column": 30
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 225,
+										"end": 226,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 16
+											},
+											"end": {
+												"line": 11,
+												"column": 17
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "ArrayPattern",
+										"start": 228,
+										"end": 231,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 19
+											},
+											"end": {
+												"line": 11,
+												"column": 22
+											}
+										},
+										"elements": [
+											{
+												"type": "Identifier",
+												"start": 229,
+												"end": 230,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 20
+													},
+													"end": {
+														"line": 11,
+														"column": 21
+													}
+												},
+												"name": "b"
+											}
+										]
+									},
+									{
+										"type": "ObjectPattern",
+										"start": 233,
+										"end": 238,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 24
+											},
+											"end": {
+												"line": 11,
+												"column": 29
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 235,
+												"end": 236,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 26
+													},
+													"end": {
+														"line": 11,
+														"column": 27
+													}
+												},
+												"method": false,
+												"shorthand": true,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 235,
+													"end": 236,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 26
+														},
+														"end": {
+															"line": 11,
+															"column": 27
+														}
+													},
+													"name": "c"
+												},
+												"value": {
+													"type": "Identifier",
+													"start": 235,
+													"end": 236,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 26
+														},
+														"end": {
+															"line": 11,
+															"column": 27
+														}
+													},
+													"name": "c"
+												},
+												"kind": "init"
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 241,
+						"end": 243,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 32
+							},
+							"end": {
+								"line": 11,
+								"column": 34
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested patterns",
+							"start": 190,
+							"end": 208
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 318,
+					"end": 352,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 35
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 327,
+						"end": 328,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 10
+							},
+							"end": {
+								"line": 14,
+								"column": 11
+							}
+						},
+						"name": "k"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "RestElement",
+							"start": 329,
+							"end": 348,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 12
+								},
+								"end": {
+									"line": 14,
+									"column": 31
+								}
+							},
+							"argument": {
+								"type": "ArrayPattern",
+								"start": 332,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 15
+									},
+									"end": {
+										"line": 14,
+										"column": 21
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 333,
+										"end": 334,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 16
+											},
+											"end": {
+												"line": 14,
+												"column": 17
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 336,
+										"end": 337,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 19
+											},
+											"end": {
+												"line": 14,
+												"column": 20
+											}
+										},
+										"name": "b"
+									}
+								]
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 338,
+								"end": 348,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 21
+									},
+									"end": {
+										"line": 14,
+										"column": 31
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSArrayType",
+									"start": 340,
+									"end": 348,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 23
+										},
+										"end": {
+											"line": 14,
+											"column": 31
+										}
+									},
+									"elementType": {
+										"type": "TSNumberKeyword",
+										"start": 340,
+										"end": 346,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 23
+											},
+											"end": {
+												"line": 14,
+												"column": 29
+											}
+										}
+									}
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 350,
+						"end": 352,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 33
+							},
+							"end": {
+								"line": 14,
+								"column": 35
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Typed: the annotation binds the rest element, not the inner pattern",
+							"start": 246,
+							"end": 316
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 354,
+					"end": 392,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 39
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 363,
+						"end": 364,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 10
+							},
+							"end": {
+								"line": 15,
+								"column": 11
+							}
+						},
+						"name": "l"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "RestElement",
+							"start": 365,
+							"end": 388,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 12
+								},
+								"end": {
+									"line": 15,
+									"column": 35
+								}
+							},
+							"argument": {
+								"type": "ObjectPattern",
+								"start": 368,
+								"end": 373,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 15
+									},
+									"end": {
+										"line": 15,
+										"column": 20
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 370,
+										"end": 371,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 17
+											},
+											"end": {
+												"line": 15,
+												"column": 18
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 370,
+											"end": 371,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 17
+												},
+												"end": {
+													"line": 15,
+													"column": 18
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 370,
+											"end": 371,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 17
+												},
+												"end": {
+													"line": 15,
+													"column": 18
+												}
+											},
+											"name": "a"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 373,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 20
+									},
+									"end": {
+										"line": 15,
+										"column": 35
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeLiteral",
+									"start": 375,
+									"end": 388,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 22
+										},
+										"end": {
+											"line": 15,
+											"column": 35
+										}
+									},
+									"members": [
+										{
+											"type": "TSPropertySignature",
+											"start": 377,
+											"end": 386,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 24
+												},
+												"end": {
+													"line": 15,
+													"column": 33
+												}
+											},
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 377,
+												"end": 378,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 24
+													},
+													"end": {
+														"line": 15,
+														"column": 25
+													}
+												},
+												"name": "a"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 378,
+												"end": 386,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 25
+													},
+													"end": {
+														"line": 15,
+														"column": 33
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSNumberKeyword",
+													"start": 380,
+													"end": 386,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 27
+														},
+														"end": {
+															"line": 15,
+															"column": 33
+														}
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 390,
+						"end": 392,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 37
+							},
+							"end": {
+								"line": 15,
+								"column": 39
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

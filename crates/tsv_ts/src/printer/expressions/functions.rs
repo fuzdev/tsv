@@ -1513,9 +1513,18 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
+        // With a decorated class expression (`@dec class {}`), span.start points
+        // at the first decorator's `@`, so derive the `class` keyword position
+        // from after the decorators (falls back to span.start when undecorated).
+        let class_keyword_start = self.find_keyword_after_decorators(
+            class_expr.decorators,
+            "class",
+            class_expr.span.start,
+        );
+
         // Compute heritage positions once (shared with the class-declaration printer).
         let positions = self.class_heritage_positions(
-            class_expr.span.start,
+            class_keyword_start,
             class_expr.id.as_ref(),
             class_expr.type_parameters.as_ref(),
             class_expr.super_class,
@@ -1547,13 +1556,19 @@ impl<'a> Printer<'a> {
 
         let mut parts = DocBuf::new();
 
+        // Leading decorators (`@dec class {}`), each on its own line.
+        if let Some(dec_doc) = self.build_decorators_doc(class_expr.decorators, class_keyword_start)
+        {
+            parts.push(dec_doc);
+        }
+
         // 'class' keyword
         parts.push(d.text("class"));
 
         // Optional class name
         if let Some(id) = &class_expr.id {
             // Comments between `class` keyword and name
-            parts.push(self.build_keyword_to_name_comments(class_expr.span.start, id.span.start));
+            parts.push(self.build_keyword_to_name_comments(class_keyword_start, id.span.start));
             parts.push(self.build_identifier_doc(id));
 
             // Comments between name and type params: `class A/* c */ <T> {}`
@@ -1579,11 +1594,11 @@ impl<'a> Printer<'a> {
         {
             // Anonymous class without heritage: extract comments between `class` and body
             // `class /* c */ {}` — heritage comment handling covers the heritage case
-            if self.has_line_comments_between(class_expr.span.start, class_expr.body.span.start) {
+            if self.has_line_comments_between(class_keyword_start, class_expr.body.span.start) {
                 // Line comment: hardline after, body on new line without extra space
                 // `class // c\n{}` — no heritage/type params, so return early
                 parts.push(self.build_name_to_type_params_comments(
-                    class_expr.span.start,
+                    class_keyword_start,
                     class_expr.body.span.start,
                     CommentSpacing::Leading,
                 ));
@@ -1591,7 +1606,7 @@ impl<'a> Printer<'a> {
                 return d.concat(&parts);
             }
             if let Some(comment_doc) = self.build_comments_between_filtered_opt(
-                class_expr.span.start,
+                class_keyword_start,
                 class_expr.body.span.start,
                 CommentSpacing::Leading,
                 CommentFilter::All,

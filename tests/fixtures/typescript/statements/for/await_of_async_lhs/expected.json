@@ -1,0 +1,434 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 343,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `async` is a plain IdentifierReference LHS — valid only in for-await",
+			"start": 34,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A member-expression LHS starting with `async` is unaffected (the",
+			"start": 137,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " restriction is the exact two-token `async of`), with or without await",
+			"start": 207,
+			"end": 279,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 74
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 342,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 333,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 10,
+					"end": 332,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 25,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 16
+							},
+							"end": {
+								"line": 2,
+								"column": 18
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": true,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 30,
+						"end": 332,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 21
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ForOfStatement",
+								"start": 108,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 27
+									}
+								},
+								"await": true,
+								"left": {
+									"type": "Identifier",
+									"start": 119,
+									"end": 124,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 13
+										},
+										"end": {
+											"line": 4,
+											"column": 18
+										}
+									},
+									"name": "async"
+								},
+								"right": {
+									"type": "ArrayExpression",
+									"start": 128,
+									"end": 131,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 22
+										},
+										"end": {
+											"line": 4,
+											"column": 25
+										}
+									},
+									"elements": [
+										{
+											"type": "Literal",
+											"start": 129,
+											"end": 130,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 23
+												},
+												"end": {
+													"line": 4,
+													"column": 24
+												}
+											},
+											"value": 7,
+											"raw": "7"
+										}
+									]
+								},
+								"body": {
+									"type": "EmptyStatement",
+									"start": 132,
+									"end": 133,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 26
+										},
+										"end": {
+											"line": 4,
+											"column": 27
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " `async` is a plain IdentifierReference LHS — valid only in for-await",
+										"start": 34,
+										"end": 105
+									}
+								]
+							},
+							{
+								"type": "ForOfStatement",
+								"start": 282,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 27
+									}
+								},
+								"await": true,
+								"left": {
+									"type": "MemberExpression",
+									"start": 293,
+									"end": 300,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 13
+										},
+										"end": {
+											"line": 8,
+											"column": 20
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 293,
+										"end": 298,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 13
+											},
+											"end": {
+												"line": 8,
+												"column": 18
+											}
+										},
+										"name": "async"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 299,
+										"end": 300,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 19
+											},
+											"end": {
+												"line": 8,
+												"column": 20
+											}
+										},
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 304,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 24
+										},
+										"end": {
+											"line": 8,
+											"column": 25
+										}
+									},
+									"name": "y"
+								},
+								"body": {
+									"type": "EmptyStatement",
+									"start": 306,
+									"end": 307,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 26
+										},
+										"end": {
+											"line": 8,
+											"column": 27
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A member-expression LHS starting with `async` is unaffected (the",
+										"start": 137,
+										"end": 204
+									},
+									{
+										"type": "Line",
+										"value": " restriction is the exact two-token `async of`), with or without await",
+										"start": 207,
+										"end": 279
+									}
+								]
+							},
+							{
+								"type": "ForOfStatement",
+								"start": 310,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 21
+									}
+								},
+								"await": false,
+								"left": {
+									"type": "MemberExpression",
+									"start": 315,
+									"end": 322,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 7
+										},
+										"end": {
+											"line": 9,
+											"column": 14
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 315,
+										"end": 320,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 7
+											},
+											"end": {
+												"line": 9,
+												"column": 12
+											}
+										},
+										"name": "async"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 321,
+										"end": 322,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 13
+											},
+											"end": {
+												"line": 9,
+												"column": 14
+											}
+										},
+										"name": "x"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 326,
+									"end": 327,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 18
+										},
+										"end": {
+											"line": 9,
+											"column": 19
+										}
+									},
+									"name": "y"
+								},
+								"body": {
+									"type": "EmptyStatement",
+									"start": 328,
+									"end": 329,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 20
+										},
+										"end": {
+											"line": 9,
+											"column": 21
+										}
+									}
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
