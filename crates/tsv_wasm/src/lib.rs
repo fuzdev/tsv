@@ -309,9 +309,10 @@ fn goal_from_str(goal: &str) -> Result<tsv_ts::Goal, JsError> {
 #[wasm_bindgen]
 pub fn parse_typescript_json_with_goal(source: &str, goal: &str) -> Result<String, JsError> {
     let goal = goal_from_str(goal)?;
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    let ast = tsv_ts::parse_with_goal(source, goal, &arena).map_err(err)?;
-    Ok(tsv_ts::convert_ast_json_string(&ast, source))
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
+        Ok(tsv_ts::convert_ast_json_string(&ast, source))
+    })
 }
 
 /// `format_typescript` against an explicit goal (`"script"` / `"module"`).
@@ -319,7 +320,10 @@ pub fn parse_typescript_json_with_goal(source: &str, goal: &str) -> Result<Strin
 #[wasm_bindgen]
 pub fn format_typescript_with_goal(source: &str, goal: &str) -> Result<String, JsError> {
     let goal = goal_from_str(goal)?;
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-    let ast = tsv_ts::parse_with_goal(source, goal, &arena).map_err(err)?;
-    Ok(tsv_ts::format(&ast, source))
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
+        Ok(with_doc_arena(|doc_arena| {
+            tsv_ts::format_in(&ast, source, doc_arena)
+        }))
+    })
 }
