@@ -23,7 +23,7 @@ use crate::printer::calls::{
     should_force_expansion_for_comments, wrap_call_with_hard_breaks,
     wrap_call_with_will_break_guard,
 };
-use crate::printer::{ParenContext, Printer, has_multiline_content, needs_parens};
+use crate::printer::{ParenContext, Printer, has_multiline_content};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -41,7 +41,7 @@ impl<'a> Printer<'a> {
         // not stripped here even though the standalone path would).
         let callee = if let Some(sealed) = self.build_sealed_non_null_paren_doc(new_expr.callee) {
             sealed
-        } else if needs_parens(new_expr.callee, ParenContext::NewCallee) {
+        } else if self.needs_parens(new_expr.callee, ParenContext::NewCallee) {
             // For binary expressions (including logical), use a group with softlines
             // so the parens can break independently when the content is too long:
             // new (

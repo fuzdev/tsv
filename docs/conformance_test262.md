@@ -16,31 +16,25 @@ at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,545 graded after skips).
 
-- Positive (should parse) — 41,903 passed, 211 failed
+- Positive (should parse) — 41,907 passed, 207 failed
 - Negative (should reject) — 1,339 passed, 3,092 failed
 
-- **Overall**: 43,242/46,545 (92.9%)
+- **Overall**: 43,246/46,545 (92.9%)
 - **Positive pass rate**: 99.5% — valid syntax tsv accepts
 - **Skipped**: 2,591 (sloppy mode: 2,519, runtime: 38, resolution: 34)
 
-**Triaging the positive failures against the drop-in oracle.** Each of the 211 is
+**Triaging the positive failures against the drop-in oracle.** Each of the 207 is
 parsed with the canonical parser (acorn-typescript in module mode — what the
-fixtures' `expected.json` is generated from). **~23 are genuine tsv-vs-acorn bugs
-(acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~188
+fixtures' `expected.json` is generated from). **~18 are genuine tsv-vs-acorn bugs
+(acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~189
 are rejected by acorn too (not tsv-specific). _(Methodology: parse each
 `../test262/<path>` with `canonical_parse` and bucket on whether it yields an
 AST. An earlier triage used a wrong path prefix, so every file came back
 "not found" and was mis-bucketed as rejected — the corrected sweep below is
 authoritative.)_
 
-**The ~23 real bugs**, by cluster:
+**The ~18 real bugs**, by cluster:
 
-- **`in` not permitted where `[+In]` should be restored, inside a `for`-header (5)**
-  — the for-init disables `in` (`[~In]`), but nested sub-expressions must restore
-  `[+In]`: a computed class member/accessor name
-  (`for (C = class { get ['x' in y]() {} }; ;) {}`), a ternary branch, and a
-  dynamic-import 2nd argument. tsv leaks the for-header `[~In]` into them; the same
-  forms parse fine outside a for-header.
 - **Unicode `Other_ID_Start` / `Other_ID_Continue` identifiers (4)** — characters
   like `゛` (U+309B) and their escaped forms. tsv's `unicode-ident` uses the XID
   sets, which exclude the legacy `Other_ID_*` compatibility code points.
@@ -59,8 +53,13 @@ authoritative.)_
   position, and an assignment-target case.
 
 These are the actionable positive-conformance backlog (fixtures-first per the
-repo TDD gate). The ✅ tagged-template invalid-escape gap (ES2018) was one such
-bug and is now fixed.
+repo TDD gate). Two such gaps are now fixed: ✅ the tagged-template invalid-escape
+gap (ES2018), and ✅ the `[+In]` for-header reset — the for-init disables `in`
+(`[~In]`), but nested sub-expressions restore `[+In]` (computed class member name,
+ternary consequent, dynamic-import argument, function/class bodies). tsv had leaked
+the for-header `[~In]` into them; now they parse, and the formatter parenthesizes an
+`in` anywhere under a for-init (matching prettier, keeping it distinct from the
+`for (x in y)` separator).
 
 **The ~188 acorn-also-rejects** are not tsv bugs — they split into:
 **sloppy-mode-only** (`with`, AnnexB `f() = g()` / `for (var a = x in b)`, legacy

@@ -15,7 +15,7 @@ use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{CommentFilter, CommentSpacing};
 use crate::printer::{
     ParenContext, Printer, has_newline_before_position, is_multiline_template_expression,
-    needs_parens, unwrap_parenthesized,
+    unwrap_parenthesized,
 };
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
@@ -935,7 +935,7 @@ impl<'a> Printer<'a> {
         }
 
         // Standard cases: objects and assignments always need parens
-        if needs_parens(expr, ParenContext::ArrowBody) {
+        if self.needs_parens(expr, ParenContext::ArrowBody) {
             d.parens(self.build_expression_doc(expr))
         } else {
             self.build_expression_doc(expr)

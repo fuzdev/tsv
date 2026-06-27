@@ -3,7 +3,7 @@
 // Contains the primary `build_call_doc_with_wrapping` function that handles
 // all the special cases for call expression formatting.
 
-use super::super::{ParenContext, Printer, has_multiline_content, needs_parens};
+use super::super::{ParenContext, Printer, has_multiline_content};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, find_comma_pos, first_arg_has_any_comments,
     has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
@@ -59,7 +59,7 @@ pub(super) fn build_call_doc_with_wrapping(
 
     // Wrap callee in parens if needed (e.g., ternary: `(a ? b : c)()`)
     // This must happen BEFORE adding removed-paren comments so comments stay outside
-    let callee_doc = if needs_parens(call.callee, ParenContext::Callee) {
+    let callee_doc = if printer.needs_parens(call.callee, ParenContext::Callee) {
         d.parens(callee_doc)
     } else {
         callee_doc

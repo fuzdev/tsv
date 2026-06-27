@@ -19,9 +19,13 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::{INDENT, PRINT_WIDTH};
 
-/// Wrap a doc in parentheses if the expression needs them for variable init context
-fn wrap_init_doc(d: &DocArena, init_doc: DocId, init: &Expression<'_>) -> DocId {
-    if needs_parens(init, ParenContext::VariableInit) {
+/// Wrap a doc in parentheses if the expression needs them for variable init context.
+/// `in_for_init` carries the for-header rule: a statement-level `const x = b in c`
+/// lexically under a for-header init (e.g. in a nested function body) parenthesizes
+/// the `in` like every other position there. (A for-header's *own* declarator is
+/// built in `build_for_init_doc`, not here.)
+fn wrap_init_doc(d: &DocArena, init_doc: DocId, init: &Expression<'_>, in_for_init: bool) -> DocId {
+    if needs_parens(init, ParenContext::VariableInit, in_for_init) {
         d.parens(init_doc)
     } else {
         init_doc
@@ -601,6 +605,7 @@ impl<'a> Printer<'a> {
                                     declarator.span.end,
                                 ),
                                 init,
+                                self.in_for_init.get(),
                             ),
                         ])));
                     } else {
@@ -613,6 +618,7 @@ impl<'a> Printer<'a> {
                                     declarator.span.end,
                                 ),
                                 init,
+                                self.in_for_init.get(),
                             ),
                         ])));
                     }
@@ -628,6 +634,7 @@ impl<'a> Printer<'a> {
                         d,
                         self.build_expression_doc_with_paren_comments(init, declarator.span.end),
                         init,
+                        self.in_for_init.get(),
                     );
                     let rhs_doc = d.concat(&[comments_doc, init_doc]);
                     parts.push(hang_after_operator(d, rhs_doc));
@@ -645,6 +652,7 @@ impl<'a> Printer<'a> {
                                 declarator.span.end,
                             ),
                             init,
+                            self.in_for_init.get(),
                         ),
                     ])));
                 } else if is_curried_arrow_chain(init) {
@@ -662,6 +670,7 @@ impl<'a> Printer<'a> {
                                     declarator.span.end,
                                 ),
                                 init,
+                                self.in_for_init.get(),
                             ))
                         },
                     );
@@ -708,6 +717,7 @@ impl<'a> Printer<'a> {
                         d,
                         self.build_expression_doc_with_paren_comments(init, declarator.span.end),
                         init,
+                        self.in_for_init.get(),
                     ));
                     parts.push(d.group(init_doc));
                 } else if is_type_assertion_with_lhs_type
@@ -734,6 +744,7 @@ impl<'a> Printer<'a> {
                         d,
                         self.build_expression_doc_with_paren_comments(init, declarator.span.end),
                         init,
+                        self.in_for_init.get(),
                     ));
                     parts.push(build_fluid_assignment_doc(
                         d,
@@ -753,6 +764,7 @@ impl<'a> Printer<'a> {
                         d,
                         self.build_expression_doc_with_paren_comments(init, declarator.span.end),
                         init,
+                        self.in_for_init.get(),
                     ));
                     parts.push(hang_after_operator(d, init_doc));
                 } else if is_layout_eligible && !is_simple_value(init) {
@@ -765,6 +777,7 @@ impl<'a> Printer<'a> {
                         d,
                         self.build_expression_doc_with_paren_comments(init, declarator.span.end),
                         init,
+                        self.in_for_init.get(),
                     ));
                     parts.push(build_fluid_assignment_doc(
                         d,
@@ -778,6 +791,7 @@ impl<'a> Printer<'a> {
                         d,
                         self.build_expression_doc_with_paren_comments(init, declarator.span.end),
                         init,
+                        self.in_for_init.get(),
                     ));
                     parts.push(init_doc);
                 }

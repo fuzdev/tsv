@@ -56,7 +56,7 @@ pub(crate) use expressions::assignment::{
     is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
     is_single_call_on_member_chain, is_type_assertion_call,
 };
-pub(crate) use needs_parens::{ParenContext, needs_parens};
+pub(crate) use needs_parens::{ParenContext, is_in_binary, needs_parens};
 pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
 
 use crate::PrinterInputs;
@@ -171,6 +171,16 @@ pub struct Printer<'a> {
     /// (`args.assignmentLayout`, `isCallLikeExpression(parent)`,
     /// `isBinaryish(parent)`) into `printArrowFunctionSignatures`.
     pub(crate) arrow_chain_context: Cell<ArrowChainContext>,
+    /// Whether we're building the **init** clause of a C-style `for` header.
+    /// In that clause an `in` binary expression must be parenthesized to keep it
+    /// distinct from the `for (x in y)` separator — prettier parenthesizes every
+    /// `in` anywhere lexically under the init (not just where strictly required),
+    /// so this flag is set while building the init subtree and propagates through
+    /// it (including nested function/class bodies). Read by `needs_parens` and the
+    /// surgical `in`-wrap at positions that build an expression without a
+    /// `needs_parens` check (assignment RHS, ternary branches/test).
+    /// Uses Cell for interior mutability so doc builders (&self) can set this.
+    pub(crate) in_for_init: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -205,7 +215,33 @@ impl<'a> Printer<'a> {
             arrow_body_object_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
+            in_for_init: Cell::new(false),
         }
+    }
+
+    /// Wrap `doc` in parens when `expr` is an `in` binary built directly inside a
+    /// `for` header init. Used at positions that build an expression *without* a
+    /// [`needs_parens`] check — assignment RHS, ternary branches/test, and the
+    /// init clause's own expression/declarator — so the for-init `in` rule still
+    /// applies there. Positions that already route through [`needs_parens`] (call
+    /// args, object values, binary operands, …) get the same wrap via that path.
+    #[inline]
+    pub(crate) fn wrap_for_init_in(&self, expr: &internal::Expression<'_>, doc: DocId) -> DocId {
+        if self.in_for_init.get() && is_in_binary(expr) {
+            self.arena.parens(doc)
+        } else {
+            doc
+        }
+    }
+
+    /// Print-context-aware wrapper over the free [`needs_parens`]: supplies the
+    /// ambient for-header-init flag so the for-init `in` rule applies at every
+    /// call site without threading the flag by hand. Prefer this inside `Printer`
+    /// methods; the free function (which still requires the flag explicitly) is
+    /// only for the few free helpers that have no `self`.
+    #[inline]
+    pub(crate) fn needs_parens(&self, expr: &internal::Expression<'_>, ctx: ParenContext) -> bool {
+        needs_parens(expr, ctx, self.in_for_init.get())
     }
 
     /// Get a reference to the doc arena.

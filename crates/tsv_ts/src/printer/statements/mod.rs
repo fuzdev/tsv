@@ -18,9 +18,9 @@ mod variable;
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
 pub(super) use super::{Printer, build_entity_name_doc, should_hug_union_type};
 
+use super::ParenContext;
 use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
-use super::{ParenContext, needs_parens};
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -90,7 +90,8 @@ impl<'a> Printer<'a> {
         } else {
             // Parens required for correctness (object expressions, object pattern assignments)
             // OR preserved from source for string literals (matches Prettier behavior)
-            let needs_parens = needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
+            let needs_parens = self
+                .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
                 || self.has_expression_statement_source_parens(stmt);
 
             if needs_parens {

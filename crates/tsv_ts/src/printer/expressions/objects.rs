@@ -388,7 +388,7 @@ impl<'a> Printer<'a> {
         let key_doc = if prop.computed {
             // Assignment expressions need parens in computed keys: {[(a = b)]: c}
             let key_expr_doc =
-                if super::needs_parens(&prop.key, super::ParenContext::ComputedPropertyKey) {
+                if self.needs_parens(&prop.key, super::ParenContext::ComputedPropertyKey) {
                     d.parens(self.build_expression_doc(&prop.key))
                 } else {
                     self.build_expression_doc(&prop.key)
@@ -516,10 +516,9 @@ impl<'a> Printer<'a> {
             if self.has_line_comments_between(key_region_end, colon_pos) {
                 let value_doc = {
                     let v = self.build_expression_doc(&prop.value);
-                    let v = if super::needs_parens(
-                        &prop.value,
-                        super::ParenContext::ObjectPropertyValue,
-                    ) {
+                    let v = if self
+                        .needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue)
+                    {
                         d.concat(&[d.text("("), v, d.text(")")])
                     } else {
                         v
@@ -542,7 +541,7 @@ impl<'a> Printer<'a> {
 
             // Check if value needs parens (e.g., assignment expressions)
             let needs_parens =
-                super::needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
+                self.needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
 
             if pre_colon_comments.is_empty() && post_colon_comments.is_empty() {
                 if needs_parens {

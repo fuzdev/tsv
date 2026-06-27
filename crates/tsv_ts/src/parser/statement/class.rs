@@ -366,17 +366,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?;
 
-        let mut body = self.bvec();
-
-        while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            // Stray semicolons are empty class members — acorn skips them,
-            // producing no node (prettier strips them on format).
-            if self.eat(TokenKind::Semicolon) {
-                continue;
+        // A class body is a fresh `[+In]` context: computed member names
+        // (`[+In]`), field initializers (`[+In]`), method/getter/setter bodies,
+        // and static blocks all permit `in` even when the class expression sits
+        // in a for-header init. A nested for-header inside re-disables it.
+        let body = self.with_allow_in(|p| {
+            let mut body = p.bvec();
+            while !matches!(p.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
+                // Stray semicolons are empty class members — acorn skips them,
+                // producing no node (prettier strips them on format).
+                if p.eat(TokenKind::Semicolon) {
+                    continue;
+                }
+                let member = p.parse_class_member(ambient)?;
+                body.push(member);
             }
-            let member = self.parse_class_member(ambient)?;
-            body.push(member);
-        }
+            Ok(body)
+        })?;
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;

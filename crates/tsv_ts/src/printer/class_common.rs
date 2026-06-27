@@ -188,7 +188,7 @@ impl<'a> Printer<'a> {
     /// arguments are rendered separately via `super_type_parameters`.
     fn build_super_class_doc(&self, super_class: &internal::Expression<'_>) -> DocId {
         let doc = self.build_expression_doc(super_class);
-        if super::needs_parens(super_class, super::ParenContext::SuperClass) {
+        if self.needs_parens(super_class, super::ParenContext::SuperClass) {
             self.d().parens(doc)
         } else {
             doc
