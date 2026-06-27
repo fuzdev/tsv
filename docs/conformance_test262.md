@@ -17,9 +17,9 @@ changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,149 graded after skips).
 
 - Positive (should parse) — 41,857 passed, 42 failed
-- Negative (should reject) — 1,157 passed, 3,093 failed
+- Negative (should reject) — 1,746 passed, 2,504 failed
 
-- **Overall**: 43,014/46,149 (93.2%)
+- **Overall**: 43,603/46,149 (94.5%)
 - **Positive pass rate**: 99.9% — valid syntax tsv accepts
 - **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
 
@@ -88,9 +88,22 @@ longer appear here — they're skipped by feature filtering above, not graded.)
 
 Most negative failures are over-acceptance of _early errors_ — programs that
 parse under the syntactic grammar but that the spec rejects semantically
-(duplicate parameter names, rest parameters with initializers, escaped
-reserved words, strict-mode-only restrictions). tsv currently enforces the
-syntactic grammar; early-error enforcement is future diagnostics-layer work.
+(duplicate parameter names, escaped reserved words, strict-mode-only
+restrictions). tsv currently enforces the syntactic grammar; early-error
+enforcement is future diagnostics-layer work.
+
+A smaller share were genuinely _syntactic_ over-acceptances — the grammar
+itself forbids the construct — which tsv fixes as they surface. The
+rest-element constraints are now enforced: a rest/spread element must be the
+final element of a parameter list (value and TS function-type) or an
+array/object destructuring pattern (binding and assignment targets), with no
+element or trailing comma after it and no default initializer — so
+`function f(...a, b)`, `function f(...a, ...b)`, `[...a, b] = c`,
+`{...a, b} = c`, and `[...a = 1] = c` are all rejected, matching acorn. Two
+narrow rest cases stay over-accepted: a trailing comma after a _pattern_ rest
+(`[...a,] = c` — the array/object parser drops the comma before pattern
+conversion) and a rest in a for-in/of destructuring LHS
+(`for ([...a, b] of y)` — not routed through the pattern conversion).
 
 ## Scope
 

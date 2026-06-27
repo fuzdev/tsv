@@ -182,6 +182,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let expr = self.parse_expression_no_in()?;
 
         // Check for 'in' or 'of'
+        // TODO: a destructuring for-in/of LHS keeps the raw expression here and is
+        // only relabeled to a pattern in the public converter (`expression_to_pattern`),
+        // so it never runs through `to_assignable`. As a result the rest-element
+        // constraints (rest must be last, no default) are NOT enforced for
+        // `for ([...a, b] of y)` / `for ([...x = 1] of y)`, unlike every other
+        // pattern context. Routing this through `to_assignable` also changes the
+        // internal AST shape (ArrayExpression → ArrayPattern), so it wants its own
+        // fixtures-first pass.
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
             self.advance()?;
             return self.parse_for_in(start, ForInOfLeft::Pattern(expr));
