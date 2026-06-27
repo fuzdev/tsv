@@ -480,6 +480,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
+        // Stage-3 import-phase proposals: `import source <binding> from …` and
+        // `import defer * as ns from …`. `source`/`defer` are contextual — a phase
+        // keyword only in the phase-specific shape, otherwise an ordinary default
+        // binding (`import defer from …` imports a default named `defer`). acorn
+        // supports neither proposal, so accepting them is a deliberate divergence
+        // from the Svelte/acorn oracle — see docs/conformance_svelte.md.
+        let phase = if matches!(self.current_kind(), TokenKind::Identifier) {
+            let is_defer = self.current_value() == "defer";
+            let is_source = self.current_value() == "source";
+            if is_defer && matches!(self.peek_kind(), TokenKind::Star) {
+                self.advance()?; // consume `defer`
+                ImportPhase::Defer
+            } else if is_source && matches!(self.peek_kind(), TokenKind::Identifier) {
+                self.advance()?; // consume `source`
+                ImportPhase::Source
+            } else {
+                ImportPhase::None
+            }
+        } else {
+            ImportPhase::None
+        };
+
         let mut specifiers = self.bvec();
 
         // Check for side-effect import: `import "y"`
@@ -494,6 +516,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 source,
                 attributes,
                 import_kind: ImportKind::Value,
+                phase,
                 span: Span::new(start as u32, end),
             }));
         }
@@ -521,6 +544,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ImportKind::Value
         };
 
+        // Whether a default specifier was parsed with no following comma — used to
+        // reject `import x * as ns` / `import x { a }` (a default must be separated
+        // from a namespace/named clause by a comma).
+        let mut default_needs_comma = false;
+
         // Parse default import: `import x from "y"` or `import type X from "y"`
         // Also check for `import x = require("y")` or `import x = A.B`
         if matches!(self.current_kind(), TokenKind::Identifier) {
@@ -545,14 +573,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(id_start as u32, id_end as u32),
             }));
 
-            // Check for comma (default + named/namespace)
+            // Check for comma (default + named/namespace). A default import must be
+            // followed by `,` (then a namespace/named clause) or `from`: a default
+            // butting directly against `* as ns` / `{ … }` with no comma is a syntax
+            // error (`import x * as ns`, `import x { a }`), matching acorn. Tracked so
+            // the namespace/named blocks below can reject the missing-comma form.
             if matches!(self.current_kind(), TokenKind::Comma) {
                 self.advance()?;
+            } else {
+                default_needs_comma = true;
             }
         }
 
         // Parse namespace import: `import * as ns from "y"`
         if matches!(self.current_kind(), TokenKind::Star) {
+            if default_needs_comma {
+                return Err(self.error_expected_after("','", "default import"));
+            }
             let ns_start = self.current_pos().0;
             self.advance()?;
 
@@ -578,6 +615,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse named imports: `import { a, b as c } from "y"`
         if matches!(self.current_kind(), TokenKind::BraceOpen) {
+            if default_needs_comma {
+                return Err(self.error_expected_after("','", "default import"));
+            }
             self.advance()?;
 
             while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
@@ -701,6 +741,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             source,
             attributes,
             import_kind,
+            phase,
             span: Span::new(start as u32, end),
         }))
     }

@@ -68,7 +68,14 @@ impl<'a> Printer<'a> {
         search_end: u32,
     ) -> u32 {
         let is_type = decl.import_kind == internal::ImportKind::Type;
-        self.module_header_end(is_type, decl.span.start, search_end)
+        let base = self.module_header_end(is_type, decl.span.start, search_end);
+        // Skip the phase keyword (`source `/`defer `) for the import-phase proposals
+        // so the default-binding / namespace comment scan starts after it.
+        base + match decl.phase {
+            internal::ImportPhase::Source => "source ".len() as u32,
+            internal::ImportPhase::Defer => "defer ".len() as u32,
+            internal::ImportPhase::None => 0,
+        }
     }
 
     /// Position just past the leading keyword(s) of an export named declaration:

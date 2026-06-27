@@ -11,16 +11,12 @@
 /// scoring it as a positive failure (and the differential manifest drops it too,
 /// since both share `classify`).
 ///
-/// Currently the two Stage-3 import proposals whose `import.source(…)` /
-/// `import.defer(…)` syntax tsv rejects (`Expected 'meta' after 'import.'`):
-/// `source-phase-imports` (with its companion `…-module-source` tag) and
-/// `import-defer`. Together ~145 test262 files. When tsv implements a proposal,
-/// drop its name here so those tests re-enter the graded set.
-const UNIMPLEMENTED_FEATURES: &[&str] = &[
-    "source-phase-imports",
-    "source-phase-imports-module-source",
-    "import-defer",
-];
+/// Currently empty: the Stage-3 import-phase proposals (`source-phase-imports`
+/// with its `…-module-source` companion, and `import-defer`) are now parsed —
+/// `import source …` / `import defer …` and `import.source(…)` / `import.defer(…)`
+/// — so their tests are graded. Add a `features:` name here when tsv meets a new
+/// proposal it doesn't yet parse; drop it again once the syntax lands.
+const UNIMPLEMENTED_FEATURES: &[&str] = &[];
 
 /// Parsed frontmatter from a test262 test file.
 #[derive(Debug, Default)]
@@ -372,26 +368,27 @@ flags: [module]
 
     #[test]
     fn test_requires_unimplemented_feature() {
-        // The real shape: the proposal name sits alongside `dynamic-import`.
+        // The import-phase proposals are now parsed, so they are graded, not
+        // filtered — `UNIMPLEMENTED_FEATURES` is empty.
         let source_phase = r"/*---
 features: [source-phase-imports, dynamic-import]
 flags: [generated, async]
 ---*/";
-        assert_eq!(
+        assert!(
             parse(source_phase)
                 .unwrap()
-                .requires_unimplemented_feature(),
-            Some("source-phase-imports")
+                .requires_unimplemented_feature()
+                .is_none()
         );
 
         let import_defer = r"/*---
 features: [import-defer, dynamic-import]
 ---*/";
-        assert_eq!(
+        assert!(
             parse(import_defer)
                 .unwrap()
-                .requires_unimplemented_feature(),
-            Some("import-defer")
+                .requires_unimplemented_feature()
+                .is_none()
         );
 
         // Plain dynamic-import is implemented — not filtered.

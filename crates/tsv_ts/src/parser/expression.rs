@@ -2,8 +2,8 @@
 
 use crate::ast::internal::{
     AssignmentExpression, AwaitExpression, BinaryExpression, BinaryOperator, BlockStatement,
-    CallExpression, ConditionalExpression, Expression, Identifier, ImportExpression, JsdocCast,
-    Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression, RegexLiteral,
+    CallExpression, ConditionalExpression, Expression, Identifier, ImportExpression, ImportPhase,
+    JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression, RegexLiteral,
     SequenceExpression, SpreadElement, Statement, Super, TSAsExpression, TSInstantiationExpression,
     TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression,
     ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
@@ -1845,13 +1845,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Handles:
     /// - `import('module')` - dynamic import expression
+    /// - `import.source('module')` / `import.defer('module')` - phased dynamic
+    ///   import (Stage-3 source-phase-imports / import-defer proposals)
     /// - `import.meta` - meta property
     fn parse_import_or_meta_property(&mut self) -> Result<Expression<'arena>, ParseError> {
         let arena = self.arena;
         let (start, import_end) = self.current_pos();
         self.advance()?; // consume 'import'
 
-        // Check for import.meta meta property
+        // Check for `import.meta` / `import.source(…)` / `import.defer(…)`.
+        let mut phase = ImportPhase::None;
         if *self.current_kind() == TokenKind::Dot {
             self.advance()?; // consume '.'
             if *self.current_kind() == TokenKind::Identifier && self.current_value() == "meta" {
@@ -1874,16 +1877,38 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     span: Span::new(start as u32, prop_end as u32),
                 }));
             }
-            return Err(self.error_expected_after("'meta'", "import."));
+            // `import.source(…)` / `import.defer(…)` — the import-phase proposals.
+            // The phase keyword must be immediately followed by the `(` call: a bare
+            // `import.source` or a member access `import.source.x` is a syntax error
+            // (enforced by the `ParenOpen` expect below).
+            if *self.current_kind() == TokenKind::Identifier {
+                match self.current_value() {
+                    "source" => phase = ImportPhase::Source,
+                    "defer" => phase = ImportPhase::Defer,
+                    _ => return Err(self.error_expected_after("'meta'", "import.")),
+                }
+                self.advance()?; // consume 'source' / 'defer'
+            } else {
+                return Err(self.error_expected_after("'meta'", "import."));
+            }
         }
 
-        // Dynamic import: import('module') or import('module', options)
+        // Dynamic import: import('module') or import('module', options), possibly
+        // phased as import.source(...) / import.defer(...).
         self.expect(&TokenKind::ParenOpen)?;
 
         // The argument list is a grouping delimiter — `in` is always the binary
         // operator inside it, even within a for-header init (the args are
         // `AssignmentExpression[+In]`). Mirrors `parse_call_arguments`.
         self.grouping_depth += 1;
+
+        // An `ImportCall` argument is an `AssignmentExpression`, never a spread:
+        // `import(...x)` / `import.source(...x)` are syntax errors (acorn agrees).
+        // Guard here because the primary-expression parser accepts a leading `...`
+        // as a `SpreadElement` (valid only in array/object/call-argument contexts).
+        if matches!(self.current_kind(), TokenKind::DotDotDot) {
+            return Err(self.error_msg("Cannot use spread element in import() argument"));
+        }
 
         // Parse the source expression (usually a string literal)
         let source = self.parse_assignment_expression()?;
@@ -1899,6 +1924,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // comma. See docs/conformance_svelte.md.
         let mut options: Option<&'arena Expression<'arena>> = None;
         if self.eat(TokenKind::Comma) && !self.check(&TokenKind::ParenClose) {
+            // The options argument is likewise an `AssignmentExpression`, not a spread.
+            if matches!(self.current_kind(), TokenKind::DotDotDot) {
+                return Err(self.error_msg("Cannot use spread element in import() argument"));
+            }
             options = Some(arena.alloc(self.parse_assignment_expression()?));
             self.eat(TokenKind::Comma); // optional trailing comma after the options
         }
@@ -1911,6 +1940,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(Expression::ImportExpression(ImportExpression {
             source: arena.alloc(source),
             options,
+            phase,
             span: Span::new(start as u32, paren_end as u32),
         }))
     }

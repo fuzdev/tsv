@@ -207,6 +207,35 @@ Conversely, acorn-typescript *over-accepts* three or more arguments
 spec-faithful in both directions. **Upstream candidate**: acorn-typescript
 `ImportCall` argument handling.
 
+#### Import-phase proposals
+
+The Stage-3 **source-phase imports** and **import defer** proposals add a phase to
+both static and dynamic imports:
+
+- `import source x from 'mod'` / `import.source('mod')` — phase `'source'`
+- `import defer * as ns from 'mod'` / `import.defer('mod')` — phase `'defer'`
+
+acorn-typescript implements neither (`import source x` → `Unexpected token`,
+`import.source(…)` → `The only valid meta property for import is 'import.meta'`),
+so accepting them is a deliberate, forward-looking divergence from the
+Svelte/acorn oracle. tsv parses the valid forms and rejects the invalid ones per
+the proposals' grammars (`import defer` allows only the `* as ns` namespace shape;
+`import.source`/`import.defer` must be a call, never a bare meta-property or member
+access; neither dynamic form takes a spread argument), and tags the public AST node
+with a `phase: 'source' | 'defer'` field (omitted for an ordinary import). `source`
+and `defer` stay contextual — `import defer from 'mod'` still imports a default
+binding named `defer`.
+
+**No `_svelte_divergence` fixture** (the fixture pipeline needs acorn to produce
+`expected.json`, and acorn rejects the syntax). The parser is graded instead by the
+test262 suite — ~396 graded files, all passing; see
+[conformance_test262.md](./conformance_test262.md). Prettier diverges too (it drops
+`import defer`'s phase and throws on `import source`), so the *printer* is covered by
+`tests/import_phase.rs` rather than a fixture; the prettier side is cataloged in
+[conformance_prettier.md](./conformance_prettier.md#import-phase-proposals).
+**Upstream candidate**: acorn-typescript import-phase support — drop the divergence
+and promote to fixtures once it lands.
+
 ### TypeScript Parser Corrections (corpus-enforced)
 
 Intentional AST divergences from acorn-typescript that have no prettier-stable
