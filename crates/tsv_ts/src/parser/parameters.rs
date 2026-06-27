@@ -18,14 +18,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .ok_or_else(|| self.error_expected("parameter name or destructuring pattern"))?;
         self.advance()?;
 
-        // Check for optional marker: param?
-        let optional = self.eat(TokenKind::Question);
-        // The `?` extends the identifier span when no type annotation follows
-        let param_end = if optional {
-            self.prev_token_end()
-        } else {
-            param_end
-        };
+        // Check for optional marker: param? — a bare `?` extends the span.
+        let (optional, param_end) = self.eat_optional_marker(param_end);
 
         // Check for type annotation: param: type
         let (type_annotation, id_end) = if self.check(&TokenKind::Colon) {
@@ -38,12 +32,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Build binding extra only when a type annotation is present (decorators,
         // if any, are attached later by the parameter-list caller).
-        let extra = type_annotation.map(|ta| {
-            self.alloc(IdentifierParamExtra {
-                type_annotation: Some(ta),
-                decorators: None,
-            })
-        });
+        let extra = type_annotation.map(|ta| self.typed_extra(ta));
 
         let mut param = Expression::Identifier(Identifier {
             name: symbol,
@@ -302,12 +291,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 (None, id_end)
                             };
 
-                            let argument = Expression::Identifier(Identifier {
-                                name: symbol,
-                                optional: false,
-                                extra: None,
-                                span: Span::new(id_start as u32, id_end as u32),
-                            });
+                            let argument = Expression::Identifier(Identifier::simple(
+                                symbol,
+                                Span::new(id_start as u32, id_end as u32),
+                            ));
 
                             Expression::RestElement(RestElement {
                                 argument: self.alloc(argument),

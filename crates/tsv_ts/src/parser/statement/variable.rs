@@ -223,12 +223,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .as_ref()
             .map_or(end, |ta| ta.span.end_usize());
 
-        let extra = type_annotation.map(|ta| {
-            self.alloc(IdentifierParamExtra {
-                type_annotation: Some(ta),
-                decorators: None,
-            })
-        });
+        let extra = type_annotation.map(|ta| self.typed_extra(ta));
 
         Ok((
             Expression::Identifier(Identifier {
