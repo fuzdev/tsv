@@ -14,41 +14,15 @@ Use test262 to validate that tsv's parser correctly:
 Regenerate with `cargo run -p tsv_debug test262` (expects a test262 checkout
 at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
-<<<<<<< HEAD
-discovered tests (46,545 graded after skips).
-||||||| 8e9238b9
-discovered tests (46,149 graded after skips).
-=======
-discovered tests (46,148 graded after skips).
->>>>>>> main
+discovered tests (46,544 graded after skips).
 
-<<<<<<< HEAD
-- Positive (should parse) — 42,113 passed, 1 failed
+- Positive (should parse) — 42,113 passed, 0 failed
 - Negative (should reject) — 1,995 passed, 2,436 failed
-||||||| 8e9238b9
-- Positive (should parse) — 41,898 passed, 1 failed
-- Negative (should reject) — 1,795 passed, 2,455 failed
-=======
-- Positive (should parse) — 41,898 passed, 0 failed
-- Negative (should reject) — 1,795 passed, 2,455 failed
->>>>>>> main
 
-<<<<<<< HEAD
-- **Overall**: 44,108/46,545 (94.8%)
-- **Positive pass rate**: 99.99% — one failure, the lone sloppy-by-content `raw`
-  test (all graded at each test's declared goal; see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
-- **Skipped**: 2,591 (sloppy mode: 2,519, unimplemented feature: 0, runtime: 38, resolution: 34)
-||||||| 8e9238b9
-- **Overall**: 43,693/46,149 (94.7%)
-- **Positive pass rate**: 99.99% — one failure, the lone sloppy-by-content `raw`
-  test (all graded at each test's declared goal; see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
-- **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
-=======
-- **Overall**: 43,693/46,148 (94.7%)
+- **Overall**: 44,108/46,544 (94.8%)
 - **Positive pass rate**: 100% — every test tsv grades and that should parse does,
   graded at each test's declared goal (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
-- **Skipped**: 2,988 (sloppy mode: 2,494, unimplemented feature: 422, runtime: 38, resolution: 34)
->>>>>>> main
+- **Skipped**: 2,592 (sloppy mode: 2,520, unimplemented feature: 0, runtime: 38, resolution: 34)
 
 The remaining negative failures are early-error *under-enforcement* (programs that
 parse under the syntactic grammar but the spec rejects semantically — duplicate
