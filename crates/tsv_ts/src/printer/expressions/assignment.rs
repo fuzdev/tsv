@@ -107,10 +107,8 @@ pub fn choose_layout(
     }
 
     // Decorated class expression → break after operator (`const C =\n\t@dec\n\tclass {}`).
-    // Prettier ref: shouldBreakAfterOperator (assignment.js:228)
-    //   `case "ClassExpression": return isNonEmptyArray(rightNode.decorators)`.
     if let Expression::ClassExpression(c) = right_expr
-        && c.decorators.is_some_and(|d| !d.is_empty())
+        && class_expr_has_decorators(c)
     {
         return AssignmentLayout::BreakAfterOperator;
     }
@@ -148,6 +146,18 @@ pub fn choose_layout(
     AssignmentLayout::Fluid
 }
 
+/// Whether a class expression carries decorators (`@dec class {}`).
+///
+/// A decorated class expression breaks after the assignment operator (each
+/// decorator on its own line) rather than self-expanding; an undecorated one
+/// expands its body in place. Prettier ref: shouldBreakAfterOperator
+/// (assignment.js:228) `case "ClassExpression": isNonEmptyArray(decorators)`;
+/// the never-break ClassExpression case (assignment.js:189) only applies once
+/// that has ruled out a decorated class.
+pub fn class_expr_has_decorators(c: &internal::ClassExpression<'_>) -> bool {
+    c.decorators.is_some_and(|d| !d.is_empty())
+}
+
 /// Check if an expression handles its own expansion (objects, arrays, functions, classes)
 ///
 /// These values should never have a break between key: and value because they
@@ -168,13 +178,9 @@ pub fn is_self_expanding_value(expr: &Expression<'_>) -> bool {
         | Expression::ArrayExpression(_)
         | Expression::FunctionExpression(_) => true,
 
-        // An undecorated class expression expands its body in place
-        // (`= class {…}`); a *decorated* one breaks after the operator instead
-        // (each decorator takes its own line), handled in `choose_layout`.
-        // Prettier ref: the never-break ClassExpression case (assignment.js:189)
-        // only applies once `shouldBreakAfterOperator` (228) has ruled out a
-        // decorated class.
-        Expression::ClassExpression(c) => !matches!(c.decorators, Some(d) if !d.is_empty()),
+        // An undecorated class expression expands its body in place (`= class {…}`);
+        // a *decorated* one breaks after the operator instead (`choose_layout`).
+        Expression::ClassExpression(c) => !class_expr_has_decorators(c),
 
         // Arrow functions are self-expanding UNLESS they're curried with return type
         Expression::ArrowFunctionExpression(_) => !is_curried_arrow_with_return_type(expr),

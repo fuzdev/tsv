@@ -169,12 +169,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (id_start, id_end) = self.current_pos();
             let symbol = self.intern_identifier();
             self.advance()?; // consume 'async'
-            let async_ident = Expression::Identifier(Identifier {
-                name: symbol,
-                optional: false,
-                extra: None,
-                span: Span::new(id_start as u32, id_end as u32),
-            });
+            let async_ident = Expression::Identifier(Identifier::simple(
+                symbol,
+                Span::new(id_start as u32, id_end as u32),
+            ));
             self.advance()?; // consume 'of'
             return self.parse_for_of(start, ForInOfLeft::Pattern(async_ident), is_await);
         }

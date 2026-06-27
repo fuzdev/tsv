@@ -4,11 +4,11 @@ use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
-    CommentFilter, CommentSpacing, ParenContext, analysis, conditional_should_break_after_op,
-    is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_with_return_type,
-    is_literal_member_chain, is_module_path_fluid_call, is_multiline_string_literal,
-    is_poorly_breakable_chain, is_pure_property_chain, is_regex_root_chain,
-    is_self_expanding_value, is_simple_self_expanding, is_simple_value,
+    CommentFilter, CommentSpacing, ParenContext, analysis, class_expr_has_decorators,
+    conditional_should_break_after_op, is_call_on_member_chain, is_curried_arrow_chain,
+    is_curried_arrow_with_return_type, is_literal_member_chain, is_module_path_fluid_call,
+    is_multiline_string_literal, is_poorly_breakable_chain, is_pure_property_chain,
+    is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding, is_simple_value,
     is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
     should_inline_logical_expression,
 };
@@ -469,12 +469,9 @@ impl<'a> Printer<'a> {
                     && is_layout_eligible;
 
                 // Decorated class expression → break after operator, each decorator
-                // on its own line (`const C =\n\t@dec\n\tclass {}`). Prettier ref:
-                // shouldBreakAfterOperator (assignment.js:228)
-                //   `case "ClassExpression": isNonEmptyArray(rightNode.decorators)`.
+                // on its own line (`const C =\n\t@dec\n\tclass {}`).
                 let is_decorated_class_expr = is_layout_eligible
-                    && matches!(init, Expression::ClassExpression(c)
-                        if c.decorators.is_some_and(|decs| !decs.is_empty()));
+                    && matches!(init, Expression::ClassExpression(c) if class_expr_has_decorators(c));
 
                 // Single-call member chains with complex args (arrows, objects, arrays):
                 // Use TRUE fluid layout to break at `=` only when necessary.
