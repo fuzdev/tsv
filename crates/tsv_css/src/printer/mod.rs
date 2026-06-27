@@ -26,7 +26,9 @@ mod selectors;
 pub mod value_normalization;
 mod values;
 
-use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};
+use crate::ast::internal::{
+    Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet, CssValue,
+};
 use tsv_lang::{
     CommentPosition, EmbedContext, INDENT, OutputBuffer, TAB_WIDTH, classify_comment_fast,
     doc::{
@@ -124,10 +126,7 @@ impl<'a> Printer<'a> {
     ///
     /// Value comments are comments that appear after the colon, e.g., `color: /* comment */ red;`
     /// Detected by scanning the source text directly (value comments are not stored in the Vec).
-    pub(crate) fn has_value_comments_in_decl(
-        &self,
-        decl: &crate::ast::internal::CssDeclaration<'_>,
-    ) -> bool {
+    pub(crate) fn has_value_comments_in_decl(&self, decl: &CssDeclaration<'_>) -> bool {
         let decl_source = decl.span.extract(self.source);
         if let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) {
             let value_part = &decl_source[colon_pos + 1..];
@@ -528,6 +527,26 @@ impl<'a> Printer<'a> {
         }
 
         consumed
+    }
+
+    /// Print a declaration — honoring a pending `prettier-ignore` — then any same-line
+    /// trailing comments, returning the number of comments consumed (advance the loop
+    /// index by it). Shared by the three CSS block-body loops (top-level rule body,
+    /// nested-rule body, at-rule direct-declaration body) so their declaration handling
+    /// stays in lockstep; drift between two of them was the at-rule trailing-comment bug.
+    pub(crate) fn print_decl_with_inline_comments(
+        &mut self,
+        children: &[CssBlockChild<'_>],
+        index: usize,
+        decl: &CssDeclaration<'_>,
+        format_ignore: bool,
+    ) -> usize {
+        if format_ignore {
+            self.write_format_ignore_declaration(decl);
+        } else {
+            self.print_css_declaration(decl);
+        }
+        self.try_print_inline_comments_after_decl(children, index, decl.span.end)
     }
 
     /// Check if previous sibling is a comment

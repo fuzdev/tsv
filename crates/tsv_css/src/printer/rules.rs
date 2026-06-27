@@ -59,22 +59,14 @@ impl<'a> Printer<'a> {
                     if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
                         self.write("\n");
                     }
-                    if format_ignore_next {
-                        self.write_format_ignore_declaration(decl);
-                        format_ignore_next = false;
-                    } else {
-                        self.print_css_declaration(decl);
-                    }
-
-                    // Check for inline comments after the declaration
-                    let inline_count = self.try_print_inline_comments_after_decl(
+                    let format_ignore = format_ignore_next;
+                    format_ignore_next = false;
+                    i += self.print_decl_with_inline_comments(
                         rule.declarations,
                         i,
-                        decl.span.end,
+                        decl,
+                        format_ignore,
                     );
-                    if inline_count > 0 {
-                        i += inline_count;
-                    }
                 }
                 internal::CssBlockChild::Comment(comment) => {
                     // Standalone comment (not inline after a declaration)
