@@ -1519,7 +1519,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let symbol = self.intern("await");
         self.advance()?;
         Ok(ParsedExpr::with_end(
-            Expression::Identifier(Identifier::simple(symbol, Span::new(start as u32, end as u32))),
+            Expression::Identifier(Identifier::simple(
+                symbol,
+                Span::new(start as u32, end as u32),
+            )),
             end,
         ))
     }
