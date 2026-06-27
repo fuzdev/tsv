@@ -28,6 +28,20 @@
 /// );
 /// ```
 pub(crate) fn normalize_css_whitespace(s: &str) -> String {
+    // Fast path: input with no byte the normalizer acts on normalizes to itself.
+    // With no ASCII whitespace (to collapse), no `(`/`)` (paren-space stripping),
+    // no `,` (comma spacing), no `/` (comment spacing) and no quote (string
+    // handling), every char takes the loop's regular-character branch, so
+    // `pending_space` never sets and the final `trim()` is a no-op — the output
+    // equals the input. Skip the char scan, the per-char push, and the trim; one
+    // bulk copy instead. The overwhelmingly-common `CssValue::Identifier` value
+    // (`red`, `flex`, `1px`) hits this. Non-ASCII bytes bail to the slow path so any
+    // Unicode whitespace (NBSP, U+2028, …) the char loop's `is_whitespace()` would
+    // collapse is still handled there.
+    if s.bytes().all(is_normalize_noop_byte) {
+        return s.to_string();
+    }
+
     let mut result = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
     let mut in_string = false;
@@ -154,6 +168,23 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+/// Whether `normalize_css_whitespace` leaves byte `b` untouched: an ASCII,
+/// non-whitespace byte that is none of the structural bytes the normalizer acts on
+/// (`(` `)` `,` `/` and the two quotes). A string composed only of such bytes
+/// normalizes to itself, enabling the scan-skip fast path. Non-ASCII bytes (≥0x80)
+/// are conservatively treated as "acted on" so that Unicode whitespace (NBSP,
+/// U+2028, …) — which the char loop's `is_whitespace()` collapses — never slips
+/// through the fast path. The ASCII whitespace set (`\t \n \x0B \x0C \r` space)
+/// matches `char::is_whitespace`'s ASCII members.
+#[inline]
+fn is_normalize_noop_byte(b: u8) -> bool {
+    b.is_ascii()
+        && !matches!(
+            b,
+            b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ' | b'(' | b')' | b',' | b'/' | b'\'' | b'"'
+        )
 }
 
 /// Normalize spacing in a value containing comments (alias for backward compatibility)
@@ -306,6 +337,34 @@ fn push_segment<'a>(parts: &mut Vec<&'a str>, segment: &'a str, trim: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_normalize_css_whitespace_fast_path_equivalence() {
+        // Bare ASCII tokens (the fast path) are returned verbatim.
+        for s in [
+            "red", "1px", "#fff", "flex", "inherit", "-0.5em", "bold!", "a-b_c",
+        ] {
+            assert_eq!(
+                normalize_css_whitespace(s),
+                s,
+                "bare token {s:?} must pass through"
+            );
+        }
+        assert_eq!(normalize_css_whitespace(""), "");
+
+        // Inputs the normalizer acts on still take the slow path and normalize.
+        assert_eq!(normalize_css_whitespace("a  b"), "a b"); // whitespace collapse
+        assert_eq!(normalize_css_whitespace("(  a  )"), "(a)"); // paren spacing
+        assert_eq!(normalize_css_whitespace("a , b"), "a, b"); // comma spacing
+        assert_eq!(normalize_css_whitespace("a,b"), "a, b");
+        assert_eq!(normalize_css_whitespace(" red "), "red"); // trim
+        assert_eq!(normalize_css_whitespace("a\tb"), "a b"); // tab is whitespace
+
+        // Non-ASCII bails to the slow path (conservative), so Unicode whitespace is
+        // still collapsed exactly as before and non-ws non-ASCII content is preserved.
+        assert_eq!(normalize_css_whitespace("a\u{00A0}b"), "a b"); // NBSP collapses
+        assert_eq!(normalize_css_whitespace("émotion"), "émotion"); // non-ws non-ASCII verbatim
+    }
 
     #[test]
     fn test_extract_function_args() {
