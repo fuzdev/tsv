@@ -137,7 +137,6 @@ pub enum LiteralValue<'arena> {
     BigInt,
     Boolean(bool),
     Null,
-    Undefined,
 }
 
 /// The decoded value of a string literal, mirroring [`crate::ast::internal::TemplateCooked`].
