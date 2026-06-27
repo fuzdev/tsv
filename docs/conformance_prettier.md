@@ -794,11 +794,12 @@ The `prettier-ignore` family matches prettier exactly (both emit the construct r
 - `format-ignore` in `<script>` / `<style>` — Design choice — [js_css](../tests/fixtures/svelte/syntax/format_ignore/js_css_prettier_divergence/)
 - `format-ignore` template element — Design choice — [basic](../tests/fixtures/svelte/syntax/format_ignore/basic_prettier_divergence/)
 - `format-ignore` nested CSS — Design choice — [css_nested](../tests/fixtures/svelte/syntax/format_ignore/css_nested_prettier_divergence/)
+- `format-ignore` at-rule-body declaration — Design choice — [css_atrule_decl](../tests/fixtures/svelte/syntax/format_ignore/css_atrule_decl_prettier_divergence/)
 - `format-ignore-start` / `-end` range — Design choice — [range](../tests/fixtures/svelte/syntax/format_ignore/range_prettier_divergence/)
 - `format-ignore` standalone `.ts` — Design choice — [ts_standalone](../tests/fixtures/typescript/syntax/comments/format_ignore_prettier_divergence/)
 - `format-ignore` standalone `.css` — Design choice — [css_standalone](../tests/fixtures/css/syntax/comments/format_ignore_prettier_divergence/)
 
-The first four are Svelte-embedded; the last two pin the **standalone**
+The first five are Svelte-embedded; the last two pin the **standalone**
 `.ts` / `.css` paths (acorn-typescript / `parseCss` + `tsv_ts` / `tsv_css`
 directly), so the directive is covered in every language outside a Svelte host
 too.

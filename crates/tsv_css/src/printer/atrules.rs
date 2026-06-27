@@ -229,10 +229,13 @@ impl<'a> Printer<'a> {
                         // Print the declaration and keep any same-line trailing comment on its
                         // line, via the shared helper. Without the inline-comment step the
                         // comment falls through to the next iteration and prints standalone.
-                        // TODO: unlike the rule-body loops, the at-rule direct body doesn't
-                        // apply a pending `prettier-ignore` to a declaration (passes `false`);
-                        // honor `format_ignore_next` here for parity.
-                        i += self.print_decl_with_inline_comments(block.children, i, decl, false);
+                        // The helper consumes the pending format-ignore flag (honor + reset).
+                        i += self.print_decl_with_inline_comments(
+                            block.children,
+                            i,
+                            decl,
+                            &mut format_ignore_next,
+                        );
                     }
                     internal::CssBlockChild::Rule(_) | internal::CssBlockChild::Atrule(_) => {
                         // Rules and at-rules need indentation
@@ -323,13 +326,11 @@ impl<'a> Printer<'a> {
                             {
                                 self.write("\n");
                             }
-                            let format_ignore = format_ignore_next;
-                            format_ignore_next = false;
                             i += self.print_decl_with_inline_comments(
                                 rule.declarations,
                                 i,
                                 decl,
-                                format_ignore,
+                                &mut format_ignore_next,
                             );
                         }
                         internal::CssBlockChild::Comment(comment) => {

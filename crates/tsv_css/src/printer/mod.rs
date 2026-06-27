@@ -529,19 +529,26 @@ impl<'a> Printer<'a> {
         consumed
     }
 
-    /// Print a declaration — honoring a pending `prettier-ignore` — then any same-line
-    /// trailing comments, returning the number of comments consumed (advance the loop
-    /// index by it). Shared by the three CSS block-body loops (top-level rule body,
-    /// nested-rule body, at-rule direct-declaration body) so their declaration handling
-    /// stays in lockstep; drift between two of them was the at-rule trailing-comment bug.
+    /// Print a declaration — honoring a pending format-ignore directive — then any
+    /// same-line trailing comments, returning the number of comments consumed (advance
+    /// the loop index by it). Shared by the three CSS block-body loops (top-level rule
+    /// body, nested-rule body, at-rule direct-declaration body) so their declaration
+    /// handling stays in lockstep; drift between two of them was the at-rule
+    /// trailing-comment bug.
+    ///
+    /// The pending-ignore flag is passed by `&mut` and **consumed here** (read, then
+    /// reset to false) so the directive applies to exactly this one declaration. Folding
+    /// the reset into the helper means a caller cannot honor the flag without also
+    /// clearing it — the failure mode that left the at-rule body loop ignoring the
+    /// directive (it hardcoded `false`, skipping both honor and reset).
     pub(crate) fn print_decl_with_inline_comments(
         &mut self,
         children: &[CssBlockChild<'_>],
         index: usize,
         decl: &CssDeclaration<'_>,
-        format_ignore: bool,
+        format_ignore_next: &mut bool,
     ) -> usize {
-        if format_ignore {
+        if std::mem::take(format_ignore_next) {
             self.write_format_ignore_declaration(decl);
         } else {
             self.print_css_declaration(decl);
