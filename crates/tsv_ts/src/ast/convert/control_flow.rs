@@ -15,13 +15,13 @@ use tsv_lang::LocationTracker;
 /// for simplicity.
 const SCHEMA: Schema = Schema::Acorn;
 
-pub(in crate::ast) fn convert_if_statement(
+pub(in crate::ast) fn convert_if_statement<'src>(
     if_stmt: &internal::IfStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::IfStatement {
+) -> public::IfStatement<'src> {
     public::IfStatement {
         node_type: "IfStatement",
         start: if_stmt.span.start,
@@ -50,13 +50,13 @@ pub(in crate::ast) fn convert_if_statement(
     }
 }
 
-pub(in crate::ast) fn convert_for_statement(
+pub(in crate::ast) fn convert_for_statement<'src>(
     for_stmt: &internal::ForStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ForStatement {
+) -> public::ForStatement<'src> {
     public::ForStatement {
         node_type: "ForStatement",
         start: for_stmt.span.start,
@@ -85,13 +85,13 @@ pub(in crate::ast) fn convert_for_statement(
     }
 }
 
-pub(in crate::ast) fn convert_for_in_statement(
+pub(in crate::ast) fn convert_for_in_statement<'src>(
     for_in: &internal::ForInStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ForInStatement {
+) -> public::ForInStatement<'src> {
     public::ForInStatement {
         node_type: "ForInStatement",
         start: for_in.span.start,
@@ -116,13 +116,13 @@ pub(in crate::ast) fn convert_for_in_statement(
     }
 }
 
-pub(in crate::ast) fn convert_for_of_statement(
+pub(in crate::ast) fn convert_for_of_statement<'src>(
     for_of: &internal::ForOfStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ForOfStatement {
+) -> public::ForOfStatement<'src> {
     public::ForOfStatement {
         node_type: "ForOfStatement",
         start: for_of.span.start,
@@ -148,13 +148,13 @@ pub(in crate::ast) fn convert_for_of_statement(
     }
 }
 
-pub(in crate::ast) fn convert_while_statement(
+pub(in crate::ast) fn convert_while_statement<'src>(
     while_stmt: &internal::WhileStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::WhileStatement {
+) -> public::WhileStatement<'src> {
     public::WhileStatement {
         node_type: "WhileStatement",
         start: while_stmt.span.start,
@@ -178,13 +178,13 @@ pub(in crate::ast) fn convert_while_statement(
     }
 }
 
-pub(in crate::ast) fn convert_do_while_statement(
+pub(in crate::ast) fn convert_do_while_statement<'src>(
     do_while: &internal::DoWhileStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::DoWhileStatement {
+) -> public::DoWhileStatement<'src> {
     public::DoWhileStatement {
         node_type: "DoWhileStatement",
         start: do_while.span.start,
@@ -208,13 +208,13 @@ pub(in crate::ast) fn convert_do_while_statement(
     }
 }
 
-pub(in crate::ast) fn convert_switch_statement(
+pub(in crate::ast) fn convert_switch_statement<'src>(
     switch_stmt: &internal::SwitchStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::SwitchStatement {
+) -> public::SwitchStatement<'src> {
     public::SwitchStatement {
         node_type: "SwitchStatement",
         start: switch_stmt.span.start,
@@ -235,13 +235,13 @@ pub(in crate::ast) fn convert_switch_statement(
     }
 }
 
-pub(in crate::ast) fn convert_try_statement(
+pub(in crate::ast) fn convert_try_statement<'src>(
     try_stmt: &internal::TryStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TryStatement {
+) -> public::TryStatement<'src> {
     public::TryStatement {
         node_type: "TryStatement",
         start: try_stmt.span.start,
@@ -259,13 +259,13 @@ pub(in crate::ast) fn convert_try_statement(
     }
 }
 
-pub(in crate::ast) fn convert_throw_statement(
+pub(in crate::ast) fn convert_throw_statement<'src>(
     throw_stmt: &internal::ThrowStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ThrowStatement {
+) -> public::ThrowStatement<'src> {
     public::ThrowStatement {
         node_type: "ThrowStatement",
         start: throw_stmt.span.start,
@@ -281,12 +281,13 @@ pub(in crate::ast) fn convert_throw_statement(
     }
 }
 
-pub(in crate::ast) fn convert_break_statement(
+pub(in crate::ast) fn convert_break_statement<'src>(
     break_stmt: &internal::BreakStatement<'_>,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::BreakStatement {
+) -> public::BreakStatement<'src> {
     public::BreakStatement {
         node_type: "BreakStatement",
         start: break_stmt.span.start,
@@ -295,16 +296,17 @@ pub(in crate::ast) fn convert_break_statement(
         label: break_stmt
             .label
             .as_ref()
-            .map(|id| super::convert_identifier(id, loc, interner, offset)),
+            .map(|id| super::convert_identifier(id, source, loc, interner, offset)),
     }
 }
 
-pub(in crate::ast) fn convert_continue_statement(
+pub(in crate::ast) fn convert_continue_statement<'src>(
     continue_stmt: &internal::ContinueStatement<'_>,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ContinueStatement {
+) -> public::ContinueStatement<'src> {
     public::ContinueStatement {
         node_type: "ContinueStatement",
         start: continue_stmt.span.start,
@@ -313,23 +315,23 @@ pub(in crate::ast) fn convert_continue_statement(
         label: continue_stmt
             .label
             .as_ref()
-            .map(|id| super::convert_identifier(id, loc, interner, offset)),
+            .map(|id| super::convert_identifier(id, source, loc, interner, offset)),
     }
 }
 
-pub(in crate::ast) fn convert_labeled_statement(
+pub(in crate::ast) fn convert_labeled_statement<'src>(
     labeled: &internal::LabeledStatement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::LabeledStatement {
+) -> public::LabeledStatement<'src> {
     public::LabeledStatement {
         node_type: "LabeledStatement",
         start: labeled.span.start,
         end: labeled.span.end,
         loc: create_location(labeled.span, loc, offset),
-        label: super::convert_identifier(&labeled.label, loc, interner, offset),
+        label: super::convert_identifier(&labeled.label, source, loc, interner, offset),
         body: Box::new(convert_statement(
             labeled.body,
             source,
@@ -343,13 +345,13 @@ pub(in crate::ast) fn convert_labeled_statement(
 
 // Helper functions
 
-fn convert_for_init(
+fn convert_for_init<'src>(
     init: &internal::ForInit<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ForInit {
+) -> public::ForInit<'src> {
     match init {
         internal::ForInit::VariableDeclaration(decl) => public::ForInit::VariableDeclaration(
             convert_variable_declaration(decl, source, loc, interner, offset),
@@ -360,13 +362,13 @@ fn convert_for_init(
     }
 }
 
-fn convert_for_in_of_left(
+fn convert_for_in_of_left<'src>(
     left: &internal::ForInOfLeft<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ForInOfLeft {
+) -> public::ForInOfLeft<'src> {
     match left {
         internal::ForInOfLeft::VariableDeclaration(decl) => {
             public::ForInOfLeft::VariableDeclaration(convert_variable_declaration(
@@ -383,7 +385,7 @@ fn convert_for_in_of_left(
 /// Convert expression types to pattern types for for-in/of LHS.
 /// Acorn converts `ObjectExpression` → `ObjectPattern` and `ArrayExpression` → `ArrayPattern`
 /// when used in the left-hand side of for-in/of statements.
-fn expression_to_pattern(expr: public::Expression) -> public::Expression {
+fn expression_to_pattern(expr: public::Expression<'_>) -> public::Expression<'_> {
     match expr {
         public::Expression::ObjectExpression(obj) => {
             public::Expression::ObjectPattern(public::ObjectPattern {
@@ -427,13 +429,13 @@ fn expression_to_pattern(expr: public::Expression) -> public::Expression {
     }
 }
 
-fn convert_switch_case(
+fn convert_switch_case<'src>(
     case: &internal::SwitchCase<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::SwitchCase {
+) -> public::SwitchCase<'src> {
     public::SwitchCase {
         node_type: "SwitchCase",
         start: case.span.start,
@@ -451,13 +453,13 @@ fn convert_switch_case(
     }
 }
 
-fn convert_catch_clause(
+fn convert_catch_clause<'src>(
     clause: &internal::CatchClause<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::CatchClause {
+) -> public::CatchClause<'src> {
     public::CatchClause {
         node_type: "CatchClause",
         start: clause.span.start,

@@ -38,7 +38,7 @@ use super::super::public::*;
 ///
 /// For ASCII-only sources this is a no-op (byte == UTF-16 offset).
 pub fn translate_byte_to_char_offsets_typed(
-    program: &mut Program,
+    program: &mut Program<'_>,
     map: &ByteToCharMap,
     tracker: &LocationTracker,
 ) {
@@ -127,7 +127,7 @@ impl Translator<'_> {
         }
     }
 
-    fn program(&self, n: &mut Program) {
+    fn program(&self, n: &mut Program<'_>) {
         span!(self, n);
         for s in &mut n.body {
             self.statement(s);
@@ -138,7 +138,7 @@ impl Translator<'_> {
     // Statements
     //
 
-    fn statement(&self, s: &mut Statement) {
+    fn statement(&self, s: &mut Statement<'_>) {
         match s {
             Statement::ExpressionStatement(n) => {
                 span!(self, n);
@@ -357,21 +357,21 @@ impl Translator<'_> {
         }
     }
 
-    fn block_statement(&self, n: &mut BlockStatement) {
+    fn block_statement(&self, n: &mut BlockStatement<'_>) {
         span!(self, n);
         for s in &mut n.body {
             self.statement(s);
         }
     }
 
-    fn for_in_of_left(&self, left: &mut ForInOfLeft) {
+    fn for_in_of_left(&self, left: &mut ForInOfLeft<'_>) {
         match left {
             ForInOfLeft::VariableDeclaration(d) => self.variable_declaration(d),
             ForInOfLeft::Pattern(e) => self.expression(e),
         }
     }
 
-    fn variable_declaration(&self, n: &mut VariableDeclaration) {
+    fn variable_declaration(&self, n: &mut VariableDeclaration<'_>) {
         span!(self, n);
         for d in &mut n.declarations {
             span!(self, d);
@@ -382,10 +382,10 @@ impl Translator<'_> {
         }
     }
 
-    function_visitor!(function_declaration, FunctionDeclaration);
-    function_visitor!(function_expression, FunctionExpression);
+    function_visitor!(function_declaration, FunctionDeclaration<'_>);
+    function_visitor!(function_expression, FunctionExpression<'_>);
 
-    fn declare_function(&self, n: &mut TSDeclareFunction) {
+    fn declare_function(&self, n: &mut TSDeclareFunction<'_>) {
         span!(self, n);
         self.identifier(&mut n.id);
         self.type_parameter_declaration_opt(n.type_parameters.as_mut());
@@ -395,7 +395,7 @@ impl Translator<'_> {
         self.type_annotation_opt(n.return_type.as_mut());
     }
 
-    fn module_declaration(&self, n: &mut TSModuleDeclaration) {
+    fn module_declaration(&self, n: &mut TSModuleDeclaration<'_>) {
         span!(self, n);
         match &mut n.id {
             TSModuleName::Identifier(id) => self.identifier(id),
@@ -419,10 +419,10 @@ impl Translator<'_> {
     // Classes
     //
 
-    class_visitor!(class_declaration, ClassDeclaration);
-    class_visitor!(class_expression, ClassExpression);
+    class_visitor!(class_declaration, ClassDeclaration<'_>);
+    class_visitor!(class_expression, ClassExpression<'_>);
 
-    fn class_body(&self, n: &mut ClassBody) {
+    fn class_body(&self, n: &mut ClassBody<'_>) {
         span!(self, n);
         for member in &mut n.body {
             match member {
@@ -465,7 +465,7 @@ impl Translator<'_> {
         }
     }
 
-    fn decorators_opt(&self, decorators: Option<&mut Vec<Decorator>>) {
+    fn decorators_opt(&self, decorators: Option<&mut Vec<Decorator<'_>>>) {
         if let Some(decorators) = decorators {
             for d in decorators {
                 span!(self, d);
@@ -474,7 +474,7 @@ impl Translator<'_> {
         }
     }
 
-    fn implements_opt(&self, implements: Option<&mut Vec<TSExpressionWithTypeArguments>>) {
+    fn implements_opt(&self, implements: Option<&mut Vec<TSExpressionWithTypeArguments<'_>>>) {
         if let Some(implements) = implements {
             for i in implements {
                 span!(self, i);
@@ -484,14 +484,14 @@ impl Translator<'_> {
         }
     }
 
-    fn module_export_name(&self, name: &mut ModuleExportName) {
+    fn module_export_name(&self, name: &mut ModuleExportName<'_>) {
         match name {
             ModuleExportName::Identifier(id) => self.identifier(id),
             ModuleExportName::Literal(lit) => span!(self, lit),
         }
     }
 
-    fn import_attributes_opt(&self, attributes: Option<&mut Vec<ImportAttribute>>) {
+    fn import_attributes_opt(&self, attributes: Option<&mut Vec<ImportAttribute<'_>>>) {
         if let Some(attributes) = attributes {
             for a in attributes {
                 span!(self, a);
@@ -508,7 +508,7 @@ impl Translator<'_> {
     // Expressions
     //
 
-    fn identifier(&self, n: &mut Identifier) {
+    fn identifier(&self, n: &mut Identifier<'_>) {
         span!(self, n);
         self.type_annotation_opt(n.type_annotation.as_mut());
         for d in &mut n.decorators {
@@ -517,7 +517,7 @@ impl Translator<'_> {
         }
     }
 
-    fn expression(&self, e: &mut Expression) {
+    fn expression(&self, e: &mut Expression<'_>) {
         match e {
             Expression::Literal(n) => span!(self, n),
             Expression::Identifier(n) => self.identifier(n),
@@ -696,24 +696,24 @@ impl Translator<'_> {
         }
     }
 
-    fn unary_expression(&self, n: &mut UnaryExpression) {
+    fn unary_expression(&self, n: &mut UnaryExpression<'_>) {
         span!(self, n);
         self.expression(&mut n.argument);
     }
 
-    fn property(&self, n: &mut Property) {
+    fn property(&self, n: &mut Property<'_>) {
         span!(self, n);
         self.expression(&mut n.key);
         self.expression(&mut n.value);
     }
 
-    fn rest_element(&self, n: &mut RestElement) {
+    fn rest_element(&self, n: &mut RestElement<'_>) {
         span!(self, n);
         self.expression(&mut n.argument);
         self.type_annotation_opt(n.type_annotation.as_mut());
     }
 
-    fn template_literal(&self, n: &mut TemplateLiteral) {
+    fn template_literal(&self, n: &mut TemplateLiteral<'_>) {
         span!(self, n);
         for e in &mut n.expressions {
             self.expression(e);
@@ -727,18 +727,18 @@ impl Translator<'_> {
     // Types
     //
 
-    fn type_annotation(&self, n: &mut TSTypeAnnotation) {
+    fn type_annotation(&self, n: &mut TSTypeAnnotation<'_>) {
         span!(self, n);
         self.ts_type(&mut n.type_annotation);
     }
 
-    fn type_annotation_opt(&self, annotation: Option<&mut TSTypeAnnotation>) {
+    fn type_annotation_opt(&self, annotation: Option<&mut TSTypeAnnotation<'_>>) {
         if let Some(annotation) = annotation {
             self.type_annotation(annotation);
         }
     }
 
-    fn type_parameter_declaration_opt(&self, decl: Option<&mut TSTypeParameterDeclaration>) {
+    fn type_parameter_declaration_opt(&self, decl: Option<&mut TSTypeParameterDeclaration<'_>>) {
         if let Some(decl) = decl {
             span!(self, decl);
             if let Some(extra) = &mut decl.extra {
@@ -750,7 +750,7 @@ impl Translator<'_> {
         }
     }
 
-    fn type_parameter(&self, n: &mut TSTypeParameter) {
+    fn type_parameter(&self, n: &mut TSTypeParameter<'_>) {
         span!(self, n);
         if let Some(constraint) = &mut n.constraint {
             self.ts_type(constraint);
@@ -760,33 +760,36 @@ impl Translator<'_> {
         }
     }
 
-    fn type_parameter_instantiation(&self, n: &mut TSTypeParameterInstantiation) {
+    fn type_parameter_instantiation(&self, n: &mut TSTypeParameterInstantiation<'_>) {
         span!(self, n);
         for t in &mut n.params {
             self.ts_type(t);
         }
     }
 
-    fn type_parameter_instantiation_opt(&self, inst: Option<&mut TSTypeParameterInstantiation>) {
+    fn type_parameter_instantiation_opt(
+        &self,
+        inst: Option<&mut TSTypeParameterInstantiation<'_>>,
+    ) {
         if let Some(inst) = inst {
             self.type_parameter_instantiation(inst);
         }
     }
 
-    fn entity_name(&self, name: &mut TSEntityName) {
+    fn entity_name(&self, name: &mut TSEntityName<'_>) {
         match name {
             TSEntityName::Identifier(id) => self.identifier(id),
             TSEntityName::QualifiedName(q) => self.qualified_name(q),
         }
     }
 
-    fn qualified_name(&self, n: &mut TSQualifiedName) {
+    fn qualified_name(&self, n: &mut TSQualifiedName<'_>) {
         span!(self, n);
         self.entity_name(&mut n.left);
         self.identifier(&mut n.right);
     }
 
-    fn type_element(&self, element: &mut TSTypeElement) {
+    fn type_element(&self, element: &mut TSTypeElement<'_>) {
         match element {
             TSTypeElement::PropertySignature(n) => {
                 span!(self, n);
@@ -822,7 +825,7 @@ impl Translator<'_> {
         }
     }
 
-    fn index_signature(&self, n: &mut TSIndexSignature) {
+    fn index_signature(&self, n: &mut TSIndexSignature<'_>) {
         span!(self, n);
         for p in &mut n.parameters {
             self.identifier(p);
@@ -831,7 +834,7 @@ impl Translator<'_> {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn ts_type(&self, t: &mut TSType) {
+    fn ts_type(&self, t: &mut TSType<'_>) {
         match t {
             TSType::TSNumberKeyword(n) => span!(self, n),
             TSType::TSStringKeyword(n) => span!(self, n),
@@ -984,7 +987,7 @@ impl Translator<'_> {
         }
     }
 
-    fn import_type(&self, n: &mut TSImportType) {
+    fn import_type(&self, n: &mut TSImportType<'_>) {
         span!(self, n);
         span!(self, n.argument);
         if let Some(options) = &mut n.options {

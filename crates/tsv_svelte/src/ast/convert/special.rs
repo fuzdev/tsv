@@ -43,12 +43,12 @@ fn script_has_lang_ts(
     false
 }
 
-pub(super) fn convert_script(
+pub(super) fn convert_script<'src>(
     script: &internal::Script<'_>,
-    source: &str,
+    source: &'src str,
     interner: &DefaultStringInterner,
     html_leading_comment: Option<&internal::HtmlComment>,
-) -> public::Script {
+) -> public::Script<'src> {
     let context = script.context.as_str();
 
     // Use full source LocationTracker for absolute line/column numbers everywhere
@@ -220,12 +220,12 @@ fn bool_option(
     })
 }
 
-pub(super) fn convert_svelte_options(
+pub(super) fn convert_svelte_options<'src>(
     options: &internal::SvelteOptions<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::SvelteOptions {
+) -> public::SvelteOptions<'src> {
     let runes = bool_option(options.attributes, "runes", interner);
     let immutable = bool_option(options.attributes, "immutable", interner);
     let accessors = bool_option(options.attributes, "accessors", interner);
@@ -356,12 +356,12 @@ pub(super) fn convert_style<'src>(
     }
 }
 
-pub(super) fn convert_special_element(
+pub(super) fn convert_special_element<'src>(
     elem: &internal::SpecialElement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::SpecialElement {
+) -> public::SpecialElement<'src> {
     // Extract tag and expression from the kind enum
     let tag = elem.kind.tag().map(|e| {
         // For plain string attributes (this="hello"), Svelte produces a Literal

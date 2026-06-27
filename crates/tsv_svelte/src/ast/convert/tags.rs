@@ -13,12 +13,12 @@ use tsv_lang::LocationTracker;
 
 use super::convert_pattern_expression;
 
-pub(super) fn convert_html_tag(
+pub(super) fn convert_html_tag<'src>(
     tag: &internal::HtmlTag<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::HtmlTag {
+) -> public::HtmlTag<'src> {
     let expression =
         tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
 
@@ -91,12 +91,12 @@ pub(super) fn convert_declaration_tag(
     }
 }
 
-pub(super) fn convert_debug_tag(
+pub(super) fn convert_debug_tag<'src>(
     tag: &internal::DebugTag<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::DebugTag {
+) -> public::DebugTag<'src> {
     let identifiers = tag
         .identifiers
         .iter()
@@ -111,12 +111,12 @@ pub(super) fn convert_debug_tag(
     }
 }
 
-pub(super) fn convert_render_tag(
+pub(super) fn convert_render_tag<'src>(
     tag: &internal::RenderTag<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::RenderTag {
+) -> public::RenderTag<'src> {
     let expression =
         tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
 

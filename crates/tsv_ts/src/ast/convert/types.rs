@@ -4,16 +4,17 @@ use super::super::{internal, public};
 use super::declarations::convert_type_parameter;
 use super::{convert_expression, create_location};
 use internal::TSKeywordKind;
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
 
-pub(in crate::ast) fn convert_type_annotation(
+pub(in crate::ast) fn convert_type_annotation<'src>(
     type_annotation: &internal::TSTypeAnnotation<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSTypeAnnotation {
+) -> public::TSTypeAnnotation<'src> {
     public::TSTypeAnnotation {
         node_type: "TSTypeAnnotation",
         start: type_annotation.span.start,
@@ -29,13 +30,13 @@ pub(in crate::ast) fn convert_type_annotation(
     }
 }
 
-pub(in crate::ast) fn convert_type(
+pub(in crate::ast) fn convert_type<'src>(
     ts_type: &internal::TSType<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSType {
+) -> public::TSType<'src> {
     match ts_type {
         internal::TSType::Keyword(kw) => convert_keyword_type(kw, loc, offset),
         internal::TSType::Literal(lit) => convert_literal_type(lit, source, loc, interner, offset),
@@ -82,7 +83,7 @@ pub(in crate::ast) fn convert_type(
                 start: r.span.start,
                 end: r.span.end,
                 loc: create_location(r.span, loc, offset),
-                type_name: convert_entity_name(&r.type_name, loc, interner, offset),
+                type_name: convert_entity_name(&r.type_name, source, loc, interner, offset),
                 type_arguments: r.type_arguments.as_ref().map(|ta| {
                     convert_type_parameter_instantiation(ta, source, loc, interner, offset)
                 }),
@@ -171,9 +172,7 @@ pub(in crate::ast) fn convert_type(
             })
         }
         internal::TSType::TypePredicate(p) => {
-            let name = interner
-                .resolve_infallible(p.parameter_name.name)
-                .to_string();
+            let name = interner.resolve_infallible(p.parameter_name.name);
             let parameter_name = if name == "this" {
                 public::TSTypePredicateParameterName::TSThisType(public::TSThisType {
                     node_type: "TSThisType",
@@ -184,6 +183,7 @@ pub(in crate::ast) fn convert_type(
             } else {
                 public::TSTypePredicateParameterName::Identifier(super::convert_identifier(
                     &p.parameter_name,
+                    source,
                     loc,
                     interner,
                     offset,
@@ -229,9 +229,13 @@ pub(in crate::ast) fn convert_type(
                 start: m.type_parameter.span.start,
                 end: m.type_parameter.span.end,
                 loc: create_location(m.type_parameter.span, loc, offset),
-                name: interner
-                    .resolve_infallible(m.type_parameter.name)
-                    .to_string(),
+                // Mapped-type parameter name is a bare symbol with no name-only
+                // span (the struct span covers `K in C`), so it stays owned.
+                name: Cow::Owned(
+                    interner
+                        .resolve_infallible(m.type_parameter.name)
+                        .to_string(),
+                ),
                 constraint: Some(Box::new(convert_type(
                     m.type_parameter.constraint,
                     source,
@@ -257,7 +261,7 @@ pub(in crate::ast) fn convert_type(
                 start: o.span.start,
                 end: o.span.end,
                 loc: create_location(o.span, loc, offset),
-                operator: o.operator.as_str().to_string(),
+                operator: o.operator.as_str(),
                 type_annotation: Box::new(convert_type(
                     o.type_annotation,
                     source,
@@ -280,7 +284,7 @@ pub(in crate::ast) fn convert_type(
             qualifier: i
                 .qualifier
                 .as_ref()
-                .map(|q| convert_entity_name(q, loc, interner, offset)),
+                .map(|q| convert_entity_name(q, source, loc, interner, offset)),
             type_arguments: i
                 .type_arguments
                 .as_ref()
@@ -339,7 +343,7 @@ pub(in crate::ast) fn convert_type(
                 start: n.span.start,
                 end: n.span.end,
                 loc: create_location(n.span, loc, offset),
-                label: super::convert_identifier(&n.label, loc, interner, offset),
+                label: super::convert_identifier(&n.label, source, loc, interner, offset),
                 element_type: Box::new(convert_type(n.element_type, source, loc, interner, offset)),
                 optional: n.optional,
             })
@@ -369,17 +373,17 @@ pub(in crate::ast) fn convert_type(
     }
 }
 
-fn convert_type_query_expr_name(
+fn convert_type_query_expr_name<'src>(
     expr_name: &internal::TSTypeQueryExprName<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSTypeQueryExprName {
+) -> public::TSTypeQueryExprName<'src> {
     match expr_name {
         internal::TSTypeQueryExprName::EntityName(entity) => match entity {
             internal::TSEntityName::Identifier(id) => public::TSTypeQueryExprName::Identifier(
-                super::convert_identifier(id, loc, interner, offset),
+                super::convert_identifier(id, source, loc, interner, offset),
             ),
             internal::TSEntityName::QualifiedName(qn) => {
                 public::TSTypeQueryExprName::QualifiedName(public::TSQualifiedName {
@@ -387,8 +391,8 @@ fn convert_type_query_expr_name(
                     start: qn.span.start,
                     end: qn.span.end,
                     loc: create_location(qn.span, loc, offset),
-                    left: Box::new(convert_entity_name(&qn.left, loc, interner, offset)),
-                    right: super::convert_identifier(&qn.right, loc, interner, offset),
+                    left: Box::new(convert_entity_name(&qn.left, source, loc, interner, offset)),
+                    right: super::convert_identifier(&qn.right, source, loc, interner, offset),
                 })
             }
         },
@@ -406,7 +410,7 @@ fn convert_type_query_expr_name(
                 qualifier: i
                     .qualifier
                     .as_ref()
-                    .map(|q| convert_entity_name(q, loc, interner, offset)),
+                    .map(|q| convert_entity_name(q, source, loc, interner, offset)),
                 type_arguments: i.type_arguments.as_ref().map(|ta| {
                     convert_type_parameter_instantiation(ta, source, loc, interner, offset)
                 }),
@@ -415,13 +419,13 @@ fn convert_type_query_expr_name(
     }
 }
 
-fn convert_literal_type(
+fn convert_literal_type<'src>(
     lit: &internal::TSLiteralType<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSType {
+) -> public::TSType<'src> {
     match lit {
         internal::TSLiteralType::TemplateLiteral(template) => {
             public::TSType::TSLiteralType(public::TSLiteralType {
@@ -466,7 +470,7 @@ fn convert_literal_type(
                     start: unary.span.start,
                     end: unary.span.end,
                     loc: create_location(unary.span, loc, offset),
-                    operator: unary.operator.as_str().to_string(),
+                    operator: unary.operator.as_str(),
                     prefix: unary.prefix,
                     argument: Box::new(public::Expression::Literal(super::convert_literal(
                         arg_lit, source, loc, offset,
@@ -477,13 +481,13 @@ fn convert_literal_type(
     }
 }
 
-fn convert_template_literal_type(
+fn convert_template_literal_type<'src>(
     template: &internal::TemplateLiteralType<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TemplateLiteralType {
+) -> public::TemplateLiteralType<'src> {
     public::TemplateLiteralType {
         node_type: "TemplateLiteral",
         start: template.span.start,
@@ -505,11 +509,11 @@ fn convert_template_literal_type(
 // Template element conversion reuses convert_template_element from patterns module
 
 /// Convert internal TSKeywordType to the appropriate public type variant
-fn convert_keyword_type(
+fn convert_keyword_type<'src>(
     kw: &internal::TSKeywordType,
     loc: &LocationTracker,
     offset: usize,
-) -> public::TSType {
+) -> public::TSType<'src> {
     // Helper macro to reduce boilerplate - creates the public type struct
     macro_rules! make_public {
         ($variant:ident) => {{
@@ -549,7 +553,7 @@ fn convert_keyword_type(
                     end: kw.span.end,
                     loc: create_location(kw.span, loc, offset),
                     value: serde_json::Value::Bool(is_true),
-                    raw: if is_true { "true" } else { "false" }.to_string(),
+                    raw: Cow::Borrowed(if is_true { "true" } else { "false" }),
                     bigint: None,
                 }),
             })
@@ -558,36 +562,37 @@ fn convert_keyword_type(
 }
 
 // Entity name conversion
-pub(super) fn convert_entity_name(
+pub(super) fn convert_entity_name<'src>(
     name: &internal::TSEntityName<'_>,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSEntityName {
+) -> public::TSEntityName<'src> {
     match name {
-        internal::TSEntityName::Identifier(id) => {
-            public::TSEntityName::Identifier(super::convert_identifier(id, loc, interner, offset))
-        }
+        internal::TSEntityName::Identifier(id) => public::TSEntityName::Identifier(
+            super::convert_identifier(id, source, loc, interner, offset),
+        ),
         internal::TSEntityName::QualifiedName(qn) => {
             public::TSEntityName::QualifiedName(public::TSQualifiedName {
                 node_type: "TSQualifiedName",
                 start: qn.span.start,
                 end: qn.span.end,
                 loc: create_location(qn.span, loc, offset),
-                left: Box::new(convert_entity_name(&qn.left, loc, interner, offset)),
-                right: super::convert_identifier(&qn.right, loc, interner, offset),
+                left: Box::new(convert_entity_name(&qn.left, source, loc, interner, offset)),
+                right: super::convert_identifier(&qn.right, source, loc, interner, offset),
             })
         }
     }
 }
 
-fn convert_type_parameter_instantiation(
+fn convert_type_parameter_instantiation<'src>(
     params: &internal::TSTypeParameterInstantiation<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSTypeParameterInstantiation {
+) -> public::TSTypeParameterInstantiation<'src> {
     public::TSTypeParameterInstantiation {
         node_type: "TSTypeParameterInstantiation",
         start: params.span.start,
@@ -602,13 +607,13 @@ fn convert_type_parameter_instantiation(
 }
 
 /// Simplified version that passes through interner but uses placeholder identifier names
-fn convert_type_parameter_declaration_simple(
+fn convert_type_parameter_declaration_simple<'src>(
     params: &internal::TSTypeParameterDeclaration<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSTypeParameterDeclaration {
+) -> public::TSTypeParameterDeclaration<'src> {
     public::TSTypeParameterDeclaration {
         node_type: "TSTypeParameterDeclaration",
         start: params.span.start,
@@ -627,13 +632,13 @@ fn convert_type_parameter_declaration_simple(
     }
 }
 
-fn convert_type_element(
+fn convert_type_element<'src>(
     elem: &internal::TSTypeElement<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSTypeElement {
+) -> public::TSTypeElement<'src> {
     match elem {
         internal::TSTypeElement::PropertySignature(p) => {
             public::TSTypeElement::PropertySignature(public::TSPropertySignature {
@@ -662,9 +667,9 @@ fn convert_type_element(
         }
         internal::TSTypeElement::MethodSignature(m) => {
             let kind = match m.kind {
-                internal::MethodKind::Get => Some("get".to_string()),
-                internal::MethodKind::Set => Some("set".to_string()),
-                _ => Some("method".to_string()),
+                internal::MethodKind::Get => Some("get"),
+                internal::MethodKind::Set => Some("set"),
+                _ => Some("method"),
             };
             public::TSTypeElement::MethodSignature(public::TSMethodSignature {
                 node_type: "TSMethodSignature",
@@ -743,7 +748,7 @@ fn convert_type_element(
                         start: p.span.start,
                         end: p.span.end,
                         loc: create_location(p.span, loc, offset),
-                        name: interner.resolve_infallible(p.name).to_string(),
+                        name: public::name_cow(p.span, source, p.name, interner),
                         optional: p.optional,
                         type_annotation: p
                             .type_annotation()
@@ -766,19 +771,19 @@ fn convert_type_element(
 }
 
 // Interface declaration conversion
-pub(in crate::ast) fn convert_interface_declaration(
+pub(in crate::ast) fn convert_interface_declaration<'src>(
     iface: &internal::TSInterfaceDeclaration<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSInterfaceDeclaration {
+) -> public::TSInterfaceDeclaration<'src> {
     public::TSInterfaceDeclaration {
         node_type: "TSInterfaceDeclaration",
         start: iface.span.start,
         end: iface.span.end,
         loc: create_location(iface.span, loc, offset),
-        id: super::convert_identifier(&iface.id, loc, interner, offset),
+        id: super::convert_identifier(&iface.id, source, loc, interner, offset),
         type_parameters: iface
             .type_parameters
             .as_ref()
@@ -793,19 +798,19 @@ pub(in crate::ast) fn convert_interface_declaration(
     }
 }
 
-fn convert_interface_heritage(
+fn convert_interface_heritage<'src>(
     heritage: &internal::TSInterfaceHeritage<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSInterfaceHeritage {
+) -> public::TSInterfaceHeritage<'src> {
     public::TSInterfaceHeritage {
         node_type: "TSExpressionWithTypeArguments",
         start: heritage.span.start,
         end: heritage.span.end,
         loc: create_location(heritage.span, loc, offset),
-        expression: convert_entity_name(&heritage.expression, loc, interner, offset),
+        expression: convert_entity_name(&heritage.expression, source, loc, interner, offset),
         type_parameters: heritage
             .type_arguments
             .as_ref()
@@ -813,13 +818,13 @@ fn convert_interface_heritage(
     }
 }
 
-fn convert_interface_body(
+fn convert_interface_body<'src>(
     body: &internal::TSInterfaceBody<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSInterfaceBody {
+) -> public::TSInterfaceBody<'src> {
     public::TSInterfaceBody {
         node_type: "TSInterfaceBody",
         start: body.span.start,
@@ -834,20 +839,20 @@ fn convert_interface_body(
 }
 
 // Declare function conversion
-pub(in crate::ast) fn convert_declare_function(
+pub(in crate::ast) fn convert_declare_function<'src>(
     func: &internal::TSDeclareFunction<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSDeclareFunction {
+) -> public::TSDeclareFunction<'src> {
     public::TSDeclareFunction {
         node_type: "TSDeclareFunction",
         start: func.span.start,
         end: func.span.end,
         loc: create_location(func.span, loc, offset),
         declare: func.declare,
-        id: super::convert_identifier(&func.id, loc, interner, offset),
+        id: super::convert_identifier(&func.id, source, loc, interner, offset),
         expression: false, // Always false for declarations
         generator: func.generator,
         is_async: func.r#async,
@@ -869,19 +874,19 @@ pub(in crate::ast) fn convert_declare_function(
 }
 
 /// Convert TSEnumDeclaration to public AST
-pub(in crate::ast) fn convert_enum_declaration(
+pub(in crate::ast) fn convert_enum_declaration<'src>(
     enum_decl: &internal::TSEnumDeclaration<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSEnumDeclaration {
+) -> public::TSEnumDeclaration<'src> {
     public::TSEnumDeclaration {
         node_type: "TSEnumDeclaration",
         start: enum_decl.span.start,
         end: enum_decl.span.end,
         loc: create_location(enum_decl.span, loc, offset),
-        id: super::convert_identifier(&enum_decl.id, loc, interner, offset),
+        id: super::convert_identifier(&enum_decl.id, source, loc, interner, offset),
         members: enum_decl
             .members
             .iter()
@@ -893,17 +898,17 @@ pub(in crate::ast) fn convert_enum_declaration(
 }
 
 /// Convert a single TSEnumMember
-fn convert_enum_member(
+fn convert_enum_member<'src>(
     member: &internal::TSEnumMember<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::TSEnumMember {
+) -> public::TSEnumMember<'src> {
     let id = match &member.id {
-        internal::TSEnumMemberId::Identifier(id) => {
-            public::TSEnumMemberId::Identifier(super::convert_identifier(id, loc, interner, offset))
-        }
+        internal::TSEnumMemberId::Identifier(id) => public::TSEnumMemberId::Identifier(
+            super::convert_identifier(id, source, loc, interner, offset),
+        ),
         internal::TSEnumMemberId::String(lit) => {
             public::TSEnumMemberId::Literal(super::convert_literal(lit, source, loc, offset))
         }
