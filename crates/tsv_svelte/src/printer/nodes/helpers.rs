@@ -92,10 +92,10 @@ pub(crate) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
 /// siblings are skipped. (Block elements are `Element`, hence breakable, so their
 /// separation still fires.) The force is also gated on `kind.is_block()` at the call site,
 /// so it only applies to block-element parents.
-pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>], source: &str) -> bool {
+pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool {
     let mut seen_breakable = false;
     for node in nodes {
-        if node.is_whitespace_only_text(source) {
+        if node.is_whitespace_only_text() {
             continue;
         }
         if seen_breakable && is_control_flow_block(node) {
