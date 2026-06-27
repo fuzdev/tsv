@@ -4,7 +4,7 @@
 
 use crate::ast::internal::{
     ArrayPattern, AssignmentPattern, Expression, ObjectPattern, ObjectPatternProperty,
-    ObjectProperty, Property, RestElement,
+    ObjectProperty, Property, RestElement, SpreadElement,
 };
 use tsv_lang::ParseError;
 
@@ -37,7 +37,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Convert ObjectExpression to ObjectPattern
             Expression::ObjectExpression(obj) => {
                 let mut properties = self.bvec();
-                for prop in obj.properties {
+                let last_index = obj.properties.len().saturating_sub(1);
+                for (i, prop) in obj.properties.iter().enumerate() {
+                    // A rest property must be the last property in an object
+                    // destructuring pattern (`ObjectBindingPattern` /
+                    // `ObjectAssignmentPattern` place the rest last, with no
+                    // trailing comma allowed after it).
+                    if let ObjectProperty::SpreadElement(spread) = prop
+                        && i != last_index
+                    {
+                        return Err(self.error_msg_at(
+                            "A rest element must be last in a destructuring pattern",
+                            spread.span.start_usize(),
+                        ));
+                    }
                     properties.push(self.object_property_to_pattern(prop.clone())?);
                 }
 
@@ -49,13 +62,33 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Convert ArrayExpression to ArrayPattern
+            // TODO: a trailing comma after the rest element (`[...a,] = c`) is also a
+            // syntax error, but the array/object expression parser discards the
+            // trailing comma before this conversion runs, so it is not caught here
+            // (it would need a "trailing comma after spread" flag threaded from the
+            // expression parser). Element-after-rest (`[...a, b]`) and rest-with-default
+            // (`[...a = 1]`) are caught below.
             Expression::ArrayExpression(arr) => {
                 let mut elements = self.bvec();
-                for elem in arr.elements {
-                    elements.push(match elem {
-                        Some(e) => Some(self.to_assignable(e.clone())?),
+                let last_index = arr.elements.len().saturating_sub(1);
+                for (i, elem) in arr.elements.iter().enumerate() {
+                    let converted = match elem {
+                        Some(e) => {
+                            // A rest element must be the last element in an array
+                            // destructuring pattern (`ArrayBindingPattern` /
+                            // `ArrayAssignmentPattern` place the rest last). acorn:
+                            // "Comma is not permitted after the rest element".
+                            if matches!(e, Expression::SpreadElement(_)) && i != last_index {
+                                return Err(self.error_msg_at(
+                                    "A rest element must be last in a destructuring pattern",
+                                    e.span().start_usize(),
+                                ));
+                            }
+                            Some(self.to_assignable(e.clone())?)
+                        }
                         None => None,
-                    });
+                    };
+                    elements.push(converted);
                 }
 
                 Ok(Expression::ArrayPattern(ArrayPattern {
@@ -66,14 +99,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Convert SpreadElement to RestElement
-            Expression::SpreadElement(spread) => {
-                let argument = self.to_assignable(spread.argument.clone())?;
-                Ok(Expression::RestElement(RestElement {
-                    argument: self.alloc(argument),
-                    type_annotation: None,
-                    span: spread.span,
-                }))
-            }
+            Expression::SpreadElement(spread) => Ok(Expression::RestElement(
+                self.spread_to_rest_element(&spread)?,
+            )),
 
             // AssignmentExpression in pattern context becomes AssignmentPattern
             // This handles default values like `{a = 1}` which was parsed as shorthand
@@ -97,6 +125,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Convert a `...expr` spread into a `RestElement` — the shared core of both
+    /// pattern arms (array/assignment-target spreads in `to_assignable`, object
+    /// rest properties in `object_property_to_pattern`). A rest element binds its
+    /// target directly: the grammar's `BindingRestElement` / `AssignmentRestElement`
+    /// / `BindingRestProperty` / `AssignmentRestProperty` carry no `Initializer`, so
+    /// a default (`[...a = 1]`, `{...a = 1}`) is a syntax error.
+    fn spread_to_rest_element(
+        &self,
+        spread: &SpreadElement<'arena>,
+    ) -> Result<RestElement<'arena>, ParseError> {
+        let argument = self.to_assignable(spread.argument.clone())?;
+        if matches!(argument, Expression::AssignmentPattern(_)) {
+            return Err(self.error_msg_at(
+                "A rest element cannot have a default value",
+                spread.span.start_usize(),
+            ));
+        }
+        Ok(RestElement {
+            argument: self.alloc(argument),
+            type_annotation: None,
+            span: spread.span,
+        })
+    }
+
     /// Convert an object property to a pattern property
     fn object_property_to_pattern(
         &self,
@@ -117,15 +169,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     span: p.span,
                 }))
             }
-            ObjectProperty::SpreadElement(spread) => {
-                // Convert spread to rest element
-                let argument = self.to_assignable(spread.argument.clone())?;
-                Ok(ObjectPatternProperty::RestElement(RestElement {
-                    argument: self.alloc(argument),
-                    type_annotation: None,
-                    span: spread.span,
-                }))
-            }
+            ObjectProperty::SpreadElement(spread) => Ok(ObjectPatternProperty::RestElement(
+                self.spread_to_rest_element(&spread)?,
+            )),
         }
     }
 }
