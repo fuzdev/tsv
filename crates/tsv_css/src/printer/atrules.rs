@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
-use tsv_lang::doc::{self, Mode, arena::DocId};
+use tsv_lang::doc::{self, DocBuf, Mode, arena::DocId};
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 use tsv_lang::{comments_in_range, is_format_ignore_directive};
 
@@ -750,7 +750,7 @@ impl<'a> Printer<'a> {
     /// Build a doc representation of condition query for width checking
     fn build_condition_doc(&self, parts: &[NormalizedConditionPart<'_>]) -> DocId {
         let d = self.d();
-        let mut docs = Vec::new();
+        let mut docs = DocBuf::new();
         for (i, part) in parts.iter().enumerate() {
             if i > 0 {
                 docs.push(d.text(" "));

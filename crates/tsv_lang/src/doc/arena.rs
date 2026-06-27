@@ -251,8 +251,11 @@ impl DocArena {
         Self {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
             children: RefCell::new(Vec::with_capacity(estimated_children)),
-            will_break_cache: RefCell::new(Vec::new()),
-            flat_width_cache: RefCell::new(Vec::new()),
+            // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
+            // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
+            // to absorb those reallocs. Only capacity changes — never values.
+            will_break_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
+            flat_width_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }

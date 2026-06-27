@@ -17,7 +17,7 @@
 use super::{Printer, has_wrappable_args, value_normalization};
 use crate::ast::internal::{CssValue, StringCooked};
 use tsv_lang::Span;
-use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Format a CSS value
@@ -104,7 +104,7 @@ impl<'a> Printer<'a> {
     /// - Break: `(\n  a - b -\n    c\n)`
     fn build_paren_group_doc(&self, tokens: &[&str]) -> DocId {
         let d = self.d();
-        let mut fill_parts = Vec::with_capacity(tokens.len() * 2);
+        let mut fill_parts = DocBuf::with_capacity(tokens.len() * 2);
         for (i, token) in tokens.iter().enumerate() {
             fill_parts.push(d.text_owned(token.to_string()));
             if i < tokens.len() - 1 {
@@ -262,7 +262,7 @@ impl<'a> Printer<'a> {
         //   arg3
         // )
         // When flat: name(arg1, arg2, arg3)
-        let mut inner_parts = Vec::new();
+        let mut inner_parts = DocBuf::new();
         for (i, arg) in args.iter().enumerate() {
             // For List args (space-separated values like calc math expressions),
             // use fill with line() separators so content can break at operators.
