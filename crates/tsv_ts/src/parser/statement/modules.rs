@@ -245,6 +245,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ))
     }
 
+    /// Parse a `ModuleExportName` at the current token: a `StringLiteral`
+    /// (arbitrary module namespace name) or an `IdentifierName` (any keyword,
+    /// e.g. the `default` in `export * as default`). Advances past the name.
+    ///
+    /// Both call sites consume the preceding `as` first, so the error message
+    /// frames a missing name as following an `as`.
+    fn parse_module_export_name(&mut self) -> Result<ModuleExportName<'arena>, ParseError> {
+        if matches!(self.current_kind(), TokenKind::String) {
+            Ok(ModuleExportName::Literal(self.parse_string_literal()?))
+        } else {
+            let (start, end) = self.current_pos();
+            let Some(name) = self.try_intern_identifier_name() else {
+                return Err(self.error_expected_after("identifier", "as"));
+            };
+            self.advance()?;
+            Ok(ModuleExportName::Identifier(Identifier::simple(
+                name,
+                Span::new(start as u32, end as u32),
+            )))
+        }
+    }
+
     /// Parse export all declaration:
     /// - `export * from "y"`
     /// - `export * as ns from "y"`
@@ -262,20 +284,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for `as ns` — a `ModuleExportName` (identifier or string).
         let exported = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
             self.advance()?; // consume 'as'
-
-            if matches!(self.current_kind(), TokenKind::String) {
-                Some(ModuleExportName::Literal(self.parse_string_literal()?))
-            } else if matches!(self.current_kind(), TokenKind::Identifier) {
-                let (id_start, id_end) = self.current_pos();
-                let name = self.intern_identifier();
-                self.advance()?;
-                Some(ModuleExportName::Identifier(Identifier::simple(
-                    name,
-                    Span::new(id_start as u32, id_end as u32),
-                )))
-            } else {
-                return Err(self.error_expected_after("identifier", "as"));
-            }
+            Some(self.parse_module_export_name()?)
         } else {
             None
         };
@@ -428,20 +437,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // ES spec: exported name is a ModuleExportName (any IdentifierName or string)
         let exported = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
             self.advance()?; // consume 'as'
-
-            if matches!(self.current_kind(), TokenKind::String) {
-                ModuleExportName::Literal(self.parse_string_literal()?)
-            } else {
-                let (exp_start, exp_end) = self.current_pos();
-                let Some(exported_name) = self.try_intern_identifier_name() else {
-                    return Err(self.error_expected_after("identifier", "as"));
-                };
-                self.advance()?;
-                ModuleExportName::Identifier(Identifier::simple(
-                    exported_name,
-                    Span::new(exp_start as u32, exp_end as u32),
-                ))
-            }
+            self.parse_module_export_name()?
         } else {
             local.clone()
         };
@@ -593,13 +589,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     ImportKind::Value
                 };
 
-                // Parse imported name: a `ModuleExportName` — a string (arbitrary
-                // module namespace name) or an identifier/keyword (`import { object }`).
+                // Parse imported name. Grammar:
+                //   ImportSpecifier : ImportedBinding
+                //                   | ModuleExportName as ImportedBinding
+                // With `as`, the first name is a `ModuleExportName` — a string
+                // (arbitrary module namespace name) or any `IdentifierName`
+                // including reserved words (`import { class as C }`). Without
+                // `as`, it is an `ImportedBinding` (a `BindingIdentifier`), so
+                // reserved words are rejected (`import { class }` is a syntax
+                // error, see `input_invalid_keyword_no_binding`).
                 let (imp_start, imp_end) = self.current_pos();
                 let imported = if matches!(self.current_kind(), TokenKind::String) {
                     ModuleExportName::Literal(self.parse_string_literal()?)
                 } else {
-                    let Some(imported_symbol) = self.try_intern_identifier_or_keyword() else {
+                    let imported_symbol = if self.peek_kind() == TokenKind::Keyword(KeywordKind::As)
+                    {
+                        self.try_intern_identifier_name()
+                    } else {
+                        self.try_intern_identifier_or_keyword()
+                    };
+                    let Some(imported_symbol) = imported_symbol else {
                         return Err(self.error_expected("identifier in import specifier"));
                     };
                     self.advance()?;
