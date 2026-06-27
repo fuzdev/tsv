@@ -15,11 +15,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             start: start as u32,
             end: end as u32,
         };
-        Ok(Text {
-            raw_span: span,
-            decoding: TextDecoding::Fragment,
-            span,
-        })
+        Ok(Text::new(span, TextDecoding::Fragment, span, self.source))
     }
 
     /// Parse an HTML comment: <!-- content -->

@@ -6,7 +6,6 @@
 
 // Helper trait for text analysis
 pub(crate) trait TextAnalysis {
-    fn is_whitespace_only(&self) -> bool;
     fn count_newlines(&self) -> usize;
     fn has_blank_line(&self) -> bool;
 
@@ -18,17 +17,6 @@ pub(crate) trait TextAnalysis {
 }
 
 impl TextAnalysis for str {
-    /// Check if string contains only collapsible (ASCII) whitespace
-    ///
-    /// Uses the ASCII whitespace class `[\t\n\f\r ]` — matching
-    /// prettier-plugin-svelte's text split (`splitTextToDocs`: `text.split(/[\t\n\f\r ]+/)`).
-    /// Non-breaking spaces (U+00A0 / U+202F) and other Unicode whitespace (NEL,
-    /// em-spaces, ideographic space, vertical tab) are content, not collapsible
-    /// whitespace, so a node made of only those is NOT whitespace-only.
-    fn is_whitespace_only(&self) -> bool {
-        self.bytes().all(|b| b.is_ascii_whitespace())
-    }
-
     /// Count newlines in the string
     fn count_newlines(&self) -> usize {
         self.chars().filter(|&c| c == '\n').count()
@@ -42,7 +30,8 @@ impl TextAnalysis for str {
     /// Get the leading (ASCII) whitespace portion of the string
     ///
     /// Stops at the first non-ASCII-whitespace byte, so a leading non-breaking
-    /// space counts as content, not whitespace (see `is_whitespace_only`).
+    /// space counts as content, not whitespace (the collapsible ASCII class
+    /// `[\t\n\f\r ]`, matching `Text::is_ascii_ws_only`).
     fn leading_whitespace(&self) -> &str {
         let trimmed = self.trim_ascii_start();
         &self[..self.len() - trimmed.len()]
@@ -51,7 +40,8 @@ impl TextAnalysis for str {
     /// Get the trailing (ASCII) whitespace portion of the string
     ///
     /// Stops at the last non-ASCII-whitespace byte, so a trailing non-breaking
-    /// space counts as content, not whitespace (see `is_whitespace_only`).
+    /// space counts as content, not whitespace (the collapsible ASCII class
+    /// `[\t\n\f\r ]`, matching `Text::is_ascii_ws_only`).
     fn trailing_whitespace(&self) -> &str {
         let trimmed = self.trim_ascii_end();
         &self[trimmed.len()..]
@@ -73,15 +63,6 @@ impl TextAnalysis for str {
 #[cfg(test)]
 mod tests {
     use super::TextAnalysis;
-
-    #[test]
-    fn whitespace_only_uses_ascii_class() {
-        assert!("  \t\n ".is_whitespace_only());
-        assert!("".is_whitespace_only());
-        // NBSP (U+00A0) is content, not collapsible whitespace.
-        assert!(!"\u{00A0}".is_whitespace_only());
-        assert!(!"a".is_whitespace_only());
-    }
 
     #[test]
     fn newline_counting_and_blank_line() {

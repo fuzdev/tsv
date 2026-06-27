@@ -666,7 +666,7 @@ impl<'a> Printer<'a> {
                 .fragment
                 .nodes
                 .iter()
-                .all(|n| n.is_whitespace_only_text(self.source));
+                .all(FragmentNode::is_whitespace_only_text);
 
         if has_attrs && (is_inline || kind.is_component()) {
             // Closing for inline/hug states: "></tag>" or "> </tag>"

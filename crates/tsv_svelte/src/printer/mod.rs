@@ -282,7 +282,7 @@ impl<'a> Printer<'a> {
                 FragmentNode::Comment(comment) => {
                     last_comment = Some(comment);
                 }
-                FragmentNode::Text(text) if text.raw(self.source).is_whitespace_only() => {
+                FragmentNode::Text(text) if text.is_ascii_ws_only => {
                     // Skip whitespace text nodes
                 }
                 _ => {
@@ -317,7 +317,7 @@ impl<'a> Printer<'a> {
         // Check next non-comment, non-whitespace fragment node
         for node in root.fragment.nodes.iter().skip(comment_idx + 1) {
             match node {
-                FragmentNode::Text(t) if t.raw(self.source).is_whitespace_only() => continue,
+                FragmentNode::Text(t) if t.is_ascii_ws_only => continue,
                 FragmentNode::Comment(_) => continue,
                 other => {
                     let pos = other.span().start;
@@ -467,12 +467,11 @@ impl<'a> Printer<'a> {
         }
 
         // Format template fragment (if not empty)
-        let source = self.source;
         let has_content = root.fragment.nodes.iter().enumerate().any(|(i, node)| {
             if printed_comment_indices.contains(&i) {
                 return false;
             }
-            !matches!(node, FragmentNode::Text(text) if text.raw(source).is_whitespace_only())
+            !matches!(node, FragmentNode::Text(text) if text.is_ascii_ws_only)
         });
 
         if has_content {
@@ -595,7 +594,7 @@ impl<'a> Printer<'a> {
             if skip_indices.contains(&(start + i)) {
                 if nodes[seg_start..i]
                     .iter()
-                    .any(|n| !n.is_whitespace_only_text(source))
+                    .any(|n| !n.is_whitespace_only_text())
                 {
                     out.push(self.build_nodes_doc_multiline(&nodes[seg_start..i]));
                     if let Some(sep) = self.range_trailing_separator(nodes, i) {
@@ -658,9 +657,9 @@ impl<'a> Printer<'a> {
         while i < nodes.len() {
             if let Some(run_end) = self.detect_root_inline_run(nodes, i) {
                 let run = &nodes[i..=run_end];
-                let multiline = run.iter().any(
-                    |n| matches!(n, FragmentNode::Text(t) if t.raw(self.source).contains('\n')),
-                );
+                let multiline = run
+                    .iter()
+                    .any(|n| matches!(n, FragmentNode::Text(t) if t.has_newline()));
                 if !multiline {
                     for n in run {
                         if nodes::is_control_flow_block(n) {
@@ -690,7 +689,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let blank = matches!(
             &nodes[range_end + 1],
-            FragmentNode::Text(t) if t.raw(self.source).has_blank_line()
+            FragmentNode::Text(t) if t.has_blank_line()
         );
         Some(if blank {
             d.concat(&[d.literalline(), d.hardline()])
@@ -725,8 +724,8 @@ impl<'a> Printer<'a> {
         nodes: &[FragmentNode<'_>],
         start_idx: usize,
     ) -> Option<usize> {
-        let source = self.source;
-        let is_content_text = |n: &FragmentNode<'_>| matches!(n, FragmentNode::Text(t) if !t.raw(source).is_whitespace_only());
+        let is_content_text =
+            |n: &FragmentNode<'_>| matches!(n, FragmentNode::Text(t) if !t.is_ascii_ws_only);
 
         // The start must be a node that can participate in a run.
         let start = &nodes[start_idx];
@@ -750,7 +749,7 @@ impl<'a> Printer<'a> {
             let node = &nodes[j];
             if let FragmentNode::Text(text) = node {
                 // Whitespace-only text separates runs (intentional separation).
-                if text.raw(source).is_whitespace_only() {
+                if text.is_ascii_ws_only {
                     break;
                 }
                 last_idx = j;

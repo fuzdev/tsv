@@ -465,11 +465,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             end: content_end as u32,
         };
         let mut nodes = self.bvec();
-        nodes.push(FragmentNode::Text(Text {
-            raw_span: span,
-            decoding: TextDecoding::Raw,
+        nodes.push(FragmentNode::Text(Text::new(
             span,
-        }));
+            TextDecoding::Raw,
+            span,
+            self.source,
+        )));
         Ok(nodes)
     }
 }

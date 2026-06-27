@@ -35,7 +35,7 @@ impl<'a> Printer<'a> {
             // (matches Prettier's replaceEndOfLine(node.value.raw) for TemplateElement).
             // Using literalline makes will_break() propagate correctly through
             // containing groups, so chains/calls break when they contain multiline templates.
-            parts.push(self.replace_end_of_line(quasi.raw(self.source)));
+            parts.push(self.replace_end_of_line(quasi.raw(self.source), quasi.has_newline));
 
             // Interpolation
             if i < template.expressions.len() {
@@ -44,7 +44,7 @@ impl<'a> Printer<'a> {
 
                 // Calculate indent size from quasi text (Prettier's getIndentSize)
                 let text = quasi.raw(self.source);
-                let indent_size = if text.contains('\n') {
+                let indent_size = if quasi.has_newline {
                     self.get_template_indent_size(text)
                 } else {
                     previous_quasi_indent_size
@@ -188,9 +188,11 @@ impl<'a> Printer<'a> {
 
     /// Convert a string with newlines into a doc with literalline between parts.
     /// Equivalent to Prettier's `replaceEndOfLine(text)` for TemplateElement nodes.
-    fn replace_end_of_line(&self, text: &str) -> DocId {
+    /// `has_newline` is the caller's precomputed `text.contains('\n')` (the quasi's
+    /// `has_newline` flag), so the common no-newline fast path skips re-scanning.
+    fn replace_end_of_line(&self, text: &str, has_newline: bool) -> DocId {
         let d = self.d();
-        if !text.contains('\n') {
+        if !has_newline {
             return d.text_owned(text.to_string());
         }
         let mut doc_parts = Vec::new();

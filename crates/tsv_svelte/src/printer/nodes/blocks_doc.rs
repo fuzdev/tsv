@@ -378,7 +378,7 @@ impl<'a> Printer<'a> {
         let mut all_inline = self.fragment_inline_authored(&block.consequent, imc);
         let mut alt = block.alternate.as_ref();
         while let Some(a) = alt {
-            if let Some(else_if) = Self::get_flattenable_else_if(a, self.source) {
+            if let Some(else_if) = Self::get_flattenable_else_if(a) {
                 all_inline &= self.fragment_inline_authored(&else_if.consequent, imc);
                 alt = else_if.alternate.as_ref();
             } else {
@@ -427,7 +427,7 @@ impl<'a> Printer<'a> {
     fn build_if_alternate_tail(&self, alt: &Fragment<'_>, multiline: bool) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
-        if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
+        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             // Build the else-if head with wrapping enabled so it can dangle within the
             // expanded form; in the inline form `BlockHead` resolves flat (no dangle).
             let expr_doc = self.build_else_if_expr_doc(else_if, true);
@@ -571,7 +571,6 @@ impl<'a> Printer<'a> {
     /// two distinct (collapsing would be information loss).
     pub(super) fn get_flattenable_else_if<'arena>(
         alt: &Fragment<'arena>,
-        source: &str,
     ) -> Option<&'arena internal::IfBlock<'arena>> {
         // The boxed `IfBlock` variant is a `&'arena` pointer, so the returned
         // reference is tied to the arena, not to `alt`.
@@ -586,7 +585,7 @@ impl<'a> Printer<'a> {
                     }
                     if_block = Some(b);
                 }
-                FragmentNode::Text(t) if t.raw(source).trim_ascii().is_empty() => {
+                FragmentNode::Text(t) if t.is_ascii_ws_only => {
                     // Collapsible (ASCII) whitespace-only text is OK; a non-breaking
                     // space is content and blocks the elseif flatten.
                 }
@@ -639,7 +638,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         // Check if this can be flattened to {:else if ...}
-        if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
+        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             // {:else if condition}
             let expr_doc = self.build_else_if_expr_doc(else_if, in_multiline_context);
 
@@ -727,7 +726,7 @@ impl<'a> Printer<'a> {
         };
 
         // Check if this is an else-if chain
-        if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
+        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             // Recurse into else-if
             return self.get_final_branch_trailing(else_if, in_multiline_context);
         }

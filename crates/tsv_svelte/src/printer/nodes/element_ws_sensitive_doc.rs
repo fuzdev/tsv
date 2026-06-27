@@ -412,7 +412,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // Check if this can be flattened to {:else if ...}
-        if let Some(else_if) = Self::get_flattenable_else_if(alt, self.source) {
+        if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             let expr_doc = self.build_else_if_expr_doc(else_if, false);
 
             let body_doc = self.build_whitespace_sensitive_content_doc(else_if.consequent.nodes);

@@ -219,7 +219,7 @@ impl<'a> Printer<'a> {
                 // Inline elements keep boundary whitespace (normalized to single space)
                 // ASCII whitespace only — a non-breaking space (U+00A0) is content, not a
                 // collapsible boundary, so an NBSP-only node is never skipped.
-                text.raw(source).trim_ascii().is_empty() && trim_boundaries
+                text.is_ascii_ws_only && trim_boundaries
             } else {
                 false // Not text, don't skip
             }
@@ -279,8 +279,8 @@ impl<'a> Printer<'a> {
             // the inline callers never see adjacent whitespace-only nodes.
             if multiline
                 && i > 0
-                && matches!(node, FragmentNode::Text(t) if t.raw(source).trim_ascii().is_empty())
-                && matches!(&trimmed_nodes[i - 1], FragmentNode::Text(p) if p.raw(source).trim_ascii().is_empty())
+                && matches!(node, FragmentNode::Text(t) if t.is_ascii_ws_only)
+                && matches!(&trimmed_nodes[i - 1], FragmentNode::Text(p) if p.is_ascii_ws_only)
             {
                 continue;
             }
@@ -413,7 +413,7 @@ impl<'a> Printer<'a> {
     /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
     fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>) -> Option<DocId> {
         if let FragmentNode::Text(text) = node
-            && text.raw(self.source).is_whitespace_only()
+            && text.is_ascii_ws_only
         {
             return None;
         }
@@ -484,9 +484,8 @@ impl<'a> Printer<'a> {
         // whitespace-only and is preserved verbatim.
         let has_leading_ws = raw.starts_with(|c: char| c.is_ascii_whitespace());
         let has_trailing_ws = raw.ends_with(|c: char| c.is_ascii_whitespace());
-        let trimmed = raw.trim_ascii();
 
-        if trimmed.is_empty() {
+        if text.is_ascii_ws_only {
             // Whitespace-only text node.
             if (is_first || is_last) && !trim_boundaries {
                 // Boundary whitespace in an inline element. For single-line content the parent's
@@ -519,7 +518,7 @@ impl<'a> Printer<'a> {
             // space-separated `{/if} {x}` drop once the `{#if}` forces the parent multiline). A
             // newline before an *inline element* therefore breaks (matching prettier and path 1),
             // rather than collapsing as it did before this convergence.
-            let newline_count = raw.matches('\n').count();
+            let newline_count = text.newline_count as usize;
             let trim_to_collapsible = (next_is_inline_el && newline_count == 0)
                 || (next_is_block_el && newline_count < 2);
             if trim_to_collapsible {
@@ -900,7 +899,7 @@ impl<'a> Printer<'a> {
         let break_after = match next {
             Some(FragmentNode::Text(t)) => {
                 let raw = t.raw(self.source);
-                let is_empty_ws = raw.trim_ascii().is_empty();
+                let is_empty_ws = t.is_ascii_ws_only;
                 // idx+2 is an inline element (prettier's `isInlineElement`, excludes components)
                 let next2_inline = self.next_is_inline_element(trimmed_nodes, i + 1);
                 (!is_empty_ws || next2_inline) && !text_starts_with_linebreak(raw)
@@ -948,10 +947,9 @@ impl<'a> Printer<'a> {
     /// children and at least one is a block element, content should break.
     /// This forces the multiline path even for "inline" Svelte block bodies.
     pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode<'_>]) -> bool {
-        let source = self.source;
         let non_ws_count = nodes
             .iter()
-            .filter(|n| !n.is_whitespace_only_text(source))
+            .filter(|n| !n.is_whitespace_only_text())
             .count();
         non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n))
     }
@@ -997,7 +995,7 @@ impl<'a> Printer<'a> {
                 // (source_has_leading_break && has_trailing_whitespace)
                 nodes[first..=last]
                     .iter()
-                    .any(|n| n.is_whitespace_only_text(self.source))
+                    .any(FragmentNode::is_whitespace_only_text)
             }
             _ => false,
         }

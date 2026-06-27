@@ -774,11 +774,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 start: content_start as u32,
                 end: content_end as u32,
             };
-            parts.push(AttributeValue::Text(Text {
-                raw_span: span,
-                decoding: TextDecoding::AttributeValue,
+            parts.push(AttributeValue::Text(Text::new(
                 span,
-            }));
+                TextDecoding::AttributeValue,
+                span,
+                self.source,
+            )));
             return Ok(parts);
         }
 
@@ -801,11 +802,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     start: text_start as u32,
                     end: pos as u32,
                 };
-                parts.push(AttributeValue::Text(Text {
-                    raw_span: span,
-                    decoding: TextDecoding::AttributeValue,
+                parts.push(AttributeValue::Text(Text::new(
                     span,
-                }));
+                    TextDecoding::AttributeValue,
+                    span,
+                    self.source,
+                )));
             }
 
             if pos < content_end && source_bytes[pos] == b'{' {
@@ -823,17 +825,18 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `raw` is empty here even when the node span covers a stray byte (e.g. a
         // literal `{`), so `raw_span` is an empty span, not the node span.
         if parts.is_empty() {
-            parts.push(AttributeValue::Text(Text {
-                raw_span: Span {
+            parts.push(AttributeValue::Text(Text::new(
+                Span {
                     start: content_start as u32,
                     end: content_start as u32,
                 },
-                decoding: TextDecoding::AttributeValue,
-                span: Span {
+                TextDecoding::AttributeValue,
+                Span {
                     start: content_start as u32,
                     end: content_end as u32,
                 },
-            }));
+                self.source,
+            )));
         }
 
         Ok(parts)
@@ -874,11 +877,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                         start: from as u32,
                         end: to as u32,
                     };
-                    parts.push(AttributeValue::Text(Text {
-                        raw_span: span,
-                        decoding: TextDecoding::AttributeValue,
+                    parts.push(AttributeValue::Text(Text::new(
                         span,
-                    }));
+                        TextDecoding::AttributeValue,
+                        span,
+                        src,
+                    )));
                 }
             };
 
