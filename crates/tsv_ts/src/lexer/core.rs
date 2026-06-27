@@ -458,8 +458,8 @@ impl<'a> Lexer<'a> {
 
                 Ok(self.make_token(TokenKind::Number, start))
             }
-            // ECMAScript identifiers: start with XID_Start, _, or $; continue with XID_Continue or $
-            // Note: _ is in XID_Continue but not XID_Start, so we check it explicitly for start
+            // ECMAScript identifiers: start with ID_Start, _, or $; continue with ID_Continue or $
+            // Note: _ is in ID_Continue but not ID_Start, so we check it explicitly for start
             // Identifiers may contain unicode escapes: \u0066oo → foo, b\u0061r → bar
             Some(ch) if is_id_start(ch) => self.scan_identifier_with_escapes(ch),
             // Unicode escape at start of identifier: \u0066oo → foo
@@ -1020,7 +1020,7 @@ impl<'a> Lexer<'a> {
 
         self.advance(); // Consume closing /
 
-        // Read flags (IdentifierPartChar = XID_Continue, plus $ for ECMAScript)
+        // Read flags (IdentifierPartChar = ID_Continue, plus $ for ECMAScript)
         // TODO: Validate flags are only valid regex flags (d, g, i, m, s, u, v, y)
         // TODO: Reject duplicate flags (e.g., /test/gg)
         // TODO: Support Unicode escape sequences in flags (e.g., /test/\u0067 for 'g')

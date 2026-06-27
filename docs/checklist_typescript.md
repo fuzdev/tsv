@@ -40,7 +40,7 @@ Foundation for all parsing.
 ### Identifiers
 
 - ASCII identifiers (`foo`, `_private`, `$jquery`)
-- Unicode identifiers (`π`, `日本語`)
+- Unicode identifiers (`π`, `日本語`) — full `ID_Start`/`ID_Continue` per UAX #31, including the `Other_ID_*` and NFKC-excluded code points (`゛` U+309B, …) that `XID_*` drops
 - Escaped identifiers (`\u0041` = A)
 - Private identifiers (`#privateField`) - ES2022
 - Reserved word restrictions

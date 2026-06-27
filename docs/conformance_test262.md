@@ -16,10 +16,10 @@ at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,149 graded after skips).
 
-- Positive (should parse) — 41,837 passed, 62 failed
+- Positive (should parse) — 41,841 passed, 58 failed
 - Negative (should reject) — 1,158 passed, 3,092 failed
 
-- **Overall**: 42,995/46,149 (93.2%)
+- **Overall**: 42,999/46,149 (93.2%)
 - **Positive pass rate**: 99.9% — valid syntax tsv accepts
 - **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
 
@@ -31,9 +31,9 @@ import proposals (`source-phase-imports` / `import.source(…)` and `import-defe
 `Expected 'meta' after 'import.'`. They drop out of both the headline pass rate
 and the differential manifest. See [Scope](#what-we-skip).
 
-**Triaging the positive failures against the drop-in oracle.** Each of the 62 is
+**Triaging the positive failures against the drop-in oracle.** Each of the 58 is
 parsed with the canonical parser (acorn-typescript in module mode — what the
-fixtures' `expected.json` is generated from). **~18 are genuine tsv-vs-acorn bugs
+fixtures' `expected.json` is generated from). **~14 are genuine tsv-vs-acorn bugs
 (acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~44
 are rejected by acorn too (not tsv-specific). _(Methodology: parse each
 `../test262/<path>` with `canonical_parse` and bucket on whether it yields an
@@ -41,11 +41,8 @@ AST. An earlier triage used a wrong path prefix, so every file came back
 "not found" and was mis-bucketed as rejected — the corrected sweep below is
 authoritative.)_
 
-**The ~18 real bugs**, by cluster:
+**The ~14 real bugs**, by cluster:
 
-- **Unicode `Other_ID_Start` / `Other_ID_Continue` identifiers (4)** — characters
-  like `゛` (U+309B) and their escaped forms. tsv's `unicode-ident` uses the XID
-  sets, which exclude the legacy `Other_ID_*` compatibility code points.
 - **Module export/import name = reserved word (4)** — `export * as default`,
   `export { x as class }`, import specifiers naming a reserved word. An
   export/import name is an `IdentifierName` (reserved words allowed), not a
@@ -61,13 +58,21 @@ authoritative.)_
   position, and an assignment-target case.
 
 These are the actionable positive-conformance backlog (fixtures-first per the
-repo TDD gate). Two such gaps are now fixed: ✅ the tagged-template invalid-escape
-gap (ES2018), and ✅ the `[+In]` for-header reset — the for-init disables `in`
+repo TDD gate). Three such gaps are now fixed: ✅ the tagged-template invalid-escape
+gap (ES2018); ✅ the `[+In]` for-header reset — the for-init disables `in`
 (`[~In]`), but nested sub-expressions restore `[+In]` (computed class member name,
 ternary consequent, dynamic-import argument, function/class bodies). tsv had leaked
 the for-header `[~In]` into them; now they parse, and the formatter parenthesizes an
 `in` anywhere under a for-init (matching prettier, keeping it distinct from the
-`for (x in y)` separator).
+`for (x in y)` separator); and ✅ **Unicode identifier code points in `ID_Start` /
+`ID_Continue` but not `XID_Start` / `XID_Continue`** — the lexer keyed identifier
+validity on `unicode-ident`'s `XID_*` sets, but ECMAScript uses the `ID_*`
+properties (ecma262 §sec-names-and-keywords → UAX #31), a superset. The gap is the
+`Other_ID_Start` voiced/semi-voiced sound marks (`゛` U+309B, `゜` U+309C) plus
+letters whose NFKC decomposition leaves the set (U+037A, U+0E33, U+0EB3, the
+halfwidth katakana marks, and the Arabic ligature/presentation forms); the lexer
+now adds them back (covering the four `other_id_*` test262 files and the broader
+NFKC-excluded set).
 
 **The ~44 acorn-also-rejects** are not tsv bugs — they split into:
 **sloppy-mode-only** (`with`, AnnexB `f() = g()` / `for (var a = x in b)`, legacy
