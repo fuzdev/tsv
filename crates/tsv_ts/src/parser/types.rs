@@ -976,14 +976,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .ok_or_else(|| self.error_expected("parameter name"))?;
         self.advance()?;
 
-        // Check for optional: ?
-        let optional = self.eat(TokenKind::Question);
-        // The `?` extends the identifier span when no type annotation follows
-        let id_end = if optional {
-            self.prev_token_end()
-        } else {
-            id_end
-        };
+        // Check for optional: param? — a bare `?` extends the span.
+        let (optional, id_end) = self.eat_optional_marker(id_end);
 
         // Check for type annotation: : T
         let type_annotation = self.parse_optional_type_annotation()?;
@@ -992,12 +986,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .as_ref()
             .map_or_else(|| id_end as u32, |ta| ta.span.end);
 
-        let extra = type_annotation.map(|ta| {
-            self.alloc(IdentifierParamExtra {
-                type_annotation: Some(ta),
-                decorators: None,
-            })
-        });
+        let extra = type_annotation.map(|ta| self.typed_extra(ta));
 
         Ok(Expression::Identifier(Identifier {
             name: symbol,

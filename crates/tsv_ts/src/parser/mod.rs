@@ -149,6 +149,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.arena.alloc_str(s)
     }
 
+    /// Allocate the binding `extra` for a typed identifier carrying `ta`: a type
+    /// annotation and no decorators. Callers thread the optionality
+    /// (`type_annotation.map(|ta| self.typed_extra(ta))`); decorators, when
+    /// present, are folded in separately by the parameter-list caller
+    /// (`attach_param_decorators`).
+    #[inline]
+    fn typed_extra(&self, ta: TSTypeAnnotation<'arena>) -> &'arena IdentifierParamExtra<'arena> {
+        self.alloc(IdentifierParamExtra {
+            type_annotation: Some(ta),
+            decorators: None,
+        })
+    }
+
     /// Create a parser with shared interner and base offset.
     ///
     /// Used when parsing embedded expressions/scripts in Svelte templates.
@@ -327,6 +340,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn prev_token_end(&self) -> usize {
         self.prev_end + self.base_offset
+    }
+
+    /// Consume an optional `?` marker, extending a binding's end to cover it.
+    /// Returns `(present, end)`: when the `?` is eaten, `end` advances to
+    /// `prev_token_end` (so a `?` with no following type annotation still
+    /// extends the identifier span); otherwise `end` passes through unchanged.
+    #[inline]
+    pub(super) fn eat_optional_marker(&mut self, end: usize) -> (bool, usize) {
+        if self.eat(TokenKind::Question) {
+            (true, self.prev_token_end())
+        } else {
+            (false, end)
+        }
     }
 
     /// Get the raw end position (without base_offset) for lexer operations
