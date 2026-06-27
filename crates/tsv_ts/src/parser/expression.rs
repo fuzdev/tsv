@@ -512,6 +512,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.parse_primary_expression_with_end()?
                 }
             }
+            TokenKind::At => {
+                // Decorated class expression: `@dec class {}`. Decorators are
+                // otherwise statement-only; in expression position the only thing
+                // that may follow a decorator list is a class expression.
+                let expr = self.parse_decorated_class_expression()?;
+                ParsedExpr::from_expr(expr)
+            }
             TokenKind::Keyword(KeywordKind::Class) => {
                 // Class expression: `class { }` or `class Foo<T> { }`
                 let expr = self.parse_class_expression()?;

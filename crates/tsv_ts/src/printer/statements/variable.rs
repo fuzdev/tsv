@@ -468,6 +468,14 @@ impl<'a> Printer<'a> {
                     || matches!(init, Expression::RegexLiteral(_)))
                     && is_layout_eligible;
 
+                // Decorated class expression → break after operator, each decorator
+                // on its own line (`const C =\n\t@dec\n\tclass {}`). Prettier ref:
+                // shouldBreakAfterOperator (assignment.js:228)
+                //   `case "ClassExpression": isNonEmptyArray(rightNode.decorators)`.
+                let is_decorated_class_expr = is_layout_eligible
+                    && matches!(init, Expression::ClassExpression(c)
+                        if c.decorators.is_some_and(|decs| !decs.is_empty()));
+
                 // Single-call member chains with complex args (arrows, objects, arrays):
                 // Use TRUE fluid layout to break at `=` only when necessary.
                 // E.g., `const x = a.b.c.filter((x) => ...)` breaks at `=` if > print_width
@@ -525,8 +533,9 @@ impl<'a> Printer<'a> {
                     false
                 };
 
-                let is_break_after_op_rhs =
-                    should_break_after_op_rhs || needs_break_after_op_layout;
+                let is_break_after_op_rhs = should_break_after_op_rhs
+                    || needs_break_after_op_layout
+                    || is_decorated_class_expr;
 
                 // Breakable LHS (destructuring patterns) with non-self-expanding RHS:
                 // Use fluid layout so the printer breaks at `=` before expanding the

@@ -106,6 +106,15 @@ pub fn choose_layout(
         return AssignmentLayout::BreakAfterOperator;
     }
 
+    // Decorated class expression → break after operator (`const C =\n\t@dec\n\tclass {}`).
+    // Prettier ref: shouldBreakAfterOperator (assignment.js:228)
+    //   `case "ClassExpression": return isNonEmptyArray(rightNode.decorators)`.
+    if let Expression::ClassExpression(c) = right_expr
+        && c.decorators.is_some_and(|d| !d.is_empty())
+    {
+        return AssignmentLayout::BreakAfterOperator;
+    }
+
     // Conditional expressions with binary test → break after operator
     // Prettier ref: shouldBreakAfterOperator (assignment.js:216-219)
     if conditional_should_break_after_op(right_expr) {
@@ -157,8 +166,15 @@ pub fn is_self_expanding_value(expr: &Expression<'_>) -> bool {
     match expr {
         Expression::ObjectExpression(_)
         | Expression::ArrayExpression(_)
-        | Expression::FunctionExpression(_)
-        | Expression::ClassExpression(_) => true,
+        | Expression::FunctionExpression(_) => true,
+
+        // An undecorated class expression expands its body in place
+        // (`= class {…}`); a *decorated* one breaks after the operator instead
+        // (each decorator takes its own line), handled in `choose_layout`.
+        // Prettier ref: the never-break ClassExpression case (assignment.js:189)
+        // only applies once `shouldBreakAfterOperator` (228) has ruled out a
+        // decorated class.
+        Expression::ClassExpression(c) => !matches!(c.decorators, Some(d) if !d.is_empty()),
 
         // Arrow functions are self-expanding UNLESS they're curried with return type
         Expression::ArrowFunctionExpression(_) => !is_curried_arrow_with_return_type(expr),

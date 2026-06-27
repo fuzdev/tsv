@@ -135,6 +135,36 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Parse a decorated class expression: `@dec class {}`.
+    ///
+    /// The expression-position counterpart of `parse_decorated_class` (which
+    /// builds a class *declaration*): parse the decorator list, then a class
+    /// expression, attaching the decorators to it. `export`/`abstract` are
+    /// declaration-only, so neither appears here.
+    pub(in crate::parser) fn parse_decorated_class_expression(
+        &mut self,
+    ) -> Result<Expression<'arena>, ParseError> {
+        let start = self.current_pos().0;
+
+        let decorators = self.parse_decorators()?;
+
+        if *self.current_kind() != TokenKind::Keyword(KeywordKind::Class) {
+            return Err(self.error_expected_after("'class'", "decorator"));
+        }
+
+        let mut expr = self.parse_class_expression()?;
+        if let Expression::ClassExpression(class) = &mut expr {
+            class.decorators = if decorators.is_empty() {
+                None
+            } else {
+                Some(decorators.into_bump_slice())
+            };
+            // Extend the span to cover the leading decorators.
+            class.span = Span::new(start as u32, class.span.end);
+        }
+        Ok(expr)
+    }
+
     /// Parse a list of decorators: `@dec1 @dec2 ...`
     pub(super) fn parse_decorators(
         &mut self,

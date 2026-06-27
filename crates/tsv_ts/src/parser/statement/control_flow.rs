@@ -154,6 +154,31 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return self.parse_for_standard(start, Some(ForInit::VariableDeclaration(var_decl)));
         }
 
+        // `for await (async of …)` — here `async` is a plain IdentifierReference
+        // LHS, not the start of an `async … =>` arrow (which the generic
+        // expression path would assume on seeing `async` followed by `of`). The
+        // for-of `[lookahead ∉ { async of }]` restriction applies ONLY to the
+        // non-await for-of, so this is gated on `is_await`; plain
+        // `for (async of …)` keeps falling through to the normal path and stays
+        // rejected (matching acorn).
+        if is_await
+            && matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
+            && self.peek_is_identifier()
+            && self.peek_value() == "of"
+        {
+            let (id_start, id_end) = self.current_pos();
+            let symbol = self.intern_identifier();
+            self.advance()?; // consume 'async'
+            let async_ident = Expression::Identifier(Identifier {
+                name: symbol,
+                optional: false,
+                extra: None,
+                span: Span::new(id_start as u32, id_end as u32),
+            });
+            self.advance()?; // consume 'of'
+            return self.parse_for_of(start, ForInOfLeft::Pattern(async_ident), is_await);
+        }
+
         // Parse expression (could be init or left-hand side)
         // Use parse_expression_no_in to prevent `in` from being parsed as binary operator
         let expr = self.parse_expression_no_in()?;
