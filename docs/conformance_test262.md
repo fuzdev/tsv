@@ -99,11 +99,21 @@ final element of a parameter list (value and TS function-type) or an
 array/object destructuring pattern (binding and assignment targets), with no
 element or trailing comma after it and no default initializer — so
 `function f(...a, b)`, `function f(...a, ...b)`, `[...a, b] = c`,
-`{...a, b} = c`, and `[...a = 1] = c` are all rejected, matching acorn. Two
-narrow rest cases stay over-accepted: a trailing comma after a _pattern_ rest
-(`[...a,] = c` — the array/object parser drops the comma before pattern
-conversion) and a rest in a for-in/of destructuring LHS
-(`for ([...a, b] of y)` — not routed through the pattern conversion).
+`{...a, b} = c`, `[...a = 1] = c`, and the trailing-comma form `[...a,] = c` /
+`{...a,} = c` are all rejected, matching acorn. The trailing comma is
+recovered from a `spread_trailing_comma` flag the array/object literal parser
+records (the literal itself is valid, so the parser can't reject it outright;
+the cover-grammar conversion consults the flag). A for-in/of destructuring LHS
+is now routed through the same cover-grammar conversion (`to_assignable`), so
+the rest constraints hold there too (`for ([...a, b] of y)`,
+`for ([...x = 1] of y)`, `for ({...a, b} of y)` are rejected) — matching the
+spec's "an `ObjectLiteral`/`ArrayLiteral` for-in/of LHS must cover an
+`AssignmentPattern`" rule, which additionally drops invalid non-pattern LHS
+targets like `for (a + b of y)` and `for ((a, b) of y)`. A still-open adjacent
+gap: the object rest _target_ shape — `({...[a]} = c)` / `const {...[a]} = c`
+(the spec forbids an `ArrayLiteral`/`ObjectLiteral` target on an object rest,
+and a `BindingRestProperty` must be a plain identifier) — is a separate
+constraint left over-accepted.
 
 ## Scope
 

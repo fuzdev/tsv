@@ -181,22 +181,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Use parse_expression_no_in to prevent `in` from being parsed as binary operator
         let expr = self.parse_expression_no_in()?;
 
-        // Check for 'in' or 'of'
-        // TODO: a destructuring for-in/of LHS keeps the raw expression here and is
-        // only relabeled to a pattern in the public converter (`expression_to_pattern`),
-        // so it never runs through `to_assignable`. As a result the rest-element
-        // constraints (rest must be last, no default) are NOT enforced for
-        // `for ([...a, b] of y)` / `for ([...x = 1] of y)`, unlike every other
-        // pattern context. Routing this through `to_assignable` also changes the
-        // internal AST shape (ArrayExpression → ArrayPattern), so it wants its own
-        // fixtures-first pass.
+        // Check for 'in' or 'of'. A no-declaration for-in/of LHS is refined
+        // through `to_assignable` (the cover-grammar conversion): per the spec
+        // an `ObjectLiteral`/`ArrayLiteral` LHS must cover an `AssignmentPattern`
+        // (enforcing the rest constraints + producing the deep internal pattern,
+        // `ArrayExpression` → `ArrayPattern`), and any other LHS must have a
+        // valid (non-`invalid`) assignment-target type.
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
             self.advance()?;
-            return self.parse_for_in(start, ForInOfLeft::Pattern(expr));
+            let left = self.to_assignable(expr)?;
+            return self.parse_for_in(start, ForInOfLeft::Pattern(left));
         }
         if self.current_value() == "of" {
             self.advance()?;
-            return self.parse_for_of(start, ForInOfLeft::Pattern(expr), is_await);
+            let left = self.to_assignable(expr)?;
+            return self.parse_for_of(start, ForInOfLeft::Pattern(left), is_await);
         }
 
         // Standard for loop with expression init
@@ -513,37 +512,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         span: Span::new(id_start as u32, param_end as u32),
                     })
                 }
-                TokenKind::BraceOpen => {
-                    // Object destructuring: catch ({message}) or catch ({message}: ErrorType)
-                    let expr = self.parse_object_expression()?;
-                    let mut pattern = self.to_assignable(expr)?;
-
-                    // Check for type annotation
-                    if self.check(&TokenKind::Colon) {
-                        let ta = self.parse_type_annotation()?;
-                        let end = ta.span.end;
-                        if let Expression::ObjectPattern(ref mut op) = pattern {
-                            op.type_annotation = Some(ta);
-                            op.span.end = end;
-                        }
-                    }
-                    pattern
-                }
-                TokenKind::BracketOpen => {
-                    // Array destructuring: catch ([x, y]) or catch ([x, y]: ErrorType)
-                    let expr = self.parse_array_expression()?;
-                    let mut pattern = self.to_assignable(expr)?;
-
-                    // Check for type annotation
-                    if self.check(&TokenKind::Colon) {
-                        let ta = self.parse_type_annotation()?;
-                        let end = ta.span.end;
-                        if let Expression::ArrayPattern(ref mut ap) = pattern {
-                            ap.type_annotation = Some(ta);
-                            ap.span.end = end;
-                        }
-                    }
-                    pattern
+                // Destructuring binding with an optional type annotation:
+                // catch ({message}) / catch ([x, y]) / catch ({message}: ErrorType)
+                TokenKind::BraceOpen | TokenKind::BracketOpen => {
+                    self.parse_destructured_binding()?
                 }
                 _ => {
                     return Err(self.error_expected("catch parameter"));
