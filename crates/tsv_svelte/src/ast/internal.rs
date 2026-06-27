@@ -683,9 +683,11 @@ impl<'arena> FragmentNode<'arena> {
     /// other Unicode separator is template *content*, not collapsible whitespace
     /// (HTML/infra "ASCII whitespace"; matches prettier-plugin-svelte), so a node
     /// made only of those returns false. All non-Text nodes return false.
+    ///
+    /// Reads the precomputed `Text::is_ascii_ws_only` flag — O(1), source-free.
     #[inline]
-    pub fn is_whitespace_only_text(&self, source: &str) -> bool {
-        matches!(self, FragmentNode::Text(t) if t.raw(source).trim_ascii().is_empty())
+    pub fn is_whitespace_only_text(&self) -> bool {
+        matches!(self, FragmentNode::Text(t) if t.is_ascii_ws_only)
     }
 
     /// Check if this node is a whitespace-only text containing at least one newline.
@@ -693,13 +695,10 @@ impl<'arena> FragmentNode<'arena> {
     /// Used to detect source line breaks at element boundaries (hug mode pattern).
     /// "Whitespace-only" is the collapsible (ASCII) class — see `is_whitespace_only_text`;
     /// a node with a non-breaking space is content, not a boundary break. Returns false
-    /// for non-Text nodes or Text without newlines.
+    /// for non-Text nodes or Text without newlines. Reads precomputed flags — source-free.
     #[inline]
-    pub fn is_boundary_break(&self, source: &str) -> bool {
-        matches!(self, FragmentNode::Text(t) if {
-            let raw = t.raw(source);
-            raw.trim_ascii().is_empty() && raw.contains('\n')
-        })
+    pub fn is_boundary_break(&self) -> bool {
+        matches!(self, FragmentNode::Text(t) if t.is_ascii_ws_only && t.has_newline())
     }
 }
 
@@ -821,14 +820,15 @@ pub enum AttributeValue<'arena> {
 /// (`<`, `A`) is computed lazily via `Text::data`, borrowing `raw` without
 /// allocating when no entity is present.
 ///
-/// TODO(performance): Printer repeatedly calls is_whitespace_only()/contains('\n')
-/// on text nodes in hot loops (multiline children, inline run detection), each
-/// re-slicing source. Could precompute these as bool fields during parsing (the
-/// `multiline`-style trick comment-as-span used). Trade-off: a few bytes per Text
-/// node vs repeated source scans. The template-text whitespace-only predicates are
-/// now uniformly the collapsible (ASCII) class (`trim_ascii`; a non-breaking space
-/// is content) so a single `is_ascii_ws_only` flag covers them; `has_newline` /
-/// blank-line need their own flags. Profile before optimizing.
+/// The printer's hot template-whitespace predicates (multiline-children analysis,
+/// inline-run detection, boundary trimming) read the precomputed `is_ascii_ws_only`
+/// and `newline_count` scalars below instead of re-scanning `raw` each time — the
+/// same `multiline`-style trick `comment-as-span` used for `tsv_lang::Comment`. A
+/// content `Text` is otherwise re-scanned ~10× per parent-element format, across the
+/// analyze and build passes (which share no result). The flags cover the *whole-raw*
+/// collapsible-whitespace and newline-count notions only; boundary / leading-trailing
+/// / trimmed-substring predicates stay scan-based (they're first/last-char or
+/// substring, already O(1) or rare).
 #[derive(Debug, Clone)]
 pub struct Text {
     /// Span of the raw text (entities preserved) in the host source; text via `raw`.
@@ -836,6 +836,14 @@ pub struct Text {
     /// Which entity decode `data()` applies, fixed at parse time by context.
     pub decoding: TextDecoding,
     pub span: Span,
+    /// Precomputed at parse: `raw` is entirely collapsible (ASCII) whitespace
+    /// `[\t\n\f\r ]`, or empty — equivalently `raw(source).trim_ascii().is_empty()`.
+    /// A non-breaking space (U+00A0 / U+202F) or other Unicode separator is template
+    /// *content*, so it makes this `false` (matches prettier-plugin-svelte's split).
+    pub is_ascii_ws_only: bool,
+    /// Precomputed count of `\n` in `raw`, **saturating at 2** — enough for every test
+    /// the printer makes (`has_newline` = `>= 1`, blank line = `>= 2`).
+    pub newline_count: u8,
 }
 
 /// Entity-decode context for a `Text` node, mirroring the decode the canonical
@@ -853,6 +861,37 @@ pub enum TextDecoding {
 }
 
 impl Text {
+    /// Construct a `Text`, precomputing the whitespace scalars from `raw_span`.
+    /// `source` must be the host document `raw_span` was recorded against (the same
+    /// document every later `raw(source)` reader passes), so the flags stay in sync
+    /// with `raw` whether the node is standalone or embedded.
+    pub fn new(raw_span: Span, decoding: TextDecoding, span: Span, source: &str) -> Self {
+        let raw = raw_span.extract(source);
+        // `is_ascii_ws_only` == `raw.trim_ascii().is_empty()` (true for empty too);
+        // `newline_count` saturates at 2 (the printer only tests ==0 / <2 / >=1 / >=2).
+        let is_ascii_ws_only = raw.bytes().all(|b| b.is_ascii_whitespace());
+        let newline_count = raw.bytes().filter(|&b| b == b'\n').take(2).count() as u8;
+        Text {
+            raw_span,
+            decoding,
+            span,
+            is_ascii_ws_only,
+            newline_count,
+        }
+    }
+
+    /// Whether `raw` contains at least one `\n` (precomputed, source-free).
+    #[inline]
+    pub fn has_newline(&self) -> bool {
+        self.newline_count >= 1
+    }
+
+    /// Whether `raw` contains a blank line (2+ `\n`) (precomputed, source-free).
+    #[inline]
+    pub fn has_blank_line(&self) -> bool {
+        self.newline_count >= 2
+    }
+
     /// Raw text (entities preserved) — a sub-slice of `source`, no allocation.
     /// `source` must be the host document the spans were recorded against.
     pub fn raw<'s>(&self, source: &'s str) -> &'s str {
@@ -989,5 +1028,36 @@ mod tests {
         assert!(!SpecialElementKind::SvelteFragment.is_block());
         assert!(!SpecialElementKind::SvelteBoundary.is_block());
         assert!(!SpecialElementKind::TitleElement.is_block());
+    }
+
+    #[test]
+    fn text_new_precomputes_whitespace_flags() {
+        use super::{Span, Text, TextDecoding};
+        // A `Text` whose `raw_span` covers the whole probe string.
+        let mk = |raw: &str| {
+            let span = Span {
+                start: 0,
+                end: raw.len() as u32,
+            };
+            Text::new(span, TextDecoding::Fragment, span, raw)
+        };
+
+        // `is_ascii_ws_only`: collapsible (ASCII) whitespace only; empty counts true.
+        assert!(mk("  \t\n ").is_ascii_ws_only);
+        assert!(mk("").is_ascii_ws_only);
+        // A non-breaking space (U+00A0) is content, not collapsible whitespace.
+        assert!(!mk("\u{00A0}").is_ascii_ws_only);
+        assert!(!mk("a").is_ascii_ws_only);
+
+        // `newline_count` saturates at 2 (drives `has_newline` / `has_blank_line`).
+        assert_eq!(mk("a b").newline_count, 0);
+        assert!(!mk("a b").has_newline());
+        assert_eq!(mk("a\nb").newline_count, 1);
+        assert!(mk("a\nb").has_newline());
+        assert!(!mk("a\nb").has_blank_line());
+        assert_eq!(mk("a\n\nb").newline_count, 2);
+        assert!(mk("a\n\nb").has_blank_line());
+        // 3+ newlines still report the saturated 2.
+        assert_eq!(mk("\n\n\n\n").newline_count, 2);
     }
 }

@@ -8,7 +8,6 @@
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
-use crate::printer::text::TextAnalysis;
 use tsv_lang::SymbolResolver;
 use tsv_lang::doc::arena::DocId;
 use tsv_ts::ast::internal::Expression;
@@ -158,12 +157,8 @@ impl<'a> Printer<'a> {
         let source = self.source;
 
         // Find first and last non-whitespace content indices
-        let first_content_idx = nodes
-            .iter()
-            .position(|n| !n.is_whitespace_only_text(source));
-        let last_content_idx = nodes
-            .iter()
-            .rposition(|n| !n.is_whitespace_only_text(source));
+        let first_content_idx = nodes.iter().position(|n| !n.is_whitespace_only_text());
+        let last_content_idx = nodes.iter().rposition(|n| !n.is_whitespace_only_text());
 
         let (Some(first), Some(last)) = (first_content_idx, last_content_idx) else {
             return false;
@@ -213,10 +208,10 @@ impl<'a> Printer<'a> {
             let raw = t.raw(source);
             if kind.preserves_boundary_breaks() {
                 // Block/component: any newline triggers source break
-                raw.contains('\n')
-            } else if raw.trim_ascii().is_empty() {
+                t.has_newline()
+            } else if t.is_ascii_ws_only {
                 // Inline, whitespace-only: newlines are separators
-                raw.contains('\n')
+                t.has_newline()
             } else {
                 // Inline, text with content: exclude boundary (ASCII) whitespace.
                 // A non-breaking space is content, so trim_ascii keeps it attached.
@@ -267,28 +262,26 @@ impl<'a> Printer<'a> {
             && element.fragment.nodes.is_empty()
             && self.span_was_self_closing(element.span);
 
-        let source = self.source;
-
         // Check if empty
         let is_empty = element.fragment.nodes.is_empty()
             || element
                 .fragment
                 .nodes
                 .iter()
-                .all(|n| n.is_whitespace_only_text(source));
+                .all(FragmentNode::is_whitespace_only_text);
 
         // Source boundary breaks
         let source_has_leading_break = element
             .fragment
             .nodes
             .first()
-            .is_some_and(|n| n.is_boundary_break(source));
+            .is_some_and(FragmentNode::is_boundary_break);
         let source_has_trailing_break = source_has_leading_break
             && element
                 .fragment
                 .nodes
                 .last()
-                .is_some_and(|n| n.is_boundary_break(source));
+                .is_some_and(FragmentNode::is_boundary_break);
 
         // Hug modes
         let hug_start = self.should_hug_start(element, kind.is_block());
@@ -389,7 +382,7 @@ impl<'a> Printer<'a> {
         let has_block_children = block_child_count > 0;
         if has_block_children {
             let has_non_block = element.fragment.nodes.iter().any(|n| match n {
-                FragmentNode::Text(t) => !t.raw(self.source).is_whitespace_only(),
+                FragmentNode::Text(t) => !t.is_ascii_ws_only,
                 FragmentNode::Element(e) => !self.is_block_element(e),
                 FragmentNode::ExpressionTag(_) => true,
                 FragmentNode::HtmlTag(_)
@@ -444,8 +437,7 @@ impl<'a> Printer<'a> {
         // await/snippet (which don't force-expand on their own) still go multiline when they
         // follow a sibling, so their body-drop matches if/each (via the multiline path) and
         // the sibling-`>` dangle / block-on-own-line separation resolves in one pass.
-        if kind.is_block()
-            && super::helpers::has_control_flow_after_sibling(element.fragment.nodes, self.source)
+        if kind.is_block() && super::helpers::has_control_flow_after_sibling(element.fragment.nodes)
         {
             return true;
         }
@@ -495,7 +487,7 @@ impl<'a> Printer<'a> {
         let source = self.source;
         let has_ws_around_blocks = has_expanding_blocks
             && element.fragment.nodes.iter().any(|n| {
-                matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.is_whitespace_only() && !r.is_empty() })
+                matches!(n, FragmentNode::Text(t) if t.is_ascii_ws_only && !t.raw(source).is_empty())
             });
 
         has_non_inline_block || has_ws_around_blocks
@@ -509,7 +501,7 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let source = self.source;
         let has_leading_content_break = element.fragment.nodes.first().is_some_and(|n| {
-            matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.starts_with('\n') && !r.is_whitespace_only() })
+            matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.starts_with('\n') && !t.is_ascii_ws_only })
         });
 
         (source_has_leading_break || has_leading_content_break)

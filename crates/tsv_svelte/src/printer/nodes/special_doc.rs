@@ -8,7 +8,6 @@
 
 use crate::ast::internal::{self, FragmentNode, SpecialElementKind};
 use crate::printer::Printer;
-use crate::printer::text::TextAnalysis;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 impl<'a> Printer<'a> {
@@ -172,12 +171,12 @@ impl<'a> Printer<'a> {
             .fragment
             .nodes
             .first()
-            .is_some_and(|n| n.is_boundary_break(source));
+            .is_some_and(FragmentNode::is_boundary_break);
         let source_has_trailing_break = element
             .fragment
             .nodes
             .last()
-            .is_some_and(|n| n.is_boundary_break(source));
+            .is_some_and(FragmentNode::is_boundary_break);
 
         // Check for expanding control flow blocks (if/each/key) or expanding blocks inside await
         // These force hug mode (not full multiline) for inline special elements like <slot>
@@ -191,7 +190,7 @@ impl<'a> Printer<'a> {
                 .fragment
                 .nodes
                 .iter()
-                .any(|n| matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.is_whitespace_only() && !r.is_empty() }));
+                .any(|n| matches!(n, FragmentNode::Text(t) if t.is_ascii_ws_only && !t.raw(source).is_empty()));
         // Only force hug mode when expanding blocks present WITHOUT surrounding whitespace
         // svelte:boundary never uses hug mode - it always uses normal multiline for expanding blocks
         let forces_hug_mode =

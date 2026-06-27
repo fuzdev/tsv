@@ -79,14 +79,10 @@ impl<'a> Printer<'a> {
 
     /// Check if any text node in the fragment contains a newline.
     fn fragment_has_any_newlines(&self, fragment: &Fragment<'_>) -> bool {
-        let source = self.source;
-        fragment.nodes.iter().any(|n| {
-            if let FragmentNode::Text(t) = n {
-                t.raw(source).contains('\n')
-            } else {
-                false
-            }
-        })
+        fragment
+            .nodes
+            .iter()
+            .any(|n| matches!(n, FragmentNode::Text(t) if t.has_newline()))
     }
 
     /// Check if a fragment has leading whitespace of any kind (space or newline).
