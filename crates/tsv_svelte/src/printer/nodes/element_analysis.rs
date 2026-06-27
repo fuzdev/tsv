@@ -181,7 +181,7 @@ impl<'a> Printer<'a> {
             .first()
             .is_some_and(|n| matches!(n, FragmentNode::Text(t) if t.raw(source).starts_with('\n')));
         let last_text_ends_with_whitespace = nodes.last().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if t.raw(source).ends_with(char::is_whitespace)),
+            |n| matches!(n, FragmentNode::Text(t) if t.raw(source).ends_with(|c: char| c.is_ascii_whitespace())),
         );
 
         if first_text_starts_with_newline && last_text_ends_with_whitespace {
@@ -214,17 +214,18 @@ impl<'a> Printer<'a> {
             if kind.preserves_boundary_breaks() {
                 // Block/component: any newline triggers source break
                 raw.contains('\n')
-            } else if raw.trim().is_empty() {
+            } else if raw.trim_ascii().is_empty() {
                 // Inline, whitespace-only: newlines are separators
                 raw.contains('\n')
             } else {
-                // Inline, text with content: exclude boundary whitespace
+                // Inline, text with content: exclude boundary (ASCII) whitespace.
+                // A non-breaking space is content, so trim_ascii keeps it attached.
                 let is_first_content = i == 0;
                 let is_last_content = i == last - first;
                 let check_str = match (is_first_content, is_last_content) {
-                    (true, true) => raw.trim(),
-                    (true, false) => raw.trim_start(),
-                    (false, true) => raw.trim_end(),
+                    (true, true) => raw.trim_ascii(),
+                    (true, false) => raw.trim_ascii_start(),
+                    (false, true) => raw.trim_ascii_end(),
                     (false, false) => raw,
                 };
                 check_str.contains('\n')
@@ -512,11 +513,9 @@ impl<'a> Printer<'a> {
         });
 
         (source_has_leading_break || has_leading_content_break)
-            && element
-                .fragment
-                .nodes
-                .iter()
-                .any(|n| matches!(n, FragmentNode::Text(t) if t.raw(source).trim().contains('\n')))
+            && element.fragment.nodes.iter().any(
+                |n| matches!(n, FragmentNode::Text(t) if t.raw(source).trim_ascii().contains('\n')),
+            )
     }
 
     /// Compute element layout from analyzed context

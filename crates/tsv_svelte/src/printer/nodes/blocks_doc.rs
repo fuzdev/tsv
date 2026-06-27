@@ -586,8 +586,9 @@ impl<'a> Printer<'a> {
                     }
                     if_block = Some(b);
                 }
-                FragmentNode::Text(t) if t.raw(source).trim().is_empty() => {
-                    // Whitespace-only text is OK
+                FragmentNode::Text(t) if t.raw(source).trim_ascii().is_empty() => {
+                    // Collapsible (ASCII) whitespace-only text is OK; a non-breaking
+                    // space is content and blocks the elseif flatten.
                 }
                 _ => {
                     // Non-whitespace content - can't flatten
