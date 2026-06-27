@@ -419,7 +419,10 @@ mod tests {
         // Mode-independent raw test (a hashbang not in the sloppy-only list) — graded.
         let raw = "/*---\nflags: [raw]\n---*/\n#!/usr/bin/env node\n";
         assert!(matches!(
-            classify("test/language/comments/hashbang/preceding-whitespace.js", raw),
+            classify(
+                "test/language/comments/hashbang/preceding-whitespace.js",
+                raw
+            ),
             Classification::Grade { .. }
         ));
 
@@ -432,7 +435,10 @@ mod tests {
         // Same content at a non-listed path stays graded — the skip is path-keyed
         // and gated on the `raw` flag, not a content sniff.
         assert!(matches!(
-            classify("test/language/comments/hashbang/preceding-hashbang.js", sloppy_raw),
+            classify(
+                "test/language/comments/hashbang/preceding-hashbang.js",
+                sloppy_raw
+            ),
             Classification::Grade { .. }
         ));
 
