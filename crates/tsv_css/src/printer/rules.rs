@@ -59,13 +59,11 @@ impl<'a> Printer<'a> {
                     if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
                         self.write("\n");
                     }
-                    let format_ignore = format_ignore_next;
-                    format_ignore_next = false;
                     i += self.print_decl_with_inline_comments(
                         rule.declarations,
                         i,
                         decl,
-                        format_ignore,
+                        &mut format_ignore_next,
                     );
                 }
                 internal::CssBlockChild::Comment(comment) => {
