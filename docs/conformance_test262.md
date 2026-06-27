@@ -146,31 +146,6 @@ constraint left over-accepted.
 
 - `negative.phase: runtime` - Requires execution
 - `negative.phase: resolution` - Requires module resolution
-<<<<<<< HEAD
-- `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only). `flags: [raw]`
-  (verbatim source, no harness) is **not** skipped — it's a transformation opt-out,
-  not a sloppy declaration, so raw tests are graded at their goal like any other
-  (the one sloppy-by-content raw test is an honest positive failure, not a skip)
-- `features:` naming an **unimplemented syntactic proposal** - skipped in both
-  polarities so the score reflects conformance on syntax tsv aims to support, not
-  unimplemented scope. The skip set lives in
-  `crates/tsv_debug/src/test262/frontmatter.rs` (`UNIMPLEMENTED_FEATURES`) and is
-  **currently empty** — the Stage-3 import-phase proposals
-  (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`)
-  that used to live here are now parsed, so their ~396 graded files count. Add a
-  name here when tsv meets a new proposal it doesn't parse; drop it once it lands.
-||||||| 8e9238b9
-- `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only). `flags: [raw]`
-  (verbatim source, no harness) is **not** skipped — it's a transformation opt-out,
-  not a sloppy declaration, so raw tests are graded at their goal like any other
-  (the one sloppy-by-content raw test is an honest positive failure, not a skip)
-- `features:` naming an **unimplemented syntactic proposal** - currently
-  `source-phase-imports` / `source-phase-imports-module-source` / `import-defer`
-  (the Stage-3 import proposals). Skipped in both polarities so the score
-  reflects conformance on syntax tsv aims to support, not unimplemented scope.
-  The skip set lives in `crates/tsv_debug/src/test262/frontmatter.rs`
-  (`UNIMPLEMENTED_FEATURES`) — remove a name when tsv implements that proposal.
-=======
 - `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only). A `flags: [raw]`
   test (verbatim source, no harness) also runs in non-strict mode only per
   test262/INTERPRETING.md, but nearly all exercise mode-independent syntax (hashbang,
@@ -180,13 +155,14 @@ constraint left over-accepted.
   octal) — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
   `crates/tsv_debug/src/test262/runner.rs`) is currently the single
   `language/comments/hashbang/use-strict.js`
-- `features:` naming an **unimplemented syntactic proposal** - currently
-  `source-phase-imports` / `source-phase-imports-module-source` / `import-defer`
-  (the Stage-3 import proposals). Skipped in both polarities so the score
-  reflects conformance on syntax tsv aims to support, not unimplemented scope.
-  The skip set lives in `crates/tsv_debug/src/test262/frontmatter.rs`
-  (`UNIMPLEMENTED_FEATURES`) — remove a name when tsv implements that proposal.
->>>>>>> main
+- `features:` naming an **unimplemented syntactic proposal** - skipped in both
+  polarities so the score reflects conformance on syntax tsv aims to support, not
+  unimplemented scope. The skip set lives in
+  `crates/tsv_debug/src/test262/frontmatter.rs` (`UNIMPLEMENTED_FEATURES`) and is
+  **currently empty** — the Stage-3 import-phase proposals
+  (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`)
+  that used to live here are now parsed, so their ~396 graded files count. Add a
+  name here when tsv meets a new proposal it doesn't parse; drop it once it lands.
 - `*_FIXTURE.js` files - Module dependencies, not standalone tests
 
 ### Test Directories
