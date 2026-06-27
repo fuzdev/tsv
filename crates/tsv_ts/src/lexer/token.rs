@@ -520,8 +520,110 @@ static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
     // - Type keywords: interface, type, namespace, etc.
 };
 
-/// O(1) keyword lookup using perfect hash function
+/// Shortest reserved word (`as`/`in`/`if`/`do`) is 2 bytes; longest (`instanceof`) is 10.
+const KEYWORD_MIN_LEN: usize = 2;
+const KEYWORD_MAX_LEN: usize = 10;
+
+/// Bit `b - b'a'` is set when some reserved word begins with lowercase-ASCII letter `b`.
+/// Kept exactly in sync with `KEYWORDS` by `prefilter_admits_every_keyword`.
+const KEYWORD_FIRST_LETTER_MASK: u32 = {
+    const fn bit(b: u8) -> u32 {
+        1 << (b - b'a')
+    }
+    bit(b'a')
+        | bit(b'b')
+        | bit(b'c')
+        | bit(b'd')
+        | bit(b'e')
+        | bit(b'f')
+        | bit(b'i')
+        | bit(b'l')
+        | bit(b'n')
+        | bit(b'o')
+        | bit(b'r')
+        | bit(b's')
+        | bit(b't')
+        | bit(b'u')
+        | bit(b'v')
+        | bit(b'w')
+        | bit(b'y')
+};
+
+/// O(1) keyword lookup using a perfect hash function, gated by a cheap reject pre-filter.
+///
+/// Every reserved word is 2–10 bytes long and begins with one of a fixed set of
+/// lowercase-ASCII letters, so an identifier failing either test cannot be a keyword.
+/// The gate skips the phf hash for PascalCase types, `_`/`$`-prefixed names, and any
+/// identifier whose first letter starts no keyword — the overwhelming majority of
+/// identifier tokens. `prefilter_admits_every_keyword` proves it never rejects a real
+/// keyword, so the gate is purely a fast path and changes no behavior.
 #[inline]
 pub fn keyword_kind(s: &str) -> Option<KeywordKind> {
+    let bytes = s.as_bytes();
+    if !matches!(bytes.len(), KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN) {
+        return None;
+    }
+    let idx = bytes[0].wrapping_sub(b'a');
+    if idx >= 26 || (KEYWORD_FIRST_LETTER_MASK >> idx) & 1 == 0 {
+        return None;
+    }
     KEYWORDS.get(s).copied()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The gate must admit every reserved word — otherwise the lexer would misclassify
+    /// a keyword as an identifier. Also re-derives the length bounds and the first-letter
+    /// mask from `KEYWORDS`, so adding or removing a keyword that shifts either invariant
+    /// fails here instead of silently corrupting tokenization.
+    #[test]
+    fn prefilter_admits_every_keyword() {
+        let mut derived_mask = 0u32;
+        for (&kw, &kind) in KEYWORDS.entries() {
+            assert_eq!(
+                keyword_kind(kw),
+                Some(kind),
+                "pre-filter rejected reserved word `{kw}`"
+            );
+            let len = kw.len();
+            assert!(
+                (KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN).contains(&len),
+                "reserved word `{kw}` (len {len}) is outside the pre-filter bound \
+                 {KEYWORD_MIN_LEN}..={KEYWORD_MAX_LEN}"
+            );
+            let first = kw.as_bytes()[0];
+            assert!(
+                first.is_ascii_lowercase(),
+                "reserved word `{kw}` does not start lowercase-ASCII"
+            );
+            derived_mask |= 1u32 << (first - b'a');
+        }
+        assert_eq!(
+            derived_mask, KEYWORD_FIRST_LETTER_MASK,
+            "KEYWORD_FIRST_LETTER_MASK is out of sync with the keyword set"
+        );
+    }
+
+    /// Non-keywords the gate should reject (most without hashing): PascalCase, sigil-led
+    /// and single-char names, and contextual words deliberately absent from `KEYWORDS`.
+    #[test]
+    fn prefilter_rejects_non_keywords() {
+        for s in [
+            "Foo",
+            "_private",
+            "$x",
+            "x",
+            "",
+            "interface",
+            "readonly",
+            "namespace",
+            "get",
+            "kind",
+            "map",
+        ] {
+            assert_eq!(keyword_kind(s), None, "`{s}` should not be a keyword");
+        }
+    }
 }
