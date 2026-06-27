@@ -13,12 +13,12 @@ use tsv_lang::LocationTracker;
 
 use super::{convert_fragment, convert_pattern_expression};
 
-pub(super) fn convert_if_block(
+pub(super) fn convert_if_block<'src>(
     block: &internal::IfBlock<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::IfBlock {
+) -> public::IfBlock<'src> {
     let ts_expr = tsv_ts::ast::convert::convert_expression(&block.test, source, loc, interner, 0);
 
     public::IfBlock {
@@ -35,12 +35,12 @@ pub(super) fn convert_if_block(
     }
 }
 
-pub(super) fn convert_each_block(
+pub(super) fn convert_each_block<'src>(
     block: &internal::EachBlock<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::EachBlock {
+) -> public::EachBlock<'src> {
     let expression =
         tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
     let context = block
@@ -68,12 +68,12 @@ pub(super) fn convert_each_block(
     }
 }
 
-pub(super) fn convert_await_block(
+pub(super) fn convert_await_block<'src>(
     block: &internal::AwaitBlock<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::AwaitBlock {
+) -> public::AwaitBlock<'src> {
     let expression =
         tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
     // Simple identifier bindings get `character` in loc from Svelte's read_identifier().
@@ -109,12 +109,12 @@ pub(super) fn convert_await_block(
     }
 }
 
-pub(super) fn convert_key_block(
+pub(super) fn convert_key_block<'src>(
     block: &internal::KeyBlock<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::KeyBlock {
+) -> public::KeyBlock<'src> {
     let expression =
         tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);
 
@@ -127,12 +127,12 @@ pub(super) fn convert_key_block(
     }
 }
 
-pub(super) fn convert_snippet_block(
+pub(super) fn convert_snippet_block<'src>(
     block: &internal::SnippetBlock<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::SnippetBlock {
+) -> public::SnippetBlock<'src> {
     // Svelte's read_identifier() adds `character` to loc for the snippet name.
     let mut expression =
         tsv_ts::ast::convert::convert_expression(&block.expression, source, loc, interner, 0);

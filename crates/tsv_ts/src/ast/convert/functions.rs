@@ -7,15 +7,15 @@ use super::{
     convert_type_parameter_declaration, convert_type_parameter_instantiation, create_location,
 };
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::LocationTracker;
 
-pub(in crate::ast) fn convert_arrow_function_expression(
+pub(in crate::ast) fn convert_arrow_function_expression<'src>(
     arrow: &internal::ArrowFunctionExpression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ArrowFunctionExpression {
+) -> public::ArrowFunctionExpression<'src> {
     let body = match &arrow.body {
         internal::ArrowFunctionBody::Expression(expr) => public::ArrowFunctionBody::Expression(
             Box::new(convert_expression(expr, source, loc, interner, offset)),
@@ -52,13 +52,13 @@ pub(in crate::ast) fn convert_arrow_function_expression(
     }
 }
 
-pub(in crate::ast) fn convert_function_expression(
+pub(in crate::ast) fn convert_function_expression<'src>(
     func: &internal::FunctionExpression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::FunctionExpression {
+) -> public::FunctionExpression<'src> {
     public::FunctionExpression {
         node_type: "FunctionExpression",
         start: func.span.start,
@@ -69,7 +69,7 @@ pub(in crate::ast) fn convert_function_expression(
             start: id.span.start,
             end: id.span.end,
             loc: create_location(id.span, loc, offset),
-            name: interner.resolve_infallible(id.name).to_string(),
+            name: public::name_cow(id.span, source, id.name, interner),
             optional: id.optional,
             type_annotation: None,
             decorators: Vec::new(),
@@ -94,13 +94,13 @@ pub(in crate::ast) fn convert_function_expression(
     }
 }
 
-pub(in crate::ast) fn convert_new_expression(
+pub(in crate::ast) fn convert_new_expression<'src>(
     new_expr: &internal::NewExpression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::NewExpression {
+) -> public::NewExpression<'src> {
     public::NewExpression {
         node_type: "NewExpression",
         start: new_expr.span.start,
@@ -128,14 +128,14 @@ pub(in crate::ast) fn convert_new_expression(
 /// Chain-aware call expression conversion.
 /// When `in_chain` is true, uses `convert_expression_inner` with `in_chain=true`
 /// for the callee so nested chain expressions don't get double-wrapped.
-pub(in crate::ast) fn convert_call_expression(
+pub(in crate::ast) fn convert_call_expression<'src>(
     call: &internal::CallExpression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
     in_chain: bool,
-) -> public::CallExpression {
+) -> public::CallExpression<'src> {
     let mut callee = convert_expression_inner(call.callee, source, loc, interner, offset, in_chain);
     // acorn-typescript's `?.<T>(...)` path marks the callee node itself optional
     // (its parseSubscript sets `base.optional = true` before parsing the type args)
@@ -179,14 +179,14 @@ pub(in crate::ast) fn convert_call_expression(
 /// Chain-aware member expression conversion.
 /// When `in_chain` is true, uses `convert_expression_inner` with `in_chain=true`
 /// for the object so nested chain expressions don't get double-wrapped.
-pub(in crate::ast) fn convert_member_expression(
+pub(in crate::ast) fn convert_member_expression<'src>(
     member: &internal::MemberExpression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
     in_chain: bool,
-) -> public::MemberExpression {
+) -> public::MemberExpression<'src> {
     public::MemberExpression {
         node_type: "MemberExpression",
         start: member.span.start,
@@ -212,13 +212,13 @@ pub(in crate::ast) fn convert_member_expression(
     }
 }
 
-pub(in crate::ast) fn convert_conditional_expression(
+pub(in crate::ast) fn convert_conditional_expression<'src>(
     cond: &internal::ConditionalExpression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ConditionalExpression {
+) -> public::ConditionalExpression<'src> {
     public::ConditionalExpression {
         node_type: "ConditionalExpression",
         start: cond.span.start,
@@ -242,13 +242,13 @@ pub(in crate::ast) fn convert_conditional_expression(
     }
 }
 
-pub(in crate::ast) fn convert_await_expression(
+pub(in crate::ast) fn convert_await_expression<'src>(
     await_expr: &internal::AwaitExpression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::AwaitExpression {
+) -> public::AwaitExpression<'src> {
     public::AwaitExpression {
         node_type: "AwaitExpression",
         start: await_expr.span.start,
@@ -264,13 +264,13 @@ pub(in crate::ast) fn convert_await_expression(
     }
 }
 
-pub(in crate::ast) fn convert_yield_expression(
+pub(in crate::ast) fn convert_yield_expression<'src>(
     yield_expr: &internal::YieldExpression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::YieldExpression {
+) -> public::YieldExpression<'src> {
     public::YieldExpression {
         node_type: "YieldExpression",
         start: yield_expr.span.start,

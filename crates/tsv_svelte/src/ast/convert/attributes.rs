@@ -16,12 +16,12 @@ use super::{
     convert_transition_directive, convert_use_directive, span_to_name_loc, to_json_value,
 };
 
-pub(super) fn convert_attribute_node(
+pub(super) fn convert_attribute_node<'src>(
     node: &internal::AttributeNode<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::AttributeNode {
+) -> public::AttributeNode<'src> {
     match node {
         internal::AttributeNode::Attribute(attr) => {
             public::AttributeNode::Attribute(convert_attribute(attr, source, loc, interner))
@@ -61,12 +61,12 @@ pub(super) fn convert_attribute_node(
     }
 }
 
-fn convert_attach_tag(
+fn convert_attach_tag<'src>(
     tag: &internal::AttachTag<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::AttachTag {
+) -> public::AttachTag<'src> {
     let expression =
         tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
 
@@ -78,12 +78,12 @@ fn convert_attach_tag(
     }
 }
 
-fn convert_spread_attribute(
+fn convert_spread_attribute<'src>(
     spread: &internal::SpreadAttribute<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::SpreadAttribute {
+) -> public::SpreadAttribute<'src> {
     let expression =
         tsv_ts::ast::convert::convert_expression(&spread.expression, source, loc, interner, 0);
 
@@ -175,12 +175,12 @@ fn convert_attribute(
     }
 }
 
-pub(super) fn convert_attribute_value(
+pub(super) fn convert_attribute_value<'src>(
     value: &internal::AttributeValue<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::AttributeValue {
+) -> public::AttributeValue<'src> {
     match value {
         internal::AttributeValue::Text(text) => {
             public::AttributeValue::Text(convert_attribute_text(text, source))

@@ -11,12 +11,12 @@ use tsv_lang::LocationTracker;
 
 use super::{convert_attribute_value, convert_expression_tag, span_to_name_loc, to_json_value};
 
-pub(super) fn convert_on_directive(
+pub(super) fn convert_on_directive<'src>(
     d: &internal::OnDirective<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::OnDirective {
+) -> public::OnDirective<'src> {
     let expression = d
         .expression
         .as_ref()
@@ -129,12 +129,12 @@ pub(super) fn convert_style_directive(
     }
 }
 
-pub(super) fn convert_use_directive(
+pub(super) fn convert_use_directive<'src>(
     d: &internal::UseDirective<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::UseDirective {
+) -> public::UseDirective<'src> {
     let expression = d
         .expression
         .as_ref()
@@ -151,12 +151,12 @@ pub(super) fn convert_use_directive(
     }
 }
 
-pub(super) fn convert_transition_directive(
+pub(super) fn convert_transition_directive<'src>(
     d: &internal::TransitionDirective<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::TransitionDirective {
+) -> public::TransitionDirective<'src> {
     let expression = d
         .expression
         .as_ref()
@@ -175,12 +175,12 @@ pub(super) fn convert_transition_directive(
     }
 }
 
-pub(super) fn convert_animate_directive(
+pub(super) fn convert_animate_directive<'src>(
     d: &internal::AnimateDirective<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::AnimateDirective {
+) -> public::AnimateDirective<'src> {
     let expression = d
         .expression
         .as_ref()
@@ -197,12 +197,12 @@ pub(super) fn convert_animate_directive(
     }
 }
 
-pub(super) fn convert_let_directive(
+pub(super) fn convert_let_directive<'src>(
     d: &internal::LetDirective<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::LetDirective {
+) -> public::LetDirective<'src> {
     let expression = d
         .expression
         .as_ref()
