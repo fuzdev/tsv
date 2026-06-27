@@ -218,10 +218,13 @@ impl Fixture {
     /// acorn `expected.json` oracle so a standalone-script fixture is graded at
     /// the same goal on both sides.
     pub fn goal(&self) -> Goal {
-        match std::fs::read_to_string(self.goal_path()) {
-            Ok(s) if s.trim() == "script" => Goal::Script,
-            _ => Goal::Module,
-        }
+        // Lenient: an absent/unreadable/unrecognized marker → the `Module` default
+        // (only a marker trimming to `script`/`module` selects a goal), via the
+        // shared `Goal::from_source_type` vocabulary.
+        std::fs::read_to_string(self.goal_path())
+            .ok()
+            .and_then(|s| Goal::from_source_type(s.trim()))
+            .unwrap_or(Goal::Module)
     }
 
     /// Check if this fixture matches any of the given filter terms

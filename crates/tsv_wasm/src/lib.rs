@@ -268,3 +268,45 @@ lang_bindings!(
     tsv_css,
     CssStyleSheet,
 );
+
+// --- TypeScript goal-aware exports ---
+//
+// The parse goal (`Script` vs `Module`) is a TypeScript-only axis — Svelte
+// `<script>` is always a module and CSS has no goal — so these sit outside the
+// uniform `lang_bindings!` macro rather than threading a meaningless `goal`
+// through svelte/css. They mirror the `tsv_ts` arms of the macro
+// (`parse_typescript_json` / `format_typescript`) with an explicit goal; the
+// goalless exports remain the `Module` default. See `tsv parse|format --goal`.
+
+/// Parse a goal string (`"script"` / `"module"`) for the goal-aware exports,
+/// mirroring `tsv_cli`'s `parse_goal_arg`.
+#[cfg(any(feature = "parse", feature = "format"))]
+fn goal_from_str(goal: &str) -> Result<tsv_ts::Goal, JsError> {
+    tsv_ts::Goal::from_source_type(goal).ok_or_else(|| {
+        err(format!(
+            "invalid goal '{goal}' (expected 'script' or 'module')"
+        ))
+    })
+}
+
+/// `parse_typescript_json` against an explicit goal (`"script"` / `"module"`):
+/// at `script`, `await` is an ordinary identifier and `import`/`export`/
+/// `import.meta` are syntax errors. Returns the compact JSON-string wire form.
+#[cfg(feature = "parse")]
+#[wasm_bindgen]
+pub fn parse_typescript_json_with_goal(source: &str, goal: &str) -> Result<String, JsError> {
+    let goal = goal_from_str(goal)?;
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let ast = tsv_ts::parse_with_goal(source, goal, &arena).map_err(err)?;
+    Ok(tsv_ts::convert_ast_json_string(&ast, source))
+}
+
+/// `format_typescript` against an explicit goal (`"script"` / `"module"`).
+#[cfg(feature = "format")]
+#[wasm_bindgen]
+pub fn format_typescript_with_goal(source: &str, goal: &str) -> Result<String, JsError> {
+    let goal = goal_from_str(goal)?;
+    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let ast = tsv_ts::parse_with_goal(source, goal, &arena).map_err(err)?;
+    Ok(tsv_ts::format(&ast, source))
+}

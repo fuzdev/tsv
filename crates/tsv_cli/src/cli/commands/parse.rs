@@ -71,11 +71,9 @@ impl ParseCommand {
 /// default); `module`/`script` map to the goals. Shared by `parse` and `format`.
 pub fn parse_goal_arg(goal: Option<&str>) -> Result<tsv_ts::Goal, String> {
     match goal {
-        None | Some("module") => Ok(tsv_ts::Goal::Module),
-        Some("script") => Ok(tsv_ts::Goal::Script),
-        Some(other) => Err(format!(
-            "invalid --goal '{other}' (expected 'script' or 'module')"
-        )),
+        None => Ok(tsv_ts::Goal::Module),
+        Some(s) => tsv_ts::Goal::from_source_type(s)
+            .ok_or_else(|| format!("invalid --goal '{s}' (expected 'script' or 'module')")),
     }
 }
 

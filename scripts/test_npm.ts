@@ -273,6 +273,49 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
+	it('parse --goal script accepts `await` as an identifier; module/default reject it', () => {
+		const script = run_cli([
+			'parse', '--content', 'var await = 1;', '--parser', 'ts', '--goal', 'script',
+		]);
+		assert.equal(script.status, 0, script.stderr);
+		assert.match(script.stdout, /"sourceType":"script"/);
+
+		// the same source is reserved at Module goal (explicit and default)
+		const mod = run_cli(['parse', '--content', 'var await = 1;', '--parser', 'ts', '--goal', 'module']);
+		assert.equal(mod.status, 1);
+		const dflt = run_cli(['parse', '--content', 'var await = 1;', '--parser', 'ts']);
+		assert.equal(dflt.status, 1);
+	});
+
+	it('format --goal script formats an `await` arrow param', () => {
+		const result = run_cli([
+			'format', '--content', 'await => 1;', '--parser', 'ts', '--goal', 'script',
+		]);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stdout, '(await) => 1;\n');
+	});
+
+	it('an invalid --goal value exits 1 for parse, 2 for format (arg-error parity)', () => {
+		const p = run_cli(['parse', '--content', 'x;', '--parser', 'ts', '--goal', 'bogus']);
+		assert.equal(p.status, 1);
+		assert.match(p.stderr, /invalid --goal/);
+		const f = run_cli(['format', '--content', 'x;', '--parser', 'ts', '--goal', 'bogus']);
+		assert.equal(f.status, 2);
+		assert.match(f.stderr, /invalid --goal/);
+	});
+
+	it('format --goal with a path argument is a usage error (exit 2)', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const x = 1;\n');
+			const result = run_cli(['format', '--goal', 'script', join(dir, 'a.ts')]);
+			assert.equal(result.status, 2);
+			assert.match(result.stderr, /--goal applies to --content\/--stdin/);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it('format paths writes in place, recurses, and skips excluded dirs', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
