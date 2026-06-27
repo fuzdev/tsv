@@ -61,7 +61,7 @@ the for-header `[~In]` into them; now they parse, and the formatter parenthesize
 `in` anywhere under a for-init (matching prettier, keeping it distinct from the
 `for (x in y)` separator).
 
-**The ~188 acorn-also-rejects** are not tsv bugs — they split into:
+**The ~189 acorn-also-rejects** are not tsv bugs — they split into:
 **sloppy-mode-only** (`with`, AnnexB `f() = g()` / `for (var a = x in b)`, legacy
 octal — tsv is strict-only); **strict-*Script*-only** (top-level `await` as a
 *binding*, e.g. `var await = 1` — valid in a strict Script but not a Module;
