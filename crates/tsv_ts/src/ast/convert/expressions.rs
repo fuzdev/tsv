@@ -8,17 +8,18 @@ use super::{
     convert_template_literal, convert_type, convert_type_annotation,
     convert_type_parameter_instantiation, convert_yield_expression, create_location,
 };
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker, Span};
+use tsv_lang::{LocationTracker, Span};
 
 /// Main expression conversion dispatcher
-pub fn convert_expression(
+pub fn convert_expression<'src>(
     expr: &internal::Expression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::Expression {
+) -> public::Expression<'src> {
     convert_expression_inner(expr, source, loc, interner, offset, false)
 }
 
@@ -27,14 +28,14 @@ pub fn convert_expression(
 /// When `in_chain` is false and a MemberExpression/CallExpression/TSNonNullExpression
 /// contains optional chaining (`?.`), it gets wrapped in ChainExpression. When `in_chain`
 /// is true (we're already inside a chain), no wrapping occurs.
-pub(in crate::ast::convert) fn convert_expression_inner(
+pub(in crate::ast::convert) fn convert_expression_inner<'src>(
     expr: &internal::Expression<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
     in_chain: bool,
-) -> public::Expression {
+) -> public::Expression<'src> {
     match expr {
         // A JSDoc cast is internal-only: unwrap to the inner expression so the
         // public AST stays paren-free (matching acorn/Svelte, which carry no
@@ -50,7 +51,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 start: id.span.start,
                 end: id.span.end,
                 loc: create_location(id.span, loc, offset),
-                name: interner.resolve_infallible(id.name).to_string(),
+                name: public::name_cow(id.span, source, id.name, interner),
                 optional: id.optional,
                 type_annotation: id
                     .type_annotation()
@@ -66,12 +67,15 @@ pub(in crate::ast::convert) fn convert_expression_inner(
             })
         }
         internal::Expression::PrivateIdentifier(pid) => {
+            // The span includes the leading `#`, but the public `name` excludes
+            // it — so borrow/resolve against the `#`-stripped span.
+            let name_span = Span::new(pid.span.start + 1, pid.span.end);
             public::Expression::PrivateIdentifier(public::PrivateIdentifier {
                 node_type: "PrivateIdentifier",
                 start: pid.span.start,
                 end: pid.span.end,
                 loc: create_location(pid.span, loc, offset),
-                name: interner.resolve_infallible(pid.name).to_string(),
+                name: public::name_cow(name_span, source, pid.name, interner),
             })
         }
         internal::Expression::ObjectExpression(obj) => {
@@ -109,7 +113,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 start: unary.span.start,
                 end: unary.span.end,
                 loc: create_location(unary.span, loc, offset),
-                operator: unary.operator.as_str().to_string(),
+                operator: unary.operator.as_str(),
                 prefix: unary.prefix,
                 argument: Box::new(convert_expression(
                     unary.argument,
@@ -126,7 +130,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 start: update.span.start,
                 end: update.span.end,
                 loc: create_location(update.span, loc, offset),
-                operator: update.operator.as_str().to_string(),
+                operator: update.operator.as_str(),
                 prefix: update.prefix,
                 argument: Box::new(convert_expression(
                     update.argument,
@@ -158,7 +162,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                     interner,
                     offset,
                 )),
-                operator: binary.operator.as_str().to_string(),
+                operator: binary.operator.as_str(),
                 right: Box::new(convert_expression(
                     binary.right,
                     source,
@@ -276,18 +280,17 @@ pub(in crate::ast::convert) fn convert_expression_inner(
             })
         }
         internal::Expression::RegexLiteral(regex) => {
-            // Reconstruct raw from source: /pattern/flags
-            let raw = regex.span.extract(source).to_string();
+            // Reconstruct raw/pattern/flags as borrowed source slices (verbatim).
             public::Expression::RegexLiteral(public::RegexLiteral {
                 node_type: "Literal", // Regex uses "Literal" type in acorn/Svelte AST
                 start: regex.span.start,
                 end: regex.span.end,
                 loc: create_location(regex.span, loc, offset),
                 value: serde_json::Value::Object(serde_json::Map::new()), // Empty object {}
-                raw,
+                raw: Cow::Borrowed(regex.span.extract(source)),
                 regex: public::RegexValue {
-                    pattern: regex.pattern(source).to_string(),
-                    flags: regex.flags(source).to_string(),
+                    pattern: Cow::Borrowed(regex.pattern(source)),
+                    flags: Cow::Borrowed(regex.flags(source)),
                 },
             })
         }
@@ -311,7 +314,7 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 start: assign.span.start,
                 end: assign.span.end,
                 loc: create_location(assign.span, loc, offset),
-                operator: assign.operator.as_str().to_string(),
+                operator: assign.operator.as_str(),
                 left: Box::new(convert_expression(
                     assign.left,
                     source,
@@ -524,8 +527,8 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 start: meta.span.start,
                 end: meta.span.end,
                 loc: create_location(meta.span, loc, offset),
-                meta: super::convert_identifier(&meta.meta, loc, interner, offset),
-                property: super::convert_identifier(&meta.property, loc, interner, offset),
+                meta: super::convert_identifier(&meta.meta, source, loc, interner, offset),
+                property: super::convert_identifier(&meta.property, source, loc, interner, offset),
             })
         }
         internal::Expression::TSParameterProperty(param_prop) => {
@@ -551,7 +554,9 @@ pub(in crate::ast::convert) fn convert_expression_inner(
                 start: param_prop.span.start,
                 end: param_prop.span.end,
                 loc: create_location(param_prop.span, loc, offset),
-                accessibility: param_prop.accessibility.map(|a| a.as_str().to_string()),
+                accessibility: param_prop
+                    .accessibility
+                    .map(internal::Accessibility::as_str),
                 readonly: param_prop.readonly,
                 r#override: param_prop.r#override,
                 parameter: Box::new(parameter),
@@ -575,13 +580,13 @@ fn child_in_chain(parent_start: u32, child_start: u32, needs_chain: bool, in_cha
 
 /// Conditionally wrap an expression in ChainExpression.
 /// Returns the expression as-is if `needs_chain` is false.
-fn maybe_wrap_chain(
-    inner: public::Expression,
+fn maybe_wrap_chain<'src>(
+    inner: public::Expression<'src>,
     span: Span,
     loc: &LocationTracker,
     offset: usize,
     needs_chain: bool,
-) -> public::Expression {
+) -> public::Expression<'src> {
     if needs_chain {
         public::Expression::ChainExpression(public::ChainExpression {
             node_type: "ChainExpression",
@@ -595,12 +600,12 @@ fn maybe_wrap_chain(
     }
 }
 
-fn convert_literal_expression(
+fn convert_literal_expression<'src>(
     lit: &internal::Literal<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     offset: usize,
-) -> public::Expression {
+) -> public::Expression<'src> {
     // undefined is a global identifier, not a literal
     if matches!(lit.value, internal::LiteralValue::Undefined) {
         return public::Expression::Identifier(public::Identifier {
@@ -608,7 +613,7 @@ fn convert_literal_expression(
             start: lit.span.start,
             end: lit.span.end,
             loc: create_location(lit.span, loc, offset),
-            name: "undefined".to_string(),
+            name: Cow::Borrowed("undefined"),
             optional: false,
             type_annotation: None,
             decorators: Vec::new(),
@@ -620,13 +625,13 @@ fn convert_literal_expression(
     public::Expression::Literal(super::convert_literal(lit, source, loc, offset))
 }
 
-fn convert_object_property(
+fn convert_object_property<'src>(
     prop: &internal::ObjectProperty<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ObjectProperty {
+) -> public::ObjectProperty<'src> {
     match prop {
         internal::ObjectProperty::Property(p) => {
             public::ObjectProperty::Property(convert_property(p, source, loc, interner, offset))

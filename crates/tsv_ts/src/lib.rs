@@ -156,7 +156,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
 /// let json = serde_json::to_string_pretty(&public_ast)?;
 /// ```
 #[cfg(feature = "convert")]
-pub fn convert_ast(program: &Program<'_>, source: &str) -> ast::public::Program {
+pub fn convert_ast<'src>(program: &Program<'_>, source: &'src str) -> ast::public::Program<'src> {
     let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
     ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn)
 }

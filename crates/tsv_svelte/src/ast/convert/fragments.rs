@@ -14,12 +14,12 @@ use super::{
     span_to_name_loc,
 };
 
-pub(super) fn convert_fragment(
+pub(super) fn convert_fragment<'src>(
     fragment: &internal::Fragment<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::Fragment {
+) -> public::Fragment<'src> {
     public::Fragment {
         node_type: "Fragment",
         nodes: fragment
@@ -30,12 +30,12 @@ pub(super) fn convert_fragment(
     }
 }
 
-pub(super) fn convert_fragment_node(
+pub(super) fn convert_fragment_node<'src>(
     node: &internal::FragmentNode<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::FragmentNode {
+) -> public::FragmentNode<'src> {
     match node {
         internal::FragmentNode::Element(elem) => {
             let converted = convert_element(elem, source, loc, interner);
@@ -100,12 +100,12 @@ fn convert_comment(comment: &internal::HtmlComment, source: &str) -> public::Com
     }
 }
 
-fn convert_element(
+fn convert_element<'src>(
     elem: &internal::Element<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::Element {
+) -> public::Element<'src> {
     // Set node_type based on element kind
     let node_type = match elem.kind {
         internal::ElementKind::Component => "Component",
@@ -128,12 +128,12 @@ fn convert_element(
     }
 }
 
-pub(super) fn convert_expression_tag(
+pub(super) fn convert_expression_tag<'src>(
     tag: &internal::ExpressionTag<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::ExpressionTag {
+) -> public::ExpressionTag<'src> {
     // Delegate to tsv_ts for expression conversion
     let ts_expr =
         tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);

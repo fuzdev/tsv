@@ -7,17 +7,18 @@ use super::{
     convert_expression, convert_identifier, convert_type_annotation,
     convert_type_parameter_declaration, create_location, json_number_from_f64,
 };
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
 
-pub(in crate::ast) fn convert_import_specifier(
+pub(in crate::ast) fn convert_import_specifier<'src>(
     spec: &internal::ImportSpecifier<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
     schema: Schema,
-) -> public::ImportSpecifier {
+) -> public::ImportSpecifier<'src> {
     match spec {
         internal::ImportSpecifier::Default(default_spec) => {
             public::ImportSpecifier::Default(public::ImportDefaultSpecifier {
@@ -25,7 +26,7 @@ pub(in crate::ast) fn convert_import_specifier(
                 start: default_spec.span.start,
                 end: default_spec.span.end,
                 loc: create_location(default_spec.span, loc, offset),
-                local: convert_identifier(&default_spec.local, loc, interner, offset),
+                local: convert_identifier(&default_spec.local, source, loc, interner, offset),
             })
         }
         internal::ImportSpecifier::Named(named_spec) => {
@@ -34,10 +35,10 @@ pub(in crate::ast) fn convert_import_specifier(
                     if schema.is_svelte_script() {
                         None
                     } else {
-                        Some("value".to_string())
+                        Some("value")
                     }
                 }
-                internal::ImportKind::Type => Some("type".to_string()),
+                internal::ImportKind::Type => Some("type"),
             };
             public::ImportSpecifier::Named(public::ImportNamedSpecifier {
                 node_type: "ImportSpecifier",
@@ -51,7 +52,7 @@ pub(in crate::ast) fn convert_import_specifier(
                     interner,
                     offset,
                 ),
-                local: convert_identifier(&named_spec.local, loc, interner, offset),
+                local: convert_identifier(&named_spec.local, source, loc, interner, offset),
                 import_kind,
             })
         }
@@ -61,23 +62,23 @@ pub(in crate::ast) fn convert_import_specifier(
                 start: ns_spec.span.start,
                 end: ns_spec.span.end,
                 loc: create_location(ns_spec.span, loc, offset),
-                local: convert_identifier(&ns_spec.local, loc, interner, offset),
+                local: convert_identifier(&ns_spec.local, source, loc, interner, offset),
             })
         }
     }
 }
 
-pub(in crate::ast) fn convert_import_attribute(
+pub(in crate::ast) fn convert_import_attribute<'src>(
     attr: &internal::ImportAttribute<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ImportAttribute {
+) -> public::ImportAttribute<'src> {
     let key = match &attr.key {
-        internal::ImportAttributeKey::Identifier(id) => {
-            public::ImportAttributeKey::Identifier(convert_identifier(id, loc, interner, offset))
-        }
+        internal::ImportAttributeKey::Identifier(id) => public::ImportAttributeKey::Identifier(
+            convert_identifier(id, source, loc, interner, offset),
+        ),
         internal::ImportAttributeKey::Literal(lit) => {
             public::ImportAttributeKey::Literal(convert_literal(lit, source, loc, offset))
         }
@@ -92,23 +93,23 @@ pub(in crate::ast) fn convert_import_attribute(
     }
 }
 
-pub(in crate::ast) fn convert_export_specifier(
+pub(in crate::ast) fn convert_export_specifier<'src>(
     spec: &internal::ExportSpecifier<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
     schema: Schema,
-) -> public::ExportSpecifier {
+) -> public::ExportSpecifier<'src> {
     let export_kind = match spec.export_kind {
         internal::ExportKind::Value => {
             if schema.is_svelte_script() {
                 None
             } else {
-                Some("value".to_string())
+                Some("value")
             }
         }
-        internal::ExportKind::Type => Some("type".to_string()),
+        internal::ExportKind::Type => Some("type"),
     };
     public::ExportSpecifier {
         node_type: "ExportSpecifier",
@@ -124,30 +125,30 @@ pub(in crate::ast) fn convert_export_specifier(
 /// Convert a `ModuleExportName` (import/export specifier name, or `export * as`
 /// namespace name): an identifier emits an `Identifier` node, a string a
 /// `Literal` node — mirroring acorn (`ModuleExportName : IdentifierName | StringLiteral`).
-pub(in crate::ast) fn convert_module_export_name(
+pub(in crate::ast) fn convert_module_export_name<'src>(
     name: &internal::ModuleExportName<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ModuleExportName {
+) -> public::ModuleExportName<'src> {
     match name {
-        internal::ModuleExportName::Identifier(id) => {
-            public::ModuleExportName::Identifier(convert_identifier(id, loc, interner, offset))
-        }
+        internal::ModuleExportName::Identifier(id) => public::ModuleExportName::Identifier(
+            convert_identifier(id, source, loc, interner, offset),
+        ),
         internal::ModuleExportName::Literal(lit) => {
             public::ModuleExportName::Literal(convert_literal(lit, source, loc, offset))
         }
     }
 }
 
-pub(in crate::ast) fn convert_export_default_value(
+pub(in crate::ast) fn convert_export_default_value<'src>(
     value: &internal::ExportDefaultValue<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ExportDefaultValue {
+) -> public::ExportDefaultValue<'src> {
     match value {
         internal::ExportDefaultValue::Expression(expr) => public::ExportDefaultValue::Expression(
             convert_expression(expr, source, loc, interner, offset),
@@ -171,12 +172,12 @@ pub(in crate::ast) fn convert_export_default_value(
 }
 
 // Helper to convert literal for import attributes and export sources
-pub(in crate::ast) fn convert_literal(
+pub(in crate::ast) fn convert_literal<'src>(
     lit: &internal::Literal<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     offset: usize,
-) -> public::Literal {
+) -> public::Literal<'src> {
     let (value, bigint) = match &lit.value {
         internal::LiteralValue::Number(n) => {
             (serde_json::Value::Number(json_number_from_f64(*n)), None)
@@ -200,19 +201,19 @@ pub(in crate::ast) fn convert_literal(
         end: lit.span.end,
         loc: create_location(lit.span, loc, offset),
         value,
-        raw: raw.to_string(),
+        raw: Cow::Borrowed(raw),
         bigint,
     }
 }
 
 // Helper for export default value conversion
-fn convert_function_to_public(
+fn convert_function_to_public<'src>(
     func: &internal::FunctionDeclaration<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::FunctionDeclaration {
+) -> public::FunctionDeclaration<'src> {
     public::FunctionDeclaration {
         node_type: "FunctionDeclaration",
         start: func.span.start,
@@ -221,7 +222,7 @@ fn convert_function_to_public(
         id: func
             .id
             .as_ref()
-            .map(|id| convert_identifier(id, loc, interner, offset)),
+            .map(|id| convert_identifier(id, source, loc, interner, offset)),
         expression: false,
         generator: func.generator,
         is_async: func.r#async,
@@ -243,13 +244,13 @@ fn convert_function_to_public(
 }
 
 // Helper for export default class conversion
-fn convert_class_declaration_local(
+fn convert_class_declaration_local<'src>(
     class: &internal::ClassDeclaration<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
     offset: usize,
-) -> public::ClassDeclaration {
+) -> public::ClassDeclaration<'src> {
     // Delegate to the main converter in declarations.rs
     convert_class_declaration(class, source, loc, interner, offset)
 }
