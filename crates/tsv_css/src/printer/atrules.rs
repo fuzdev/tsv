@@ -225,9 +225,21 @@ impl<'a> Printer<'a> {
 
                 // Format the child with appropriate indentation handling
                 match child {
-                    internal::CssBlockChild::Declaration(_) => {
+                    internal::CssBlockChild::Declaration(decl) => {
                         // Declaration will write its own indentation
                         self.print_atrule_block_child(child);
+
+                        // Keep a same-line trailing comment on the declaration line.
+                        // The nested-rule path (`print_atrule_block_child`'s Rule arm)
+                        // and the top-level rule path both do this; without it the
+                        // comment falls through to the next iteration and is printed as
+                        // a standalone comment on its own line.
+                        let inline_count = self.try_print_inline_comments_after_decl(
+                            block.children,
+                            i,
+                            decl.span.end,
+                        );
+                        i += inline_count;
                     }
                     internal::CssBlockChild::Rule(_) | internal::CssBlockChild::Atrule(_) => {
                         // Rules and at-rules need indentation
@@ -261,16 +273,14 @@ impl<'a> Printer<'a> {
 
             self.indent_level -= 1;
 
-            // Write the newline before `}` only when the last child didn't already
-            // end one. Declarations end with `\n`; an empty block has no children at
-            // all, so the `{\n` already opened the line — prettier renders empty
-            // at-rule blocks as `{\n}` (no blank line inside).
-            if !block.children.is_empty()
-                && !matches!(
-                    block.children.last(),
-                    Some(internal::CssBlockChild::Declaration(_))
-                )
-            {
+            // Write the newline before `}` only when the output didn't already end
+            // one. Declarations (and declarations with a trailing inline comment) and
+            // standalone comments end with `\n`; rules/at-rules end with `}`. An empty
+            // block leaves the `{\n` that opened the line — prettier renders empty
+            // at-rule blocks as `{\n}` (no blank line inside). Keying on the buffer
+            // rather than the last child's type keeps an inline-consumed trailing
+            // comment (still the last AST child) from adding a stray blank line.
+            if !self.output_ends_with_newline() {
                 self.write("\n");
             }
             self.write_indent();
