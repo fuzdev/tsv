@@ -9,7 +9,7 @@
 use super::{Printer, has_wrappable_args, value_normalization};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::PRINT_WIDTH;
-use tsv_lang::doc::{self, DocContext, Mode, arena::DocId};
+use tsv_lang::doc::{self, DocBuf, DocContext, Mode, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Write the declaration ending: optional `!important` tail and the semicolon with newline.
@@ -522,7 +522,7 @@ impl<'a> Printer<'a> {
     /// `printCommaSeparatedValueGroup` which returns `group(indent(fill(parts)))`.
     fn build_comma_fill_doc(&self, values: &[CssValue<'_>]) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for (i, val) in values.iter().enumerate() {
             if let CssValue::List {
                 values: list_values,
@@ -580,9 +580,9 @@ impl<'a> Printer<'a> {
     ///
     /// Returns `[val1, line, val2, line, val3]` — suitable for `d.fill()`.
     /// Used by both declaration wrapping and function arg wrapping.
-    pub(super) fn build_space_fill_parts(&self, values: &[CssValue<'_>]) -> Vec<DocId> {
+    pub(super) fn build_space_fill_parts(&self, values: &[CssValue<'_>]) -> DocBuf {
         let d = self.d();
-        let mut parts = Vec::with_capacity(values.len() * 2);
+        let mut parts = DocBuf::with_capacity(values.len() * 2);
         for (i, val) in values.iter().enumerate() {
             parts.push(self.build_css_value_doc(val));
             if i < values.len() - 1 {
@@ -717,7 +717,7 @@ impl<'a> Printer<'a> {
     /// Build fill doc parts from string slices
     fn build_fill_parts_from_strings(&self, parts: &[&str]) -> DocId {
         let d = self.d();
-        let mut doc_parts = Vec::with_capacity(parts.len() * 2);
+        let mut doc_parts = DocBuf::with_capacity(parts.len() * 2);
         for (i, part) in parts.iter().enumerate() {
             doc_parts.push(d.text_owned((*part).to_string()));
             if i < parts.len() - 1 {
