@@ -236,7 +236,10 @@ fn convert_directive_expression(
         let converted = tsv_ts::ast::convert::convert_expression(expr, source, loc, interner, 0);
         to_json_value(&converted)
     } else {
-        // Shorthand: synthetic identifier without loc, Svelte field ordering
+        // Shorthand: synthetic identifier without loc, Svelte field ordering.
+        // The shorthand form (`bind:x` / `class:x`) is built with a synthetic
+        // `make_shorthand_identifier`, so the expression is always an `Identifier`.
+        #[allow(clippy::unreachable)] // shorthand directive expr is a synthetic Identifier
         let tsv_ts::ast::internal::Expression::Identifier(id) = expr else {
             unreachable!("shorthand directive expression is always an Identifier");
         };

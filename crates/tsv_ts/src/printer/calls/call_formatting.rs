@@ -119,7 +119,9 @@ pub(super) fn build_call_doc_with_wrapping(
             None => callee,
         };
 
-        // Check for trailing comments on last arg
+        // Check for trailing comments on last arg. The empty-args case returned
+        // above, so `arguments` is non-empty here and `.last()` is always `Some`.
+        #[allow(clippy::unreachable)] // empty args already returned above ⇒ last() is Some
         let Some(last_arg) = call.arguments.last() else {
             unreachable!("is_test_call requires arguments");
         };

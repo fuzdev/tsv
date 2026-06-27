@@ -12,6 +12,7 @@ pub(crate) fn format_color_value(color: &Color) -> String {
         // `Named`/`Hex` carry no text — callers with a span use
         // `format_color_from_source`; this source-free path only handles the
         // computed `Rgb`/`Hsl` forms.
+        #[allow(clippy::unreachable)] // callers route Named/Hex to format_color_from_source first
         Color::Named | Color::Hex => {
             unreachable!("named/hex colors are rendered from source via format_color_from_source")
         }

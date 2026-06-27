@@ -281,7 +281,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     expression_tag_span,
                 }))
             }
-            DirectiveType::Style => unreachable!("handled above"),
+            #[allow(clippy::unreachable)] // Style directives return early before this match
+            DirectiveType::Style => unreachable!("Style directives are handled and returned above"),
             DirectiveType::Use => Ok(AttributeNode::UseDirective(UseDirective {
                 name_span,
                 expression,
@@ -349,20 +350,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let expr_tag = self.parse_expression_tag()?;
             Ok((expr_tag.expression, expr_tag.span))
         } else if self.check(TokenKind::String) {
-            // Quoted mustache form: "{expr}"
+            // Quoted mustache form: "{expr}" — must be exactly one ExpressionTag
+            // with no text parts. Popping the lone element extracts it owned.
             let mut parts = self.parse_attribute_value()?;
-            // Must be exactly one ExpressionTag with no text parts
-            match parts.as_mut_slice() {
-                [AttributeValue::ExpressionTag(_)] => {
-                    // Safety: slice match above confirmed exactly one ExpressionTag element
-                    let Some(AttributeValue::ExpressionTag(expr_tag)) = parts.pop() else {
-                        unreachable!("matched single ExpressionTag element")
-                    };
-                    Ok((expr_tag.expression, expr_tag.span))
-                }
-                _ => Err(self.error_msg(
+            if parts.len() == 1
+                && let Some(AttributeValue::ExpressionTag(expr_tag)) = parts.pop()
+            {
+                Ok((expr_tag.expression, expr_tag.span))
+            } else {
+                Err(self.error_msg(
                     "Quoted directive value must contain a single expression, e.g. \"{expr}\"",
-                )),
+                ))
             }
         } else {
             Err(self.error_msg("Directive value must be an expression wrapped in {}"))
@@ -407,16 +405,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             } else if self.check(TokenKind::String) {
                 // Parse string value like "red" or quoted mustache like "{value}"
                 let mut parts = self.parse_attribute_value()?;
-                // Quoted mustache "{expr}" → ExpressionTag (quotes stripped)
-                match parts.as_mut_slice() {
-                    [AttributeValue::ExpressionTag(_)] => {
-                        // Safety: slice match above confirmed exactly one ExpressionTag element
-                        let Some(AttributeValue::ExpressionTag(expr_tag)) = parts.pop() else {
-                            unreachable!("matched single ExpressionTag element")
-                        };
+                // A lone quoted mustache "{expr}" becomes an ExpressionTag (quotes
+                // stripped); any other shape (text, multiple parts) stays as raw
+                // value parts. Pop the last element to test/extract it owned.
+                match parts.pop() {
+                    Some(AttributeValue::ExpressionTag(expr_tag)) if parts.is_empty() => {
                         StyleDirectiveValue::ExpressionTag(expr_tag)
                     }
-                    _ => StyleDirectiveValue::Parts(parts.into_bump_slice()),
+                    popped => {
+                        // Not a lone ExpressionTag: restore the popped part and keep
+                        // everything as raw value parts.
+                        if let Some(part) = popped {
+                            parts.push(part);
+                        }
+                        StyleDirectiveValue::Parts(parts.into_bump_slice())
+                    }
                 }
             } else if self.check(TokenKind::Identifier) {
                 // Unquoted value: style:background=green

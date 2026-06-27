@@ -129,6 +129,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         // peek_cache is guaranteed Some after the if block above
         match &self.peek_cache {
             Some(data) => Ok(&data.kind),
+            #[allow(clippy::unreachable)] // peek_cache was set Some immediately above
             None => unreachable!("peek_cache was just populated"),
         }
     }

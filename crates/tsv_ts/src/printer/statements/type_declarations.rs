@@ -4,7 +4,7 @@
 use super::{Printer, build_entity_name_doc, should_hug_union_type};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
-use crate::printer::{CommentFilter, CommentSpacing};
+use crate::printer::{CommentFilter, CommentSpacing, HeritageKeyword};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -399,7 +399,7 @@ impl<'a> Printer<'a> {
         // Build extends doc, with comments between `extends` keyword and first item
         let extends_doc = if !decl.extends.is_empty() {
             Some(self.build_heritage_clause_doc(
-                "extends",
+                HeritageKeyword::Extends,
                 decl.extends,
                 group_mode,
                 extends_keyword_start,

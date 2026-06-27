@@ -451,17 +451,17 @@ impl<'a> Printer<'a> {
             parts.push(self.build_expression_doc(&prop.key));
         }
 
-        // Optional/definite modifier after key, with comment extraction
-        let after_modifier = if prop.modifier != internal::PropertyModifier::None {
-            let modifier_char = match prop.modifier {
-                internal::PropertyModifier::Optional => b'?',
-                internal::PropertyModifier::Definite => b'!',
-                internal::PropertyModifier::None => unreachable!(),
-            };
-            // Comments between key and modifier (e.g., `a /* c */? = 1;`)
-            self.push_modifier_marker_doc(&mut parts, key_region_end, modifier_char)
-        } else {
-            key_region_end
+        // Optional/definite modifier after key, with comment extraction.
+        // `push_modifier_marker_doc` also captures comments between key and marker
+        // (e.g., `a /* c */? = 1;`); `None` simply has no marker to emit.
+        let after_modifier = match prop.modifier {
+            internal::PropertyModifier::None => key_region_end,
+            internal::PropertyModifier::Optional => {
+                self.push_modifier_marker_doc(&mut parts, key_region_end, b'?')
+            }
+            internal::PropertyModifier::Definite => {
+                self.push_modifier_marker_doc(&mut parts, key_region_end, b'!')
+            }
         };
 
         // Type annotation - width-aware wrapping for generics and union types,

@@ -38,7 +38,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
 
     // Check for arguments: :nth-child(2n+1), :is(), :not(), etc.
     let args = if parser.check(TokenKind::LeftParen) {
-        let (args_opt, args_end) = parse_pseudo_args(parser, name)?;
+        let (args_opt, args_end) = parse_pseudo_args(parser, name, is_pseudo_element)?;
         end = args_end; // Use end of closing paren
         args_opt
     } else {
@@ -71,9 +71,18 @@ pub(crate) fn parse_pseudo_selector<'arena>(
 /// - :nth-child(), :nth-of-type(), :nth-last-child(), :nth-last-of-type() → PseudoClassArgs::Nth
 /// - :is(), :not(), :where(), :has(), :global() → PseudoClassArgs::SelectorList
 /// - Others: returns None (unknown pseudo-classes)
+///
+/// `is_pseudo_element` distinguishes `::slotted`/`::part` (the real pseudo-elements,
+/// which build the dedicated `Slotted`/`Part` args dropped from the public AST) from
+/// a single-colon `:slotted(.x)`/`:part(foo)`, which Svelte accepts as an ordinary
+/// pseudo-class with a selector-list argument. Gating on the flag keeps the
+/// `Slotted`/`Part` args off pseudo-classes, so they fall through to the generic
+/// selector-list path and convert to a `PseudoClassSelector` matching Svelte —
+/// rather than reaching the convert layer, which exposes no pseudo-element args.
 fn parse_pseudo_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     pseudo_name: &str,
+    is_pseudo_element: bool,
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
     parser.expect(TokenKind::LeftParen)?;
 
@@ -83,7 +92,9 @@ fn parse_pseudo_args<'arena>(
     //
     // Per CSS Scoping Module Level 1: `::slotted( <compound-selector> )`
     // A compound selector is a sequence of simple selectors without combinators.
-    if pseudo_name == "slotted" {
+    // Only the `::` pseudo-element form builds these args; a single-colon `:slotted(...)`
+    // falls through to the generic selector-list path (matching Svelte's PseudoClassSelector).
+    if is_pseudo_element && pseudo_name == "slotted" {
         parser.skip_whitespace_and_comments()?;
 
         // Parse compound selector (sequence of simple selectors, no combinators)
@@ -142,7 +153,9 @@ fn parse_pseudo_args<'arena>(
     //
     // Per CSS Shadow Parts Specification: `::part( <ident>+ )`
     // One or more space-separated identifiers (NOT selectors).
-    if pseudo_name == "part" {
+    // Only the `::` pseudo-element form builds these args; a single-colon `:part(...)`
+    // falls through to the generic selector-list path (matching Svelte's PseudoClassSelector).
+    if is_pseudo_element && pseudo_name == "part" {
         parser.skip_whitespace_and_comments()?;
 
         let mut idents = parser.bvec();
@@ -250,7 +263,9 @@ fn parse_pseudo_args<'arena>(
                 // :not() and :global() use complex selectors (strict parsing)
                 parse_complex_selector_list(parser)?
             }
-            _ => unreachable!(),
+            // The enclosing `matches!` restricts `pseudo_name` to exactly these five.
+            #[allow(clippy::unreachable)] // guarded by the matches! above
+            _ => unreachable!("pseudo_name is is/not/where/has/global per the matches! guard"),
         };
 
         parser.skip_whitespace_and_comments()?;

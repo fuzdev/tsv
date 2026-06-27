@@ -107,7 +107,6 @@ lang_bindings!(
 // These call the plain Rust functions the `#[napi]` macro wraps; the JS
 // marshalling layer is what `scripts/test_napi.ts` covers under Node.
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

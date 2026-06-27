@@ -26,6 +26,8 @@ pub(crate) fn format_string_literal_from_ast(
     source: &str,
 ) -> String {
     let raw_literal = literal.span.extract(source);
+    // A string literal's source slice always includes both quote delimiters, so
+    // `raw_literal.len() >= 2` and stripping one byte from each end is in bounds.
     let raw_content = &raw_literal[1..raw_literal.len() - 1];
 
     debug_assert!(
@@ -51,6 +53,8 @@ pub(crate) fn format_string_literal_from_ast(
 ///
 /// `raw` is the literal *with* its surrounding quotes (the source slice).
 pub(crate) fn format_directive(raw: &str) -> String {
+    // `raw` is the directive literal with its surrounding quotes (≥2 bytes), so
+    // stripping one quote from each end is in bounds.
     let content = &raw[1..raw.len() - 1];
     if content.contains('\'') || content.contains('"') {
         raw.to_string()

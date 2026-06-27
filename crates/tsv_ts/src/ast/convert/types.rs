@@ -455,6 +455,7 @@ fn convert_literal_type<'src>(
         internal::TSLiteralType::UnaryExpression(unary) => {
             // Convert UnaryExpression for negative number types like `-1`
             // Get the argument literal (parser guarantees this is always a Literal)
+            #[allow(clippy::unreachable)] // parser builds this variant only with a Literal argument
             let internal::Expression::Literal(arg_lit) = unary.argument else {
                 unreachable!(
                     "parser only creates TSLiteralType::UnaryExpression with Literal argument"

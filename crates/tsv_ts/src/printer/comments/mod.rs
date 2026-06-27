@@ -31,6 +31,8 @@ mod paren;
 mod render;
 mod scan;
 
+pub(crate) use declarations::HeritageKeyword;
+
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};
 

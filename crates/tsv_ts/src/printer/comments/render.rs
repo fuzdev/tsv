@@ -62,6 +62,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
         let lines: Vec<&str> = content.split('\n').collect();
+        #[allow(clippy::unreachable)] // content has a newline ⇒ split yields ≥2 lines
         let [first, middle @ .., last] = lines.as_slice() else {
             unreachable!("multi-line comment");
         };
@@ -98,6 +99,7 @@ impl<'a> Printer<'a> {
 
         // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
         let lines: Vec<&str> = stripped.split('\n').collect();
+        #[allow(clippy::unreachable)] // stripped retains the newline ⇒ split yields ≥2 lines
         let [first, middle @ .., last] = lines.as_slice() else {
             unreachable!("multi-line comment");
         };

@@ -165,6 +165,8 @@ impl<'arena> StringCooked<'arena> {
         match self {
             StringCooked::Verbatim => {
                 let raw = span.extract(source);
+                // The string token's source slice always includes both quote
+                // delimiters (≥2 bytes), so stripping one from each end is in bounds.
                 &raw[1..raw.len() - 1]
             }
             StringCooked::Decoded(decoded) => decoded,

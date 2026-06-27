@@ -253,7 +253,6 @@ pub unsafe extern "C" fn tsv_free(ptr: *mut u8, len: usize) {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
