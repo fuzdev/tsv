@@ -16,10 +16,10 @@ at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,149 graded after skips).
 
-- Positive (should parse) — 41,841 passed, 58 failed
-- Negative (should reject) — 1,158 passed, 3,092 failed
+- Positive (should parse) — 41,845 passed, 54 failed
+- Negative (should reject) — 1,157 passed, 3,093 failed
 
-- **Overall**: 42,999/46,149 (93.2%)
+- **Overall**: 43,002/46,149 (93.2%)
 - **Positive pass rate**: 99.9% — valid syntax tsv accepts
 - **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
 
@@ -31,9 +31,9 @@ import proposals (`source-phase-imports` / `import.source(…)` and `import-defe
 `Expected 'meta' after 'import.'`. They drop out of both the headline pass rate
 and the differential manifest. See [Scope](#what-we-skip).
 
-**Triaging the positive failures against the drop-in oracle.** Each of the 58 is
+**Triaging the positive failures against the drop-in oracle.** Each of the 54 is
 parsed with the canonical parser (acorn-typescript in module mode — what the
-fixtures' `expected.json` is generated from). **~14 are genuine tsv-vs-acorn bugs
+fixtures' `expected.json` is generated from). **~10 are genuine tsv-vs-acorn bugs
 (acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~44
 are rejected by acorn too (not tsv-specific). _(Methodology: parse each
 `../test262/<path>` with `canonical_parse` and bucket on whether it yields an
@@ -41,12 +41,8 @@ AST. An earlier triage used a wrong path prefix, so every file came back
 "not found" and was mis-bucketed as rejected — the corrected sweep below is
 authoritative.)_
 
-**The ~14 real bugs**, by cluster:
+**The ~10 real bugs**, by cluster:
 
-- **Module export/import name = reserved word (4)** — `export * as default`,
-  `export { x as class }`, import specifiers naming a reserved word. An
-  export/import name is an `IdentifierName` (reserved words allowed), not a
-  `BindingIdentifier`.
 - **Rest parameter with a destructuring pattern (2)** — `function f(...[a, b]) {}`,
   `function f(...{ a }) {}`. A rest element can be a `BindingPattern`, not only an
   identifier.
