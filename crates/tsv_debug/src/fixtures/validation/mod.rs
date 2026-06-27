@@ -178,7 +178,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
         // convert_ast_json materialization for 2/2b/2c). The arena owns the
         // internal AST and must outlive `parsed` (caller-owns-`Bump`).
         let arena = bumpalo::Bump::new();
-        match parse_input(&input, input_type, &arena) {
+        match parse_input(&input, input_type, fixture.goal(), &arena) {
             Ok(parsed) => {
                 match input_ast_paths(&parsed, &input) {
                     Ok(paths) => {
@@ -201,7 +201,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
 
                 // Phase 2d: Typed-walk parity probes — synthesized multibyte
                 // variants and extracted <script> contents (pure Rust)
-                validate_typed_walk_parity(&mut result, &input, &parsed);
+                validate_typed_walk_parity(&mut result, &input, &parsed, fixture.goal());
             }
             Err(e) => {
                 // One parse failure, one error — svelte_divergence fixtures

@@ -490,10 +490,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse optional parameter: (param) or (param: type) or ({destructuring}) or ({destructuring}: Type)
         let param = if self.eat(TokenKind::ParenOpen) {
             let param = match self.current_kind() {
-                TokenKind::Identifier => {
-                    // Simple identifier: catch (e) or catch (e: Error)
+                // Simple identifier: catch (e) or catch (e: Error). Also `await`
+                // as a `BindingIdentifier`, valid only at Script goal in a
+                // `[~Await]` context (`at_await_identifier`).
+                k if matches!(k, TokenKind::Identifier) || self.at_await_identifier() => {
                     let (id_start, id_end) = self.current_pos();
-                    let symbol = self.intern_identifier();
+                    let symbol = self.intern_identifier_or_await();
                     self.advance()?;
 
                     // Check for type annotation: param: type
@@ -579,10 +581,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for optional label (no line terminator allowed)
         // If ASI can apply, treat as no label
         let label = if !self.can_insert_semicolon()
-            && matches!(self.current_kind(), TokenKind::Identifier)
+            && (matches!(self.current_kind(), TokenKind::Identifier) || self.at_await_identifier())
         {
             let (label_start, label_end) = self.current_pos();
-            let symbol = self.intern_identifier();
+            // Plain identifier, or `await` as a `LabelIdentifier` target at Script
+            // `[~Await]` (`break await` / `continue await`); reserved at Module.
+            let symbol = self.intern_identifier_or_await();
             self.advance()?;
             Some(Identifier::simple(
                 symbol,
@@ -614,10 +618,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for optional label (no line terminator allowed)
         // If ASI can apply, treat as no label
         let label = if !self.can_insert_semicolon()
-            && matches!(self.current_kind(), TokenKind::Identifier)
+            && (matches!(self.current_kind(), TokenKind::Identifier) || self.at_await_identifier())
         {
             let (label_start, label_end) = self.current_pos();
-            let symbol = self.intern_identifier();
+            // Plain identifier, or `await` as a `LabelIdentifier` target at Script
+            // `[~Await]` (`break await` / `continue await`); reserved at Module.
+            let symbol = self.intern_identifier_or_await();
             self.advance()?;
             Some(Identifier::simple(
                 symbol,
@@ -656,9 +662,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_labeled_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, label_end) = self.current_pos();
 
-        // Parse label identifier
-        debug_assert!(matches!(self.current_kind(), TokenKind::Identifier));
-        let symbol = self.intern_identifier();
+        // Parse label identifier. Normally a plain identifier; also `await` at
+        // Script `[~Await]` (a valid `LabelIdentifier`), which the statement
+        // dispatcher routes here as a keyword token.
+        let symbol = self
+            .try_intern_identifier_or_keyword()
+            .ok_or_else(|| self.error_expected("label"))?;
         self.advance()?;
 
         let label = Identifier::simple(symbol, Span::new(start as u32, label_end as u32));

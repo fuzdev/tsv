@@ -4,10 +4,10 @@
  * Consumes the manifest emitted by
  *   cargo run -p tsv_debug test262 --emit-manifest <file>
  * (tsv's graded strict subset — each row carries the test's `expected` verdict
- * and tsv's actual verdict), runs oxc-parser over the same files in the same
- * mode (`sourceType: 'module'` — tsv parses every graded test as a strict ES
- * module; it has no script mode), and buckets the agreement so a tsv failure
- * can be triaged as a real bug vs. a shared limitation. The two starred buckets
+ * and tsv's actual verdict), runs oxc-parser over the same files at the same
+ * goal tsv grades each at (`module`-flagged → module, else strict script — tsv
+ * supports both goals, always strict), and buckets the agreement so a tsv
+ * failure can be triaged as a real bug vs. a shared limitation. The two starred buckets
  * are the actionable output:
  *   - positives where tsv rejects but oxc accepts → tsv real-bug candidates
  *   - negatives where oxc rejects but tsv accepts → tsv early-error gaps
@@ -66,14 +66,18 @@ console.error(
 );
 
 /**
- * oxc's accept/reject verdict for one source. Parsed as a module to mirror tsv
- * (which has no script mode), so script-only tests reject on both sides and
- * land in `both-reject` — correctly NOT flagged as tsv-specific. A non-empty
- * `errors` array, or a throw, counts as reject.
+ * oxc's accept/reject verdict for one source, parsed at the test's goal to
+ * mirror tsv: `module`-flagged tests as a module, everything else (the
+ * run-both-ways default + `onlyStrict`) as a strict script — the same goal tsv
+ * grades it at (`module` comes from the manifest). So an `await`-as-identifier
+ * test, valid only in a script, now lands in `both-accept` rather than
+ * `both-reject`. A non-empty `errors` array, or a throw, counts as reject.
  */
-function oxc_verdict(filename: string, source: string): Verdict {
+function oxc_verdict(filename: string, source: string, module: boolean): Verdict {
 	try {
-		const result = oxc.parseSync(filename, source, { sourceType: 'module' });
+		const result = oxc.parseSync(filename, source, {
+			sourceType: module ? 'module' : 'script',
+		});
 		return result.errors && result.errors.length > 0 ? 'reject' : 'accept';
 	} catch {
 		return 'reject';
@@ -108,7 +112,7 @@ for (const t of manifest.tests) {
 		continue;
 	}
 
-	const oxc_v = oxc_verdict(t.relative_path, source);
+	const oxc_v = oxc_verdict(t.relative_path, source, t.module);
 	const row: Row = {
 		path: t.relative_path,
 		module: t.module,

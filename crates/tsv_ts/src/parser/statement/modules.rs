@@ -30,6 +30,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_export_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
+        // `export` declarations are reachable only via `ModuleItem` — a Script
+        // goal has no export declarations.
+        if self.goal != crate::Goal::Module {
+            return Err(self.error_msg("'export' is only allowed in a module"));
+        }
+
         // Consume 'export' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -459,6 +465,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - `import x from "y" with { type: "json" }` (import attributes)
     pub(super) fn parse_import_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
+
+        // `import` declarations are reachable only via `ModuleItem`. (Dynamic
+        // `import(...)` and `import.meta` are expressions, parsed elsewhere — the
+        // statement dispatcher routes `import(`/`import.` there before here.)
+        if self.goal != crate::Goal::Module {
+            return Err(self.error_msg("'import' is only allowed in a module"));
+        }
 
         // Consume 'import' keyword
         debug_assert!(matches!(

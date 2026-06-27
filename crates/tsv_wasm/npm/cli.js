@@ -23,10 +23,12 @@ import {
 	format_css,
 	format_svelte,
 	format_typescript,
+	format_typescript_with_goal,
 	IgnoreStack,
 	parse_css_json,
 	parse_svelte_json,
 	parse_typescript_json,
+	parse_typescript_json_with_goal,
 } from './index.js';
 
 /** tsv's native ignore file, discovered hierarchically (one per directory).
@@ -73,7 +75,7 @@ Run \`tsv <command> --help\` for command flags.
 `;
 
 const FORMAT_HELP =
-	`Usage: tsv format [<paths...>] [--check] [--list] [--content <s> | --stdin] [--parser <p>]
+	`Usage: tsv format [<paths...>] [--check] [--list] [--content <s> | --stdin] [--parser <p>] [--goal <g>]
 
 Format source code in place (near-Prettier output).
 
@@ -87,6 +89,7 @@ Options:
   --content <s>     content to format, printed to stdout (requires --parser)
   --stdin           read from stdin, print to stdout (requires --parser)
   --parser <p>      parser type: svelte | typescript | css (--content/--stdin only)
+  --goal <g>        TypeScript parse goal: script | module (default: module; --content/--stdin only)
   --check           check instead of writing/printing: exit 1 if any input would change
   --list            list the discovered in-scope files (one per line) without formatting; path mode only
   --jobs <n>        accepted for native-CLI parity and ignored (single-threaded)
@@ -94,7 +97,7 @@ Options:
 Exit codes: 0 clean, 1 would change (--check), 2 errors.
 `;
 
-const PARSE_HELP = `Usage: tsv parse [<file>] [--pretty] [--content <s> | --stdin] [--parser <p>]
+const PARSE_HELP = `Usage: tsv parse [<file>] [--pretty] [--content <s> | --stdin] [--parser <p>] [--goal <g>]
 
 Parse source code into AST JSON.
 
@@ -103,6 +106,7 @@ Options:
   --content <s>     content to parse (requires --parser)
   --stdin           read from stdin (requires --parser)
   --parser <p>      parser type: svelte | typescript | css
+  --goal <g>        TypeScript parse goal: script | module (default: module)
 `;
 
 main();
@@ -178,6 +182,16 @@ function resolve_parser(name) {
 	return resolved;
 }
 
+/** Validate a `--goal` value (the TypeScript goal axis), or exit `code` — the
+ * native CLI validates it at the argument layer (`parse_goal_arg`), so a bad
+ * value is an argument error (`parse` exits 1, `format` exits 2). Absent → `undefined`
+ * (the `module` default); the goal only affects the TypeScript parser. */
+function resolve_goal(goal, code) {
+	if (goal === undefined || goal === 'module' || goal === 'script') return goal;
+	eprint(`Error: invalid --goal '${goal}' (expected 'script' or 'module')\n`);
+	process.exit(code);
+}
+
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
 function parser_from_extension(path) {
 	if (path.endsWith('.svelte')) return 'svelte';
@@ -192,6 +206,7 @@ function run_format(args) {
 			content: { type: 'string' },
 			stdin: { type: 'boolean' },
 			parser: { type: 'string' },
+			goal: { type: 'string' },
 			check: { type: 'boolean' },
 			list: { type: 'boolean' },
 			jobs: { type: 'string' },
@@ -211,14 +226,17 @@ function run_format(args) {
 		process.exit(1);
 	}
 	if (values.content !== undefined || values.stdin) {
-		format_single(values, positionals, parser);
+		// --goal is content/stdin-only and TypeScript-only; a bad value is a usage
+		// error (exit 2, format parity). Path mode rejects --goal in format_paths.
+		const goal = resolve_goal(values.goal, 2);
+		format_single(values, positionals, parser, goal);
 	} else {
 		format_paths(values, positionals);
 	}
 }
 
 /** `--content`/`--stdin` mode — format one input to stdout (or `--check` it). */
-function format_single(values, positionals, parser) {
+function format_single(values, positionals, parser, goal) {
 	if (positionals.length > 0) {
 		eprint('Error: --content/--stdin cannot be combined with file paths\n');
 		process.exit(2);
@@ -239,7 +257,11 @@ function format_single(values, positionals, parser) {
 	const input = values.content !== undefined ? values.content : read_stdin(2);
 	let formatted;
 	try {
-		formatted = FORMATTERS[parser](input);
+		// --goal applies only to the TypeScript parser (svelte is always a module,
+		// css has no goal); svelte/css ignore it, matching the native CLI.
+		formatted = parser === 'typescript' && goal !== undefined
+			? format_typescript_with_goal(input, goal)
+			: FORMATTERS[parser](input);
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
 		process.exit(2);
@@ -264,6 +286,10 @@ function format_paths(values, positionals) {
 		eprint(
 			'Error: --parser applies to --content/--stdin; file paths use extension detection\n',
 		);
+		process.exit(2);
+	}
+	if (values.goal !== undefined) {
+		eprint('Error: --goal applies to --content/--stdin; file paths are formatted as modules\n');
 		process.exit(2);
 	}
 	if (values.list && values.check) {
@@ -352,6 +378,7 @@ function run_parse(args) {
 			content: { type: 'string' },
 			stdin: { type: 'boolean' },
 			parser: { type: 'string' },
+			goal: { type: 'string' },
 			help: { type: 'boolean' },
 		},
 		PARSE_HELP,
@@ -359,6 +386,9 @@ function run_parse(args) {
 
 	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
 	const flag_parser = values.parser === undefined ? undefined : resolve_parser(values.parser);
+	// --goal is validated upfront (exit 1) like the native CLI; it only affects the
+	// TypeScript parser (svelte is always a module, css has no goal).
+	const goal = resolve_goal(values.goal, 1);
 	if (positionals.length > 1) {
 		eprint(`Unrecognized argument: ${positionals[1]}\n`);
 		process.exit(1);
@@ -397,7 +427,9 @@ function run_parse(args) {
 
 	let json;
 	try {
-		json = PARSERS[parser](input);
+		json = parser === 'typescript' && goal !== undefined
+			? parse_typescript_json_with_goal(input, goal)
+			: PARSERS[parser](input);
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
 		process.exit(1);

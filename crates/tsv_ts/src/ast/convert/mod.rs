@@ -303,7 +303,7 @@ pub fn convert_program<'src>(
             .iter()
             .map(|s| convert_statement(s, source, loc, &interner, 0, schema))
             .collect(),
-        source_type: "module",
+        source_type: program.goal.source_type(),
     }
 }
 

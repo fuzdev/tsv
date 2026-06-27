@@ -110,6 +110,9 @@ pub struct Program<'arena> {
     pub line_breaks: Vec<u32>,
     pub span: Span,
     pub interner: std::rc::Rc<std::cell::RefCell<DefaultStringInterner>>,
+    /// The goal symbol this program was parsed against. Drives the public AST's
+    /// `sourceType` and (eventually) the goal-specific grammar gates.
+    pub goal: crate::Goal,
 }
 
 /// Decorator: `@expression` applied to classes and class members

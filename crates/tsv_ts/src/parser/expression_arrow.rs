@@ -62,15 +62,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params
         let (params_start, _) = self.current_pos();
 
-        // Parse parameter list
-        let params = self.parse_parameter_list()?.into_bump_slice();
-
-        // Check for return type annotation: <T>(): type => ... or type predicate
-        let return_type = self.parse_optional_return_type()?;
-
-        self.expect(&TokenKind::Arrow)?; // consume '=>'
-
-        let body = self.parse_arrow_body()?;
+        // Params + body in the arrow's `[~Await]` context (a non-async arrow is
+        // `[~Await]`; the return type between them is await-free).
+        let (params, return_type, body) = self.with_in_await(false, |p| {
+            let params = p.parse_parameter_list()?.into_bump_slice();
+            // Return type annotation: <T>(): type => ... or type predicate
+            let return_type = p.parse_optional_return_type()?;
+            p.expect(&TokenKind::Arrow)?; // consume '=>'
+            let body = p.parse_arrow_body()?;
+            Ok((params, return_type, body))
+        })?;
         let end = self.prev_token_end() as u32;
 
         Ok(Expression::ArrowFunctionExpression(
@@ -121,15 +122,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params
         let (params_start, _) = self.current_pos();
 
-        // Parse parameter list (reuse shared method)
-        let params = self.parse_parameter_list()?.into_bump_slice();
-
-        // Check for return type annotation: (): type => ... or type predicate
-        let return_type = self.parse_optional_return_type()?;
-
-        self.expect(&TokenKind::Arrow)?; // consume '=>'
-
-        let body = self.parse_arrow_body()?;
+        // Params + body in the arrow's `[~Await]` context (non-async).
+        let (params, return_type, body) = self.with_in_await(false, |p| {
+            let params = p.parse_parameter_list()?.into_bump_slice();
+            // Return type annotation: (): type => ... or type predicate
+            let return_type = p.parse_optional_return_type()?;
+            p.expect(&TokenKind::Arrow)?; // consume '=>'
+            let body = p.parse_arrow_body()?;
+            Ok((params, return_type, body))
+        })?;
         let end = self.prev_token_end() as u32;
 
         Ok(Expression::ArrowFunctionExpression(
@@ -151,10 +152,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
-        // Parse the single identifier parameter
-        debug_assert!(matches!(self.current_kind(), TokenKind::Identifier));
+        // Parse the single parameter: a plain identifier, or `await` as a
+        // `BindingIdentifier` at Script `[~Await]` (`await => …`).
+        debug_assert!(
+            matches!(self.current_kind(), TokenKind::Identifier) || self.at_await_identifier()
+        );
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
+        let symbol = self.intern_identifier_or_await();
         self.advance()?;
 
         let mut params = self.bvec();
@@ -166,7 +170,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
-        let body = self.parse_arrow_body()?;
+        // Non-async single-param arrow body is `[~Await]`.
+        let body = self.with_in_await(false, Self::parse_arrow_body)?;
         let end = self.prev_token_end() as u32;
 
         Ok(Expression::ArrowFunctionExpression(
@@ -197,7 +202,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         {
             let (paren_pos, _) = self.current_pos();
             (
-                self.parse_parameter_list()?.into_bump_slice(),
+                // Async arrow params are `[+Await]`.
+                self.with_in_await(true, Self::parse_parameter_list)?
+                    .into_bump_slice(),
                 Some(paren_pos as u32),
             )
         } else if type_parameters.is_none() && matches!(self.current_kind(), TokenKind::Identifier)
@@ -222,7 +229,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         self.expect(&TokenKind::Arrow)?; // consume '=>'
 
-        let body = self.parse_arrow_body()?;
+        // Async arrow body is `[+Await]`.
+        let body = self.with_in_await(true, Self::parse_arrow_body)?;
         let end = self.prev_token_end() as u32;
 
         Ok(Expression::ArrowFunctionExpression(

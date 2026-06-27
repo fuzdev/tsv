@@ -35,6 +35,21 @@ measurably slower.
 forward the wire format (disk, network, another tool) without paying
 `JSON.parse` for an object they don't need.
 
+## TypeScript Goal-Aware Exports
+
+`parse_typescript_json_with_goal(source, goal)` and
+`format_typescript_with_goal(source, goal)` mirror the `tsv_ts` arms of
+`lang_bindings!` but take an explicit goal string (`"script"` / `"module"`,
+validated by `goal_from_str`) and call `tsv_ts::parse_with_goal`. They are the
+**one deliberate exception** to the uniform per-language binding shape: the parse
+goal is TypeScript-only (Svelte `<script>` is always a module; CSS has no goal),
+so they sit **outside** the macro rather than threading a meaningless `goal`
+through svelte/css. The goalless `parse_typescript_json` / `format_typescript`
+remain the `Module` default. Only these two TS variants exist — no typed-object
+`parse_typescript_with_goal` (returns are plain `String`, so no `tsv_ast.d.ts`
+wiring); add one only if a typed consumer needs it. `npm/cli.js` routes
+`tsv parse|format --goal` through them (TS only); see [../../docs/cli.md §Input Handling](../../docs/cli.md).
+
 ## Discovery Matcher + Policy (`IgnoreStack`)
 
 The `format` feature exports an `IgnoreStack` class wrapping

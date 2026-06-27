@@ -253,11 +253,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Without this guard it lexes as an identifier and gets swallowed as the name,
         // leaving the `implements` clause unparsed. acorn matches this; the declaration
         // path keeps its own behavior (acorn rejects a bare-`implements` class statement).
-        let id = if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() != "implements"
+        let id = if (matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() != "implements")
+            || self.at_await_identifier()
         {
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern_identifier();
+            // `await` (Script `[~Await]`) is a valid class-name `BindingIdentifier`.
+            let symbol = self.intern_identifier_or_await();
             self.advance()?;
 
             Some(Identifier::simple(
@@ -337,11 +339,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // of an anonymous class, so `export default class implements Foo {}` (spec-valid,
         // name optional) parses where acorn-typescript rejects it (`implements` reserved).
         // A `name_required` declaration (`class implements Foo {}`) still errors below.
-        let id = if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() != "implements"
+        let id = if (matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() != "implements")
+            || self.at_await_identifier()
         {
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern_identifier();
+            // `await` (Script `[~Await]`) is a valid class-name `BindingIdentifier`.
+            let symbol = self.intern_identifier_or_await();
             self.advance()?;
 
             Some(Identifier::simple(
@@ -525,8 +529,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // A static block is a body, so it's forbidden in ambient context — there
         // `static {` falls through to the member-name parse and errors, as before.
         if is_static && !ambient && matches!(self.current_kind(), TokenKind::BraceOpen) {
-            // Parse the block body
-            let block = self.parse_block_statement()?;
+            // Parse the block body. A class static initialization block is a
+            // `[+Await]` context (`await` is allowed inside it).
+            let block = self.with_in_await(true, Self::parse_block_statement)?;
             let end = block.span.end;
 
             return Ok(ClassMember::StaticBlock(StaticBlock {
@@ -725,8 +730,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
 
-        // Parse parameter list and block body (like a function)
-        let params = self.parse_parameter_list()?.into_bump_slice();
+        // Parse parameter list and block body (like a function), in the method's
+        // own `[Await]` context (async method → `[+Await]`, else `[~Await]`).
+        let params = self
+            .with_in_await(is_async, Self::parse_parameter_list)?
+            .into_bump_slice();
 
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;
@@ -761,7 +769,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 end,
             )
         } else {
-            let body_block = self.parse_function_body()?;
+            let body_block = self.with_in_await(is_async, Self::parse_function_body)?;
             let end = body_block.span.end;
             (body_block, end)
         };
@@ -827,9 +835,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for type annotation: `name: type`
         let type_annotation = self.parse_optional_type_annotation()?;
 
-        // Check for value: `= value`
+        // Check for value: `= value`. A class field `Initializer` is `[~Await]`
+        // (it does not inherit a `[+Await]` enclosing — `await` is not an
+        // await-expression there, only an identifier under Script goal), unlike
+        // a computed key, which inherits.
         let value: Option<Expression<'arena>> = if self.eat(TokenKind::Equals) {
-            Some(self.parse_assignment_expression()?)
+            Some(self.with_in_await(false, Self::parse_assignment_expression)?)
         } else {
             None
         };

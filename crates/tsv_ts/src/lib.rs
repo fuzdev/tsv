@@ -19,6 +19,7 @@
 //! ```
 
 pub mod ast;
+mod goal;
 mod lexer;
 mod parser;
 mod printer;
@@ -28,6 +29,8 @@ use std::rc::Rc;
 use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
 pub use tsv_lang::{ParseError, Result, SharedInterner};
+
+pub use goal::Goal;
 
 /// The per-document environment shared by every formatting entry point: the
 /// source the AST's spans index into, the shared interner, the comment buffer,
@@ -90,6 +93,21 @@ fn make_doc_printer<'a>(
 /// ```
 pub fn parse<'arena>(source: &str, arena: &'arena bumpalo::Bump) -> Result<Program<'arena>> {
     parser::parse_typescript(source, arena).map_err(|e| e.with_context(source))
+}
+
+/// Parse TypeScript source against an explicit [`Goal`] (`Script` vs `Module`).
+///
+/// [`parse`] is the `Goal::Module` form (the default, correct for Svelte
+/// `<script>` and ~all real TS). Pass `Goal::Script` to parse a standalone
+/// strict script, where `await` is an ordinary identifier and `import`/`export`
+/// declarations, `import.meta`, and top-level `await` expressions are syntax
+/// errors. tsv is strict under both goals.
+pub fn parse_with_goal<'arena>(
+    source: &str,
+    goal: Goal,
+    arena: &'arena bumpalo::Bump,
+) -> Result<Program<'arena>> {
+    parser::parse_typescript_with_goal(source, goal, arena).map_err(|e| e.with_context(source))
 }
 
 /// Format a TypeScript AST back to source code

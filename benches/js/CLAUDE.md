@@ -875,8 +875,9 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
   `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/skip_triage.ts`
 - `diagnostics/test262_compare.ts` — test262 differential conformance, tsv vs oxc-parser. Consumes
   the manifest from `tsv_debug test262 --emit-manifest <file>` (tsv's graded strict subset + each
-  test's expected/tsv verdict), runs oxc over the same files as a module (mirroring tsv's module-only
-  parse), and buckets the agreement — surfacing positive **tsv real-bug candidates** (tsv rejects,
+  test's expected/tsv verdict + `module` flag), runs oxc over the same files at each test's goal
+  (mirroring tsv: `module`-flagged → module, else strict script), and buckets the agreement —
+  surfacing positive **tsv real-bug candidates** (tsv rejects,
   oxc accepts) and negative **early-error gaps** (oxc rejects, tsv accepts). On-demand triage, not a
   CI gate; numbers move with the pinned oxc version. No biome (its js-api has no parser to grade).
   See `docs/conformance_test262.md` §Differential. Run from the repo root:

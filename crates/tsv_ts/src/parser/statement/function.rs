@@ -72,9 +72,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Parse function name (required for declarations)
-        // Keywords like `object` and `async` can be function names
+        // Keywords like `object` and `async` can be function names; `await` is a
+        // valid name only at Script `[~Await]` (reserved at Module / `[+Await]`).
         let (id_start, id_end) = self.current_pos();
-        let Some(symbol) = self.try_intern_identifier_or_keyword() else {
+        let Some(symbol) = self.try_intern_function_name() else {
             return Err(self.error_expected_after("function name", "function"));
         };
         self.advance()?;
@@ -87,8 +88,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
 
-        // Parse parameter list
-        let params: &'arena [Expression<'arena>] = self.parse_parameter_list()?.into_bump_slice();
+        // Parse parameter list (in the function's own `[Await]` context — async
+        // params are `[+Await]`, non-async `[~Await]`).
+        let params: &'arena [Expression<'arena>] = self
+            .with_in_await(is_async, Self::parse_parameter_list)?
+            .into_bump_slice();
 
         // Check for return type annotation
         let return_type = self.parse_optional_return_type()?;
@@ -110,8 +114,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(start as u32, end),
             }))
         } else {
-            // Function implementation - parse body
-            let body = self.parse_function_body()?;
+            // Function implementation - parse body (the function's `[Await]` context).
+            let body = self.with_in_await(is_async, Self::parse_function_body)?;
             let end = body.span.end;
 
             Ok(Statement::FunctionDeclaration(FunctionDeclaration {
@@ -185,8 +189,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Parse function name (required for declarations, optional for export default)
-        // Keywords like `object` and `async` can be function names
-        let id = if let Some(symbol) = self.try_intern_identifier_or_keyword() {
+        // Keywords like `object` and `async` can be function names; `await` is a
+        // valid name only at Script `[~Await]` (reserved at Module / `[+Await]`).
+        let id = if let Some(symbol) = self.try_intern_function_name() {
             let (id_start, id_end) = self.current_pos();
             self.advance()?;
 
@@ -206,8 +211,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
 
-        // Parse parameter list
-        let params: &'arena [Expression<'arena>] = self.parse_parameter_list()?.into_bump_slice();
+        // Parse parameter list (in the function's own `[Await]` context).
+        let params: &'arena [Expression<'arena>] = self
+            .with_in_await(is_async, Self::parse_parameter_list)?
+            .into_bump_slice();
 
         // Check for return type annotation
         let return_type = self.parse_optional_return_type()?;
@@ -230,8 +237,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(start as u32, end),
             }))
         } else {
-            // Has body - regular function declaration
-            let body = self.parse_function_body()?;
+            // Has body - regular function declaration (the function's `[Await]` context).
+            let body = self.with_in_await(is_async, Self::parse_function_body)?;
             let end = body.span.end;
 
             Ok(ExportFunctionDeclaration::Declaration(
@@ -291,19 +298,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             false
         };
 
-        // Parse optional function name
-        let id = if matches!(self.current_kind(), TokenKind::Identifier) {
-            let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern_identifier();
-            self.advance()?;
-
-            Some(Identifier::simple(
-                symbol,
-                Span::new(id_start as u32, id_end as u32),
-            ))
-        } else {
-            None
-        };
+        // Parse the optional name in the function expression's own `[Await]`
+        // context: a `FunctionExpression` name is `[~Await]` (non-async) /
+        // `[+Await]` (async), so `await` is a valid name in a non-async function
+        // expression even inside a `[+Await]` enclosing scope (e.g. a static
+        // block), but not in an async one.
+        let id = self.with_in_await(is_async, |p| {
+            if matches!(p.current_kind(), TokenKind::Identifier) || p.at_await_identifier() {
+                let (id_start, id_end) = p.current_pos();
+                let symbol = p.intern_identifier_or_await();
+                p.advance()?;
+                Ok(Some(Identifier::simple(
+                    symbol,
+                    Span::new(id_start as u32, id_end as u32),
+                )))
+            } else {
+                Ok(None)
+            }
+        })?;
 
         // Parse type parameters (TypeScript generics): function<T>()
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -314,11 +326,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Param defaults (`[+In]`) and the function body are a fresh `[+In]`
         // context, so `in` is the binary operator even when this function
         // expression sits in a for-header init.
-        let (params, return_type, body) = self.with_allow_in(|p| {
-            let params: &'arena [Expression<'arena>] = p.parse_parameter_list()?.into_bump_slice();
-            let return_type = p.parse_optional_return_type()?;
-            let body = p.parse_function_body()?;
-            Ok((params, return_type, body))
+        let (params, return_type, body) = self.with_in_await(is_async, |p| {
+            p.with_allow_in(|p| {
+                let params: &'arena [Expression<'arena>] =
+                    p.parse_parameter_list()?.into_bump_slice();
+                let return_type = p.parse_optional_return_type()?;
+                let body = p.parse_function_body()?;
+                Ok((params, return_type, body))
+            })
         })?;
         let end = body.span.end;
 

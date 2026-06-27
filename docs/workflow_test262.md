@@ -127,7 +127,7 @@ Pass rate: 42400/46500 (91.2%)
 - Positive failed, many tests — **High** — Fix immediately - blocking valid code
 - Positive failed, few tests — Medium — Fix when addressing related code
 - Negative failed, early error — Lower — Track for later - code runs but shouldn't
-- Sloppy-mode required — Skip — Out of scope (strict-mode only design)
+- Sloppy-mode required (`noStrict`) — Skip — Out of scope (strict-only design)
 - AnnexB features — Lower — Web-compat, not essential
 
 ### Common Failure Patterns

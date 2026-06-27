@@ -65,6 +65,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                 }
                 KeywordKind::Await => {
+                    // Script `[~Await]`: `await` is an ordinary identifier — a
+                    // labeled statement (`await: …`) or an expression statement
+                    // (`await`, `await.x`, …), exactly like a plain identifier.
+                    if self.await_is_identifier() {
+                        if self.peek_kind() == TokenKind::Colon {
+                            return self.parse_labeled_statement();
+                        }
+                        return self.parse_expression_statement();
+                    }
                     // Check for `await using` declaration (ES2024 Explicit Resource Management);
                     // both gaps carry [no LineTerminator here] — a break before `using` or
                     // before the binding makes this an `await using` expression statement
@@ -74,7 +83,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     {
                         return self.parse_await_using_declaration();
                     }
-                    // Regular await expression
+                    // Regular await expression (rejected by the expression parser
+                    // when Module `[~Await]` — reserved with no `[+Await]`).
                     self.parse_expression_statement()
                 }
                 KeywordKind::True

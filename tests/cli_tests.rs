@@ -177,6 +177,166 @@ fn test_format_command_css() {
 }
 
 #[test]
+fn test_parse_goal_script_accepts_await_identifier() {
+    // At Script goal, `await` is an ordinary identifier (`var await = 1`), and the
+    // public AST's `sourceType` follows the goal.
+    let output = tsv(&[
+        "parse",
+        "--content",
+        "var await = 1;",
+        "--parser",
+        "typescript",
+        "--goal",
+        "script",
+    ]);
+
+    assert!(output.status.success(), "Script-goal parse should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(r#""sourceType":"script""#),
+        "Program sourceType should follow the goal: {stdout}"
+    );
+}
+
+#[test]
+fn test_parse_goal_module_rejects_await_identifier() {
+    // The same source is rejected at Module goal — `await` is reserved there.
+    let output = tsv(&[
+        "parse",
+        "--content",
+        "var await = 1;",
+        "--parser",
+        "typescript",
+        "--goal",
+        "module",
+    ]);
+
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "Module-goal `var await` should be rejected"
+    );
+}
+
+#[test]
+fn test_parse_goal_defaults_to_module() {
+    // No `--goal` flag → Module (rejects `var await`), matching the explicit case.
+    let output = tsv(&[
+        "parse",
+        "--content",
+        "var await = 1;",
+        "--parser",
+        "typescript",
+    ]);
+
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "Default goal should be Module"
+    );
+}
+
+#[test]
+fn test_parse_goal_invalid_value() {
+    let output = tsv(&[
+        "parse",
+        "--content",
+        "x;",
+        "--parser",
+        "typescript",
+        "--goal",
+        "bogus",
+    ]);
+
+    // parse reports usage errors with its own exit-1 convention (see
+    // `test_parse_invalid_syntax`).
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "Invalid --goal should exit 1 for parse"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("invalid --goal"),
+        "Should report invalid --goal: {stderr}"
+    );
+}
+
+#[test]
+fn test_format_goal_script() {
+    // `await => 1` is a single-param arrow at Script goal; formats with arrowParens.
+    let output = tsv(&[
+        "format",
+        "--content",
+        "await => 1;",
+        "--parser",
+        "typescript",
+        "--goal",
+        "script",
+    ]);
+
+    assert!(output.status.success(), "Script-goal format should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("(await) => 1;"),
+        "Should format the `await` arrow param: {stdout}"
+    );
+}
+
+#[test]
+fn test_format_goal_invalid_value() {
+    let output = tsv(&[
+        "format",
+        "--content",
+        "x;",
+        "--parser",
+        "typescript",
+        "--goal",
+        "bogus",
+    ]);
+
+    // format uses exit 2 for argument/usage errors (distinct from parse's 1).
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "Invalid --goal should exit 2 for format"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("invalid --goal"),
+        "Should report invalid --goal: {stderr}"
+    );
+}
+
+#[test]
+fn test_format_goal_rejected_in_path_mode() {
+    // `--goal` is content/stdin-only; with a path argument it's a usage error
+    // (file paths are always formatted as modules).
+    let dir = temp_dir("format_goal_path");
+    let file = dir.join("a.ts");
+    fs::write(&file, "const x = 1;\n").expect("write temp file");
+
+    let output = tsv(&[
+        "format",
+        "--goal",
+        "script",
+        file.to_str().expect("utf8 path"),
+    ]);
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "`--goal` with a path should be a usage error"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--goal applies to --content/--stdin"),
+        "Should explain the path-mode restriction: {stderr}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn test_unknown_command() {
     let output = tsv(&["unknown-command"]);
 

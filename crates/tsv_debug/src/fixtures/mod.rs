@@ -9,7 +9,7 @@ mod variants;
 pub use audit_signature::{AUDIT_SIGNATURE_FILENAME, AuditSignature};
 pub use discovery::{find_input_file, walk_fixtures};
 pub use model::{
-    EXPECTED_SVELTE_ERROR_JSON, Fixture, InputType, PRETTIER_NONCONVERGENT_FILENAME,
+    EXPECTED_SVELTE_ERROR_JSON, Fixture, GOAL_FILENAME, InputType, PRETTIER_NONCONVERGENT_FILENAME,
     PRETTIER_REJECTS_FILENAME, determine_required_suffix, has_prettier_divergence_suffix,
     has_svelte_divergence_suffix,
 };
@@ -17,7 +17,7 @@ pub use variants::FixtureFiles;
 
 use std::fs;
 use std::path::Path;
-use tsv_cli::cli::format_source::format_source;
+use tsv_cli::cli::format_source::format_source_with_goal;
 
 /// Recursively remove location/span fields from JSON for AST comparison
 pub fn remove_locations(mut value: serde_json::Value) -> serde_json::Value {
@@ -63,9 +63,20 @@ pub fn delete_file_if_exists(path: &Path) -> Result<(), String> {
 /// Determines file type from filepath extension and calls the appropriate formatter.
 /// Supports .svelte, .svelte.ts, .ts, and .css files.
 pub fn format_with_our_formatter(content: &str, filepath: &str) -> Result<String, String> {
+    format_with_our_formatter_with_goal(content, filepath, tsv_ts::Goal::Module)
+}
+
+/// [`format_with_our_formatter`] against an explicit TypeScript parse goal —
+/// used by the validation phases for standalone-script (`Goal::Script`)
+/// fixtures. The goal is consulted only for `.ts` / `.svelte.ts` inputs.
+pub fn format_with_our_formatter_with_goal(
+    content: &str,
+    filepath: &str,
+    goal: tsv_ts::Goal,
+) -> Result<String, String> {
     let Some(input_type) = InputType::from_filepath(filepath) else {
         return Err(format!("Unsupported file type for formatting: {filepath}"));
     };
-    format_source(content, input_type.parser_type())
+    format_source_with_goal(content, input_type.parser_type(), goal)
         .map_err(|e| format!("Format error (parse): {e}"))
 }

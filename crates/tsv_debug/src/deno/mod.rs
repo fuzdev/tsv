@@ -144,9 +144,24 @@ pub async fn parse_svelte(source: &str) -> Result<serde_json::Value, DenoError> 
 /// # Errors
 /// Returns an error if Deno is not available or parsing fails.
 pub async fn parse_typescript(source: &str) -> Result<serde_json::Value, DenoError> {
+    parse_typescript_with_goal(source, tsv_ts::Goal::Module).await
+}
+
+/// Parse TypeScript with acorn against an explicit goal symbol.
+///
+/// `Goal::Module` (the default, via [`parse_typescript`]) mirrors Svelte's
+/// always-module parse; `Goal::Script` parses a standalone strict script (acorn
+/// `sourceType: 'script'`), so it accepts `await` as an identifier and rejects
+/// `import`/`export`/`import.meta` — matching tsv's own `Goal::Script` parse for
+/// standalone-script fixtures.
+pub async fn parse_typescript_with_goal(
+    source: &str,
+    goal: tsv_ts::Goal,
+) -> Result<serde_json::Value, DenoError> {
+    let options = serde_json::json!({ "sourceType": goal.source_type() });
     get_actor()
         .await?
-        .call("acorn-typescript-parse", source, None)
+        .call("acorn-typescript-parse", source, Some(options))
         .await
 }
 
