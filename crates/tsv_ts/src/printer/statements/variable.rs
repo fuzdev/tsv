@@ -813,15 +813,20 @@ impl<'a> Printer<'a> {
         }
 
         // Comments between the last declarator and the `;`, with the `;` bound to the
-        // declaration: a same-line block stays before it (`const x = 1 /* c */;` — a
-        // divergence; prettier moves it after), a same-line line trails after it via
+        // declaration: a same-line block trails *after* it (`const x = 1 /* c */;` →
+        // `const x = 1; /* c */`, prettier 3.9), a same-line line trails after it via
         // `line_suffix` (`const x = 1; // c`), an own-line comment drops to its own line
         // after it (`const x = 1;⏎// c`). See `split_separator_gap_comments`.
         if emit_semicolon {
             let mut after = DocBuf::new();
             if let Some(last) = decl.declarations.last() {
                 let semicolon_pos = decl.span.end.saturating_sub(1);
-                after = self.split_separator_gap_comments(&mut parts, last.span.end, semicolon_pos);
+                after = self.split_separator_gap_comments(
+                    &mut parts,
+                    last.span.end,
+                    semicolon_pos,
+                    true,
+                );
             }
             parts.push(d.text(";"));
             parts.extend(after);

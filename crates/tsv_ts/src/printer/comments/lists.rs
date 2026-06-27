@@ -753,28 +753,41 @@ impl<'a> Printer<'a> {
     ///
     /// - a **same-line** comment is pushed to `parts` (before the separator) — a block
     ///   inline (`X /* c */<sep>`, preserved), a line via `line_suffix` (zero width, so
-    ///   it floats past the separator to the next hardline → `X<sep> // c`);
+    ///   it floats past the separator to the next hardline → `X<sep> // c`) — *except*
+    ///   that when `block_after_separator` is set a same-line **block** is instead
+    ///   *returned* (deferred), so it trails **after** the separator (`X<sep> /* c */`);
     /// - an **own-line** comment is *returned* (not pushed), each on its own line
     ///   (`hardline` + comment), for the caller to emit **after** the separator so the
     ///   author's line break is kept and a `//` can't swallow the separator.
     ///
-    /// Caller idiom: `let after = self.split_separator_gap_comments(parts, start, sep);
-    /// parts.push(sep_text); parts.extend(after);`. Shared by the list `,` separator
-    /// (`emit_multiline_comma_with_comments`) and the statement/member `;` terminator
-    /// (variable / expression-statement / class-property). Emitting an own-line comment
-    /// *before* the separator would put the separator on the comment's line — a `//`
-    /// swallows it (content loss), a block just diverges from prettier.
+    /// `block_after_separator` is the prettier-3.9 behavior for the statement/member
+    /// **`;` terminator** (the `;` is pure structure, so trailing a block past it is
+    /// lossless — `expr; /* c */`); the list **`,` separator** passes `false` and keeps
+    /// a same-line block before the comma (`X /* c */,`) — prettier did not change that.
+    ///
+    /// Caller idiom: `let after = self.split_separator_gap_comments(parts, start, sep,
+    /// block_after_separator); parts.push(sep_text); parts.extend(after);`. Shared by the
+    /// list `,` separator (`emit_multiline_comma_with_comments`, `false`) and the
+    /// statement/member `;` terminator (variable / expression-statement / class-property,
+    /// `true`). Emitting an own-line comment *before* the separator would put the
+    /// separator on the comment's line — a `//` swallows it (content loss), a block just
+    /// diverges from prettier.
     pub(crate) fn split_separator_gap_comments(
         &self,
         parts: &mut DocBuf,
         start: u32,
         sep_pos: u32,
+        block_after_separator: bool,
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
         for comment in comments_in_range(self.comments, start, sep_pos) {
             if self.is_same_line(start, comment.span.start) {
-                parts.push(self.build_trailing_comment_doc(comment));
+                if block_after_separator && comment.is_block {
+                    deferred.push(self.build_trailing_comment_doc(comment));
+                } else {
+                    parts.push(self.build_trailing_comment_doc(comment));
+                }
             } else {
                 deferred.push(d.hardline());
                 deferred.push(self.build_comment_doc(comment));
@@ -862,10 +875,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let comma_pos = self.find_list_comma(elem_end, next_start);
 
-        // The comma binds to the element; same-line gap comments stay before it,
-        // own-line ones defer to after it (leading the next element). See
-        // `split_separator_gap_comments`.
-        let deferred_own_line = self.split_separator_gap_comments(parts, elem_end, comma_pos);
+        // The comma binds to the element; same-line gap comments stay before it
+        // (block inline, line via `line_suffix`), own-line ones defer to after it
+        // (leading the next element). A same-line block stays *before* the comma
+        // (`block_after_separator: false`) — prettier 3.9 only moved the `;` case.
+        // See `split_separator_gap_comments`.
+        let deferred_own_line =
+            self.split_separator_gap_comments(parts, elem_end, comma_pos, false);
         parts.push(d.text(","));
         parts.extend(deferred_own_line);
 

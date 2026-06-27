@@ -12,8 +12,7 @@ switch) keep the comment inside the parens.
 ## Reason
 
 tsv treats user comment placement as intentional. Consistent with tsv's handling
-of comments before `)`
-([close_paren_comment](../close_paren_comment_prettier_divergence/)) and before
+of comments before
 the `while` keyword
 ([line_before_while_comment](../line_before_while_comment_prettier_divergence/),
 [while_leading_block_comment](../while_leading_block_comment_prettier_divergence/)),

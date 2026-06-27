@@ -349,7 +349,6 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
 A comment on a return/property type annotation immediately followed by `;` (the
 member-type reparse) — root `comments` duplication, same mechanism as above:
 
-- [method_trailing_semicolon_comment_svelte_prettier_divergence](../tests/fixtures/typescript/declarations/class/method_trailing_semicolon_comment_svelte_prettier_divergence/)
 - [trailing_semicolon_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)
 
 Beyond acorn-typescript's per-parse duplication, **Svelte's own comment glue duplicates or drops comments at `<script>` and template boundaries**. tsv attaches each comment once, in its source region — the same anti-duplication stance as above. In every case below the distinct-comment set is identical (the comment is preserved on its source node and/or in the root `comments` array), `ast_diff` confirms semantic equivalence, and the formatter — which locates comments by position — is unaffected.

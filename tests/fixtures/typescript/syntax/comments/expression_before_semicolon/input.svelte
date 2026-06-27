@@ -3,6 +3,6 @@
 	1 /* comment */ as const;
 
 	// Other expression statements with trailing comments
-	fn() /* comment */;
-	a + b /* comment */;
+	fn(); /* comment */
+	a + b; /* comment */
 </script>

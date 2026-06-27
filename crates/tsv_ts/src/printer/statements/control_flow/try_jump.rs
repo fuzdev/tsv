@@ -177,9 +177,6 @@ impl<'a> Printer<'a> {
             // Comments between keyword and label (e.g., `break /* c */ loop;`)
             let pre_label_comment =
                 self.build_inline_comments_between_doc_opt(keyword_end, label.span.start);
-            // Comments between label and semicolon (e.g., `break loop /* c */;`)
-            let post_label_comment =
-                self.build_inline_comments_between_doc_opt(label.span.end, span.end);
 
             let mut parts = DocBuf::new();
             parts.push(d.text(keyword));
@@ -188,10 +185,14 @@ impl<'a> Printer<'a> {
             }
             parts.push(d.text(" "));
             parts.push(d.symbol(label.name.to_u32()));
-            if let Some(comment_doc) = post_label_comment {
-                parts.push(comment_doc);
-            }
+            // Comments between label and `;`: a same-line block trails *after* the `;`
+            // (`break loop; /* c */`, prettier 3.9), a same-line line via `line_suffix`,
+            // an own-line comment on its own line after. See `split_separator_gap_comments`.
+            let semicolon_pos = span.end.saturating_sub(1);
+            let after =
+                self.split_separator_gap_comments(&mut parts, label.span.end, semicolon_pos, true);
             parts.push(d.text(";"));
+            parts.extend(after);
             d.concat(&parts)
         } else {
             let keyword_end = span.start + keyword.len() as u32;

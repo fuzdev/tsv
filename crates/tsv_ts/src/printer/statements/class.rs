@@ -544,16 +544,17 @@ impl<'a> Printer<'a> {
         }
 
         // Comments between last content and `;`, with the `;` bound to the member: a
-        // same-line block stays inline before it, a same-line line trails after it via
-        // `line_suffix`, an own-line comment drops to its own line after it (emitting a
-        // line comment before the `;` would swallow it). See `split_separator_gap_comments`.
+        // same-line block trails *after* it (`x = 1 /* c */;` → `x = 1; /* c */`,
+        // prettier 3.9), a same-line line trails after it via `line_suffix`, an own-line
+        // comment drops to its own line after it (emitting a line comment before the `;`
+        // would swallow it). See `split_separator_gap_comments`.
         let content_end = prop
             .value
             .as_ref()
             .map(|v| v.span().end)
             .or_else(|| prop.type_annotation.as_ref().map(|ta| ta.span.end))
             .unwrap_or(after_modifier);
-        let after = self.split_separator_gap_comments(&mut parts, content_end, prop.span.end);
+        let after = self.split_separator_gap_comments(&mut parts, content_end, prop.span.end, true);
         parts.push(d.text(";"));
         parts.extend(after);
 
@@ -712,14 +713,24 @@ impl<'a> Printer<'a> {
 
         // For abstract methods or overload signatures, use semicolon instead of body
         if method.r#abstract || is_overload_signature {
-            // Comments between return type (or params) and `;`
-            self.append_signature_end_comments(
-                &mut parts,
-                method.value.return_type.as_ref(),
-                Some(method.value.params_start),
-                method.span.end,
+            // Comments between the return type (or params `)`) and the `;`, with the
+            // `;` bound to the member: a same-line trailing block trails *after* it
+            // (`a(): number; /* c */`, prettier 3.9 #18837) — unlike interface and
+            // type-literal members, which keep a same-line block *before* the `;`
+            // (so this class path does not use the shared `append_signature_end_comments`).
+            // See `split_separator_gap_comments`.
+            let content_end = method.value.return_type.as_ref().map_or_else(
+                || {
+                    self.find_closing_paren(method.value.params_start, method.span.end)
+                        .unwrap_or(method.span.end)
+                },
+                |rt| rt.span.end,
             );
+            let semicolon_pos = method.span.end.saturating_sub(1);
+            let after =
+                self.split_separator_gap_comments(&mut parts, content_end, semicolon_pos, true);
             parts.push(d.text(";"));
+            parts.extend(after);
         } else {
             let sig_end = if let Some(rt) = &method.value.return_type {
                 rt.span.end

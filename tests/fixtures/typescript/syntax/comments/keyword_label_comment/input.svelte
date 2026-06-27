@@ -10,11 +10,11 @@
 
 	// Block comment between label and semicolon
 	loop3: for (;;) {
-		break loop3 /* c */;
+		break loop3; /* c */
 	}
 
 	loop4: for (;;) {
-		continue loop4 /* c */;
+		continue loop4; /* c */
 	}
 
 	// Line comment after label (forces line break)

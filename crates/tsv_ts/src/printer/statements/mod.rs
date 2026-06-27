@@ -130,13 +130,14 @@ impl<'a> Printer<'a> {
         }
 
         // Comments between the expression and the `;`, with the `;` bound to the
-        // statement: a same-line block stays inline before it, a same-line line trails
-        // after it via `line_suffix` (`fn() // c` → `fn(); // c`), an own-line comment
-        // drops to its own line after it (emitting a line comment before the `;` would
-        // swallow it). See `split_separator_gap_comments`.
+        // statement: a same-line block trails *after* it (`fn() /* c */;` → `fn(); /* c */`,
+        // prettier 3.9), a same-line line trails after it via `line_suffix`
+        // (`fn() // c` → `fn(); // c`), an own-line comment drops to its own line after it
+        // (emitting a line comment before the `;` would swallow it). See
+        // `split_separator_gap_comments`.
         let expr_end = stmt.expression.span().end;
         let semicolon_pos = stmt.span.end.saturating_sub(1);
-        let after = self.split_separator_gap_comments(&mut parts, expr_end, semicolon_pos);
+        let after = self.split_separator_gap_comments(&mut parts, expr_end, semicolon_pos, true);
         parts.push(d.text(";"));
         parts.extend(after);
         d.concat(&parts)
@@ -165,14 +166,17 @@ impl<'a> Printer<'a> {
     fn build_return_statement_doc(&self, ret: &internal::ReturnStatement<'_>) -> DocId {
         let d = self.d();
         let Some(arg) = &ret.argument else {
-            // Check for comments between `return` and `;`: return /* comment */;
+            // Comments between `return` and `;`, with the `;` bound to the statement: a
+            // same-line block trails *after* it (`return /* c */;` → `return; /* c */`,
+            // prettier 3.9). See `split_separator_gap_comments`.
             let keyword_end = ret.span.start + "return".len() as u32;
-            let semi = ret.span.end; // span end is after `;`
-            if let Some(comment_doc) = self.build_inline_comments_between_doc_opt(keyword_end, semi)
-            {
-                return d.concat(&[d.text("return"), comment_doc, d.text(";")]);
-            }
-            return d.text("return;");
+            let semicolon_pos = ret.span.end.saturating_sub(1);
+            let mut parts: DocBuf = smallvec![d.text("return")];
+            let after =
+                self.split_separator_gap_comments(&mut parts, keyword_end, semicolon_pos, true);
+            parts.push(d.text(";"));
+            parts.extend(after);
+            return d.concat(&parts);
         };
 
         self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg)
@@ -248,10 +252,13 @@ impl<'a> Printer<'a> {
         };
 
         let mut result_parts = smallvec![d.text(keyword), d.text(" "), rhs_doc];
-        if has_trailing_comments {
-            self.append_trailing_paren_comments(&mut result_parts, argument_end, span_end);
-        }
+        let after = if has_trailing_comments {
+            self.split_terminator_gap_comments(&mut result_parts, argument_end, span_end)
+        } else {
+            DocBuf::new()
+        };
         result_parts.push(d.text(";"));
+        result_parts.extend(after);
         d.concat(&result_parts)
     }
 
@@ -373,16 +380,23 @@ impl<'a> Printer<'a> {
         // skips comments so a `;` inside one (`a + b /* ; */ /* c */;`) isn't
         // mistaken for the statement's terminator, which would drop the comments
         // after it.
-        let expr_end = binary.span.end as usize;
+        let expr_end = binary.span.end;
         let semicolon_pos = tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
-            expr_end,
+            expr_end as usize,
             self.source.len(),
             b';',
         )
-        .unwrap_or(expr_end);
-        let trailing_comments_doc =
-            self.build_inline_comments_between_doc(expr_end as u32, semicolon_pos as u32);
+        .map_or(expr_end, |p| p as u32);
+
+        // Split the trailing comments: an operand-attached block (inside stripped
+        // parens, `return (a + b /* c */);`) stays inside the parens before the `;`,
+        // while a statement-trailing comment trails *after* the `;` (prettier 3.9:
+        // `return a + b; /* c */`). See `split_terminator_gap_comments`.
+        let mut inline_trailing = DocBuf::new();
+        let after_semi =
+            self.split_terminator_gap_comments(&mut inline_trailing, expr_end, semicolon_pos);
+        let trailing_comments_doc = d.concat(&inline_trailing);
 
         // When the expression contains hardlines (e.g., multi-line callback in a
         // chain), the group must break to produce parens. In Prettier, hardline
@@ -401,11 +415,13 @@ impl<'a> Printer<'a> {
 
         let flat_doc = d.concat(&[d.text(" "), expr_doc, trailing_comments_doc]);
 
-        let inner = d.concat(&[
+        let mut inner_parts: DocBuf = smallvec![
             d.text(keyword),
             d.if_break(broken_doc, flat_doc),
             d.text(";"),
-        ]);
+        ];
+        inner_parts.extend(after_semi);
+        let inner = d.concat(&inner_parts);
 
         if force_break {
             d.group_break(inner)

@@ -1,7 +1,7 @@
 <script>
 	async function fn1() {
 		// trailing block comment after operand
-		await x /* c */;
+		await x; /* c */
 
 		// trailing line comment after operand
 		await x; // c
@@ -13,7 +13,7 @@
 
 	function* fn2() {
 		// trailing block comment after operand
-		yield x /* c */;
+		yield x; /* c */
 
 		// trailing line comment after operand
 		yield x; // c

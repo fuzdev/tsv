@@ -63,7 +63,12 @@ impl<'a> Printer<'a> {
     /// - Line comments: deferred via `line_suffix` to appear after the semicolon (`x; // c`)
     /// - Own-line block comments: deferred via `line_suffix` with hardline (`x;\n/* c */`)
     ///
-    /// Used by await, yield, return, throw, and export default.
+    /// Keeps a same-line block comment with its operand (before any terminator) — the
+    /// expression-level operand callers (await, yield, binary, sequence) where the
+    /// comment is inside the stripped operand parens, plus `export =` (which, like
+    /// `import =`, keeps a same-line trailing block before the `;`). Statement
+    /// terminators that move the block *after* the `;` (return/throw, `export default`)
+    /// use `split_terminator_gap_comments` instead.
     pub(crate) fn append_trailing_paren_comments(
         &self,
         parts: &mut DocBuf,
@@ -88,48 +93,101 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Append comments between a declaration's last content token and its
-    /// terminating `;`, preserving the user's placement (consistent with the
-    /// before-semicolon and do-while `)`→`;` divergences — see
-    /// `conformance_prettier.md` §Comment relocation). A same-line block comment
-    /// trails the content inline (` /* c */`); line comments and own-line block
-    /// comments stay on their own line, forcing the `;` onto a following line.
+    /// Split the trailing comments in a statement terminator's content→`;` gap
+    /// the way prettier 3.9 does, returning the docs to emit **after** the `;`.
     ///
-    /// Returns `true` if any comment forced a line break, so the caller emits the
-    /// `;` after a `hardline` (and keeps these comments outside the content group
-    /// so the break doesn't expand the specifier braces).
-    pub(crate) fn append_pre_semi_comments(
+    /// A same-line **block** comment trails *after* the `;` (`return x; /* c */`) —
+    /// *unless* it is still enclosed by a stripped grouping paren around the operand
+    /// (`return (x /* c */);`), in which case it stays inline before the `;` (it is
+    /// attached to the operand, not the statement). Line comments (`line_suffix`) and
+    /// own-line block comments also trail after the `;`. The inline (operand-attached)
+    /// comments are pushed into `parts`; the rest are returned.
+    ///
+    /// Caller idiom: `let after = self.split_terminator_gap_comments(parts, arg_end,
+    /// span_end); parts.push(";"); parts.extend(after);`. Used by return/throw,
+    /// `export default`, and `export =` — the terminator callers whose argument may be
+    /// parenthesized (unlike the expression-statement/var/class-property terminators,
+    /// whose operand parens are consumed by inner printers — they use
+    /// `split_separator_gap_comments`).
+    pub(crate) fn split_terminator_gap_comments(
         &self,
         parts: &mut DocBuf,
-        start: u32,
-        end: u32,
-    ) -> bool {
+        argument_end: u32,
+        span_end: u32,
+    ) -> DocBuf {
         let d = self.d();
+        let mut deferred = DocBuf::new();
+        for comment in comments_in_range(self.comments, argument_end, span_end) {
+            let same_line = !self.has_newline_between(argument_end, comment.span.start);
+            if comment.is_block && same_line {
+                if self.gap_has_close_paren(comment.span.end, span_end) {
+                    // Operand-attached (inside stripped parens): `return (x /* c */);`.
+                    parts.push(d.text(" "));
+                    parts.push(self.build_comment_doc(comment));
+                } else {
+                    // Statement-trailing block: trails after the `;` (prettier 3.9).
+                    deferred.push(d.text(" "));
+                    deferred.push(self.build_comment_doc(comment));
+                }
+            } else if !comment.is_block {
+                // Line comment: trails after the `;` via `line_suffix` (`return x; // c`).
+                deferred
+                    .push(d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)])));
+            } else {
+                // Own-line block comment: on its own line after the `;`.
+                deferred.push(d.hardline());
+                deferred.push(self.build_comment_doc(comment));
+            }
+        }
+        deferred
+    }
+
+    /// Whether a (comment-skipping) `)` appears in `[start, end)` — i.e. a stripped
+    /// grouping paren follows a trailing comment before the terminator, marking the
+    /// comment as operand-enclosed rather than statement-trailing.
+    fn gap_has_close_paren(&self, start: u32, end: u32) -> bool {
+        tsv_lang::source_scan::find_char_skipping_comments(
+            self.source.as_bytes(),
+            start as usize,
+            end as usize,
+            b')',
+        )
+        .is_some()
+    }
+
+    /// Collect comments between a module statement's last content token and its
+    /// terminating `;`, returned to emit **after** the `;` (prettier 3.9 — the `;`
+    /// is structure; trailing past it is lossless). A same-line block trails inline
+    /// (`} /* c */` → `}; /* c */`); a same-line line comment trails via `line_suffix`
+    /// (`}; // c`); an own-line comment stays on its own line after the `;`. Module
+    /// statements (import/export source, specifiers, attributes) have no operand
+    /// parens, so every trailing comment is statement-attached. The caller emits the
+    /// `;` right after the content, then `parts.extend(returned)`.
+    pub(crate) fn collect_post_semi_comments(&self, start: u32, end: u32) -> DocBuf {
+        let d = self.d();
+        let mut deferred = DocBuf::new();
         let mut prev_end = start;
-        let mut broke = false;
         for comment in comments_in_range(self.comments, start, end) {
             let same_line = self.is_same_line(prev_end, comment.span.start);
             if comment.is_block && same_line {
-                // Same-line block comment trails inline.
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
+                // Same-line block comment trails inline after the `;`.
+                deferred.push(d.text(" "));
+                deferred.push(self.build_comment_doc(comment));
             } else if same_line {
-                // Trailing line comment: stays on the content line, forces a break.
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-                broke = true;
+                // Trailing line comment: after the `;` via `line_suffix` (zero width).
+                deferred
+                    .push(d.line_suffix(d.concat(&[d.text(" "), self.build_comment_doc(comment)])));
             } else {
-                // Own-line comment (line or block): preserve its own line.
+                // Own-line comment (line or block): preserve its own line after the `;`.
                 if self.has_blank_line_between(prev_end, comment.span.start) {
-                    parts.push(d.literalline());
+                    deferred.push(d.literalline());
                 }
-                parts.push(d.hardline());
-                parts.push(self.build_comment_doc(comment));
-                broke = true;
+                deferred.push(d.hardline());
+                deferred.push(self.build_comment_doc(comment));
             }
             prev_end = comment.span.end;
         }
-        broke
+        deferred
     }
 
     /// Append trailing comments from stripped grouping parens in spread elements,

@@ -61,32 +61,32 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 169,
-			"end": 182,
+			"start": 170,
+			"end": 183,
 			"loc": {
 				"start": {
 					"line": 6,
-					"column": 6
+					"column": 7
 				},
 				"end": {
 					"line": 6,
-					"column": 19
+					"column": 20
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 191,
-			"end": 204,
+			"start": 192,
+			"end": 205,
 			"loc": {
 				"start": {
 					"line": 7,
-					"column": 7
+					"column": 8
 				},
 				"end": {
 					"line": 7,
-					"column": 20
+					"column": 21
 				}
 			}
 		}
@@ -208,7 +208,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 164,
-					"end": 183,
+					"end": 169,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -216,7 +216,7 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 20
+							"column": 6
 						}
 					},
 					"expression": {
@@ -250,15 +250,7 @@
 							"name": "fn"
 						},
 						"arguments": [],
-						"optional": false,
-						"trailingComments": [
-							{
-								"type": "Block",
-								"value": " comment ",
-								"start": 169,
-								"end": 182
-							}
-						]
+						"optional": false
 					},
 					"leadingComments": [
 						{
@@ -267,12 +259,20 @@
 							"start": 109,
 							"end": 162
 						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " comment ",
+							"start": 170,
+							"end": 183
+						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
 					"start": 185,
-					"end": 205,
+					"end": 191,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -280,7 +280,7 @@
 						},
 						"end": {
 							"line": 7,
-							"column": 21
+							"column": 7
 						}
 					},
 					"expression": {
@@ -329,16 +329,16 @@
 								}
 							},
 							"name": "b"
-						},
-						"trailingComments": [
-							{
-								"type": "Block",
-								"value": " comment ",
-								"start": 191,
-								"end": 204
-							}
-						]
-					}
+						}
+					},
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " comment ",
+							"start": 192,
+							"end": 205
+						}
+					]
 				}
 			],
 			"sourceType": "module"

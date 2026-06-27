@@ -199,12 +199,20 @@ impl<'a> Printer<'a> {
             parts.push(self.build_expression_doc(&stmt.test));
         }
 
-        // Preserve comments between the condition's `)` and the terminating `;` in
-        // place: `} while (x) /* c */;` keeps the comment after `)` (Prettier
-        // relocates it inside the parens — see close_paren_comment_prettier_divergence).
-        // Mirrors the if-empty path's `append_close_paren_empty_stmt_with_comments`.
+        // Comments between the condition's `)` and the do-while's terminating `;`,
+        // with the `;` bound to the statement: a same-line block trails *after* it
+        // (`} while (x) /* c */;` → `} while (x); /* c */`, prettier 3.9), a same-line
+        // line via `line_suffix`, an own-line comment on its own line after. (Unlike
+        // an empty *body* `;` — `if (a) /* c */ ;` — which keeps the comment inline;
+        // the do-while `;` is the statement terminator.) See
+        // `split_separator_gap_comments`.
         if let Some(close) = close_paren {
-            self.append_close_paren_empty_stmt_with_comments(&mut parts, close + 1, stmt.span.end);
+            parts.push(d.text(")"));
+            let semicolon_pos = stmt.span.end.saturating_sub(1);
+            let after =
+                self.split_separator_gap_comments(&mut parts, close + 1, semicolon_pos, true);
+            parts.push(d.text(";"));
+            parts.extend(after);
         } else {
             parts.push(d.text(");"));
         }

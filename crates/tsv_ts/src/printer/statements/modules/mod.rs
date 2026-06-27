@@ -42,6 +42,9 @@ impl<'a> Printer<'a> {
         let argument_end = decl.expression.span().end;
         let has_trailing_comments = self.has_comments_between(argument_end, decl.span.end);
         if has_trailing_comments {
+            // `export =` keeps a same-line trailing block comment *before* the `;`
+            // (operand-attached — prettier 3.9 does not move it, unlike `export default`
+            // / named exports). A line comment still floats after the `;` via `line_suffix`.
             let mut parts = smallvec![d.text("export = "), expr_doc];
             self.append_trailing_paren_comments(&mut parts, argument_end, decl.span.end);
             parts.push(d.text(";"));
@@ -255,8 +258,10 @@ impl<'a> Printer<'a> {
                 let has_trailing_comments = self.has_comments_between(argument_end, decl.span.end);
                 if has_trailing_comments {
                     let mut parts = smallvec![expr_doc];
-                    self.append_trailing_paren_comments(&mut parts, argument_end, decl.span.end);
+                    let after =
+                        self.split_terminator_gap_comments(&mut parts, argument_end, decl.span.end);
                     parts.push(d.text(";"));
+                    parts.extend(after);
                     d.concat(&parts)
                 } else {
                     d.concat(&[expr_doc, d.text(";")])
@@ -666,11 +671,19 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Comments between the module reference and `;` — preserved in place.
+        // Comments between the module reference and `;`: like `export =` (and unlike
+        // named imports / re-exports), a same-line trailing **block** comment stays
+        // *before* the `;` (operand-attached — prettier 3.9 keeps it), while a same-line
+        // **line** comment floats after the `;` via `line_suffix`. So this uses the
+        // comma-style `block_after_separator: false`, not `finish_with_pre_semi`.
         let ref_end = match &decl.module_reference {
             internal::TSModuleReference::ExternalModuleReference(ext_ref) => ext_ref.span.end,
             internal::TSModuleReference::EntityName(entity_name) => entity_name.span().end,
         };
-        self.finish_with_pre_semi(parts, ref_end, decl.span.end, false)
+        let semicolon_pos = decl.span.end.saturating_sub(1);
+        let after = self.split_separator_gap_comments(&mut parts, ref_end, semicolon_pos, false);
+        parts.push(d.text(";"));
+        parts.extend(after);
+        d.concat(&parts)
     }
 }
