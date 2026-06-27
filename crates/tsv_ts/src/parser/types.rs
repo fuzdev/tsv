@@ -925,13 +925,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut params = self.bvec();
 
         if !self.check(&TokenKind::ParenClose) {
-            params.push(self.parse_function_type_param()?);
+            let first = self.parse_function_type_param()?;
+            let mut rest_seen = matches!(&first, Expression::RestElement(_));
+            params.push(first);
             while self.eat(TokenKind::Comma) {
+                // A rest parameter must be last: nothing — not even a trailing
+                // comma — may follow it (see `parse_parameter_list`).
+                if rest_seen {
+                    return Err(self.error_msg("A rest parameter must be last in a parameter list"));
+                }
                 // Handle trailing comma
                 if self.check(&TokenKind::ParenClose) {
                     break;
                 }
-                params.push(self.parse_function_type_param()?);
+                let param = self.parse_function_type_param()?;
+                rest_seen = matches!(&param, Expression::RestElement(_));
+                params.push(param);
             }
         }
 

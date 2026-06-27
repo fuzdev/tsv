@@ -323,7 +323,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                 };
 
+                let is_rest = matches!(&param, Expression::RestElement(_));
                 params.push(param);
+
+                // A rest parameter must be the last in the list. Per the grammar
+                // (`FormalParameters : FormalParameterList `,` FunctionRestParameter`)
+                // nothing — not even a trailing comma — may follow it. acorn:
+                // "Comma is not permitted after the rest element".
+                if is_rest {
+                    if self.check(&TokenKind::Comma) {
+                        return Err(
+                            self.error_msg("A rest parameter must be last in a parameter list")
+                        );
+                    }
+                    break;
+                }
 
                 // Check for comma or closing paren
                 if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
