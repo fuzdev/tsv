@@ -207,6 +207,7 @@ tsv/
 ├── Cargo.toml         # workspace root
 ├── crates/
 │   ├── tsv_lang/      # foundation (Span, Location, ParseError)
+│   ├── tsv_arena/     # per-thread reusable AST/doc arenas for the bindings' hot loop
 │   ├── tsv_html/      # HTML classification and whitespace rules
 │   ├── tsv_ignore/    # gitignore-aware discovery matcher (.gitignore/.formatignore/.prettierignore)
 │   ├── tsv_discover/  # file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
@@ -216,7 +217,8 @@ tsv/
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
 │   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
 │   ├── tsv_ffi/       # C FFI bindings
-│   └── tsv_wasm/      # WebAssembly bindings
+│   ├── tsv_wasm/      # WebAssembly bindings
+│   └── tsv_napi/      # N-API bindings (Node/Bun native path)
 └── tests/             # workspace-level integration tests
 ```
 

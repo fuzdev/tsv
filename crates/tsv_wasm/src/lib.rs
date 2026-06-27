@@ -16,6 +16,17 @@
 
 use wasm_bindgen::prelude::*;
 
+// Per-thread reusable AST/doc arenas, shared with the native bindings via the
+// `tsv_arena` crate. WASM is single-threaded, so the thread-local is effectively
+// a module static: the arena's high-water chunk is retained across calls and
+// `reset()` rewinds it, removing the per-call `Bump` / `DocArena` allocation (the
+// documented WASM-format allocation-count lever). Soundness matches the native
+// bindings — the AST/doc are fully consumed into an owned return value before the
+// next call's `reset()`.
+use tsv_arena::with_ast_arena;
+#[cfg(feature = "format")]
+use tsv_arena::with_doc_arena;
+
 fn err(e: impl ToString) -> JsError {
     JsError::new(&e.to_string())
 }
@@ -217,29 +228,31 @@ macro_rules! lang_bindings {
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_json_fn(source: &str) -> Result<String, JsError> {
-            let arena =
-                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-            let ast = $lang::parse(source, &arena).map_err(err)?;
-            Ok($lang::convert_ast_json_string(&ast, source))
+            with_ast_arena(|arena| {
+                let ast = $lang::parse(source, arena).map_err(err)?;
+                Ok($lang::convert_ast_json_string(&ast, source))
+            })
         }
 
         #[cfg(feature = "parse")]
         #[wasm_bindgen]
         pub fn $parse_internal_fn(source: &str) -> Result<(), JsError> {
-            let arena =
-                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-            let ast = $lang::parse(source, &arena).map_err(err)?;
-            std::hint::black_box(ast);
-            Ok(())
+            with_ast_arena(|arena| {
+                let ast = $lang::parse(source, arena).map_err(err)?;
+                std::hint::black_box(ast);
+                Ok(())
+            })
         }
 
         #[cfg(feature = "format")]
         #[wasm_bindgen]
         pub fn $format_fn(source: &str) -> Result<String, JsError> {
-            let arena =
-                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
-            let ast = $lang::parse(source, &arena).map_err(err)?;
-            Ok($lang::format(&ast, source))
+            with_ast_arena(|arena| {
+                let ast = $lang::parse(source, arena).map_err(err)?;
+                Ok(with_doc_arena(|doc_arena| {
+                    $lang::format_in(&ast, source, doc_arena)
+                }))
+            })
         }
     };
 }

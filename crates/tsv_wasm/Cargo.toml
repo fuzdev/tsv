@@ -21,7 +21,8 @@ wasm-opt = ['-O3', '--enable-bulk-memory', '--enable-nontrapping-float-to-int']
 default = ["format", "parse"]
 # `format_*` exports + the `IgnoreStack` discovery matcher and its
 # `tsv_discover` verdict methods (@fuzdev/tsv_format_wasm when alone).
-format = ["dep:tsv_ignore", "dep:tsv_discover"]
+# `tsv_arena/format` adds the reusable doc arena (`with_doc_arena`).
+format = ["dep:tsv_ignore", "dep:tsv_discover", "tsv_arena/format"]
 # `parse_*` exports + convert layer (@fuzdev/tsv_parse_wasm when alone).
 # The parse-only build drops the printers via link-level dead-code
 # elimination — no printer feature gates in the language crates.
@@ -37,9 +38,12 @@ tsv_svelte.workspace = true
 tsv_ts.workspace = true
 tsv_css.workspace = true
 tsv_lang.workspace = true
-# Bump arena for the per-call AST (caller-owns-Bump): each entry point creates a
-# local Bump, parses into it, and returns an owned String — the arena never escapes.
-bumpalo.workspace = true
+# Per-thread reusable AST/doc arenas (shared with the native bindings). The
+# workspace entry is default-features = false (AST-arena helper only); the
+# `format` feature adds `tsv_arena/format` for the reusable doc arena. WASM is
+# single-threaded, so the thread-local reuse is sound and removes the per-call
+# arena allocation.
+tsv_arena = { workspace = true }
 # gitignore-style discovery matcher, exposed as `IgnoreStack` for the JS CLI
 # and VS Code extension. Format-only — pulled in by the `format` feature.
 tsv_ignore = { workspace = true, optional = true }
