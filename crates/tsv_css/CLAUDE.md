@@ -33,7 +33,7 @@ The two `StyleSheet` / `StyleContent` types (re-exported only with `convert`) ar
 - **`escapes` module is its own thing**, unlike `tsv_lang::escapes` (which handles JS-style quote swapping). CSS escapes are positional Unicode (`\XXXXXX` with optional whitespace terminator) and live entirely in `escapes.rs`. `tsv_ts` has its own `lexer/escapes.rs` for the same reason; `tsv_svelte` has none and delegates.
 - **`convert` feature flag** (default-on) — gates the entire `ast::public` + `ast::convert` layer plus `serde`/`serde_json` deps. Disabled in the `@fuzdev/tsv_format_wasm` build, which only needs to format. See [`tsv_wasm/CLAUDE.md`](../tsv_wasm/CLAUDE.md).
 - **Comments live on `CssStyleSheet`**, not on nodes. Value comments (e.g., `color: /* x */ red;`) are detected by scanning source text directly in `printer/mod.rs::has_value_comments_in_decl`, since they're not stored as `Comment` entries.
-- **Printer is organized by CSS spec hierarchy** (`rules.rs` → `declarations.rs` → `values.rs`, plus `atrules.rs` and `selectors.rs`), not by node kind. `selectors.rs` is shared between rules and at-rules; `value_normalization.rs` normalizes value text to prettier's form (numbers, hex colors, whitespace).
+- **Printer is organized by CSS spec hierarchy** (`rules.rs` → `declarations.rs` → `values.rs`, plus `atrules.rs` and `selectors.rs`), not by node kind. `selectors.rs` is shared between rules and at-rules; the `value_normalization/` module normalizes value text to prettier's form (numbers, hex colors, whitespace).
 
 ## Checklist
 
