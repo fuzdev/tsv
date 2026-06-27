@@ -530,9 +530,23 @@ const KEYWORD_FIRST_LETTER_MASK: u32 = {
     const fn bit(b: u8) -> u32 {
         1 << (b - b'a')
     }
-    bit(b'a') | bit(b'b') | bit(b'c') | bit(b'd') | bit(b'e') | bit(b'f') | bit(b'i')
-        | bit(b'l') | bit(b'n') | bit(b'o') | bit(b'r') | bit(b's') | bit(b't') | bit(b'u')
-        | bit(b'v') | bit(b'w') | bit(b'y')
+    bit(b'a')
+        | bit(b'b')
+        | bit(b'c')
+        | bit(b'd')
+        | bit(b'e')
+        | bit(b'f')
+        | bit(b'i')
+        | bit(b'l')
+        | bit(b'n')
+        | bit(b'o')
+        | bit(b'r')
+        | bit(b's')
+        | bit(b't')
+        | bit(b'u')
+        | bit(b'v')
+        | bit(b'w')
+        | bit(b'y')
 };
 
 /// O(1) keyword lookup using a perfect hash function, gated by a cheap reject pre-filter.
@@ -568,7 +582,11 @@ mod tests {
     fn prefilter_admits_every_keyword() {
         let mut derived_mask = 0u32;
         for (&kw, &kind) in KEYWORDS.entries() {
-            assert_eq!(keyword_kind(kw), Some(kind), "pre-filter rejected reserved word `{kw}`");
+            assert_eq!(
+                keyword_kind(kw),
+                Some(kind),
+                "pre-filter rejected reserved word `{kw}`"
+            );
             let len = kw.len();
             assert!(
                 (KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN).contains(&len),
@@ -576,7 +594,10 @@ mod tests {
                  {KEYWORD_MIN_LEN}..={KEYWORD_MAX_LEN}"
             );
             let first = kw.as_bytes()[0];
-            assert!(first.is_ascii_lowercase(), "reserved word `{kw}` does not start lowercase-ASCII");
+            assert!(
+                first.is_ascii_lowercase(),
+                "reserved word `{kw}` does not start lowercase-ASCII"
+            );
             derived_mask |= 1u32 << (first - b'a');
         }
         assert_eq!(
@@ -589,7 +610,19 @@ mod tests {
     /// and single-char names, and contextual words deliberately absent from `KEYWORDS`.
     #[test]
     fn prefilter_rejects_non_keywords() {
-        for s in ["Foo", "_private", "$x", "x", "", "interface", "readonly", "namespace", "get", "kind", "map"] {
+        for s in [
+            "Foo",
+            "_private",
+            "$x",
+            "x",
+            "",
+            "interface",
+            "readonly",
+            "namespace",
+            "get",
+            "kind",
+            "map",
+        ] {
             assert_eq!(keyword_kind(s), None, "`{s}` should not be a keyword");
         }
     }
