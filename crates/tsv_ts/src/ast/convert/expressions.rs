@@ -44,7 +44,9 @@ pub(in crate::ast::convert) fn convert_expression_inner<'src>(
         internal::Expression::JsdocCast(cast) => {
             convert_expression_inner(cast.inner, source, loc, interner, offset, false)
         }
-        internal::Expression::Literal(lit) => convert_literal_expression(lit, source, loc, offset),
+        internal::Expression::Literal(lit) => {
+            public::Expression::Literal(super::convert_literal(lit, source, loc, offset))
+        }
         internal::Expression::Identifier(id) => {
             public::Expression::Identifier(public::Identifier {
                 node_type: "Identifier",
@@ -598,31 +600,6 @@ fn maybe_wrap_chain<'src>(
     } else {
         inner
     }
-}
-
-fn convert_literal_expression<'src>(
-    lit: &internal::Literal<'_>,
-    source: &'src str,
-    loc: &LocationTracker,
-    offset: usize,
-) -> public::Expression<'src> {
-    // undefined is a global identifier, not a literal
-    if matches!(lit.value, internal::LiteralValue::Undefined) {
-        return public::Expression::Identifier(public::Identifier {
-            node_type: "Identifier",
-            start: lit.span.start,
-            end: lit.span.end,
-            loc: create_location(lit.span, loc, offset),
-            name: Cow::Borrowed("undefined"),
-            optional: false,
-            type_annotation: None,
-            decorators: Vec::new(),
-        });
-    }
-
-    // Every other literal shares the canonical converter (`undefined` is the
-    // only `LiteralValue` it would handle differently, and it's returned above).
-    public::Expression::Literal(super::convert_literal(lit, source, loc, offset))
 }
 
 fn convert_object_property<'src>(

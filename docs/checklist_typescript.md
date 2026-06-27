@@ -22,10 +22,10 @@ Foundation for all parsing.
 
 ### Tokens & Whitespace
 
-- Whitespace tokens (space, tab, newlines)
-- Line terminators (LF, CR, CRLF)
+- Whitespace tokens — ECMAScript WhiteSpace (space, tab, VT, FF, NBSP, ZWNBSP/U+FEFF, other Zs)
+- Line terminators (LF, CR, CRLF, LS/U+2028, PS/U+2029)
 - Unicode BOM handling (intentional divergence: tsv strips BOM)
-- Hashbang comments (`#!/usr/bin/env node`) - ES2023
+- Hashbang comments (`#!/usr/bin/env node`, terminated by any line terminator) - ES2023
 
 ### Comments
 

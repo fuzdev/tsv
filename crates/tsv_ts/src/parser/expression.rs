@@ -1130,17 +1130,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     end,
                 ))
             }
-            TokenKind::Keyword(KeywordKind::Undefined) => {
-                let (start, end) = self.current_pos();
-                self.advance()?;
-                Ok(ParsedExpr::with_end(
-                    Expression::Literal(Literal {
-                        value: LiteralValue::Undefined,
-                        span: Span::new(start as u32, end as u32),
-                    }),
-                    end,
-                ))
-            }
             TokenKind::Keyword(KeywordKind::This) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
@@ -1255,6 +1244,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | TokenKind::Keyword(KeywordKind::Object)
             | TokenKind::Keyword(KeywordKind::Symbol)
             | TokenKind::Keyword(KeywordKind::Bigint)
+            // `undefined` is a global identifier (not a ReservedWord), so in value
+            // position it is an `Identifier` named "undefined" — never a literal.
+            // This makes it a valid assignment target (`undefined = 12`). acorn
+            // models it the same way.
+            | TokenKind::Keyword(KeywordKind::Undefined)
             // Contextual keywords that can be identifiers
             | TokenKind::Keyword(KeywordKind::Async)
             | TokenKind::Keyword(KeywordKind::From)
@@ -1670,6 +1664,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::Keyword(KeywordKind::Class) => {
                     // Class expression: `new class {}`
                     let expr = self.parse_class_expression()?;
+                    ParsedExpr::from_expr(expr)
+                }
+                TokenKind::Keyword(KeywordKind::Import) => {
+                    // `new import.meta()` — `import.meta` is a MetaProperty (a
+                    // MemberExpression), a valid `new` callee. `new import(...)`
+                    // is not: an `import(...)` ImportCall is a CallExpression, not
+                    // a MemberExpression — acorn agrees ("Cannot use new with
+                    // import()").
+                    let (import_start, _) = self.current_pos();
+                    let expr = self.parse_import_or_meta_property()?;
+                    if matches!(expr, Expression::ImportExpression(_)) {
+                        return Err(self.error_msg_at("Cannot use new with import()", import_start));
+                    }
                     ParsedExpr::from_expr(expr)
                 }
                 _ => {

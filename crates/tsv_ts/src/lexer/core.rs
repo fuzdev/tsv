@@ -70,6 +70,31 @@ pub struct Lexer<'a> {
     had_line_terminator: bool,
 }
 
+/// Returns true if `c` is an ECMAScript **WhiteSpace** code point (ES spec
+/// `sec-white-space`): `<TAB>`, `<VT>`, `<FF>`, `<ZWNBSP>` (U+FEFF), and every
+/// `Space_Separator` (Unicode category `Zs`, which includes `<SP>` and `<NBSP>`).
+///
+/// This is deliberately **not** Rust's `char::is_whitespace()` (the Unicode
+/// `White_Space` property), which differs in both directions: it omits U+FEFF
+/// and includes U+0085 (`<NEL>`), neither of which ECMAScript treats as
+/// WhiteSpace. LineTerminators (`<LF>`/`<CR>`/`<LS>`/`<PS>`) are a separate
+/// production and are matched ahead of this in `skip_whitespace`, so they are
+/// intentionally absent here.
+const fn is_es_whitespace(c: char) -> bool {
+    matches!(
+        c,
+        '\u{0009}'              // <TAB>
+        | '\u{000B}'            // <VT>
+        | '\u{000C}'            // <FF>
+        | '\u{FEFF}'            // <ZWNBSP>
+        // <USP>: Unicode category Zs (Space_Separator)
+        | '\u{0020}'            // SPACE
+        | '\u{00A0}'            // NO-BREAK SPACE
+        | '\u{1680}'
+        | '\u{2000}'..='\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}'
+    )
+}
+
 impl<'a> Lexer<'a> {
     pub fn new(source: &'a str) -> Self {
         let mut chars = source.chars();
@@ -346,8 +371,8 @@ impl<'a> Lexer<'a> {
                         self.advance();
                     }
                 }
-                c if c.is_whitespace() => {
-                    // Other whitespace (space, tab, etc.)
+                c if is_es_whitespace(c) => {
+                    // Other whitespace (space, tab, NBSP, ZWNBSP, Zs, …)
                     self.advance();
                 }
                 _ => break,
@@ -1146,9 +1171,11 @@ impl<'a> Lexer<'a> {
         // (no delimiter stripping) — recovered on demand as a source slice.
         loop {
             match self.current {
-                None | Some('\n') | Some('\r') => {
-                    // End of hashbang comment
-                    // Don't consume the newline - it's whitespace for the next token
+                None | Some('\n' | '\r' | '\u{2028}' | '\u{2029}') => {
+                    // End of hashbang comment at the first LineTerminator (LF, CR,
+                    // LS, PS) or EOF. Don't consume the terminator - it's
+                    // whitespace for the next token. (Mirrors the `//` line-comment
+                    // reader in `comments.rs`.)
                     break;
                 }
                 Some(_) => {

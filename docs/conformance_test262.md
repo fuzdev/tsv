@@ -16,10 +16,10 @@ at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,149 graded after skips).
 
-- Positive (should parse) — 41,845 passed, 54 failed
+- Positive (should parse) — 41,852 passed, 47 failed
 - Negative (should reject) — 1,157 passed, 3,093 failed
 
-- **Overall**: 43,002/46,149 (93.2%)
+- **Overall**: 43,009/46,149 (93.2%)
 - **Positive pass rate**: 99.9% — valid syntax tsv accepts
 - **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
 
@@ -31,30 +31,27 @@ import proposals (`source-phase-imports` / `import.source(…)` and `import-defe
 `Expected 'meta' after 'import.'`. They drop out of both the headline pass rate
 and the differential manifest. See [Scope](#what-we-skip).
 
-**Triaging the positive failures against the drop-in oracle.** Each of the 54 is
+**Triaging the positive failures against the drop-in oracle.** Each of the 47 is
 parsed with the canonical parser (acorn-typescript in module mode — what the
-fixtures' `expected.json` is generated from). **~10 are genuine tsv-vs-acorn bugs
-(acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~44
+fixtures' `expected.json` is generated from). **~4 are genuine tsv-vs-acorn bugs
+(acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~43
 are rejected by acorn too (not tsv-specific). _(Methodology: parse each
 `../test262/<path>` with `canonical_parse` and bucket on whether it yields an
 AST. An earlier triage used a wrong path prefix, so every file came back
 "not found" and was mis-bucketed as rejected — the corrected sweep below is
 authoritative.)_
 
-**The ~10 real bugs**, by cluster:
+**The ~4 real bugs**, by cluster:
 
 - **Rest parameter with a destructuring pattern (2)** — `function f(...[a, b]) {}`,
   `function f(...{ a }) {}`. A rest element can be a `BindingPattern`, not only an
   identifier.
-- **Hashbang terminated by U+2028 / U+2029 (2)** — a line/paragraph separator
-  should end a `#!` comment.
-- **Singletons (6)** — `import.meta` in some positions, `for await (… of …)` with
-  an async LHS, `var undefined` (`undefined` is not reserved), do-while ASI on one
-  line, a ZWNBSP (U+FEFF) after a regex literal, a decorator member-expression
-  position, and an assignment-target case.
+- **Singletons (2)** — `for await (… of …)` with an async LHS (`for await (async of
+  [7])`), and a decorated class *expression* (`x = @dec class {}` — decorators are
+  wired into statement position only).
 
 These are the actionable positive-conformance backlog (fixtures-first per the
-repo TDD gate). Three such gaps are now fixed: ✅ the tagged-template invalid-escape
+repo TDD gate). Several such gaps are now fixed: ✅ the tagged-template invalid-escape
 gap (ES2018); ✅ the `[+In]` for-header reset — the for-init disables `in`
 (`[~In]`), but nested sub-expressions restore `[+In]` (computed class member name,
 ternary consequent, dynamic-import argument, function/class bodies). tsv had leaked
@@ -68,7 +65,16 @@ properties (ecma262 §sec-names-and-keywords → UAX #31), a superset. The gap i
 letters whose NFKC decomposition leaves the set (U+037A, U+0E33, U+0EB3, the
 halfwidth katakana marks, and the Arabic ligature/presentation forms); the lexer
 now adds them back (covering the four `other_id_*` test262 files and the broader
-NFKC-excluded set).
+NFKC-excluded set); ✅ **the hashbang line/paragraph-separator terminators** — a
+`#!…` comment ends at U+2028 / U+2029, like any other LineTerminator; ✅
+**ECMAScript-exact inter-token whitespace** — U+FEFF (ZWNBSP) is WhiteSpace and is
+skipped mid-stream, not only as a leading BOM, while U+0085 (NEL), which ECMAScript
+excludes, is not; ✅ **do-while ASI** — a `;` is inserted unconditionally after the
+`)` (`do x; while (c) y`); ✅ **`undefined` as an ordinary identifier** — a valid
+binding name (`var undefined`) and assignment target (`undefined = 12`), modeled as
+an `Identifier` like acorn rather than a literal; and ✅ **`new import.meta()`** —
+`import.meta` is a valid `new` callee (a MetaProperty), while `new import(…)` stays
+rejected.
 
 **The ~44 acorn-also-rejects** are not tsv bugs — they split into:
 **sloppy-mode-only** (`with`, AnnexB `f() = g()` / `for (var a = x in b)`, legacy
