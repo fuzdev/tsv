@@ -376,56 +376,14 @@ fn convert_for_in_of_left<'src>(
             ))
         }
         internal::ForInOfLeft::Pattern(expr) => {
-            let converted = convert_expression(expr, source, loc, interner, offset);
-            public::ForInOfLeft::Pattern(Box::new(expression_to_pattern(converted)))
+            // The parser already refined the LHS through `to_assignable`, so a
+            // destructuring LHS is an `ArrayPattern`/`ObjectPattern` in the
+            // internal AST (deeply, with `RestElement`s) — `convert_expression`
+            // mirrors it directly; no public-side relabel is needed.
+            public::ForInOfLeft::Pattern(Box::new(convert_expression(
+                expr, source, loc, interner, offset,
+            )))
         }
-    }
-}
-
-/// Convert expression types to pattern types for for-in/of LHS.
-/// Acorn converts `ObjectExpression` → `ObjectPattern` and `ArrayExpression` → `ArrayPattern`
-/// when used in the left-hand side of for-in/of statements.
-fn expression_to_pattern(expr: public::Expression<'_>) -> public::Expression<'_> {
-    match expr {
-        public::Expression::ObjectExpression(obj) => {
-            public::Expression::ObjectPattern(public::ObjectPattern {
-                node_type: "ObjectPattern",
-                start: obj.start,
-                end: obj.end,
-                loc: obj.loc,
-                properties: obj
-                    .properties
-                    .into_iter()
-                    .map(|p| match p {
-                        public::ObjectProperty::Property(p) => {
-                            public::ObjectPatternProperty::Property(p)
-                        }
-                        public::ObjectProperty::SpreadElement(s) => {
-                            public::ObjectPatternProperty::RestElement(public::RestElement {
-                                node_type: "RestElement",
-                                start: s.start,
-                                end: s.end,
-                                loc: s.loc,
-                                argument: s.argument,
-                                type_annotation: None,
-                            })
-                        }
-                    })
-                    .collect(),
-                type_annotation: None,
-            })
-        }
-        public::Expression::ArrayExpression(arr) => {
-            public::Expression::ArrayPattern(public::ArrayPattern {
-                node_type: "ArrayPattern",
-                start: arr.start,
-                end: arr.end,
-                loc: arr.loc,
-                elements: arr.elements,
-                type_annotation: None,
-            })
-        }
-        other => other,
     }
 }
 

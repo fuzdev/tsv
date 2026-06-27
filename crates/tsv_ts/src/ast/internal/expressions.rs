@@ -166,6 +166,12 @@ pub struct JsdocCast<'arena> {
 #[derive(Debug, Clone)]
 pub struct ObjectExpression<'arena> {
     pub properties: &'arena [ObjectProperty<'arena>],
+    /// `true` when a trailing comma follows a final spread property (`{...a,}`).
+    /// Valid in an object *literal*, but a syntax error once the literal is
+    /// refined to an object pattern — the grammar's rest property admits no
+    /// trailing comma. The literal parser discards the comma, so this flag is
+    /// the only surviving record of it for `to_assignable` to consult.
+    pub spread_trailing_comma: bool,
     pub span: Span,
 }
 
@@ -230,6 +236,12 @@ impl<'arena> ObjectProperty<'arena> {
 #[derive(Debug, Clone)]
 pub struct ArrayExpression<'arena> {
     pub elements: &'arena [Option<Expression<'arena>>],
+    /// `true` when a trailing comma follows a final spread element (`[...a,]`).
+    /// Valid in an array *literal*, but a syntax error once the literal is
+    /// refined to an array pattern — the grammar's rest element admits no
+    /// trailing comma. The literal parser discards the comma, so this flag is
+    /// the only surviving record of it for `to_assignable` to consult.
+    pub spread_trailing_comma: bool,
     pub span: Span,
 }
 

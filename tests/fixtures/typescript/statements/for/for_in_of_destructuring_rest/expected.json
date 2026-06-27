@@ -1,0 +1,800 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 452,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Nested array destructuring (inner array converts to a pattern deeply)",
+			"start": 10,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested object destructuring (inner object converts to a pattern deeply)",
+			"start": 124,
+			"end": 198,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Valid rest as the last array element (rest stays accepted)",
+			"start": 239,
+			"end": 300,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Valid rest as the last object property, for-in branch",
+			"start": 343,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 57
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 451,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 442,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForOfStatement",
+					"start": 84,
+					"end": 121,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "ArrayPattern",
+						"start": 89,
+						"end": 100,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 17
+							}
+						},
+						"elements": [
+							{
+								"type": "Identifier",
+								"start": 90,
+								"end": 91,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ArrayPattern",
+								"start": 93,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 16
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 94,
+										"end": 95,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 11
+											},
+											"end": {
+												"line": 3,
+												"column": 12
+											}
+										},
+										"name": "b"
+									},
+									{
+										"type": "Identifier",
+										"start": 97,
+										"end": 98,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 14
+											},
+											"end": {
+												"line": 3,
+												"column": 15
+											}
+										},
+										"name": "c"
+									}
+								]
+							}
+						]
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 104,
+						"end": 107,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 21
+							},
+							"end": {
+								"line": 3,
+								"column": 24
+							}
+						},
+						"name": "arr"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 109,
+						"end": 121,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 26
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 113,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 113,
+									"end": 117,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 6
+										}
+									},
+									"name": "expr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested array destructuring (inner array converts to a pattern deeply)",
+							"start": 10,
+							"end": 82
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 200,
+					"end": 236,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "ArrayPattern",
+						"start": 205,
+						"end": 215,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 16
+							}
+						},
+						"elements": [
+							{
+								"type": "Identifier",
+								"start": 206,
+								"end": 207,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "ObjectPattern",
+								"start": 209,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 10
+									},
+									"end": {
+										"line": 8,
+										"column": 15
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 211,
+										"end": 212,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 12
+											},
+											"end": {
+												"line": 8,
+												"column": 13
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 211,
+											"end": 212,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 12
+												},
+												"end": {
+													"line": 8,
+													"column": 13
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 211,
+											"end": 212,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 12
+												},
+												"end": {
+													"line": 8,
+													"column": 13
+												}
+											},
+											"name": "b"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						]
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 219,
+						"end": 222,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 20
+							},
+							"end": {
+								"line": 8,
+								"column": 23
+							}
+						},
+						"name": "arr"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 224,
+						"end": 236,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 25
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 228,
+								"end": 233,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 228,
+									"end": 232,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"name": "expr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested object destructuring (inner object converts to a pattern deeply)",
+							"start": 124,
+							"end": 198
+						}
+					]
+				},
+				{
+					"type": "ForOfStatement",
+					"start": 302,
+					"end": 340,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"await": false,
+					"left": {
+						"type": "ArrayPattern",
+						"start": 307,
+						"end": 319,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 6
+							},
+							"end": {
+								"line": 13,
+								"column": 18
+							}
+						},
+						"elements": [
+							{
+								"type": "Identifier",
+								"start": 308,
+								"end": 309,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "RestElement",
+								"start": 311,
+								"end": 318,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 10
+									},
+									"end": {
+										"line": 13,
+										"column": 17
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 314,
+									"end": 318,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 13
+										},
+										"end": {
+											"line": 13,
+											"column": 17
+										}
+									},
+									"name": "rest"
+								}
+							}
+						]
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 323,
+						"end": 326,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 22
+							},
+							"end": {
+								"line": 13,
+								"column": 25
+							}
+						},
+						"name": "arr"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 328,
+						"end": 340,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 27
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 332,
+								"end": 337,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 332,
+									"end": 336,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 6
+										}
+									},
+									"name": "expr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Valid rest as the last array element (rest stays accepted)",
+							"start": 239,
+							"end": 300
+						}
+					]
+				},
+				{
+					"type": "ForInStatement",
+					"start": 401,
+					"end": 441,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 2
+						}
+					},
+					"left": {
+						"type": "ObjectPattern",
+						"start": 406,
+						"end": 420,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 20
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 408,
+								"end": 409,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 8
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"method": false,
+								"shorthand": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 408,
+									"end": 409,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 8
+										},
+										"end": {
+											"line": 18,
+											"column": 9
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 408,
+									"end": 409,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 8
+										},
+										"end": {
+											"line": 18,
+											"column": 9
+										}
+									},
+									"name": "a"
+								},
+								"kind": "init"
+							},
+							{
+								"type": "RestElement",
+								"start": 411,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 18
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 414,
+									"end": 418,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 14
+										},
+										"end": {
+											"line": 18,
+											"column": 18
+										}
+									},
+									"name": "rest"
+								}
+							}
+						]
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 424,
+						"end": 427,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 24
+							},
+							"end": {
+								"line": 18,
+								"column": 27
+							}
+						},
+						"name": "obj"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 429,
+						"end": 441,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 29
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 433,
+								"end": 438,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 433,
+									"end": 437,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 6
+										}
+									},
+									"name": "expr"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Valid rest as the last object property, for-in branch",
+							"start": 343,
+							"end": 399
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
