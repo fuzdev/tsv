@@ -14,19 +14,27 @@ Use test262 to validate that tsv's parser correctly:
 Regenerate with `cargo run -p tsv_debug test262` (expects a test262 checkout
 at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
-discovered tests (46,545 graded after skips).
+discovered tests (46,149 graded after skips).
 
-- Positive (should parse) — 41,907 passed, 207 failed
-- Negative (should reject) — 1,339 passed, 3,092 failed
+- Positive (should parse) — 41,837 passed, 62 failed
+- Negative (should reject) — 1,158 passed, 3,092 failed
 
-- **Overall**: 43,246/46,545 (92.9%)
-- **Positive pass rate**: 99.5% — valid syntax tsv accepts
-- **Skipped**: 2,591 (sloppy mode: 2,519, runtime: 38, resolution: 34)
+- **Overall**: 42,995/46,149 (93.2%)
+- **Positive pass rate**: 99.9% — valid syntax tsv accepts
+- **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
 
-**Triaging the positive failures against the drop-in oracle.** Each of the 207 is
+**Feature filtering.** Tests whose `features:` frontmatter names a syntactic
+proposal tsv does not implement are skipped, not graded — scoring them as parse
+failures would measure scope, not a conformance gap. Currently the two Stage-3
+import proposals (`source-phase-imports` / `import.source(…)` and `import-defer`
+/ `import.defer(…)`, ~422 files across both polarities) tsv rejects with
+`Expected 'meta' after 'import.'`. They drop out of both the headline pass rate
+and the differential manifest. See [Scope](#what-we-skip).
+
+**Triaging the positive failures against the drop-in oracle.** Each of the 62 is
 parsed with the canonical parser (acorn-typescript in module mode — what the
 fixtures' `expected.json` is generated from). **~18 are genuine tsv-vs-acorn bugs
-(acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~189
+(acorn accepts, tsv rejects) — real parser gaps to close.** The remaining ~44
 are rejected by acorn too (not tsv-specific). _(Methodology: parse each
 `../test262/<path>` with `canonical_parse` and bucket on whether it yields an
 AST. An earlier triage used a wrong path prefix, so every file came back
@@ -61,7 +69,7 @@ the for-header `[~In]` into them; now they parse, and the formatter parenthesize
 `in` anywhere under a for-init (matching prettier, keeping it distinct from the
 `for (x in y)` separator).
 
-**The ~189 acorn-also-rejects** are not tsv bugs — they split into:
+**The ~44 acorn-also-rejects** are not tsv bugs — they split into:
 **sloppy-mode-only** (`with`, AnnexB `f() = g()` / `for (var a = x in b)`, legacy
 octal — tsv is strict-only); **strict-*Script*-only** (top-level `await` as a
 *binding*, e.g. `var await = 1` — valid in a strict Script but not a Module;
@@ -70,11 +78,11 @@ a strict reserved word in both goals); **`await`-as-identifier inside a non-asyn
 function/generator/method** (`function foo(await) {}`, the `static-init-await`
 cluster — valid in *module* per spec but acorn rejects it anyway; the planned
 **`await`-context tracking** fixes this and the strict-Script bindings together);
-**Stage-3 proposals** (`import.source`, `import.defer` — the dynamic-import
-cluster, a roadmap question); and **plugin-gated syntax** (decorators, not in the
-oracle config). When the await-context work lands, the strict-Script + non-async
-buckets move from "acorn-also-rejects" to deliberate, more-spec-correct
-divergences from acorn-as-module.
+and **plugin-gated syntax** (decorators, not in the oracle config). When the
+await-context work lands, the strict-Script + non-async buckets move from
+"acorn-also-rejects" to deliberate, more-spec-correct divergences from
+acorn-as-module. (The Stage-3 import proposals that acorn-via-oxc also rejects no
+longer appear here — they're skipped by feature filtering above, not graded.)
 
 Most negative failures are over-acceptance of _early errors_ — programs that
 parse under the syntactic grammar but that the spec rejects semantically
@@ -93,6 +101,13 @@ syntactic grammar; early-error enforcement is future diagnostics-layer work.
 
 - `negative.phase: runtime` - Requires execution
 - `negative.phase: resolution` - Requires module resolution
+- `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only)
+- `features:` naming an **unimplemented syntactic proposal** - currently
+  `source-phase-imports` / `source-phase-imports-module-source` / `import-defer`
+  (the Stage-3 import proposals). Skipped in both polarities so the score
+  reflects conformance on syntax tsv aims to support, not unimplemented scope.
+  The skip set lives in `crates/tsv_debug/src/test262/frontmatter.rs`
+  (`UNIMPLEMENTED_FEATURES`) — remove a name when tsv implements that proposal.
 - `*_FIXTURE.js` files - Module dependencies, not standalone tests
 
 ### Test Directories

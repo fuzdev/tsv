@@ -5,6 +5,23 @@
 
 #![allow(dead_code)] // Some methods are useful for future expansion
 
+/// Syntactic proposals tsv deliberately does not parse, by their test262
+/// `features:` name. A test requiring one of these is not a tsv conformance gap
+/// — it exercises an unimplemented proposal — so the runner skips it instead of
+/// scoring it as a positive failure (and the differential manifest drops it too,
+/// since both share `classify`).
+///
+/// Currently the two Stage-3 import proposals whose `import.source(…)` /
+/// `import.defer(…)` syntax tsv rejects (`Expected 'meta' after 'import.'`):
+/// `source-phase-imports` (with its companion `…-module-source` tag) and
+/// `import-defer`. Together ~145 test262 files. When tsv implements a proposal,
+/// drop its name here so those tests re-enter the graded set.
+const UNIMPLEMENTED_FEATURES: &[&str] = &[
+    "source-phase-imports",
+    "source-phase-imports-module-source",
+    "import-defer",
+];
+
 /// Parsed frontmatter from a test262 test file.
 #[derive(Debug, Default)]
 pub struct Frontmatter {
@@ -52,6 +69,16 @@ impl Frontmatter {
     /// Check if this test requires strict mode only.
     pub fn requires_strict_mode(&self) -> bool {
         self.flags.iter().any(|f| f == "onlyStrict")
+    }
+
+    /// The first `features:` entry naming a proposal tsv does not implement
+    /// (see `UNIMPLEMENTED_FEATURES`), or `None` if the test needs only
+    /// implemented syntax. The runner skips a `Some` test rather than grading
+    /// the unimplemented proposal as a failure.
+    pub fn requires_unimplemented_feature(&self) -> Option<&'static str> {
+        self.features
+            .iter()
+            .find_map(|f| UNIMPLEMENTED_FEATURES.iter().copied().find(|&u| u == f))
     }
 }
 
@@ -341,5 +368,52 @@ flags: [module]
     fn test_no_frontmatter() {
         let content = "var x = 1;";
         assert!(parse(content).is_none());
+    }
+
+    #[test]
+    fn test_requires_unimplemented_feature() {
+        // The real shape: the proposal name sits alongside `dynamic-import`.
+        let source_phase = r"/*---
+features: [source-phase-imports, dynamic-import]
+flags: [generated, async]
+---*/";
+        assert_eq!(
+            parse(source_phase)
+                .unwrap()
+                .requires_unimplemented_feature(),
+            Some("source-phase-imports")
+        );
+
+        let import_defer = r"/*---
+features: [import-defer, dynamic-import]
+---*/";
+        assert_eq!(
+            parse(import_defer)
+                .unwrap()
+                .requires_unimplemented_feature(),
+            Some("import-defer")
+        );
+
+        // Plain dynamic-import is implemented — not filtered.
+        let plain = r"/*---
+features: [dynamic-import]
+---*/";
+        assert!(
+            parse(plain)
+                .unwrap()
+                .requires_unimplemented_feature()
+                .is_none()
+        );
+
+        // No features at all.
+        let bare = r"/*---
+esid: sec-example
+---*/";
+        assert!(
+            parse(bare)
+                .unwrap()
+                .requires_unimplemented_feature()
+                .is_none()
+        );
     }
 }
