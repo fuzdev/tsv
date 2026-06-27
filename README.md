@@ -86,11 +86,12 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the focused artifacts
-- JS and TS always parse as modules in strict mode - sloppy-mode-only syntax
-  like `with` is rejected, while strict-mode early errors
-  (e.g. duplicate params, reserved-word bindings) still parse for now, with
-  enforcement deferred to a future diagnostics layer; Svelte and TypeScript
-  are inherently strict, so this only matters for standalone JS scripts
+- JS and TS parse in strict mode only - sloppy-mode-only syntax like `with` is
+  rejected, while strict-mode early errors (e.g. duplicate params, reserved-word
+  bindings) still parse for now, with enforcement deferred to a future
+  diagnostics layer. The parse goal defaults to Module, with an opt-in Script
+  goal (`--goal script`); since Svelte and TypeScript are inherently strict
+  modules, the goal and strictness only matter for standalone JS scripts
 - pushes complexity and mess to the printer and JSON conversion,
   out of the parser and internal AST,
   keeping the model clean for the other planned tools

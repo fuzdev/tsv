@@ -5,6 +5,7 @@ use crate::deno::PrettierParser;
 use crate::fixtures::AUDIT_SIGNATURE_FILENAME;
 use std::path::PathBuf;
 use tsv_cli::cli::input::ParserType;
+use tsv_ts::Goal;
 
 /// Canonical error JSON format for expected_svelte.json files
 ///
@@ -35,6 +36,15 @@ pub const PRETTIER_NONCONVERGENT_FILENAME: &str = "prettier_nonconvergent.txt";
 /// the expected-error substring — prose lives in README.md. Mutually exclusive
 /// with `prettier_nonconvergent.txt` (prettier either throws or oscillates).
 pub const PRETTIER_REJECTS_FILENAME: &str = "prettier_rejects.txt";
+
+/// Marker file selecting the parse goal for a standalone-script fixture. When
+/// present (containing `script`), the fixture's `input.ts` is parsed as a
+/// strict **Script** (`tsv_ts::Goal::Script`) rather than the default
+/// **Module** — by both tsv and the acorn `expected.json` oracle — so `await`
+/// is an ordinary identifier and `import`/`export`/`import.meta` are syntax
+/// errors. Absent (the common case) means `Goal::Module`. Only meaningful on
+/// `.ts` / `.svelte.ts` fixtures (Svelte `<script>` and CSS have no goal).
+pub const GOAL_FILENAME: &str = "goal";
 
 /// Type of input file for a fixture
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -195,6 +205,23 @@ impl Fixture {
     /// Get the full path to the prettier-rejects marker file
     pub fn prettier_rejects_path(&self) -> PathBuf {
         self.path.join(PRETTIER_REJECTS_FILENAME)
+    }
+
+    /// Get the full path to the parse-goal marker file
+    pub fn goal_path(&self) -> PathBuf {
+        self.path.join(GOAL_FILENAME)
+    }
+
+    /// The parse goal for this fixture's input, read lazily from the `goal`
+    /// marker file. Absent or unreadable → `Goal::Module` (the default); a file
+    /// trimming to `script` → `Goal::Script`. Drives both tsv's parse and the
+    /// acorn `expected.json` oracle so a standalone-script fixture is graded at
+    /// the same goal on both sides.
+    pub fn goal(&self) -> Goal {
+        match std::fs::read_to_string(self.goal_path()) {
+            Ok(s) if s.trim() == "script" => Goal::Script,
+            _ => Goal::Module,
+        }
     }
 
     /// Check if this fixture matches any of the given filter terms

@@ -471,8 +471,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 ParsedExpr::from_expr(expr)
             }
             TokenKind::Keyword(KeywordKind::Await) => {
-                let expr = self.parse_await_expression()?;
-                ParsedExpr::from_expr(expr)
+                if self.in_await {
+                    // `[+Await]` context: a real await expression.
+                    let expr = self.parse_await_expression()?;
+                    ParsedExpr::from_expr(expr)
+                } else if self.await_is_identifier() {
+                    if self.is_single_param_arrow_start() {
+                        // Script `[~Await]`: `await => …` is an arrow whose single
+                        // `BindingIdentifier` parameter is `await`.
+                        ParsedExpr::from_expr(self.parse_single_param_arrow_function()?)
+                    } else {
+                        // Script `[~Await]`: `await` is an ordinary `IdentifierReference`.
+                        self.parse_await_identifier_reference()?
+                    }
+                } else {
+                    // Module `[~Await]`: `await` is reserved and there is no
+                    // `[+Await]` to make it an await expression.
+                    return Err(self.error_msg(
+                        "'await' is only allowed inside an async function or at the top level of a module",
+                    ));
+                }
             }
             TokenKind::Keyword(KeywordKind::Yield) => {
                 let expr = self.parse_yield_expression()?;
@@ -1102,6 +1120,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     end,
                 ))
             }
+            // `await` as an ordinary `IdentifierReference` (Script `[~Await]`) —
+            // e.g. a `new` callee (`new await()`) or any primary reference.
+            TokenKind::Keyword(KeywordKind::Await) if self.await_is_identifier() => {
+                self.parse_await_identifier_reference()
+            }
             TokenKind::BraceOpen => Ok(ParsedExpr::from_expr(self.parse_object_expression()?)),
             TokenKind::BracketOpen => Ok(ParsedExpr::from_expr(self.parse_array_expression()?)),
             TokenKind::Keyword(KeywordKind::True) => {
@@ -1488,6 +1511,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
+    /// Consume the current `await` token as an ordinary `IdentifierReference`
+    /// (Script `[~Await]`). The caller must have verified `await_is_identifier()`
+    /// — used for a primary reference and a `new` callee (`new await()`).
+    fn parse_await_identifier_reference(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
+        let (start, end) = self.current_pos();
+        let symbol = self.intern("await");
+        self.advance()?;
+        Ok(ParsedExpr::with_end(
+            Expression::Identifier(Identifier::simple(symbol, Span::new(start as u32, end as u32))),
+            end,
+        ))
+    }
+
     /// Parse yield expression: `yield`, `yield value`, or `yield* iterable`
     ///
     /// Yield expressions have low precedence (lowest in expressions).
@@ -1816,6 +1852,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if *self.current_kind() == TokenKind::Dot {
             self.advance()?; // consume '.'
             if *self.current_kind() == TokenKind::Identifier && self.current_value() == "meta" {
+                // `import.meta` is a Module-goal-only construct (early error:
+                // "Syntax Error if the syntactic goal symbol is not Module").
+                if self.goal != crate::Goal::Module {
+                    return Err(self.error_msg("'import.meta' is only allowed in a module"));
+                }
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'meta'
                 return Ok(Expression::MetaProperty(MetaProperty {

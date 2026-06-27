@@ -664,12 +664,18 @@ Stage 2 proposals and experimental features tsv does not yet parse.
 
 # Out of Scope
 
-## Strict Mode Only
+## Strict Mode Only (with an explicit goal axis)
 
 All code in Svelte scripts runs in strict mode (ES modules). tsv parses the
 syntactic grammar; it enforces the *lexical* strict-mode restrictions but not the
 strict-mode *early errors* — those still parse, with enforcement deferred to a
 future diagnostics layer.
+
+Strict and the *goal* (`Module` vs `Script`) are orthogonal — both goals are
+strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is
+available (`parse_with_goal`, `--goal script`), where `await` is an ordinary
+identifier and `import`/`export`/`import.meta` are errors. See
+[conformance_test262.md](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
 
 Rejected by the parser today:
 

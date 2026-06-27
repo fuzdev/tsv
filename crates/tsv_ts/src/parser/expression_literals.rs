@@ -139,11 +139,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::Keyword(kw) => {
                     let (key_start, key_end) = self.current_pos();
                     let symbol = self.intern(kw.as_str());
-                    // Track if this keyword cannot be used as identifier reference in shorthand
-                    let restricted = matches!(
-                        kw,
-                        KeywordKind::Await | KeywordKind::Yield | KeywordKind::Let
-                    );
+                    // Track if this keyword cannot be used as identifier reference
+                    // in shorthand. `await` is allowed at Script `[~Await]` (a
+                    // valid `IdentifierReference`), like any other identifier.
+                    let restricted = match kw {
+                        KeywordKind::Await => !self.await_is_identifier(),
+                        KeywordKind::Yield | KeywordKind::Let => true,
+                        _ => false,
+                    };
                     self.advance()?;
                     (
                         Expression::Identifier(Identifier::simple(
@@ -378,12 +381,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
-        let params = self.parse_parameter_list()?.into_bump_slice();
+        // Params + body in the method's `[Await]` context (async → `[+Await]`).
+        let params = self
+            .with_in_await(is_async, Self::parse_parameter_list)?
+            .into_bump_slice();
 
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;
 
-        let body = self.parse_function_body()?;
+        let body = self.with_in_await(is_async, Self::parse_function_body)?;
         let end = body.span.end;
 
         Ok(FunctionExpression {

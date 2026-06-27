@@ -56,7 +56,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(pv_name.clone());
 
-        match fixtures::format_with_our_formatter(&pv_content, pv_name) {
+        match fixtures::format_with_our_formatter_with_goal(&pv_content, pv_name, fixture.goal()) {
             Ok(formatted) => {
                 if formatted != *input {
                     result.add_error(ValidationError::NormalizationPrettierVariantNotNormalized(
@@ -124,7 +124,11 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(variant_name.clone());
 
-        match fixtures::format_with_our_formatter(&variant_content, &fixture.input_file) {
+        match fixtures::format_with_our_formatter_with_goal(
+            &variant_content,
+            &fixture.input_file,
+            fixture.goal(),
+        ) {
             Ok(formatted) => {
                 if formatted != *input {
                     result.add_error(ValidationError::NormalizationUnformattedNotNormalized(
@@ -188,7 +192,11 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(variant_name.clone());
 
-        match fixtures::format_with_our_formatter(&variant_content, &fixture.input_file) {
+        match fixtures::format_with_our_formatter_with_goal(
+            &variant_content,
+            &fixture.input_file,
+            fixture.goal(),
+        ) {
             Ok(formatted) => {
                 if formatted != *input {
                     result.add_error(ValidationError::NormalizationUnformattedOursNotNormalized(
@@ -257,7 +265,11 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
             .or_default()
             .push(stable_name.clone());
 
-        match fixtures::format_with_our_formatter(&stable_content, &fixture.input_file) {
+        match fixtures::format_with_our_formatter_with_goal(
+            &stable_content,
+            &fixture.input_file,
+            fixture.goal(),
+        ) {
             Ok(formatted) => {
                 // N9c: Must NOT normalize to input
                 if formatted == *input {
@@ -268,7 +280,11 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
                 }
 
                 // N9b: Our output must be idempotent (format the result again)
-                match fixtures::format_with_our_formatter(&formatted, &fixture.input_file) {
+                match fixtures::format_with_our_formatter_with_goal(
+                    &formatted,
+                    &fixture.input_file,
+                    fixture.goal(),
+                ) {
                     Ok(second_pass) => {
                         if second_pass != formatted {
                             result.add_error(

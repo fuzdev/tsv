@@ -109,14 +109,34 @@ pub struct Parser<'a, 'arena> {
     /// Whether to allow `in` as a binary operator.
     /// Set to false when parsing for-loop headers to distinguish `for (x in y)` from expressions.
     allow_in: bool,
+    /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
+    /// Fixed for the whole parse — embedders (Svelte) and the standalone
+    /// `parse`/`format` default to `Module`; `parse_with_goal` overrides it.
+    goal: crate::Goal,
+    /// The `[Await]` grammar context. `true` (`[+Await]`) inside an async
+    /// function/arrow/method/generator's params or body, a class static
+    /// initialization block, a `for await` head, and — by default — module top
+    /// level; reset to `false` (`[~Await]`) on entering a non-async
+    /// function-like scope, and at Script top level. When `false`, `await` is
+    /// not an await-expression: under `Goal::Script` it is an ordinary
+    /// identifier (`await_is_identifier`), under `Goal::Module` it is reserved.
+    in_await: bool,
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
-    fn new(source: &'a str, arena: &'arena Bump) -> Result<Self, ParseError> {
-        Self::with_interner(
+    /// Create a parser with a fresh interner against an explicit goal symbol.
+    /// The standalone `parse`/`parse_with_goal` paths use this; embedders go
+    /// through [`Parser::with_interner`] (always `Module`).
+    fn new_with_goal(
+        source: &'a str,
+        goal: crate::Goal,
+        arena: &'arena Bump,
+    ) -> Result<Self, ParseError> {
+        Self::with_interner_and_goal(
             source,
             0,
             Rc::new(RefCell::new(DefaultStringInterner::new())),
+            goal,
             arena,
         )
     }
@@ -166,10 +186,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Used when parsing embedded expressions/scripts in Svelte templates.
     /// base_offset is added to all span positions to get correct positions in full source.
+    /// Embedded contexts are always modules (Svelte `<script>` is a module), so
+    /// this defaults the goal; the goal-aware [`Parser::new_with_goal`] is the
+    /// only `Script` entry.
     pub fn with_interner(
         source: &'a str,
         base_offset: usize,
         interner: SharedInterner,
+        arena: &'arena Bump,
+    ) -> Result<Self, ParseError> {
+        Self::with_interner_and_goal(source, base_offset, interner, crate::Goal::Module, arena)
+    }
+
+    /// [`Parser::with_interner`] with an explicit goal symbol — the single
+    /// constructor that actually builds the parser state.
+    fn with_interner_and_goal(
+        source: &'a str,
+        base_offset: usize,
+        interner: SharedInterner,
+        goal: crate::Goal,
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
@@ -216,6 +251,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error: None,              // No stored lexer error
             peek_had_line_terminator: false, // No peek cached yet
             allow_in: true,                 // Allow `in` binary operator by default
+            goal,
+            // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
+            // level is `[~Await]` (`ScriptBody[~Await]`).
+            in_await: matches!(goal, crate::Goal::Module),
         })
     }
 
@@ -400,6 +439,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.intern(self.current_identifier_name())
     }
 
+    /// Intern the current token, which the caller has already verified is either
+    /// a plain `Identifier` or `await` used as an identifier (`at_await_identifier`
+    /// — e.g. a class name, single-param arrow param, or `break`/`continue` label
+    /// at Script `[~Await]`). A plain identifier decodes unicode escapes; `await`
+    /// interns verbatim.
+    pub(super) fn intern_identifier_or_await(&self) -> DefaultSymbol {
+        if matches!(self.current_kind(), TokenKind::Identifier) {
+            self.intern_identifier()
+        } else {
+            self.intern("await")
+        }
+    }
+
     /// Get the string value of the current identifier or contextual keyword.
     ///
     /// Returns the decoded name for identifiers with unicode escapes,
@@ -426,6 +478,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Intern the current token as a function declaration name. Like
+    /// [`Parser::try_intern_identifier_or_keyword`], but `await` is accepted only
+    /// where it is a valid identifier (Script `[~Await]`): at `Module` / `[+Await]`
+    /// it is a reserved `BindingIdentifier` (the goal-level and `[Await]` early
+    /// errors), so `function await(){}` / `export function await(){}` reject there,
+    /// matching acorn-as-module and the function-expression name path. Other
+    /// contextual keywords (`async`, `from`, type keywords) stay valid names.
+    pub(super) fn try_intern_function_name(&self) -> Option<DefaultSymbol> {
+        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
+            && !self.await_is_identifier()
+        {
+            return None;
+        }
+        self.try_intern_identifier_or_keyword()
+    }
+
     /// Intern the current token as a binding name, accepting contextual keywords.
     ///
     /// Like `try_intern_identifier_or_keyword` but uses `can_be_binding_name()`,
@@ -434,8 +502,47 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.intern_identifier()),
             TokenKind::Keyword(kw) if kw.can_be_binding_name() => Some(self.intern(kw.as_str())),
+            // `await` is a valid `BindingIdentifier` only at Script goal in a
+            // `[~Await]` context (the two independent goal/`[Await]` early errors).
+            TokenKind::Keyword(KeywordKind::Await) if self.await_is_identifier() => {
+                Some(self.intern("await"))
+            }
             _ => None,
         }
+    }
+
+    /// Whether `await` may be used as an ordinary identifier in the current
+    /// context: only at `Goal::Script` and outside any `[+Await]` context. This
+    /// is the conjunction of the two independent ECMAScript early errors —
+    /// `await`-as-identifier is a Syntax Error if the goal is `Module`, OR if the
+    /// production carries the `[Await]` parameter.
+    pub(super) fn await_is_identifier(&self) -> bool {
+        self.goal == crate::Goal::Script && !self.in_await
+    }
+
+    /// Whether the current token is `await` *and* it may be an ordinary
+    /// identifier here (`await_is_identifier`) — i.e. it should be treated as a
+    /// `BindingIdentifier`/`IdentifierReference`/`LabelIdentifier` rather than an
+    /// await-expression or a reserved word.
+    pub(super) fn at_await_identifier(&self) -> bool {
+        matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
+            && self.await_is_identifier()
+    }
+
+    /// Run `f` with the `[Await]` context set to `value`, restoring it
+    /// afterward (on success and error alike). Mirrors `with_allow_in`; wrap a
+    /// function-like scope's params+body so a nested async/non-async scope sets
+    /// its own `await`-context without leaking to the enclosing one.
+    pub(super) fn with_in_await<T>(
+        &mut self,
+        value: bool,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = self.in_await;
+        self.in_await = value;
+        let result = f(self);
+        self.in_await = saved;
+        result
     }
 
     /// Like `try_intern_binding_name`, but also accepts the `this` keyword as the
@@ -1119,6 +1226,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             line_breaks,
             span: Span::new(start as u32, end as u32),
             interner: Rc::clone(&self.interner),
+            goal: self.goal,
         })
     }
 
@@ -1229,6 +1337,16 @@ pub fn parse_typescript<'arena>(
     source: &str,
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, ParseError> {
-    let mut parser = Parser::new(source, arena)?;
+    parse_typescript_with_goal(source, crate::Goal::Module, arena)
+}
+
+/// [`parse_typescript`] against an explicit goal symbol. `parse_typescript` is
+/// the `Goal::Module` form.
+pub fn parse_typescript_with_goal<'arena>(
+    source: &str,
+    goal: crate::Goal,
+    arena: &'arena Bump,
+) -> Result<Program<'arena>, ParseError> {
+    let mut parser = Parser::new_with_goal(source, goal, arena)?;
     parser.parse()
 }

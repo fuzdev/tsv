@@ -22,15 +22,18 @@ pub(super) enum ParsedInput<'arena> {
 pub(super) fn parse_input<'arena>(
     content: &str,
     input_type: InputType,
+    goal: tsv_ts::Goal,
     arena: &'arena bumpalo::Bump,
 ) -> Result<ParsedInput<'arena>, String> {
     match input_type {
         InputType::Svelte => tsv_svelte::parse(content, arena)
             .map(ParsedInput::Svelte)
             .map_err(|e| format!("Parse error: {e:?}")),
-        InputType::SvelteTs | InputType::TypeScript => tsv_ts::parse(content, arena)
-            .map(ParsedInput::Ts)
-            .map_err(|e| format!("Parse error: {e:?}")),
+        InputType::SvelteTs | InputType::TypeScript => {
+            tsv_ts::parse_with_goal(content, goal, arena)
+                .map(ParsedInput::Ts)
+                .map_err(|e| format!("Parse error: {e:?}"))
+        }
         InputType::Css => tsv_css::parse(content, arena)
             .map(ParsedInput::Css)
             .map_err(|e| format!("Parse error: {e:?}")),
@@ -144,23 +147,24 @@ pub(super) struct TypedWalkParity {
 /// gate. Takes the already-parsed input so `.svelte` script-span extraction
 /// reuses the fixture's one parse.
 #[allow(clippy::expect_used)] // Value serialization cannot fail
-pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) -> TypedWalkParity {
+pub(super) fn typed_walk_parity_probes(
+    content: &str,
+    parsed: &ParsedInput<'_>,
+    goal: tsv_ts::Goal,
+) -> TypedWalkParity {
     let mut parity = TypedWalkParity::default();
 
-    // Parse `$content` as standalone `$lang` (tsv_ts / tsv_css — identical
-    // free-function API by convention) and assert its `convert_ast_json_string`
-    // is byte-identical to `to_string(&convert_ast_json(..))`, recording the
-    // result onto `parity`. One body for every language arm.
+    // Parse `$content` as standalone `$lang` and assert its
+    // `convert_ast_json_string` is byte-identical to
+    // `to_string(&convert_ast_json(..))`, recording the result onto `parity`.
+    // TypeScript probes take an explicit goal (the top-level arm uses the
+    // fixture's; Svelte's extracted `<script>` content is always `Module`); CSS
+    // has no goal axis. The `@record` arm holds the shared bookkeeping tail.
     macro_rules! probe {
-        ($lang:ident, $content:expr, $description:expr) => {{
-            let content: &str = $content;
+        (@record $description:expr, $result:expr) => {{
             let description = $description;
-            let arena = bumpalo::Bump::new();
-            match $lang::parse(content, &arena) {
-                Ok(ast) => {
-                    let string_path = $lang::convert_ast_json_string(&ast, content);
-                    let value_path = serde_json::to_string(&$lang::convert_ast_json(&ast, content))
-                        .expect("Value serialization cannot fail");
+            match $result {
+                Ok((string_path, value_path)) => {
                     if string_path == value_path {
                         parity.checked += 1;
                     } else {
@@ -177,6 +181,30 @@ pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) 
                 }
             }
         }};
+        (tsv_ts @ $goal:expr, $content:expr, $description:expr) => {{
+            let content: &str = $content;
+            let arena = bumpalo::Bump::new();
+            let result = tsv_ts::parse_with_goal(content, $goal, &arena).map(|ast| {
+                (
+                    tsv_ts::convert_ast_json_string(&ast, content),
+                    serde_json::to_string(&tsv_ts::convert_ast_json(&ast, content))
+                        .expect("Value serialization cannot fail"),
+                )
+            });
+            probe!(@record $description, result);
+        }};
+        (tsv_css, $content:expr, $description:expr) => {{
+            let content: &str = $content;
+            let arena = bumpalo::Bump::new();
+            let result = tsv_css::parse(content, &arena).map(|ast| {
+                (
+                    tsv_css::convert_ast_json_string(&ast, content),
+                    serde_json::to_string(&tsv_css::convert_ast_json(&ast, content))
+                        .expect("Value serialization cannot fail"),
+                )
+            });
+            probe!(@record $description, result);
+        }};
     }
 
     match parsed {
@@ -187,8 +215,10 @@ pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) 
             }
             // The as-is input is already covered by the string-path identity
             // check; only the synthesized multibyte variant is new coverage.
+            // Parse at the fixture's goal so standalone-script fixtures probe at
+            // Script (where `await` is an identifier, `import.meta` rejects, …).
             let synthesized = format!("{TYPED_WALK_SYNTH_PREFIX}{content}");
-            probe!(tsv_ts, &synthesized, "synthesized multibyte input");
+            probe!(tsv_ts @ goal, &synthesized, "synthesized multibyte input");
         }
         ParsedInput::Svelte(root) => {
             for (i, (start, end)) in tsv_svelte::script_content_spans(root)
@@ -199,12 +229,13 @@ pub(super) fn typed_walk_parity_probes(content: &str, parsed: &ParsedInput<'_>) 
                 if !script.is_ascii() {
                     // Multibyte .svelte inputs take the Value fallback in
                     // tsv_svelte, so this standalone-TS run is the only
-                    // typed-walk coverage their script content gets
-                    probe!(tsv_ts, script, &format!("extracted script {i} (as-is)"));
+                    // typed-walk coverage their script content gets. Svelte
+                    // `<script>` is always a module.
+                    probe!(tsv_ts @ tsv_ts::Goal::Module, script, &format!("extracted script {i} (as-is)"));
                 }
                 let synthesized = format!("{TYPED_WALK_SYNTH_PREFIX}{script}");
                 probe!(
-                    tsv_ts,
+                    tsv_ts @ tsv_ts::Goal::Module,
                     &synthesized,
                     &format!("extracted script {i} (synthesized multibyte)")
                 );

@@ -1,5 +1,6 @@
+use crate::cli::commands::parse::parse_goal_arg;
 use crate::cli::discover::discover_files;
-use crate::cli::format_source::{format_source, format_source_in};
+use crate::cli::format_source::{format_source_in, format_source_with_goal};
 use crate::cli::input::{InputArgs, ParserType};
 use argh::FromArgs;
 use std::fs;
@@ -33,6 +34,11 @@ pub struct FormatCommand {
     /// parser type: svelte | typescript | css (--content/--stdin only; paths use the extension)
     #[argh(option)]
     parser: Option<ParserType>,
+
+    /// parse goal for TypeScript: script | module (default: module).
+    /// `--content`/`--stdin` only — file paths are formatted as modules.
+    #[argh(option)]
+    goal: Option<String>,
 
     /// check instead of writing/printing: exit 1 if any input would change
     #[argh(switch)]
@@ -86,6 +92,13 @@ impl FormatCommand {
             );
             process::exit(2);
         }
+        let goal = match parse_goal_arg(self.goal.as_deref()) {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                process::exit(2);
+            }
+        };
         let input_args = InputArgs {
             content: self.content,
             stdin: self.stdin,
@@ -99,7 +112,7 @@ impl FormatCommand {
                 process::exit(2);
             }
         };
-        match format_source(input.content(), parser_type) {
+        match format_source_with_goal(input.content(), parser_type, goal) {
             Ok(formatted) => {
                 if self.check {
                     if formatted != input.content() {
@@ -126,6 +139,12 @@ impl FormatCommand {
         if self.parser.is_some() {
             eprintln!(
                 "Error: --parser applies to --content/--stdin; file paths use extension detection"
+            );
+            process::exit(2);
+        }
+        if self.goal.is_some() {
+            eprintln!(
+                "Error: --goal applies to --content/--stdin; file paths are formatted as modules"
             );
             process::exit(2);
         }
