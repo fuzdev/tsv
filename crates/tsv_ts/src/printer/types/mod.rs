@@ -76,7 +76,7 @@ impl<'a> Printer<'a> {
             TSType::Keyword(kw) => d.text_owned(kw.kind.as_str().to_string()),
             TSType::Literal(lit) => self.build_literal_type_doc(lit),
             TSType::Array(arr) => self.build_array_type_doc(arr),
-            TSType::Union(u) => self.build_union_type_doc(u, true),
+            TSType::Union(u) => self.build_union_type_doc(u),
             TSType::Intersection(i) => self.build_intersection_type_doc(i, true),
             TSType::TypeReference(r) => {
                 let mut parts: DocBuf = smallvec![self.build_entity_name_doc(&r.type_name)];
@@ -158,7 +158,7 @@ impl<'a> Printer<'a> {
                         // stripped first); everything else stays inline after `is `.
                         match self.unwrap_redundant_parens(type_ann) {
                             TSType::Union(u) => {
-                                let type_doc = self.build_union_type_doc(u, false);
+                                let type_doc = self.build_union_type_doc(u);
                                 parts.push(d.text(" is"));
                                 parts.push(hang_after_operator(
                                     d,
@@ -382,7 +382,7 @@ impl<'a> Printer<'a> {
                 // stripped first); everything else stays inline after `: `.
                 match self.unwrap_redundant_parens(n.element_type) {
                     TSType::Union(u) => {
-                        let type_doc = self.build_union_type_doc(u, false);
+                        let type_doc = self.build_union_type_doc(u);
                         parts.push(d.text(":"));
                         parts.push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
                     }

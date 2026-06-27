@@ -8,14 +8,7 @@
 	// 101 chars - union type wraps (exceeds print_width)
 	try {
 	} catch (e:
-		| A
-		| B
-		| C
-		| D
-		| E
-		| F
-		| G
-		| LongGenericTypeNameForTestingLineLengthAtExactBoundaryX) {}
+		A | B | C | D | E | F | G | LongGenericTypeNameForTestingLineLengthAtExactBoundaryX) {}
 
 	// Catch destructured parameter at boundaries
 

@@ -10,18 +10,19 @@ use super::arg_comments::{
     is_comment_after_comma, last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
-    arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_concise_numeric_array,
-    is_curried_arrow, is_function_composition_args, is_ternary_arrow_body,
-    last_arg_is_array_or_object, preceding_args_allow_expand_last,
+    arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
+    is_array_or_object_unwrapped, is_concise_numeric_array, is_curried_arrow,
+    is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
+    preceding_args_allow_expand_last,
 };
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, arg_needs_soft_wrap, arrow_has_type_annotations,
-    arrow_has_type_reference_return, build_args_joined_with_comments, build_args_split_last,
-    build_args_with_blank_lines, build_arrow_call_body_states, build_arrow_inline_signature,
-    build_arrow_sig_doc, build_break_body_state, build_empty_args_doc, build_expand_all_args,
-    build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    last_two_args_same_type, prepend_arrow_body_comments, should_expand_first_arg,
-    try_hug_multiline_template_arg, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    build_args_joined_with_comments, build_args_split_last, build_args_with_blank_lines,
+    build_arrow_call_body_states, build_arrow_inline_signature, build_arrow_sig_doc,
+    build_break_body_state, build_empty_args_doc, build_expand_all_args, build_inline_args,
+    build_inline_or_expand_all, could_expand_arrow_chain, last_two_args_same_type,
+    prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
+    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
 use super::test_patterns::{callee_chain_string, is_test_call};
@@ -527,8 +528,7 @@ fn try_single_arg_hug(
         // are treated identically to block-body arrows. Matches prettier's
         // couldExpandArg recursive check with arrowChainRecursion=true.
         internal::Expression::ArrowFunctionExpression(arrow)
-            if !arrow.body.is_expression()
-                || (!arrow_has_type_reference_return(arrow) && could_expand_arrow_chain(arrow)) =>
+            if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) =>
         {
             return Some(build_block_arrow_hug_states(printer, callee, arrow, arg));
         }
@@ -619,9 +619,10 @@ fn try_single_arg_hug(
                 // Prettier's "expand last arg" pattern:
                 // - Flat: `map((x) => (x ? y : z))` - parens prevent `<=` ambiguity
                 // - Break: `map((x) =>\n  x ? y : z,)` - no parens, indented
-                // Arrows with TSTypeReference return types are NOT expandable
-                // (prettier's couldExpandArg returns false), so they fall through.
-                if is_ternary_arrow_body(body_expr) && !arrow_has_type_reference_return(arrow) {
+                // Prettier's couldExpandArg keys on the body type and looks
+                // through the return-type annotation, so typed-return arrows
+                // (`(x): T => …`) are eligible too.
+                if is_ternary_arrow_body(body_expr) {
                     return Some(build_ternary_arrow_hug_states(
                         printer, callee, arrow, body_expr,
                     ));
@@ -637,15 +638,12 @@ fn try_single_arg_hug(
     // Wrap callback with width-aware breaking
     if let internal::Expression::ArrowFunctionExpression(arrow) = &call.arguments[0] {
         if let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body {
-            // Prettier keeps `fn((x) =>` together (sig on opening line) only when:
-            // 1. Body is a call expression
-            // 2. Arrow is expandable (no TSTypeReference return type)
-            // Arrows with TSTypeReference returns (e.g., `: Promise<any>`) are NOT
-            // expandable per prettier's couldExpandArg, so they wrap at `fn(`.
-            // Keyword returns (`: void`, `: string`) and type predicates are fine.
-            if matches!(&**body_expr, internal::Expression::CallExpression(_))
-                && !arrow_has_type_reference_return(arrow)
-            {
+            // Prettier keeps `fn((x) =>` together (sig on opening line) when the
+            // body is a call expression (looking through a trailing non-null `!`,
+            // per prettier's `stripChainElementWrappers`). couldExpandArg keys on
+            // the body type and ignores the return-type annotation, so typed-return
+            // arrows (`(x): T => call()`) hug too.
+            if arrow_body_is_call_through_non_null(body_expr) {
                 let arrow_doc = printer.build_expression_doc(&call.arguments[0]);
                 let body_doc = printer.build_expression_doc(body_expr);
                 let body_doc =
@@ -899,12 +897,8 @@ fn try_expand_last_function_arg(
         // in callArguments.js:167-175).
         if let Some(internal::Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-            && matches!(
-                &**body_expr,
-                internal::Expression::CallExpression(_)
-                    | internal::Expression::ConditionalExpression(_)
-            )
-            && !arrow_has_type_reference_return(arrow)
+            && (arrow_body_is_call_through_non_null(body_expr)
+                || matches!(&**body_expr, internal::Expression::ConditionalExpression(_)))
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
             let body_doc = printer.build_expression_doc(body_expr);

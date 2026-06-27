@@ -4,8 +4,5 @@
 
 	// 101 chars - wraps (exceeds print_width)
 	type Union101 =
-		| Aaaaaaaaaaaaaaaaaaaaa
-		| Bbbbbbbbbbbbbbbbbbb
-		| Ccccccccccccccccccc
-		| Dddddddddddddd;
+		Aaaaaaaaaaaaaaaaaaaaa | Bbbbbbbbbbbbbbbbbbb | Ccccccccccccccccccc | Dddddddddddddd;
 </script>

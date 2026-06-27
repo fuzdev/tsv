@@ -1,8 +1,8 @@
 <script lang="ts">
-	// TSTypeReference return + complex call body in chain: breaks at open paren
+	// TSTypeReference return + complex call body in chain: now expandable (3.9), sig hugged
 	const a = {
-		propAAAAAAAAAAAAAAAAAAAAAAAAAAAA: obj.method(
-			(x: string): Promise<any> => anotherCallAAAAAAAAA({ key: valueAAAAAAAAAA })
+		propAAAAAAAAAAAAAAAAAAAAAAAAAAAA: obj.method((x: string): Promise<any> =>
+			anotherCallAAAAAAAAA({ key: valueAAAAAAAAAA })
 		)
 	};
 

@@ -48,9 +48,7 @@
 	const k = [A, B /* before close */];
 
 	// Empty array with comment
-	const l = [
-		/* inside empty */
-	];
+	const l = [/* inside empty */];
 
 	// Spread with comments
 	const m = [A, /* before spread */ ...B];

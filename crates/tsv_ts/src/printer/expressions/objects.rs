@@ -47,7 +47,7 @@ impl<'a> Printer<'a> {
 
         if obj.properties.is_empty() {
             // Handle empty object with comments
-            return self.build_empty_body_with_comments_doc(obj.span);
+            return self.build_empty_braces_inline_with_comments_doc(obj.span);
         }
 
         // Check if source has newline after opening brace

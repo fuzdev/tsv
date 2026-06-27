@@ -103,6 +103,27 @@ where
     }
 }
 
+/// Strip a trailing non-null `!` (`TSNonNullExpression`) off an expression.
+///
+/// Mirrors prettier's `stripChainElementWrappers` (sans `ChainExpression`, which
+/// tsv's AST doesn't model as a distinct node — optional chaining is a flag on the
+/// member/call). Used so the arrow-body call check looks through `=> call()!`.
+fn strip_non_null<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
+    match expr {
+        Expression::TSNonNullExpression(e) => strip_non_null(e.expression),
+        _ => expr,
+    }
+}
+
+/// Whether an arrow's expression body is a call, looking through a trailing `!`.
+///
+/// Matches prettier's `isCallExpression(stripChainElementWrappers(body))` in
+/// `couldExpandArg`: `(x) => fn()` and `(x) => fn()!` are both call bodies, so the
+/// arrow hugs the call's open paren rather than breaking at it.
+pub(in crate::printer) fn arrow_body_is_call_through_non_null(body: &Expression<'_>) -> bool {
+    matches!(strip_non_null(body), Expression::CallExpression(_))
+}
+
 /// Check if an arrow function body is a ternary expression
 ///
 /// Check if an arrow body is a ternary that needs conditional paren treatment.

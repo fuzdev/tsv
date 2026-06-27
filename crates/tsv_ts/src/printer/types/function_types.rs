@@ -120,7 +120,7 @@ impl<'a> Printer<'a> {
         // keep the match-on-original fall-through below.
         let value_type = self.unwrap_redundant_parens(return_type.type_annotation);
         if let TSType::Union(u) = value_type {
-            let type_doc = self.build_union_type_doc(u, false);
+            let type_doc = self.build_union_type_doc(u);
             return d.concat(&[
                 d.text_owned(format!("{sp}=>")),
                 hang_after_operator(d, d.concat(&[comments_doc, type_doc])),

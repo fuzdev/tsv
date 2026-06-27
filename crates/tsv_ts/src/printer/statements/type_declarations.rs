@@ -279,7 +279,7 @@ impl<'a> Printer<'a> {
             // For union/intersection types, build without their own group so they inherit
             // breaking from this context's group.
             if let TSType::Union(u) = value_type {
-                let type_doc = self.build_union_type_doc(u, false);
+                let type_doc = self.build_union_type_doc(u);
                 if should_hug_union_type(u) {
                     // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
                     // expansion, so keep `= {` together like other internally-breaking types
@@ -786,8 +786,9 @@ impl<'a> Printer<'a> {
         let body_span = tsv_lang::Span::new(body_start - 1, decl.span.end); // Include '{' and '}'
 
         if decl.members.is_empty() {
-            // Empty enum body - handle comments inside
-            parts.push(self.build_empty_body_with_comments_doc(body_span));
+            // Empty enum body - handle comments inside (a fitting block comment
+            // stays inline as `enum E {/* c */}`).
+            parts.push(self.build_empty_braces_inline_with_comments_doc(body_span));
         } else {
             // A comment trailing the opening `{` on its own line is kept on the
             // `{` line when the body expands (divergence from prettier, which

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 585,
+	"end": 581,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,15 +45,15 @@
 		{
 			"type": "Line",
 			"value": " Short intersection in redundant parens - stripped, stays inline",
-			"start": 291,
-			"end": 357,
+			"start": 287,
+			"end": 353,
 			"loc": {
 				"start": {
-					"line": 10,
+					"line": 9,
 					"column": 1
 				},
 				"end": {
-					"line": 10,
+					"line": 9,
 					"column": 67
 				}
 			}
@@ -61,15 +61,15 @@
 		{
 			"type": "Line",
 			"value": " Long intersection in redundant parens - stripped, first member hugs `=`, rest wrap",
-			"start": 382,
-			"end": 467,
+			"start": 378,
+			"end": 463,
 			"loc": {
 				"start": {
-					"line": 13,
+					"line": 12,
 					"column": 1
 				},
 				"end": {
-					"line": 13,
+					"line": 12,
 					"column": 86
 				}
 			}
@@ -78,19 +78,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 584,
+		"end": 580,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 575,
+			"end": 571,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 16,
+					"line": 15,
 					"column": 9
 				}
 			},
@@ -216,15 +216,15 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 179,
-					"end": 288,
+					"end": 284,
 					"loc": {
 						"start": {
 							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
-							"column": 48
+							"line": 7,
+							"column": 92
 						}
 					},
 					"id": {
@@ -246,44 +246,44 @@
 					"typeAnnotation": {
 						"type": "TSUnionType",
 						"start": 194,
-						"end": 287,
+						"end": 283,
 						"loc": {
 							"start": {
 								"line": 7,
 								"column": 2
 							},
 							"end": {
-								"line": 8,
-								"column": 47
+								"line": 7,
+								"column": 91
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeReference",
-								"start": 196,
-								"end": 239,
+								"start": 194,
+								"end": 237,
 								"loc": {
 									"start": {
 										"line": 7,
-										"column": 4
+										"column": 2
 									},
 									"end": {
 										"line": 7,
-										"column": 47
+										"column": 45
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 196,
-									"end": 239,
+									"start": 194,
+									"end": 237,
 									"loc": {
 										"start": {
 											"line": 7,
-											"column": 4
+											"column": 2
 										},
 										"end": {
 											"line": 7,
-											"column": 47
+											"column": 45
 										}
 									},
 									"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -291,30 +291,30 @@
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 244,
-								"end": 287,
+								"start": 240,
+								"end": 283,
 								"loc": {
 									"start": {
-										"line": 8,
-										"column": 4
+										"line": 7,
+										"column": 48
 									},
 									"end": {
-										"line": 8,
-										"column": 47
+										"line": 7,
+										"column": 91
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 244,
-									"end": 287,
+									"start": 240,
+									"end": 283,
 									"loc": {
 										"start": {
-											"line": 8,
-											"column": 4
+											"line": 7,
+											"column": 48
 										},
 										"end": {
-											"line": 8,
-											"column": 47
+											"line": 7,
+											"column": 91
 										}
 									},
 									"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -333,29 +333,29 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 359,
-					"end": 379,
+					"start": 355,
+					"end": 375,
 					"loc": {
 						"start": {
-							"line": 11,
+							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 11,
+							"line": 10,
 							"column": 21
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 364,
-						"end": 370,
+						"start": 360,
+						"end": 366,
 						"loc": {
 							"start": {
-								"line": 11,
+								"line": 10,
 								"column": 6
 							},
 							"end": {
-								"line": 11,
+								"line": 10,
 								"column": 12
 							}
 						},
@@ -363,44 +363,44 @@
 					},
 					"typeAnnotation": {
 						"type": "TSIntersectionType",
-						"start": 373,
-						"end": 378,
+						"start": 369,
+						"end": 374,
 						"loc": {
 							"start": {
-								"line": 11,
+								"line": 10,
 								"column": 15
 							},
 							"end": {
-								"line": 11,
+								"line": 10,
 								"column": 20
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeReference",
-								"start": 373,
-								"end": 374,
+								"start": 369,
+								"end": 370,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 10,
 										"column": 15
 									},
 									"end": {
-										"line": 11,
+										"line": 10,
 										"column": 16
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 373,
-									"end": 374,
+									"start": 369,
+									"end": 370,
 									"loc": {
 										"start": {
-											"line": 11,
+											"line": 10,
 											"column": 15
 										},
 										"end": {
-											"line": 11,
+											"line": 10,
 											"column": 16
 										}
 									},
@@ -409,29 +409,29 @@
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 377,
-								"end": 378,
+								"start": 373,
+								"end": 374,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 10,
 										"column": 19
 									},
 									"end": {
-										"line": 11,
+										"line": 10,
 										"column": 20
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 377,
-									"end": 378,
+									"start": 373,
+									"end": 374,
 									"loc": {
 										"start": {
-											"line": 11,
+											"line": 10,
 											"column": 19
 										},
 										"end": {
-											"line": 11,
+											"line": 10,
 											"column": 20
 										}
 									},
@@ -444,36 +444,36 @@
 						{
 							"type": "Line",
 							"value": " Short intersection in redundant parens - stripped, stays inline",
-							"start": 291,
-							"end": 357
+							"start": 287,
+							"end": 353
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 469,
-					"end": 574,
+					"start": 465,
+					"end": 570,
 					"loc": {
 						"start": {
-							"line": 14,
+							"line": 13,
 							"column": 1
 						},
 						"end": {
-							"line": 15,
+							"line": 14,
 							"column": 46
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 474,
-						"end": 479,
+						"start": 470,
+						"end": 475,
 						"loc": {
 							"start": {
-								"line": 14,
+								"line": 13,
 								"column": 6
 							},
 							"end": {
-								"line": 14,
+								"line": 13,
 								"column": 11
 							}
 						},
@@ -481,44 +481,44 @@
 					},
 					"typeAnnotation": {
 						"type": "TSIntersectionType",
-						"start": 482,
-						"end": 573,
+						"start": 478,
+						"end": 569,
 						"loc": {
 							"start": {
-								"line": 14,
+								"line": 13,
 								"column": 14
 							},
 							"end": {
-								"line": 15,
+								"line": 14,
 								"column": 45
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeReference",
-								"start": 482,
-								"end": 525,
+								"start": 478,
+								"end": 521,
 								"loc": {
 									"start": {
-										"line": 14,
+										"line": 13,
 										"column": 14
 									},
 									"end": {
-										"line": 14,
+										"line": 13,
 										"column": 57
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 482,
-									"end": 525,
+									"start": 478,
+									"end": 521,
 									"loc": {
 										"start": {
-											"line": 14,
+											"line": 13,
 											"column": 14
 										},
 										"end": {
-											"line": 14,
+											"line": 13,
 											"column": 57
 										}
 									},
@@ -527,29 +527,29 @@
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 530,
-								"end": 573,
+								"start": 526,
+								"end": 569,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 14,
 										"column": 2
 									},
 									"end": {
-										"line": 15,
+										"line": 14,
 										"column": 45
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 530,
-									"end": 573,
+									"start": 526,
+									"end": 569,
 									"loc": {
 										"start": {
-											"line": 15,
+											"line": 14,
 											"column": 2
 										},
 										"end": {
-											"line": 15,
+											"line": 14,
 											"column": 45
 										}
 									},
@@ -562,8 +562,8 @@
 						{
 							"type": "Line",
 							"value": " Long intersection in redundant parens - stripped, first member hugs `=`, rest wrap",
-							"start": 382,
-							"end": 467
+							"start": 378,
+							"end": 463
 						}
 					]
 				}

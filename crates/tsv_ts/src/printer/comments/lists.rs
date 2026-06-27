@@ -512,36 +512,13 @@ impl<'a> Printer<'a> {
     ///
     /// If no comments, returns `{}`.
     ///
-    /// Used by: interface body, class body, enum body, namespace body, object literal, object pattern.
+    /// Always breaks when a comment is present — used by the containers prettier
+    /// keeps exploded (class body, interface body, namespace body). The
+    /// containers that keep a fitting block comment inline (object literals and
+    /// patterns, enum bodies, type literals) use the
+    /// `build_empty_*_inline_with_comments_doc` helpers instead.
     pub(crate) fn build_empty_body_with_comments_doc(&self, body_span: tsv_lang::Span) -> DocId {
         self.build_empty_delimited_with_comments_doc(body_span.start, body_span.end, "{", "}")
-    }
-
-    /// Build a Doc for an empty bracket body (`[]`) that may contain comments.
-    ///
-    /// If comments exist between the brackets, formats as:
-    /// ```text
-    /// [
-    ///     // comment
-    /// ]
-    /// ```
-    ///
-    /// If no comments, returns `[]`.
-    ///
-    /// Used by: array literal, tuple type.
-    pub(crate) fn build_empty_brackets_with_comments_doc(&self, span: tsv_lang::Span) -> DocId {
-        self.build_empty_delimited_with_comments_doc(span.start, span.end, "[", "]")
-    }
-
-    /// Build a Doc for an empty bracket body with explicit bounds.
-    ///
-    /// Used when the bracket body ends before the full span (e.g., array pattern with type annotation).
-    pub(crate) fn build_empty_brackets_with_comments_doc_range(
-        &self,
-        body_start: u32,
-        body_end: u32,
-    ) -> DocId {
-        self.build_empty_delimited_with_comments_doc(body_start, body_end, "[", "]")
     }
 
     /// Build a Doc for an empty delimited container that may contain comments.
@@ -585,6 +562,120 @@ impl<'a> Printer<'a> {
             d.hardline(),
             d.text(close),
         ])
+    }
+
+    /// Build a Doc for an empty `{}` body whose only content is a dangling
+    /// comment, keeping a fitting block comment inline (`{/* c */}`).
+    ///
+    /// No bracket spacing — used by object literals/patterns and enum bodies,
+    /// which prettier prints as `{/* c */}` (no surrounding spaces). See
+    /// [`Self::build_empty_inline_with_comments_doc`].
+    pub(crate) fn build_empty_braces_inline_with_comments_doc(
+        &self,
+        body_span: tsv_lang::Span,
+    ) -> DocId {
+        let d = self.d();
+        let sep = d.softline();
+        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{", "}", sep)
+    }
+
+    /// Build a Doc for an empty type-literal `{}` body whose only content is a
+    /// dangling comment, keeping a fitting block comment inline with bracket
+    /// spacing (`{ /* c */ }`).
+    ///
+    /// Type literals carry bracket spacing even in the empty-dangling case
+    /// (prettier prints `type B = { /* c */ }` with surrounding spaces),
+    /// unlike object literals. See [`Self::build_empty_inline_with_comments_doc`].
+    pub(crate) fn build_empty_type_literal_inline_with_comments_doc(
+        &self,
+        body_span: tsv_lang::Span,
+    ) -> DocId {
+        let d = self.d();
+        let sep = d.line();
+        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{", "}", sep)
+    }
+
+    /// Build a Doc for an empty bracket `[]` body whose only content is a
+    /// dangling comment, keeping a fitting block comment inline (`[/* c */]`).
+    ///
+    /// Used by array literals/patterns and tuple types. See
+    /// [`Self::build_empty_inline_with_comments_doc`].
+    pub(crate) fn build_empty_brackets_inline_with_comments_doc(
+        &self,
+        span: tsv_lang::Span,
+    ) -> DocId {
+        self.build_empty_brackets_inline_with_comments_doc_range(span.start, span.end)
+    }
+
+    /// Build a Doc for an empty bracket `[]` body with explicit bounds (e.g. an
+    /// array pattern with a type annotation). See
+    /// [`Self::build_empty_brackets_inline_with_comments_doc`].
+    pub(crate) fn build_empty_brackets_inline_with_comments_doc_range(
+        &self,
+        body_start: u32,
+        body_end: u32,
+    ) -> DocId {
+        let d = self.d();
+        let sep = d.softline();
+        self.build_empty_inline_with_comments_doc(body_start, body_end, "[", "]", sep)
+    }
+
+    /// Build a Doc for an empty delimited container whose only content is a
+    /// dangling comment, matching prettier 3.9's `printDanglingCommentsInList`
+    /// (prettier PRs #18617 / #18615): a block comment that fits stays inline
+    /// (`[/* c */]`, `{/* c */}`); a line comment can't be inlined and forces
+    /// the break, and an overflowing or multi-line block comment breaks via the
+    /// enclosing group. `sep` is the open/close separator — `softline` (no
+    /// space) for brackets, object literals/patterns, and enum bodies, `line`
+    /// (bracket spacing) for type literals.
+    ///
+    /// Containers that always break with a dangling comment (class, interface,
+    /// and namespace bodies) keep using
+    /// [`Self::build_empty_delimited_with_comments_doc`] instead.
+    fn build_empty_inline_with_comments_doc(
+        &self,
+        span_start: u32,
+        span_end: u32,
+        open: &'static str,
+        close: &'static str,
+        sep: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let body_start = span_start + 1; // After opening delimiter
+        let body_end = span_end.saturating_sub(1); // Before closing delimiter
+
+        // Single binary search to find comments
+        let first_idx = tsv_lang::find_first_comment_from(self.comments, body_start);
+        let comments: Vec<_> = self.comments[first_idx..]
+            .iter()
+            .take_while(|c| c.span.end <= body_end)
+            .collect();
+
+        if comments.is_empty() {
+            return d.text_owned(format!("{open}{close}"));
+        }
+
+        // Dangling comments join with hardline (prettier `printDanglingComments`).
+        let mut comment_parts = DocBuf::new();
+        for (i, comment) in comments.iter().enumerate() {
+            if i > 0 {
+                comment_parts.push(d.hardline());
+            }
+            comment_parts.push(self.build_comment_doc(comment));
+        }
+
+        // A line comment can't be inlined, so it forces the break; a fitting
+        // block comment stays inline (the group breaks on overflow / a multi-line
+        // block comment's own hardlines).
+        let has_line = comments.iter().any(|c| !c.is_block);
+        let close_sep = if has_line { d.hardline() } else { sep };
+
+        d.group(d.concat(&[
+            d.text(open),
+            d.indent(d.concat(&[sep, d.concat(&comment_parts)])),
+            close_sep,
+            d.text(close),
+        ]))
     }
 
     /// Append a function/method body with comment splitting between signature and body.

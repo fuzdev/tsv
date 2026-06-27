@@ -2,14 +2,12 @@
 	// union `extends` constraint breaks after `extends` with leading-pipe members
 	type Constraint<
 		AAAAAAAAAAAAAAAAAAAAAAAAA extends
-			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-			| Cccccccccccccccccccccccccccccccccc
+			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | Cccccccccccccccccccccccccccccccccc
 	> = X;
 
 	// union default breaks after `=` the same way
 	type Default<
 		AAAAAAAAAAAAAAAAAAAAAAAAAAAAA =
-			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-			| Cccccccccccccccccccccccccccccccccc
+			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | Cccccccccccccccccccccccccccccccccc
 	> = X;
 </script>

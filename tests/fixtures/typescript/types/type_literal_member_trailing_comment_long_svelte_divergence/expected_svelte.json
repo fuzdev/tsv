@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 667,
+	"end": 660,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " union at 101 columns, no comment — breaks into leading-pipe multiline",
+			"value": " union at 101 columns, no comment — drops to an indented continuation line",
 			"start": 197,
-			"end": 269,
+			"end": 273,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,22 +54,22 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 74
+					"column": 78
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " 100-column union plus a trailing comment past 100 — stays inline (comment excluded from fits)",
-			"start": 386,
-			"end": 482,
+			"start": 379,
+			"end": 475,
 			"loc": {
 				"start": {
-					"line": 11,
+					"line": 8,
 					"column": 2
 				},
 				"end": {
-					"line": 11,
+					"line": 8,
 					"column": 98
 				}
 			}
@@ -77,15 +77,15 @@
 		{
 			"type": "Line",
 			"value": " trailing comment that pushes the line well past one hundred columns",
-			"start": 582,
-			"end": 652,
+			"start": 575,
+			"end": 645,
 			"loc": {
 				"start": {
-					"line": 12,
+					"line": 9,
 					"column": 99
 				},
 				"end": {
-					"line": 12,
+					"line": 9,
 					"column": 169
 				}
 			}
@@ -94,19 +94,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 666,
+		"end": 659,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 657,
+			"end": 650,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 14,
+					"line": 11,
 					"column": 9
 				}
 			},
@@ -114,14 +114,14 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 20,
-					"end": 656,
+					"end": 649,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 13,
+							"line": 10,
 							"column": 3
 						}
 					},
@@ -144,14 +144,14 @@
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
 						"start": 33,
-						"end": 655,
+						"end": 648,
 						"loc": {
 							"start": {
 								"line": 2,
 								"column": 14
 							},
 							"end": {
-								"line": 13,
+								"line": 10,
 								"column": 2
 							}
 						},
@@ -345,23 +345,23 @@
 							},
 							{
 								"type": "TSPropertySignature",
-								"start": 272,
-								"end": 383,
+								"start": 276,
+								"end": 376,
 								"loc": {
 									"start": {
 										"line": 6,
 										"column": 2
 									},
 									"end": {
-										"line": 10,
-										"column": 15
+										"line": 7,
+										"column": 96
 									}
 								},
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 272,
-									"end": 273,
+									"start": 276,
+									"end": 277,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -377,59 +377,59 @@
 								"optional": true,
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 274,
-									"end": 382,
+									"start": 278,
+									"end": 375,
 									"loc": {
 										"start": {
 											"line": 6,
 											"column": 4
 										},
 										"end": {
-											"line": 10,
-											"column": 14
+											"line": 7,
+											"column": 95
 										}
 									},
 									"typeAnnotation": {
 										"type": "TSUnionType",
-										"start": 279,
-										"end": 382,
+										"start": 283,
+										"end": 375,
 										"loc": {
 											"start": {
 												"line": 7,
 												"column": 3
 											},
 											"end": {
-												"line": 10,
-												"column": 14
+												"line": 7,
+												"column": 95
 											}
 										},
 										"types": [
 											{
 												"type": "TSTypeReference",
-												"start": 281,
-												"end": 305,
+												"start": 283,
+												"end": 307,
 												"loc": {
 													"start": {
 														"line": 7,
-														"column": 5
+														"column": 3
 													},
 													"end": {
 														"line": 7,
-														"column": 29
+														"column": 27
 													}
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 281,
-													"end": 305,
+													"start": 283,
+													"end": 307,
 													"loc": {
 														"start": {
 															"line": 7,
-															"column": 5
+															"column": 3
 														},
 														"end": {
 															"line": 7,
-															"column": 29
+															"column": 27
 														}
 													},
 													"name": "AAAAAAAAAAAAAAAAAAAAAAAA"
@@ -437,30 +437,30 @@
 											},
 											{
 												"type": "TSTypeReference",
-												"start": 311,
-												"end": 335,
+												"start": 310,
+												"end": 334,
 												"loc": {
 													"start": {
-														"line": 8,
-														"column": 5
+														"line": 7,
+														"column": 30
 													},
 													"end": {
-														"line": 8,
-														"column": 29
+														"line": 7,
+														"column": 54
 													}
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 311,
-													"end": 335,
+													"start": 310,
+													"end": 334,
 													"loc": {
 														"start": {
-															"line": 8,
-															"column": 5
+															"line": 7,
+															"column": 30
 														},
 														"end": {
-															"line": 8,
-															"column": 29
+															"line": 7,
+															"column": 54
 														}
 													},
 													"name": "BBBBBBBBBBBBBBBBBBBBBBBB"
@@ -468,30 +468,30 @@
 											},
 											{
 												"type": "TSTypeReference",
-												"start": 341,
-												"end": 367,
+												"start": 337,
+												"end": 363,
 												"loc": {
 													"start": {
-														"line": 9,
-														"column": 5
+														"line": 7,
+														"column": 57
 													},
 													"end": {
-														"line": 9,
-														"column": 31
+														"line": 7,
+														"column": 83
 													}
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 341,
-													"end": 367,
+													"start": 337,
+													"end": 363,
 													"loc": {
 														"start": {
-															"line": 9,
-															"column": 5
+															"line": 7,
+															"column": 57
 														},
 														"end": {
-															"line": 9,
-															"column": 31
+															"line": 7,
+															"column": 83
 														}
 													},
 													"name": "CCCCCCCCCCCCCCCCCCCCCCCCCC"
@@ -499,16 +499,16 @@
 											},
 											{
 												"type": "TSUndefinedKeyword",
-												"start": 373,
-												"end": 382,
+												"start": 366,
+												"end": 375,
 												"loc": {
 													"start": {
-														"line": 10,
-														"column": 5
+														"line": 7,
+														"column": 86
 													},
 													"end": {
-														"line": 10,
-														"column": 14
+														"line": 7,
+														"column": 95
 													}
 												}
 											}
@@ -518,38 +518,38 @@
 								"leadingComments": [
 									{
 										"type": "Line",
-										"value": " union at 101 columns, no comment — breaks into leading-pipe multiline",
+										"value": " union at 101 columns, no comment — drops to an indented continuation line",
 										"start": 197,
-										"end": 269
+										"end": 273
 									}
 								]
 							},
 							{
 								"type": "TSPropertySignature",
-								"start": 485,
-								"end": 581,
+								"start": 478,
+								"end": 574,
 								"loc": {
 									"start": {
-										"line": 12,
+										"line": 9,
 										"column": 2
 									},
 									"end": {
-										"line": 12,
+										"line": 9,
 										"column": 98
 									}
 								},
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 485,
-									"end": 486,
+									"start": 478,
+									"end": 479,
 									"loc": {
 										"start": {
-											"line": 12,
+											"line": 9,
 											"column": 2
 										},
 										"end": {
-											"line": 12,
+											"line": 9,
 											"column": 3
 										}
 									},
@@ -558,58 +558,58 @@
 								"optional": true,
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 487,
-									"end": 580,
+									"start": 480,
+									"end": 573,
 									"loc": {
 										"start": {
-											"line": 12,
+											"line": 9,
 											"column": 4
 										},
 										"end": {
-											"line": 12,
+											"line": 9,
 											"column": 97
 										}
 									},
 									"typeAnnotation": {
 										"type": "TSUnionType",
-										"start": 489,
-										"end": 580,
+										"start": 482,
+										"end": 573,
 										"loc": {
 											"start": {
-												"line": 12,
+												"line": 9,
 												"column": 6
 											},
 											"end": {
-												"line": 12,
+												"line": 9,
 												"column": 97
 											}
 										},
 										"types": [
 											{
 												"type": "TSTypeReference",
-												"start": 489,
-												"end": 513,
+												"start": 482,
+												"end": 506,
 												"loc": {
 													"start": {
-														"line": 12,
+														"line": 9,
 														"column": 6
 													},
 													"end": {
-														"line": 12,
+														"line": 9,
 														"column": 30
 													}
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 489,
-													"end": 513,
+													"start": 482,
+													"end": 506,
 													"loc": {
 														"start": {
-															"line": 12,
+															"line": 9,
 															"column": 6
 														},
 														"end": {
-															"line": 12,
+															"line": 9,
 															"column": 30
 														}
 													},
@@ -618,29 +618,29 @@
 											},
 											{
 												"type": "TSTypeReference",
-												"start": 516,
-												"end": 540,
+												"start": 509,
+												"end": 533,
 												"loc": {
 													"start": {
-														"line": 12,
+														"line": 9,
 														"column": 33
 													},
 													"end": {
-														"line": 12,
+														"line": 9,
 														"column": 57
 													}
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 516,
-													"end": 540,
+													"start": 509,
+													"end": 533,
 													"loc": {
 														"start": {
-															"line": 12,
+															"line": 9,
 															"column": 33
 														},
 														"end": {
-															"line": 12,
+															"line": 9,
 															"column": 57
 														}
 													},
@@ -649,29 +649,29 @@
 											},
 											{
 												"type": "TSTypeReference",
-												"start": 543,
-												"end": 568,
+												"start": 536,
+												"end": 561,
 												"loc": {
 													"start": {
-														"line": 12,
+														"line": 9,
 														"column": 60
 													},
 													"end": {
-														"line": 12,
+														"line": 9,
 														"column": 85
 													}
 												},
 												"typeName": {
 													"type": "Identifier",
-													"start": 543,
-													"end": 568,
+													"start": 536,
+													"end": 561,
 													"loc": {
 														"start": {
-															"line": 12,
+															"line": 9,
 															"column": 60
 														},
 														"end": {
-															"line": 12,
+															"line": 9,
 															"column": 85
 														}
 													},
@@ -680,15 +680,15 @@
 											},
 											{
 												"type": "TSUndefinedKeyword",
-												"start": 571,
-												"end": 580,
+												"start": 564,
+												"end": 573,
 												"loc": {
 													"start": {
-														"line": 12,
+														"line": 9,
 														"column": 88
 													},
 													"end": {
-														"line": 12,
+														"line": 9,
 														"column": 97
 													}
 												}
@@ -700,16 +700,16 @@
 									{
 										"type": "Line",
 										"value": " 100-column union plus a trailing comment past 100 — stays inline (comment excluded from fits)",
-										"start": 386,
-										"end": 482
+										"start": 379,
+										"end": 475
 									}
 								],
 								"trailingComments": [
 									{
 										"type": "Line",
 										"value": " trailing comment that pushes the line well past one hundred columns",
-										"start": 582,
-										"end": 652
+										"start": 575,
+										"end": 645
 									}
 								]
 							}

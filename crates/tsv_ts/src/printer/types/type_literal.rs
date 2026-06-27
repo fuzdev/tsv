@@ -218,7 +218,7 @@ impl<'a> Printer<'a> {
         emit_inner_leading_line_comments: bool,
     ) -> DocId {
         let d = self.d();
-        let union_doc = self.build_union_type_doc(union, false);
+        let union_doc = self.build_union_type_doc(union);
 
         let mut needs_break = false;
         let mut indented: DocBuf = smallvec![d.softline()];
@@ -245,8 +245,9 @@ impl<'a> Printer<'a> {
         if let Some(p) = paren {
             // Trailing comments between the union and `)`: a block comment stays
             // inline (`(a | b /* c */)`); a line comment defers to end-of-line and
-            // forces the paren group to break — the inner union (built without its
-            // own group) inherits the break, expanding to one member per line.
+            // forces the paren group to break. The inner union has its own group,
+            // but the line comment's `break_parent` (below) propagates, expanding it
+            // to one member per line.
             for comment in comments_in_range(self.comments, union.span.end, p.span.end - 1) {
                 if comment.is_block {
                     indented.push(d.text(" "));
@@ -536,13 +537,10 @@ impl<'a> Printer<'a> {
         let force_multiline = self.type_literal_force_multiline(t);
 
         if t.members.is_empty() {
-            // Empty type literal - handle comments inside
-            let empty_doc = self.build_empty_body_with_comments_doc(t.span);
-            return if wrap_in_group {
-                d.group(empty_doc)
-            } else {
-                empty_doc
-            };
+            // Empty type literal - handle comments inside. The helper already
+            // returns a self-managing group (a fitting block comment stays
+            // inline as `{ /* c */ }`), so it's correct in both modes.
+            return self.build_empty_type_literal_inline_with_comments_doc(t.span);
         }
 
         let mut parts: DocBuf = smallvec![d.text("{")];

@@ -13,9 +13,7 @@
 		})).length;
 
 	// With type annotation
-	items.map(
-		(x): Result => ({
-			value: x
-		})
-	).length;
+	items.map((x): Result => ({
+		value: x
+	})).length;
 </script>

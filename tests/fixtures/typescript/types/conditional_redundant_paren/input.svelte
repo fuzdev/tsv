@@ -10,15 +10,13 @@
 	// Union branches: redundant parens stripped, branch hangs
 	type LongFalseU = XEnd extends YEnd
 		? aaaaa
-		:
-				| Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-				| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-				| Ccccccccccccccccccccccccccccccccccccccccccc;
+		: | Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+			| Ccccccccccccccccccccccccccccccccccccccccccc;
 	type LongTrueU = XEnd extends YEnd
-		?
-				| Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-				| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-				| Ccccccccccccccccccccccccccccccccccccccccccc
+		? | Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+			| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+			| Ccccccccccccccccccccccccccccccccccccccccccc
 		: bbbbb;
 	// Intersection check: redundant parens stripped
 	type ShortCheckI = A & B extends XEnd ? aaaaa : bbbbb;

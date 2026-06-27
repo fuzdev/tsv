@@ -16,7 +16,7 @@ mod member_only;
 
 use expansion::{
     call_callback_status, call_has_complex_args, ends_with_member, has_blank_lines_between_methods,
-    has_comments_forcing_expansion, has_param_type_annotation,
+    has_comments_forcing_expansion,
 };
 use helpers::{
     build_expanded_doc, build_first_groups_doc, build_first_groups_expanded_doc,
@@ -33,7 +33,7 @@ use super::printing::{
     print_group_standard_expanded, print_node,
 };
 use super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
-use crate::ast::internal::{ArrowFunctionBody, Expression};
+use crate::ast::internal::Expression;
 use crate::printer::calls::arg_predicates::contains_call_expression;
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -77,24 +77,9 @@ fn call_has_breaking_single_arg<P: ChainPrinter>(
             let arg_doc = printer.print_expression(&call.arguments[0]);
             d.will_break(arg_doc)
         }
-        // Arrow with type annotations and breaking object/array body
-        Expression::ArrowFunctionExpression(arrow)
-            if arrow.return_type.is_some()
-                || arrow.type_parameters.is_some()
-                || arrow.params.iter().any(has_param_type_annotation) =>
-        {
-            if let ArrowFunctionBody::Expression(body) = &arrow.body
-                && matches!(
-                    &**body,
-                    Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
-                )
-            {
-                let body_doc = printer.print_expression(body);
-                d.will_break(body_doc)
-            } else {
-                false
-            }
-        }
+        // Object/array-body arrows (typed or not) are expandable per prettier's
+        // couldExpandArg — they hug the call's open paren rather than forcing the
+        // chain to expand — so they are NOT treated as a breaking single arg here.
         _ => false,
     }
 }

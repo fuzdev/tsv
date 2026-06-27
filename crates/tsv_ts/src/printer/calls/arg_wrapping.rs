@@ -258,16 +258,10 @@ pub(super) fn classify_chain_arg(arg: &internal::Expression<'_>) -> ChainArgKind
         internal::Expression::TSSatisfiesExpression(e) => classify_chain_arg(e.expression),
         internal::Expression::TSTypeAssertion(e) => classify_chain_arg(e.expression),
         internal::Expression::TSNonNullExpression(e) => classify_chain_arg(e.expression),
-        // Arrow functions: arrows with TSTypeReference return types are NOT expandable
-        // per prettier's couldExpandArg, so they need soft wrapping (default behavior).
-        // Other arrows are classified by their body.
-        internal::Expression::ArrowFunctionExpression(arrow) => {
-            if arrow_has_type_reference_return(arrow) {
-                ChainArgKind::NeedsSoftWrap
-            } else {
-                classify_arrow_body(arrow)
-            }
-        }
+        // Arrow functions: prettier's couldExpandArg keys on the body type and
+        // looks through the return-type annotation, so arrows are classified by
+        // their body regardless of any return type.
+        internal::Expression::ArrowFunctionExpression(arrow) => classify_arrow_body(arrow),
         // Everything else needs soft wrapping so the call can break
         // before the argument, giving the argument a fresh line to fit on
         _ => ChainArgKind::NeedsSoftWrap,
@@ -282,23 +276,6 @@ pub(crate) fn arrow_has_type_annotations(arrow: &internal::ArrowFunctionExpressi
     arrow.return_type.is_some()
         || arrow.type_parameters.is_some()
         || arrow.params.iter().any(param_has_type_annotation)
-}
-
-/// Check if an arrow function has a TSTypeReference return type.
-///
-/// Matches prettier's couldExpandArg check: arrows with TSTypeReference return
-/// types (e.g., `Promise<any>`, `Array<T>`) and non-block bodies are NOT expandable.
-/// Other return types (TSTypePredicate, keyword types, unions) are fine.
-///
-/// Prettier ref: call-arguments.js couldExpandArg (lines 222-226)
-pub(crate) fn arrow_has_type_reference_return(
-    arrow: &internal::ArrowFunctionExpression<'_>,
-) -> bool {
-    if let Some(rt) = &arrow.return_type {
-        matches!(*rt.type_annotation, internal::TSType::TypeReference(_))
-    } else {
-        false
-    }
 }
 
 /// Check if a function parameter has a type annotation.
@@ -348,9 +325,7 @@ pub(crate) fn could_expand_arrow_chain(arrow: &internal::ArrowFunctionExpression
         internal::ArrowFunctionBody::Expression(expr) => match &**expr {
             internal::Expression::ObjectExpression(_)
             | internal::Expression::ArrayExpression(_) => true,
-            internal::Expression::ArrowFunctionExpression(inner) => {
-                !arrow_has_type_reference_return(inner) && could_expand_arrow_chain(inner)
-            }
+            internal::Expression::ArrowFunctionExpression(inner) => could_expand_arrow_chain(inner),
             _ => false,
         },
     }

@@ -421,10 +421,10 @@ impl<'a> Printer<'a> {
                 let boundary = close_paren.unwrap_or(stmt.span.end);
                 self.push_for_clause_same_line_comments(&mut inner_parts, end, boundary, end);
             }
-        } else if has_test && !has_own_line_comments {
-            // Prettier adds trailing space when update is None but test exists (no comments)
-            inner_parts.push(d.if_break(d.empty(), d.text(" ")));
         }
+        // When the update clause is absent, nothing trails the last `;`: prettier
+        // 3.9 (#19188) dropped the space it used to add before `)` →
+        // `for (…; cond;)`, not `for (…; cond; )`.
 
         let closing = if has_own_line_comments {
             d.hardline()

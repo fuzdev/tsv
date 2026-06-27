@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 102,
+	"end": 99,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,32 +45,32 @@
 		{
 			"type": "Block",
 			"value": " block comment ",
-			"start": 68,
-			"end": 87,
+			"start": 66,
+			"end": 85,
 			"loc": {
 				"start": {
-					"line": 7,
-					"column": 2
+					"line": 6,
+					"column": 12
 				},
 				"end": {
-					"line": 7,
-					"column": 21
+					"line": 6,
+					"column": 31
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " block comment ",
-			"start": 68,
-			"end": 87,
+			"start": 66,
+			"end": 85,
 			"loc": {
 				"start": {
-					"line": 7,
-					"column": 2
+					"line": 6,
+					"column": 12
 				},
 				"end": {
-					"line": 7,
-					"column": 21
+					"line": 6,
+					"column": 31
 				}
 			}
 		}
@@ -78,19 +78,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 101,
+		"end": 98,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 92,
+			"end": 89,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 7,
 					"column": 9
 				}
 			},
@@ -145,15 +145,15 @@
 				{
 					"type": "TSTypeAliasDeclaration",
 					"start": 55,
-					"end": 91,
+					"end": 88,
 					"loc": {
 						"start": {
 							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
-							"column": 3
+							"line": 6,
+							"column": 34
 						}
 					},
 					"id": {
@@ -175,15 +175,15 @@
 					"typeAnnotation": {
 						"type": "TSTypeLiteral",
 						"start": 64,
-						"end": 90,
+						"end": 87,
 						"loc": {
 							"start": {
 								"line": 6,
 								"column": 10
 							},
 							"end": {
-								"line": 8,
-								"column": 2
+								"line": 6,
+								"column": 33
 							}
 						},
 						"members": []
@@ -206,14 +206,14 @@
 						{
 							"type": "Block",
 							"value": " block comment ",
-							"start": 68,
-							"end": 87
+							"start": 66,
+							"end": 85
 						},
 						{
 							"type": "Block",
 							"value": " block comment ",
-							"start": 68,
-							"end": 87
+							"start": 66,
+							"end": 85
 						}
 					]
 				}
