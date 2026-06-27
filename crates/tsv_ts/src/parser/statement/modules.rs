@@ -487,8 +487,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // supports neither proposal, so accepting them is a deliberate divergence
         // from the Svelte/acorn oracle — see docs/conformance_svelte.md.
         let phase = if matches!(self.current_kind(), TokenKind::Identifier) {
-            let is_defer = self.current_value() == "defer";
-            let is_source = self.current_value() == "source";
+            let value = self.current_value();
+            let is_defer = value == "defer";
+            let is_source = value == "source";
             if is_defer && matches!(self.peek_kind(), TokenKind::Star) {
                 self.advance()?; // consume `defer`
                 ImportPhase::Defer

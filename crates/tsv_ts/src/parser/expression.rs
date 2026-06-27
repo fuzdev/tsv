@@ -1847,6 +1847,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
+    /// Reject a spread element where an `ImportCall` argument (an
+    /// `AssignmentExpression`) is expected — `import(...x)` / `import.source(...x)`
+    /// are syntax errors (acorn agrees). Guards both argument positions, because the
+    /// primary-expression parser otherwise accepts a leading `...` as a
+    /// `SpreadElement` (valid only in array/object/call-argument contexts).
+    fn reject_import_call_spread(&self) -> Result<(), ParseError> {
+        if matches!(self.current_kind(), TokenKind::DotDotDot) {
+            return Err(self.error_msg("Cannot use spread element in import() argument"));
+        }
+        Ok(())
+    }
+
     /// Parse import expression or import.meta meta property
     ///
     /// Handles:
@@ -1908,13 +1920,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `AssignmentExpression[+In]`). Mirrors `parse_call_arguments`.
         self.grouping_depth += 1;
 
-        // An `ImportCall` argument is an `AssignmentExpression`, never a spread:
-        // `import(...x)` / `import.source(...x)` are syntax errors (acorn agrees).
-        // Guard here because the primary-expression parser accepts a leading `...`
-        // as a `SpreadElement` (valid only in array/object/call-argument contexts).
-        if matches!(self.current_kind(), TokenKind::DotDotDot) {
-            return Err(self.error_msg("Cannot use spread element in import() argument"));
-        }
+        self.reject_import_call_spread()?;
 
         // Parse the source expression (usually a string literal)
         let source = self.parse_assignment_expression()?;
@@ -1930,10 +1936,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // comma. See docs/conformance_svelte.md.
         let mut options: Option<&'arena Expression<'arena>> = None;
         if self.eat(TokenKind::Comma) && !self.check(&TokenKind::ParenClose) {
-            // The options argument is likewise an `AssignmentExpression`, not a spread.
-            if matches!(self.current_kind(), TokenKind::DotDotDot) {
-                return Err(self.error_msg("Cannot use spread element in import() argument"));
-            }
+            self.reject_import_call_spread()?; // the options arg is likewise no spread
             options = Some(arena.alloc(self.parse_assignment_expression()?));
             self.eat(TokenKind::Comma); // optional trailing comma after the options
         }
