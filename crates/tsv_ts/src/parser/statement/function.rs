@@ -311,14 +311,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
 
-        // Parse parameter list
-        let params: &'arena [Expression<'arena>] = self.parse_parameter_list()?.into_bump_slice();
-
-        // Check for return type annotation
-        let return_type = self.parse_optional_return_type()?;
-
-        // Parse function body
-        let body = self.parse_function_body()?;
+        // Param defaults (`[+In]`) and the function body are a fresh `[+In]`
+        // context, so `in` is the binary operator even when this function
+        // expression sits in a for-header init.
+        let (params, return_type, body) = self.with_allow_in(|p| {
+            let params: &'arena [Expression<'arena>] = p.parse_parameter_list()?.into_bump_slice();
+            let return_type = p.parse_optional_return_type()?;
+            let body = p.parse_function_body()?;
+            Ok((params, return_type, body))
+        })?;
         let end = body.span.end;
 
         Ok(Expression::FunctionExpression(FunctionExpression {

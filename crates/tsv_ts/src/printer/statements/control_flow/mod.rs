@@ -483,7 +483,7 @@ impl<'a> Printer<'a> {
             }
             _ => self.build_expression_doc(expr),
         };
-        if super::needs_parens(expr, super::ParenContext::StatementTest) {
+        if self.needs_parens(expr, super::ParenContext::StatementTest) {
             let d = self.d();
             d.parens(inner)
         } else {

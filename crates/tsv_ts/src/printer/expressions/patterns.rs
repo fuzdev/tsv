@@ -9,9 +9,7 @@
 
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use crate::printer::CommentSpacing;
-use crate::printer::{
-    ParenContext, PatternContext, Printer, needs_parens, object_pattern_should_expand,
-};
+use crate::printer::{ParenContext, PatternContext, Printer, object_pattern_should_expand};
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -908,7 +906,7 @@ impl<'a> Printer<'a> {
         let inline_comments = self.build_rhs_comments_opt(eq_pos + 1, rhs_start);
 
         let rhs_doc = self.build_expression_doc(pattern.right);
-        let rhs_doc = if needs_parens(pattern.right, ParenContext::DefaultValue) {
+        let rhs_doc = if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
             d.parens(rhs_doc)
         } else {
             rhs_doc

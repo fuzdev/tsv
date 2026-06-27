@@ -889,6 +889,10 @@ impl<'a> Printer<'a> {
                 self.build_expression_doc(right_expr)
             }
         });
+        // Parenthesize an `in` RHS inside a for-header init (`for (a = (b in c);…)`);
+        // a no-op elsewhere. The assignment builder is the RHS's only build site and
+        // never routes it through `needs_parens`, so the for-init rule is applied here.
+        let right_doc = self.wrap_for_init_in(right_expr, right_doc);
 
         // Validate static heuristic: if is_poorly_breakable_chain classified this
         // expression as poorly breakable (no good internal break points), the printed
