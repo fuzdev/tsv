@@ -15,6 +15,8 @@ pub(crate) use splitting::{
     split_by_space_preserving_parens,
 };
 
+use std::borrow::Cow;
+
 use numbers::{is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
@@ -190,6 +192,11 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// # Returns
 /// * Normalized property name (e.g., `color /* test */`)
 ///
+/// The common case (a bare property name with no comment and no significant
+/// trailing whitespace) returns a `Cow::Borrowed` sub-slice of `decl_source` — no
+/// per-declaration allocation. Only the comment-bearing and hex-escape-terminator
+/// forms reconstruct an owned `String`.
+///
 /// # Example
 /// ```ignore
 /// let source = "color/* comment */:red;";
@@ -208,40 +215,39 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// - Input: `color/* comment */:red;`
 /// - Output: `color /* comment */` (normalized spacing)
 /// - Prettier: `color/* comment */` (no space before comment)
-pub(crate) fn extract_property_name(decl_source: &str) -> String {
-    if let Some(colon_pos) = find_declaration_colon(decl_source) {
-        let property_part = &decl_source[..colon_pos];
+pub(crate) fn extract_property_name(decl_source: &str) -> Cow<'_, str> {
+    let Some(colon_pos) = find_declaration_colon(decl_source) else {
+        // Fallback: no colon found (malformed declaration).
+        return Cow::Borrowed(decl_source.trim());
+    };
+    let property_part = &decl_source[..colon_pos];
 
-        // Check if property contains a comment
-        if let Some(comment_start) = property_part.find("/*") {
-            if let Some(comment_end_rel) = property_part[comment_start..].find("*/") {
-                let comment_end = comment_start + comment_end_rel + 2; // Include */
-                // Extract parts
-                let before_comment = property_part[..comment_start].trim();
-                let comment = &property_part[comment_start..comment_end];
+    // Check if property contains a comment
+    if let Some(comment_start) = property_part.find("/*") {
+        if let Some(comment_end_rel) = property_part[comment_start..].find("*/") {
+            let comment_end = comment_start + comment_end_rel + 2; // Include */
+            // Extract parts
+            let before_comment = property_part[..comment_start].trim();
+            let comment = &property_part[comment_start..comment_end];
 
-                // Normalize: property + space + comment (no trailing space)
-                format!("{before_comment} {comment}")
-            } else {
-                // Malformed comment - just trim
-                property_part.trim().to_string()
-            }
+            // Normalize: property + space + comment (no trailing space)
+            Cow::Owned(format!("{before_comment} {comment}"))
         } else {
-            // No comment: trim insignificant whitespace, but a property name ending in a
-            // hex escape (`\41`) consumes one following whitespace as the escape's
-            // terminator. That whitespace is part of the identifier token, so prettier
-            // keeps it before the `:` (`\41 : red`); any extra whitespace is still trimmed
-            // (`color : red` → `color: red`).
-            let bare = property_part.trim();
-            if property_part.ends_with(char::is_whitespace) && ends_with_hex_escape(bare) {
-                format!("{bare} ")
-            } else {
-                bare.to_string()
-            }
+            // Malformed comment - just trim
+            Cow::Borrowed(property_part.trim())
         }
     } else {
-        // Fallback: no colon found (malformed declaration)
-        decl_source.trim().to_string()
+        // No comment: trim insignificant whitespace, but a property name ending in a
+        // hex escape (`\41`) consumes one following whitespace as the escape's
+        // terminator. That whitespace is part of the identifier token, so prettier
+        // keeps it before the `:` (`\41 : red`); any extra whitespace is still trimmed
+        // (`color : red` → `color: red`).
+        let bare = property_part.trim();
+        if property_part.ends_with(char::is_whitespace) && ends_with_hex_escape(bare) {
+            Cow::Owned(format!("{bare} "))
+        } else {
+            Cow::Borrowed(bare)
+        }
     }
 }
 
@@ -328,5 +334,74 @@ pub(crate) fn extract_value_with_comments(decl_source: &str) -> Option<String> {
         Some(normalized)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_property_name_borrows_common_case() {
+        // The overwhelmingly-common case: a bare property name with no comment and
+        // no significant trailing whitespace borrows a sub-slice of the input — no
+        // per-declaration allocation.
+        for src in [
+            "margin: 10px",
+            "color:red",
+            "--custom-prop: var(--x)",
+            "grid-template-columns: 1fr 2fr",
+        ] {
+            let got = extract_property_name(src);
+            assert!(
+                matches!(got, Cow::Borrowed(_)),
+                "bare property in {src:?} must borrow, got owned {got:?}"
+            );
+        }
+        assert_eq!(extract_property_name("margin: 10px"), "margin");
+        assert_eq!(extract_property_name("color:red"), "color");
+        assert_eq!(
+            extract_property_name("--custom-prop: var(--x)"),
+            "--custom-prop"
+        );
+    }
+
+    #[test]
+    fn test_extract_property_name_trims_but_still_borrows() {
+        // Insignificant whitespace around the property name is trimmed; the result
+        // is still a borrowed sub-slice (trim returns a sub-slice, no alloc).
+        let got = extract_property_name("color : red");
+        assert_eq!(got, "color");
+        assert!(matches!(got, Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn test_extract_property_name_comment_owns() {
+        // A comment in the property name reconstructs an owned, space-normalized form.
+        let got = extract_property_name("color/* comment */:red");
+        assert_eq!(got, "color /* comment */");
+        assert!(matches!(got, Cow::Owned(_)));
+    }
+
+    #[test]
+    fn test_extract_property_name_hex_escape_terminator_owns() {
+        // A property name ending in a hex escape consumes one trailing whitespace as
+        // the escape's terminator — that space is preserved, so the result owns.
+        let got = extract_property_name("\\41 : red");
+        assert_eq!(got, "\\41 ");
+        assert!(matches!(got, Cow::Owned(_)));
+
+        // A non-escape trailing space is trimmed (borrowed).
+        let got = extract_property_name("color : red");
+        assert_eq!(got, "color");
+        assert!(matches!(got, Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn test_extract_property_name_no_colon_fallback() {
+        // Malformed declaration with no colon: trim the whole source (borrowed).
+        let got = extract_property_name("  orphan  ");
+        assert_eq!(got, "orphan");
+        assert!(matches!(got, Cow::Borrowed(_)));
     }
 }
