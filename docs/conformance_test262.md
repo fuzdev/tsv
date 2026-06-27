@@ -14,15 +14,15 @@ Use test262 to validate that tsv's parser correctly:
 Regenerate with `cargo run -p tsv_debug test262` (expects a test262 checkout
 at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
-discovered tests (46,149 graded after skips).
+discovered tests (46,148 graded after skips).
 
-- Positive (should parse) — 41,898 passed, 1 failed
+- Positive (should parse) — 41,898 passed, 0 failed
 - Negative (should reject) — 1,795 passed, 2,455 failed
 
-- **Overall**: 43,693/46,149 (94.7%)
-- **Positive pass rate**: 99.99% — one failure, the lone sloppy-by-content `raw`
-  test (all graded at each test's declared goal; see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
-- **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
+- **Overall**: 43,693/46,148 (94.7%)
+- **Positive pass rate**: 100% — every test tsv grades and that should parse does,
+  graded at each test's declared goal (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
+- **Skipped**: 2,988 (sloppy mode: 2,494, unimplemented feature: 422, runtime: 38, resolution: 34)
 
 The remaining negative failures are early-error *under-enforcement* (programs that
 parse under the syntactic grammar but the spec rejects semantically — duplicate
@@ -37,17 +37,18 @@ import proposals (`source-phase-imports` / `import.source(…)` and `import-defe
 `Expected 'meta' after 'import.'`. They drop out of both the headline pass rate
 and the differential manifest. See [Scope](#what-we-skip).
 
-**Positive parse conformance is 99.99% (1 failure).** Every test tsv grades and that
-should parse does — graded at the test's declared goal (`module`-flagged as `Module`,
-the run-both-ways default + `onlyStrict` as a strict `Script`) — except one:
-`language/comments/hashbang/use-strict.js`. There the `#!` hashbang turns the
-following `"use strict"` into a comment rather than a directive, so the program is
-**sloppy** and its `with ({}) {}` is valid; tsv, being strict-only, rejects `with`.
-That single test is genuinely out of scope for a strict-only parser (the same reason
-`noStrict` tests are skipped) — it is the lone sloppy-by-content `raw` test, accepted
-as one honest failure rather than blanket-skipping the 27 other in-scope `raw` tests
-alongside it. The former positive-failure cluster was the `await`-as-identifier tests,
-valid only in a strict Script; with [Script-goal support](#design-decision-strict-mode-only-explicit-goal-axis)
+**Positive parse conformance is 100%.** Every test tsv grades and that should parse
+does — graded at the test's declared goal (`module`-flagged as `Module`, the
+run-both-ways default + `onlyStrict` as a strict `Script`). The one sloppy-by-content
+`raw` test, `language/comments/hashbang/use-strict.js`, is **skipped** rather than
+graded: there the `#!` hashbang turns the following `"use strict"` into a comment
+rather than a directive, so the program is **sloppy** and its `with ({}) {}` is valid;
+tsv, being strict-only, rejects `with`. That test is genuinely out of scope for a
+strict-only parser — the same reason `noStrict` tests are skipped — so it joins the
+sloppy-mode skip bucket (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis)),
+while the 27 other in-scope `raw` tests (mode-independent hashbang / directive-prologue
+syntax) stay graded. The former positive-failure cluster was the `await`-as-identifier
+tests, valid only in a strict Script; with [Script-goal support](#design-decision-strict-mode-only-explicit-goal-axis)
 they now parse. _(Methodology for any future failure: parse each `../test262/<path>`
 with `canonical_parse` and bucket on whether it yields an AST.)_
 
@@ -142,10 +143,15 @@ constraint left over-accepted.
 
 - `negative.phase: runtime` - Requires execution
 - `negative.phase: resolution` - Requires module resolution
-- `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only). `flags: [raw]`
-  (verbatim source, no harness) is **not** skipped — it's a transformation opt-out,
-  not a sloppy declaration, so raw tests are graded at their goal like any other
-  (the one sloppy-by-content raw test is an honest positive failure, not a skip)
+- `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only). A `flags: [raw]`
+  test (verbatim source, no harness) also runs in non-strict mode only per
+  test262/INTERPRETING.md, but nearly all exercise mode-independent syntax (hashbang,
+  HTML-close comments, `"use strict"` directive prologues) tsv grades correctly at
+  their goal, so those stay graded. Only a raw test whose verdict genuinely needs
+  sloppy semantics — it uses a construct tsv rejects as strict-only (`with`, legacy
+  octal) — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
+  `crates/tsv_debug/src/test262/runner.rs`) is currently the single
+  `language/comments/hashbang/use-strict.js`
 - `features:` naming an **unimplemented syntactic proposal** - currently
   `source-phase-imports` / `source-phase-imports-module-source` / `import-defer`
   (the Stage-3 import proposals). Skipped in both polarities so the score
@@ -263,14 +269,18 @@ Found 49136 test files
 Processing: 49136/49136
 
 Results:
-  Positive tests: 41898 passed, 1 failed
+  Positive tests: 41898 passed, 0 failed
   Negative tests: 1795 passed, 2455 failed
-  Skipped:        2987 (sloppy mode: 2493, unimplemented feature: 422, runtime: 38, resolution: 34)
+  Skipped:        2988 (sloppy mode: 2494, unimplemented feature: 422, runtime: 38, resolution: 34)
 
-Pass rate: 43693/46149 (94.7%)
+Pass rate: 43693/46148 (94.7%)
 ```
 
 ### Verbose (Failures)
+
+`--verbose` lists each failure under a `Failures:` block. The remaining failures are
+negative early-error under-enforcement (programs that parse syntactically but the spec
+rejects semantically); filtering to one shows the format:
 
 ```
 test262 validation
@@ -278,18 +288,19 @@ test262 validation
 Path: ../test262
 
 Found 49136 test files
-Filtered to 1 tests matching: language/comments/hashbang/use-strict
+Filtered to 1 tests matching: RegExp/property-escapes/binary-property-with-value-ASCII_-_F.js
+
+Processing: 1/1
 
 Failures:
 ---------
-test/language/comments/hashbang/use-strict.js
-  Expected: Parse success
-  Got: Parse error
-  InvalidSyntax { message: "Expected ';'", position: 388, context: Some(ErrorContext { source_line: "with ({}) {}", column: 10, line_number: 17 }) }
+test/built-ins/RegExp/property-escapes/binary-property-with-value-ASCII_-_F.js
+  Expected: Parse error (phase: parse)
+  Got: Parse success
 
 Results:
-  Positive tests: 0 passed, 1 failed
-  Negative tests: 0 passed, 0 failed
+  Positive tests: 0 passed, 0 failed
+  Negative tests: 0 passed, 1 failed
 
 Pass rate: 0/1 (0.0%)
 ```
@@ -299,10 +310,13 @@ Pass rate: 0/1 (0.0%)
 **tsv parses as strict mode only** — there is no sloppy mode and no `"use strict"`
 detection. This matches our use cases (TypeScript is always strict; ES modules and
 Svelte `<script>` are always strict). Tests with `flags: [noStrict]` (sloppy) are
-skipped as out of scope. `flags: [raw]` (verbatim source, no harness) is a
-*transformation* opt-out, not a sloppy declaration (test262/INTERPRETING.md), so raw
-tests are graded at their goal like any other; the one whose source is sloppy by
-content (`hashbang/use-strict.js`) is an honest positive failure, not a blanket skip.
+skipped as out of scope. A `flags: [raw]` test (verbatim source, no harness) also runs
+in non-strict mode only per test262/INTERPRETING.md, but nearly all exercise
+mode-independent syntax (hashbang, HTML-close comments, directive prologues) a
+strict-only parser grades correctly, so those stay graded at their goal. The lone raw
+test that is sloppy *by content* — `hashbang/use-strict.js`, whose `#!` turns
+`"use strict"` into a comment, leaving a sloppy `with` — is out of scope for the same
+reason `noStrict` is, so it is skipped (sloppy-mode bucket), not graded as a failure.
 
 **Strict and the *goal* symbol are orthogonal axes** (ECMAScript §11.2.2): a parse
 runs against either `Goal::Module` or `Goal::Script`, both strict. tsv exposes this
@@ -362,10 +376,12 @@ tests tsv grades (the strict, non-sloppy, parse-phase subset), parsing each at t
 **same goal tsv grades it at** (`module`-flagged → `sourceType: 'module'`, else
 `'script'`) — so the two sides agree on the goal axis. One caveat: oxc's `'script'`
 is **sloppy** while tsv's `Goal::Script` is strict, so a *sloppy-by-content* script
-shows up as a positive "tsv rejects, oxc accepts" candidate even though it's a
-sanctioned strict-only divergence, not a bug — currently exactly one test
+would show up as a positive "tsv rejects, oxc accepts" candidate even though it's a
+sanctioned strict-only divergence, not a bug. The one known such test
 (`hashbang/use-strict.js`, whose `#!` turns `"use strict"` into a comment, leaving a
-sloppy `with`). The two actionable buckets:
+sloppy `with`) is skipped before grading, so it never enters the manifest; any future
+sloppy-by-content script would surface here and want the same treatment. The two
+actionable buckets:
 
 - **positives where tsv rejects but oxc accepts** → tsv real-bug candidates (modulo
   the strict-vs-sloppy-script caveat above)

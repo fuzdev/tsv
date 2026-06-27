@@ -133,12 +133,41 @@ enum Classification {
     },
 }
 
+/// `raw` tests (`flags: [raw]`) whose parse verdict genuinely depends on sloppy
+/// semantics, keyed by test262-root-relative path (`/`-separated). Per
+/// test262/INTERPRETING.md a raw test runs once **in non-strict mode only**;
+/// nearly all exercise mode-INDEPENDENT syntax (hashbang comments, HTML-close
+/// comments, `"use strict"` directive prologues) whose accept/reject is identical
+/// strict or sloppy, so a strict-only parser grades them correctly and they stay
+/// graded. The entries here are the exceptions: their source uses a construct tsv
+/// rejects only because it parses strict-mode-only (`with`, legacy octal), so
+/// grading at strict produces a *spurious* failure. They're out of tsv's scope
+/// exactly as `noStrict` is, and skipped for the same reason.
+///
+/// Currently one: `hashbang/use-strict.js`, where the leading `#!` makes the
+/// following `"use strict"` a hashbang comment rather than a directive, leaving
+/// the program sloppy so its `with ({}) {}` is legal — which tsv, being
+/// strict-only, correctly rejects.
+const SLOPPY_ONLY_RAW_TESTS: &[&str] = &["test/language/comments/hashbang/use-strict.js"];
+
+/// Whether a graded path is a `raw` test that needs sloppy-mode semantics tsv
+/// can't grade (see `SLOPPY_ONLY_RAW_TESTS`). Gated on the `raw` flag so a future
+/// non-raw test reusing one of these paths wouldn't be silently skipped.
+fn is_sloppy_only_raw(frontmatter: &frontmatter::Frontmatter, relative_path: &str) -> bool {
+    frontmatter.is_raw() && {
+        let normalized = relative_path.replace('\\', "/");
+        SLOPPY_ONLY_RAW_TESTS.contains(&normalized.as_str())
+    }
+}
+
 /// Read a test's frontmatter and decide skip-vs-grade.
 ///
 /// tsv is strict-mode only, so sloppy (`noStrict`) tests are skipped, as are
 /// runtime/resolution negatives (we only test parsing), tests requiring an
-/// unimplemented syntactic proposal, and files with no frontmatter.
-fn classify(content: &str) -> Classification {
+/// unimplemented syntactic proposal, and files with no frontmatter. `relative_path`
+/// is the test262-root-relative path, needed only for the sloppy-by-content `raw`
+/// skip (`is_sloppy_only_raw`).
+fn classify(relative_path: &str, content: &str) -> Classification {
     let Some(frontmatter) = frontmatter::parse(content) else {
         return Classification::Skip(SkipReason::NoFrontmatter);
     };
@@ -155,16 +184,13 @@ fn classify(content: &str) -> Classification {
     if let Some(feature) = frontmatter.requires_unimplemented_feature() {
         return Classification::Skip(SkipReason::UnimplementedFeature(feature));
     }
-    // `noStrict` tests need sloppy mode; tsv is strict-only, so they're out of
-    // scope and skipped. `raw` tests (verbatim source, no harness) are NOT
-    // skipped — `raw` is a transformation opt-out, not a sloppy-mode declaration
-    // (test262/INTERPRETING.md), and nearly all exercise mode-independent syntax
-    // (hashbang, directive prologue) that a strict-only parser grades correctly.
-    // They're graded at the test's goal like any other. The lone sloppy-by-content
-    // raw test (`hashbang/use-strict.js`, where the `#!` turns `"use strict"` into
-    // a comment so `with` is valid) surfaces as one honest positive failure,
-    // rather than blanket-skipping the 27 in-scope raw tests alongside it.
-    if frontmatter.requires_sloppy_mode() {
+    // Both kinds of sloppy-mode-required test are out of tsv's strict-only scope:
+    // an explicit `noStrict` declaration, and a `raw` test (non-strict mode only
+    // per test262/INTERPRETING.md) that is sloppy *by content* — it uses a
+    // construct tsv rejects only because it's strict-only (`with`, legacy octal),
+    // so grading it at strict would be a spurious failure. The remaining raw tests
+    // exercise mode-independent syntax and stay graded at their goal.
+    if frontmatter.requires_sloppy_mode() || is_sloppy_only_raw(&frontmatter, relative_path) {
         return Classification::Skip(SkipReason::SloppyModeRequired);
     }
     Classification::Grade {
@@ -176,8 +202,9 @@ fn classify(content: &str) -> Classification {
 /// The parse goal for a graded test. A `module`-flagged test is parsed as a
 /// `Module`; everything else tsv grades (the run-both-ways default and
 /// `onlyStrict`) is a strict `Script` — `await` is an ordinary identifier there,
-/// and `import`/`export`/`import.meta` are syntax errors. tsv is strict under
-/// both goals (sloppy `noStrict` tests are skipped above; `raw` tests are graded).
+/// and `import`/`export`/`import.meta` are syntax errors. tsv is strict under both
+/// goals (sloppy `noStrict` tests, and the sloppy-by-content `raw` test, are
+/// skipped above; the remaining `raw` tests are graded).
 fn goal_for(module: bool) -> tsv_ts::Goal {
     if module {
         tsv_ts::Goal::Module
@@ -198,7 +225,7 @@ pub fn run_test(test: &TestFile) -> (TestResult, Option<bool>) {
         }
     };
 
-    match classify(&content) {
+    match classify(&test.relative_path, &content) {
         Classification::Skip(reason) => (TestResult::Skipped(reason), None),
         Classification::Grade {
             is_negative_parse,
@@ -239,7 +266,8 @@ pub struct ManifestEntry {
     /// `await`-as-identifier script test lands in `both-accept`, not `both-reject`.
     pub module: bool,
     /// Always `true` for the graded subset — tsv is strict under both goals and
-    /// skips `noStrict` tests. Emitted for transparency / future flexibility.
+    /// skips sloppy tests (`noStrict`, and the sloppy-by-content `raw` test).
+    /// Emitted for transparency / future flexibility.
     pub strict: bool,
     /// What test262 expects: `accept` for positives, `reject` for parse negatives.
     pub expected: Verdict,
@@ -281,7 +309,7 @@ pub fn grade_for_manifest(test: &TestFile) -> Option<ManifestEntry> {
     let Classification::Grade {
         is_negative_parse,
         module,
-    } = classify(&content)
+    } = classify(&test.relative_path, &content)
     else {
         return None;
     };
@@ -358,13 +386,16 @@ mod tests {
         let proposal =
             "/*---\nfeatures: [source-phase-imports, dynamic-import]\n---*/\nimport.source('x');\n";
         assert!(matches!(
-            classify(proposal),
+            classify("test/x.js", proposal),
             Classification::Skip(SkipReason::UnimplementedFeature("source-phase-imports"))
         ));
 
         // Plain dynamic import is implemented — graded, not skipped.
         let plain = "/*---\nfeatures: [dynamic-import]\n---*/\nimport('x');\n";
-        assert!(matches!(classify(plain), Classification::Grade { .. }));
+        assert!(matches!(
+            classify("test/x.js", plain),
+            Classification::Grade { .. }
+        ));
     }
 
     /// The feature check runs before the sloppy-mode check, so a test that is
@@ -374,22 +405,46 @@ mod tests {
     fn classify_feature_precedes_sloppy() {
         let both = "/*---\nfeatures: [import-defer]\nflags: [noStrict]\n---*/\n";
         assert!(matches!(
-            classify(both),
+            classify("test/x.js", both),
             Classification::Skip(SkipReason::UnimplementedFeature("import-defer"))
         ));
     }
 
-    /// `raw` is a transformation opt-out, not a sloppy-mode declaration, so a raw
-    /// test is GRADED (at its goal) — unlike `noStrict`, which is skipped. The lone
-    /// sloppy-by-content raw test is an honest failure rather than a blanket skip.
+    /// A `raw` test runs in non-strict mode only, but most exercise
+    /// mode-independent syntax tsv grades correctly, so a raw test is GRADED at
+    /// its goal — UNLESS it is sloppy by content (in `SLOPPY_ONLY_RAW_TESTS`), in
+    /// which case it's skipped like `noStrict`, out of tsv's strict-only scope.
     #[test]
-    fn classify_grades_raw_but_skips_nostrict() {
+    fn classify_grades_raw_but_skips_sloppy() {
+        // Mode-independent raw test (a hashbang not in the sloppy-only list) — graded.
         let raw = "/*---\nflags: [raw]\n---*/\n#!/usr/bin/env node\n";
-        assert!(matches!(classify(raw), Classification::Grade { .. }));
+        assert!(matches!(
+            classify(
+                "test/language/comments/hashbang/preceding-whitespace.js",
+                raw
+            ),
+            Classification::Grade { .. }
+        ));
+
+        // The sloppy-by-content raw test (`with` needs sloppy mode) — skipped.
+        let sloppy_raw = "/*---\nflags: [raw]\n---*/\n#!\"use strict\"\nwith ({}) {}\n";
+        assert!(matches!(
+            classify("test/language/comments/hashbang/use-strict.js", sloppy_raw),
+            Classification::Skip(SkipReason::SloppyModeRequired)
+        ));
+        // Same content at a non-listed path stays graded — the skip is path-keyed
+        // and gated on the `raw` flag, not a content sniff.
+        assert!(matches!(
+            classify(
+                "test/language/comments/hashbang/preceding-hashbang.js",
+                sloppy_raw
+            ),
+            Classification::Grade { .. }
+        ));
 
         let no_strict = "/*---\nflags: [noStrict]\n---*/\n";
         assert!(matches!(
-            classify(no_strict),
+            classify("test/x.js", no_strict),
             Classification::Skip(SkipReason::SloppyModeRequired)
         ));
     }
