@@ -78,7 +78,7 @@ pub(super) fn skip_whitespace_and_comments(bytes: &[u8], mut pos: usize) -> usiz
 ///
 /// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
 /// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
-/// `is_xid_start` from `unicode_ident` crate for validation.
+/// `ID_Start` validation (`lexer::ident::is_id_start`) on the decoded char.
 #[inline]
 pub(super) fn is_identifier_start(b: u8) -> bool {
     b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127
@@ -88,7 +88,7 @@ pub(super) fn is_identifier_start(b: u8) -> bool {
 ///
 /// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
 /// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
-/// `is_xid_continue` from `unicode_ident` crate for validation.
+/// `ID_Continue` validation (`lexer::ident::is_id_continue`) on the decoded char.
 #[inline]
 pub(super) fn is_identifier_continue(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127

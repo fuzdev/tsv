@@ -395,22 +395,32 @@ impl<'a> Printer<'a> {
     }
 }
 
-/// Check if a string is a valid JS identifier (so prettier outputs it unquoted).
+/// Check if a string is an identifier prettier would output unquoted as an object key.
 ///
-/// Built on the lexer's identifier grammar (`lexer::ident`) so any key we
-/// unquote here can be re-lexed as an identifier (idempotency). Reserved words
+/// This predicts prettier's quote-stripping (`is-es5-identifier-name`), which is a
+/// distinct question from "is this a valid ECMAScript identifier?" — so it is kept
+/// **off** the lexer's `ID_Start`/`ID_Continue` grammar (`lexer::ident`). The two
+/// diverge only on rare grandfathered/NFKC code points (e.g. U+309B, an
+/// `Other_ID_Start` sound mark prettier keeps quoted but the lexer accepts as an
+/// identifier). Staying on the `XID_Start`/`XID_Continue` subset keeps key
+/// formatting independent of the parser's identifier set and is sound for
+/// idempotency (`XID ⊆ ID`, so any key we unquote still re-lexes). Reserved words
 /// count as identifiers here (prettier outputs them unquoted).
+//
+// NOTE: prettier's actual rule is ES5 `UnicodeLetter` (general-category based), which
+// is neither `XID` nor modern `ID` — matching it exactly needs Unicode general-category
+// data we don't carry. `XID` is the closest dependency-free approximation.
 pub(in crate::printer) fn is_valid_js_identifier(s: &str) -> bool {
-    use crate::lexer::ident::{is_id_continue, is_id_start};
+    use unicode_ident::{is_xid_continue, is_xid_start};
 
     let mut chars = s.chars();
 
     match chars.next() {
-        Some(c) if is_id_start(c) => {}
+        Some(c) if is_xid_start(c) || c == '_' || c == '$' => {}
         _ => return false,
     }
 
-    chars.all(is_id_continue)
+    chars.all(|c| is_xid_continue(c) || c == '$')
 }
 
 /// Check if an identifier name matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u`
