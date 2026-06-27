@@ -17,55 +17,11 @@
 //! `tsv_ffi` / `tsv_wasm`).
 
 use napi_derive::napi;
-
-/// Run `f` with a per-thread reusable AST arena.
-///
-/// Duplicates `tsv_ffi`'s `with_ast_arena` (see its rationale): the bindings are
-/// called once per file in tight loops, so a fresh `Bump` per call churns the
-/// system allocator's heap high-water in a way that is measurable through the
-/// binding boundary. Each thread keeps one `Bump` and `reset()`s it between
-/// calls — `reset()` rewinds the bump pointer and retains the largest chunk, so
-/// a warm thread does no per-call malloc/free. The per-file AST is fully consumed
-/// inside `f` (the returned value owns its bytes — a formatted `String`, a JSON
-/// `String`, or `()`), so no AST outlives the next call's `reset()`.
-///
-/// Kept in lockstep with `tsv_ffi::with_ast_arena` by hand for now; factoring
-/// both onto one shared helper is a follow-up (lore TODO_NAPI_BINDINGS §arena
-/// reuse / TODO_BUMPALO_ARENA item 1).
-fn with_ast_arena<R>(f: impl FnOnce(&bumpalo::Bump) -> R) -> R {
-    thread_local! {
-        static AST_ARENA: std::cell::RefCell<bumpalo::Bump> =
-            std::cell::RefCell::new(bumpalo::Bump::new());
-    }
-    AST_ARENA.with(|cell| {
-        let mut arena = cell.borrow_mut();
-        arena.reset();
-        f(&arena)
-    })
-}
-
-/// Run `f` with a per-thread reusable doc arena (the `format` path's analogue of
-/// [`with_ast_arena`]).
-///
-/// Reusing one `DocArena` per thread and `reset()`ing it between calls retains the
-/// backing buffers instead of allocating a fresh doc arena per file. Soundness
-/// mirrors `with_ast_arena`: the doc tree is fully rendered to the returned
-/// `String` inside `f`, so no `DocId` outlives the next call's `reset()`.
-///
-/// Kept in lockstep with `tsv_ffi::with_doc_arena` by hand for now (same
-/// follow-up as `with_ast_arena`).
+// Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
+// native bindings — see its module docs for the reuse rationale + soundness).
+use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
-fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -> R {
-    thread_local! {
-        static DOC_ARENA: std::cell::RefCell<tsv_lang::doc::arena::DocArena> =
-            std::cell::RefCell::new(tsv_lang::doc::arena::DocArena::new());
-    }
-    DOC_ARENA.with(|cell| {
-        let mut arena = cell.borrow_mut();
-        arena.reset();
-        f(&arena)
-    })
-}
+use tsv_arena::with_doc_arena;
 
 /// Generate `parse_<lang>` / `parse_internal_<lang>` / `format_<lang>` N-API
 /// functions for one language module. The `js_name` literals keep the JS export
@@ -155,58 +111,142 @@ lang_bindings!(
 mod tests {
     use super::*;
 
-    fn error_message(err: &napi::Error) -> String {
-        err.reason.clone()
-    }
+    /// Signature shared by every `parse_<lang>` / `format_<lang>` entry point.
+    type StringFn = fn(String) -> napi::Result<String>;
+    /// Signature shared by every `parse_internal_<lang>` entry point.
+    type UnitFn = fn(String) -> napi::Result<()>;
 
-    // --- format: happy path (one per language exercises the macro expansion) ---
+    // --- format: normalizes, every language (exact output) ---
 
     #[test]
-    fn format_typescript_normalizes() {
-        assert_eq!(
-            format_typescript("const   x=1".to_owned()).unwrap(),
-            "const x = 1;\n"
+    fn format_normalizes_per_language() {
+        // Annotate the array type so the fn items coerce to `StringFn` (no casts).
+        let cases: [(&str, StringFn, &str, &str); 3] = [
+            (
+                "typescript",
+                format_typescript,
+                "const   x=1",
+                "const x = 1;\n",
+            ),
+            ("css", format_css, "a{color:red}", "a {\n\tcolor: red;\n}\n"),
+            (
+                "svelte",
+                format_svelte,
+                "<div   >x</div   >",
+                "<div>x</div>\n",
+            ),
+        ];
+        for (label, f, input, expected) in cases {
+            assert_eq!(f(input.to_owned()).unwrap(), expected, "{label} format");
+        }
+    }
+
+    // --- parse: returns the language's own JSON root type ---
+
+    #[test]
+    fn parse_returns_language_root_type() {
+        // The root `type` is distinct per language, so asserting it also guards
+        // the `lang_bindings!` wiring: a transposed invocation (e.g. `parse_css`
+        // pointed at `tsv_ts`) would return the wrong root, not just "some JSON."
+        let cases: [(&str, StringFn, &str, &str); 3] = [
+            ("typescript", parse_typescript, "const x = 1;", "Program"),
+            ("css", parse_css, "a { color: red }", "StyleSheetFile"),
+            ("svelte", parse_svelte, "<div>x</div>", "Root"),
+        ];
+        for (label, f, src, root_type) in cases {
+            let json = f(src.to_owned()).unwrap();
+            let value: serde_json::Value =
+                serde_json::from_str(&json).unwrap_or_else(|e| panic!("{label}: not JSON: {e}"));
+            assert_eq!(
+                value.get("type").and_then(serde_json::Value::as_str),
+                Some(root_type),
+                "{label}: unexpected root type in {json}"
+            );
+        }
+    }
+
+    // --- parse_internal: parses without converting (Ok, no JSON), every language ---
+
+    #[test]
+    fn parse_internal_ok_per_language() {
+        let cases: [(&str, UnitFn, &str); 3] = [
+            ("typescript", parse_internal_typescript, "const x = 1;"),
+            ("css", parse_internal_css, "a { color: red }"),
+            ("svelte", parse_internal_svelte, "<div>x</div>"),
+        ];
+        for (label, f, src) in cases {
+            f(src.to_owned()).unwrap_or_else(|e| panic!("{label}: {}", e.reason));
+        }
+    }
+
+    // --- errors surface as a thrown napi::Error carrying the engine message ---
+
+    #[test]
+    fn invalid_syntax_errors_per_language() {
+        // Both parse and format wrap the engine error into a napi::Error (which
+        // napi-rs throws — there is no `{"error": …}` envelope, unlike FFI).
+        // Cover the error arm for every language across both entry-point kinds.
+        let cases: [(&str, StringFn, StringFn, &str); 3] = [
+            (
+                "typescript",
+                parse_typescript,
+                format_typescript,
+                "const = ;",
+            ),
+            ("css", parse_css, format_css, "a {"),
+            ("svelte", parse_svelte, format_svelte, "<div {"),
+        ];
+        for (label, parse_fn, format_fn, src) in cases {
+            let parse_err = parse_fn(src.to_owned()).unwrap_err();
+            assert!(
+                !parse_err.reason.is_empty(),
+                "{label} parse: error must carry a reason"
+            );
+            let format_err = format_fn(src.to_owned()).unwrap_err();
+            assert!(
+                !format_err.reason.is_empty(),
+                "{label} format: error must carry a reason"
+            );
+        }
+    }
+
+    // --- the per-thread arenas are reset+reused across calls (warm-path soundness) ---
+
+    #[test]
+    fn repeated_calls_reuse_arenas() {
+        // This crate's distinctive risk: `with_ast_arena` / `with_doc_arena`
+        // keep one arena per thread and `reset()` it at the start of each call,
+        // so nothing built in a prior call may leak past the next reset. Two
+        // back-to-back formats on a warm arena must produce identical output,
+        // and interleaving a parse (which drives the AST arena on its own)
+        // between them must not perturb the format result.
+        let once = format_typescript("const   x=1".to_owned()).unwrap();
+        let twice = format_typescript("const   x=1".to_owned()).unwrap();
+        assert_eq!(once, twice, "second format on a warm arena diverged");
+        parse_typescript("const y = 2;".to_owned()).unwrap();
+        let after_parse = format_typescript("const   x=1".to_owned()).unwrap();
+        assert_eq!(once, after_parse, "interleaved parse perturbed format");
+    }
+
+    // --- multibyte source survives the JS-string marshalling + char-offset boundary ---
+
+    #[test]
+    fn parse_and_format_preserve_multibyte_source() {
+        // napi-rs marshals JS strings in/out and the AST carries char offsets;
+        // this is the same boundary risk tsv_ffi's same-named test guards.
+        let src = "const x = '€🦀';\n";
+        let json = parse_typescript(src.to_owned()).unwrap();
+        assert!(json.contains("\"type\""), "parse produced no AST: {json}");
+        let formatted = format_typescript(src.to_owned()).unwrap();
+        assert!(
+            formatted.contains("€🦀"),
+            "multibyte content lost: {formatted}"
         );
-    }
-
-    #[test]
-    fn format_css_normalizes() {
+        // Re-formatting is stable (idempotent) across the boundary.
         assert_eq!(
-            format_css("a{color:red}".to_owned()).unwrap(),
-            "a {\n\tcolor: red;\n}\n"
+            format_typescript(formatted.clone()).unwrap(),
+            formatted,
+            "re-format not idempotent across the boundary"
         );
-    }
-
-    #[test]
-    fn format_svelte_normalizes() {
-        assert_eq!(
-            format_svelte("<div   >x</div   >".to_owned()).unwrap(),
-            "<div>x</div>\n"
-        );
-    }
-
-    // --- parse: returns JSON AST; internal returns unit ---
-
-    #[test]
-    fn parse_typescript_returns_json() {
-        let json = parse_typescript("const x = 1;".to_owned()).unwrap();
-        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            value.get("type").and_then(serde_json::Value::as_str),
-            Some("Program")
-        );
-    }
-
-    #[test]
-    fn parse_internal_css_ok() {
-        parse_internal_css("a { color: red }".to_owned()).unwrap();
-    }
-
-    // --- errors surface as napi::Error with the engine message ---
-
-    #[test]
-    fn format_typescript_invalid_errors() {
-        let err = format_typescript("const = ;".to_owned()).unwrap_err();
-        assert!(!error_message(&err).is_empty(), "error must carry a reason");
     }
 }
