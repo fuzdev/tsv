@@ -61,8 +61,10 @@ impl<'a> Printer<'a> {
             return false;
         };
 
-        // Boundary char must be whitespace to trigger boundary ws
-        if !ch.is_whitespace() {
+        // Boundary char must be collapsible (ASCII) whitespace to trigger boundary ws;
+        // a non-breaking space (U+00A0) is content, not a boundary (so `{#if a} {/if}`
+        // with an NBSP body stays inline, matching prettier).
+        if !ch.is_ascii_whitespace() {
             return false;
         }
 
@@ -112,7 +114,7 @@ impl<'a> Printer<'a> {
                 } else {
                     t.raw(source).chars().last()
                 };
-                ch.is_some_and(char::is_whitespace)
+                ch.is_some_and(|c: char| c.is_ascii_whitespace())
             } else {
                 false
             }

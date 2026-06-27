@@ -457,7 +457,9 @@ impl<'a> Printer<'a> {
             return true;
         }
         match &element.fragment.nodes[0] {
-            FragmentNode::Text(text) => !text.raw(self.source).starts_with(char::is_whitespace),
+            FragmentNode::Text(text) => !text
+                .raw(self.source)
+                .starts_with(|c: char| c.is_ascii_whitespace()),
             _ => true,
         }
     }
@@ -468,7 +470,9 @@ impl<'a> Printer<'a> {
             return true;
         }
         match element.fragment.nodes.last() {
-            Some(FragmentNode::Text(text)) => !text.raw(self.source).ends_with(char::is_whitespace),
+            Some(FragmentNode::Text(text)) => !text
+                .raw(self.source)
+                .ends_with(|c: char| c.is_ascii_whitespace()),
             _ => true,
         }
     }

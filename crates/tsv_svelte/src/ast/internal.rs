@@ -678,22 +678,27 @@ impl<'arena> FragmentNode<'arena> {
 
     /// Check if this node is whitespace-only text.
     ///
-    /// Returns true only for Text nodes containing only whitespace characters.
-    /// All other node types return false.
+    /// Returns true only for Text nodes whose content is entirely *collapsible*
+    /// (ASCII) whitespace `[\t\n\f\r ]`. A non-breaking space (U+00A0 / U+202F) or
+    /// other Unicode separator is template *content*, not collapsible whitespace
+    /// (HTML/infra "ASCII whitespace"; matches prettier-plugin-svelte), so a node
+    /// made only of those returns false. All non-Text nodes return false.
     #[inline]
     pub fn is_whitespace_only_text(&self, source: &str) -> bool {
-        matches!(self, FragmentNode::Text(t) if t.raw(source).trim().is_empty())
+        matches!(self, FragmentNode::Text(t) if t.raw(source).trim_ascii().is_empty())
     }
 
     /// Check if this node is a whitespace-only text containing at least one newline.
     ///
     /// Used to detect source line breaks at element boundaries (hug mode pattern).
-    /// Returns false for non-Text nodes or Text without newlines.
+    /// "Whitespace-only" is the collapsible (ASCII) class — see `is_whitespace_only_text`;
+    /// a node with a non-breaking space is content, not a boundary break. Returns false
+    /// for non-Text nodes or Text without newlines.
     #[inline]
     pub fn is_boundary_break(&self, source: &str) -> bool {
         matches!(self, FragmentNode::Text(t) if {
             let raw = t.raw(source);
-            raw.trim().is_empty() && raw.contains('\n')
+            raw.trim_ascii().is_empty() && raw.contains('\n')
         })
     }
 }
@@ -820,8 +825,10 @@ pub enum AttributeValue<'arena> {
 /// on text nodes in hot loops (multiline children, inline run detection), each
 /// re-slicing source. Could precompute these as bool fields during parsing (the
 /// `multiline`-style trick comment-as-span used). Trade-off: a few bytes per Text
-/// node vs repeated source scans; per-predicate semantics (`trim` vs `trim_ascii`)
-/// must be preserved. Profile before optimizing.
+/// node vs repeated source scans. The template-text whitespace-only predicates are
+/// now uniformly the collapsible (ASCII) class (`trim_ascii`; a non-breaking space
+/// is content) so a single `is_ascii_ws_only` flag covers them; `has_newline` /
+/// blank-line need their own flags. Profile before optimizing.
 #[derive(Debug, Clone)]
 pub struct Text {
     /// Span of the raw text (entities preserved) in the host source; text via `raw`.

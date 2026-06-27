@@ -217,7 +217,9 @@ impl<'a> Printer<'a> {
             if let FragmentNode::Text(text) = n {
                 // Whitespace-only: skip only for block elements
                 // Inline elements keep boundary whitespace (normalized to single space)
-                text.raw(source).trim().is_empty() && trim_boundaries
+                // ASCII whitespace only — a non-breaking space (U+00A0) is content, not a
+                // collapsible boundary, so an NBSP-only node is never skipped.
+                text.raw(source).trim_ascii().is_empty() && trim_boundaries
             } else {
                 false // Not text, don't skip
             }
@@ -1287,10 +1289,13 @@ impl<'a> Printer<'a> {
     ///   If false, preserve single space at boundaries (inline context).
     fn build_text_doc(&self, text: &internal::Text, trim_completely: bool) -> Option<DocId> {
         let raw = text.raw(self.source);
-        let trimmed = raw.trim();
+        // ASCII (collapsible) whitespace only: a non-breaking space (U+00A0) is content,
+        // so a node made only of NBSP is NOT empty here and flows to the fill path below
+        // (preserved verbatim), never dropped or collapsed to a regular space.
+        let trimmed = raw.trim_ascii();
         if trimmed.is_empty() {
-            // Pure whitespace: collapse to single space only in inline context
-            if !trim_completely && raw.contains(char::is_whitespace) {
+            // Pure (ASCII) whitespace: collapse to single space only in inline context
+            if !trim_completely && raw.bytes().any(|b| b.is_ascii_whitespace()) {
                 Some(self.d().text(" "))
             } else {
                 None

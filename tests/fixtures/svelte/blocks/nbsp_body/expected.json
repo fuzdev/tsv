@@ -1,0 +1,160 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 228,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 170,
+				"data": " A non-breaking space (U+00A0) body is content, not boundary whitespace, so the\nblock stays inline and the NBSP is preserved (an ASCII-space body expands instead) "
+			},
+			{
+				"type": "Text",
+				"start": 170,
+				"end": 171,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 171,
+				"end": 184,
+				"test": {
+					"type": "Identifier",
+					"start": 176,
+					"end": 177,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 5
+						},
+						"end": {
+							"line": 3,
+							"column": 6
+						}
+					},
+					"name": "a"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 178,
+							"end": 179,
+							"raw": " ",
+							"data": " "
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 184,
+				"end": 185,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 185,
+				"end": 211,
+				"expression": {
+					"type": "Identifier",
+					"start": 192,
+					"end": 197,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 7
+						},
+						"end": {
+							"line": 4,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 203,
+							"end": 204,
+							"raw": " ",
+							"data": " "
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "i",
+					"start": 201,
+					"end": 202,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 16,
+							"character": 201
+						},
+						"end": {
+							"line": 4,
+							"column": 17,
+							"character": 202
+						}
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 211,
+				"end": 212,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "KeyBlock",
+				"start": 212,
+				"end": 227,
+				"expression": {
+					"type": "Identifier",
+					"start": 218,
+					"end": 219,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 6
+						},
+						"end": {
+							"line": 5,
+							"column": 7
+						}
+					},
+					"name": "k"
+				},
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 220,
+							"end": 221,
+							"raw": " ",
+							"data": " "
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
