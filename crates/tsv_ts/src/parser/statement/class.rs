@@ -3,9 +3,9 @@
 use crate::ast::internal::{
     Accessibility, BlockStatement, ClassBody, ClassDeclaration, ClassExpression, ClassMember,
     Decorator, ExportDefaultDeclaration, ExportDefaultValue, ExportKind, ExportNamedDeclaration,
-    Expression, FunctionExpression, Identifier, IdentifierParamExtra, Literal, LiteralValue,
-    MethodDefinition, MethodKind, PropertyDefinition, PropertyModifier, Statement, StaticBlock,
-    TSIndexSignature, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    Expression, FunctionExpression, Identifier, Literal, LiteralValue, MethodDefinition,
+    MethodKind, PropertyDefinition, PropertyModifier, Statement, StaticBlock, TSIndexSignature,
+    TSTypeParameterDeclaration, TSTypeParameterInstantiation,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
@@ -903,12 +903,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         let param_end = param_type.as_ref().map_or(id_end, |t| t.span.end as usize);
-        let extra = param_type.map(|ta| {
-            self.alloc(IdentifierParamExtra {
-                type_annotation: Some(ta),
-                decorators: None,
-            })
-        });
+        let extra = param_type.map(|ta| self.typed_extra(ta));
         let parameter = Identifier {
             name: param_name,
             optional: false,

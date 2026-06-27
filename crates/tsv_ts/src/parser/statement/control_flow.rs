@@ -493,12 +493,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (extra, param_end) = if self.check(&TokenKind::Colon) {
                         let ta = self.parse_type_annotation()?;
                         let end = ta.span.end as usize;
-                        let extra: Option<&'arena IdentifierParamExtra<'arena>> =
-                            Some(self.alloc(IdentifierParamExtra {
-                                type_annotation: Some(ta),
-                                decorators: None,
-                            }));
-                        (extra, end)
+                        (Some(self.typed_extra(ta)), end)
                     } else {
                         (None, id_end)
                     };
