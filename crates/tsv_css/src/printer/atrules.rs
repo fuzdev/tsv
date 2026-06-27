@@ -226,20 +226,13 @@ impl<'a> Printer<'a> {
                 // Format the child with appropriate indentation handling
                 match child {
                     internal::CssBlockChild::Declaration(decl) => {
-                        // Declaration will write its own indentation
-                        self.print_atrule_block_child(child);
-
-                        // Keep a same-line trailing comment on the declaration line.
-                        // The nested-rule path (`print_atrule_block_child`'s Rule arm)
-                        // and the top-level rule path both do this; without it the
-                        // comment falls through to the next iteration and is printed as
-                        // a standalone comment on its own line.
-                        let inline_count = self.try_print_inline_comments_after_decl(
-                            block.children,
-                            i,
-                            decl.span.end,
-                        );
-                        i += inline_count;
+                        // Print the declaration and keep any same-line trailing comment on its
+                        // line, via the shared helper. Without the inline-comment step the
+                        // comment falls through to the next iteration and prints standalone.
+                        // TODO: unlike the rule-body loops, the at-rule direct body doesn't
+                        // apply a pending `prettier-ignore` to a declaration (passes `false`);
+                        // honor `format_ignore_next` here for parity.
+                        i += self.print_decl_with_inline_comments(block.children, i, decl, false);
                     }
                     internal::CssBlockChild::Rule(_) | internal::CssBlockChild::Atrule(_) => {
                         // Rules and at-rules need indentation
@@ -330,22 +323,14 @@ impl<'a> Printer<'a> {
                             {
                                 self.write("\n");
                             }
-                            if format_ignore_next {
-                                self.write_format_ignore_declaration(decl);
-                                format_ignore_next = false;
-                            } else {
-                                self.print_css_declaration(decl);
-                            }
-
-                            // Check for inline comments after the declaration
-                            let inline_count = self.try_print_inline_comments_after_decl(
+                            let format_ignore = format_ignore_next;
+                            format_ignore_next = false;
+                            i += self.print_decl_with_inline_comments(
                                 rule.declarations,
                                 i,
-                                decl.span.end,
+                                decl,
+                                format_ignore,
                             );
-                            if inline_count > 0 {
-                                i += inline_count;
-                            }
                         }
                         internal::CssBlockChild::Comment(comment) => {
                             // Standalone comment (not inline after a declaration)
