@@ -635,6 +635,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsv_arena"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+ "tsv_lang",
+]
+
+[[package]]
 name = "tsv_cli"
 version = "0.1.0"
 dependencies = [
@@ -693,10 +701,9 @@ dependencies = [
 name = "tsv_ffi"
 version = "0.1.0"
 dependencies = [
- "bumpalo",
  "serde_json",
+ "tsv_arena",
  "tsv_css",
- "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
 ]
@@ -728,13 +735,12 @@ dependencies = [
 name = "tsv_napi"
 version = "0.1.0"
 dependencies = [
- "bumpalo",
  "napi",
  "napi-build",
  "napi-derive",
  "serde_json",
+ "tsv_arena",
  "tsv_css",
- "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
 ]
@@ -772,8 +778,8 @@ dependencies = [
 name = "tsv_wasm"
 version = "0.1.0"
 dependencies = [
- "bumpalo",
  "js-sys",
+ "tsv_arena",
  "tsv_css",
  "tsv_discover",
  "tsv_ignore",

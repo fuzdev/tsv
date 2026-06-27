@@ -20,6 +20,14 @@
 use std::panic;
 use std::slice;
 
+// Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
+// native bindings — see its module docs for the reuse rationale + soundness;
+// the FFI path additionally relies on `reset()` recovering cleanly after a
+// `catch_unwind`-caught panic).
+use tsv_arena::with_ast_arena;
+#[cfg(feature = "format")]
+use tsv_arena::with_doc_arena;
+
 /// Extract a &str from source pointer, or return an error result.
 ///
 /// # Safety
@@ -123,57 +131,6 @@ fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
     #[allow(clippy::unwrap_used)] // JSON serialization of simple object won't fail
     let json = serde_json::to_string(&error).unwrap();
     string_to_ptr(json, out_len)
-}
-
-/// Run `f` with a per-thread reusable AST arena.
-///
-/// The native bindings are called once per file in tight loops (formatters,
-/// editor save hooks, benchmarks). Allocating a fresh `Bump` per call — and
-/// freeing it at call end — churns the system allocator's heap high-water on
-/// every call, which is measurable through a host FFI layer even when the engine
-/// work is unchanged. Instead each thread keeps one `Bump` and `reset()`s it
-/// between calls: `reset()` rewinds the bump pointer and retains the largest
-/// chunk, so once a thread warms to its high-water mark there is no per-call
-/// malloc/free (this supersedes per-call `with_capacity` pre-sizing — the first
-/// few calls pay the chunk-growth tail once, then it amortizes to zero).
-///
-/// Soundness: the per-file AST borrows `&Bump` and is fully consumed inside `f`
-/// (the returned value owns its bytes — a formatted `String`, a JSON `String`,
-/// or `()`), so no AST outlives the `reset()` at the start of the next call;
-/// `reset()` also recovers cleanly after a `catch_unwind`-caught panic. A future
-/// `tsv_napi` should mirror this shape (the shared native-binding reuse path).
-fn with_ast_arena<R>(f: impl FnOnce(&bumpalo::Bump) -> R) -> R {
-    thread_local! {
-        static AST_ARENA: std::cell::RefCell<bumpalo::Bump> =
-            std::cell::RefCell::new(bumpalo::Bump::new());
-    }
-    AST_ARENA.with(|cell| {
-        let mut arena = cell.borrow_mut();
-        arena.reset();
-        f(&arena)
-    })
-}
-
-/// Run `f` with a per-thread reusable doc arena (the `format` path's analogue of
-/// [`with_ast_arena`]).
-///
-/// The doc IR (`DocArena`) is rebuilt per call from the parsed AST; reusing one
-/// arena per thread and `reset()`ing it between calls retains the backing buffers
-/// instead of allocating a fresh doc arena per file — the same per-call heap-churn
-/// argument as the AST `Bump`. Soundness mirrors `with_ast_arena`: the doc tree is
-/// fully rendered to the returned `String` inside `f`, so no `DocId` outlives the
-/// next call's `reset()`. A future `tsv_napi` mirrors this shape.
-#[cfg(feature = "format")]
-fn with_doc_arena<R>(f: impl FnOnce(&tsv_lang::doc::arena::DocArena) -> R) -> R {
-    thread_local! {
-        static DOC_ARENA: std::cell::RefCell<tsv_lang::doc::arena::DocArena> =
-            std::cell::RefCell::new(tsv_lang::doc::arena::DocArena::new());
-    }
-    DOC_ARENA.with(|cell| {
-        let mut arena = cell.borrow_mut();
-        arena.reset();
-        f(&arena)
-    })
 }
 
 /// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`

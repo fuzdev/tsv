@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/tsv_lang",
+    "crates/tsv_arena",
     "crates/tsv_html",
     "crates/tsv_ignore",
     "crates/tsv_discover",
@@ -25,6 +26,13 @@ repository = "https://github.com/fuzdev/tsv"
 [workspace.dependencies]
 # Foundation
 tsv_lang = { path = "crates/tsv_lang" }
+# Per-thread reusable arenas for the bindings' hot loop (shared by tsv_ffi,
+# tsv_napi, and tsv_wasm). default-features = false here so consumers stay lean
+# by default — the AST-arena helper only; each binding re-enables `format` (the
+# doc-arena helper, which pulls tsv_lang) from its own `format` feature. A
+# standalone `cargo test -p tsv_arena` still uses the crate's own `default =
+# ["format"]`, so both helpers are exercised there.
+tsv_arena = { path = "crates/tsv_arena", default-features = false }
 tsv_html = { path = "crates/tsv_html" }
 tsv_ignore = { path = "crates/tsv_ignore" }
 tsv_discover = { path = "crates/tsv_discover" }

@@ -4,9 +4,9 @@
 
 ## Architecture Position
 
-Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. Sibling binding crates: [`tsv_wasm`](../tsv_wasm/) (WebAssembly) and [`tsv_napi`](../tsv_napi/) (N-API, the Node/Bun native path). This crate is the C-ABI path — consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. Node/Bun use `tsv_napi` instead (no C-FFI glue); the per-thread `with_ast_arena` reuse below is mirrored there.
+Depends on `tsv_ts`, `tsv_css`, `tsv_svelte`. Sibling binding crates: [`tsv_wasm`](../tsv_wasm/) (WebAssembly) and [`tsv_napi`](../tsv_napi/) (N-API, the Node/Bun native path). This crate is the C-ABI path — consumers include Deno FFI, Python `ctypes`, and any other C-FFI host. Node/Bun use `tsv_napi` instead (no C-FFI glue); the per-thread arena reuse below is shared across all three bindings via the [`tsv_arena`](../tsv_arena/) crate.
 
-The bindings hold a **per-thread reusable AST `Bump`** (`with_ast_arena`) that is `reset()` between calls rather than allocated fresh per call: the bindings are invoked once per file in tight loops, and per-call arena malloc/free churns the system allocator's heap high-water in a way that is measurable through a host FFI layer. `reset()` retains the largest chunk and rewinds, so a warm thread does no per-call malloc/free. The per-file AST is fully consumed before the next call's `reset()`, so the reuse is sound (incl. after a `catch_unwind`-caught panic). The `format` path additionally holds a **per-thread reusable doc arena** (`with_doc_arena`, the same shape over `DocArena` and calling each language's `format_in`); that brings back an **optional** `tsv_lang` dependency gated to the `format` feature (the `DocArena` type), so the parse-only build stays lean.
+The bindings reuse a **per-thread AST `Bump`** (`with_ast_arena`) that is `reset()` between calls rather than allocated fresh per call: the bindings are invoked once per file in tight loops, and per-call arena malloc/free churns the system allocator's heap high-water in a way that is measurable through a host FFI layer. `reset()` retains the largest chunk and rewinds, so a warm thread does no per-call malloc/free. The per-file AST is fully consumed before the next call's `reset()`, so the reuse is sound (incl. after a `catch_unwind`-caught panic). The `format` path additionally reuses a **per-thread doc arena** (`with_doc_arena`, the same shape over `DocArena` and calling each language's `format_in`). Both helpers live in the shared [`tsv_arena`](../tsv_arena/) crate (one copy for all three bindings — `tsv_ffi`, `tsv_napi`, `tsv_wasm`); this crate's `format` feature maps to `tsv_arena/format`, which pulls `tsv_lang` for the `DocArena` type, so the parse-only build stays lean.
 
 Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-bindings).
 
@@ -41,8 +41,8 @@ All return-pointer functions share the signature `(source_ptr: *const u8, source
 
 ## Files
 
-- `src/lib.rs` — All bindings: `lang_bindings!` macro, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module
-- `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it)
+- `src/lib.rs` — All bindings: `lang_bindings!` macro, source-extraction helpers, `tsv_free`, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (FFI requires it); deps include `tsv_arena` (`format` → `tsv_arena/format`)
 
 The in-crate test module drives every entry point in-process (real
 alloc → write `out_len` → `tsv_free` round-trip), covering the happy path per

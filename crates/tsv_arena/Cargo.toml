@@ -1,0 +1,26 @@
+[package]
+name = "tsv_arena"
+version.workspace = true
+edition.workspace = true
+description = "Per-thread reusable arenas for tsv's binding hot loop"
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bumpalo.workspace = true
+# Only `with_doc_arena` needs the `DocArena` type; gated to `format` so a
+# parse-only binding (which sets default-features = false and enables neither
+# default features nor `format`) doesn't pull tsv_lang for it.
+tsv_lang = { workspace = true, optional = true }
+
+[features]
+# `format` adds the reusable doc arena (`with_doc_arena`); `with_ast_arena` is
+# always available (parse and format both use it). Default-on so a standalone
+# `cargo test -p tsv_arena` exercises both helpers; the binding crates set
+# `default-features = false` and re-enable `format` from their own `format`
+# feature, so their parse-only build stays lean.
+default = ["format"]
+format = ["dep:tsv_lang"]
+
+[lints]
+workspace = true

@@ -94,11 +94,13 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
         ↓
    tsv_svelte   (depends on tsv_lang, tsv_ts, tsv_css, tsv_html)
         ↑
-   ┌───────────┬──────────────┬───────────┬───────────────────┐
- tsv_cli     tsv_debug      tsv_ffi     tsv_wasm
-(production) (dev, Deno)    (C FFI)    (browser/Node/Deno)
+   ┌───────────┬─────────────┬──────────┬──────────────────┬─────────────────────┐
+ tsv_cli     tsv_debug     tsv_ffi    tsv_napi           tsv_wasm
+(production) (dev, Deno)   (C FFI)    (N-API, Node/Bun)  (browser/Node/Deno)
 
    tsv_cli and tsv_wasm also consume tsv_discover (→ tsv_ignore).
+   tsv_ffi, tsv_napi, and tsv_wasm also consume tsv_arena — per-thread
+   reusable AST/doc arenas (→ bumpalo; → tsv_lang under `format`).
 ```
 
 ### Design Rationale
@@ -635,7 +637,7 @@ tsv runs on the system allocator — no `#[global_allocator]`, no alternative-al
 
 **Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
-**Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists), referenced by `u32` `DocId`s — no per-node heap allocation, no recursive `Drop`. The single-shot `format()` path pre-sizes one arena from source length (~4 nodes per source byte; `DocArena::with_source_size_hint`) and drops it after rendering; multi-file drivers (the CLI dir-walk worker, the FFI/NAPI bindings) instead reuse one arena across files via `DocArena::reset()` — clearing the node/child/memo stores while retaining capacity, the doc-IR analogue of the per-call AST `Bump::reset()` reuse — and the printers borrow `&DocArena` so the caller owns the reusable one (`format_in` is the borrowed-arena entry point). Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: `DocText::Symbol` stores an interner ID resolved at print time (see [DocText](#doctext-static-owned-symbol)), so the only per-node string allocations are `Owned` text a printer actually constructs.
+**Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists), referenced by `u32` `DocId`s — no per-node heap allocation, no recursive `Drop`. The single-shot `format()` path pre-sizes one arena from source length (~4 nodes per source byte; `DocArena::with_source_size_hint`) and drops it after rendering; multi-file drivers (the CLI dir-walk worker, the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — clearing the node/child/memo stores while retaining capacity, the doc-IR analogue of the per-call AST `Bump::reset()` reuse — and the printers borrow `&DocArena` so the caller owns the reusable one (`format_in` is the borrowed-arena entry point). Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: `DocText::Symbol` stores an interner ID resolved at print time (see [DocText](#doctext-static-owned-symbol)), so the only per-node string allocations are `Owned` text a printer actually constructs.
 
 **Rendering — pre-sized output, stack-allocated scratch.** The output `String` is pre-allocated from arena node count (`DocArena::estimated_output_capacity`, clamped against pathological initial sizes), and `OutputBuffer` pre-allocates from source length for the Svelte printer's direct writes. The `fits()` lookahead and the render loop's own work-list both run on `SmallVec` stacks — the render command stack and its pending line-suffix buffer stay inline for the common small sub-render (the renderers run once per CSS declaration/value and per Svelte template expression, so each would otherwise allocate a fresh `Vec` from empty) — the per-render group-mode map is a fixed inline array keyed by the closed `GroupId` enum (no per-render `HashMap` allocation), and comment-classification buckets are `SmallVec`s sized for the common 0-2 comments case.
 

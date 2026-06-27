@@ -69,6 +69,8 @@
 		"test:npm:parse:run": "PKG_DIR=crates/tsv_wasm/pkg/parse/npm node --test scripts/test_npm.ts",
 		"test:npm:all": "deno task build:npm:all && deno task test:npm:all:run",
 		"test:npm:all:run": "PKG_DIR=crates/tsv_wasm/pkg/all/npm node --test scripts/test_npm.ts",
+		"test:napi": "deno task build:napi && deno task test:napi:run",
+		"test:napi:run": "node --test scripts/test_napi.ts",
 		"validate:artifacts": "deno run --allow-read scripts/validate_artifacts.ts",
 
 		"publish": "deno run --allow-read --allow-write --allow-run --allow-env --allow-net scripts/publish.ts"

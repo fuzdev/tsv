@@ -196,7 +196,7 @@ Three binding crates for different use cases:
 
 - `tsv_ffi` (C ABI) — target: Any FFI (Deno, Python, etc.); output: `libtsv_ffi.so` / `.dylib` / `.dll`
 - `tsv_wasm` (wasm-bindgen) — target: Browser, Deno, Node; output: `.wasm` module (format / parse / all variants via cargo features)
-- `tsv_napi` (napi-rs) — target: Node.js / Bun native addon; output: `libtsv_napi.{so,dylib,dll}` (loaded via `process.dlopen`). Currently a **measurement-only** binding for the Node benchmark runner (single-platform local build, `deno task build:napi`); the cross-platform publish matrix as `@fuzdev/tsv_napi` is targeted for 0.2. tsv-scoped carve-out from the ecosystem N-API deferral. See ./crates/tsv_napi/CLAUDE.md.
+- `tsv_napi` (napi-rs) — target: Node.js / Bun native addon; output: `libtsv_napi.{so,dylib,dll}` (loaded via `process.dlopen`). Currently a **measurement-only** binding for the Node benchmark runner (single-platform local build, `deno task build:napi`, with `deno task test:napi` driving the Node-side boundary tests in `scripts/test_napi.ts`); the cross-platform publish matrix as `@fuzdev/tsv_napi` is targeted for 0.2. tsv-scoped carve-out from the ecosystem N-API deferral. See ./crates/tsv_napi/CLAUDE.md.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv_format_wasm` (format only), `@fuzdev/tsv_parse_wasm` (parse only), and `@fuzdev/tsv_wasm` (everything + the `tsv` CLI). Each variant has its own output directory.
 
@@ -399,6 +399,7 @@ let formatted = format(&ast, source); // same output standalone or Svelte-embedd
 tsv/
 ├── crates/
 │   ├── tsv_lang/    # Foundation (span, location, error, doc builder, printing utils)
+│   ├── tsv_arena/   # Per-thread reusable AST/doc arenas for the bindings' hot loop (tsv_ffi, tsv_napi, tsv_wasm)
 │   ├── tsv_html/    # HTML element classification and whitespace rules
 │   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
 │   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
@@ -410,7 +411,7 @@ tsv/
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WebAssembly bindings (published as @fuzdev/tsv_format_wasm + @fuzdev/tsv_parse_wasm + @fuzdev/tsv_wasm; bundles hand-maintained types/tsv_ast.d.ts; npm/cli.js is the tsv bin)
 │   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only for the Node bench, 0.2 publish target)
-├── scripts/         # Publish orchestrator, npm package patcher, Node artifact tests, AST type drift check
+├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API addon tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   └── fixtures/    # Test fixtures organized by language/feature
 └── docs/            # Documentation (fixtures, cli, architecture, etc.)
@@ -912,7 +913,7 @@ Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/
 - `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers
 - `unicode-segmentation` — Grapheme clustering for visual width measurement
 - `unicode-width` — Character display width (CJK, zero-width)
-- `bumpalo` — Bump arena for the internal AST (and the binding crates' per-thread `reset()` reuse)
+- `bumpalo` — Bump arena for the internal AST (and, via the `tsv_arena` crate, the bindings' per-thread `reset()` reuse — `tsv_ffi`/`tsv_napi`/`tsv_wasm`)
 - `napi` / `napi-derive` / `napi-build` — N-API bindings for `tsv_napi` (Node/Bun native addon; tsv-scoped carve-out)
 
 ## Canonical References
