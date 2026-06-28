@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 104,
+	"end": 105,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 103,
+				"end": 104,
 				"name": "pre",
 				"name_loc": {
 					"start": {
@@ -32,7 +32,7 @@
 							"type": "IfBlock",
 							"elseif": false,
 							"start": 5,
-							"end": 97,
+							"end": 98,
 							"test": {
 								"type": "Identifier",
 								"start": 10,
@@ -55,7 +55,7 @@
 									{
 										"type": "RegularElement",
 										"start": 15,
-										"end": 92,
+										"end": 93,
 										"name": "span",
 										"name_loc": {
 											"start": {

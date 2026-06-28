@@ -22,15 +22,22 @@ impl<'a> Printer<'a> {
     /// These elements preserve text whitespace exactly as-is, but still format
     /// expressions, blocks, and other dynamic content normally.
     ///
+    /// All indents are relative to the element's own doc-indent, which its parent's body
+    /// wrap (one level per container, like prettier — see
+    /// `build_whitespace_sensitive_content_doc`) sets to the element's nesting depth.
+    /// Preserved text carries no doc-hardlines, so that wrap never injects rendered
+    /// whitespace; only the tag-internal breaks below pick it up.
+    ///
     /// Behavior differs by content type:
     /// - **Inline with multiline content** (e.g., `<span>` inside `<pre>` with `\n` in text):
-    ///   break `>` to new line at indent+2, preserve content literally. Only when first
-    ///   text starts with non-whitespace (space/newline keeps `>` inline).
+    ///   break `>` to its own line one level past the element (attr indent), preserve content
+    ///   literally. Only when first text starts with non-whitespace (space/newline keeps `>` inline).
     /// - **Inline with single-line content and attrs** (textarea with content): keep attrs
     ///   inline, wrap `>content</tag` together based on width.
     /// - **Block with simple content** (pre with single expression): break `>` when
     ///   attrs + content would exceed print width.
-    /// - **Fallback**: hug `>` with attrs (block) or break `>` on wrap (inline empty).
+    /// - **Inline empty with attrs**: self-closing `/>` drops on wrap; explicit `></tag>` hugs.
+    /// - **Fallback**: block hugs `>` with the last attr; no attrs → plain `<tag>`.
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
         tag_name: &str,
@@ -77,7 +84,7 @@ impl<'a> Printer<'a> {
 
         // Opening-tag layout splits on (is_inline, has_content, has-attrs). Each arm
         // below returns, so order matters. Cases:
-        //   inline + multiline content              → break `>` to its own line (2 levels)
+        //   inline + multiline content              → break `>` to its own line (attr indent)
         //   inline + single-line content + attrs    → if_break: hug `>content` flat, else break `>`
         //   block  + content + attrs (simple expr)  → hug `>` with the last attr
         //   inline + empty + attrs                  → self-closing `/>` drops; explicit `></tag>` hugs unless overflow
@@ -85,27 +92,25 @@ impl<'a> Printer<'a> {
         //   block, otherwise (empty/complex) + attrs → hug `>`, tolerating overflow
         //
         // Inline elements with multiline content inside whitespace-sensitive context:
-        // Always break `>` to new line (indented 2 levels), preserve content literally.
-        // Attrs stay inline if short, wrap to separate lines if long.
+        // break `>` to its own line one level past the element (attr indent), preserve
+        // content literally. Attrs stay inline if short, wrap to separate lines if long.
         // Example: <pre><span attr="val"\n\t\t>text\n</span></pre>
         if is_inline && content_has_newlines {
             let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
 
+            // Indents below are relative to this element's own (ambient) doc-indent,
+            // which its parent's body wrap already set to the element's nesting depth.
             // When content doesn't end with \n, the closing </tag> has its `>` split
-            // to a new line: `line2</span\n\t>` instead of `\n</span>`
+            // to a new line at the element level: `line2</span\n\t>`.
             let closing = if last_text_ends_with_newline {
                 self.end_tag(tag_sym)
             } else {
-                // </tag\n\t> — closing > on new line with indent
-                d.concat(&[
-                    d.text("</"),
-                    d.symbol(tag_sym),
-                    d.indent(d.concat(&[d.hardline(), d.text(">")])),
-                ])
+                // </tag\n> — closing > on its own line at the element's level
+                d.concat(&[d.text("</"), d.symbol(tag_sym), d.hardline(), d.text(">")])
             };
 
-            // Opening `>` at indent+2 (2 levels: one for element nesting, one for attr indent).
-            // Attrs (if any) go in a group at the same level — flat when short, wrapped when long.
+            // Opening `>` at element level + 1 (attr indent). Attrs (if any) go in a
+            // group at the same level — flat when short, wrapped when long.
             let opening_break = d.concat(&[d.hardline(), d.text(">")]);
             let opening_inner = if attr_docs.is_empty() {
                 opening_break
@@ -117,7 +122,7 @@ impl<'a> Printer<'a> {
             return d.concat(&[
                 d.text("<"),
                 d.symbol(tag_sym),
-                d.indent(d.indent(opening_inner)),
+                d.indent(opening_inner),
                 content_doc,
                 closing,
             ]);
@@ -286,7 +291,14 @@ impl<'a> Printer<'a> {
             .map(|node| self.build_whitespace_sensitive_node_doc(node))
             .collect();
         self.set_block_dangle_allowed(prev_dangle);
-        self.d().concat(&node_docs)
+        // One body-indent level per container (element body, block body), matching
+        // prettier's uniform "each container adds a level" model. Preserved text has
+        // no doc-hardlines so this never injects rendered whitespace into <pre> — it
+        // only accumulates the depth that nested elements' wrapped attributes and
+        // dangling `>` breaks resolve against. See nodes/element_ws_sensitive_doc.rs
+        // header + docs/conformance_prettier.md §Svelte.
+        let d = self.d();
+        d.indent(d.concat(&node_docs))
     }
 
     /// Build doc for a single node in whitespace-sensitive context.
@@ -295,17 +307,17 @@ impl<'a> Printer<'a> {
     /// - **Elements**: recursively use whitespace-sensitive formatting (e.g., `<code>` inside `<pre>`).
     /// - **If/Each blocks**: use inline ws-sensitive block formatting (no added whitespace,
     ///   body nodes formatted whitespace-sensitively).
-    /// - **Expressions and other blocks**: format normally WITH indent wrapper (double-indented:
-    ///   once for being inside `<pre>`, once for internal structure).
+    /// - **Expressions and other blocks**: format normally; the per-container body-indent
+    ///   level is applied collectively by `build_whitespace_sensitive_content_doc`, not here.
     fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode<'_>) -> DocId {
         let d = self.d();
         match node {
             // Text: preserve exact whitespace (significant in pre/textarea)
             FragmentNode::Text(text) => d.text_owned(text.raw(self.source).to_string()),
 
-            // Elements: recursively build as whitespace-sensitive (no indent wrapper needed -
-            // the element's own indentation logic handles it)
-            // This handles cases like <pre><code> where <code> inherits whitespace preservation
+            // Elements: recursively build as whitespace-sensitive. The body-indent level
+            // comes from the parent's collective wrap (build_whitespace_sensitive_content_doc),
+            // so no per-node wrapper here. Handles <pre><code> where <code> inherits ws preservation.
             FragmentNode::Element(element) => {
                 let tag_name = self.resolve_symbol(element.name);
                 let ws_is_html = element.kind == internal::ElementKind::Html;
@@ -324,57 +336,21 @@ impl<'a> Printer<'a> {
                 self.build_special_element_doc(element)
             }
 
-            // Expressions and blocks: format normally WITH indent wrapper
-            // This gives them proper indentation (e.g., expression args inside <pre> get
-            // double-indented: once for <pre>, once for call structure)
-            FragmentNode::ExpressionTag(tag) => {
-                let inner = self.build_expression_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::Comment(comment) => {
-                let inner = self.build_html_comment_doc(comment);
-                d.indent(inner)
-            }
-            FragmentNode::IfBlock(block) => {
-                let inner = self.build_ws_sensitive_if_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::EachBlock(block) => {
-                let inner = self.build_ws_sensitive_each_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::AwaitBlock(block) => {
-                let inner = self.build_await_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::KeyBlock(block) => {
-                let inner = self.build_key_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::SnippetBlock(block) => {
-                let inner = self.build_snippet_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::HtmlTag(tag) => {
-                let inner = self.build_html_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::ConstTag(tag) => {
-                let inner = self.build_const_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::DeclarationTag(tag) => {
-                let inner = self.build_declaration_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::DebugTag(tag) => {
-                let inner = self.build_debug_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::RenderTag(tag) => {
-                let inner = self.build_render_tag_doc(tag);
-                d.indent(inner)
-            }
+            // Expressions and blocks: format normally. The body-indent level is
+            // applied collectively by build_whitespace_sensitive_content_doc, so each
+            // node sits at the container's body level without its own wrapper.
+            FragmentNode::ExpressionTag(tag) => self.build_expression_tag_doc(tag),
+            FragmentNode::Comment(comment) => self.build_html_comment_doc(comment),
+            FragmentNode::IfBlock(block) => self.build_ws_sensitive_if_block_doc(block),
+            FragmentNode::EachBlock(block) => self.build_ws_sensitive_each_block_doc(block),
+            FragmentNode::AwaitBlock(block) => self.build_await_block_doc(block),
+            FragmentNode::KeyBlock(block) => self.build_key_block_doc(block),
+            FragmentNode::SnippetBlock(block) => self.build_snippet_block_doc(block),
+            FragmentNode::HtmlTag(tag) => self.build_html_tag_doc(tag),
+            FragmentNode::ConstTag(tag) => self.build_const_tag_doc(tag),
+            FragmentNode::DeclarationTag(tag) => self.build_declaration_tag_doc(tag),
+            FragmentNode::DebugTag(tag) => self.build_debug_tag_doc(tag),
+            FragmentNode::RenderTag(tag) => self.build_render_tag_doc(tag),
         }
     }
 
