@@ -22,15 +22,22 @@ impl<'a> Printer<'a> {
     /// These elements preserve text whitespace exactly as-is, but still format
     /// expressions, blocks, and other dynamic content normally.
     ///
+    /// All indents are relative to the element's own doc-indent, which its parent's body
+    /// wrap (one level per container, like prettier — see
+    /// `build_whitespace_sensitive_content_doc`) sets to the element's nesting depth.
+    /// Preserved text carries no doc-hardlines, so that wrap never injects rendered
+    /// whitespace; only the tag-internal breaks below pick it up.
+    ///
     /// Behavior differs by content type:
     /// - **Inline with multiline content** (e.g., `<span>` inside `<pre>` with `\n` in text):
-    ///   break `>` to new line at indent+2, preserve content literally. Only when first
-    ///   text starts with non-whitespace (space/newline keeps `>` inline).
+    ///   break `>` to its own line one level past the element (attr indent), preserve content
+    ///   literally. Only when first text starts with non-whitespace (space/newline keeps `>` inline).
     /// - **Inline with single-line content and attrs** (textarea with content): keep attrs
     ///   inline, wrap `>content</tag` together based on width.
     /// - **Block with simple content** (pre with single expression): break `>` when
     ///   attrs + content would exceed print width.
-    /// - **Fallback**: hug `>` with attrs (block) or break `>` on wrap (inline empty).
+    /// - **Inline empty with attrs**: self-closing `/>` drops on wrap; explicit `></tag>` hugs.
+    /// - **Fallback**: block hugs `>` with the last attr; no attrs → plain `<tag>`.
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
         tag_name: &str,
@@ -77,7 +84,7 @@ impl<'a> Printer<'a> {
 
         // Opening-tag layout splits on (is_inline, has_content, has-attrs). Each arm
         // below returns, so order matters. Cases:
-        //   inline + multiline content              → break `>` to its own line (2 levels)
+        //   inline + multiline content              → break `>` to its own line (attr indent)
         //   inline + single-line content + attrs    → if_break: hug `>content` flat, else break `>`
         //   block  + content + attrs (simple expr)  → hug `>` with the last attr
         //   inline + empty + attrs                  → self-closing `/>` drops; explicit `></tag>` hugs unless overflow
@@ -85,8 +92,8 @@ impl<'a> Printer<'a> {
         //   block, otherwise (empty/complex) + attrs → hug `>`, tolerating overflow
         //
         // Inline elements with multiline content inside whitespace-sensitive context:
-        // Always break `>` to new line (indented 2 levels), preserve content literally.
-        // Attrs stay inline if short, wrap to separate lines if long.
+        // break `>` to its own line one level past the element (attr indent), preserve
+        // content literally. Attrs stay inline if short, wrap to separate lines if long.
         // Example: <pre><span attr="val"\n\t\t>text\n</span></pre>
         if is_inline && content_has_newlines {
             let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
@@ -300,17 +307,17 @@ impl<'a> Printer<'a> {
     /// - **Elements**: recursively use whitespace-sensitive formatting (e.g., `<code>` inside `<pre>`).
     /// - **If/Each blocks**: use inline ws-sensitive block formatting (no added whitespace,
     ///   body nodes formatted whitespace-sensitively).
-    /// - **Expressions and other blocks**: format normally WITH indent wrapper (double-indented:
-    ///   once for being inside `<pre>`, once for internal structure).
+    /// - **Expressions and other blocks**: format normally; the per-container body-indent
+    ///   level is applied collectively by `build_whitespace_sensitive_content_doc`, not here.
     fn build_whitespace_sensitive_node_doc(&self, node: &FragmentNode<'_>) -> DocId {
         let d = self.d();
         match node {
             // Text: preserve exact whitespace (significant in pre/textarea)
             FragmentNode::Text(text) => d.text_owned(text.raw(self.source).to_string()),
 
-            // Elements: recursively build as whitespace-sensitive (no indent wrapper needed -
-            // the element's own indentation logic handles it)
-            // This handles cases like <pre><code> where <code> inherits whitespace preservation
+            // Elements: recursively build as whitespace-sensitive. The body-indent level
+            // comes from the parent's collective wrap (build_whitespace_sensitive_content_doc),
+            // so no per-node wrapper here. Handles <pre><code> where <code> inherits ws preservation.
             FragmentNode::Element(element) => {
                 let tag_name = self.resolve_symbol(element.name);
                 let ws_is_html = element.kind == internal::ElementKind::Html;
