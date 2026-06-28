@@ -417,14 +417,50 @@ impl<'a> Printer<'a> {
         delim_pos: u32,
         first_elem_start: u32,
     ) -> (DocBuf, Option<u32>) {
+        self.delimiter_line_comment_prefix_impl(delim_pos, first_elem_start, false)
+    }
+
+    /// Object-literal variant of `delimiter_line_comment_prefix` that *also* pulls
+    /// a block comment sharing the opening `{` line onto that line when the first
+    /// property is on a later line (the object spans multiple lines). An object
+    /// literal preserves its authored multi-line-ness, so a source newline before
+    /// the first property means it will break, and the block trails `{` (like a
+    /// line comment does) instead of dropping to the property's leading line.
+    /// Collapsing containers (arrays, arg lists) keep the base behavior and call
+    /// the plain form. The caller must treat a fired pull as forcing must-break
+    /// (the prefix is only emitted on the break path).
+    pub(in crate::printer) fn delimiter_line_comment_prefix_object(
+        &self,
+        delim_pos: u32,
+        first_elem_start: u32,
+    ) -> (DocBuf, Option<u32>) {
+        self.delimiter_line_comment_prefix_impl(delim_pos, first_elem_start, true)
+    }
+
+    fn delimiter_line_comment_prefix_impl(
+        &self,
+        delim_pos: u32,
+        first_elem_start: u32,
+        pull_expanding_block: bool,
+    ) -> (DocBuf, Option<u32>) {
         let pc = super::calls::PartitionedComments::new(
             self.comments,
             self.line_breaks,
             delim_pos,
             first_elem_start,
         );
+        // The base rule gates the pull on forced expansion (a line comment, or a
+        // block standalone on its own line). `pull_expanding_block` adds the
+        // object case: a block on the delimiter line with the first element on a
+        // later line — the object will break, so the block trails the `{`.
         let pull = (!pc.trailing_block.is_empty() || !pc.trailing_line.is_empty())
-            && super::calls::should_force_expansion_for_comments(self, delim_pos, first_elem_start);
+            && (super::calls::should_force_expansion_for_comments(
+                self,
+                delim_pos,
+                first_elem_start,
+            ) || (pull_expanding_block
+                && !pc.trailing_block.is_empty()
+                && !self.is_same_line(delim_pos, first_elem_start)));
         let mut prefix = DocBuf::new();
         if pull {
             pc.emit_trailing_comments(&mut prefix, self);
@@ -535,23 +571,20 @@ impl<'a> Printer<'a> {
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
 
-        // Single binary search to find comments
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, body_start);
-        let comments: Vec<_> = self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= body_end)
-            .collect();
+        // Single binary search to find comments (no collect: peek covers both the
+        // empty check and the is-last check).
+        let mut comments = comments_in_range(self.comments, body_start, body_end).peekable();
 
-        if comments.is_empty() {
+        if comments.peek().is_none() {
             return d.text_owned(format!("{open}{close}"));
         }
         let mut comment_parts = DocBuf::new();
 
-        for (i, comment) in comments.iter().enumerate() {
+        while let Some(comment) = comments.next() {
             comment_parts.push(self.build_comment_doc(comment));
             // Add hardline after line comments, except for the last one
             // (the hardline before closing delimiter handles that)
-            if !comment.is_block && i < comments.len() - 1 {
+            if !comment.is_block && comments.peek().is_some() {
                 comment_parts.push(d.hardline());
             }
         }

@@ -741,7 +741,7 @@ impl<'a> Printer<'a> {
         let param_docs: Vec<_> = decl
             .params
             .iter()
-            .map(|param| self.build_type_parameter_doc(param, false))
+            .map(|param| self.build_type_parameter_doc(param))
             .collect();
 
         // A bare `<T>` is the canonical form everywhere. Prettier forces a trailing

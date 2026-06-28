@@ -13,6 +13,12 @@ const o = { // c1               const o = {
 	a: 1                               // c1
 };                                 a: 1
                                  };
+
+// block comment, first property on a later line — same divergence
+const o = { /* c */             const o = {
+	a: 1                               /* c */
+};                                 a: 1
+                                 };
 ```
 
 ## Reason
@@ -24,9 +30,10 @@ preserves it in place, which is also idempotent in a single pass (Prettier's
 relocation is its own canonical form). When the author instead writes the
 comment on its own line, both formatters keep it there — the two positions are
 dual-stable. Inline block comments that hug content in an object that stays
-inline (`{ /* c */ a: 1 }` on one line) are unchanged and match Prettier; only
-the expanding cases (a line comment after `{`, or own-line content forcing a
-break) diverge.
+inline (`{ /* c */ a: 1 }` on one line) are unchanged and match Prettier. The
+diverging cases are the *expanding* ones: a line comment after `{`, a block
+comment after `{` whose first property is on a later line (the object preserves
+its authored multi-line form), or own-line content forcing a break.
 
 Consistent with tsv's handling of the same comment position after a call's
 opening `(`

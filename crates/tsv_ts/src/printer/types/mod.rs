@@ -412,7 +412,7 @@ impl<'a> Printer<'a> {
                 d.concat(&[
                     d.text("infer "),
                     comments_doc,
-                    self.build_type_parameter_doc(&i.type_parameter, true),
+                    self.build_type_parameter_doc(&i.type_parameter),
                 ])
             }
             TSType::ThisType(_) => d.text("this"),

@@ -77,12 +77,18 @@ impl<'a> Printer<'a> {
             let mut parts = DocBuf::new();
             let mut prev_end = obj.span.start + 1; // After opening brace
 
-            // A comment trailing the opening `{` on its own line is kept on the `{`
-            // line when the object expands (divergence from prettier, which relocates
-            // it to its own line as the first property's leading comment). See
-            // conformance_prettier.md §Comment relocation (Object literal `{`).
+            // A comment trailing the opening `{` is kept on the `{` line when the
+            // object expands — both a line comment and a block comment before a
+            // first property on a later line (divergence from prettier, which
+            // relocates it to its own line as the first property's leading
+            // comment). See conformance_prettier.md §Comment relocation (Object
+            // literal `{`).
             let (brace_line_prefix, brace_pull_pos) =
-                self.delimiter_line_comment_prefix(obj.span.start, first_prop_start);
+                self.delimiter_line_comment_prefix_object(obj.span.start, first_prop_start);
+            // The prefix is only emitted on the break path, so a fired pull forces
+            // must-break (an expanding object with a block on the `{` line breaks
+            // via has_source_newline, not the must_break conditions above).
+            let must_break = must_break || brace_pull_pos.is_some();
 
             for (i, prop) in obj.properties.iter().enumerate() {
                 let prop_start = prop.span().start;

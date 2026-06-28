@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 300,
+	"end": 401,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -121,24 +121,56 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment trailing `{`, first property directly after",
+			"start": 292,
+			"end": 352,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " brace2 ",
+			"start": 367,
+			"end": 379,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 14
+				},
+				"end": {
+					"line": 20,
+					"column": 26
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 299,
+		"end": 400,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 290,
+			"end": 391,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 18,
+					"line": 23,
 					"column": 9
 				}
 			},
@@ -600,6 +632,140 @@
 							"value": " block comment trailing `{`, then own-line leading comment",
 							"start": 182,
 							"end": 242
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 354,
+					"end": 390,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 360,
+							"end": 389,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 22,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 360,
+								"end": 362,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 9
+									}
+								},
+								"name": "o4"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 365,
+								"end": 389,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 12
+									},
+									"end": {
+										"line": 22,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 382,
+										"end": 386,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 382,
+											"end": 383,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 2
+												},
+												"end": {
+													"line": 21,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 385,
+											"end": 386,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 5
+												},
+												"end": {
+													"line": 21,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " brace2 ",
+												"start": 367,
+												"end": 379
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing `{`, first property directly after",
+							"start": 292,
+							"end": 352
 						}
 					]
 				}

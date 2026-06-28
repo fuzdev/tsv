@@ -1,0 +1,994 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 395,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Conditional type in `extends` constraint: parens kept (3.9 #18760)",
+			"start": 20,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Conditional type in `=` default: parens stripped (both formatters)",
+			"start": 145,
+			"end": 214,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested conditional in constraint: parens kept",
+			"start": 262,
+			"end": 310,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 49
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 394,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 91,
+					"end": 143,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 53
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 96,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "X"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 97,
+						"end": 136,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 46
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 98,
+								"end": 135,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 45
+									}
+								},
+								"name": "Foo",
+								"constraint": {
+									"type": "TSParenthesizedType",
+									"start": 110,
+									"end": 135,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 20
+										},
+										"end": {
+											"line": 3,
+											"column": 45
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSConditionalType",
+										"start": 111,
+										"end": 134,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 21
+											},
+											"end": {
+												"line": 3,
+												"column": 44
+											}
+										},
+										"checkType": {
+											"type": "TSTypeReference",
+											"start": 111,
+											"end": 114,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 21
+												},
+												"end": {
+													"line": 3,
+													"column": 24
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 111,
+												"end": 114,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 21
+													},
+													"end": {
+														"line": 3,
+														"column": 24
+													}
+												},
+												"name": "Bar"
+											}
+										},
+										"extendsType": {
+											"type": "TSTypeReference",
+											"start": 123,
+											"end": 126,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 33
+												},
+												"end": {
+													"line": 3,
+													"column": 36
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 123,
+												"end": 126,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 33
+													},
+													"end": {
+														"line": 3,
+														"column": 36
+													}
+												},
+												"name": "Baz"
+											}
+										},
+										"trueType": {
+											"type": "TSTypeReference",
+											"start": 129,
+											"end": 130,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 39
+												},
+												"end": {
+													"line": 3,
+													"column": 40
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 129,
+												"end": 130,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 39
+													},
+													"end": {
+														"line": 3,
+														"column": 40
+													}
+												},
+												"name": "A"
+											}
+										},
+										"falseType": {
+											"type": "TSTypeReference",
+											"start": 133,
+											"end": 134,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 43
+												},
+												"end": {
+													"line": 3,
+													"column": 44
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 133,
+												"end": 134,
+												"loc": {
+													"start": {
+														"line": 3,
+														"column": 43
+													},
+													"end": {
+														"line": 3,
+														"column": 44
+													}
+												},
+												"name": "B"
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 139,
+						"end": 142,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 49
+							},
+							"end": {
+								"line": 3,
+								"column": 52
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 139,
+							"end": 142,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 49
+								},
+								"end": {
+									"line": 3,
+									"column": 52
+								}
+							},
+							"name": "Foo"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Conditional type in `extends` constraint: parens kept (3.9 #18760)",
+							"start": 20,
+							"end": 89
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 216,
+					"end": 260,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 45
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 221,
+						"end": 222,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "Y"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 222,
+						"end": 253,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 7
+							},
+							"end": {
+								"line": 5,
+								"column": 38
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 223,
+								"end": 252,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 8
+									},
+									"end": {
+										"line": 5,
+										"column": 37
+									}
+								},
+								"name": "Foo",
+								"default": {
+									"type": "TSConditionalType",
+									"start": 229,
+									"end": 252,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 14
+										},
+										"end": {
+											"line": 5,
+											"column": 37
+										}
+									},
+									"checkType": {
+										"type": "TSTypeReference",
+										"start": 229,
+										"end": 232,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 14
+											},
+											"end": {
+												"line": 5,
+												"column": 17
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 229,
+											"end": 232,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 14
+												},
+												"end": {
+													"line": 5,
+													"column": 17
+												}
+											},
+											"name": "Bar"
+										}
+									},
+									"extendsType": {
+										"type": "TSTypeReference",
+										"start": 241,
+										"end": 244,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 26
+											},
+											"end": {
+												"line": 5,
+												"column": 29
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 241,
+											"end": 244,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 26
+												},
+												"end": {
+													"line": 5,
+													"column": 29
+												}
+											},
+											"name": "Baz"
+										}
+									},
+									"trueType": {
+										"type": "TSTypeReference",
+										"start": 247,
+										"end": 248,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 32
+											},
+											"end": {
+												"line": 5,
+												"column": 33
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 247,
+											"end": 248,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 32
+												},
+												"end": {
+													"line": 5,
+													"column": 33
+												}
+											},
+											"name": "A"
+										}
+									},
+									"falseType": {
+										"type": "TSTypeReference",
+										"start": 251,
+										"end": 252,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 36
+											},
+											"end": {
+												"line": 5,
+												"column": 37
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 251,
+											"end": 252,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 36
+												},
+												"end": {
+													"line": 5,
+													"column": 37
+												}
+											},
+											"name": "B"
+										}
+									}
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 256,
+						"end": 259,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 41
+							},
+							"end": {
+								"line": 5,
+								"column": 44
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 256,
+							"end": 259,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 41
+								},
+								"end": {
+									"line": 5,
+									"column": 44
+								}
+							},
+							"name": "Foo"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Conditional type in `=` default: parens stripped (both formatters)",
+							"start": 145,
+							"end": 214
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 312,
+					"end": 384,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 73
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 317,
+						"end": 318,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"name": "Z"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 318,
+						"end": 377,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 7
+							},
+							"end": {
+								"line": 7,
+								"column": 66
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 319,
+								"end": 376,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 8
+									},
+									"end": {
+										"line": 7,
+										"column": 65
+									}
+								},
+								"name": "Foo",
+								"constraint": {
+									"type": "TSParenthesizedType",
+									"start": 331,
+									"end": 376,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 20
+										},
+										"end": {
+											"line": 7,
+											"column": 65
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSConditionalType",
+										"start": 332,
+										"end": 375,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 21
+											},
+											"end": {
+												"line": 7,
+												"column": 64
+											}
+										},
+										"checkType": {
+											"type": "TSTypeReference",
+											"start": 332,
+											"end": 335,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 21
+												},
+												"end": {
+													"line": 7,
+													"column": 24
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 332,
+												"end": 335,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 21
+													},
+													"end": {
+														"line": 7,
+														"column": 24
+													}
+												},
+												"name": "Bar"
+											}
+										},
+										"extendsType": {
+											"type": "TSTypeReference",
+											"start": 344,
+											"end": 347,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 33
+												},
+												"end": {
+													"line": 7,
+													"column": 36
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 344,
+												"end": 347,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 33
+													},
+													"end": {
+														"line": 7,
+														"column": 36
+													}
+												},
+												"name": "Baz"
+											}
+										},
+										"trueType": {
+											"type": "TSParenthesizedType",
+											"start": 350,
+											"end": 371,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 39
+												},
+												"end": {
+													"line": 7,
+													"column": 60
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSConditionalType",
+												"start": 351,
+												"end": 370,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 40
+													},
+													"end": {
+														"line": 7,
+														"column": 59
+													}
+												},
+												"checkType": {
+													"type": "TSTypeReference",
+													"start": 351,
+													"end": 352,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 40
+														},
+														"end": {
+															"line": 7,
+															"column": 41
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 351,
+														"end": 352,
+														"loc": {
+															"start": {
+																"line": 7,
+																"column": 40
+															},
+															"end": {
+																"line": 7,
+																"column": 41
+															}
+														},
+														"name": "C"
+													}
+												},
+												"extendsType": {
+													"type": "TSTypeReference",
+													"start": 361,
+													"end": 362,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 50
+														},
+														"end": {
+															"line": 7,
+															"column": 51
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 361,
+														"end": 362,
+														"loc": {
+															"start": {
+																"line": 7,
+																"column": 50
+															},
+															"end": {
+																"line": 7,
+																"column": 51
+															}
+														},
+														"name": "D"
+													}
+												},
+												"trueType": {
+													"type": "TSTypeReference",
+													"start": 365,
+													"end": 366,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 54
+														},
+														"end": {
+															"line": 7,
+															"column": 55
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 365,
+														"end": 366,
+														"loc": {
+															"start": {
+																"line": 7,
+																"column": 54
+															},
+															"end": {
+																"line": 7,
+																"column": 55
+															}
+														},
+														"name": "E"
+													}
+												},
+												"falseType": {
+													"type": "TSTypeReference",
+													"start": 369,
+													"end": 370,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 58
+														},
+														"end": {
+															"line": 7,
+															"column": 59
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 369,
+														"end": 370,
+														"loc": {
+															"start": {
+																"line": 7,
+																"column": 58
+															},
+															"end": {
+																"line": 7,
+																"column": 59
+															}
+														},
+														"name": "F"
+													}
+												}
+											}
+										},
+										"falseType": {
+											"type": "TSTypeReference",
+											"start": 374,
+											"end": 375,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 63
+												},
+												"end": {
+													"line": 7,
+													"column": 64
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 374,
+												"end": 375,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 63
+													},
+													"end": {
+														"line": 7,
+														"column": 64
+													}
+												},
+												"name": "G"
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 380,
+						"end": 383,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 69
+							},
+							"end": {
+								"line": 7,
+								"column": 72
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 380,
+							"end": 383,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 69
+								},
+								"end": {
+									"line": 7,
+									"column": 72
+								}
+							},
+							"name": "Foo"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested conditional in constraint: parens kept",
+							"start": 262,
+							"end": 310
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
