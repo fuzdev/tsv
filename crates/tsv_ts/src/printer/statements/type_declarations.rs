@@ -3,7 +3,6 @@
 
 use super::{Printer, build_entity_name_doc, should_hug_union_type};
 use crate::ast::internal::{self, TSType};
-use crate::printer::analysis::has_newline_before_position;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing, HeritageKeyword};
 use smallvec::smallvec;
@@ -231,7 +230,7 @@ impl<'a> Printer<'a> {
         // up to `=` — the union/intersection RHS then renders below it.
         let force_break = self.comments_force_own_line_between(eq_pos + 1, type_start)
             || comments_in_range(self.comments, eq_pos + 1, type_start)
-                .any(|c| c.is_block && has_newline_before_position(self.source, c.span.start));
+                .any(|c| c.is_block && self.is_own_line_comment(c));
 
         if force_break {
             // Line/multiline block comments force type to next line with indent.

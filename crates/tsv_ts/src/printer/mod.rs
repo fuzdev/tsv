@@ -573,6 +573,18 @@ impl<'a> Printer<'a> {
             || self.has_multiline_block_comments_between(start, end)
     }
 
+    /// Whether a single comment occupies its own physical line — a line comment
+    /// (always runs to end-of-line), or a block comment with only horizontal
+    /// whitespace then a newline before it (`…⏎/* c */…`). The precise "starts a
+    /// fresh line" test: `has_newline_before_position` walks back over spaces/tabs
+    /// from the comment, so a block following another comment on the same line
+    /// (`/* a */ /* b */`) is *not* own-line. Unlike the neighbor-anchored
+    /// `is_same_line(prev, …)` / `has_newline_between(prev, …)` checks, it takes no
+    /// anchor — each comment is judged against whatever immediately precedes it.
+    pub(crate) fn is_own_line_comment(&self, comment: &internal::Comment) -> bool {
+        !comment.is_block || has_newline_before_position(self.source, comment.span.start)
+    }
+
     /// Check if a delimited list (tuple, type params, etc.) has line comments
     /// between any elements OR after the last element.
     ///
