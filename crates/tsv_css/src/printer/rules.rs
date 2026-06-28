@@ -15,7 +15,6 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::is_format_ignore_directive;
 
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
@@ -39,89 +38,18 @@ impl<'a> Printer<'a> {
             }
             // Always add space before comment for readability (normalize)
             // This is an intentional divergence from prettier (which preserves no-space)
-            self.write(" /*");
-            self.write(comment.content(self.source));
-            self.write("*/");
+            self.write(" ");
+            self.print_css_comment(comment);
             start_index += 1; // Skip this comment when processing declarations
         }
 
         self.write(" {\n");
 
-        // Format declarations and comments with indentation
+        // Format declarations and comments with indentation, via the shared
+        // block-body routine (also used by at-rule blocks). `start_index` skips
+        // the pre-brace comments consumed inline above.
         self.indent_level += 1;
-        let mut i = start_index;
-        let mut format_ignore_next = false;
-        while i < rule.declarations.len() {
-            let child = &rule.declarations[i];
-            match child {
-                internal::CssBlockChild::Declaration(decl) => {
-                    // Preserve blank line before declaration if source has one
-                    if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
-                        self.write("\n");
-                    }
-                    i += self.print_decl_with_inline_comments(
-                        rule.declarations,
-                        i,
-                        decl,
-                        &mut format_ignore_next,
-                    );
-                }
-                internal::CssBlockChild::Comment(comment) => {
-                    // Standalone comment (not inline after a declaration)
-                    // Preserve blank line before comment if present in source
-                    if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
-                        self.write("\n");
-                    }
-
-                    // Check for a format-ignore directive
-                    if is_format_ignore_directive(comment.content(self.source)) {
-                        format_ignore_next = true;
-                    }
-
-                    self.write_indent();
-                    self.print_css_comment(comment);
-                    self.write("\n");
-                }
-                internal::CssBlockChild::Rule(nested_rule) => {
-                    // CSS Nesting Module - format nested rule
-                    // Add blank line before nested rule if source has one (preserve author intent)
-                    if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
-                        self.write("\n");
-                    }
-                    self.write_indent();
-                    if format_ignore_next {
-                        self.write(nested_rule.span.extract(self.source));
-                        format_ignore_next = false;
-                    } else {
-                        self.print_css_rule(nested_rule);
-                    }
-
-                    // Check for inline comment after nested rule's closing brace
-                    let inline_count =
-                        self.try_print_inline_comments(rule.declarations, i, nested_rule.span.end);
-
-                    self.write("\n");
-
-                    i += inline_count;
-                }
-                internal::CssBlockChild::Atrule(nested_atrule) => {
-                    // Nested at-rule (e.g., @media inside a rule)
-                    // Add blank line before nested at-rule only if source had one
-                    if i > start_index && self.has_blank_line_before_child(rule.declarations, i) {
-                        self.write("\n");
-                    }
-                    self.write_indent();
-                    if format_ignore_next {
-                        self.write(nested_atrule.span.extract(self.source));
-                        format_ignore_next = false;
-                    } else {
-                        self.print_css_atrule(nested_atrule);
-                    }
-                    self.write("\n");
-                }
-            }
-            i += 1;
-        }
+        self.print_css_block_children(rule.declarations, start_index);
         self.indent_level -= 1;
 
         self.write_indent();
