@@ -14,6 +14,9 @@ authored with the comments before the `;` — show the split: tsv reflows them t
 `input.svelte`, prettier reflows the `// 2` to lead the next statement, so they
 are `unformatted_ours_*` (tsv-only normalization), not `unformatted_*`.
 
+That promoted form is dual-stable — both formatters keep it as-is — so it is
+pinned as `variant_promoted.svelte`, not the canonical input.
+
 Per Comment Position Philosophy, tsv keeps an own-line comment with the statement
 the author wrote it under rather than promoting it across the statement boundary.
 

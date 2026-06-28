@@ -11,7 +11,7 @@ return a&&b/* c */;
 
 function f3(){
 // Return: combined leading + trailing
-return/* l */a+b;/* t */
+return/* l */a+b/* t */;
 }
 
 // Inside function call argument

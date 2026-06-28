@@ -9,7 +9,9 @@ The divergence survives in the **same-line** authoring, pinned by
 `unformatted_ours_leading.svelte` (`/* b */ else if`): tsv splits the comment
 onto its own line before `else` (normalizing to `input`), while prettier 3.9
 keeps it cuddled on the `else` line (`/* b */ else if`), so prettier does **not**
-normalize that variant to `input`.
+normalize that variant to `input`. Prettier's cuddled output is itself
+prettier-stable, pinned as `prettier_variant_leading.svelte` (tsv normalizes it
+back to `input`).
 
 ```ts
 // prettier 3.9 (same-line, cuddled)   // tsv (own line before else)
