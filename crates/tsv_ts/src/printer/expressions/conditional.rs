@@ -6,6 +6,7 @@ use crate::ast::internal;
 use crate::printer::{Printer, template_literal_has_newlines};
 use smallvec::smallvec;
 use tsv_lang::INDENT;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -332,7 +333,7 @@ impl<'a> Printer<'a> {
         let mut has_line_comment_before_consequent = false;
         let mut has_prev_comment_after_q = false;
         if let Some(q_pos) = question_pos {
-            for comment in tsv_lang::comments_in_range(self.comments, q_pos + 1, consequent_start) {
+            for comment in comments_in_range(self.comments, q_pos + 1, consequent_start) {
                 if has_prev_comment_after_q {
                     // Subsequent comments go on their own line
                     q_parts.push(d.hardline());
@@ -405,7 +406,7 @@ impl<'a> Printer<'a> {
         let mut has_line_comment_before_alternate = false;
         let mut has_prev_comment_after_colon = false;
         if let Some(c_pos) = colon_pos {
-            for comment in tsv_lang::comments_in_range(self.comments, c_pos + 1, alternate_start) {
+            for comment in comments_in_range(self.comments, c_pos + 1, alternate_start) {
                 if has_prev_comment_after_colon {
                     // Subsequent comments go on their own line
                     q_parts.push(d.hardline());

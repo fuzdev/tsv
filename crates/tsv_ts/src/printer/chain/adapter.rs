@@ -9,7 +9,7 @@ use crate::ast::internal;
 use crate::printer::{CommentSpacing, Printer, comments_in_range};
 use string_interner::DefaultSymbol;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::{ClassifiedComments, Comment};
+use tsv_lang::{ClassifiedComments, Comment, Span};
 
 impl<'a> SymbolLookup for Printer<'a> {
     fn with_name<R>(&self, symbol: DefaultSymbol, f: impl FnOnce(&str) -> R) -> Option<R> {
@@ -79,7 +79,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.format_block_comments(&block_comments, spacing)
     }
 
-    fn get_property_span(&self, expr: &internal::Expression<'_>) -> tsv_lang::Span {
+    fn get_property_span(&self, expr: &internal::Expression<'_>) -> Span {
         expr.span()
     }
 

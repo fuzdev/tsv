@@ -19,6 +19,7 @@
 use super::internal;
 use super::public;
 use std::borrow::Cow;
+use tsv_lang::Span;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
 
 mod translate_typed;
@@ -262,7 +263,7 @@ fn convert_declaration<'src>(
 /// `span`. Used for the `Nth` and identifier (`:dir(ltr)`) pseudo-class args.
 fn wrap_single_selector<'src>(
     selector: public::SimpleSelector<'src>,
-    span: tsv_lang::Span,
+    span: Span,
     scope: AstScope,
 ) -> public::SelectorList<'src> {
     let relative = public::RelativeSelector {
@@ -631,7 +632,7 @@ fn convert_relative_selector<'src>(
 /// `\1F4A9`, optional single whitespace terminator) decode to their codepoint, while
 /// identity escapes (`\?`) keep the backslash. The internal AST stores the fully
 /// decoded spec form; this reconstructs Svelte's public form at the boundary.
-fn raw_selector_name(source: &str, span: tsv_lang::Span, prefix_len: usize) -> Cow<'_, str> {
+fn raw_selector_name(source: &str, span: Span, prefix_len: usize) -> Cow<'_, str> {
     let raw = &source[span.start as usize + prefix_len..span.end as usize];
     // Fast path: no backslash means no escapes to decode, so the name is the raw
     // source slice verbatim — borrowed, no allocation. (The vast majority of names.)
@@ -688,7 +689,7 @@ fn raw_selector_name(source: &str, span: tsv_lang::Span, prefix_len: usize) -> C
 /// arguments the name runs only up to the first `(`; without arguments the whole span is
 /// the name. Used to bound the `raw_selector_name` slice (and, for pseudo-elements, the
 /// public `end`) to just the name — the decoded internal name is never re-serialized.
-fn pseudo_name_end(source: &str, span: tsv_lang::Span, has_args: bool) -> u32 {
+fn pseudo_name_end(source: &str, span: Span, has_args: bool) -> u32 {
     if has_args {
         let raw = &source[span.start as usize..span.end as usize];
         raw.find('(').map_or(span.end, |i| span.start + i as u32)
@@ -787,7 +788,7 @@ fn convert_simple_selector<'src>(
             let args_val = args
                 .as_ref()
                 .map(|a| Box::new(convert_pseudo_class_args(a, source, scope)));
-            let name_span = tsv_lang::Span {
+            let name_span = Span {
                 start: span.start,
                 end: pseudo_name_end(source, *span, args.is_some()),
             };
@@ -813,7 +814,7 @@ fn convert_simple_selector<'src>(
             let name_end = pseudo_name_end(source, *span, args.is_some());
             let name = raw_selector_name(
                 source,
-                tsv_lang::Span {
+                Span {
                     start: span.start,
                     end: name_end,
                 },

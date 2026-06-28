@@ -10,6 +10,7 @@
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use smallvec::smallvec;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 
@@ -153,7 +154,7 @@ impl<'a> Printer<'a> {
     /// add their own break, or a spurious blank line / leading space appears. A trailing
     /// *block* comment carries no `hardline`, so it does not suppress the dangle.
     pub(super) fn head_trailing_line_comment(&self, start: u32, end: u32) -> bool {
-        tsv_lang::comments_in_range(self.comments, start, end)
+        comments_in_range(self.comments, start, end)
             .last()
             .is_some_and(|c| !c.is_block)
     }

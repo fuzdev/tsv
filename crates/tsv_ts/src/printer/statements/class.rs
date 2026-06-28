@@ -6,6 +6,7 @@ use crate::printer::CommentSpacing;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{SymbolToU32, comments_in_range};
 
 /// Printed keyword (with trailing space) for an accessibility modifier.
@@ -429,7 +430,7 @@ impl<'a> Printer<'a> {
         if prop.computed {
             // Comments before the `[` (inside-bracket comments are handled by
             // the bracket builder)
-            let bracket_pos = tsv_lang::source_scan::find_char_skipping_comments(
+            let bracket_pos = find_char_skipping_comments(
                 self.source.as_bytes(),
                 cursor as usize,
                 key_start as usize,
@@ -633,7 +634,7 @@ impl<'a> Printer<'a> {
             // Comments before the `[` (inside-bracket comments are handled by
             // the bracket builder); generators handle this span after the `*`.
             if !method.value.generator {
-                let bracket_pos = tsv_lang::source_scan::find_char_skipping_comments(
+                let bracket_pos = find_char_skipping_comments(
                     self.source.as_bytes(),
                     cursor as usize,
                     key_start as usize,
@@ -683,7 +684,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_type_parameter_declaration_doc(type_params));
 
             // Comments between type_params `>` and `(` go after type_params
-            if let Some(pp) = tsv_lang::source_scan::find_char_skipping_comments(
+            if let Some(pp) = find_char_skipping_comments(
                 self.source.as_bytes(),
                 type_params.span.end as usize,
                 self.source.len(),

@@ -10,6 +10,7 @@ use crate::ast::{internal, public};
 use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
 use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_ts::ast::convert::convert_expression;
 
 use super::comment_attachment::{
     CommentAttachmentContext, attach_comments_recursively, comment_to_json,
@@ -381,15 +382,13 @@ pub(super) fn convert_special_element<'src>(
                 });
             }
         }
-        to_json_value(&tsv_ts::ast::convert::convert_expression(
-            e, source, loc, interner, 0,
-        ))
+        to_json_value(&convert_expression(e, source, loc, interner, 0))
     });
 
     let expression = elem
         .kind
         .expression()
-        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0));
 
     public::SpecialElement {
         node_type: elem.kind.node_type(),

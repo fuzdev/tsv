@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
+use tsv_lang::estimated_ast_arena_capacity;
 
 /// Profile parse + format timing on files or directories.
 #[derive(FromArgs, Debug)]
@@ -188,8 +189,7 @@ fn profile_once(source: &str, parser_type: ParserType) -> Result<(Duration, Dura
         ParserType::TypeScript => {
             // Allocate the arena outside the timed region so its setup isn't
             // counted in the parse measurement.
-            let arena =
-                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+            let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
             let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
@@ -201,8 +201,7 @@ fn profile_once(source: &str, parser_type: ParserType) -> Result<(Duration, Dura
             Ok((parse_dur, format_dur))
         }
         ParserType::Svelte => {
-            let arena =
-                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+            let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
             let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
@@ -214,8 +213,7 @@ fn profile_once(source: &str, parser_type: ParserType) -> Result<(Duration, Dura
             Ok((parse_dur, format_dur))
         }
         ParserType::Css => {
-            let arena =
-                bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+            let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
             let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();

@@ -4,9 +4,10 @@ use super::super::{internal, public};
 use super::{
     convert_arrow_function_expression, convert_await_expression, convert_call_expression,
     convert_class_expression, convert_conditional_expression, convert_function_expression,
-    convert_member_expression, convert_new_expression, convert_object_pattern, convert_property,
-    convert_template_literal, convert_type, convert_type_annotation,
-    convert_type_parameter_instantiation, convert_yield_expression, create_location,
+    convert_identifier, convert_literal, convert_member_expression, convert_new_expression,
+    convert_object_pattern, convert_property, convert_template_literal, convert_type,
+    convert_type_annotation, convert_type_parameter_instantiation, convert_yield_expression,
+    create_location,
 };
 use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
@@ -45,7 +46,7 @@ pub(in crate::ast::convert) fn convert_expression_inner<'src>(
             convert_expression_inner(cast.inner, source, loc, interner, offset, false)
         }
         internal::Expression::Literal(lit) => {
-            public::Expression::Literal(super::convert_literal(lit, source, loc, offset))
+            public::Expression::Literal(convert_literal(lit, source, loc, offset))
         }
         internal::Expression::Identifier(id) => {
             public::Expression::Identifier(public::Identifier {
@@ -530,8 +531,8 @@ pub(in crate::ast::convert) fn convert_expression_inner<'src>(
                 start: meta.span.start,
                 end: meta.span.end,
                 loc: create_location(meta.span, loc, offset),
-                meta: super::convert_identifier(&meta.meta, source, loc, interner, offset),
-                property: super::convert_identifier(&meta.property, source, loc, interner, offset),
+                meta: convert_identifier(&meta.meta, source, loc, interner, offset),
+                property: convert_identifier(&meta.property, source, loc, interner, offset),
             })
         }
         internal::Expression::TSParameterProperty(param_prop) => {

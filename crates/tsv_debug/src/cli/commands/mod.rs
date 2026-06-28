@@ -21,6 +21,7 @@ pub mod test262;
 pub mod ts_fixture_audit;
 
 use crate::cli::CliError;
+use crate::fixtures::Fixture;
 use futures_util::stream::{self, Stream, StreamExt};
 use std::future::Future;
 use std::path::{Path, PathBuf};
@@ -44,7 +45,7 @@ pub fn create_runtime() -> tokio::runtime::Runtime {
 ///
 /// Returns [`CliError::Failed`] when the fixtures directory is missing or the
 /// walk fails.
-pub fn walk_fixtures_or_fail() -> Result<Vec<crate::fixtures::Fixture>, CliError> {
+pub fn walk_fixtures_or_fail() -> Result<Vec<Fixture>, CliError> {
     let fixtures_dir = Path::new("tests/fixtures");
     if !fixtures_dir.exists() {
         eprintln!("Error: fixtures directory not found: tests/fixtures");
@@ -67,9 +68,7 @@ pub fn walk_fixtures_or_fail() -> Result<Vec<crate::fixtures::Fixture>, CliError
 ///
 /// Returns [`CliError::Failed`] when the walk fails or no fixture matches the
 /// filters.
-pub fn walk_and_filter(
-    filters: &[String],
-) -> Result<(Vec<crate::fixtures::Fixture>, usize), CliError> {
+pub fn walk_and_filter(filters: &[String]) -> Result<(Vec<Fixture>, usize), CliError> {
     filter_fixtures(walk_fixtures_or_fail()?, filters)
 }
 
@@ -78,9 +77,9 @@ pub fn walk_and_filter(
 /// selects nothing. Split from [`walk_and_filter`] so the empty-match policy is
 /// unit-testable without walking the tree.
 fn filter_fixtures(
-    all: Vec<crate::fixtures::Fixture>,
+    all: Vec<Fixture>,
     filters: &[String],
-) -> Result<(Vec<crate::fixtures::Fixture>, usize), CliError> {
+) -> Result<(Vec<Fixture>, usize), CliError> {
     let total = all.len();
     let matches: Vec<_> = all
         .into_iter()
@@ -100,7 +99,7 @@ fn filter_fixtures(
 /// Print the `--list` view of a fixture set: each fixture's path and input file,
 /// then a `Total` (no filters) or `Matched N of M` (with filters) line. Shared by
 /// the `fixtures_*` commands' list mode; `total` is the count before filtering.
-pub fn print_fixture_list(fixtures: &[crate::fixtures::Fixture], filters: &[String], total: usize) {
+pub fn print_fixture_list(fixtures: &[Fixture], filters: &[String], total: usize) {
     println!("Found fixtures:");
     for fixture in fixtures {
         println!("  {} ({})", fixture.relative_path, fixture.input_file);
@@ -152,12 +151,12 @@ type FixtureTaskStream<T> = Pin<Box<dyn Stream<Item = Result<T, JoinError>>>>;
 /// The stream is boxed to unify the two combinator types behind one return; the
 /// per-item vtable poll is negligible against each fixture's parse/format cost.
 pub fn spawn_fixture_stream<F, Fut>(
-    fixtures: Vec<crate::fixtures::Fixture>,
+    fixtures: Vec<Fixture>,
     order: ResultOrder,
     work: F,
 ) -> FixtureTaskStream<Fut::Output>
 where
-    F: Fn(crate::fixtures::Fixture) -> Fut + 'static,
+    F: Fn(Fixture) -> Fut + 'static,
     Fut: Future + Send + 'static,
     Fut::Output: Send + 'static,
 {
@@ -187,8 +186,8 @@ pub fn task_result<T>(joined: Result<T, JoinError>, what: &str) -> Result<T, Cli
 mod tests {
     use super::*;
 
-    fn fixture(relative_path: &str) -> crate::fixtures::Fixture {
-        crate::fixtures::Fixture {
+    fn fixture(relative_path: &str) -> Fixture {
+        Fixture {
             path: relative_path.into(),
             relative_path: relative_path.to_string(),
             input_file: "input.svelte".to_string(),

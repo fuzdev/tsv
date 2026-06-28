@@ -17,6 +17,7 @@ use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
+use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{INDENT, PRINT_WIDTH};
 
 /// Wrap a doc in parentheses if the expression needs them for variable init context.
@@ -172,7 +173,7 @@ impl<'a> Printer<'a> {
                 // The declarator-separating comma. A block comment keeps the author's
                 // side of it: before → trails the previous init; after → leads the next
                 // declarator. (Only consulted when `has_block_comment`.)
-                let comma_pos = tsv_lang::source_scan::find_char_skipping_comments(
+                let comma_pos = find_char_skipping_comments(
                     self.source.as_bytes(),
                     prev_end as usize,
                     curr_start as usize,
@@ -283,7 +284,7 @@ impl<'a> Printer<'a> {
                 if declarator.definite
                     && let Expression::Identifier(ident) = &declarator.id
                     && ident.type_annotation().is_none()
-                    && let Some(bang_pos) = tsv_lang::source_scan::find_char_skipping_comments(
+                    && let Some(bang_pos) = find_char_skipping_comments(
                         self.source.as_bytes(),
                         id_end as usize,
                         init_start as usize,
