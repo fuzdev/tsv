@@ -89,9 +89,8 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
                     self.write_indent();
-                    if format_ignore_next {
+                    if std::mem::take(&mut format_ignore_next) {
                         self.write(nested_rule.span.extract(self.source));
-                        format_ignore_next = false;
                     } else {
                         self.print_css_rule(nested_rule);
                     }
@@ -111,9 +110,8 @@ impl<'a> Printer<'a> {
                         self.write("\n");
                     }
                     self.write_indent();
-                    if format_ignore_next {
+                    if std::mem::take(&mut format_ignore_next) {
                         self.write(nested_atrule.span.extract(self.source));
-                        format_ignore_next = false;
                     } else {
                         self.print_css_atrule(nested_atrule);
                     }
