@@ -351,14 +351,19 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
 // Simple predicates (expression type groupings)
 //
 
-/// Strip non-null assertion (`!`) wrappers, returning the inner expression.
+/// Strip trailing non-null assertion (`!`) wrappers, returning the inner expression.
 ///
-/// Mirrors prettier's `stripChainElementWrappers` for the `extends`-clause paren
-/// decision (#18652): the `!` postfix binds tightly, so a heritage paren around a
-/// bare non-null is redundant (`extends (Base!)` → `extends Base!`). tsv has no
-/// distinct `ChainExpression` node (optional chains fold into member/call), so only
-/// the non-null wrapper needs unwrapping here.
-fn strip_non_null_wrappers<'a>(mut expr: &'a Expression<'a>) -> &'a Expression<'a> {
+/// tsv's mirror of prettier's `stripChainElementWrappers`: tsv has no distinct
+/// `ChainExpression` node (optional chains fold into member/call), so only the
+/// non-null wrapper needs unwrapping. Shared by the `extends`-clause paren decision
+/// (#18652: `extends (Base!)` → `extends Base!`, the `!` binds tightly so the
+/// heritage paren is redundant) and the call-arg arrow-body check
+/// (`arrow_body_is_call_through_non_null`, `couldExpandArg`'s
+/// `isCallExpression(stripChainElementWrappers(body))` — `=> fn()!` is a call body
+/// that hugs the open paren).
+pub(in crate::printer) fn strip_non_null_wrappers<'a>(
+    mut expr: &'a Expression<'a>,
+) -> &'a Expression<'a> {
     while let Expression::TSNonNullExpression(non_null) = expr {
         expr = non_null.expression;
     }
