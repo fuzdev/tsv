@@ -1,5 +1,5 @@
 use crate::cli::CliError;
-use crate::deno::{parse_css, parse_svelte, parse_typescript};
+use crate::deno::{parse_css, parse_svelte, parse_typescript_with_goal};
 use crate::fixtures;
 use crate::fixtures::InputType;
 use argh::FromArgs;
@@ -139,7 +139,7 @@ async fn generate_expected_fixture(fixture: &fixtures::Fixture) -> FixtureResult
     let json = match fixture.input_type() {
         InputType::SvelteTs | InputType::TypeScript => {
             // TypeScript and SvelteTs fixtures use acorn+typescript parser
-            match parse_typescript(&source).await {
+            match parse_typescript_with_goal(&source, fixture.goal()).await {
                 Ok(ast) => match to_json_with_tabs(&ast) {
                     Ok(json) => format!("{json}\n"),
                     Err(e) => {
@@ -206,7 +206,7 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
     let our_json = match fixture.input_type() {
         InputType::SvelteTs | InputType::TypeScript => {
             let arena = bumpalo::Bump::new();
-            let ast = match tsv_ts::parse(source, &arena) {
+            let ast = match tsv_ts::parse_with_goal(source, fixture.goal(), &arena) {
                 Ok(ast) => ast,
                 Err(e) => return FixtureResult::Failed(format!("Our parser error: {e:?}")),
             };
@@ -251,17 +251,19 @@ async fn generate_divergence_fixture(fixture: &fixtures::Fixture, source: &str) 
     // Generate expected_svelte.json from the external canonical parser
     // (Svelte, acorn-typescript, or parseCss), falling back to the error marker.
     let svelte_json = match fixture.input_type() {
-        InputType::SvelteTs | InputType::TypeScript => match parse_typescript(source).await {
-            Ok(ast) => match to_json_with_tabs(&ast) {
-                Ok(json) => format!("{json}\n"),
-                Err(e) => {
-                    return FixtureResult::Failed(format!(
-                        "Failed to serialize TypeScript AST: {e}"
-                    ));
-                }
-            },
-            Err(_) => fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string(),
-        },
+        InputType::SvelteTs | InputType::TypeScript => {
+            match parse_typescript_with_goal(source, fixture.goal()).await {
+                Ok(ast) => match to_json_with_tabs(&ast) {
+                    Ok(json) => format!("{json}\n"),
+                    Err(e) => {
+                        return FixtureResult::Failed(format!(
+                            "Failed to serialize TypeScript AST: {e}"
+                        ));
+                    }
+                },
+                Err(_) => fixtures::EXPECTED_SVELTE_ERROR_JSON.to_string(),
+            }
+        }
         InputType::Css => match parse_css(source).await {
             Ok(ast) => match to_json_with_tabs(&ast) {
                 Ok(json) => format!("{json}\n"),

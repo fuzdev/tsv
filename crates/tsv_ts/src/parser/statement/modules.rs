@@ -30,6 +30,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_export_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
+        // `export` declarations are reachable only via `ModuleItem` — a Script
+        // goal has no export declarations.
+        if self.goal != crate::Goal::Module {
+            return Err(self.error_msg("'export' is only allowed in a module"));
+        }
+
         // Consume 'export' keyword
         debug_assert!(matches!(
             self.current_kind(),
@@ -460,12 +466,42 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_import_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
+        // `import` declarations are reachable only via `ModuleItem`. (Dynamic
+        // `import(...)` and `import.meta` are expressions, parsed elsewhere — the
+        // statement dispatcher routes `import(`/`import.` there before here.)
+        if self.goal != crate::Goal::Module {
+            return Err(self.error_msg("'import' is only allowed in a module"));
+        }
+
         // Consume 'import' keyword
         debug_assert!(matches!(
             self.current_kind(),
             TokenKind::Keyword(KeywordKind::Import)
         ));
         self.advance()?;
+
+        // Stage-3 import-phase proposals: `import source <binding> from …` and
+        // `import defer * as ns from …`. `source`/`defer` are contextual — a phase
+        // keyword only in the phase-specific shape, otherwise an ordinary default
+        // binding (`import defer from …` imports a default named `defer`). acorn
+        // supports neither proposal, so accepting them is a deliberate divergence
+        // from the Svelte/acorn oracle — see docs/conformance_svelte.md.
+        let phase = if matches!(self.current_kind(), TokenKind::Identifier) {
+            let value = self.current_value();
+            let is_defer = value == "defer";
+            let is_source = value == "source";
+            if is_defer && matches!(self.peek_kind(), TokenKind::Star) {
+                self.advance()?; // consume `defer`
+                ImportPhase::Defer
+            } else if is_source && matches!(self.peek_kind(), TokenKind::Identifier) {
+                self.advance()?; // consume `source`
+                ImportPhase::Source
+            } else {
+                ImportPhase::None
+            }
+        } else {
+            ImportPhase::None
+        };
 
         let mut specifiers = self.bvec();
 
@@ -481,6 +517,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 source,
                 attributes,
                 import_kind: ImportKind::Value,
+                phase,
                 span: Span::new(start as u32, end),
             }));
         }
@@ -508,6 +545,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ImportKind::Value
         };
 
+        // Whether a default specifier was parsed with no following comma — used to
+        // reject `import x * as ns` / `import x { a }` (a default must be separated
+        // from a namespace/named clause by a comma).
+        let mut default_needs_comma = false;
+
         // Parse default import: `import x from "y"` or `import type X from "y"`
         // Also check for `import x = require("y")` or `import x = A.B`
         if matches!(self.current_kind(), TokenKind::Identifier) {
@@ -517,6 +559,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Check for `import x = ...` (TSImportEqualsDeclaration)
             if matches!(self.current_kind(), TokenKind::Equals) {
+                // A phase keyword has no import-equals form (`import source x =
+                // require(…)` is not in the proposal grammar); reject rather than
+                // silently drop the phase. Only `Source` can reach here — `Defer`
+                // requires `* as`, so its leading token is `*`, not this binding.
+                if phase != ImportPhase::None {
+                    return Err(self.error_msg(
+                        "an import-phase keyword cannot precede an import-equals declaration",
+                    ));
+                }
                 return self.parse_import_equals_declaration(
                     start,
                     id_start,
@@ -532,14 +583,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 span: Span::new(id_start as u32, id_end as u32),
             }));
 
-            // Check for comma (default + named/namespace)
+            // Check for comma (default + named/namespace). A default import must be
+            // followed by `,` (then a namespace/named clause) or `from`: a default
+            // butting directly against `* as ns` / `{ … }` with no comma is a syntax
+            // error (`import x * as ns`, `import x { a }`), matching acorn. Tracked so
+            // the namespace/named blocks below can reject the missing-comma form.
             if matches!(self.current_kind(), TokenKind::Comma) {
                 self.advance()?;
+            } else {
+                default_needs_comma = true;
             }
         }
 
         // Parse namespace import: `import * as ns from "y"`
         if matches!(self.current_kind(), TokenKind::Star) {
+            if default_needs_comma {
+                return Err(self.error_expected_after("','", "default import"));
+            }
             let ns_start = self.current_pos().0;
             self.advance()?;
 
@@ -565,6 +625,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse named imports: `import { a, b as c } from "y"`
         if matches!(self.current_kind(), TokenKind::BraceOpen) {
+            if default_needs_comma {
+                return Err(self.error_expected_after("','", "default import"));
+            }
             self.advance()?;
 
             while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
@@ -666,6 +729,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.expect(&TokenKind::BraceClose)?;
         }
 
+        // A source-phase import is `import source ImportedBinding FromClause` — a
+        // single binding, no namespace/named clause and no second specifier. The
+        // phase commits on the leading `source <ident>` one-token lookahead, so a
+        // multi-specifier or non-default clause that slipped past it is rejected
+        // here: `import source x, { a }`, `import source x, * as ns`, and (after a
+        // stray `type` modifier) `import source type { a }`. (`import defer` is held
+        // to its `* as ns` shape by the phase lookahead, so it needs no analogue.)
+        if phase == ImportPhase::Source
+            && !(specifiers.len() == 1 && matches!(specifiers[0], ImportSpecifier::Default(_)))
+        {
+            return Err(self.error_msg("a source-phase import takes a single binding"));
+        }
+
         // Expect 'from' keyword
         if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::From)) {
             return Err(self.error_expected_after("'from'", "import specifiers"));
@@ -688,6 +764,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             source,
             attributes,
             import_kind,
+            phase,
             span: Span::new(start as u32, end),
         }))
     }

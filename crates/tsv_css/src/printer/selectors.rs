@@ -414,7 +414,7 @@ impl<'a> Printer<'a> {
         }
 
         for simple in relative.selectors {
-            self.print_simple_selector(simple);
+            self.print_simple_selector(simple, false);
         }
     }
 
@@ -480,7 +480,17 @@ impl<'a> Printer<'a> {
     }
 
     /// Format a simple selector
-    pub(super) fn print_simple_selector(&mut self, simple: &internal::SimpleSelector<'_>) {
+    ///
+    /// `extra_indent` is forwarded to a pseudo-class's args (the only kind that
+    /// can break across lines): in a multiline selector list whose complex
+    /// selectors have >2 simple selectors, prettier indents the broken pseudo
+    /// content one extra level. All other selector kinds ignore it. Callers that
+    /// aren't inside such a multiline list pass `false`.
+    pub(super) fn print_simple_selector(
+        &mut self,
+        simple: &internal::SimpleSelector<'_>,
+        extra_indent: bool,
+    ) {
         match simple {
             internal::SimpleSelector::Type {
                 namespace: _, // Namespace already included in span/source
@@ -547,7 +557,7 @@ impl<'a> Printer<'a> {
             internal::SimpleSelector::PseudoClass { args, span, .. } => {
                 self.write_pseudo_name(*span, args.is_some());
                 if let Some(args) = args {
-                    self.print_pseudo_class_with_args(args, false);
+                    self.print_pseudo_class_with_args(args, extra_indent);
                 }
             }
             internal::SimpleSelector::PseudoElement { args, span, .. } => {
@@ -826,7 +836,7 @@ impl<'a> Printer<'a> {
                     self.write_indent();
                 }
                 for selector in selectors.iter() {
-                    self.print_simple_selector(selector);
+                    self.print_simple_selector(selector, false);
                 }
             }
             internal::PseudoClassArgs::Part { idents, .. } => {
@@ -901,25 +911,7 @@ impl<'a> Printer<'a> {
         }
 
         for simple in relative.selectors {
-            self.print_simple_selector_with_extra_indent(simple, extra_indent);
-        }
-    }
-
-    /// Print a simple selector, using extra indent for pseudo-class content
-    fn print_simple_selector_with_extra_indent(
-        &mut self,
-        simple: &internal::SimpleSelector<'_>,
-        extra_indent: bool,
-    ) {
-        match simple {
-            internal::SimpleSelector::PseudoClass { args, span, .. } => {
-                self.write_pseudo_name(*span, args.is_some());
-                if let Some(args) = args {
-                    self.print_pseudo_class_with_args(args, extra_indent);
-                }
-            }
-            // For non-pseudo-class selectors, delegate to the regular printer
-            _ => self.print_simple_selector(simple),
+            self.print_simple_selector(simple, extra_indent);
         }
     }
 
@@ -944,7 +936,7 @@ impl<'a> Printer<'a> {
             }
             internal::PseudoClassArgs::Slotted { selectors, .. } => {
                 for selector in selectors.iter() {
-                    self.print_simple_selector(selector);
+                    self.print_simple_selector(selector, false);
                 }
             }
             internal::PseudoClassArgs::Part { idents, .. } => {

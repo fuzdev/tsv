@@ -242,6 +242,7 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 - @media long with `/* */` — Print width (the comment is incidental; the divergence is the over-width unwrapped query) — [media_long](../tests/fixtures/css/tokens/comments/media_long_prettier_divergence/)
 - Selector before `{` — [selector_before_opening_brace](../tests/fixtures/css/tokens/comments/selector_before_opening_brace_prettier_divergence/)
 - Selector before `{` (≥2) — [selector_before_opening_brace_multiple](../tests/fixtures/css/tokens/comments/selector_before_opening_brace_multiple_prettier_divergence/)
+- Selector before `{` (in at-rule) — [selector_before_opening_brace_in_atrule](../tests/fixtures/css/tokens/comments/selector_before_opening_brace_in_atrule_prettier_divergence/)
 - Selector list — [selector_list](../tests/fixtures/css/tokens/comments/selector_list_prettier_divergence/)
 
 ### Whitespace: BOM Handling
@@ -350,7 +351,7 @@ Same layout inside an inline element (head wraps + body expands, element hugs th
 
 **Head `}` dangle + clause hug.** When a block head wraps, tsv drops the closing `}` (and any `as item` / `then value` clause) to its own line at the tag's base indent — `{#if a &&⏎\t…⏎}`, `{#each …⏎as item}` — consistent with tsv's JS `if (⏎…⏎) {` and its broken-element `>` (`bracketSameLine: false`). The one shape that hugs is a single call/`new` whose arguments wrapped: its `)` already dedents to base, so the clause + `}` continue on it (`) as item}`, `)}`, `) then r}`). Prettier never wraps a block head, so it never faces this.
 
-**Body-expand (whole construct goes multiline).** When the head wraps — or the inline construct simply exceeds printWidth — tsv expands the **entire** block: the body, every `{:then}` / `{:catch}` / `{:else}` / `{:else if}` section/branch, and the `{/tag}` close each drop to their own indented lines, uniformly across `{#if}` / `{#each}` / `{#await}` / `{#key}` / `{#snippet}`. This holds **inside inline elements/components too** (`<span>{#if …}…{/if}</span>`) — block-body boundary whitespace is render-non-significant there (verified against the Svelte compiler), so it is safe; the only gate is `<pre>` / `white-space:pre`, where the drop is suppressed and the body stays on the line (both formatters agree — [elements/pre_block_body_long](../tests/fixtures/svelte/elements/pre_block_body_long/)); when an inline-element body there must wrap its own `>`, tsv indents it one level shallower than prettier, injecting less significant whitespace — [elements/pre_block_element_body_indent](../tests/fixtures/svelte/elements/pre_block_element_body_indent_prettier_divergence/); an empty element there wraps lean and keeps its source close form (self-closing `/>` vs explicit `></tag>`), for components and HTML inline elements alike — [elements/pre_block_empty_element](../tests/fixtures/svelte/elements/pre_block_empty_element_prettier_divergence/). Prettier keeps the construct inline past printWidth (only the enclosing element wraps).
+**Body-expand (whole construct goes multiline).** When the head wraps — or the inline construct simply exceeds printWidth — tsv expands the **entire** block: the body, every `{:then}` / `{:catch}` / `{:else}` / `{:else if}` section/branch, and the `{/tag}` close each drop to their own indented lines, uniformly across `{#if}` / `{#each}` / `{#await}` / `{#key}` / `{#snippet}`. This holds **inside inline elements/components too** (`<span>{#if …}…{/if}</span>`) — block-body boundary whitespace is render-non-significant there (verified against the Svelte compiler), so it is safe; the only gate is `<pre>` / `white-space:pre`, where the drop is suppressed and the body stays on the line (both formatters agree — [elements/pre_block_body_long](../tests/fixtures/svelte/elements/pre_block_body_long/)). Inside `<pre>` a nested element's wrapped attributes and close token indent off its nesting depth — one level per enclosing container, the same model as prettier ([elements/pre_nested_attr_indent](../tests/fixtures/svelte/elements/pre_nested_attr_indent/)) — and the source close form is preserved (self-closing `/>` vs explicit `></tag>`), for components and HTML inline elements alike. One residual divergence remains there: an empty self-closing element whose attributes fit within printWidth (counting the preserved-text prefix on the line) keeps them on one line with only `/>` dropping, where prettier full-breaks them regardless — [elements/pre_block_empty_element](../tests/fixtures/svelte/elements/pre_block_empty_element_prettier_divergence/). Prettier keeps the construct inline past printWidth (only the enclosing element wraps).
 
 **Middle zone (head fits alone, head + body doesn't).** tsv decouples the head-wrap decision (head-alone width) from the body-expand decision (head + body width): when the head fits on its own line but the whole construct overflows, the head stays flat and only the body expands. This is chosen in one pass (no wrap-then-unwrap across two formats), so every layout is an idempotent fixed point.
 
@@ -419,6 +420,33 @@ tsv treats these like any other function call—no special-casing for module pat
 **Return type generic union**: Prettier has special handling for `null` and `void` in union types within generic return types. When the second union member is `null` or `void`: (1) function declarations and class methods allow lines to exceed print width instead of breaking inside `<>`, (2) arrow functions break the assignment (`const fn =`) instead of breaking inside the return type. tsv breaks consistently inside the return type generic at the print width boundary regardless of type keyword.
 
 **Arrow type param trailing comma**: For a generic arrow with a **single type param that has no constraint** (`<T>`, default-only `<T = string>`, or `const`-modified `<const T>`), Prettier forces a trailing comma — `<T,>` — via `shouldForceTrailingComma` (`language-js/print/type-parameters.js`). It does so to keep the output valid as TSX, where a bare `<T>` is ambiguous with a JSX element; the guard fires whenever the file is not known to end in `.ts`, which is always the case for a Svelte `<script>` body (prettier-plugin-svelte hands it to prettier without a `.ts` filepath). tsv has no JSX — it never emits TSX, and Svelte's own parser accepts bare `<T>` in every TS position (`<script>`, template `{...}`, `{@const}`) — so the disambiguation is vestigial and tsv emits the bare canonical form. Multi-param (`<T, U>`), constrained (`<T extends X>`), and empty (`<>`) type params are unaffected; prettier never forces the comma for those and tsv matches. The accepted tradeoff: in a mixed-tool repo prettier rewrites `<T>` back to `<T,>`, so the two ping-pong on this construct (reviewed and accepted — bare `<T>` is correct for a non-JSX formatter). Fixtures: [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/), [const_type_param_arrow](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_arrow_prettier_divergence/), and — stacked with the acorn-typescript async param-drop parser bug — [async_generic/stacked](../tests/fixtures/typescript/expressions/arrow/async_generic/stacked_svelte_prettier_divergence/), [async_generic/forms](../tests/fixtures/typescript/expressions/arrow/async_generic/forms_svelte_prettier_divergence/) (optional-param, object-`as`-body, and a type-vs-value-position contrast that pins the comma to value position) and [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/). The comment-relocation fixture [arrow_type_params_paren_comment](../tests/fixtures/typescript/declarations/function/arrow_type_params_paren_comment_prettier_divergence/) also exercises it.
+
+#### Import-phase proposals
+
+The Stage-3 **source-phase imports** and **import defer** proposals (`import source x
+from 'mod'` / `import.source('mod')`, `import defer * as ns from 'mod'` /
+`import.defer('mod')`) are a tsv-native parser divergence — acorn rejects them, so
+they are **not** in the "Prettier rejects valid input" set above (that set is keyed
+on acorn *accepting* the input). Prettier diverges two ways:
+
+- **`import defer` — phase dropped (information loss).** Prettier formats `import
+  defer * as ns from 'mod'` to `import * as ns from 'mod'`, silently deleting the
+  `defer` phase keyword and changing the import's semantics. tsv preserves it.
+- **`import source` — printer throws.** Prettier's `typescript` parser reads
+  `source` as a binding name and throws (`'=' expected`). tsv parses and keeps the
+  statement stable.
+
+The dynamic `import.source(…)` / `import.defer(…)` forms have no divergence —
+prettier formats them identically to tsv. None of these can be fixtures (acorn,
+the fixture parse oracle, rejects the syntax; prettier, the format oracle, drops or
+throws), so the printer's round-trips are covered by `tests/import_phase.rs` and
+the parser by the test262 suite. The `import source` throw is also live-pinned in
+`tests/prettier_error_bugs.rs`; the `import defer` phase-drop is documented-only
+(a live "prettier succeeds with wrong output" check would gate the suite on a
+sidecar call under load). See
+[conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals)
+and [conformance_test262.md](./conformance_test262.md). **Upstream candidate**:
+prettier import-phase support — promote to fixtures once it lands.
 
 ### Prettier rejects valid input
 
@@ -778,11 +806,12 @@ The `prettier-ignore` family matches prettier exactly (both emit the construct r
 - `format-ignore` in `<script>` / `<style>` — Design choice — [js_css](../tests/fixtures/svelte/syntax/format_ignore/js_css_prettier_divergence/)
 - `format-ignore` template element — Design choice — [basic](../tests/fixtures/svelte/syntax/format_ignore/basic_prettier_divergence/)
 - `format-ignore` nested CSS — Design choice — [css_nested](../tests/fixtures/svelte/syntax/format_ignore/css_nested_prettier_divergence/)
+- `format-ignore` at-rule-body declaration — Design choice — [css_atrule_decl](../tests/fixtures/svelte/syntax/format_ignore/css_atrule_decl_prettier_divergence/)
 - `format-ignore-start` / `-end` range — Design choice — [range](../tests/fixtures/svelte/syntax/format_ignore/range_prettier_divergence/)
 - `format-ignore` standalone `.ts` — Design choice — [ts_standalone](../tests/fixtures/typescript/syntax/comments/format_ignore_prettier_divergence/)
 - `format-ignore` standalone `.css` — Design choice — [css_standalone](../tests/fixtures/css/syntax/comments/format_ignore_prettier_divergence/)
 
-The first four are Svelte-embedded; the last two pin the **standalone**
+The first five are Svelte-embedded; the last two pin the **standalone**
 `.ts` / `.css` paths (acorn-typescript / `parseCss` + `tsv_ts` / `tsv_css`
 directly), so the directive is covered in every language outside a Svelte host
 too.

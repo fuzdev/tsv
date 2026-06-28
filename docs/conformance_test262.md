@@ -14,29 +14,46 @@ Use test262 to validate that tsv's parser correctly:
 Regenerate with `cargo run -p tsv_debug test262` (expects a test262 checkout
 at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
-discovered tests (46,149 graded after skips).
+discovered tests (46,544 graded after skips).
 
-- Positive (should parse) — 41,857 passed, 42 failed
-- Negative (should reject) — 1,746 passed, 2,504 failed
+- Positive (should parse) — 42,113 passed, 0 failed
+- Negative (should reject) — 1,995 passed, 2,436 failed
 
-- **Overall**: 43,603/46,149 (94.5%)
-- **Positive pass rate**: 99.9% — valid syntax tsv accepts
-- **Skipped**: 2,987 (sloppy mode: 2,493, unimplemented feature: 422, runtime: 38, resolution: 34)
+- **Overall**: 44,108/46,544 (94.8%)
+- **Positive pass rate**: 100% — every test tsv grades and that should parse does,
+  graded at each test's declared goal (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
+- **Skipped**: 2,592 (sloppy mode: 2,520, unimplemented feature: 0, runtime: 38, resolution: 34)
+
+The remaining negative failures are early-error *under-enforcement* (programs that
+parse under the syntactic grammar but the spec rejects semantically — duplicate
+params, escaped reserved words, etc.), deferred to a future diagnostics layer by
+design, not parser bugs.
 
 **Feature filtering.** Tests whose `features:` frontmatter names a syntactic
 proposal tsv does not implement are skipped, not graded — scoring them as parse
-failures would measure scope, not a conformance gap. Currently the two Stage-3
-import proposals (`source-phase-imports` / `import.source(…)` and `import-defer`
-/ `import.defer(…)`, ~422 files across both polarities) tsv rejects with
-`Expected 'meta' after 'import.'`. They drop out of both the headline pass rate
-and the differential manifest. See [Scope](#what-we-skip).
+failures would measure scope, not a conformance gap. The set
+(`UNIMPLEMENTED_FEATURES` in `crates/tsv_debug/src/test262/frontmatter.rs`) is
+**currently empty**: the two Stage-3 import-phase proposals that used to fill it
+(`source-phase-imports` / `import.source(…)` and `import-defer` /
+`import.defer(…)`, ~396 graded files) are now parsed — a deliberate divergence
+from acorn, which rejects them (see
+[conformance_svelte.md](./conformance_svelte.md#import-phase-proposals)).
+See [Scope](#what-we-skip).
 
-**Triaging the positive failures against the drop-in oracle.** Each of the 42 is
-parsed with the canonical parser (acorn-typescript in module mode — what the
-fixtures' `expected.json` is generated from). **None are genuine tsv-vs-acorn bugs:
-the drop-in backlog is closed** — all 42 are rejected by acorn too (not
-tsv-specific). _(Methodology: parse each `../test262/<path>` with `canonical_parse`
-and bucket on whether it yields an AST.)_
+**Positive parse conformance is 100%.** Every test tsv grades and that should parse
+does — graded at the test's declared goal (`module`-flagged as `Module`, the
+run-both-ways default + `onlyStrict` as a strict `Script`). The one sloppy-by-content
+`raw` test, `language/comments/hashbang/use-strict.js`, is **skipped** rather than
+graded: there the `#!` hashbang turns the following `"use strict"` into a comment
+rather than a directive, so the program is **sloppy** and its `with ({}) {}` is valid;
+tsv, being strict-only, rejects `with`. That test is genuinely out of scope for a
+strict-only parser — the same reason `noStrict` tests are skipped — so it joins the
+sloppy-mode skip bucket (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis)),
+while the 27 other in-scope `raw` tests (mode-independent hashbang / directive-prologue
+syntax) stay graded. The former positive-failure cluster was the `await`-as-identifier
+tests, valid only in a strict Script; with [Script-goal support](#design-decision-strict-mode-only-explicit-goal-axis)
+they now parse. _(Methodology for any future failure: parse each `../test262/<path>`
+with `canonical_parse` and bucket on whether it yields an AST.)_
 
 **The drop-in positive-conformance backlog is closed** — every gap acorn accepts and
 tsv rejected has been fixed (fixtures-first per the repo TDD gate): ✅ **rest parameter
@@ -71,20 +88,23 @@ an `Identifier` like acorn rather than a literal; and ✅ **`new import.meta()`*
 `import.meta` is a valid `new` callee (a MetaProperty), while `new import(…)` stays
 rejected.
 
-**The 42 acorn-also-rejects** are not tsv bugs — they split into:
-**sloppy-mode-only** (`with`, AnnexB `f() = g()` / `for (var a = x in b)`, legacy
-octal — tsv is strict-only); **strict-*Script*-only** (top-level `await` as a
-*binding*, e.g. `var await = 1` — valid in a strict Script but not a Module;
-**strict-script support is planned**, sloppy is not — `yield` is unaffected, being
-a strict reserved word in both goals); **`await`-as-identifier inside a non-async
-function/generator/method** (`function foo(await) {}`, the `static-init-await`
-cluster — valid in *module* per spec but acorn rejects it anyway; the planned
-**`await`-context tracking** fixes this and the strict-Script bindings together);
-and **plugin-gated syntax** (decorators, not in the oracle config). When the
-await-context work lands, the strict-Script + non-async buckets move from
-"acorn-also-rejects" to deliberate, more-spec-correct divergences from
-acorn-as-module. (The Stage-3 import proposals that acorn-via-oxc also rejects no
-longer appear here — they're skipped by feature filtering above, not graded.)
+**`await`-as-identifier — landed.** Previously the largest positive-failure cluster,
+the strict-Script `await`-as-identifier tests (top-level `var await = 1`, `function
+foo(await)`, `await => x` single-param arrow, `class await {}`, `await:` label,
+`break await` / `continue await` label targets, `({ await })` shorthand, `catch
+(await)`, `function await(){}` declaration/expression name, `new await()` callee, and
+the `static-init-await` nests) now parse: tsv grades them at `Goal::Script`, where
+`await` is an ordinary identifier in a `[~Await]` context. The same `await_is_identifier`
+read sites are gated the other way at `Goal::Module` / `[+Await]`, where `await` stays a
+reserved `BindingIdentifier`/`LabelIdentifier` (so `function await(){}` is rejected in a
+module, matching acorn). This is a deliberate,
+more-spec-correct divergence from acorn-*as-module* (acorn-as-script accepts them —
+that's the fixtures' oracle). `yield` is unaffected — a strict reserved word in both
+goals. The constructs still out of scope are **sloppy-mode-only** (`with`, AnnexB
+`f() = g()` / `for (var a = x in b)`, legacy octal — tsv is strict-only, those tests
+skipped) and **plugin-gated syntax** (some decorator forms, not in the oracle config).
+(The Stage-3 import proposals that acorn-via-oxc also rejects don't appear here —
+they're skipped by feature filtering above, not graded.)
 
 Most negative failures are over-acceptance of _early errors_ — programs that
 parse under the syntactic grammar but that the spec rejects semantically
@@ -126,13 +146,23 @@ constraint left over-accepted.
 
 - `negative.phase: runtime` - Requires execution
 - `negative.phase: resolution` - Requires module resolution
-- `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only)
-- `features:` naming an **unimplemented syntactic proposal** - currently
-  `source-phase-imports` / `source-phase-imports-module-source` / `import-defer`
-  (the Stage-3 import proposals). Skipped in both polarities so the score
-  reflects conformance on syntax tsv aims to support, not unimplemented scope.
-  The skip set lives in `crates/tsv_debug/src/test262/frontmatter.rs`
-  (`UNIMPLEMENTED_FEATURES`) — remove a name when tsv implements that proposal.
+- `flags: [noStrict]` - Requires sloppy mode (tsv is strict-only). A `flags: [raw]`
+  test (verbatim source, no harness) also runs in non-strict mode only per
+  test262/INTERPRETING.md, but nearly all exercise mode-independent syntax (hashbang,
+  HTML-close comments, `"use strict"` directive prologues) tsv grades correctly at
+  their goal, so those stay graded. Only a raw test whose verdict genuinely needs
+  sloppy semantics — it uses a construct tsv rejects as strict-only (`with`, legacy
+  octal) — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
+  `crates/tsv_debug/src/test262/runner.rs`) is currently the single
+  `language/comments/hashbang/use-strict.js`
+- `features:` naming an **unimplemented syntactic proposal** - skipped in both
+  polarities so the score reflects conformance on syntax tsv aims to support, not
+  unimplemented scope. The skip set lives in
+  `crates/tsv_debug/src/test262/frontmatter.rs` (`UNIMPLEMENTED_FEATURES`) and is
+  **currently empty** — the Stage-3 import-phase proposals
+  (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`)
+  that used to live here are now parsed, so their ~396 graded files count. Add a
+  name here when tsv meets a new proposal it doesn't parse; drop it once it lands.
 - `*_FIXTURE.js` files - Module dependencies, not standalone tests
 
 ### Test Directories
@@ -239,54 +269,86 @@ test262 validation
 ==================
 Path: ../test262
 
-Scanning test/language/...
+Found 49136 test files
+
+Processing: 49136/49136
 
 Results:
-  Positive tests: 20432 passed, 127 failed
-  Negative tests: 3100 passed, 23 failed
-  Skipped:        2591 (sloppy mode: 2519, runtime: 38, resolution: 34)
+  Positive tests: 41898 passed, 0 failed
+  Negative tests: 1795 passed, 2455 failed
+  Skipped:        2988 (sloppy mode: 2494, unimplemented feature: 422, runtime: 38, resolution: 34)
 
-Pass rate: 23532/23682 (99.4%)
-
-Run with --verbose to see failure details
+Pass rate: 43693/46148 (94.7%)
 ```
 
 ### Verbose (Failures)
+
+`--verbose` lists each failure under a `Failures:` block. The remaining failures are
+negative early-error under-enforcement (programs that parse syntactically but the spec
+rejects semantically); filtering to one shows the format:
 
 ```
 test262 validation
 ==================
 Path: ../test262
 
-Failed positive tests (should parse but didn't):
-  test/language/expressions/class/syntax-error.js
-    Error: Unexpected token at line 5, column 3
+Found 49136 test files
+Filtered to 1 tests matching: RegExp/property-escapes/binary-property-with-value-ASCII_-_F.js
 
-  test/language/statements/for/invalid-init.js
-    Error: Expected ';' at line 2, column 10
+Processing: 1/1
 
-Failed negative tests (should fail but parsed):
-  test/language/statements/for/invalid-lhs.js
-    Expected: SyntaxError (phase: parse)
-    Got: Parsed successfully
+Failures:
+---------
+test/built-ins/RegExp/property-escapes/binary-property-with-value-ASCII_-_F.js
+  Expected: Parse error (phase: parse)
+  Got: Parse success
 
 Results:
-  Positive tests: 20432 passed, 2 failed
-  Negative tests: 3100 passed, 1 failed
-  Skipped:        2591 (sloppy mode: 2519, runtime: 38, resolution: 34)
+  Positive tests: 0 passed, 0 failed
+  Negative tests: 0 passed, 1 failed
 
-Pass rate: 23535/23538 (99.9%)
+Pass rate: 0/1 (0.0%)
 ```
 
-## Design Decision: Strict Mode Only
+## Design Decision: Strict Mode Only, Explicit Goal Axis
 
-**tsv parses as strict mode only.** This matches our actual use cases:
+**tsv parses as strict mode only** — there is no sloppy mode and no `"use strict"`
+detection. This matches our use cases (TypeScript is always strict; ES modules and
+Svelte `<script>` are always strict). Tests with `flags: [noStrict]` (sloppy) are
+skipped as out of scope. A `flags: [raw]` test (verbatim source, no harness) also runs
+in non-strict mode only per test262/INTERPRETING.md, but nearly all exercise
+mode-independent syntax (hashbang, HTML-close comments, directive prologues) a
+strict-only parser grades correctly, so those stay graded at their goal. The lone raw
+test that is sloppy *by content* — `hashbang/use-strict.js`, whose `#!` turns
+`"use strict"` into a comment, leaving a sloppy `with` — is out of scope for the same
+reason `noStrict` is, so it is skipped (sloppy-mode bucket), not graded as a failure.
 
-- **TypeScript**: Always strict (implicitly)
-- **ES Modules**: Always strict (`import`/`export` implies strict)
-- **Svelte `<script>`**: ES modules, always strict
+**Strict and the *goal* symbol are orthogonal axes** (ECMAScript §11.2.2): a parse
+runs against either `Goal::Module` or `Goal::Script`, both strict. tsv exposes this
+as `tsv_ts::parse_with_goal` (and `tsv parse|format --goal script|module`),
+defaulting to **`Module`** — correct for Svelte `<script>` and ~all real TS. The
+goal toggles only the four goal-specific constructs:
 
-Tests with `noStrict` flag (requiring sloppy mode) are skipped. This is intentional.
+| construct | `Module` | `Script` |
+| --- | --- | --- |
+| `await` as identifier / binding / label / class name / param | reserved | **identifier** (`[~Await]`) |
+| top-level `await` *expression* | allowed | error |
+| `import.meta` | allowed | error |
+| top-level `import` / `export` *declarations* | allowed | error |
+
+(Dynamic `import(...)` is valid under both.) `sourceType` in the public AST follows
+the goal.
+
+**The runner grades each test at its declared goal**: a `module`-flagged test as
+`Module`, everything else it grades (the run-both-ways default + `onlyStrict`) as a
+strict `Script`. So the `await`-as-identifier tests (valid only in a strict Script)
+parse correctly — making tsv **more spec-correct than acorn-as-module**, which is
+module-only. This is a deliberate, spec-grounded divergence from the drop-in oracle's
+*module-mode* behavior, not a bug. The context tracking is a single `[Await]` flag
+saved/restored at every function-like scope boundary (async → `[+Await]`, non-async
+→ `[~Await]`, class static block → `[+Await]`); a side effect is that `await` as an
+*expression* in a non-async function is now correctly rejected in module code too
+(previously over-accepted).
 
 ## Differential Comparison (tsv vs oxc-parser)
 
@@ -300,8 +362,9 @@ each verdict against [oxc-parser](https://github.com/oxc-project/oxc):
 #    flag, expected verdict, tsv verdict). Honors the same path filters.
 cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json
 
-# 2. Deno consumer runs oxc-parser over the same files (parsed as a module, to
-#    mirror tsv) and buckets the agreement. Run from the repo root:
+# 2. Deno consumer runs oxc-parser over the same files at each test's goal
+#    (module-flagged → module, else script — mirroring tsv) and buckets the
+#    agreement. Run from the repo root:
 deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys \
   --config benches/js/deno.json \
   benches/js/diagnostics/test262_compare.ts --manifest /tmp/t262.json
@@ -313,14 +376,20 @@ oxc-parser is the alternative with a real, gradable accept/reject verdict
 format/lint), so it has no verdict to grade; it stays a *formatter* subject in
 the bench, not here.
 
-**Fairness — same subset, same mode.** The consumer runs oxc over *only* the
-tests tsv grades (the strict, non-sloppy, parse-phase subset), and parses every
-one as `sourceType: 'module'` — because tsv has no script mode (it parses
-everything as a strict ES module). A genuinely script-only test therefore
-rejects on both sides and lands in `both-reject`, correctly *not* attributed to
-tsv. The two actionable buckets:
+**Fairness — same subset, same goal.** The consumer runs oxc over *only* the
+tests tsv grades (the strict, non-sloppy, parse-phase subset), parsing each at the
+**same goal tsv grades it at** (`module`-flagged → `sourceType: 'module'`, else
+`'script'`) — so the two sides agree on the goal axis. One caveat: oxc's `'script'`
+is **sloppy** while tsv's `Goal::Script` is strict, so a *sloppy-by-content* script
+would show up as a positive "tsv rejects, oxc accepts" candidate even though it's a
+sanctioned strict-only divergence, not a bug. The one known such test
+(`hashbang/use-strict.js`, whose `#!` turns `"use strict"` into a comment, leaving a
+sloppy `with`) is skipped before grading, so it never enters the manifest; any future
+sloppy-by-content script would surface here and want the same treatment. The two
+actionable buckets:
 
-- **positives where tsv rejects but oxc accepts** → tsv real-bug candidates
+- **positives where tsv rejects but oxc accepts** → tsv real-bug candidates (modulo
+  the strict-vs-sloppy-script caveat above)
 - **negatives where oxc rejects but tsv accepts** → tsv early-error gaps (the
   deferred-diagnostics map; tsv under-enforces early errors by design)
 

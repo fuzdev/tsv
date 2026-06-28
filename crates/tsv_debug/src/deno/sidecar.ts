@@ -106,9 +106,13 @@ async function dispatch(
 		}
 
 		case 'acorn-typescript-parse': {
-			// Return AST object directly - Rust will serialize with tabs
+			// Return AST object directly - Rust will serialize with tabs.
+			// `sourceType` follows the parse goal: 'module' (default) or 'script'
+			// for standalone-script fixtures (where `await` is an ordinary
+			// identifier and `import`/`export`/`import.meta` are errors).
+			const sourceType = (options?.sourceType as 'script' | 'module' | undefined) ?? 'module';
 			return ParserWithTS.parse(content, {
-				sourceType: 'module',
+				sourceType,
 				ecmaVersion: 2025,
 				locations: true,
 			});

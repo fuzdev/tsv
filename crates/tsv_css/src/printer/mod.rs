@@ -4,7 +4,8 @@
 //
 // This module is organized by concern to support future expansion:
 //
-// - **mod.rs** (this file): Orchestration - coordinates printing of CSS nodes, core Printer
+// - **mod.rs** (this file): Orchestration - core Printer, top-level node printing, and
+//   the shared block-body routine (`print_css_block_children`, used by rules + at-rules)
 // - **selectors.rs**: Selector printing (reusable across rules and at-rules)
 // - **rules.rs**: CSS rule printing (selector + block structure)
 // - **declarations.rs**: Declaration printing + wrapping logic
@@ -16,7 +17,7 @@
 // 1. **Match Prettier**: Output matches prettier for compatibility
 // 2. **Preserve Semantics**: Never change CSS rendering semantics
 // 3. **Modularity**: Each module has single responsibility for future maintainability
-// 4. **Reusability**: Shared printing logic (selectors) used by multiple modules
+// 4. **Reusability**: Shared printing logic (selectors, block-body iteration) used by multiple modules
 // 5. **Hierarchy-Following**: Module structure mirrors CSS spec (rules → declarations → values)
 
 mod atrules;
@@ -26,7 +27,9 @@ mod selectors;
 pub mod value_normalization;
 mod values;
 
-use crate::ast::internal::{Comment, CssBlockChild, CssNode, CssStyleSheet, CssValue};
+use crate::ast::internal::{
+    Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet, CssValue,
+};
 use tsv_lang::{
     CommentPosition, EmbedContext, INDENT, OutputBuffer, TAB_WIDTH, classify_comment_fast,
     doc::{
@@ -124,10 +127,7 @@ impl<'a> Printer<'a> {
     ///
     /// Value comments are comments that appear after the colon, e.g., `color: /* comment */ red;`
     /// Detected by scanning the source text directly (value comments are not stored in the Vec).
-    pub(crate) fn has_value_comments_in_decl(
-        &self,
-        decl: &crate::ast::internal::CssDeclaration<'_>,
-    ) -> bool {
+    pub(crate) fn has_value_comments_in_decl(&self, decl: &CssDeclaration<'_>) -> bool {
         let decl_source = decl.span.extract(self.source);
         if let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) {
             let value_part = &decl_source[colon_pos + 1..];
@@ -163,11 +163,6 @@ impl<'a> Printer<'a> {
     /// Remove trailing newline from buffer (for inline comment handling)
     pub(crate) fn buffer_remove_trailing_newline(&mut self) {
         self.buffer.pop_if_ends_with('\n');
-    }
-
-    /// Check if the output buffer ends with a newline
-    pub(crate) fn output_ends_with_newline(&self) -> bool {
-        self.buffer.ends_with('\n')
     }
 
     /// Get the current column position (for doc-builder width calculations)
@@ -433,23 +428,6 @@ impl<'a> Printer<'a> {
         printed
     }
 
-    /// Check if there's an opening brace between two spans
-    ///
-    /// Used to detect if a comment is inside a block (after `{`) vs after a selector (before `{`)
-    pub(crate) fn has_opening_brace_between(&self, prev_end: u32, curr_start: u32) -> bool {
-        let prev_end = prev_end as usize;
-        let curr_start = curr_start as usize;
-
-        if prev_end > curr_start || curr_start > self.source.len() {
-            return false;
-        }
-
-        let between = &self.source[prev_end..curr_start];
-        between.contains('{')
-    }
-
-    /// Normalize comment spacing in raw strings
-    ///
     /// Print a single CSS node
     fn print_css_node(&mut self, node: &CssNode<'_>) {
         match node {
@@ -485,9 +463,8 @@ impl<'a> Printer<'a> {
             children.get(current_idx + 1 + consumed)
             && self.is_same_line(last_end, next_comment.span.start)
         {
-            self.write(" /*");
-            self.write(next_comment.content(self.source));
-            self.write("*/");
+            self.write(" ");
+            self.print_css_comment(next_comment);
             last_end = next_comment.span.end;
             consumed += 1;
         }
@@ -497,42 +474,126 @@ impl<'a> Printer<'a> {
 
     /// Try to print inline comments after a declaration
     ///
-    /// Similar to `try_print_inline_comments` but handles the declaration-specific
-    /// case where we need to remove the trailing newline before the first comment.
+    /// Like `try_print_inline_comments`, but a declaration ends with its own `\n`:
+    /// pull that newline back before trailing the first same-line comment, then
+    /// re-add it after. Delegates the per-comment loop so the two stay in lockstep.
     pub(crate) fn try_print_inline_comments_after_decl(
         &mut self,
         children: &[CssBlockChild<'_>],
         current_idx: usize,
         prev_end: u32,
     ) -> usize {
-        let mut consumed = 0;
-        let mut last_end = prev_end;
-
-        while let Some(CssBlockChild::Comment(next_comment)) =
-            children.get(current_idx + 1 + consumed)
-            && self.is_same_line(last_end, next_comment.span.start)
-        {
-            if consumed == 0 {
-                // First inline comment - remove the trailing newline from declaration
-                self.buffer_remove_trailing_newline();
-            }
-            self.write(" /*");
-            self.write(next_comment.content(self.source));
-            self.write("*/");
-            last_end = next_comment.span.end;
-            consumed += 1;
+        // Only a same-line comment trails the declaration; if the next child isn't
+        // one, leave the declaration's trailing newline in place.
+        let has_inline = matches!(
+            children.get(current_idx + 1),
+            Some(CssBlockChild::Comment(next)) if self.is_same_line(prev_end, next.span.start)
+        );
+        if !has_inline {
+            return 0;
         }
 
-        if consumed > 0 {
-            self.write("\n");
-        }
-
+        self.buffer_remove_trailing_newline();
+        let consumed = self.try_print_inline_comments(children, current_idx, prev_end);
+        self.write("\n");
         consumed
     }
 
-    /// Check if previous sibling is a comment
-    pub(crate) fn prev_is_comment(children: &[CssBlockChild<'_>], index: usize) -> bool {
-        index > 0 && matches!(children.get(index - 1), Some(CssBlockChild::Comment(_)))
+    /// Print a declaration — honoring a pending format-ignore directive — then any
+    /// same-line trailing comments, returning the number of comments consumed (advance
+    /// the loop index by it). Shared by the three CSS block-body loops (top-level rule
+    /// body, nested-rule body, at-rule direct-declaration body) so their declaration
+    /// handling stays in lockstep; drift between two of them was the at-rule
+    /// trailing-comment bug.
+    ///
+    /// The pending-ignore flag is passed by `&mut` and **consumed here** (read, then
+    /// reset to false) so the directive applies to exactly this one declaration. Folding
+    /// the reset into the helper means a caller cannot honor the flag without also
+    /// clearing it — the failure mode that left the at-rule body loop ignoring the
+    /// directive (it hardcoded `false`, skipping both honor and reset).
+    pub(crate) fn print_decl_with_inline_comments(
+        &mut self,
+        children: &[CssBlockChild<'_>],
+        index: usize,
+        decl: &CssDeclaration<'_>,
+        format_ignore_next: &mut bool,
+    ) -> usize {
+        if std::mem::take(format_ignore_next) {
+            self.write_format_ignore_declaration(decl);
+        } else {
+            self.print_css_declaration(decl);
+        }
+        self.try_print_inline_comments_after_decl(children, index, decl.span.end)
+    }
+
+    /// Print the children of a CSS block body — a rule's declaration list or an
+    /// at-rule block's child list — applying the per-child policy that the three
+    /// former block loops (top-level rule body, nested-rule body, at-rule direct
+    /// body) each re-implemented and drifted on: source-blank-line preservation, a
+    /// trailing-newline separator, inline trailing-comment capture after a nested
+    /// rule/at-rule, and a pending format-ignore directive.
+    ///
+    /// `start_index` skips any pre-`{` comments the caller already consumed inline
+    /// before the opening brace (0 for an at-rule block, whose prelude owns that
+    /// region). Centralizing the loop is what makes that drift impossible: every
+    /// child type is handled in exactly one place. The two earlier drift bugs —
+    /// a trailing comment after a nested at-rule's `}` and a format-ignore inside
+    /// an at-rule body — were each "one of the three loops handled case X, another
+    /// didn't"; with a single routine there is no "another".
+    pub(crate) fn print_css_block_children(
+        &mut self,
+        children: &[CssBlockChild<'_>],
+        start_index: usize,
+    ) {
+        let mut i = start_index;
+        let mut format_ignore_next = false;
+        while i < children.len() {
+            // Preserve a source blank line before any child (uniform across types).
+            if i > start_index && self.has_blank_line_before_child(children, i) {
+                self.write("\n");
+            }
+            match &children[i] {
+                CssBlockChild::Declaration(decl) => {
+                    i += self.print_decl_with_inline_comments(
+                        children,
+                        i,
+                        decl,
+                        &mut format_ignore_next,
+                    );
+                }
+                CssBlockChild::Comment(comment) => {
+                    // A format-ignore directive applies to the next child.
+                    if is_format_ignore_directive(comment.content(self.source)) {
+                        format_ignore_next = true;
+                    }
+                    self.write_indent();
+                    self.print_css_comment(comment);
+                    self.write("\n");
+                }
+                CssBlockChild::Rule(rule) => {
+                    self.write_indent();
+                    if std::mem::take(&mut format_ignore_next) {
+                        self.write(rule.span.extract(self.source));
+                    } else {
+                        self.print_css_rule(rule);
+                    }
+                    // Keep a same-line comment after the closing `}` on its line.
+                    i += self.try_print_inline_comments(children, i, rule.span.end);
+                    self.write("\n");
+                }
+                CssBlockChild::Atrule(atrule) => {
+                    self.write_indent();
+                    if std::mem::take(&mut format_ignore_next) {
+                        self.write(atrule.span.extract(self.source));
+                    } else {
+                        self.print_css_atrule(atrule);
+                    }
+                    i += self.try_print_inline_comments(children, i, atrule.span.end);
+                    self.write("\n");
+                }
+            }
+            i += 1;
+        }
     }
 
     /// Find the position after the `;` following a declaration's span end.

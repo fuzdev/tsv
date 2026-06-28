@@ -242,6 +242,7 @@ Foundation for all parsing.
 
 - `import()` expression - ES2020
 - `import.meta` meta-property
+- Phased dynamic import (`import.source(…)` / `import.defer(…)`) - Stage 3; tsv-native, acorn rejects (see [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals))
 
 ---
 
@@ -361,6 +362,7 @@ ES2015 module syntax with ES2024 additions.
 - String import name (`import {'str' as b} from 'mod'`) - ES2022
 - Side-effect import (`import 'mod'`)
 - Import attributes (`import x from 'y' with {}`) - ES2024
+- Phased import (`import source x from 'mod'` / `import defer * as ns from 'mod'`) - Stage 3; tsv-native, acorn rejects (see [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals))
 
 ### Export Declarations
 
@@ -648,8 +650,6 @@ Stage 2 proposals and experimental features tsv does not yet parse.
 
 ## Stage 3 Proposals (Not Widely Adopted)
 
-- Import source phase (`import source x from "mod"`)
-- Deferred import evaluation (`import defer * as ns from "mod"`)
 - RegExp modifiers (`(?i:pattern)` inline modifiers)
 
 ## Stage 2 Proposals
@@ -664,12 +664,18 @@ Stage 2 proposals and experimental features tsv does not yet parse.
 
 # Out of Scope
 
-## Strict Mode Only
+## Strict Mode Only (with an explicit goal axis)
 
 All code in Svelte scripts runs in strict mode (ES modules). tsv parses the
 syntactic grammar; it enforces the *lexical* strict-mode restrictions but not the
 strict-mode *early errors* — those still parse, with enforcement deferred to a
 future diagnostics layer.
+
+Strict and the *goal* (`Module` vs `Script`) are orthogonal — both goals are
+strict. tsv defaults to `Module` (Svelte hard-wires it); a `Script` goal is
+available (`parse_with_goal`, `--goal script`), where `await` is an ordinary
+identifier and `import`/`export`/`import.meta` are errors. See
+[conformance_test262.md](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
 
 Rejected by the parser today:
 

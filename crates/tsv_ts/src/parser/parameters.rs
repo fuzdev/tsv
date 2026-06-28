@@ -225,6 +225,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                     // TypeScript `this` parameter: `function f(this: T) {}`
                     TokenKind::Keyword(KeywordKind::This) => self.parse_simple_param()?,
+                    // `await` as a parameter name — valid only at Script goal in a
+                    // `[~Await]` context (`parse_simple_param` interns it via
+                    // `try_intern_param_name`).
+                    TokenKind::Keyword(KeywordKind::Await) if self.await_is_identifier() => {
+                        self.parse_simple_param()?
+                    }
                     TokenKind::BracketOpen | TokenKind::BraceOpen => {
                         // Destructuring pattern: [a, b] / {a, b}, with optional
                         // type annotation and default value

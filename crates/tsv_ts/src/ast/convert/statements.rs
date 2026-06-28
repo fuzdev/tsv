@@ -72,6 +72,8 @@ pub(in crate::ast) fn convert_statement<'src>(
             // Directive: acorn stores the raw string contents without quotes,
             // taken from the source of the directive literal expression.
             let directive = expr_stmt.is_directive.then(|| {
+                // A directive is a string-literal expression, so its source slice
+                // includes both quotes (≥2 bytes) and stripping them is in bounds.
                 let raw = expr_stmt.expression.span().extract(source);
                 Cow::Borrowed(&raw[1..raw.len() - 1])
             });
@@ -286,6 +288,7 @@ pub(in crate::ast) fn convert_statement<'src>(
                 end: import_decl.span.end,
                 loc: create_location(import_decl.span, loc, offset),
                 import_kind,
+                phase: import_decl.phase.as_str(),
                 specifiers: import_decl
                     .specifiers
                     .iter()

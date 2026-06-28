@@ -7,16 +7,17 @@
 // ## Architecture
 //
 // This module uses doc builders for width-based decisions (e.g., condition query
-// wrapping). The complex prelude and block handling remains imperative for clarity.
+// wrapping). The complex prelude handling remains imperative for clarity; the block
+// body is iterated by the shared `print_css_block_children` (see `mod.rs`).
 
 use std::borrow::Cow;
 
 use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::{self, DocBuf, Mode, arena::DocId};
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
-use tsv_lang::{comments_in_range, is_format_ignore_directive};
 
 /// A condition-query part with its content prepared for printing.
 ///
@@ -36,6 +37,12 @@ fn connector_str(conn: internal::ConditionConnector) -> &'static str {
         internal::ConditionConnector::And => "and",
         internal::ConditionConnector::Or => "or",
     }
+}
+
+/// Render a comment's content as a `/*content*/` block (String form, for
+/// condition-prelude comment splitting where the text is assembled before printing).
+fn comment_block(content: &str) -> String {
+    format!("/*{content}*/")
 }
 
 /// How a media-query prelude wraps when it exceeds print width.
@@ -188,222 +195,24 @@ impl<'a> Printer<'a> {
 
         if let Some(block) = &atrule.block {
             self.write(" {\n");
+            // Format the block's children via the shared block-body routine (also
+            // used by rule bodies). At-rule blocks have no pre-`{` comments — the
+            // prelude owns that region — so `start_index` is 0. A nested rule flows
+            // through the canonical `print_css_rule`, so it formats identically to a
+            // top-level rule (no separate at-rule-block rule path to drift).
             self.indent_level += 1;
-
-            let mut i = 0;
-            let mut format_ignore_next = false;
-            while i < block.children.len() {
-                let child = &block.children[i];
-
-                // For non-first children, add newline before rules/at-rules/comments
-                if i > 0 {
-                    match child {
-                        internal::CssBlockChild::Declaration(_) => {
-                            // Preserve blank line between consecutive declarations
-                            if self.has_blank_line_before_child(block.children, i) {
-                                self.write("\n");
-                            }
-                        }
-                        internal::CssBlockChild::Rule(_)
-                        | internal::CssBlockChild::Atrule(_)
-                        | internal::CssBlockChild::Comment(_) => {
-                            let has_blank_line =
-                                self.has_blank_line_before_child(block.children, i);
-
-                            // Declarations end with \n, standalone comments end with \n,
-                            // but rules/at-rules end with } and inline comments end with */
-                            // Check the actual output buffer rather than child type
-                            if !self.output_ends_with_newline() {
-                                self.write("\n"); // Separator
-                            }
-                            if has_blank_line {
-                                self.write("\n"); // Blank line
-                            }
-                        }
-                    }
-                }
-
-                // Format the child with appropriate indentation handling
-                match child {
-                    internal::CssBlockChild::Declaration(_) => {
-                        // Declaration will write its own indentation
-                        self.print_atrule_block_child(child);
-                    }
-                    internal::CssBlockChild::Rule(_) | internal::CssBlockChild::Atrule(_) => {
-                        // Rules and at-rules need indentation
-                        self.write_indent();
-                        if format_ignore_next {
-                            self.write(child.span().extract(self.source));
-                            format_ignore_next = false;
-                        } else {
-                            self.print_atrule_block_child(child);
-                        }
-
-                        // Check if next child is an inline comment
-                        let inline_count =
-                            self.try_print_inline_comments(block.children, i, child.span().end);
-                        i += inline_count;
-                    }
-                    internal::CssBlockChild::Comment(comment) => {
-                        // Check for a format-ignore directive
-                        if is_format_ignore_directive(comment.content(self.source)) {
-                            format_ignore_next = true;
-                        }
-                        // Standalone comment
-                        self.write_indent();
-                        self.print_atrule_block_child(child);
-                        self.write("\n");
-                    }
-                }
-
-                i += 1;
-            }
-
+            self.print_css_block_children(block.children, 0);
             self.indent_level -= 1;
 
-            // Write the newline before `}` only when the last child didn't already
-            // end one. Declarations end with `\n`; an empty block has no children at
-            // all, so the `{\n` already opened the line — prettier renders empty
-            // at-rule blocks as `{\n}` (no blank line inside).
-            if !block.children.is_empty()
-                && !matches!(
-                    block.children.last(),
-                    Some(internal::CssBlockChild::Declaration(_))
-                )
-            {
-                self.write("\n");
-            }
+            // Every child ends with `\n` (declarations/comments inherently,
+            // rules/at-rules via the routine's trailing newline), and an empty block
+            // leaves the `{\n` that opened the line — so the buffer always ends with a
+            // newline here, and the closing `}` is written at the outer indent.
+            // Prettier renders an empty at-rule block as `{\n}` (no blank line inside).
             self.write_indent();
             self.write("}");
         } else {
             self.write(";");
-        }
-    }
-
-    /// Format an at-rule block child (rule, declaration, or nested at-rule)
-    fn print_atrule_block_child(&mut self, child: &internal::CssBlockChild<'_>) {
-        match child {
-            internal::CssBlockChild::Rule(rule) => {
-                // Format rule selector and opening brace
-                self.print_selector_list(&rule.selector);
-
-                // Check if first child is a comment after selector (before {)
-                let mut start_index = 0;
-                if let Some(internal::CssBlockChild::Comment(comment)) = rule.declarations.first() {
-                    // Check if comment is on same line as selector AND before the opening brace
-                    // If there's a '{' between selector and comment, the comment is inside the block, not after selector
-                    if self.is_same_line(rule.selector.span.end, comment.span.start)
-                        && !self
-                            .has_opening_brace_between(rule.selector.span.end, comment.span.start)
-                    {
-                        // Print comment inline after selector
-                        self.write(" /*");
-                        self.write(comment.content(self.source));
-                        self.write("*/");
-                        start_index = 1; // Skip this comment when processing declarations
-                    }
-                }
-
-                self.write(" {\n");
-
-                // Format declarations and comments with proper indentation
-                self.indent_level += 1;
-                let mut i = start_index;
-                let mut format_ignore_next = false;
-                while i < rule.declarations.len() {
-                    let block_child = &rule.declarations[i];
-                    match block_child {
-                        internal::CssBlockChild::Declaration(decl) => {
-                            // Preserve blank line between consecutive declarations
-                            if i > start_index
-                                && self.has_blank_line_before_child(rule.declarations, i)
-                            {
-                                self.write("\n");
-                            }
-                            if format_ignore_next {
-                                self.write_format_ignore_declaration(decl);
-                                format_ignore_next = false;
-                            } else {
-                                self.print_css_declaration(decl);
-                            }
-
-                            // Check for inline comments after the declaration
-                            let inline_count = self.try_print_inline_comments_after_decl(
-                                rule.declarations,
-                                i,
-                                decl.span.end,
-                            );
-                            if inline_count > 0 {
-                                i += inline_count;
-                            }
-                        }
-                        internal::CssBlockChild::Comment(comment) => {
-                            // Standalone comment (not inline after a declaration)
-                            // Check if there's a blank line before this comment in source
-                            if i > start_index
-                                && self.has_blank_line_before_child(rule.declarations, i)
-                            {
-                                // Source has blank line - add it
-                                // Note: Previous element already ended with \n, so one more \n gives blank line
-                                self.write("\n");
-                            }
-                            // Check for a format-ignore directive
-                            if is_format_ignore_directive(comment.content(self.source)) {
-                                format_ignore_next = true;
-                            }
-                            self.write_indent();
-                            self.print_css_comment(comment);
-                            self.write("\n");
-                        }
-                        internal::CssBlockChild::Rule(nested_rule) => {
-                            // CSS Nesting Module - format nested rule inside at-rule block rule
-                            if i > start_index && !Self::prev_is_comment(rule.declarations, i) {
-                                self.write("\n");
-                            }
-                            self.write_indent();
-                            if format_ignore_next {
-                                self.write(nested_rule.span.extract(self.source));
-                                format_ignore_next = false;
-                            } else {
-                                self.print_css_rule(nested_rule);
-                            }
-
-                            // Check for inline comment after nested rule's closing brace
-                            let inline_count = self.try_print_inline_comments(
-                                rule.declarations,
-                                i,
-                                nested_rule.span.end,
-                            );
-
-                            self.write("\n");
-                            i += inline_count;
-                        }
-                        internal::CssBlockChild::Atrule(nested_atrule) => {
-                            // Nested at-rule inside rule
-                            if i > start_index && !Self::prev_is_comment(rule.declarations, i) {
-                                self.write("\n");
-                            }
-                            self.write_indent();
-                            if format_ignore_next {
-                                self.write(nested_atrule.span.extract(self.source));
-                                format_ignore_next = false;
-                            } else {
-                                self.print_css_atrule(nested_atrule);
-                            }
-                            self.write("\n");
-                        }
-                    }
-                    i += 1;
-                }
-                self.indent_level -= 1;
-
-                // Closing brace at current indentation level (inside at-rule)
-                self.write_indent();
-                self.write("}");
-            }
-            internal::CssBlockChild::Declaration(decl) => self.print_css_declaration(decl),
-            internal::CssBlockChild::Atrule(atrule) => self.print_css_atrule(atrule),
-            internal::CssBlockChild::Comment(comment) => self.print_css_comment(comment),
         }
     }
 
@@ -496,15 +305,7 @@ impl<'a> Printer<'a> {
 
         if fits {
             // Print inline with comments between parts
-            for (i, part) in parts.iter().enumerate() {
-                if i > 0 {
-                    self.write_condition_part_with_comments(parts[i - 1].span.end, part);
-                } else {
-                    self.write_leading_condition_comments(name_end_pos, part.span.start);
-                    self.write_connector(part.connector);
-                    self.write(&part.content);
-                }
-            }
+            self.write_condition_parts(parts, name_end_pos);
             // Print trailing comments after last part
             if let (Some(last_part), Some(span)) = (parts.last(), prelude_span) {
                 self.write_trailing_condition_comments(last_part.span.end, span.end);
@@ -514,15 +315,7 @@ impl<'a> Printer<'a> {
             let split_idx = self.find_condition_split_index(parts, current_col, suffix_len);
 
             // Print first line: parts[0..split_idx]
-            for (i, part) in parts[..split_idx].iter().enumerate() {
-                if i > 0 {
-                    self.write_condition_part_with_comments(parts[i - 1].span.end, part);
-                } else {
-                    self.write_leading_condition_comments(name_end_pos, part.span.start);
-                    self.write_connector(part.connector);
-                    self.write(&part.content);
-                }
-            }
+            self.write_condition_parts(&parts[..split_idx], name_end_pos);
 
             // Print trailing connector and continuation line
             if split_idx < parts.len() {
@@ -578,9 +371,7 @@ impl<'a> Printer<'a> {
                     if i > 0 {
                         self.write(" ");
                     }
-                    self.write("/*");
-                    self.write(comment.content(self.source));
-                    self.write("*/");
+                    self.print_css_comment(comment);
                 }
                 self.write(" ");
             }
@@ -593,9 +384,28 @@ impl<'a> Printer<'a> {
             comments_in_range(self.comments, last_part_end, prelude_end).collect();
         if !comments.is_empty() {
             for comment in comments.iter() {
-                self.write(" /*");
-                self.write(comment.content(self.source));
-                self.write("*/");
+                self.write(" ");
+                self.print_css_comment(comment);
+            }
+        }
+    }
+
+    /// Print a contiguous run of condition parts: leading comments + connector +
+    /// content for the first, then each subsequent part with its inter-part
+    /// comments. Shared by the fits-inline and wrapped-first-line branches (the
+    /// wrapped branch passes the `parts[..split_idx]` prefix).
+    fn write_condition_parts(
+        &mut self,
+        parts: &[NormalizedConditionPart<'_>],
+        name_end_pos: Option<u32>,
+    ) {
+        for (i, part) in parts.iter().enumerate() {
+            if i > 0 {
+                self.write_condition_part_with_comments(parts[i - 1].span.end, part);
+            } else {
+                self.write_leading_condition_comments(name_end_pos, part.span.start);
+                self.write_connector(part.connector);
+                self.write(&part.content);
             }
         }
     }
@@ -622,6 +432,15 @@ impl<'a> Printer<'a> {
         self.write(&part.content);
     }
 
+    /// Join a run of comments as space-separated `/*content*/` blocks.
+    fn join_condition_comments(&self, comments: &[&internal::Comment]) -> String {
+        comments
+            .iter()
+            .map(|c| comment_block(c.content(self.source)))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     /// Extract comments from source range, split around connector keyword
     ///
     /// Returns (comments_before_connector, comments_after_connector)
@@ -644,16 +463,7 @@ impl<'a> Printer<'a> {
             Some(internal::ConditionConnector::Or) => "or",
             None => {
                 // No connector - all comments go to "before"
-                let mut result = String::new();
-                for (i, comment) in comments.iter().enumerate() {
-                    if i > 0 {
-                        result.push(' ');
-                    }
-                    result.push_str("/*");
-                    result.push_str(comment.content(self.source));
-                    result.push_str("*/");
-                }
-                return (result, String::new());
+                return (self.join_condition_comments(&comments), String::new());
             }
         };
 
@@ -668,16 +478,7 @@ impl<'a> Printer<'a> {
             Some(pos) => start + pos as u32,
             None => {
                 // Connector not found - all comments go to "before"
-                let mut result = String::new();
-                for (i, comment) in comments.iter().enumerate() {
-                    if i > 0 {
-                        result.push(' ');
-                    }
-                    result.push_str("/*");
-                    result.push_str(comment.content(self.source));
-                    result.push_str("*/");
-                }
-                return (result, String::new());
+                return (self.join_condition_comments(&comments), String::new());
             }
         };
 
@@ -686,7 +487,7 @@ impl<'a> Printer<'a> {
         let mut after = String::new();
 
         for comment in comments {
-            let formatted = format!("/*{}*/", comment.content(self.source));
+            let formatted = comment_block(comment.content(self.source));
             if comment.span.end <= connector_abs_pos {
                 if !before.is_empty() {
                     before.push(' ');

@@ -55,7 +55,7 @@ pub use modules::{
     ExportAllDeclaration, ExportDefaultDeclaration, ExportDefaultValue, ExportFunctionDeclaration,
     ExportKind, ExportNamedDeclaration, ExportSpecifier, ImportAttribute, ImportAttributeKey,
     ImportDeclaration, ImportDefaultSpecifier, ImportKind, ImportNamedSpecifier,
-    ImportNamespaceSpecifier, ImportSpecifier, ModuleExportName, TSExportAssignment,
+    ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, ModuleExportName, TSExportAssignment,
     TSExternalModuleReference, TSImportEqualsDeclaration, TSModuleReference,
 };
 
@@ -110,6 +110,9 @@ pub struct Program<'arena> {
     pub line_breaks: Vec<u32>,
     pub span: Span,
     pub interner: std::rc::Rc<std::cell::RefCell<DefaultStringInterner>>,
+    /// The goal symbol this program was parsed against. Drives the public AST's
+    /// `sourceType` and (eventually) the goal-specific grammar gates.
+    pub goal: crate::Goal,
 }
 
 /// Decorator: `@expression` applied to classes and class members
@@ -162,6 +165,8 @@ impl<'arena> StringCooked<'arena> {
         match self {
             StringCooked::Verbatim => {
                 let raw = span.extract(source);
+                // The string token's source slice always includes both quote
+                // delimiters (≥2 bytes), so stripping one from each end is in bounds.
                 &raw[1..raw.len() - 1]
             }
             StringCooked::Decoded(decoded) => decoded,

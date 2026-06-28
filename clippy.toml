@@ -1,7 +1,9 @@
-# Restriction lints (`unwrap_used` / `expect_used` / `panic`) are warn-level
-# workspace-wide (see Cargo.toml `[workspace.lints.clippy]`) so production
-# panic points need an explicit justified `#[allow]`. Tests panic on assertion
-# failure by design, so allow the three there.
+# Restriction lints (`unwrap_used` / `expect_used` / `panic` / `unreachable`)
+# are warn-level workspace-wide (see Cargo.toml `[workspace.lints.clippy]`) so
+# production panic points need an explicit justified `#[allow]`. Tests panic on
+# assertion failure by design, so the unwrap/expect/panic trio is allowed there
+# via the settings below. (`unreachable` has no in-tests toggle, but tests use
+# `panic!`/`assert!`, not `unreachable!`, so none is needed.)
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-panic-in-tests = true

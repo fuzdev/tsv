@@ -11,6 +11,7 @@
 
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
+use crate::printer::HeritageKeyword;
 use crate::printer::Printer;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -208,7 +209,7 @@ impl<'a> Printer<'a> {
             return None;
         }
         Some(self.build_heritage_clause_doc(
-            "implements",
+            HeritageKeyword::Implements,
             implements,
             group_mode,
             implements_keyword_start,

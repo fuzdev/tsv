@@ -278,9 +278,11 @@ impl<'a> Printer<'a> {
         let mut prev_end = param.name.span.end;
 
         if let Some(constraint) = &param.constraint {
-            // Find `extends` keyword between name and constraint
-            #[allow(clippy::expect_used)]
-            // extends must exist when constraint is present in a valid AST
+            // Find `extends` keyword between name and constraint. A `TSTypeParameter`
+            // constraint is always spelled `extends` — mapped-type `[K in T]` keys use
+            // `in`, but those take a separate `TSMappedTypeParameter`/`build_mapped_type_doc`
+            // path and never reach here, so the keyword is guaranteed present.
+            #[allow(clippy::expect_used)] // extends always present for a type-parameter constraint
             let extends_pos = self
                 .find_keyword_in_range(prev_end, constraint.span().start, "extends")
                 .expect("extends keyword must exist when constraint is present");

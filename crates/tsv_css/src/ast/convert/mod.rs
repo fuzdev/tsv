@@ -338,12 +338,16 @@ fn convert_pseudo_class_args<'src>(
             });
             wrap_single_selector(type_selector, *span, scope)
         }
-        // Note: Slotted and Part args are parsed internally but NOT exposed in public AST
-        // This matches Svelte's behavior (they omit pseudo-element args from JSON output)
-        // Internal AST retains these for formatter/tooling, but convert_pseudo_class_args is
-        // only called for PseudoClass, not PseudoElement, so these cases are unreachable
+        // Slotted/Part args are parsed internally (for the formatter/tooling) but NOT
+        // exposed in the public AST — Svelte omits pseudo-element args from its JSON.
+        // The parser only ever builds these for the `::` pseudo-element form (see
+        // `parse_pseudo_args`'s `is_pseudo_element` gate); a single-colon `:slotted`/
+        // `:part` is parsed as an ordinary pseudo-class with selector-list args. Since
+        // pseudo-element nodes never reach `convert_pseudo_class_args`, these variants
+        // cannot appear here.
+        #[allow(clippy::unreachable)] // parser only builds Slotted/Part for `::` pseudo-elements
         internal::PseudoClassArgs::Slotted { .. } | internal::PseudoClassArgs::Part { .. } => {
-            unreachable!("Pseudo-element args not exposed in public AST")
+            unreachable!("Pseudo-element args (Slotted/Part) never attach to a pseudo-class")
         }
     }
 }
@@ -845,9 +849,14 @@ fn convert_simple_selector<'src>(
                 end: span.end,
             })
         }
+        // `Invalid` is only ever produced by `parse_forgiving_selector_list` (the
+        // `:is()`/`:where()` arguments), and every forgiving list reaches the public
+        // AST through `convert_selector_list_filtered`, which drops any complex
+        // selector containing an `Invalid`. The sole non-filtering caller,
+        // `convert_selector_list`, handles rule preludes — parsed non-forgivingly, so
+        // they never contain `Invalid`. Hence no `Invalid` reaches this match.
+        #[allow(clippy::unreachable)] // forgiving-list Invalids are filtered before convert
         internal::SimpleSelector::Invalid { .. } => {
-            // Invalid selectors should be filtered out before reaching this function
-            // This case exists for safety, but should never be hit in practice
             unreachable!("Invalid selectors should be filtered in convert_selector_list_filtered")
         }
     }

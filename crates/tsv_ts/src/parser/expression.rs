@@ -2,8 +2,8 @@
 
 use crate::ast::internal::{
     AssignmentExpression, AwaitExpression, BinaryExpression, BinaryOperator, BlockStatement,
-    CallExpression, ConditionalExpression, Expression, Identifier, ImportExpression, JsdocCast,
-    Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression, RegexLiteral,
+    CallExpression, ConditionalExpression, Expression, Identifier, ImportExpression, ImportPhase,
+    JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression, RegexLiteral,
     SequenceExpression, SpreadElement, Statement, Super, TSAsExpression, TSInstantiationExpression,
     TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression,
     ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
@@ -471,8 +471,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 ParsedExpr::from_expr(expr)
             }
             TokenKind::Keyword(KeywordKind::Await) => {
-                let expr = self.parse_await_expression()?;
-                ParsedExpr::from_expr(expr)
+                if self.in_await {
+                    // `[+Await]` context: a real await expression.
+                    let expr = self.parse_await_expression()?;
+                    ParsedExpr::from_expr(expr)
+                } else if self.await_is_identifier() {
+                    if self.is_single_param_arrow_start() {
+                        // Script `[~Await]`: `await => …` is an arrow whose single
+                        // `BindingIdentifier` parameter is `await`.
+                        ParsedExpr::from_expr(self.parse_single_param_arrow_function()?)
+                    } else {
+                        // Script `[~Await]`: `await` is an ordinary `IdentifierReference`.
+                        self.parse_await_identifier_reference()?
+                    }
+                } else {
+                    // Module `[~Await]`: `await` is reserved and there is no
+                    // `[+Await]` to make it an await expression.
+                    return Err(self.error_msg(
+                        "'await' is only allowed inside an async function or at the top level of a module",
+                    ));
+                }
             }
             TokenKind::Keyword(KeywordKind::Yield) => {
                 let expr = self.parse_yield_expression()?;
@@ -1102,6 +1120,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     end,
                 ))
             }
+            // `await` as an ordinary `IdentifierReference` (Script `[~Await]`) —
+            // e.g. a `new` callee (`new await()`) or any primary reference.
+            TokenKind::Keyword(KeywordKind::Await) if self.await_is_identifier() => {
+                self.parse_await_identifier_reference()
+            }
             TokenKind::BraceOpen => Ok(ParsedExpr::from_expr(self.parse_object_expression()?)),
             TokenKind::BracketOpen => Ok(ParsedExpr::from_expr(self.parse_array_expression()?)),
             TokenKind::Keyword(KeywordKind::True) => {
@@ -1424,6 +1447,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Plus => UnaryOperator::Plus,
             TokenKind::Bang => UnaryOperator::Bang,
             TokenKind::Tilde => UnaryOperator::Tilde,
+            // Private helper; the dispatcher routes only -/+/!/~ here.
+            #[allow(clippy::unreachable)] // caller dispatches on the same token set
             _ => unreachable!("parse_unary_expression called with non-unary operator"),
         };
         self.advance()?;
@@ -1455,6 +1480,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Typeof) => UnaryOperator::Typeof,
             TokenKind::Keyword(KeywordKind::Void) => UnaryOperator::Void,
             TokenKind::Keyword(KeywordKind::Delete) => UnaryOperator::Delete,
+            // Private helper; the dispatcher routes only typeof/void/delete here.
+            #[allow(clippy::unreachable)] // caller dispatches on the same token set
             _ => unreachable!("parse_unary_keyword_expression called with non-keyword operator"),
         };
         self.advance()?;
@@ -1486,6 +1513,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             argument: self.alloc(parsed.expr),
             span: Span::new(start as u32, end),
         }))
+    }
+
+    /// Consume the current `await` token as an ordinary `IdentifierReference`
+    /// (Script `[~Await]`). The caller must have verified `await_is_identifier()`
+    /// — used for a primary reference and a `new` callee (`new await()`).
+    fn parse_await_identifier_reference(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
+        let (start, end) = self.current_pos();
+        let symbol = self.intern("await");
+        self.advance()?;
+        Ok(ParsedExpr::with_end(
+            Expression::Identifier(Identifier::simple(
+                symbol,
+                Span::new(start as u32, end as u32),
+            )),
+            end,
+        ))
     }
 
     /// Parse yield expression: `yield`, `yield value`, or `yield* iterable`
@@ -1597,6 +1640,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let operator = match self.current_kind() {
             TokenKind::PlusPlus => UpdateOperator::Increment,
             TokenKind::MinusMinus => UpdateOperator::Decrement,
+            // Private helper; the dispatcher routes only ++/-- here.
+            #[allow(clippy::unreachable)] // caller dispatches on the same token set
             _ => unreachable!("parse_prefix_update_expression called with non-update operator"),
         };
         self.advance()?;
@@ -1802,20 +1847,40 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
+    /// Reject a spread element where an `ImportCall` argument (an
+    /// `AssignmentExpression`) is expected — `import(...x)` / `import.source(...x)`
+    /// are syntax errors (acorn agrees). Guards both argument positions, because the
+    /// primary-expression parser otherwise accepts a leading `...` as a
+    /// `SpreadElement` (valid only in array/object/call-argument contexts).
+    fn reject_import_call_spread(&self) -> Result<(), ParseError> {
+        if matches!(self.current_kind(), TokenKind::DotDotDot) {
+            return Err(self.error_msg("Cannot use spread element in import() argument"));
+        }
+        Ok(())
+    }
+
     /// Parse import expression or import.meta meta property
     ///
     /// Handles:
     /// - `import('module')` - dynamic import expression
+    /// - `import.source('module')` / `import.defer('module')` - phased dynamic
+    ///   import (Stage-3 source-phase-imports / import-defer proposals)
     /// - `import.meta` - meta property
     fn parse_import_or_meta_property(&mut self) -> Result<Expression<'arena>, ParseError> {
         let arena = self.arena;
         let (start, import_end) = self.current_pos();
         self.advance()?; // consume 'import'
 
-        // Check for import.meta meta property
+        // Check for `import.meta` / `import.source(…)` / `import.defer(…)`.
+        let mut phase = ImportPhase::None;
         if *self.current_kind() == TokenKind::Dot {
             self.advance()?; // consume '.'
             if *self.current_kind() == TokenKind::Identifier && self.current_value() == "meta" {
+                // `import.meta` is a Module-goal-only construct (early error:
+                // "Syntax Error if the syntactic goal symbol is not Module").
+                if self.goal != crate::Goal::Module {
+                    return Err(self.error_msg("'import.meta' is only allowed in a module"));
+                }
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'meta'
                 return Ok(Expression::MetaProperty(MetaProperty {
@@ -1830,16 +1895,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     span: Span::new(start as u32, prop_end as u32),
                 }));
             }
-            return Err(self.error_expected_after("'meta'", "import."));
+            // `import.source(…)` / `import.defer(…)` — the import-phase proposals.
+            // The phase keyword must be immediately followed by the `(` call: a bare
+            // `import.source` or a member access `import.source.x` is a syntax error
+            // (enforced by the `ParenOpen` expect below).
+            if *self.current_kind() == TokenKind::Identifier {
+                match self.current_value() {
+                    "source" => phase = ImportPhase::Source,
+                    "defer" => phase = ImportPhase::Defer,
+                    _ => return Err(self.error_expected_after("'meta'", "import.")),
+                }
+                self.advance()?; // consume 'source' / 'defer'
+            } else {
+                return Err(self.error_expected_after("'meta'", "import."));
+            }
         }
 
-        // Dynamic import: import('module') or import('module', options)
+        // Dynamic import: import('module') or import('module', options), possibly
+        // phased as import.source(...) / import.defer(...).
         self.expect(&TokenKind::ParenOpen)?;
 
         // The argument list is a grouping delimiter — `in` is always the binary
         // operator inside it, even within a for-header init (the args are
         // `AssignmentExpression[+In]`). Mirrors `parse_call_arguments`.
         self.grouping_depth += 1;
+
+        self.reject_import_call_spread()?;
 
         // Parse the source expression (usually a string literal)
         let source = self.parse_assignment_expression()?;
@@ -1855,6 +1936,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // comma. See docs/conformance_svelte.md.
         let mut options: Option<&'arena Expression<'arena>> = None;
         if self.eat(TokenKind::Comma) && !self.check(&TokenKind::ParenClose) {
+            self.reject_import_call_spread()?; // the options arg is likewise no spread
             options = Some(arena.alloc(self.parse_assignment_expression()?));
             self.eat(TokenKind::Comma); // optional trailing comma after the options
         }
@@ -1867,6 +1949,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(Expression::ImportExpression(ImportExpression {
             source: arena.alloc(source),
             options,
+            phase,
             span: Span::new(start as u32, paren_end as u32),
         }))
     }
