@@ -151,7 +151,11 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
 ) -> DocId {
     let d = printer.arena();
     match node {
-        ChainNode::Base { expr, needs_parens } => {
+        ChainNode::Base {
+            expr,
+            needs_parens,
+            paren_comment_end,
+        } => {
             if *needs_parens {
                 let inner = printer.print_expression(expr);
                 // Match Prettier: inner group handles indent-on-break,
@@ -191,6 +195,51 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                         )
                     }
                 };
+                // Preserve a comment from the stripped grouping parens inside them,
+                // before `)` (`(x + y /* c */)!.foo`) — prettier relocates it past
+                // `)`; tsv keeps it where the author wrote it.
+                if let Some(end) = *paren_comment_end {
+                    let start = expr.span().end;
+                    let classified = printer.classify_comments(start, end);
+                    let has_line =
+                        !classified.trailing_line.is_empty() || !classified.leading_line.is_empty();
+                    if has_line {
+                        // A line comment can't trail inline before `)` (the `//` would
+                        // swallow it), so force the multiline operand layout, keeping
+                        // the comment inside — the same shape as a unary line-comment
+                        // operand (`!(\n\tx + y // c\n)`).
+                        let leading_block =
+                            printer.build_leading_comments_doc(&classified.leading_block);
+                        let leading_line =
+                            printer.build_leading_comments_doc(&classified.leading_line);
+                        let trailing_block =
+                            printer.build_trailing_block_doc(&classified.trailing_block);
+                        let trailing_line =
+                            printer.build_trailing_line_doc(&classified.trailing_line);
+                        return d.concat(&[
+                            d.text("("),
+                            d.indent(d.concat(&[
+                                d.hardline(),
+                                leading_block,
+                                leading_line,
+                                inner,
+                                trailing_block,
+                                trailing_line,
+                            ])),
+                            d.hardline(),
+                            d.text(")"),
+                        ]);
+                    }
+                    if printer.has_comments_between(start, end) {
+                        let trailing = printer.build_block_comments_doc(
+                            start,
+                            end,
+                            crate::printer::CommentSpacing::Leading,
+                            false,
+                        );
+                        return d.concat(&[d.text("("), inner_group, trailing, d.text(")")]);
+                    }
+                }
                 d.parens(inner_group)
             } else {
                 printer.print_expression(expr)

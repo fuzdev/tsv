@@ -1,0 +1,294 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 171,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a parenthesized optional-chain callee keeps an outer paren wrapping the",
+			"start": 32,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " whole decorator expression",
+			"start": 109,
+			"end": 138,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 31
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 170,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 161,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 160,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 28,
+						"end": 160,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 141,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 4
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 155,
+									"end": 156,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 3
+										}
+									},
+									"name": "x"
+								},
+								"value": null,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 141,
+										"end": 152,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 13
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 143,
+											"end": 151,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 4
+												},
+												"end": {
+													"line": 5,
+													"column": 12
+												}
+											},
+											"callee": {
+												"type": "ChainExpression",
+												"start": 144,
+												"end": 148,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 5
+													},
+													"end": {
+														"line": 5,
+														"column": 9
+													}
+												},
+												"expression": {
+													"type": "MemberExpression",
+													"start": 144,
+													"end": 148,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 5
+														},
+														"end": {
+															"line": 5,
+															"column": 9
+														}
+													},
+													"object": {
+														"type": "Identifier",
+														"start": 144,
+														"end": 145,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 5
+															},
+															"end": {
+																"line": 5,
+																"column": 6
+															}
+														},
+														"name": "a"
+													},
+													"property": {
+														"type": "Identifier",
+														"start": 147,
+														"end": 148,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 8
+															},
+															"end": {
+																"line": 5,
+																"column": 9
+															}
+														},
+														"name": "b"
+													},
+													"computed": false,
+													"optional": true
+												}
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a parenthesized optional-chain callee keeps an outer paren wrapping the",
+										"start": 32,
+										"end": 106
+									},
+									{
+										"type": "Line",
+										"value": " whole decorator expression",
+										"start": 109,
+										"end": 138
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

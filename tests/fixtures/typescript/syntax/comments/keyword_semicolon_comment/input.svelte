@@ -1,7 +1,7 @@
 <script>
 	// Return with comment before semicolon (no argument)
 	function a() {
-		return /* comment */;
+		return; /* comment */
 	}
 
 	// Break with block comment before semicolon

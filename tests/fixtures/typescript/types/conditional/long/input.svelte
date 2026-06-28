@@ -26,10 +26,7 @@
 
 	// Long union in extends clause
 	type LongUnionCheck<T> = T extends
-		| LongTypeNameOne
-		| LongTypeNameTwo
-		| LongTypeNameThree
-		| LongTypeNameFour
+		LongTypeNameOne | LongTypeNameTwo | LongTypeNameThree | LongTypeNameFour
 		? LongTypeNameOne
 		: T;
 

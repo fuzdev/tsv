@@ -358,8 +358,8 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
   - [union_hug_object_interior_comment_svelte_divergence](../tests/fixtures/typescript/types/union_hug_object_interior_comment_svelte_divergence/)
   - [union_nonhug_object_interior_comment_svelte_divergence](../tests/fixtures/typescript/types/union_nonhug_object_interior_comment_svelte_divergence/)
   - [index_signature_union_intersection_value_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_union_intersection_value_svelte_divergence/) — index-signature value formatting; the divergence is the first label comment after `{`
-  - [call_type_arg_empty_comment_svelte_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_svelte_divergence/) — empty object type literal as a call type argument (`fn<{ /* … */ }>()`); the comment is inside the empty `{ }` body
-  - [call_type_arg_member_comment_svelte_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_member_comment_svelte_divergence/) — populated object type literal **and** mapped type as a call type argument (`fn<{ // … \n a: V }>()`, `fn<{ // … \n [K in keyof T]: V }>()`); a leading comment in the body/mapped header duplicates, a trailing member comment does not (control)
+  - [call_type_arg_empty_comment_svelte_prettier_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_svelte_prettier_divergence/) — empty object type literal as a call type argument (`fn<{ /* … */ }>()`); the comment is inside the empty `{ }` body (also a formatting divergence — see conformance_prettier.md §Single curly type-argument hug)
+  - [call_type_arg_member_comment_svelte_prettier_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_member_comment_svelte_prettier_divergence/) — populated object type literal **and** mapped type as a call type argument (`fn<{ // … \n a: V }>()`, `fn<{ // … \n [K in keyof T]: V }>()`); a leading comment in the body/mapped header duplicates, a trailing member comment does not (control) (also a formatting divergence — see conformance_prettier.md §Single curly type-argument hug)
   - [prettier_ignore_members_svelte_divergence](../tests/fixtures/typescript/syntax/comments/prettier_ignore_members_svelte_divergence/)
 
 - **Mapped type `{ [K in … ] }` header — a comment from `{` up to `in`:**
@@ -368,7 +368,7 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
 
 - **Function type parameter list — a comment in the parens before the param colon (the `tsIsUnambiguouslyStartOfFunctionType` lookahead; typed params are not exempt):**
   - [function_type_empty_param_comment_svelte_divergence](../tests/fixtures/typescript/types/function_type_empty_param_comment_svelte_divergence/)
-  - [empty_param_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/function_type/empty_param_line_comment_svelte_prettier_divergence/)
+  - [empty_param_line_comment_svelte_divergence](../tests/fixtures/typescript/types/function_type/empty_param_line_comment_svelte_divergence/)
   - [typed_param_comment_positions_svelte_divergence](../tests/fixtures/typescript/types/function_type/typed_param_comment_positions_svelte_divergence/)
   - [function_type_param_trailing_svelte_divergence](../tests/fixtures/typescript/types/comments/function_type_param_trailing_svelte_divergence/)
 
@@ -399,7 +399,6 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
 A comment on a return/property type annotation immediately followed by `;` (the
 member-type reparse) — root `comments` duplication, same mechanism as above:
 
-- [method_trailing_semicolon_comment_svelte_prettier_divergence](../tests/fixtures/typescript/declarations/class/method_trailing_semicolon_comment_svelte_prettier_divergence/)
 - [trailing_semicolon_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)
 
 Beyond acorn-typescript's per-parse duplication, **Svelte's own comment glue duplicates or drops comments at `<script>` and template boundaries**. tsv attaches each comment once, in its source region — the same anti-duplication stance as above. In every case below the distinct-comment set is identical (the comment is preserved on its source node and/or in the root `comments` array), `ast_diff` confirms semantic equivalence, and the formatter — which locates comments by position — is unaffected.

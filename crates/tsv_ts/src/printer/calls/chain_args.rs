@@ -12,14 +12,14 @@ use super::arg_comments::{
     last_arg_has_comments,
 };
 use super::arg_predicates::{
-    arrow_has_trailing_param_comments, is_block_function, is_concise_numeric_array,
-    is_curried_arrow, is_function_composition_args, is_short_second_arg_for_expand_first,
-    is_ternary_arrow_body, last_arg_is_array_or_object, preceding_args_allow_expand_last,
+    arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments, is_block_function,
+    is_concise_numeric_array, is_curried_arrow, is_function_composition_args,
+    is_short_second_arg_for_expand_first, is_ternary_arrow_body, last_arg_is_array_or_object,
+    preceding_args_allow_expand_last,
 };
 use super::arg_wrapping::{
-    ChainArgKind, arrow_has_type_annotations, arrow_has_type_reference_return,
-    build_args_split_last, build_arrow_inline_signature, build_arrow_sig_doc,
-    build_break_body_state, build_chain_expand_all_args, classify_chain_arg,
+    ChainArgKind, arrow_has_type_annotations, build_args_split_last, build_arrow_inline_signature,
+    build_arrow_sig_doc, build_break_body_state, build_chain_expand_all_args, classify_chain_arg,
     last_two_args_same_type, prepend_arrow_body_comments, wrap_args_with_soft_breaks,
     wrap_huggable_arg,
 };
@@ -202,8 +202,7 @@ fn is_single_arrow_with_breakable_body(arg: &Expression<'_>) -> bool {
     if let Expression::ArrowFunctionExpression(arrow) = arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
     {
-        return matches!(&**body_expr, Expression::CallExpression(_))
-            || is_ternary_arrow_body(body_expr);
+        return arrow_body_is_call_through_non_null(body_expr) || is_ternary_arrow_body(body_expr);
     }
     false
 }
@@ -492,8 +491,8 @@ fn build_chain_args_force_expand(
     // Special case: single arrow arg with breakable body (call, ternary).
     // Use the arrow-hugging break state directly: `(sig =>\n  body,\n)`
     // This matches prettier which keeps the signature hugged even when forcing expansion.
-    // Arrows with TSTypeReference return types fall through — prettier's couldExpandArg
-    // returns false for them, so they use default wrapping.
+    // couldExpandArg keys on the body type (looking through the return-type annotation),
+    // so typed-return arrows hug too.
     // Skip when standard_expansion is requested — short chains where the chain
     // doesn't break between groups need the standard `(\n  args,\n)` form to keep
     // the first line short enough for fits().
@@ -505,7 +504,6 @@ fn build_chain_args_force_expand(
         let arg = &call.arguments[0];
         if let Expression::ArrowFunctionExpression(arrow) = arg
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-            && !arrow_has_type_reference_return(arrow)
         {
             let body_doc = printer.build_expression_doc(body_expr);
             let body_doc =
@@ -706,16 +704,15 @@ fn build_chain_args_single(
     // Prettier keeps `(sig =>` hugged, breaking after `=>` to the body.
     // Structure: `(sig =>\n  body\n)` instead of `(\n  sig =>\n    body\n)`
     //
-    // Arrows with TSTypeReference return types (e.g., `: Promise<any>`) are NOT
-    // expandable per prettier's couldExpandArg, so they fall through to default
-    // wrapping via classify_chain_arg.
+    // couldExpandArg keys on the body type and looks through the return-type
+    // annotation plus a trailing non-null `!` (its `stripChainElementWrappers`),
+    // so typed-return and `=> call()!` arrows are call-body arrows too.
     //
     // Leading comments on the arg block expand-last (prettier's shouldExpandLastArg
     // returns false when hasComment(lastArg, Leading)).
     if let Expression::ArrowFunctionExpression(arrow) = arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-        && matches!(&**body_expr, Expression::CallExpression(_))
-        && !arrow_has_type_reference_return(arrow)
+        && arrow_body_is_call_through_non_null(body_expr)
         && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
@@ -768,13 +765,12 @@ fn build_chain_args_single(
     // Prettier uses conditional parens:
     // - Flat: `map((x) => (x ? y : z))` - with parens
     // - Break: `map((x) =>\n  x ? y : z)` - no parens, body indented
-    // Arrows with TSTypeReference return types are NOT expandable
-    // (prettier's couldExpandArg returns false), so they fall through.
+    // couldExpandArg keys on the body type (looking through the return-type
+    // annotation), so typed-return arrows are eligible.
     // Leading comments block expand-last (prettier's shouldExpandLastArg).
     if let Expression::ArrowFunctionExpression(arrow) = arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && is_ternary_arrow_body(body_expr)
-        && !arrow_has_type_reference_return(arrow)
         && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
@@ -830,8 +826,8 @@ fn build_chain_args_single(
     // Special case: arrow function with object/array expression body
     // Prettier's shouldExpandLastArg path: produces a 3-state conditional_group
     // so fluid assignments can expand call args instead of breaking after =.
-    // Arrows with TSTypeReference return types are NOT expandable
-    // (prettier's couldExpandArg returns false).
+    // couldExpandArg keys on the body type (looking through the return-type
+    // annotation), so typed-return arrows are eligible.
     // Leading comments block expand-last (prettier's shouldExpandLastArg).
     // See also: call_formatting.rs's parallel non-chain implementation.
     if let Expression::ArrowFunctionExpression(arrow) = arg
@@ -840,7 +836,6 @@ fn build_chain_args_single(
             &**body_expr,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         )
-        && !arrow_has_type_reference_return(arrow)
         && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
     {
         // Render the arrow with flat params (prettier's expandLastArg

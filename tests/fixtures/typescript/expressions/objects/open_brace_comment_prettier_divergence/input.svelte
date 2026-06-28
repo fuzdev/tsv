@@ -15,4 +15,9 @@
 		// lead
 		a: 1
 	};
+
+	// block comment trailing `{`, first property directly after
+	const o4 = { /* brace2 */
+		a: 1
+	};
 </script>

@@ -1,14 +1,14 @@
 <script>
-// Trailing comment after ) - preserved, prettier absorbs into block
+// Trailing comment after )
 while(a)// trailing
 {fn();}
 
-// Own-line comment before { - preserved on own line
+// Own-line comment before {
 while(a)
 // own line
 {fn();}
 
-// Blank line before comment - blank line preserved
+// Blank line before comment
 while(a)
 
 // blank before

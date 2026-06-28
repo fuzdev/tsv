@@ -1,0 +1,828 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 613,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Long inline trailing `=` line comment: the constraint union stays inline.",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline trailing comment that is intentionally long to exceed the width",
+			"start": 166,
+			"end": 239,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 27
+				},
+				"end": {
+					"line": 5,
+					"column": 100
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line comment about the default",
+			"start": 243,
+			"end": 280,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 3
+				},
+				"end": {
+					"line": 6,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two line comments after `=` stay on separate lines (inline + own-line), not merged.",
+			"start": 296,
+			"end": 382,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline comment",
+			"start": 402,
+			"end": 419,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 6
+				},
+				"end": {
+					"line": 12,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line comment",
+			"start": 423,
+			"end": 442,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 3
+				},
+				"end": {
+					"line": 13,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two line comments after `extends` stay on separate lines.",
+			"start": 458,
+			"end": 518,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline comment",
+			"start": 549,
+			"end": 566,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 12
+				},
+				"end": {
+					"line": 19,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line comment",
+			"start": 570,
+			"end": 589,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 3
+				},
+				"end": {
+					"line": 20,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 612,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 603,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 98,
+					"end": 293,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 103,
+						"end": 110,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 13
+							}
+						},
+						"name": "Default"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 110,
+						"end": 288,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 13
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 114,
+								"end": 137,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 25
+									}
+								},
+								"name": "P",
+								"constraint": {
+									"type": "TSUnionType",
+									"start": 124,
+									"end": 137,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 12
+										},
+										"end": {
+											"line": 4,
+											"column": 25
+										}
+									},
+									"types": [
+										{
+											"type": "TSUndefinedKeyword",
+											"start": 124,
+											"end": 133,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 12
+												},
+												"end": {
+													"line": 4,
+													"column": 21
+												}
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 136,
+											"end": 137,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 24
+												},
+												"end": {
+													"line": 4,
+													"column": 25
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 136,
+												"end": 137,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 24
+													},
+													"end": {
+														"line": 4,
+														"column": 25
+													}
+												},
+												"name": "A"
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeParameter",
+								"start": 141,
+								"end": 285,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 4
+									}
+								},
+								"name": "R",
+								"constraint": {
+									"type": "TSUnionType",
+									"start": 151,
+									"end": 163,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 12
+										},
+										"end": {
+											"line": 5,
+											"column": 24
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 151,
+											"end": 152,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 12
+												},
+												"end": {
+													"line": 5,
+													"column": 13
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 151,
+												"end": 152,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 12
+													},
+													"end": {
+														"line": 5,
+														"column": 13
+													}
+												},
+												"name": "A"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 155,
+											"end": 156,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 16
+												},
+												"end": {
+													"line": 5,
+													"column": 17
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 155,
+												"end": 156,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 16
+													},
+													"end": {
+														"line": 5,
+														"column": 17
+													}
+												},
+												"name": "B"
+											}
+										},
+										{
+											"type": "TSVoidKeyword",
+											"start": 159,
+											"end": 163,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 20
+												},
+												"end": {
+													"line": 5,
+													"column": 24
+												}
+											}
+										}
+									]
+								},
+								"default": {
+									"type": "TSTypeReference",
+									"start": 284,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 4
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 284,
+										"end": 285,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 3
+											},
+											"end": {
+												"line": 7,
+												"column": 4
+											}
+										},
+										"name": "C"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " inline trailing comment that is intentionally long to exceed the width",
+											"start": 166,
+											"end": 239
+										},
+										{
+											"type": "Line",
+											"value": " own-line comment about the default",
+											"start": 243,
+											"end": 280
+										}
+									]
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 291,
+						"end": 292,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 5
+							},
+							"end": {
+								"line": 8,
+								"column": 6
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 291,
+							"end": 292,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 5
+								},
+								"end": {
+									"line": 8,
+									"column": 6
+								}
+							},
+							"name": "R"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Long inline trailing `=` line comment: the constraint union stays inline.",
+							"start": 20,
+							"end": 96
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 384,
+					"end": 455,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 389,
+						"end": 394,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 6
+							},
+							"end": {
+								"line": 11,
+								"column": 11
+							}
+						},
+						"name": "Mixed"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 394,
+						"end": 450,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 11
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 398,
+								"end": 447,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 4
+									}
+								},
+								"name": "U",
+								"default": {
+									"type": "TSTypeReference",
+									"start": 446,
+									"end": 447,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 4
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 446,
+										"end": 447,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 4
+											}
+										},
+										"name": "V"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " inline comment",
+											"start": 402,
+											"end": 419
+										},
+										{
+											"type": "Line",
+											"value": " own-line comment",
+											"start": 423,
+											"end": 442
+										}
+									]
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 453,
+						"end": 454,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 5
+							},
+							"end": {
+								"line": 15,
+								"column": 6
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 453,
+							"end": 454,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 5
+								},
+								"end": {
+									"line": 15,
+									"column": 6
+								}
+							},
+							"name": "U"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two line comments after `=` stay on separate lines (inline + own-line), not merged.",
+							"start": 296,
+							"end": 382
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 520,
+					"end": 602,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 525,
+						"end": 535,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 16
+							}
+						},
+						"name": "Constraint"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 535,
+						"end": 597,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 16
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 539,
+								"end": 594,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 4
+									}
+								},
+								"name": "T",
+								"constraint": {
+									"type": "TSTypeReference",
+									"start": 593,
+									"end": 594,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 4
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 593,
+										"end": 594,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 3
+											},
+											"end": {
+												"line": 21,
+												"column": 4
+											}
+										},
+										"name": "A"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " inline comment",
+											"start": 549,
+											"end": 566
+										},
+										{
+											"type": "Line",
+											"value": " own-line comment",
+											"start": 570,
+											"end": 589
+										}
+									]
+								}
+							}
+						]
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 600,
+						"end": 601,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 5
+							},
+							"end": {
+								"line": 22,
+								"column": 6
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 600,
+							"end": 601,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 5
+								},
+								"end": {
+									"line": 22,
+									"column": 6
+								}
+							},
+							"name": "T"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Two line comments after `extends` stay on separate lines.",
+							"start": 458,
+							"end": 518
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

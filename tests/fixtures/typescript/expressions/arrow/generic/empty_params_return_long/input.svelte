@@ -23,7 +23,5 @@
 
 	// Empty params + breaking union return: type params stay inline, union hangs after colon
 	const unionReturn = <T, U>():
-		| AaaaaaaaaaaaaaaaaaaaaaaaaaName<T>
-		| BbbbbbbbbbbbbbbbbbbbbbName<U>
-		| Cccccccc<T> => null as any;
+		AaaaaaaaaaaaaaaaaaaaaaaaaaName<T> | BbbbbbbbbbbbbbbbbbbbbbName<U> | Cccccccc<T> => null as any;
 </script>

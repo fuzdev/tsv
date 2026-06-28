@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 188,
+	"end": 159,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " assignment trailing comment stays before the semicolon (matches prettier)",
+			"value": " assignment trailing comment trails after the semicolon",
 			"start": 10,
-			"end": 86,
+			"end": 67,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,31 +22,31 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 77
+					"column": 58
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 94,
-			"end": 101,
+			"start": 76,
+			"end": 83,
 			"loc": {
 				"start": {
 					"line": 3,
-					"column": 7
+					"column": 8
 				},
 				"end": {
 					"line": 3,
-					"column": 14
+					"column": 15
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " leading comment preserved before the expression",
-			"start": 105,
-			"end": 155,
+			"value": " leading comment before the expression",
+			"start": 86,
+			"end": 126,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 51
+					"column": 41
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 167,
-			"end": 174,
+			"start": 138,
+			"end": 145,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 187,
+		"end": 158,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 178,
+			"end": 149,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -97,8 +97,8 @@
 			"body": [
 				{
 					"type": "ExpressionStatement",
-					"start": 88,
-					"end": 102,
+					"start": 69,
+					"end": 75,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -106,13 +106,13 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 15
+							"column": 7
 						}
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 88,
-						"end": 93,
+						"start": 69,
+						"end": 74,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -126,8 +126,8 @@
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
-							"start": 88,
-							"end": 89,
+							"start": 69,
+							"end": 70,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -142,8 +142,8 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 92,
-							"end": 93,
+							"start": 73,
+							"end": 74,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -155,29 +155,29 @@
 								}
 							},
 							"name": "x"
-						},
-						"trailingComments": [
-							{
-								"type": "Block",
-								"value": " c ",
-								"start": 94,
-								"end": 101
-							}
-						]
+						}
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " assignment trailing comment stays before the semicolon (matches prettier)",
+							"value": " assignment trailing comment trails after the semicolon",
 							"start": 10,
-							"end": 86
+							"end": 67
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 76,
+							"end": 83
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 157,
-					"end": 177,
+					"start": 128,
+					"end": 148,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -191,8 +191,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 163,
-							"end": 176,
+							"start": 134,
+							"end": 147,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -205,8 +205,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 163,
-								"end": 164,
+								"start": 134,
+								"end": 135,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -221,8 +221,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 175,
-								"end": 176,
+								"start": 146,
+								"end": 147,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -238,8 +238,8 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 167,
-										"end": 174
+										"start": 138,
+										"end": 145
 									}
 								]
 							}
@@ -249,9 +249,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " leading comment preserved before the expression",
-							"start": 105,
-							"end": 155
+							"value": " leading comment before the expression",
+							"start": 86,
+							"end": 126
 						}
 					]
 				}

@@ -320,21 +320,27 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Superclass: `extends (a + b)`, `extends (a ? b : c)`, `extends (await x)`,
         // `extends ((a) => b)`, `extends (x as T)`, `extends (-x)`. The
         // lower-precedence and unary/update forms cover the operator cases; beyond
-        // those prettier also parenthesizes `new`, tagged templates, non-null, and a
-        // bare object (which would otherwise be read as the class body) — all valid
-        // `extends` operands it still wraps for clarity. Bare identifiers, member/call
-        // chains, literals, untagged templates, and `class`/`function` expressions
-        // stay unparenthesized. `SequenceExpression` is absent because
-        // `build_sequence_doc` already adds its own parens.
+        // those prettier also parenthesizes `new`, tagged templates, and a bare object
+        // (which would otherwise be read as the class body) — all valid `extends`
+        // operands it still wraps for clarity. Bare identifiers, member/call chains,
+        // literals, untagged templates, and `class`/`function` expressions stay
+        // unparenthesized. `SequenceExpression` is absent because `build_sequence_doc`
+        // already adds its own parens.
+        //
+        // Prettier first strips the chain-element wrappers (non-null `!` — and, in
+        // ESTree, the `ChainExpression` optional-chain wrapper, which tsv folds into
+        // member/call nodes) and tests the *inner* expression (#18652): a lone
+        // `extends (Base!)` drops to `extends Base!`, while `extends (new Base()!)`
+        // keeps the parens because the stripped `new` still wraps.
         ParenContext::SuperClass => {
-            is_lower_precedence(expr)
-                || is_unary_or_update(expr)
+            let stripped = strip_non_null_wrappers(expr);
+            is_lower_precedence(stripped)
+                || is_unary_or_update(stripped)
                 || matches!(
-                    expr,
+                    stripped,
                     Expression::ArrowFunctionExpression(_)
                         | Expression::NewExpression(_)
                         | Expression::TaggedTemplateExpression(_)
-                        | Expression::TSNonNullExpression(_)
                         | Expression::ObjectExpression(_)
                 )
         }
@@ -344,6 +350,25 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
 //
 // Simple predicates (expression type groupings)
 //
+
+/// Strip trailing non-null assertion (`!`) wrappers, returning the inner expression.
+///
+/// tsv's mirror of prettier's `stripChainElementWrappers`: tsv has no distinct
+/// `ChainExpression` node (optional chains fold into member/call), so only the
+/// non-null wrapper needs unwrapping. Shared by the `extends`-clause paren decision
+/// (#18652: `extends (Base!)` → `extends Base!`, the `!` binds tightly so the
+/// heritage paren is redundant) and the call-arg arrow-body check
+/// (`arrow_body_is_call_through_non_null`, `couldExpandArg`'s
+/// `isCallExpression(stripChainElementWrappers(body))` — `=> fn()!` is a call body
+/// that hugs the open paren).
+pub(in crate::printer) fn strip_non_null_wrappers<'a>(
+    mut expr: &'a Expression<'a>,
+) -> &'a Expression<'a> {
+    while let Expression::TSNonNullExpression(non_null) = expr {
+        expr = non_null.expression;
+    }
+    expr
+}
 
 /// `await x` or `yield x` - always need parens together in most contexts
 fn is_await_or_yield(expr: &Expression<'_>) -> bool {

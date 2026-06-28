@@ -63,7 +63,7 @@ impl<'a> Printer<'a> {
             // (prettier strips them too); other parens keep the `_` fall-through.
             match self.unwrap_redundant_parens(annotation.type_annotation) {
                 TSType::Union(u) => {
-                    let type_doc = self.build_union_type_doc(u, false);
+                    let type_doc = self.build_union_type_doc(u);
                     // Extract comments between `:` and the union type (e.g., `: /* c */ A | B`)
                     let comments_doc = self.build_comments_between(
                         colon_end,
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
 
         // Handle Union types - break after colon with indent when long
         if let TSType::Union(u) = value_type {
-            let type_doc = self.build_union_type_doc(u, false);
+            let type_doc = self.build_union_type_doc(u);
 
             // Extract comments between `:` and the union type (e.g., `: /* c */ A | B`)
             let comments_doc =

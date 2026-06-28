@@ -115,19 +115,21 @@ impl<'a> Printer<'a> {
     /// When flat: `A | B | C`
     /// When broken: each type on its own line with leading `| `
     ///
-    /// When `wrap_in_group` is true (default), wraps the union in its own group
-    /// so that it makes independent breaking decisions. This is appropriate for
-    /// most contexts (e.g., type parameter constraints should stay flat even
-    /// when the parameter list breaks).
+    /// The broken-member doc is **always its own group** — Prettier's
+    /// `printed = group(members)` (`union-type.js`). The caller owns the outer
+    /// wrapper (the hang/`indent([softline, …])` that supplies the break after
+    /// `=` / `:` / `as` / `extends` / a conditional branch) and nests this group
+    /// inside it. Because the members form their own group, a union broken from
+    /// its parent first re-fits on the indented continuation line
+    /// (`type X =\n\tA | B | C`) and only explodes to leading-pipe members
+    /// (`| A\n| B`) when that continuation line *also* overflows — Prettier 3.9's
+    /// "don't break union type when it can fit" (#18827). Before 3.9 a parent
+    /// break dragged the members straight to the leading-pipe form.
     ///
-    /// When `wrap_in_group` is false, the union inherits breaking from its parent
-    /// group. Use this for type alias values and index signature values where
-    /// the union should break together with the parent context.
-    pub(in crate::printer) fn build_union_type_doc(
-        &self,
-        union: &TSUnionType<'_>,
-        wrap_in_group: bool,
-    ) -> DocId {
+    /// The hug path (`{ … } | null`) and the line-comment path return bare,
+    /// ungrouped docs — they have no flat/broken choice to make (the object owns
+    /// its own expansion; line comments force multiline).
+    pub(in crate::printer) fn build_union_type_doc(&self, union: &TSUnionType<'_>) -> DocId {
         let d = self.d();
         if union.types.is_empty() {
             return d.empty();
@@ -265,13 +267,10 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if wrap_in_group {
-            // Independent breaking decision
-            d.group(d.concat(&parts))
-        } else {
-            // Inherit breaking from parent group
-            d.concat(&parts)
-        }
+        // Always group the broken-member doc (Prettier's `printed = group(members)`).
+        // The group makes the union's own flat/broken decision independently of the
+        // parent's break, so it re-fits on the continuation line before exploding.
+        d.group(d.concat(&parts))
     }
 
     /// Hanging-indent layout for a union used in a position where Prettier's
@@ -299,9 +298,11 @@ impl<'a> Printer<'a> {
         if should_hug_union_type(union) {
             return None;
         }
-        // `wrap_in_group = false`: the union inherits breaking from the hanging
-        // group so the after-keyword line and the member separators break together.
-        let union_doc = self.build_union_type_doc(union, false);
+        // The union members form their own group (`build_union_type_doc`), nested
+        // inside the hang's `group(indent([line, …]))`. When the hang breaks after
+        // the keyword, the member group still re-fits on the indented continuation
+        // line (`as\n\tA | B | C`) before exploding to leading-pipe members.
+        let union_doc = self.build_union_type_doc(union);
         Some(hang_after_operator(self.d(), union_doc))
     }
 

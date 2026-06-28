@@ -7,20 +7,17 @@ A line comment in the value-`:`→type gap of an index signature
 wrote it and the type drops to a continuation line **indented one level** so it
 reads as part of the member, not a sibling.
 
-```ts
-// tsv (continuation indents one level)   // prettier
-[k: string]: // c                         [k: string]: // c
-	A & B;                                A & B;
-```
-
-- **Union value** (`A | B`, cases I/T) — **matches** prettier: both indent the
-  continuation one level.
-- **Intersection value** (`A & B`, cases J/U) — **diverges**: tsv indents,
-  prettier leaves the type flush.
-- **Simple value** (`number`, case K) — **diverges**: tsv indents, prettier
-  leaves it flush. Index signatures have no implicit-`;` end-of-line relocation
-  (unlike a *property* signature, where prettier moves a simple type's comment to
-  EOL — see [annotation_simple](../../comments/annotation_simple_prettier_divergence/)).
+- **Union value** (`A | B`, cases I/T) — **diverges**: prettier drops the comment
+  onto its own line (`[k: string]:` then the comment and the union, indented); tsv
+  keeps it trailing the `:` and indents the union one level.
+- **Intersection value** (`A & B`, cases J/U) — **diverges**: both keep the
+  comment trailing `:`, but tsv indents the type one level while prettier leaves
+  it flush.
+- **Simple value** (`number`, case K) — **diverges**: same as the intersection
+  case (comment trails `:`, tsv indents, prettier flush). Index signatures have no
+  implicit-`;` end-of-line relocation (unlike a *property* signature, where
+  prettier moves a simple type's comment to EOL — see
+  [annotation_simple](../../comments/annotation_simple_prettier_divergence/)).
 
 A **block** comment in this gap (`[k: string]: /* c */ A & B`) stays inline in
 both formatters and is not a divergence — only a line comment (which runs to EOL,

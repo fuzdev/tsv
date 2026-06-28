@@ -2,8 +2,7 @@
 	// trailing line comment inside a retained parenthesized union member (first member)
 	type A1 =
 		| (
-				| a
-				| b // c
+				a | b // c
 			)
 		| c;
 
@@ -11,8 +10,7 @@
 	type A2 =
 		| a
 		| (
-				| b
-				| c // c
+				b | c // c
 			)
 		| d;
 </script>

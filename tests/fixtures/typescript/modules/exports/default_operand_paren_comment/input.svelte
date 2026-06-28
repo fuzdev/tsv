@@ -1,3 +1,3 @@
 <script>
-	export default x /* c */;
+	export default x; /* c */
 </script>

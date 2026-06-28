@@ -20,10 +20,10 @@
 		)
 	};
 
-	// Contrast: TSTypeReference return - NOT expandable, breaks at open paren
+	// TSTypeReference return + call body - sig hugged, body breaks after =>
 	const d = {
-		propAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: fn(
-			(x: string): Promise<any> => call(undefined)
+		propAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: fn((x: string): Promise<any> =>
+			call(undefined)
 		)
 	};
 </script>

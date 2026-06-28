@@ -1,20 +1,19 @@
 # else_line_comment_nonblock_prettier_divergence
 
-Line comment between `else` keyword and non-block body expression.
+A line comment between the `else` keyword and a non-block body expression
+(`} else // c1`, then the body on the next line).
 
-**Prettier**: relocates the comment before `else`:
-```
-} // c1
-else expr;
-```
+**Prettier** keeps the comment after `else` but drops it onto its **own line**,
+indented with the body. **tsv** keeps the comment trailing `else` on the **same
+line** (the author's placement), with the body indented beneath.
 
-**tsv**: preserves the comment after `else` (user placement), body indented:
-```
-} else // c1
-  expr;
-```
+A third form — the comment relocated *before* `else` (`} // c1`, then
+`else expr`) — is also prettier-stable, documented as the dual-stable
+`variant_comment_before_else.svelte`.
 
-Per Comment Position Philosophy: preserve user intent when prettier moves a comment.
-Both positions are dual-stable (`variant_comment_before_else.svelte`).
+## Reason
+
+Per Comment Position Philosophy: preserve user intent (the comment trailing the
+`else` keyword) rather than forcing it onto its own line.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

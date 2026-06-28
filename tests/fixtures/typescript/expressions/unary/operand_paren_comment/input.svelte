@@ -1,5 +1,5 @@
 <script>
-	// block comment after operand (paren stripped, comment lost)
+	// block comment after a simple operand
 	!(x /* c */);
 	typeof (x /* c */);
 	void (x /* c */);
@@ -9,23 +9,26 @@
 	!(/* c */ x);
 	typeof (/* c */ x);
 
-	// block comment after binary operand (paren kept, comment lost)
-	!((x + y) /* c */);
-	!((x || y) /* c */);
-	!((x = y) /* c */);
+	// block comment after a binary/logical operand (redundant parens stripped)
+	!(x + y /* c */);
+	!(x || y /* c */);
 
-	// multiline block comment after operand
+	// block comment before a binary operand
+	!(/* c */ x + y);
+
+	// assignment and ternary operands keep their parens
+	!((x = y) /* c */);
+	!((a ? b : c) /* c */);
+
+	// multiline block comment after a binary operand
 	!(
-		x
+		x + y
 		/* c */
 	);
 
-	// line comment after operand
+	// line comment after a binary operand
 	!(
-		x // c
-	);
-	typeof (
-		x // c
+		x + y // c
 	);
 
 	// multiline block comment before operand

@@ -138,6 +138,7 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>]) {
         ChainNode::Base {
             expr,
             needs_parens: np,
+            ..
         },
         ChainNode::Call { .. },
         ..,
@@ -182,21 +183,18 @@ fn child_stops_optional_chain(
 
 /// Push a sealed parenthesized-optional-chain object/callee as a base node.
 ///
-/// When the sealed child is a non-null assertion wrapping the chain (`(a?.b!).c`,
-/// `!` inside the parens), lift the `!` out: emit the bare chain as the
-/// parenthesized base, then a separate `NonNull` node. That renders `(a?.b)!.c` —
-/// prettier's canonical form, identical to the `!`-outside source `(a?.b)!.c`. The
-/// `!` is a type-only assertion, so its position relative to the grouping parens
-/// carries no runtime meaning, and both formatters normalize to the outside form.
-/// Any other sealed child (a bare optional chain, `(a?.b).c`) stays a single
-/// parenthesized base.
+/// The whole sealed child becomes the parenthesized base, preserving the author's
+/// `!` position **inside** the parens (`(a?.b!).c` stays `(a?.b!).c`, not the lifted
+/// `(a?.b)!.c`). Prettier 3.9 ([#18661](https://github.com/prettier/prettier/pull/18661))
+/// stopped lifting the `!` outside the grouping parens; the two forms are
+/// semantically identical (the `!` is a type-only assertion and the parens seal the
+/// chain at the same runtime point), and they have *different* ESTree ASTs
+/// (`ChainExpression(TSNonNull(…))` vs `TSNonNull(ChainExpression(…))`), so
+/// preserving the author's form keeps tsv's output AST-faithful to the input.
+/// The `!`-outside source (`(a?.b)!.c`) takes the `seals_optional_chain` arm in
+/// `linearize_recursive` instead (it never reaches here), so it stays as written too.
 fn push_sealed_chain_base<'a>(child: &'a Expression<'_>, nodes: &mut ChainNodeVec<'a>) {
-    if let Expression::TSNonNullExpression(non_null) = child {
-        nodes.push(ChainNode::base(non_null.expression, true));
-        nodes.push(ChainNode::non_null());
-    } else {
-        nodes.push(ChainNode::base(child, true));
-    }
+    nodes.push(ChainNode::base(child, true));
 }
 
 fn linearize_recursive<'a>(
@@ -234,9 +232,21 @@ fn linearize_recursive<'a>(
             // parenthesized base + `!` so it renders `(a?.b)!.c`, not `a?.b!.c`.
             let inner = &non_null.expression;
             if non_null.seals_optional_chain() {
-                nodes.push(ChainNode::base(inner, true));
+                nodes.push(ChainNode::base_with_paren_comment(inner, non_null.span.end));
             } else {
                 linearize_recursive(inner, nodes, paren_gaps);
+                // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
+                // lives between the operand and the `!`. When the operand is a
+                // parenthesized base, keep the comment INSIDE the parens, where the
+                // author wrote it, rather than dropping it.
+                if let Some(ChainNode::Base {
+                    needs_parens: true,
+                    paren_comment_end,
+                    ..
+                }) = nodes.last_mut()
+                {
+                    *paren_comment_end = Some(non_null.span.end);
+                }
             }
             nodes.push(ChainNode::non_null());
         }
@@ -266,7 +276,8 @@ fn linearize_recursive<'a>(
 /// chain:
 /// - A parenthesized optional chain (`(a?.b).c`, `(a?.b!).c`) terminates the
 ///   chain — see `child_stops_optional_chain`; the base is built via
-///   `push_sealed_chain_base` (which lifts an inner `!` out of the parens).
+///   `push_sealed_chain_base` (which keeps the whole sealed child, `!` included,
+///   inside the parens, preserving the author's form).
 /// - A `TSInstantiationExpression` must keep its type args and be parenthesized:
 ///   `(A<T>).x`, not `A.x` (data loss) or `A<T>.x` (ambiguous). Prettier
 ///   parenthesizes an instantiation only when it is the object of a member

@@ -448,7 +448,7 @@ impl<'a> Printer<'a> {
     /// Build doc for empty object pattern: `{}` with optional type annotation
     fn build_empty_object_pattern_doc(&self, obj: &internal::ObjectPattern<'_>) -> DocId {
         let d = self.d();
-        let body_doc = self.build_empty_body_with_comments_doc(obj.span);
+        let body_doc = self.build_empty_braces_inline_with_comments_doc(obj.span);
         if let Some(type_annotation) = &obj.type_annotation {
             d.concat(&[body_doc, self.build_type_annotation_doc(type_annotation)])
         } else {
@@ -670,7 +670,8 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map_or(arr.span.end, |t| t.span.start);
 
-        let body_doc = self.build_empty_brackets_with_comments_doc_range(arr.span.start, body_end);
+        let body_doc =
+            self.build_empty_brackets_inline_with_comments_doc_range(arr.span.start, body_end);
 
         if let Some(type_annotation) = &arr.type_annotation {
             d.concat(&[body_doc, self.build_type_annotation_doc(type_annotation)])

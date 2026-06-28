@@ -418,14 +418,50 @@ impl<'a> Printer<'a> {
         delim_pos: u32,
         first_elem_start: u32,
     ) -> (DocBuf, Option<u32>) {
+        self.delimiter_line_comment_prefix_impl(delim_pos, first_elem_start, false)
+    }
+
+    /// Object-literal variant of `delimiter_line_comment_prefix` that *also* pulls
+    /// a block comment sharing the opening `{` line onto that line when the first
+    /// property is on a later line (the object spans multiple lines). An object
+    /// literal preserves its authored multi-line-ness, so a source newline before
+    /// the first property means it will break, and the block trails `{` (like a
+    /// line comment does) instead of dropping to the property's leading line.
+    /// Collapsing containers (arrays, arg lists) keep the base behavior and call
+    /// the plain form. The caller must treat a fired pull as forcing must-break
+    /// (the prefix is only emitted on the break path).
+    pub(in crate::printer) fn delimiter_line_comment_prefix_object(
+        &self,
+        delim_pos: u32,
+        first_elem_start: u32,
+    ) -> (DocBuf, Option<u32>) {
+        self.delimiter_line_comment_prefix_impl(delim_pos, first_elem_start, true)
+    }
+
+    fn delimiter_line_comment_prefix_impl(
+        &self,
+        delim_pos: u32,
+        first_elem_start: u32,
+        pull_expanding_block: bool,
+    ) -> (DocBuf, Option<u32>) {
         let pc = super::calls::PartitionedComments::new(
             self.comments,
             self.line_breaks,
             delim_pos,
             first_elem_start,
         );
+        // The base rule gates the pull on forced expansion (a line comment, or a
+        // block standalone on its own line). `pull_expanding_block` adds the
+        // object case: a block on the delimiter line with the first element on a
+        // later line — the object will break, so the block trails the `{`.
         let pull = (!pc.trailing_block.is_empty() || !pc.trailing_line.is_empty())
-            && super::calls::should_force_expansion_for_comments(self, delim_pos, first_elem_start);
+            && (super::calls::should_force_expansion_for_comments(
+                self,
+                delim_pos,
+                first_elem_start,
+            ) || (pull_expanding_block
+                && !pc.trailing_block.is_empty()
+                && !self.is_same_line(delim_pos, first_elem_start)));
         let mut prefix = DocBuf::new();
         if pull {
             pc.emit_trailing_comments(&mut prefix, self);
@@ -513,36 +549,13 @@ impl<'a> Printer<'a> {
     ///
     /// If no comments, returns `{}`.
     ///
-    /// Used by: interface body, class body, enum body, namespace body, object literal, object pattern.
+    /// Always breaks when a comment is present — used by the containers prettier
+    /// keeps exploded (class body, interface body, namespace body). The
+    /// containers that keep a fitting block comment inline (object literals and
+    /// patterns, enum bodies, type literals) use the
+    /// `build_empty_*_inline_with_comments_doc` helpers instead.
     pub(crate) fn build_empty_body_with_comments_doc(&self, body_span: Span) -> DocId {
         self.build_empty_delimited_with_comments_doc(body_span.start, body_span.end, "{", "}")
-    }
-
-    /// Build a Doc for an empty bracket body (`[]`) that may contain comments.
-    ///
-    /// If comments exist between the brackets, formats as:
-    /// ```text
-    /// [
-    ///     // comment
-    /// ]
-    /// ```
-    ///
-    /// If no comments, returns `[]`.
-    ///
-    /// Used by: array literal, tuple type.
-    pub(crate) fn build_empty_brackets_with_comments_doc(&self, span: Span) -> DocId {
-        self.build_empty_delimited_with_comments_doc(span.start, span.end, "[", "]")
-    }
-
-    /// Build a Doc for an empty bracket body with explicit bounds.
-    ///
-    /// Used when the bracket body ends before the full span (e.g., array pattern with type annotation).
-    pub(crate) fn build_empty_brackets_with_comments_doc_range(
-        &self,
-        body_start: u32,
-        body_end: u32,
-    ) -> DocId {
-        self.build_empty_delimited_with_comments_doc(body_start, body_end, "[", "]")
     }
 
     /// Build a Doc for an empty delimited container that may contain comments.
@@ -559,23 +572,20 @@ impl<'a> Printer<'a> {
         let body_start = span_start + 1; // After opening delimiter
         let body_end = span_end.saturating_sub(1); // Before closing delimiter
 
-        // Single binary search to find comments
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, body_start);
-        let comments: Vec<_> = self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= body_end)
-            .collect();
+        // Single binary search to find comments (no collect: peek covers both the
+        // empty check and the is-last check).
+        let mut comments = comments_in_range(self.comments, body_start, body_end).peekable();
 
-        if comments.is_empty() {
+        if comments.peek().is_none() {
             return d.text_owned(format!("{open}{close}"));
         }
         let mut comment_parts = DocBuf::new();
 
-        for (i, comment) in comments.iter().enumerate() {
+        while let Some(comment) = comments.next() {
             comment_parts.push(self.build_comment_doc(comment));
             // Add hardline after line comments, except for the last one
             // (the hardline before closing delimiter handles that)
-            if !comment.is_block && i < comments.len() - 1 {
+            if !comment.is_block && comments.peek().is_some() {
                 comment_parts.push(d.hardline());
             }
         }
@@ -586,6 +596,114 @@ impl<'a> Printer<'a> {
             d.hardline(),
             d.text(close),
         ])
+    }
+
+    /// Build a Doc for an empty `{}` body whose only content is a dangling
+    /// comment, keeping a fitting block comment inline (`{/* c */}`).
+    ///
+    /// No bracket spacing — used by object literals/patterns and enum bodies,
+    /// which prettier prints as `{/* c */}` (no surrounding spaces). See
+    /// [`Self::build_empty_inline_with_comments_doc`].
+    pub(crate) fn build_empty_braces_inline_with_comments_doc(&self, body_span: Span) -> DocId {
+        let d = self.d();
+        let sep = d.softline();
+        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{", "}", sep)
+    }
+
+    /// Build a Doc for an empty type-literal `{}` body whose only content is a
+    /// dangling comment, keeping a fitting block comment inline with bracket
+    /// spacing (`{ /* c */ }`).
+    ///
+    /// Type literals carry bracket spacing even in the empty-dangling case
+    /// (prettier prints `type B = { /* c */ }` with surrounding spaces),
+    /// unlike object literals. See [`Self::build_empty_inline_with_comments_doc`].
+    pub(crate) fn build_empty_type_literal_inline_with_comments_doc(
+        &self,
+        body_span: Span,
+    ) -> DocId {
+        let d = self.d();
+        let sep = d.line();
+        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{", "}", sep)
+    }
+
+    /// Build a Doc for an empty bracket `[]` body whose only content is a
+    /// dangling comment, keeping a fitting block comment inline (`[/* c */]`).
+    ///
+    /// Used by array literals/patterns and tuple types. See
+    /// [`Self::build_empty_inline_with_comments_doc`].
+    pub(crate) fn build_empty_brackets_inline_with_comments_doc(&self, span: Span) -> DocId {
+        self.build_empty_brackets_inline_with_comments_doc_range(span.start, span.end)
+    }
+
+    /// Build a Doc for an empty bracket `[]` body with explicit bounds (e.g. an
+    /// array pattern with a type annotation). See
+    /// [`Self::build_empty_brackets_inline_with_comments_doc`].
+    pub(crate) fn build_empty_brackets_inline_with_comments_doc_range(
+        &self,
+        body_start: u32,
+        body_end: u32,
+    ) -> DocId {
+        let d = self.d();
+        let sep = d.softline();
+        self.build_empty_inline_with_comments_doc(body_start, body_end, "[", "]", sep)
+    }
+
+    /// Build a Doc for an empty delimited container whose only content is a
+    /// dangling comment, matching prettier 3.9's `printDanglingCommentsInList`
+    /// (prettier PRs #18617 / #18615): a block comment that fits stays inline
+    /// (`[/* c */]`, `{/* c */}`); a line comment can't be inlined and forces
+    /// the break, and an overflowing or multi-line block comment breaks via the
+    /// enclosing group. `sep` is the open/close separator — `softline` (no
+    /// space) for brackets, object literals/patterns, and enum bodies, `line`
+    /// (bracket spacing) for type literals.
+    ///
+    /// Containers that always break with a dangling comment (class, interface,
+    /// and namespace bodies) keep using
+    /// [`Self::build_empty_delimited_with_comments_doc`] instead.
+    fn build_empty_inline_with_comments_doc(
+        &self,
+        span_start: u32,
+        span_end: u32,
+        open: &'static str,
+        close: &'static str,
+        sep: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let body_start = span_start + 1; // After opening delimiter
+        let body_end = span_end.saturating_sub(1); // Before closing delimiter
+
+        // Single binary search to find comments
+        let first_idx = tsv_lang::find_first_comment_from(self.comments, body_start);
+        let comments: Vec<_> = self.comments[first_idx..]
+            .iter()
+            .take_while(|c| c.span.end <= body_end)
+            .collect();
+
+        if comments.is_empty() {
+            return d.text_owned(format!("{open}{close}"));
+        }
+
+        // Dangling comments join with hardline (prettier `printDanglingComments`).
+        let mut comment_parts = DocBuf::new();
+        for (i, comment) in comments.iter().enumerate() {
+            if i > 0 {
+                comment_parts.push(d.hardline());
+            }
+            comment_parts.push(self.build_comment_doc(comment));
+        }
+
+        // A line comment can't be inlined, so it forces the break; a fitting
+        // block comment stays inline (the group breaks on overflow / a multi-line
+        // block comment's own hardlines).
+        let has_line = comments.iter().any(|c| !c.is_block);
+        let close_sep = if has_line { d.hardline() } else { sep };
+
+        d.group(d.concat(&[
+            d.text(open),
+            d.indent(d.concat(&[sep, d.concat(&comment_parts)])),
+            close_sep,
+            d.text(close),
+        ]))
     }
 
     /// Append a function/method body with comment splitting between signature and body.
@@ -663,28 +781,41 @@ impl<'a> Printer<'a> {
     ///
     /// - a **same-line** comment is pushed to `parts` (before the separator) — a block
     ///   inline (`X /* c */<sep>`, preserved), a line via `line_suffix` (zero width, so
-    ///   it floats past the separator to the next hardline → `X<sep> // c`);
+    ///   it floats past the separator to the next hardline → `X<sep> // c`) — *except*
+    ///   that when `block_after_separator` is set a same-line **block** is instead
+    ///   *returned* (deferred), so it trails **after** the separator (`X<sep> /* c */`);
     /// - an **own-line** comment is *returned* (not pushed), each on its own line
     ///   (`hardline` + comment), for the caller to emit **after** the separator so the
     ///   author's line break is kept and a `//` can't swallow the separator.
     ///
-    /// Caller idiom: `let after = self.split_separator_gap_comments(parts, start, sep);
-    /// parts.push(sep_text); parts.extend(after);`. Shared by the list `,` separator
-    /// (`emit_multiline_comma_with_comments`) and the statement/member `;` terminator
-    /// (variable / expression-statement / class-property). Emitting an own-line comment
-    /// *before* the separator would put the separator on the comment's line — a `//`
-    /// swallows it (content loss), a block just diverges from prettier.
+    /// `block_after_separator` is the prettier-3.9 behavior for the statement/member
+    /// **`;` terminator** (the `;` is pure structure, so trailing a block past it is
+    /// lossless — `expr; /* c */`); the list **`,` separator** passes `false` and keeps
+    /// a same-line block before the comma (`X /* c */,`) — prettier did not change that.
+    ///
+    /// Caller idiom: `let after = self.split_separator_gap_comments(parts, start, sep,
+    /// block_after_separator); parts.push(sep_text); parts.extend(after);`. Shared by the
+    /// list `,` separator (`emit_multiline_comma_with_comments`, `false`) and the
+    /// statement/member `;` terminator (variable / expression-statement / class-property,
+    /// `true`). Emitting an own-line comment *before* the separator would put the
+    /// separator on the comment's line — a `//` swallows it (content loss), a block just
+    /// diverges from prettier.
     pub(crate) fn split_separator_gap_comments(
         &self,
         parts: &mut DocBuf,
         start: u32,
         sep_pos: u32,
+        block_after_separator: bool,
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
         for comment in comments_in_range(self.comments, start, sep_pos) {
             if self.is_same_line(start, comment.span.start) {
-                parts.push(self.build_trailing_comment_doc(comment));
+                if block_after_separator && comment.is_block {
+                    deferred.push(self.build_trailing_comment_doc(comment));
+                } else {
+                    parts.push(self.build_trailing_comment_doc(comment));
+                }
             } else {
                 deferred.push(d.hardline());
                 deferred.push(self.build_comment_doc(comment));
@@ -772,10 +903,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let comma_pos = self.find_list_comma(elem_end, next_start);
 
-        // The comma binds to the element; same-line gap comments stay before it,
-        // own-line ones defer to after it (leading the next element). See
-        // `split_separator_gap_comments`.
-        let deferred_own_line = self.split_separator_gap_comments(parts, elem_end, comma_pos);
+        // The comma binds to the element; same-line gap comments stay before it
+        // (block inline, line via `line_suffix`), own-line ones defer to after it
+        // (leading the next element). A same-line block stays *before* the comma
+        // (`block_after_separator: false`) — prettier 3.9 only moved the `;` case.
+        // See `split_separator_gap_comments`.
+        let deferred_own_line =
+            self.split_separator_gap_comments(parts, elem_end, comma_pos, false);
         parts.push(d.text(","));
         parts.extend(deferred_own_line);
 

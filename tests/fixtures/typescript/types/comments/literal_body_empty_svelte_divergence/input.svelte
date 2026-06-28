@@ -3,7 +3,5 @@
 		// line comment
 	};
 
-	type B = {
-		/* block comment */
-	};
+	type B = { /* block comment */ };
 </script>

@@ -105,7 +105,7 @@ impl<'a> Printer<'a> {
                 skip_delim,
             ));
 
-            inner_parts.push(self.build_type_parameter_doc(param, false));
+            inner_parts.push(self.build_type_parameter_doc(param));
 
             if !is_last {
                 let next_start = decl.params[i + 1].span.start;
@@ -184,7 +184,7 @@ impl<'a> Printer<'a> {
                     CommentSpacing::Trailing,
                     CommentFilter::BlockOnly,
                 ));
-                parts.push(self.build_type_parameter_doc(param, false));
+                parts.push(self.build_type_parameter_doc(param));
 
                 if i + 1 < decl.params.len() {
                     // Find comma between this param and next
@@ -238,16 +238,14 @@ impl<'a> Printer<'a> {
     /// Build doc for a single type parameter
     /// With optional modifiers: `const T`, `in T`, `out T`, `in out T`
     ///
-    /// `infer_constraint` is set only when this parameter is an `infer`'s type
-    /// parameter (`infer U extends C`). An infer is always nested in a
-    /// conditional's extends-type, so a *conditional* constraint must keep its
-    /// parens — without them the enclosing `? :` rebinds and the result fails to
-    /// parse. A regular `<T extends (A ? B : C)>` declaration strips them (the
-    /// `>` terminates it), so the flag is off there.
+    /// A *conditional* type in `extends` constraint position keeps its parens
+    /// (`<T extends (A extends B ? C : D)>`) — prettier keeps them for clarity,
+    /// and for an `infer`'s conditional constraint they're required (without them
+    /// the enclosing `? :` rebinds and the result fails to parse). The `=` default
+    /// position strips redundant parens. See `append_keyword_value_with_comments`.
     pub(in crate::printer) fn build_type_parameter_doc(
         &self,
         param: &TSTypeParameter<'_>,
-        infer_constraint: bool,
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -308,7 +306,6 @@ impl<'a> Printer<'a> {
                 value_search_end,
                 value_type,
                 GroupId::TypeParameterConstraint,
-                infer_constraint,
             );
             prev_end = constraint.span().end;
         }
@@ -336,8 +333,6 @@ impl<'a> Printer<'a> {
                 default.span().start,
                 default,
                 GroupId::TypeParameterDefault,
-                // a default value is never an infer constraint
-                false,
             );
             prev_end = default.span().end;
         }
@@ -366,17 +361,19 @@ impl<'a> Printer<'a> {
         value_start: u32,
         value_type: &TSType<'_>,
         group_id: GroupId,
-        infer_constraint: bool,
     ) {
         let d = self.d();
         // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints
         // and defaults get the bare hanging layout (prettier strips them too).
         let value_type = self.unwrap_redundant_parens(value_type);
-        // An infer's *conditional* constraint is the exception: the parens are
-        // required (the enclosing conditional's `? :` rebinds without them), so
-        // re-add them around the stripped inner type. Prettier drops them,
-        // producing unparseable output — documented divergence.
-        if infer_constraint && matches!(value_type, TSType::Conditional(_)) {
+        // A *conditional* type used as a constraint keeps its parens: prettier keeps
+        // them for clarity, and for an `infer`'s conditional constraint they're
+        // outright required (the enclosing conditional's `? :` rebinds without them —
+        // prettier drops them there, producing unparseable output, a documented
+        // divergence). The `=` default position strips them.
+        if matches!(value_type, TSType::Conditional(_))
+            && group_id == GroupId::TypeParameterConstraint
+        {
             let comments =
                 self.build_comments_between(keyword_end, value_start, CommentSpacing::Leading);
             parts.push(d.concat(&[
@@ -486,9 +483,13 @@ impl<'a> Printer<'a> {
             return self.build_type_parameter_instantiation_doc_with_line_comments(inst);
         }
 
-        // Special case: single curly-brace type argument hugs the opening bracket.
-        // Prettier keeps `<{` together for a single object/mapped type; the type
-        // carries its own group so it breaks block-style when too wide.
+        // Special case: a single curly-brace type argument hugs the opening
+        // bracket. tsv keeps `<{` together for a single object/mapped type even
+        // when it carries an interior comment; the type carries its own group so
+        // it still breaks block-style when too wide. (This is the same layout the
+        // type-reference type-argument path uses. Prettier instead breaks the
+        // `<…>` onto its own lines for a comment-bearing mapped/empty type — a
+        // deliberate divergence; see docs/conformance_prettier.md.)
         if inst.params.len() == 1
             && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
         {

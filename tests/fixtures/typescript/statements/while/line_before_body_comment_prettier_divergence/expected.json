@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 316,
+	"end": 228,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Trailing comment after ) - preserved, prettier absorbs into block",
+			"value": " Trailing comment after )",
 			"start": 10,
-			"end": 78,
+			"end": 37,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 69
+					"column": 28
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " trailing",
-			"start": 90,
-			"end": 101,
+			"start": 49,
+			"end": 60,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Own-line comment before { - preserved on own line",
-			"start": 118,
-			"end": 170,
+			"value": " Own-line comment before {",
+			"start": 77,
+			"end": 105,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 8,
-					"column": 53
+					"column": 29
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " own line",
-			"start": 183,
-			"end": 194,
+			"start": 118,
+			"end": 129,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -76,9 +76,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Blank line before comment - blank line preserved",
-			"start": 211,
-			"end": 262,
+			"value": " Blank line before comment",
+			"start": 146,
+			"end": 174,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -86,15 +86,15 @@
 				},
 				"end": {
 					"line": 15,
-					"column": 52
+					"column": 29
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " blank before",
-			"start": 276,
-			"end": 291,
+			"start": 188,
+			"end": 203,
 			"loc": {
 				"start": {
 					"line": 18,
@@ -110,12 +110,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 315,
+		"end": 227,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 306,
+			"end": 218,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -129,8 +129,8 @@
 			"body": [
 				{
 					"type": "WhileStatement",
-					"start": 80,
-					"end": 115,
+					"start": 39,
+					"end": 74,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -143,8 +143,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 87,
-						"end": 88,
+						"start": 46,
+						"end": 47,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -160,15 +160,15 @@
 							{
 								"type": "Line",
 								"value": " trailing",
-								"start": 90,
-								"end": 101
+								"start": 49,
+								"end": 60
 							}
 						]
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 103,
-						"end": 115,
+						"start": 62,
+						"end": 74,
 						"loc": {
 							"start": {
 								"line": 4,
@@ -182,8 +182,8 @@
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 107,
-								"end": 112,
+								"start": 66,
+								"end": 71,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -196,8 +196,8 @@
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 107,
-									"end": 111,
+									"start": 66,
+									"end": 70,
 									"loc": {
 										"start": {
 											"line": 5,
@@ -210,8 +210,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 107,
-										"end": 109,
+										"start": 66,
+										"end": 68,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -233,16 +233,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Trailing comment after ) - preserved, prettier absorbs into block",
+							"value": " Trailing comment after )",
 							"start": 10,
-							"end": 78
+							"end": 37
 						}
 					]
 				},
 				{
 					"type": "WhileStatement",
-					"start": 172,
-					"end": 208,
+					"start": 107,
+					"end": 143,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -255,8 +255,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 179,
-						"end": 180,
+						"start": 114,
+						"end": 115,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -271,8 +271,8 @@
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 196,
-						"end": 208,
+						"start": 131,
+						"end": 143,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -286,8 +286,8 @@
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 200,
-								"end": 205,
+								"start": 135,
+								"end": 140,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -300,8 +300,8 @@
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 200,
-									"end": 204,
+									"start": 135,
+									"end": 139,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -314,8 +314,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 200,
-										"end": 202,
+										"start": 135,
+										"end": 137,
 										"loc": {
 											"start": {
 												"line": 12,
@@ -337,24 +337,24 @@
 							{
 								"type": "Line",
 								"value": " own line",
-								"start": 183,
-								"end": 194
+								"start": 118,
+								"end": 129
 							}
 						]
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Own-line comment before { - preserved on own line",
-							"start": 118,
-							"end": 170
+							"value": " Own-line comment before {",
+							"start": 77,
+							"end": 105
 						}
 					]
 				},
 				{
 					"type": "WhileStatement",
-					"start": 264,
-					"end": 305,
+					"start": 176,
+					"end": 217,
 					"loc": {
 						"start": {
 							"line": 16,
@@ -367,8 +367,8 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 271,
-						"end": 272,
+						"start": 183,
+						"end": 184,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -383,8 +383,8 @@
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 293,
-						"end": 305,
+						"start": 205,
+						"end": 217,
 						"loc": {
 							"start": {
 								"line": 19,
@@ -398,8 +398,8 @@
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 297,
-								"end": 302,
+								"start": 209,
+								"end": 214,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -412,8 +412,8 @@
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 297,
-									"end": 301,
+									"start": 209,
+									"end": 213,
 									"loc": {
 										"start": {
 											"line": 20,
@@ -426,8 +426,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 297,
-										"end": 299,
+										"start": 209,
+										"end": 211,
 										"loc": {
 											"start": {
 												"line": 20,
@@ -449,17 +449,17 @@
 							{
 								"type": "Line",
 								"value": " blank before",
-								"start": 276,
-								"end": 291
+								"start": 188,
+								"end": 203
 							}
 						]
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Blank line before comment - blank line preserved",
-							"start": 211,
-							"end": 262
+							"value": " Blank line before comment",
+							"start": 146,
+							"end": 174
 						}
 					]
 				}
