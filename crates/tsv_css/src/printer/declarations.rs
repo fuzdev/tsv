@@ -9,7 +9,7 @@
 use super::{Printer, value_normalization};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::PRINT_WIDTH;
-use tsv_lang::doc::{self, DocBuf, DocContext, Mode, arena::DocId};
+use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Write the declaration ending: optional `!important` tail and the semicolon with newline.
@@ -82,7 +82,7 @@ impl<'a> Printer<'a> {
         };
 
         // Custom properties skip structure-based multiline (one-per-line for List values).
-        // They use width-based wrapping via should_wrap_value_width_based instead.
+        // They take the self-deciding width path via `print_decl_value_list` instead.
         // See fixture: declaration_long_multiline (continuation indent for space-separated items)
         if decl.property.starts_with("--") {
             return false;
@@ -106,35 +106,52 @@ impl<'a> Printer<'a> {
         self.any_value_needs_own_line(values)
     }
 
-    /// Check if a value should use width-based wrapping
+    /// Print a declaration whose comment-free value is a comma- or space-separated
+    /// list, as one self-deciding doc: the renderer's own fit check chooses inline
+    /// vs. wrapped, so the wrap decision and the emission are a single representation
+    /// and cannot drift (the doc-first shape the at-rule prelude and the function /
+    /// multiline-continuation paths already use). Replaces the former measure-then-emit
+    /// pair (a discarded flat-join measured to decide, then a *different* fill emitted).
     ///
-    /// Prettier uses width-based wrapping for:
-    /// - Long comma-separated lists (font-family, custom properties, etc.)
-    /// - Long space-separated lists (transform chains, filter chains, etc.)
+    /// The two list kinds wrap differently, so each builds its own shape:
+    /// - **comma** breaks *after* the colon — flat `prop: a, b`, broken
+    ///   `prop:\n\ta,\n\tb` — via `group(indent([line, comma_fill]))`. The group's
+    ///   flat-fit reserves the `;` through `comma_fill`'s own `trailing_reserve`, while
+    ///   the `line` covers the colon-space, so the boundary matches the old width check
+    ///   (`indent + property + ": " + ";" + join <= PRINT_WIDTH`) exactly.
+    /// - **space** keeps `: ` literal and wraps only the tail — flat `prop: a b c`,
+    ///   broken `prop: a b\n\tc` — via `indent(space_fill)`. A `space_fill` that fits
+    ///   renders byte-identical to the old flat join; its last-item `trailing_reserve`
+    ///   reproduces the old measure pass's wrap decision (and never leaks into the
+    ///   nested `var`/`calc`/`color-mix` groups, which render in the fill's forced flat
+    ///   mode — the boundary the suffix mechanism would have broken wrongly).
     ///
-    /// Returns (needs_wrapping, is_comma_separated)
-    fn should_wrap_value_width_based(&self, value: &CssValue<'_>, property: &str) -> (bool, bool) {
-        // Comma- and space-separated lists differ only in separator and the
-        // is_comma flag returned; the width check is otherwise identical.
-        let (values, separator, is_comma) = match value {
-            CssValue::CommaSeparated { values, .. } => (values, ", ", true),
-            CssValue::List { values, .. } => (values, " ", false),
-            _ => return (false, false),
+    /// Value comments aren't in the CSS AST, so a comment-bearing list isn't routed
+    /// here (the dispatch guard); it stays on the source-extracting comment path.
+    fn print_decl_value_list(&mut self, decl: &internal::CssDeclaration<'_>) {
+        let doc = match &decl.value {
+            CssValue::CommaSeparated { values, .. } => {
+                let fill = self.build_comma_fill_doc(values);
+                let d = self.d();
+                let body = d.group(d.indent(d.concat(&[d.line(), fill])));
+                d.concat(&[d.text(":"), body])
+            }
+            CssValue::List { values, .. } => {
+                let fill = self.build_space_fill_doc(values, 1);
+                let d = self.d();
+                d.concat(&[d.text(": "), d.indent(fill)])
+            }
+            // The dispatch in `print_css_declaration` only routes comma/space lists here;
+            // fall back to the plain `: value` form rather than panicking, matching the
+            // crate's other defensive value guards (e.g. `print_comma_list_wrapped`).
+            _ => {
+                let value_doc = self.build_css_value_doc(&decl.value);
+                let d = self.d();
+                d.concat(&[d.text(": "), value_doc])
+            }
         };
-        // TODO: measure-then-emit — `doc` is built only to width-check here and then
-        // discarded; `print_decl_width_wrapped` re-builds a *different* fill to emit.
-        // Fold into one `group` whose own fit check decides flat-vs-wrapped (the
-        // doc-first shape `atrules.rs::print_media_prelude` now uses), so the wrap
-        // decision and emission can't drift.
-        let doc = self.build_separated_values_doc(values, separator);
-        let available = doc::available_width(
-            self.effective_indent(),
-            0,
-            property.len() + 3, // property + ": " + ";"
-        );
-        let exceeds_width =
-            !doc::arena_fits::<dyn doc::TextResolver>(self.arena, doc, available, Mode::Flat, None);
-        (exceeds_width, is_comma)
+        self.write_arena_doc(doc);
+        self.write_declaration_end(decl);
     }
 
     /// Format a CSS declaration (property: value;)
@@ -151,10 +168,12 @@ impl<'a> Printer<'a> {
             self.print_decl_grid_multirow(decl);
         } else if self.should_use_multiline(decl) {
             self.print_decl_multiline(decl);
-        } else if let (true, is_comma) =
-            self.should_wrap_value_width_based(&decl.value, decl.property)
+        } else if matches!(
+            &decl.value,
+            CssValue::CommaSeparated { .. } | CssValue::List { .. }
+        ) && !self.has_value_comments_in_decl(decl)
         {
-            self.print_decl_width_wrapped(decl, is_comma);
+            self.print_decl_value_list(decl);
         } else if let CssValue::Function { name, args, span } = &decl.value {
             self.print_decl_function(decl, decl_source, name, args, *span);
         } else if self.has_value_comments_in_decl(decl) {
@@ -172,24 +191,6 @@ impl<'a> Printer<'a> {
         self.indent_level += 1;
         self.print_css_value_multiline(&decl.value);
         self.indent_level -= 1;
-        self.write_declaration_end(decl);
-    }
-
-    /// Print declaration with width-based wrapping
-    fn print_decl_width_wrapped(&mut self, decl: &internal::CssDeclaration<'_>, is_comma: bool) {
-        if is_comma {
-            // Comma-separated: property:\n\titem1, item2
-            self.write(":\n");
-            self.indent_level += 1;
-            self.print_comma_list_wrapped(&decl.value);
-            self.indent_level -= 1;
-        } else {
-            // Space-separated: property: item1 item2\n\titem3
-            self.write(": ");
-            self.indent_level += 1;
-            self.print_space_list_wrapped(&decl.value);
-            self.indent_level -= 1;
-        }
         self.write_declaration_end(decl);
     }
 
@@ -408,21 +409,22 @@ impl<'a> Printer<'a> {
             // True one-per-line for shadow-like properties and wrappable functions
             for (i, val) in values.iter().enumerate() {
                 self.write_indent();
-                // A space-separated List value self-wraps: `build_space_fill_value_doc`'s
-                // `group(indent(fill))` stays flat when it fits and breaks into a
-                // continuation-indented fill when it doesn't, with the trailing `,`/`;`
-                // reserved (width 1) for the group's own fit decision. Non-List values
-                // print as-is.
-                if let CssValue::List {
+                // Every item reserves the trailing `,`/`;` (width 1) for its own fit
+                // decision, so a wrappable item breaks one column early rather than
+                // letting the terminator push the line to 101 (matching prettier and
+                // tsv's hard-print-width stance). A space-separated List value self-wraps
+                // via `build_space_fill_value_doc`'s `group(indent(fill))`; a non-List
+                // value (e.g. a gradient function) wraps via its own value group.
+                let doc = if let CssValue::List {
                     values: list_values,
                     ..
                 } = val
                 {
-                    let doc = self.build_space_fill_value_doc(list_values);
-                    self.write_arena_doc_reserving(doc, 1);
+                    self.build_space_fill_value_doc(list_values)
                 } else {
-                    self.print_nested_value(val);
-                }
+                    self.build_css_value_doc(val)
+                };
+                self.write_arena_doc_reserving(doc, 1);
                 if i < values.len() - 1 {
                     self.write(",\n");
                 }
@@ -496,26 +498,6 @@ impl<'a> Printer<'a> {
         };
         let fill = d.fill(&parts);
         d.with_context(fill, context)
-    }
-
-    /// Format a space-separated list with width-based wrapping using doc::fill
-    ///
-    /// Breaks long space-separated lists (like transform chains) when they exceed print width.
-    /// Uses doc::fill() for greedy packing (pack as many items per line as fit).
-    /// Pattern: property: item1 item2\n\titem3;
-    /// Note: First line stays inline with property, subsequent lines are indented
-    fn print_space_list_wrapped(&mut self, value: &CssValue<'_>) {
-        let CssValue::List { values, .. } = value else {
-            self.print_nested_value(value);
-            return;
-        };
-
-        // Build fill doc with space/line separators
-        // Reserve 1 char for trailing semicolon
-        let fill_doc = self.build_space_fill_doc(values, 1);
-
-        // First line is inline (no indent), write_arena_doc uses current_column for width calc
-        self.write_arena_doc(fill_doc);
     }
 
     /// Build fill parts for space-separated values (shared helper)
