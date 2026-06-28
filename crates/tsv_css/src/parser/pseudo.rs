@@ -247,7 +247,8 @@ fn parse_pseudo_args<'arena>(
     // - :not() → <<complex-real-selector-list>> (complex selectors, strict parsing)
     // - :global() → Svelte-specific, uses complex selectors
     if matches!(pseudo_name, "is" | "not" | "where" | "has" | "global") {
-        parser.skip_whitespace_and_comments()?;
+        // Register a leading comment (`:is(/* c */ .a)`) so the printer interleaves it.
+        parser.skip_whitespace_registering_comments()?;
 
         let selector_list = match pseudo_name {
             "has" => {
@@ -268,7 +269,8 @@ fn parse_pseudo_args<'arena>(
             _ => unreachable!("pseudo_name is is/not/where/has/global per the matches! guard"),
         };
 
-        parser.skip_whitespace_and_comments()?;
+        // Register a trailing comment (`:is(.a /* c */)`) so the printer interleaves it.
+        parser.skip_whitespace_registering_comments()?;
 
         let end = parser.expect_and_capture(TokenKind::RightParen)?;
 

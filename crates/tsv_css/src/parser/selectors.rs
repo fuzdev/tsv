@@ -16,18 +16,21 @@ use tsv_lang::{ParseError, Span};
 ///
 /// For selectors that CAN start with combinators, use `parse_relative_selector_list()` instead.
 /// See: CSS Selectors Level 4 - <<complex-selector-list>> vs <<relative-selector-list>>
-/// Skip comment(s) sitting between a complex selector and its `,` separator (comments are
-/// inter-token whitespace per css-syntax-3) — but only when a comma actually follows, so a
-/// trailing comment before `{` is left for `parse_rule` (it sits outside the list span and is
-/// inline-printed as a pre-brace comment). The lookahead is non-destructive.
+/// Register comment(s) sitting between a complex selector and its `,` separator
+/// (comments are inter-token whitespace per css-syntax-3) — but only when a comma
+/// actually follows, so a trailing comment before `{` is left for `parse_rule` (it
+/// sits outside the list span and is inline-printed as a pre-brace comment). The
+/// lookahead is non-destructive.
 ///
-/// Not needed by `parse_forgiving_selector_list`, whose terminator is `)` (not `{`); it can
-/// skip comments unconditionally before its comma check.
+/// The comments are **registered** (not dropped) so the printer can interleave them
+/// at the comma boundary via `comments_in_range` — the principled replacement for the
+/// old raw-source selector seam. Not needed by `parse_forgiving_selector_list`, whose
+/// terminator is `)` (not `{`); it registers comments unconditionally before its comma check.
 fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), ParseError> {
     if matches!(&parser.current_kind, TokenKind::Comment)
         && parser.peek_past_whitespace()? == TokenKind::Comma
     {
-        parser.skip_whitespace_and_comments()?;
+        parser.skip_whitespace_registering_comments()?;
     }
     Ok(())
 }
@@ -50,7 +53,7 @@ pub(crate) fn parse_complex_selector_list<'arena>(
             break;
         }
         parser.advance()?; // consume comma
-        parser.skip_whitespace_and_comments()?; // Skip whitespace and comments
+        parser.skip_whitespace_registering_comments()?; // register after-comma comments
         let sel = parse_complex_selector(parser)?;
         end = sel.span.end;
         selectors.push(sel);
@@ -116,11 +119,13 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
             }
         }
 
-        // Check for comma (more selectors) or end of list
-        parser.skip_whitespace_and_comments()?;
+        // Check for comma (more selectors) or end of list. Register comments so the
+        // printer can interleave them (forgiving lists carry leading/comma/trailing
+        // comments inside `:is()`/`:where()`).
+        parser.skip_whitespace_registering_comments()?;
         if parser.check(TokenKind::Comma) {
             parser.advance()?; // consume comma
-            parser.skip_whitespace_and_comments()?;
+            parser.skip_whitespace_registering_comments()?;
         } else {
             // End of list (hit right paren or other terminator)
             break;
@@ -255,7 +260,7 @@ pub(crate) fn parse_relative_selector_list<'arena>(
             break;
         }
         parser.advance()?; // consume comma
-        parser.skip_whitespace_and_comments()?; // Skip whitespace and comments
+        parser.skip_whitespace_registering_comments()?; // register after-comma comments
         let sel = parse_relative_complex_selector(parser)?;
         end = sel.span.end;
         selectors.push(sel);

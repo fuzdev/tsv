@@ -95,20 +95,15 @@ pub(super) fn parse_condition_query<'arena>(
             }
         }
 
-        // Check for function-style condition like `selector(:has(...))`
-        if parser.check(TokenKind::Identifier) {
-            let ident = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value());
-            // Check if this is a function call (identifier followed by '(')
-            let is_function =
-                parser.source.get(parser.current_end..=parser.current_end) == Some("(");
-            if is_function {
-                // Include the function name
-                part_content.push(ident.to_string());
-                parser.advance()?;
-                // Continue to parse the parenthesized part below
-            }
+        // Check for function-style condition like `selector(:has(...))`: an
+        // identifier directly followed by `(`. The name is serialized verbatim from
+        // source (escapes preserved) — only `and`/`or`/`not` keyword matches decode.
+        if parser.check(TokenKind::Identifier)
+            && parser.source.get(parser.current_end..=parser.current_end) == Some("(")
+        {
+            part_content.push(parser.current_value().to_string());
+            parser.advance()?;
+            // Continue to parse the parenthesized part below
         }
 
         // Now parse the parenthesized condition
@@ -157,12 +152,10 @@ pub(super) fn parse_condition_query<'arena>(
                 continue;
             }
 
-            // Get token value
+            // Get token value. Identifiers serialize verbatim from source so escapes
+            // survive (`\@foo` stays `\@foo`); keyword matching below decodes instead.
             let part = match &parser.current_kind {
-                TokenKind::Identifier => parser
-                    .current_identifier()
-                    .unwrap_or_else(|| parser.current_value())
-                    .to_string(),
+                TokenKind::Identifier => parser.current_value().to_string(),
                 TokenKind::String { quote } => {
                     let content =
                         &parser.source()[parser.current_start + 1..parser.current_end - 1];
@@ -182,12 +175,21 @@ pub(super) fn parse_condition_query<'arena>(
             // (Comments need space before the next token)
             let is_comment = matches!(parser.current_kind, TokenKind::Comment);
 
-            // Check if this is a boolean operator (and/or/not) inside nested parens
+            // Check if this is a boolean operator (and/or/not) inside nested parens.
+            // Match on the decoded value, not the now-verbatim `part`, so an escaped
+            // operator still spaces correctly.
             let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
-                && matches!(part.as_str(), "and" | "or" | "not");
+                && matches!(parser.current_identifier(), Some("and" | "or" | "not"));
 
-            // Add space before boolean operators if not preceded by whitespace
-            if is_bool_op && !matches!(prev_token_kind, Some(TokenKind::Whitespace)) {
+            // Add space before boolean operators if not preceded by whitespace — but
+            // not right after an opening paren (`(not (…))` keeps the paren tight,
+            // matching prettier; the space would otherwise stack to `( not …`).
+            if is_bool_op
+                && !matches!(
+                    prev_token_kind,
+                    Some(TokenKind::Whitespace | TokenKind::LeftParen)
+                )
+            {
                 part_content.push(" ".to_string());
             }
 
@@ -280,26 +282,20 @@ pub(super) fn parse_container_prelude<'arena>(
 ) -> Result<(Option<&'arena str>, ConditionQuery<'arena>, Span), ParseError> {
     let start = parser.base_offset() + parser.current_start;
 
-    // Check for optional container name (identifier before first '(')
-    // Container name is an identifier followed by whitespace then '('
-    // NOT a function call like style(...) where there's no whitespace
-    let container_name = if parser.check(TokenKind::Identifier) {
-        let ident = parser
-            .current_identifier()
-            .unwrap_or_else(|| parser.current_value());
-        // Check if this is actually a name (not 'not' or 'and' or 'or')
-        // Also check it's not a function call (identifier directly followed by '(')
-        let is_function_call =
-            parser.source.get(parser.current_end..=parser.current_end) == Some("(");
-        if !matches!(ident, "not" | "and" | "or") && !is_function_call {
-            // Copy into the arena only on the path that stores the name as a node.
-            let name = parser.alloc_str_in(ident);
-            parser.advance()?;
-            parser.skip_whitespace()?;
-            Some(name)
-        } else {
-            None
-        }
+    // Check for optional container name: an identifier before the first '(' that
+    // isn't a `not`/`and`/`or` keyword or a function call (`style(...)`, no space
+    // before `(`). The keyword/function exclusion decodes + a structural `(`
+    // lookahead; the stored name is serialized verbatim from source so escapes
+    // survive (`\@named` stays `\@named`).
+    let container_name = if parser.check(TokenKind::Identifier)
+        && parser.source.get(parser.current_end..=parser.current_end) != Some("(")
+        && !matches!(parser.current_identifier(), Some("not" | "and" | "or"))
+    {
+        // Copy into the arena only on the path that stores the name as a node.
+        let name = parser.alloc_str_in(parser.current_value());
+        parser.advance()?;
+        parser.skip_whitespace()?;
+        Some(name)
     } else {
         None
     };

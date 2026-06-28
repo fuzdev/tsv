@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 818,
+		"end": 1135,
 		"attributes": [],
 		"children": [
 			{
@@ -248,18 +248,79 @@
 						}
 					]
 				}
+			},
+			{
+				"type": "Atrule",
+				"start": 901,
+				"end": 1126,
+				"name": "supports",
+				"prelude": "(aaaaaaaaaaaaaaaa: 1) and (bbbbbbbbbbbbbbbb: 1) and (cccccccccccccccc: 1) and\n\t\t(dddddddddddddddd: 1) and (eeeeeeeeeeeeeeee: 1) and (ffffffffffffffff: 1) and\n\t\t(gggggggggggggggg: 1)",
+				"block": {
+					"type": "Block",
+					"start": 1093,
+					"end": 1126,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 1097,
+								"end": 1099,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 1097,
+										"end": 1099,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "e",
+														"start": 1097,
+														"end": 1099
+													}
+												],
+												"start": 1097,
+												"end": 1099
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 1100,
+								"end": 1123,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 1105,
+										"end": 1118,
+										"property": "color",
+										"value": "orange"
+									}
+								]
+							},
+							"start": 1097,
+							"end": 1123
+						}
+					]
+				}
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 810,
-			"styles": "\n\t/* @supports wraps at 101 chars (we wrap at >100, Prettier waits until >102) */\n\n\t/* 100 chars - stays inline (both agree) */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and (flex: 1aa) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 101 chars - we wrap, Prettier stays inline */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaa) {\n\t\t.b {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* 102 chars - we wrap, Prettier stays inline */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaaa) {\n\t\t.c {\n\t\t\tcolor: green;\n\t\t}\n\t}\n\n\t/* 103 chars - wraps (both agree) */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaaaa) {\n\t\t.d {\n\t\t\tcolor: yellow;\n\t\t}\n\t}\n",
+			"end": 1127,
+			"styles": "\n\t/* @supports wraps at 101 chars (we wrap at >100, Prettier waits until >102) */\n\n\t/* 100 chars - stays inline (both agree) */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and (flex: 1aa) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* 101 chars - we wrap, Prettier stays inline */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaa) {\n\t\t.b {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* 102 chars - we wrap, Prettier stays inline */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaaa) {\n\t\t.c {\n\t\t\tcolor: green;\n\t\t}\n\t}\n\n\t/* 103 chars - wraps (both agree) */\n\t@supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and\n\t\t(flex: 1aaaaa) {\n\t\t.d {\n\t\t\tcolor: yellow;\n\t\t}\n\t}\n\n\t/* very long - the continuation re-wraps greedily across multiple lines (both agree) */\n\t@supports (aaaaaaaaaaaaaaaa: 1) and (bbbbbbbbbbbbbbbb: 1) and (cccccccccccccccc: 1) and\n\t\t(dddddddddddddddd: 1) and (eeeeeeeeeeeeeeee: 1) and (ffffffffffffffff: 1) and\n\t\t(gggggggggggggggg: 1) {\n\t\t.e {\n\t\t\tcolor: orange;\n\t\t}\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 819,
+	"end": 1136,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

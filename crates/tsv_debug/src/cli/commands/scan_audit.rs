@@ -129,26 +129,6 @@ const ALLOW: &[Allow] = &[
         "css-value",
     ),
     (
-        "tsv_css/src/printer/atrules.rs",
-        ".find(&format!(\" {connector_keyword} \"))",
-        "at-rule-range",
-    ),
-    (
-        "tsv_css/src/printer/atrules.rs",
-        ".or_else(|| range_lower.find(connector_keyword));",
-        "at-rule-range",
-    ),
-    (
-        "tsv_css/src/printer/atrules.rs",
-        "for (idx, _) in content.match_indices(\" and \") {",
-        "at-rule-range",
-    ),
-    (
-        "tsv_css/src/printer/atrules.rs",
-        "for (idx, _) in content.match_indices(\" or \") {",
-        "at-rule-range",
-    ),
-    (
         "tsv_css/src/printer/declarations.rs",
         ".find(\"*/\")",
         "comment-marker",
