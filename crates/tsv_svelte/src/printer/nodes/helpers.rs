@@ -6,8 +6,12 @@
 
 use crate::ast::internal::{EachBlock, FragmentNode};
 use crate::printer::Printer;
+use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_ts::Expression;
 
 /// Trailing-comment range end for an `{#each}` head expression: the `as`-pattern
 /// start when present, else the head end (`{#each ` … `}` minus the closing `}`).
@@ -176,7 +180,7 @@ impl<'a> Printer<'a> {
     /// runs to end of line, so the following token drops to the next line to avoid
     /// swallowing it). Empty doc when the range holds no comments.
     fn build_pattern_leading_comments(&self, start: u32, end: u32) -> DocId {
-        let docs: Vec<DocId> = tsv_lang::comments_in_range(self.comments, start, end)
+        let docs: Vec<DocId> = comments_in_range(self.comments, start, end)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect();
         self.d().concat(&docs)
@@ -186,7 +190,7 @@ impl<'a> Printer<'a> {
     /// ` /* … */` (inline, leading space); a line comment as ` // …` + `hardline`. Empty
     /// doc when the range holds no comments.
     fn build_pattern_trailing_comments(&self, start: u32, end: u32) -> DocId {
-        let docs: Vec<DocId> = tsv_lang::comments_in_range(self.comments, start, end)
+        let docs: Vec<DocId> = comments_in_range(self.comments, start, end)
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
         self.d().concat(&docs)
@@ -207,7 +211,7 @@ impl<'a> Printer<'a> {
         delim_text: &'static str,
     ) -> DocId {
         let d = self.d();
-        match tsv_lang::source_scan::find_char_skipping_comments(
+        match find_char_skipping_comments(
             self.source.as_bytes(),
             left_end as usize,
             right_start as usize,
@@ -225,11 +229,7 @@ impl<'a> Printer<'a> {
 
     /// Build a `...rest` binding, threading any comment in the `...`→binding gap
     /// (`.../* c */ rest`). Shared by the array-pattern and object-pattern rest arms.
-    fn build_rest_pattern_doc(
-        &self,
-        rest_span_start: u32,
-        argument: &tsv_ts::Expression<'_>,
-    ) -> DocId {
+    fn build_rest_pattern_doc(&self, rest_span_start: u32, argument: &Expression<'_>) -> DocId {
         let d = self.d();
         let dots_end = rest_span_start + 3; // past "..."
         let lead = self.build_pattern_leading_comments(dots_end, argument.span().start);
@@ -243,7 +243,7 @@ impl<'a> Printer<'a> {
     fn build_pattern_key_doc(
         &self,
         computed: bool,
-        key: &tsv_ts::Expression<'_>,
+        key: &Expression<'_>,
         prop_start: u32,
         value_start: u32,
     ) -> (DocId, u32) {
@@ -251,7 +251,7 @@ impl<'a> Printer<'a> {
         if computed {
             let key_start = key.span().start;
             let key_end = key.span().end;
-            let close = tsv_lang::source_scan::find_char_skipping_comments(
+            let close = find_char_skipping_comments(
                 self.source.as_bytes(),
                 key_end as usize,
                 value_start as usize,
@@ -281,8 +281,8 @@ impl<'a> Printer<'a> {
         &self,
         shorthand: bool,
         computed: bool,
-        key: &tsv_ts::Expression<'_>,
-        value: &tsv_ts::Expression<'_>,
+        key: &Expression<'_>,
+        value: &Expression<'_>,
         prop_start: u32,
     ) -> DocId {
         let d = self.d();
@@ -373,7 +373,7 @@ impl<'a> Printer<'a> {
     /// (default-value) arms, which carry identical `Vec<Option<Expression>>` elements.
     fn build_array_brackets(
         &self,
-        elements: &[Option<tsv_ts::Expression<'_>>],
+        elements: &[Option<Expression<'_>>],
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -426,7 +426,7 @@ impl<'a> Printer<'a> {
     /// numeric form), where prettier-plugin-svelte preserves the author's source
     /// token — a separate deliberate divergence (see conformance_prettier.md §Svelte:
     /// destructuring literal normalization).
-    pub(super) fn build_pattern_doc(&self, expr: &tsv_ts::Expression<'_>) -> DocId {
+    pub(super) fn build_pattern_doc(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
         match expr {
             // Comments thread through every gap so a comment in any pattern position is
@@ -435,7 +435,7 @@ impl<'a> Printer<'a> {
             // **default values** (`{ a = { … } }` / `{ a = [ … ] }`), which prettier likewise
             // keeps inline (so they share the always-inline binding shape, not the breakable
             // expression printer); they just need the same comment-awareness.
-            tsv_ts::Expression::ObjectPattern(obj) => {
+            Expression::ObjectPattern(obj) => {
                 let entries: Vec<(u32, u32, DocId)> = obj
                     .properties
                     .iter()
@@ -446,7 +446,7 @@ impl<'a> Printer<'a> {
                     .collect();
                 self.build_object_braces(obj.span.start, obj.span.end, &entries)
             }
-            tsv_ts::Expression::ObjectExpression(obj) => {
+            Expression::ObjectExpression(obj) => {
                 let entries: Vec<(u32, u32, DocId)> = obj
                     .properties
                     .iter()
@@ -457,19 +457,19 @@ impl<'a> Printer<'a> {
                     .collect();
                 self.build_object_braces(obj.span.start, obj.span.end, &entries)
             }
-            tsv_ts::Expression::ArrayPattern(arr) => {
+            Expression::ArrayPattern(arr) => {
                 self.build_array_brackets(arr.elements, arr.span.start, arr.span.end)
             }
-            tsv_ts::Expression::ArrayExpression(arr) => {
+            Expression::ArrayExpression(arr) => {
                 self.build_array_brackets(arr.elements, arr.span.start, arr.span.end)
             }
-            tsv_ts::Expression::RestElement(rest) => {
+            Expression::RestElement(rest) => {
                 self.build_rest_pattern_doc(rest.span.start, rest.argument)
             }
             // Comments around the `=` stay on the side the author wrote them
             // (`a /* c */ = 1` vs `a = /* c */ 1`). The `Expression` variant is the
             // default-value form of the same `=`.
-            tsv_ts::Expression::AssignmentPattern(assign) => {
+            Expression::AssignmentPattern(assign) => {
                 let left = self.build_pattern_doc(assign.left);
                 let eq = self.build_pattern_delim_gap(
                     assign.left.span().end,
@@ -480,7 +480,7 @@ impl<'a> Printer<'a> {
                 let right = self.build_pattern_doc(assign.right);
                 d.concat(&[left, eq, right])
             }
-            tsv_ts::Expression::AssignmentExpression(assign) => {
+            Expression::AssignmentExpression(assign) => {
                 let left = self.build_pattern_doc(assign.left);
                 let eq = self.build_pattern_delim_gap(
                     assign.left.span().end,
@@ -517,7 +517,7 @@ impl<'a> Printer<'a> {
     /// `suffix_width` estimation needed.
     pub(super) fn build_expression_with_comments_doc(
         &self,
-        expr: &tsv_ts::Expression<'_>,
+        expr: &Expression<'_>,
         span_start: u32,
         span_end: u32,
     ) -> DocId {
@@ -526,10 +526,9 @@ impl<'a> Printer<'a> {
         let expr_end = expr.span().end;
 
         // Build docs for leading comments (between span_start and expression start)
-        let leading_docs: Vec<DocId> =
-            tsv_lang::comments_in_range(self.comments, span_start, expr_start)
-                .map(|c| self.build_leading_js_comment_doc(c))
-                .collect();
+        let leading_docs: Vec<DocId> = comments_in_range(self.comments, span_start, expr_start)
+            .map(|c| self.build_leading_js_comment_doc(c))
+            .collect();
 
         // Embed for embedded expression context: binary chains use ContinuationIndent style.
         // first_line_offset estimates the column position for width calculations.
@@ -549,10 +548,9 @@ impl<'a> Printer<'a> {
             tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
 
         // Build docs for trailing comments (between expression end and span_end)
-        let trailing_docs: Vec<DocId> =
-            tsv_lang::comments_in_range(self.comments, expr_end, span_end)
-                .map(|c| self.build_trailing_js_comment_doc(c))
-                .collect();
+        let trailing_docs: Vec<DocId> = comments_in_range(self.comments, expr_end, span_end)
+            .map(|c| self.build_trailing_js_comment_doc(c))
+            .collect();
 
         self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }
@@ -575,7 +573,7 @@ impl<'a> Printer<'a> {
     /// - `in_multiline_context` - Whether the block is on its own line (multiline) or inline
     pub(super) fn build_expression_doc_for_block(
         &self,
-        expr: &tsv_ts::Expression<'_>,
+        expr: &Expression<'_>,
         span_start: u32,
         span_end: u32,
         opening_offset: usize,
@@ -586,10 +584,9 @@ impl<'a> Printer<'a> {
         let expr_end = expr.span().end;
 
         // Build docs for leading comments
-        let leading_docs: Vec<DocId> =
-            tsv_lang::comments_in_range(self.comments, span_start, expr_start)
-                .map(|c| self.build_leading_js_comment_doc(c))
-                .collect();
+        let leading_docs: Vec<DocId> = comments_in_range(self.comments, span_start, expr_start)
+            .map(|c| self.build_leading_js_comment_doc(c))
+            .collect();
 
         // In multiline contexts, set up embedded expression context so binary chains
         // use ContinuationIndent style. first_line_offset estimates the column position.
@@ -607,7 +604,7 @@ impl<'a> Printer<'a> {
 
         // Build expression doc tree
         // Assignment expressions need parens in block conditions: {#if (a = b)}
-        let expr_doc = if matches!(expr, tsv_ts::Expression::AssignmentExpression(_)) {
+        let expr_doc = if matches!(expr, Expression::AssignmentExpression(_)) {
             let inner =
                 tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
             d.parens(inner)
@@ -625,10 +622,9 @@ impl<'a> Printer<'a> {
         };
 
         // Build docs for trailing comments
-        let trailing_docs: Vec<DocId> =
-            tsv_lang::comments_in_range(self.comments, expr_end, span_end)
-                .map(|c| self.build_trailing_js_comment_doc(c))
-                .collect();
+        let trailing_docs: Vec<DocId> = comments_in_range(self.comments, expr_end, span_end)
+            .map(|c| self.build_trailing_js_comment_doc(c))
+            .collect();
 
         self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }
@@ -647,8 +643,8 @@ impl<'a> Printer<'a> {
     pub(super) fn build_block_head_expr(
         &self,
         open: &'static str,
-        opening_tag_span: tsv_lang::Span,
-        expr: &tsv_ts::Expression<'_>,
+        opening_tag_span: Span,
+        expr: &Expression<'_>,
         comment_end: u32,
         wrapping: bool,
     ) -> DocId {

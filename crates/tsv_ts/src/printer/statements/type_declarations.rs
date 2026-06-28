@@ -9,7 +9,7 @@ use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Comment, SymbolToU32, comments_in_range};
+use tsv_lang::{Comment, Span, SymbolToU32, comments_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -783,7 +783,7 @@ impl<'a> Printer<'a> {
         // Find body start (after '{')
         let body_start = enum_body_brace.map_or(decl.span.start, |b| b + 1);
         let body_end = decl.span.end.saturating_sub(1); // Before '}'
-        let body_span = tsv_lang::Span::new(body_start - 1, decl.span.end); // Include '{' and '}'
+        let body_span = Span::new(body_start - 1, decl.span.end); // Include '{' and '}'
 
         if decl.members.is_empty() {
             // Empty enum body - handle comments inside

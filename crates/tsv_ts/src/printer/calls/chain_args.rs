@@ -24,6 +24,7 @@ use super::arg_wrapping::{
     wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -132,7 +133,7 @@ fn build_after_comma_leading_comments(
     let d = printer.d();
     let comma_pos = find_comma_pos(printer.source, prev_arg_end, arg_start)?;
     let mut parts = DocBuf::new();
-    for comment in tsv_lang::comments_in_range(printer.comments, prev_arg_end, arg_start) {
+    for comment in comments_in_range(printer.comments, prev_arg_end, arg_start) {
         if is_comment_after_comma(comment, comma_pos)
             && comment.is_block
             && is_comment_inline_with_next(printer, comment.span.end, arg_start)
@@ -160,7 +161,7 @@ fn build_before_comma_trailing_comments(
     let d = printer.d();
     let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start)?;
     let mut parts = DocBuf::new();
-    for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start) {
+    for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
         if is_comment_before_comma(comment, comma_pos)
             && comment.is_block
             && printer.is_same_line(arg_end, comment.span.start)

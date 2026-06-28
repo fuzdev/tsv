@@ -2,7 +2,7 @@
 
 use super::internal;
 use super::public;
-use tsv_lang::{LocationTracker, Span};
+use tsv_lang::{ByteToCharMap, LocationTracker, Span};
 
 /// Schema choice for public-AST serialization.
 ///
@@ -64,7 +64,7 @@ pub use statements::convert_variable_declaration;
 /// For ASCII-only sources, this is a no-op (byte == code-unit offset).
 pub fn translate_byte_to_char_offsets(
     value: &mut serde_json::Value,
-    map: &tsv_lang::ByteToCharMap,
+    map: &ByteToCharMap,
     tracker: &LocationTracker,
 ) {
     if !map.has_multibyte() {
@@ -82,7 +82,7 @@ pub fn translate_byte_to_char_offsets(
 fn translate_column(
     byte_offset: u32,
     existing_column: u64,
-    map: &tsv_lang::ByteToCharMap,
+    map: &ByteToCharMap,
     tracker: &LocationTracker,
 ) -> u64 {
     let line_start = tracker.line_start_byte(byte_offset as usize);
@@ -97,7 +97,7 @@ fn translate_column(
 fn translate_loc_position(
     pos: &mut serde_json::Map<String, serde_json::Value>,
     byte_offset: u32,
-    map: &tsv_lang::ByteToCharMap,
+    map: &ByteToCharMap,
     tracker: &LocationTracker,
 ) {
     if let Some(existing_col) = pos.get("column").and_then(serde_json::Value::as_u64) {
@@ -117,7 +117,7 @@ fn translate_loc_position(
 
 fn translate_positions_recursive(
     value: &mut serde_json::Value,
-    map: &tsv_lang::ByteToCharMap,
+    map: &ByteToCharMap,
     tracker: &LocationTracker,
 ) {
     match value {

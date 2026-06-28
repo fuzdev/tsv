@@ -65,7 +65,7 @@ use crate::ast::internal;
 use std::cell::Cell;
 use std::rc::Rc;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH, comments_in_range,
+    EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, TAB_WIDTH, comments_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -154,7 +154,7 @@ pub struct Printer<'a> {
     /// `startsWithNoLookaheadToken` traversal. Keyed by span (not consumed) so a chain
     /// rebuilding its base across conditional-group variants wraps consistently, and a
     /// same-shaped object nested deeper (a call argument) never matches.
-    pub(crate) arrow_body_object_parens_target: Cell<Option<tsv_lang::Span>>,
+    pub(crate) arrow_body_object_parens_target: Cell<Option<Span>>,
     /// Span of the object/function/class node that starts an expression statement
     /// and must be wrapped in parens, even when nested as the leftmost token of a
     /// member/binary/etc. chain: `(class {}).foo`, `({}).foo`, `(class {}) + 1`,
@@ -162,7 +162,7 @@ pub struct Printer<'a> {
     /// Keyed by span (not consumed, like `arrow_body_object_parens_target`) so a chain
     /// rebuilding its base across conditional-group variants wraps consistently; cleared
     /// once per statement in `build_expression_statement`.
-    pub(crate) expr_stmt_paren_target: Cell<Option<tsv_lang::Span>>,
+    pub(crate) expr_stmt_paren_target: Cell<Option<Span>>,
     /// The parent context for a curried arrow-chain value, set by the enclosing
     /// printer (assignment chokepoint, call-argument printer, binary-operand
     /// printer) just before the chain is built. The arrow printer reads and
@@ -584,7 +584,7 @@ impl<'a> Printer<'a> {
         end_boundary: u32,
     ) -> bool
     where
-        F: Fn(&T) -> tsv_lang::Span,
+        F: Fn(&T) -> Span,
     {
         let between = items.windows(2).any(|pair| {
             self.has_line_comments_between(get_span(&pair[0]).end, get_span(&pair[1]).start)
@@ -602,12 +602,12 @@ impl<'a> Printer<'a> {
     /// preceding element (or opening bracket) or the following element (or closing bracket).
     pub(crate) fn has_own_line_block_comments_in_bracket_list<T, F>(
         &self,
-        span: tsv_lang::Span,
+        span: Span,
         items: &[T],
         get_span: F,
     ) -> bool
     where
-        F: Fn(&T) -> tsv_lang::Span,
+        F: Fn(&T) -> Span,
     {
         let open_bracket = span.start;
 
@@ -855,7 +855,7 @@ impl<'a> Printer<'a> {
     /// Trailing whitespace is trimmed: a node's significant tokens never end in
     /// whitespace, and prettier never preserves it — some spans (e.g. a
     /// `TSConstructSignatureDeclaration`'s) over-extend to the next line's start.
-    fn raw_source_doc(&self, span: tsv_lang::Span) -> DocId {
+    fn raw_source_doc(&self, span: Span) -> DocId {
         self.d()
             .text_owned(span.extract(self.source).trim_end().to_string())
     }

@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
 use tsv_lang::{Comment, ParseError, SharedInterner, Span};
+use tsv_ts::Expression;
 
 use super::PeekData;
 
@@ -470,7 +471,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<tsv_ts::Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError> {
         let (expr, comments) = tsv_ts::parse_expression_with_comments(
             source,
             base_offset,
@@ -488,7 +489,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<(tsv_ts::Expression<'arena>, usize), ParseError> {
+    ) -> Result<(Expression<'arena>, usize), ParseError> {
         let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
             source,
             base_offset,
@@ -505,7 +506,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         source: &str,
         base_offset: usize,
-    ) -> Result<tsv_ts::Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError> {
         let (pattern, comments) = tsv_ts::parse_pattern_with_comments(
             source,
             base_offset,

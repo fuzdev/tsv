@@ -3,8 +3,8 @@
 use super::super::{internal, public};
 use super::types::convert_type_annotation as convert_type_annotation_from_types;
 use super::{
-    Schema, convert_block_statement, convert_expression, convert_statement, convert_type,
-    convert_type_annotation, create_location,
+    Schema, convert_block_statement, convert_expression, convert_identifier, convert_statement,
+    convert_type, convert_type_annotation, create_location,
 };
 use string_interner::DefaultStringInterner;
 use tsv_lang::{LocationTracker, Span};
@@ -68,7 +68,7 @@ pub(in crate::ast) fn convert_type_alias_declaration<'src>(
         start: type_alias.span.start,
         end: type_alias.span.end,
         loc: create_location(type_alias.span, loc, offset),
-        id: super::convert_identifier(&type_alias.id, source, loc, interner, offset),
+        id: convert_identifier(&type_alias.id, source, loc, interner, offset),
         type_parameters: type_alias
             .type_parameters
             .as_ref()
@@ -93,7 +93,7 @@ pub(in crate::ast) fn convert_function_declaration<'src>(
         id: func_decl
             .id
             .as_ref()
-            .map(|id| super::convert_identifier(id, source, loc, interner, offset)),
+            .map(|id| convert_identifier(id, source, loc, interner, offset)),
         expression: false,
         generator: func_decl.generator,
         is_async: func_decl.r#async,
@@ -153,7 +153,7 @@ pub(in crate::ast) fn convert_class_declaration<'src>(
         id: class_decl
             .id
             .as_ref()
-            .map(|id| super::convert_identifier(id, source, loc, interner, offset)),
+            .map(|id| convert_identifier(id, source, loc, interner, offset)),
         type_parameters: class_decl
             .type_parameters
             .as_ref()
@@ -215,7 +215,7 @@ pub(in crate::ast) fn convert_class_expression<'src>(
         id: class_expr
             .id
             .as_ref()
-            .map(|id| super::convert_identifier(id, source, loc, interner, offset)),
+            .map(|id| convert_identifier(id, source, loc, interner, offset)),
         type_parameters: class_expr
             .type_parameters
             .as_ref()

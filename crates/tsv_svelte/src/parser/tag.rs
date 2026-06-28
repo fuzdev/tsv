@@ -6,8 +6,10 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{ParseError, Span};
+use tsv_ts::Expression;
 
 use super::parser_impl::SvelteParser;
+use super::subslice_offset;
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Parse a template tag starting with {@
@@ -43,7 +45,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .strip_block_keyword(tag_content, "html", tag_content_start)?
             .trim();
 
-        let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
+        let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         // End is right after the closing }
@@ -68,7 +70,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .strip_block_keyword(tag_content, "const", tag_content_start)?
             .trim();
 
-        let decl_offset = tag_content_start + super::subslice_offset(tag_content, decl_str);
+        let decl_offset = tag_content_start + subslice_offset(tag_content, decl_str);
 
         // `{@const}` must be a single declarator (unlike the bare `{const}`/`{let}`
         // tags) — Svelte rejects `{@const a = 1, b = 2}`. A top-level `,` is the
@@ -197,11 +199,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         decl_str: &'a str,
         decl_offset: usize,
         eq_pos: usize,
-    ) -> Result<(tsv_ts::Expression<'arena>, tsv_ts::Expression<'arena>), ParseError> {
+    ) -> Result<(Expression<'arena>, Expression<'arena>), ParseError> {
         let id_str = decl_str[..eq_pos].trim();
         let init_str = decl_str[eq_pos + 1..].trim();
 
-        let id_offset = decl_offset + super::subslice_offset(decl_str, id_str);
+        let id_offset = decl_offset + subslice_offset(decl_str, id_str);
         let init_offset =
             decl_offset + eq_pos + 1 + (decl_str[eq_pos + 1..].len() - init_str.len());
 
@@ -258,7 +260,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 let trimmed = chunk.trim();
                 if !trimmed.is_empty() {
                     // Find where trimmed content starts within this chunk
-                    let trim_offset = super::subslice_offset(chunk, trimmed);
+                    let trim_offset = subslice_offset(chunk, trimmed);
                     let ident_offset = idents_offset + pos + trim_offset;
                     let expr = self.parse_ts_expression(trimmed, ident_offset)?;
                     identifiers.push(expr);
@@ -289,7 +291,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .strip_block_keyword(tag_content, "render", tag_content_start)?
             .trim();
 
-        let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
+        let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         let end = after_close;

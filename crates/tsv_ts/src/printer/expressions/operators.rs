@@ -9,6 +9,7 @@ use crate::printer::comments::CommentSpacing;
 use crate::printer::{ParenContext, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Holds information about an operand in a binary expression chain
@@ -94,7 +95,7 @@ impl<'a> Printer<'a> {
         // from the argument (not just whether there's a newline in the whole range,
         // which could be between the comment and the closing paren).
         let has_own_line_trailing_comment =
-            tsv_lang::comments_in_range(self.comments, argument_end, unary.span.end)
+            comments_in_range(self.comments, argument_end, unary.span.end)
                 .any(|c| !c.is_block || self.has_newline_between(argument_end, c.span.start));
         let needs_multiline = self.has_line_comments_between(operator_end, argument_start)
             || has_own_line_trailing_comment
@@ -115,9 +116,7 @@ impl<'a> Printer<'a> {
                 let mut indent_parts: DocBuf = smallvec![d.hardline()];
                 // Add leading comments — use hardline if the comment and argument
                 // are on different lines, space if they're on the same line.
-                for comment in
-                    tsv_lang::comments_in_range(self.comments, operator_end, argument_start)
-                {
+                for comment in comments_in_range(self.comments, operator_end, argument_start) {
                     indent_parts.push(self.build_comment_doc(comment));
                     if self.has_newline_between(comment.span.end, argument_start) {
                         indent_parts.push(d.hardline());
@@ -127,9 +126,7 @@ impl<'a> Printer<'a> {
                 }
                 indent_parts.push(inner);
                 // Add trailing comments with appropriate spacing
-                for comment in
-                    tsv_lang::comments_in_range(self.comments, argument_end, unary.span.end)
-                {
+                for comment in comments_in_range(self.comments, argument_end, unary.span.end) {
                     if !comment.is_block
                         || !self.has_newline_between(argument_end, comment.span.start)
                     {
@@ -157,9 +154,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(inner);
                 // Trailing block comments inline: `expr /* c */`
-                for comment in
-                    tsv_lang::comments_in_range(self.comments, argument_end, unary.span.end)
-                {
+                for comment in comments_in_range(self.comments, argument_end, unary.span.end) {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
@@ -695,7 +690,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Collect all comments in the range between operator and next operand
         let comments: Vec<_> =
-            tsv_lang::comments_in_range(self.comments, op_end, operand.span.start).collect();
+            comments_in_range(self.comments, op_end, operand.span.start).collect();
 
         if comments.is_empty() {
             // No comments - simple case
@@ -1024,9 +1019,7 @@ impl<'a> Printer<'a> {
         // Line comments inside the sequence need break handling (a forced-multiline
         // layout) the inline comma-gap path below doesn't do; route those to the
         // breaking layout so the comment isn't swallowed by the following comma/operand.
-        if tsv_lang::comments_in_range(self.comments, seq.span.start, seq.span.end)
-            .any(|c| !c.is_block)
-        {
+        if comments_in_range(self.comments, seq.span.start, seq.span.end).any(|c| !c.is_block) {
             return self.build_sequence_doc_with_line_comments(seq);
         }
 
@@ -1096,8 +1089,7 @@ impl<'a> Printer<'a> {
     /// same own-line/inline treatment — so the float is idempotent.
     fn append_floated_leading_comments(&self, parts: &mut DocBuf, start: u32, operand_start: u32) {
         let d = self.d();
-        let comments: Vec<_> =
-            tsv_lang::comments_in_range(self.comments, start, operand_start).collect();
+        let comments: Vec<_> = comments_in_range(self.comments, start, operand_start).collect();
         for (i, comment) in comments.iter().enumerate() {
             parts.push(self.build_comment_doc(comment));
             let next = comments.get(i + 1).map_or(operand_start, |c| c.span.start);
@@ -1149,7 +1141,7 @@ impl<'a> Printer<'a> {
                 let prev_end = seq.expressions[i - 1].span().end;
                 let mut pos = prev_end;
                 let mut in_trailing_run = true;
-                for comment in tsv_lang::comments_in_range(self.comments, prev_end, expr_start) {
+                for comment in comments_in_range(self.comments, prev_end, expr_start) {
                     let own_line = self.has_newline_between(pos, comment.span.start);
                     // Once a comment is own-line (or the trailing run already ended),
                     // it and the rest lead the next operand.
@@ -1177,7 +1169,7 @@ impl<'a> Printer<'a> {
             if !is_last {
                 let next_start = seq.expressions[i + 1].span().start;
                 let mut pos = expr_end;
-                for comment in tsv_lang::comments_in_range(self.comments, expr_end, next_start) {
+                for comment in comments_in_range(self.comments, expr_end, next_start) {
                     if self.has_newline_between(pos, comment.span.start) {
                         break;
                     }

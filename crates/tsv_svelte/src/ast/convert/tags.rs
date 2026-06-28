@@ -10,6 +10,7 @@
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
+use tsv_ts::ast::convert::convert_expression;
 
 use super::convert_pattern_expression;
 
@@ -19,8 +20,7 @@ pub(super) fn convert_html_tag<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::HtmlTag<'src> {
-    let expression =
-        tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
+    let expression = convert_expression(&tag.expression, source, loc, interner, 0);
 
     public::HtmlTag {
         node_type: "HtmlTag",
@@ -37,7 +37,7 @@ pub(super) fn convert_const_tag(
     interner: &DefaultStringInterner,
 ) -> public::ConstTag {
     let id_value = convert_pattern_expression(&tag.id, source, loc, interner);
-    let init = tsv_ts::ast::convert::convert_expression(&tag.init, source, loc, interner, 0);
+    let init = convert_expression(&tag.init, source, loc, interner, 0);
 
     let declarator_start = tag.id.span().start;
     let declarator_end = tag.init.span().end;
@@ -100,7 +100,7 @@ pub(super) fn convert_debug_tag<'src>(
     let identifiers = tag
         .identifiers
         .iter()
-        .map(|id| tsv_ts::ast::convert::convert_expression(id, source, loc, interner, 0))
+        .map(|id| convert_expression(id, source, loc, interner, 0))
         .collect();
 
     public::DebugTag {
@@ -117,8 +117,7 @@ pub(super) fn convert_render_tag<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::RenderTag<'src> {
-    let expression =
-        tsv_ts::ast::convert::convert_expression(&tag.expression, source, loc, interner, 0);
+    let expression = convert_expression(&tag.expression, source, loc, interner, 0);
 
     public::RenderTag {
         node_type: "RenderTag",

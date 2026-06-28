@@ -11,9 +11,11 @@ use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternPro
 use crate::printer::CommentSpacing;
 use crate::printer::{ParenContext, PatternContext, Printer, object_pattern_should_expand};
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// Context for assignment expression printing (chain detection)
 ///
@@ -364,7 +366,7 @@ impl<'a> Printer<'a> {
         collection_start: u32,
         collection_end: u32,
         elements: &[T],
-        get_span: impl Fn(&T) -> tsv_lang::Span,
+        get_span: impl Fn(&T) -> Span,
     ) -> (bool, bool) {
         let mut has_line_comments = false;
         let mut has_blank_lines = false;
@@ -435,7 +437,7 @@ impl<'a> Printer<'a> {
             .type_annotation
             .as_ref()
             .map_or(obj.span.end, |t| t.span.start);
-        let span = tsv_lang::Span::new(obj.span.start, boundary);
+        let span = Span::new(obj.span.start, boundary);
         self.has_own_line_block_comments_in_bracket_list(
             span,
             obj.properties,
@@ -615,7 +617,7 @@ impl<'a> Printer<'a> {
                     let value_start = p.value.span().start;
                     #[allow(clippy::expect_used)]
                     // Parser guarantees `:` exists in destructuring property
-                    let colon_pos = tsv_lang::source_scan::find_char_skipping_comments(
+                    let colon_pos = find_char_skipping_comments(
                         self.source.as_bytes(),
                         key_region_end as usize,
                         value_start as usize,
@@ -700,7 +702,7 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map_or(arr.span.end, |t| t.span.start);
 
-        let span = tsv_lang::Span::new(arr.span.start, boundary);
+        let span = Span::new(arr.span.start, boundary);
 
         // Collect non-hole element spans for boundary checking
         let non_null_elements: Vec<_> = arr.elements.iter().flatten().collect();

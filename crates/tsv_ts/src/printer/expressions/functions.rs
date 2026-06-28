@@ -18,6 +18,7 @@ use crate::printer::{
     unwrap_parenthesized,
 };
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
@@ -71,7 +72,7 @@ fn is_template_on_same_line(source: &str, expr: &internal::Expression<'_>) -> bo
 /// Returns the object's span so the printer wraps exactly that node (keyed by span,
 /// robust to a chain rebuilding its base across conditional-group variants) and never
 /// a same-shaped object nested deeper.
-fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<tsv_lang::Span> {
+fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<Span> {
     if matches!(
         expr,
         internal::Expression::AssignmentExpression(_) | internal::Expression::SequenceExpression(_)

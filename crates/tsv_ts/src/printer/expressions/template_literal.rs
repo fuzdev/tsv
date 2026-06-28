@@ -7,6 +7,7 @@ use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
 use crate::printer::{ParenContext, Printer};
 use tsv_lang::TAB_WIDTH;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 
@@ -60,14 +61,10 @@ impl<'a> Printer<'a> {
 
                 // Collect comments in the interpolation region
                 let leading_comments: Vec<_> =
-                    tsv_lang::comments_in_range(self.comments, quasi.span.end, expr.span().start)
+                    comments_in_range(self.comments, quasi.span.end, expr.span().start).collect();
+                let trailing_comments: Vec<_> =
+                    comments_in_range(self.comments, expr.span().end, next_quasi.span.start)
                         .collect();
-                let trailing_comments: Vec<_> = tsv_lang::comments_in_range(
-                    self.comments,
-                    expr.span().end,
-                    next_quasi.span.start,
-                )
-                .collect();
 
                 // Check if any comments are line comments (non-block)
                 let has_line_comment = leading_comments.iter().any(|c| !c.is_block)
@@ -374,7 +371,7 @@ impl<'a> Printer<'a> {
             .map_or_else(|| tagged.tag.span().end, |ta| ta.span.end);
         let comment_end = tagged.quasi.span.start;
         let gap_comments: Vec<_> =
-            tsv_lang::comments_in_range(self.comments, comment_start, comment_end).collect();
+            comments_in_range(self.comments, comment_start, comment_end).collect();
         if !gap_comments.is_empty() {
             let mut prev_end = comment_start;
             let mut ends_with_hardline = false;

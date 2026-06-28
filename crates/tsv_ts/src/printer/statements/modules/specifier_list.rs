@@ -9,7 +9,7 @@ use crate::ast::internal;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{SymbolToU32, comments_in_range};
+use tsv_lang::{Span, SymbolToU32, comments_in_range};
 
 impl<'a> Printer<'a> {
     /// Check if an import declaration has empty named braces `{}` in source.
@@ -189,7 +189,7 @@ impl<'a> Printer<'a> {
         kw_end: u32,
         bound: u32,
         capture_keyword_comment: bool,
-        get_span: impl Fn(&T) -> tsv_lang::Span,
+        get_span: impl Fn(&T) -> Span,
         build_item: impl Fn(&T) -> DocId,
     ) -> u32 {
         debug_assert!(
@@ -207,7 +207,7 @@ impl<'a> Printer<'a> {
 
         // Expanding comments (line comments, or own-line single-line block
         // comments) force the multiline path.
-        let brace_span = tsv_lang::Span::new(brace_start, brace_close + 1);
+        let brace_span = Span::new(brace_start, brace_close + 1);
         let has_expanding_comments =
             self.has_line_comments_in_delimited_list(specifiers, &get_span, brace_close)
                 || self.has_line_comments_between(brace_start + 1, first_start)
@@ -344,7 +344,7 @@ impl<'a> Printer<'a> {
         items: &[T],
         brace_start: u32,
         brace_close: u32,
-        get_span: impl Fn(&T) -> tsv_lang::Span,
+        get_span: impl Fn(&T) -> Span,
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
@@ -420,7 +420,7 @@ impl<'a> Printer<'a> {
         brace_start: u32,
         end_boundary: u32,
         brace_comment_first: Option<u32>,
-        get_span: impl Fn(&T) -> tsv_lang::Span,
+        get_span: impl Fn(&T) -> Span,
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
@@ -453,7 +453,7 @@ impl<'a> Printer<'a> {
         brace_start: u32,
         end_boundary: u32,
         delimiter_pull_pos: Option<u32>,
-        get_span: impl Fn(&T) -> tsv_lang::Span,
+        get_span: impl Fn(&T) -> Span,
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();

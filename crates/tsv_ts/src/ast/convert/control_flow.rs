@@ -2,7 +2,7 @@
 
 use super::super::{internal, public};
 use super::{
-    Schema, convert_block_statement, convert_expression, convert_statement,
+    Schema, convert_block_statement, convert_expression, convert_identifier, convert_statement,
     convert_variable_declaration, create_location,
 };
 use string_interner::DefaultStringInterner;
@@ -296,7 +296,7 @@ pub(in crate::ast) fn convert_break_statement<'src>(
         label: break_stmt
             .label
             .as_ref()
-            .map(|id| super::convert_identifier(id, source, loc, interner, offset)),
+            .map(|id| convert_identifier(id, source, loc, interner, offset)),
     }
 }
 
@@ -315,7 +315,7 @@ pub(in crate::ast) fn convert_continue_statement<'src>(
         label: continue_stmt
             .label
             .as_ref()
-            .map(|id| super::convert_identifier(id, source, loc, interner, offset)),
+            .map(|id| convert_identifier(id, source, loc, interner, offset)),
     }
 }
 
@@ -331,7 +331,7 @@ pub(in crate::ast) fn convert_labeled_statement<'src>(
         start: labeled.span.start,
         end: labeled.span.end,
         loc: create_location(labeled.span, loc, offset),
-        label: super::convert_identifier(&labeled.label, source, loc, interner, offset),
+        label: convert_identifier(&labeled.label, source, loc, interner, offset),
         body: Box::new(convert_statement(
             labeled.body,
             source,

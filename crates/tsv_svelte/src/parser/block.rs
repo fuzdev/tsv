@@ -9,9 +9,11 @@ use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 use tsv_lang::{ParseError, Span};
+use tsv_ts::Expression;
 
 use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::SvelteParser;
+use super::{match_bracket, subslice_offset};
 
 /// Whether `c` may START a JS identifier (letter, `_`, or `$` — never a digit).
 /// Mirrors the leading-char rule of Svelte's `read_identifier`, used to validate the
@@ -71,9 +73,9 @@ fn find_last_top_level_as(s: &str) -> Option<usize> {
 /// `consumed_end` is the absolute source offset just past the last token the binding
 /// consumed — the caller rejects any non-whitespace between it and the closing `}`.
 type EachBindingResult<'arena> = (
-    tsv_ts::Expression<'arena>,
+    Expression<'arena>,
     Option<&'arena str>,
-    Option<tsv_ts::Expression<'arena>>,
+    Option<Expression<'arena>>,
     Option<Span>,
     usize,
 );
@@ -81,7 +83,7 @@ type EachBindingResult<'arena> = (
 /// Return type for parse_index_and_key_after_context: (index, key_expr, key_span, consumed_end).
 type IndexAndKeyResult<'arena> = (
     Option<&'arena str>,
-    Option<tsv_ts::Expression<'arena>>,
+    Option<Expression<'arena>>,
     Option<Span>,
     usize,
 );
@@ -146,7 +148,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         };
 
         // Parse the test expression (with comments)
-        let expr_offset = tag_content_start + super::subslice_offset(expr_content, expr_str);
+        let expr_offset = tag_content_start + subslice_offset(expr_content, expr_str);
 
         let test = self.parse_ts_expression(expr_str, expr_offset)?;
 
@@ -394,7 +396,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         input: &str,
         offset: usize,
-    ) -> Result<(tsv_ts::Expression<'arena>, usize), ParseError> {
+    ) -> Result<(Expression<'arena>, usize), ParseError> {
         let trimmed = input.trim_start();
         let ws_len = input.len() - trimmed.len();
         let adjusted = offset + ws_len;
@@ -428,7 +430,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     Rc::clone(&self.interner),
                     self.arena,
                 )?;
-                if let tsv_ts::Expression::Identifier(id) = &mut expr {
+                if let Expression::Identifier(id) = &mut expr {
                     // Re-bind the identifier's binding extra with the parsed type
                     // annotation, preserving any decorators already present.
                     let decorators = id.decorators();
@@ -461,7 +463,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }
         };
 
-        super::match_bracket(bytes, 0, bytes.len(), open, close, TriviaProfile::JS)
+        match_bracket(bytes, 0, bytes.len(), open, close, TriviaProfile::JS)
             .map(|close_pos| close_pos + 1) // include the closing bracket
             .ok_or_else(|| ParseError::InvalidSyntax {
                 message: "Unmatched bracket".to_string(),
@@ -522,7 +524,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let (key, key_span) = if rest_trimmed.starts_with('(') {
             let key_ws = rest.len() - rest_trimmed.len();
             let paren_start = rest_offset + key_ws; // absolute offset of '('
-            let close = super::match_bracket(
+            let close = match_bracket(
                 rest_trimmed.as_bytes(),
                 0,
                 rest_trimmed.len(),
@@ -744,7 +746,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         keyword: &str,
         stop_keywords: &[&str],
-    ) -> Result<(Option<Fragment<'arena>>, Option<tsv_ts::Expression<'arena>>), ParseError> {
+    ) -> Result<(Option<Fragment<'arena>>, Option<Expression<'arena>>), ParseError> {
         let tag_start = self.current_end;
         let (tag_content, content_start) = self.scan_block_tag_content(tag_start)?;
         let binding_str = self
@@ -752,7 +754,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .trim();
 
         let binding = if !binding_str.is_empty() {
-            let offset = tag_start + super::subslice_offset(tag_content, binding_str);
+            let offset = tag_start + subslice_offset(tag_content, binding_str);
             Some(self.parse_await_value_pattern(binding_str, offset)?)
         } else {
             None
@@ -859,7 +861,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         region: &str,
         region_offset: usize,
-    ) -> Result<tsv_ts::Expression<'arena>, ParseError> {
+    ) -> Result<Expression<'arena>, ParseError> {
         let lead = region.len() - region.trim_start().len();
         let value_start = region_offset + lead;
         let trimmed = region.trim();
@@ -932,7 +934,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             .strip_block_keyword(tag_content, "key", tag_content_start)?
             .trim();
 
-        let expr_offset = tag_content_start + super::subslice_offset(tag_content, expr_str);
+        let expr_offset = tag_content_start + subslice_offset(tag_content, expr_str);
         let expression = self.parse_ts_expression(expr_str, expr_offset)?;
 
         // Opening tag span is from start to content_start (includes the closing })
@@ -975,7 +977,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let content_bytes = content.as_bytes();
         // Absolute offset of `content[0]` (the name's first byte) in the source, the
         // base for every span and error position below.
-        let content_offset = tag_content_start + super::subslice_offset(tag_content, content);
+        let content_offset = tag_content_start + subslice_offset(tag_content, content);
 
         // Mirror Svelte's snippet-head grammar (`1-parse/state/tag.js`): read the name,
         // then an optional `<…>` generic via the naive `<`/`>` matcher, then REQUIRE a
@@ -1033,7 +1035,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // The `)` matching the opening `(` — depth- and trivia-aware, so a `)` inside a
         // string/comment in a param default can't end the list early. Svelte requires the
         // close (`eat(')', true)`); an unmatched `(` is rejected.
-        let close_paren = super::match_bracket(
+        let close_paren = match_bracket(
             content_bytes,
             paren_pos,
             content.len(),
@@ -1067,7 +1069,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // locates them by position). Falls back to raw text on parse failure (e.g. a form
         // acorn-typescript rejects); the generics are already captured in `type_params_raw`.
         let mut type_parameters: Option<tsv_ts::TSTypeParameterDeclaration<'arena>> = None;
-        let mut parameters: &'arena [tsv_ts::Expression<'arena>] = &[];
+        let mut parameters: &'arena [Expression<'arena>] = &[];
         let mut raw_parameters: Option<&'arena str> = None;
         if type_params_raw.is_some() || !params_str.trim().is_empty() {
             // The head runs from where the signature begins (`<` or `(`) through the `)`.
@@ -1131,7 +1133,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         content: &str,
         open_pos: usize,
     ) -> Result<usize, ParseError> {
-        super::match_bracket(
+        match_bracket(
             content.as_bytes(),
             open_pos,
             content.len(),

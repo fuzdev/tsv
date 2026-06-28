@@ -6,6 +6,7 @@
 
 use crate::ast::internal;
 use string_interner::DefaultStringInterner;
+use tsv_lang::Span;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -161,7 +162,7 @@ pub(crate) fn is_multiline_string_literal(expr: &internal::Expression<'_>, sourc
 ///
 /// Detects newline immediately after opening brace: `{\n  ...}` vs `{ ... }`
 /// Used for type literals, mapped types, and other brace-delimited constructs.
-pub(crate) fn is_brace_block_multiline(source: &str, span: tsv_lang::Span) -> bool {
+pub(crate) fn is_brace_block_multiline(source: &str, span: Span) -> bool {
     let source_text = span.extract(source);
     let after_brace = source_text.strip_prefix('{').unwrap_or("");
     after_brace.starts_with('\n')

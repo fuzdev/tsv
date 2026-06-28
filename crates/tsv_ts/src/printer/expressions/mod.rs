@@ -31,6 +31,8 @@ use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression, TSType}
 use crate::printer::comments::{CommentFilter, CommentSpacing};
 use crate::printer::{ParenContext, PatternContext, Printer, chain};
 use smallvec::smallvec;
+use tsv_lang::Span;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -45,7 +47,7 @@ impl<'a> Printer<'a> {
     /// starts the enclosing expression statement (set by `build_expression_statement_doc`
     /// via `leftmost_no_lookahead`). Consumes the target so it fires exactly once:
     /// `(class {}).foo` wraps the class, not the whole member expression.
-    fn maybe_wrap_expr_stmt_paren(&self, span: tsv_lang::Span, doc: DocId) -> DocId {
+    fn maybe_wrap_expr_stmt_paren(&self, span: Span, doc: DocId) -> DocId {
         // Matched by span, not consumed: a chain may rebuild its base across
         // conditional-group variants (`({a: 1}).b().c()`), so consuming the target on
         // the first (possibly discarded) build would leave the selected variant
@@ -180,7 +182,7 @@ impl<'a> Printer<'a> {
         // (silent content loss). Mirrors `build_expression_doc_keep_paren_comments`.
         if self.has_line_comments_between(open + 1, inner_start) {
             let mut parts: DocBuf = smallvec![d.hardline()];
-            for comment in tsv_lang::comments_in_range(self.comments, open + 1, inner_start) {
+            for comment in comments_in_range(self.comments, open + 1, inner_start) {
                 parts.push(self.build_comment_doc(comment));
                 // A line comment runs to end-of-line, so it must break; a block
                 // comment hugs the next token inline (`/** @type {B} */ (x)`).

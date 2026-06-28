@@ -12,6 +12,7 @@
 // look like Rust format args but are valid Svelte template syntax.
 #![allow(clippy::literal_string_with_formatting_args)]
 
+use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
@@ -122,12 +123,11 @@ impl<'a> Printer<'a> {
             }
 
             // For control flow blocks, check if there's preceding breakable content
-            let is_control_flow = super::helpers::is_control_flow_block(node);
+            let is_control_flow = is_control_flow_block(node);
             let doc = if is_control_flow {
                 // "Breakable preceding content" is exactly the inline-content set — text never
                 // breaks before a control-flow block, so reuse the one predicate.
-                let has_preceding_breakable =
-                    nodes[..i].iter().any(super::helpers::is_inline_content);
+                let has_preceding_breakable = nodes[..i].iter().any(is_inline_content);
                 self.build_fragment_node_doc_with_preceding_context(
                     node,
                     trim_text,
@@ -309,7 +309,7 @@ impl<'a> Printer<'a> {
                     &mut child_docs,
                     &mut handle_whitespace_of_prev_text,
                 );
-            } else if multiline && super::helpers::is_control_flow_block(node) {
+            } else if multiline && is_control_flow_block(node) {
                 // Control-flow block (`{#if}`/`{#each}`/`{#await}`/`{#key}`/`{#snippet}`) in the
                 // convergence path. Mirror path 1's block dispatch.
                 //
@@ -337,9 +337,8 @@ impl<'a> Printer<'a> {
                     // wrapping work). The non-multiline callers keep the inline
                     // `build_fragment_node_doc_*` path below.
                     let node_doc = if self.is_root_inline_run_block(node) {
-                        let has_preceding_breakable = trimmed_nodes[..i]
-                            .iter()
-                            .any(super::helpers::is_inline_content);
+                        let has_preceding_breakable =
+                            trimmed_nodes[..i].iter().any(is_inline_content);
                         self.build_fragment_node_doc_with_preceding_context(
                             node,
                             false,
@@ -353,7 +352,7 @@ impl<'a> Printer<'a> {
                     }
                     handle_whitespace_of_prev_text = false;
                 }
-            } else if super::helpers::is_inline_content(node) {
+            } else if is_inline_content(node) {
                 self.handle_inline_child(
                     node,
                     &mut child_docs,
@@ -365,9 +364,7 @@ impl<'a> Printer<'a> {
                 // This affects whether block conditions should use remove_lines() or not:
                 // - With preceding breakable content: use remove_lines() so that content breaks first
                 // - Without preceding breakable content: allow wrapping to respect print_width
-                let has_preceding_breakable = trimmed_nodes[..i]
-                    .iter()
-                    .any(super::helpers::is_inline_content);
+                let has_preceding_breakable = trimmed_nodes[..i].iter().any(is_inline_content);
                 if let Some(node_doc) = self.build_fragment_node_doc_with_preceding_context(
                     node,
                     false,
@@ -447,9 +444,9 @@ impl<'a> Printer<'a> {
         let is_last = i + 1 == trimmed_nodes.len();
         let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
         let next_node = trimmed_nodes.get(i + 1);
-        let prev_is_inline = prev_node.is_some_and(super::helpers::is_inline_content);
+        let prev_is_inline = prev_node.is_some_and(is_inline_content);
         let prev_is_tag = prev_node.is_some_and(Self::is_expression_tag);
-        let next_is_inline = next_node.is_some_and(super::helpers::is_inline_content);
+        let next_is_inline = next_node.is_some_and(is_inline_content);
         let next_is_tag = next_node.is_some_and(Self::is_expression_tag);
         // Whether the next sibling is an HTML *inline* element vs a *block* element —
         // the two kinds prettier-plugin-svelte trims boundary whitespace *into* (the
@@ -937,7 +934,7 @@ impl<'a> Printer<'a> {
             // Defer to the one block-element adapter (component + script/style overlay).
             FragmentNode::Element(el) => self.is_block_element(el),
             FragmentNode::SpecialElement(el) => el.kind.is_block(),
-            _ => super::helpers::is_control_flow_block(node),
+            _ => is_control_flow_block(node),
         }
     }
 
@@ -1125,7 +1122,7 @@ impl<'a> Printer<'a> {
         i: usize,
     ) -> Option<(DocId, DocId)> {
         let block = trimmed_nodes.get(i)?;
-        if !super::helpers::is_control_flow_block(block) {
+        if !is_control_flow_block(block) {
             return None;
         }
         let prev = trimmed_nodes.get(i.checked_sub(1)?)?;

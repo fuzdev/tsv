@@ -1,5 +1,6 @@
 // TypeScript parser - main entry point and coordination
 
+use crate::Goal;
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, Lexer, TokenKind};
 use bumpalo::Bump;
@@ -112,7 +113,7 @@ pub struct Parser<'a, 'arena> {
     /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
     /// Fixed for the whole parse — embedders (Svelte) and the standalone
     /// `parse`/`format` default to `Module`; `parse_with_goal` overrides it.
-    goal: crate::Goal,
+    goal: Goal,
     /// The `[Await]` grammar context. `true` (`[+Await]`) inside an async
     /// function/arrow/method/generator's params or body, a class static
     /// initialization block, a `for await` head, and — by default — module top
@@ -127,11 +128,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Create a parser with a fresh interner against an explicit goal symbol.
     /// The standalone `parse`/`parse_with_goal` paths use this; embedders go
     /// through [`Parser::with_interner`] (always `Module`).
-    fn new_with_goal(
-        source: &'a str,
-        goal: crate::Goal,
-        arena: &'arena Bump,
-    ) -> Result<Self, ParseError> {
+    fn new_with_goal(source: &'a str, goal: Goal, arena: &'arena Bump) -> Result<Self, ParseError> {
         Self::with_interner_and_goal(
             source,
             0,
@@ -195,7 +192,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         interner: SharedInterner,
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
-        Self::with_interner_and_goal(source, base_offset, interner, crate::Goal::Module, arena)
+        Self::with_interner_and_goal(source, base_offset, interner, Goal::Module, arena)
     }
 
     /// [`Parser::with_interner`] with an explicit goal symbol — the single
@@ -204,7 +201,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         source: &'a str,
         base_offset: usize,
         interner: SharedInterner,
-        goal: crate::Goal,
+        goal: Goal,
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
@@ -254,7 +251,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
-            in_await: matches!(goal, crate::Goal::Module),
+            in_await: matches!(goal, Goal::Module),
         })
     }
 
@@ -517,7 +514,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `await`-as-identifier is a Syntax Error if the goal is `Module`, OR if the
     /// production carries the `[Await]` parameter.
     pub(super) fn await_is_identifier(&self) -> bool {
-        self.goal == crate::Goal::Script && !self.in_await
+        self.goal == Goal::Script && !self.in_await
     }
 
     /// Whether the current token is `await` *and* it may be an ordinary
@@ -1337,14 +1334,14 @@ pub fn parse_typescript<'arena>(
     source: &str,
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, ParseError> {
-    parse_typescript_with_goal(source, crate::Goal::Module, arena)
+    parse_typescript_with_goal(source, Goal::Module, arena)
 }
 
 /// [`parse_typescript`] against an explicit goal symbol. `parse_typescript` is
 /// the `Goal::Module` form.
 pub fn parse_typescript_with_goal<'arena>(
     source: &str,
-    goal: crate::Goal,
+    goal: Goal,
     arena: &'arena Bump,
 ) -> Result<Program<'arena>, ParseError> {
     let mut parser = Parser::new_with_goal(source, goal, arena)?;

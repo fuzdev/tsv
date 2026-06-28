@@ -27,6 +27,7 @@ use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_modul
 use super::test_patterns::{callee_chain_string, is_test_call};
 use crate::ast::internal;
 use tsv_lang::SymbolResolver;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -191,8 +192,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // Skip hugging if there are trailing comments - let comment handling block handle it
     // Note: Check both trailing line comments AND trailing block comments
     let has_trailing_block_comment = call.arguments.last().is_some_and(|last_arg| {
-        tsv_lang::comments_in_range(printer.comments, last_arg.span().end, call.span.end)
-            .any(|c| c.is_block)
+        comments_in_range(printer.comments, last_arg.span().end, call.span.end).any(|c| c.is_block)
     });
     if call.arguments.len() == 1
         && !has_trailing_comments_on_args(call, printer)
@@ -424,8 +424,8 @@ fn try_single_arg_comment_paths(
     // branches below — defer to the general comment path (which emits them
     // after the last arg, no trailing comma). Same-line inline trailing block
     // comments (e.g. `fn(/* c */ a /* t */)`) stay on this fast path.
-    let has_own_line_trailing_comment =
-        tsv_lang::comments_in_range(printer.comments, arg_end, paren_close).any(|c| {
+    let has_own_line_trailing_comment = comments_in_range(printer.comments, arg_end, paren_close)
+        .any(|c| {
             !c.is_block
                 || !tsv_lang::printing::is_same_line_fast(
                     printer.line_breaks,
@@ -1140,7 +1140,7 @@ fn build_call_with_arg_comments(
     // Also checks inside spread spans for comments from stripped parens.
     let has_own_line_trailing_block = call.arguments.last().is_some_and(|last_arg| {
         let search_start = printer.last_arg_comment_scan_start(last_arg);
-        tsv_lang::comments_in_range(printer.comments, search_start, call.span.end).any(|c| {
+        comments_in_range(printer.comments, search_start, call.span.end).any(|c| {
             c.is_block
                 && !tsv_lang::printing::is_same_line_fast(
                     printer.line_breaks,
@@ -1206,9 +1206,7 @@ fn build_call_with_arg_comments(
                 let all_inline_block =
                     printer.all_comments_are_inline_block(paren_open, first_arg_start);
                 let mut has_prev_comment = false;
-                for comment in
-                    tsv_lang::comments_in_range(printer.comments, paren_open, first_arg_start)
-                {
+                for comment in comments_in_range(printer.comments, paren_open, first_arg_start) {
                     if has_prev_comment {
                         if all_inline_block {
                             arg_parts.push(d.text(" "));

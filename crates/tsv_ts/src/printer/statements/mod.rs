@@ -23,8 +23,10 @@ use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
 use smallvec::smallvec;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a statement
@@ -307,7 +309,7 @@ impl<'a> Printer<'a> {
     /// This matches Prettier's `hasLeadingOwnLineComment` which checks for
     /// comments with a newline after them that are leading on a node.
     fn has_leading_own_line_comment_in_range(&self, start: u32, end: u32) -> bool {
-        tsv_lang::comments_in_range(self.comments, start, end)
+        comments_in_range(self.comments, start, end)
             .any(|c| !self.is_same_line(start, c.span.start))
     }
 
@@ -374,13 +376,9 @@ impl<'a> Printer<'a> {
         // mistaken for the statement's terminator, which would drop the comments
         // after it.
         let expr_end = binary.span.end as usize;
-        let semicolon_pos = tsv_lang::source_scan::find_char_skipping_comments(
-            self.source.as_bytes(),
-            expr_end,
-            self.source.len(),
-            b';',
-        )
-        .unwrap_or(expr_end);
+        let semicolon_pos =
+            find_char_skipping_comments(self.source.as_bytes(), expr_end, self.source.len(), b';')
+                .unwrap_or(expr_end);
         let trailing_comments_doc =
             self.build_inline_comments_between_doc(expr_end as u32, semicolon_pos as u32);
 

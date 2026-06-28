@@ -4,6 +4,7 @@
 
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
@@ -61,7 +62,7 @@ impl<'a> Printer<'a> {
             // (includes comments before first case, and between subsequent cases)
             // Skip inline comments that belong to the previous case label (fallthrough cases)
             let comments: Vec<_> =
-                tsv_lang::comments_in_range(self.comments, prev_end, case.span.start).collect();
+                comments_in_range(self.comments, prev_end, case.span.start).collect();
             let mut last_content_end = prev_end;
             for comment in &comments {
                 // Skip comments that are on the same line as the previous case label
@@ -110,7 +111,7 @@ impl<'a> Printer<'a> {
         // Also handles comments in empty switch bodies
         let switch_end = stmt.span.end - 1; // Before '}'
         let mut last_trailing_end = prev_end;
-        for comment in tsv_lang::comments_in_range(self.comments, prev_end, switch_end) {
+        for comment in comments_in_range(self.comments, prev_end, switch_end) {
             if !is_first_item {
                 if self.has_blank_line_between(last_trailing_end, comment.span.start) {
                     case_parts.push(d.literalline());
@@ -224,9 +225,7 @@ impl<'a> Printer<'a> {
         let first_stmt_start = case.consequent.first().map(|s| s.span().start);
         let inline_comment_end = first_stmt_start.unwrap_or(inline_comment_boundary);
         let mut has_inline_line_comment = false;
-        for comment in
-            tsv_lang::comments_in_range(self.comments, case_label_end, inline_comment_end)
-        {
+        for comment in comments_in_range(self.comments, case_label_end, inline_comment_end) {
             if self.is_same_line(case_label_end, comment.span.start) {
                 // A line comment goes through `line_suffix` (zero width) so it never
                 // forces the case test (e.g. a binary expression) to break; it flushes
@@ -254,8 +253,7 @@ impl<'a> Printer<'a> {
             let stmt_start = stmt.span().start;
 
             // Check for comments between previous position and this statement
-            let comments: Vec<_> =
-                tsv_lang::comments_in_range(self.comments, prev_end, stmt_start).collect();
+            let comments: Vec<_> = comments_in_range(self.comments, prev_end, stmt_start).collect();
 
             // Filter out:
             // 1. Trailing same-line comments from the previous statement

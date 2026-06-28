@@ -8,6 +8,7 @@
 
 use super::{Printer, value_normalization};
 use crate::ast::internal::{self, CssValue};
+use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
@@ -225,7 +226,7 @@ impl<'a> Printer<'a> {
         decl_source: &str,
         name: &str,
         args: &[CssValue<'_>],
-        span: tsv_lang::Span,
+        span: Span,
     ) {
         if self.has_value_comments_in_decl(decl) {
             self.print_decl_function_with_comments(decl, decl_source, name, args, span);
@@ -281,7 +282,7 @@ impl<'a> Printer<'a> {
         decl_source: &str,
         name: &str,
         args: &[CssValue<'_>],
-        span: tsv_lang::Span,
+        span: Span,
     ) {
         // Width check uses the NORMALIZED source length (comments included), since the
         // comments aren't in the doc and the value must round-trip verbatim.
