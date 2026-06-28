@@ -3,50 +3,55 @@
 // Handles formatting of:
 // - Selector lists (comma-separated)
 // - Complex selectors (with combinators)
-// - Relative selectors (simple selector chains)
+// - Relative selectors (simple selector chains / compounds)
 // - Simple selectors (type, class, id, pseudo-class, pseudo-element, etc.)
 //
 // ## Architecture
 //
-// This module uses a doc-first approach where all formatting logic lives in
-// `build_*_doc()` methods. The `print_*` methods use these doc builders and
-// handle wrapping decisions.
+// Doc-first (like `values.rs`): every selector is built as ONE `group`/`indent`/
+// `line`/`softline` doc tree and rendered once via `write_selector_doc`. The
+// renderer makes the wrapping decisions, so width measurement and emission share a
+// single representation — there is no separate measurement pass to drift from
+// emission. The list level (the "2+ selectors always break" rule and the
+// comment-bearing raw seam) stays imperative because it carries no width logic to
+// drift.
+//
+// ### Indent model (a deliberate divergence from prettier)
+//
+// A complex selector that spans more than one compound (i.e. it has a combinator)
+// indents its continuation lines one level — `group(indent(...))`. A pseudo's
+// broken arguments always indent one level relative to the pseudo. That is the
+// whole rule: a single compound's pseudo args sit one level in (the `)` aligns
+// with the selector), and on a combinator continuation they sit two levels in (the
+// combinator indent plus the pseudo's own). Prettier instead keys an extra indent
+// on a flat `nodes.length > 2` count, which shoves a single compound's pseudo args
+// a gratuitous level deeper than the rule body with no combinator to align to.
+// tsv's uniform rule is cleaner and needs no node counting — the `+1` comes only
+// from a real combinator. See conformance_prettier.md §CSS: Selectors.
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::PRINT_WIDTH;
-use tsv_lang::doc::{self, DocBuf, Mode, arena::DocId};
+use tsv_lang::Span;
+use tsv_lang::doc::{self, DocBuf, arena::DocId};
+
+/// Trailing punctuation that follows a selector on its last line (`) {` / `,`),
+/// reserved so a selector that would overflow once the brace is appended breaks
+/// instead. Two columns reproduces the imperative printer's `+2`/`+4` overheads
+/// exactly (the pseudo-args group already counts its own `()`).
+const SELECTOR_SUFFIX_WIDTH: usize = 2;
 
 impl<'a> Printer<'a> {
-    /// Get the string representation of a combinator
-    ///
-    /// - `is_leading`: true for first selector in complex, or at line start after wrap
-    ///
-    /// Returns the combinator string with appropriate spacing.
-    /// For Descendant, returns "" when leading (caller handles the space/linebreak).
-    fn get_combinator_str(combinator: internal::Combinator, is_leading: bool) -> &'static str {
-        match (combinator, is_leading) {
-            (internal::Combinator::Descendant, true) => "",
-            (internal::Combinator::Descendant, false) => " ",
-            (internal::Combinator::Child, true) => "> ",
-            (internal::Combinator::Child, false) => " > ",
-            (internal::Combinator::NextSibling, true) => "+ ",
-            (internal::Combinator::NextSibling, false) => " + ",
-            (internal::Combinator::SubsequentSibling, true) => "~ ",
-            (internal::Combinator::SubsequentSibling, false) => " ~ ",
-            (internal::Combinator::Column, true) => "|| ",
-            (internal::Combinator::Column, false) => " || ",
-        }
-    }
-
-    /// Print a selector list inline with `, ` separators
-    fn print_selector_list_inline(&mut self, list: &internal::SelectorList<'_>) {
-        for (i, complex) in list.selectors.iter().enumerate() {
-            if i > 0 {
-                self.pop_selector_terminator();
-                self.write(", ");
-            }
-            self.print_complex_selector(complex);
+    /// The leading combinator string for the first compound in a complex selector
+    /// (e.g. the `>` in `:has(> img)`). A descendant combinator has no leading
+    /// symbol, so this returns `""`. Between two compounds a combinator renders as a
+    /// breakable separator instead — see `combinator_separator_doc`.
+    fn leading_combinator_str(combinator: internal::Combinator) -> &'static str {
+        match combinator {
+            internal::Combinator::Descendant => "",
+            internal::Combinator::Child => "> ",
+            internal::Combinator::NextSibling => "+ ",
+            internal::Combinator::SubsequentSibling => "~ ",
+            internal::Combinator::Column => "|| ",
         }
     }
 
@@ -64,207 +69,175 @@ impl<'a> Printer<'a> {
             .replace("*/  .", "*/ .")
     }
 
-    /// Format a selector list (comma-separated complex selectors)
-    ///
-    /// Supports line wrapping for top-level selector lists (in rules).
-    /// Nested selector lists (inside :is(), :where(), etc.) are NOT wrapped.
-    pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList<'_>) {
-        self.print_selector_list_internal(list, false);
+    /// The raw-source seam for comment-bearing selectors: selector comments aren't
+    /// modeled in the AST, so a selector containing one is emitted verbatim (with
+    /// spacing normalized) rather than rebuilt from the doc tree. Returns `true`
+    /// when it handled the selector (the caller stops), `false` for the comment-free
+    /// doc-first path.
+    fn try_write_selector_comment_seam(&mut self, list: &internal::SelectorList<'_>) -> bool {
+        let source_text = list.span.extract(self.source);
+        if source_text.contains("/*") {
+            let normalized = Self::normalize_selector_comment_spacing(source_text);
+            self.write(&normalized);
+            return true;
+        }
+        false
     }
 
-    /// Format a selector list in nested context (inside pseudo-class arguments or @scope)
+    //
+    // Entry points
+    //
+
+    /// Format a top-level selector list (a rule's selector).
     ///
-    /// For short lists: prints inline (e.g., `:is(.a, .b)`)
-    /// For long lists: wraps each selector on its own line with indentation
+    /// Prettier's rule: a top-level list of 2+ selectors ALWAYS breaks (one per
+    /// line); a single selector wraps only on width. Comment-bearing selectors take
+    /// the raw-source seam (see `normalize_selector_comment_spacing`) — selector
+    /// comments aren't modeled in the AST and their spacing is a deliberate,
+    /// cataloged divergence.
+    pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList<'_>) {
+        if self.try_write_selector_comment_seam(list) {
+            return;
+        }
+        if list.selectors.is_empty() {
+            return;
+        }
+        if list.selectors.len() >= 2 {
+            // Top-level list: each selector on its own line.
+            for (i, complex) in list.selectors.iter().enumerate() {
+                if i > 0 {
+                    self.write(",\n");
+                    self.write_indent();
+                }
+                self.print_complex_selector(complex);
+            }
+        } else {
+            self.print_complex_selector(&list.selectors[0]);
+        }
+    }
+
+    /// Format a selector list in a nested context that wraps inside its own
+    /// parentheses — `@scope (root) to (limit)`. The caller writes the `(`/`)`; this
+    /// renders the inner list, breaking each selector onto its own indented line
+    /// when it exceeds the print width (never the always-break top-level rule).
     pub(super) fn print_selector_list_nested(&mut self, list: &internal::SelectorList<'_>) {
         if list.selectors.is_empty() {
             return;
         }
-
-        // Check if source contains comments
-        let source_text = list.span.extract(self.source);
-        if source_text.contains("/*") {
-            let normalized = Self::normalize_selector_comment_spacing(source_text);
-            self.write(&normalized);
+        if self.try_write_selector_comment_seam(list) {
             return;
         }
-
-        // Build a doc for the selector list to check if it fits
-        let list_doc = self.build_selector_list_doc(list);
-
-        // Check if it fits on one line
-        // Use current column position (what's already printed: indent + pseudo-class prefix)
-        // and leave room for closing `) {` (3 chars)
-        let current_col = self.current_column();
-        let available_width = PRINT_WIDTH.saturating_sub(current_col + 3);
-        let fits = doc::arena_fits::<dyn doc::TextResolver>(
-            self.arena,
-            list_doc,
-            available_width,
-            Mode::Flat,
-            None,
-        );
-
-        if fits {
-            // Print inline
-            self.print_selector_list_inline(list);
-        } else {
-            // Print multiline with indentation
-            self.write("\n");
-            self.indent_level += 1;
-            for (i, complex) in list.selectors.iter().enumerate() {
-                if i > 0 {
-                    self.pop_selector_terminator();
-                    self.write(",\n");
-                }
-                self.write_indent();
-                self.print_complex_selector(complex);
-            }
-            self.write("\n");
-            self.indent_level -= 1;
-            self.write_indent();
-        }
-    }
-
-    /// Internal implementation of selector list formatting
-    ///
-    /// - `nested`: if true, never wrap (for :is(), :where(), :not() arguments)
-    /// - if false, wrap top-level selector lists with 2+ selectors (prettier's rule)
-    fn print_selector_list_internal(&mut self, list: &internal::SelectorList<'_>, nested: bool) {
-        // Check if source contains comments (/* ... */)
-        let source_text = list.span.extract(self.source);
-        if source_text.contains("/*") {
-            let normalized = Self::normalize_selector_comment_spacing(source_text);
-            self.write(&normalized);
-        } else {
-            self.print_selector_list_with_wrapping(list, nested);
-        }
-    }
-
-    /// Format a selector list with optional line wrapping
-    ///
-    /// Prettier's rule for top-level selector lists: ALWAYS break with 2+ selectors.
-    /// Nested selector lists (in :is(), :where(), etc.) never wrap.
-    fn print_selector_list_with_wrapping(
-        &mut self,
-        list: &internal::SelectorList<'_>,
-        nested: bool,
-    ) {
-        if list.selectors.is_empty() {
-            return;
-        }
-
-        // Prettier's rule: top-level selector lists with 2+ selectors ALWAYS break
-        // Nested selector lists (in pseudo-classes) NEVER break
-        let should_break = !nested && list.selectors.len() >= 2;
-
-        if should_break {
-            // Print multiline: each selector on its own line
-            for (i, complex) in list.selectors.iter().enumerate() {
-                if i > 0 {
-                    self.pop_selector_terminator();
-                    self.write(",");
-                    self.write("\n");
-                    self.write_indent();
-                }
-                self.print_complex_selector(complex);
-            }
-        } else {
-            // Print inline: ", " between selectors
-            self.print_selector_list_inline(list);
-        }
-    }
-
-    /// Format a complex selector (relative selectors with combinators)
-    ///
-    /// Supports line wrapping for long selectors (>100 chars):
-    /// - If selector fits on one line: print inline
-    /// - If too long: break at combinators with indentation
-    pub(super) fn print_complex_selector(&mut self, complex: &internal::ComplexSelector<'_>) {
-        // Single selector part - always print inline
-        if complex.children.len() == 1 {
-            self.print_relative_selector_internal(&complex.children[0], true, false);
-            return;
-        }
-
-        // Build a doc for the entire complex selector to check if it fits
-        let selector_doc = self.build_complex_selector_doc(complex);
-
-        // Check if it fits on one line
-        // Account for: indent + trailing " {" (2 chars)
-        let overhead = self.indent_width() + 2; // " {" or ", "
-        let available_width = PRINT_WIDTH.saturating_sub(overhead);
-        let fits = doc::arena_fits::<dyn doc::TextResolver>(
-            self.arena,
-            selector_doc,
-            available_width,
-            Mode::Flat,
-            None,
-        );
-
-        if fits {
-            // Print inline
-            for (i, relative) in complex.children.iter().enumerate() {
-                let is_first = i == 0;
-                self.print_relative_selector_internal(relative, is_first, false);
-            }
-        } else {
-            // Print with line breaks at combinators
-            for (i, relative) in complex.children.iter().enumerate() {
-                let is_first = i == 0;
-
-                if !is_first {
-                    // Break before combinator with indentation
-                    self.write("\n");
-                    self.indent_level += 1;
-                    self.write_indent();
-                    self.indent_level -= 1;
-                }
-
-                // When wrapping, all parts after the first are at line start (no leading space needed)
-                self.print_relative_selector_internal(relative, is_first, !is_first);
-            }
-        }
-    }
-
-    /// Build a doc representation of a selector list for width checking
-    pub(crate) fn build_selector_list_doc(&self, list: &internal::SelectorList<'_>) -> DocId {
         let d = self.d();
-        let sep = d.text(", ");
-        d.join_doc(
-            list.selectors
-                .iter()
-                .map(|complex| self.build_complex_selector_doc(complex)),
-            sep,
-        )
+        let inner = self.build_nested_selector_list_doc(list);
+        // The caller already wrote `(`; emit `softline inner` indented, then a
+        // trailing softline so the closing `)` (written by the caller) lands at the
+        // base level when broken. Reserve `) {`-ish via a 3-col suffix.
+        let doc = d.group(d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]));
+        self.write_selector_doc(doc, 3);
     }
 
-    /// Build a doc representation of a complex selector for width checking
+    /// Build a doc for a selector list joined by `,`-`line` — the nested/forgiving
+    /// form used inside pseudo arguments and `@scope`. Each selector is a full
+    /// complex-selector doc; the group around it (added by the caller) decides
+    /// whether the `line`s flatten to `, ` or break one-per-line.
+    fn build_nested_selector_list_doc(&self, list: &internal::SelectorList<'_>) -> DocId {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        for (i, complex) in list.selectors.iter().enumerate() {
+            if i > 0 {
+                parts.push(d.text(","));
+                parts.push(d.line());
+            }
+            parts.push(self.build_complex_selector_doc(complex));
+        }
+        d.concat(&parts)
+    }
+
+    /// Render a single complex selector by building its doc and printing it,
+    /// reserving the trailing `) {`/`,` so an over-width selector breaks.
+    fn print_complex_selector(&mut self, complex: &internal::ComplexSelector<'_>) {
+        let doc = self.build_complex_selector_doc(complex);
+        self.write_selector_doc(doc, SELECTOR_SUFFIX_WIDTH);
+    }
+
+    /// Render a selector doc, reserving `suffix_width` columns for the punctuation
+    /// the caller appends after it (` {`, `) {`). The reservation rides
+    /// `EmbedContext::suffix_width`, so every group's fit check leaves room for the
+    /// suffix on its line.
+    fn write_selector_doc(&mut self, d: DocId, suffix_width: usize) {
+        let current_col = self.current_column();
+        let mut embed = self.embed;
+        embed.suffix_width = suffix_width;
+        let output =
+            doc::arena_print_doc_with_indent(self.arena, d, &embed, current_col, self.indent_level);
+        self.write(&output);
+    }
+
+    //
+    // Doc builders — all formatting logic expressed as doc IR
+    //
+
+    /// Build a doc for a complex selector (compounds joined by combinators).
+    ///
+    /// Multi-compound selectors get `group(indent(...))` so they break at their
+    /// combinators and indent continuation lines (and any pseudo args on them) one
+    /// level. A single compound needs no group/indent — its only break point is a
+    /// pseudo's own arg group, which is self-contained.
     fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector<'_>) -> DocId {
-        let docs: DocBuf = complex
-            .children
-            .iter()
-            .enumerate()
-            .map(|(i, relative)| self.build_relative_selector_doc(relative, i == 0))
-            .collect();
-        self.d().concat(&docs)
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        for (i, rel) in complex.children.iter().enumerate() {
+            if let Some(combinator) = rel.combinator {
+                if i == 0 {
+                    // Leading combinator (e.g. `:has(> img)`): no break before it.
+                    let s = Self::leading_combinator_str(combinator);
+                    if !s.is_empty() {
+                        parts.push(d.text(s));
+                    }
+                } else {
+                    parts.push(self.combinator_separator_doc(combinator));
+                }
+            }
+            let n = rel.selectors.len();
+            for (j, simple) in rel.selectors.iter().enumerate() {
+                parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
+            }
+        }
+        let body = d.concat(&parts);
+        if complex.children.len() > 1 {
+            d.group(d.indent(body))
+        } else {
+            body
+        }
     }
 
-    //
-    // Doc Builders - all formatting logic expressed as doc IR
-    //
+    /// The break point between two compounds: a bare `line` for a descendant
+    /// combinator (space when flat, newline when broken), or `line` + the
+    /// combinator symbol + a trailing space for `>`/`+`/`~`/`||`.
+    fn combinator_separator_doc(&self, combinator: internal::Combinator) -> DocId {
+        let d = self.d();
+        match combinator {
+            internal::Combinator::Descendant => d.line(),
+            other => d.concat(&[d.line(), d.text(other.as_str()), d.text(" ")]),
+        }
+    }
 
-    /// Build a width-measurement doc for a span-based simple selector (type /
-    /// class / id / pseudo) from source, preserving raw escapes verbatim.
-    fn build_span_selector_doc(&self, span: tsv_lang::Span) -> DocId {
+    /// Build a width-measurement-and-emission doc for a span-based simple selector
+    /// (type / class / id / pseudo-without-args) extracted verbatim from source so
+    /// escapes are preserved.
+    ///
+    /// A CSS hex escape consumes one following whitespace as its terminator, which
+    /// the lexer captures into the selector's span (`.\1F600 ` before `{`). When
+    /// this is the last simple selector in its compound, whatever follows is a
+    /// structural separator (a combinator's space, `,`, `)`, or the block `{`) that
+    /// terminates the escape on its own, so the captured terminator is dropped to
+    /// avoid a doubled space. An internal terminator (`.\1F600 .b` inside one
+    /// compound, or the first of `:\41 :\42`) is kept — it separates the escape from
+    /// the next simple selector. This single leaf rule replaces the old
+    /// buffer-popping `pop_selector_terminator`.
+    fn span_leaf_doc(&self, span: Span, is_last_in_compound: bool) -> DocId {
         let raw = span.extract(self.source);
-        // An escaped selector that is the last before a line break (in wrapped source)
-        // absorbs that newline as its escape terminator into the span. The terminator is
-        // always dropped on render (it sits at a separator), and a newline inside a
-        // width-measurement text node makes `fits()` short-circuit on it — collapsing the
-        // list. Exclude a newline-bearing terminator from the measured width. Space/tab
-        // terminators are left intact (they may be a rendered compound separator).
-        let text = if raw.contains('\n') {
+        let text = if is_last_in_compound {
             raw.trim_end()
         } else {
             raw
@@ -272,14 +245,13 @@ impl<'a> Printer<'a> {
         self.d().text_owned(text.to_string())
     }
 
-    /// Reconstruct an attribute selector (`[ns|name op 'value' flags]`) verbatim from
-    /// source. Single source of truth for both selector-printing paths — the doc
-    /// builder (`build_simple_selector_doc`, via `text_owned`) and the direct writer
-    /// (`print_simple_selector`, via `write`) — so the reconstruction can't drift.
+    /// Reconstruct an attribute selector (`[ns|name op 'value' flags]`) verbatim
+    /// from source. The name is emitted raw (escapes preserved — `[f\oo]` stays
+    /// `[f\oo]`).
     fn build_attribute_selector_text(
         &self,
         namespace: Option<&str>,
-        name_span: tsv_lang::Span,
+        name_span: Span,
         matcher: Option<internal::AttributeMatcher>,
         value: Option<&str>,
         flags: Option<&str>,
@@ -289,7 +261,6 @@ impl<'a> Printer<'a> {
             result.push_str(ns);
             result.push('|');
         }
-        // Emit the name verbatim from source (escapes preserved — never decode it).
         result.push_str(name_span.extract(self.source));
         if let Some(m) = matcher {
             result.push_str(m.as_str());
@@ -308,21 +279,64 @@ impl<'a> Printer<'a> {
         result
     }
 
-    /// Build a width-measurement doc for a simple selector, dispatched by kind.
-    /// Span-based kinds extract from source to preserve escapes verbatim.
-    pub(crate) fn build_simple_selector_doc(&self, simple: &internal::SimpleSelector<'_>) -> DocId {
+    /// Fold a pseudo selector's `:name` / `::name` prefix to its canonical case,
+    /// returning the text (the args, if any, format separately).
+    ///
+    /// Svelte decodes the internal name (`:\41 ` → name "A"), but the formatter
+    /// keeps it verbatim like class/id/type selectors. Prettier lowercases
+    /// case-insensitive pseudo keywords (`:HOVER` → `:hover`, `::-WEBKIT-` →
+    /// `::-webkit-`) but preserves custom `:--Name` pseudos and, for an escaped
+    /// name, folds only up to the escape's terminator whitespace (`:\4A b` →
+    /// `:\4a b`, keeping the literal `B` in `::\41 B`). With `has_args`, only the
+    /// part before `(` is the name.
+    fn pseudo_name_text(&self, span: Span, has_args: bool) -> String {
+        let raw = span.extract(self.source);
+        let name = if has_args {
+            raw.split_once('(').map_or(raw, |(before, _)| before)
+        } else {
+            raw
+        };
+        let after_colons = name.trim_start_matches(':');
+        if after_colons.starts_with("--") {
+            return name.to_string();
+        }
+        let (head, tail) = match name.find(|c: char| c.is_ascii_whitespace()) {
+            Some(i) => name.split_at(i),
+            None => (name, ""),
+        };
+        let mut out = String::with_capacity(name.len());
+        if head.bytes().any(|b| b.is_ascii_uppercase()) {
+            out.push_str(&head.to_ascii_lowercase());
+        } else {
+            out.push_str(head);
+        }
+        out.push_str(tail);
+        out
+    }
+
+    /// Build a doc for a simple selector, dispatched by kind.
+    ///
+    /// `is_last_in_compound` controls the escape-terminator strip (see
+    /// `span_leaf_doc`): only the final simple selector of a compound drops its
+    /// trailing terminator whitespace.
+    fn build_simple_selector_doc(
+        &self,
+        simple: &internal::SimpleSelector<'_>,
+        is_last_in_compound: bool,
+    ) -> DocId {
         let d = self.d();
         match simple {
-            internal::SimpleSelector::Type { span, .. } => self.build_span_selector_doc(*span),
-            internal::SimpleSelector::Universal { namespace, .. } => {
-                if let Some(ns) = namespace {
-                    d.text_owned(format!("{ns}|*"))
-                } else {
-                    d.text("*")
-                }
+            internal::SimpleSelector::Type { span, .. } => {
+                self.span_leaf_doc(*span, is_last_in_compound)
             }
-            internal::SimpleSelector::Class { span, .. } => self.build_span_selector_doc(*span),
-            internal::SimpleSelector::Id { span, .. } => self.build_span_selector_doc(*span),
+            internal::SimpleSelector::Universal { namespace, .. } => match namespace {
+                Some(ns) => d.text_owned(format!("{ns}|*")),
+                None => d.text("*"),
+            },
+            internal::SimpleSelector::Class { span } => {
+                self.span_leaf_doc(*span, is_last_in_compound)
+            }
+            internal::SimpleSelector::Id { span } => self.span_leaf_doc(*span, is_last_in_compound),
             internal::SimpleSelector::Attribute {
                 namespace,
                 name_span,
@@ -335,11 +349,11 @@ impl<'a> Printer<'a> {
                     *namespace, *name_span, *matcher, *value, *flags,
                 ))
             }
-            internal::SimpleSelector::PseudoClass { span, .. } => {
-                self.build_span_selector_doc(*span)
+            internal::SimpleSelector::PseudoClass { args, span } => {
+                self.build_pseudo_doc(*span, args.as_ref(), is_last_in_compound)
             }
-            internal::SimpleSelector::PseudoElement { span, .. } => {
-                self.build_span_selector_doc(*span)
+            internal::SimpleSelector::PseudoElement { args, span } => {
+                self.build_pseudo_doc(*span, args.as_ref(), is_last_in_compound)
             }
             internal::SimpleSelector::Nesting { .. } => d.text("&"),
             internal::SimpleSelector::Percentage { value, .. } => d.text_owned(format!("{value}%")),
@@ -349,242 +363,92 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a doc for a relative selector
-    ///
-    /// A relative selector is a combinator followed by simple selectors.
-    fn build_relative_selector_doc(
+    /// Build the doc for a pseudo-class or pseudo-element (`:name` / `::name`,
+    /// optionally with arguments). Pseudo-classes and pseudo-elements share one
+    /// path: the name folds case the same way and the argument group is identical
+    /// (the historical extra-indent split between them is gone).
+    fn build_pseudo_doc(
         &self,
-        relative: &internal::RelativeSelector<'_>,
-        is_first: bool,
+        span: Span,
+        args: Option<&internal::PseudoClassArgs<'_>>,
+        is_last_in_compound: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
-
-        // Add combinator if present
-        if let Some(combinator) = relative.combinator {
-            let combinator_text = Self::get_combinator_str(combinator, is_first);
-            if !combinator_text.is_empty() {
-                parts.push(d.text(combinator_text));
+        match args {
+            Some(args) => {
+                let name = self.pseudo_name_text(span, true);
+                d.concat(&[d.text_owned(name), self.build_pseudo_args_doc(args)])
+            }
+            None => {
+                // No args: the whole span is the name; drop its escape terminator
+                // when it ends the compound.
+                let name = self.pseudo_name_text(span, false);
+                let text = if is_last_in_compound {
+                    name.trim_end().to_string()
+                } else {
+                    name
+                };
+                d.text_owned(text)
             }
         }
-
-        // Add simple selectors
-        for simple in relative.selectors {
-            parts.push(self.build_simple_selector_doc(simple));
-        }
-
-        d.concat(&parts)
     }
 
-    /// Internal helper to format a relative selector with context
+    /// Build the parenthesized argument doc for a pseudo-class/element.
     ///
-    /// - `is_first_in_complex`: true if this is the first relative selector in a complex selector
-    /// - `at_line_start`: true if this selector is at the start of a line (after a line break)
-    fn print_relative_selector_internal(
-        &mut self,
-        relative: &internal::RelativeSelector<'_>,
-        is_first_in_complex: bool,
-        at_line_start: bool,
-    ) {
-        // Print combinator if present
-        if let Some(combinator) = relative.combinator {
-            // Leading combinator: first selector in a complex selector with a combinator,
-            // or at start of line (after line break in wrapped selector)
-            // Example: :has(> img) - the > is leading (no space before)
-            // Example (wrapped): <newline><indent>> .class - the > is leading (no space before)
-            // Between combinator: subsequent selectors in a complex selector on same line
-            // Example: div > span - the > is between (space before and after)
-            let is_leading = is_first_in_complex || at_line_start;
-
-            // For Descendant at line start, skip the space - the line break serves as separator
-            if matches!(combinator, internal::Combinator::Descendant) && at_line_start {
-                // Do nothing - line break is the separator
-            } else {
-                let combinator_text = Self::get_combinator_str(combinator, is_leading);
-                if !combinator_text.is_empty() {
-                    // A between-combinator (` > `, ` + `, ` `, …) leads with a
-                    // space; if the previous compound ended with a hex escape's
-                    // terminator whitespace, drop it so the two don't double.
-                    if combinator_text.starts_with(' ') {
-                        self.pop_selector_terminator();
+    /// Selector-list args (`:is()`, `:not()`, `:where()`, `:has()`, `::slotted()`
+    /// list form, `:nth-child(... of S)`) wrap as `group("(" indent(softline join)
+    /// softline ")")` — inline when they fit, one-per-line indented when they
+    /// don't. `::slotted()` compound args, `::part()` idents, and identifier args
+    /// never break.
+    fn build_pseudo_args_doc(&self, args: &internal::PseudoClassArgs<'_>) -> DocId {
+        let d = self.d();
+        match args {
+            internal::PseudoClassArgs::SelectorList { selectors, .. } => {
+                let inner = self.build_nested_selector_list_doc(selectors);
+                self.wrap_pseudo_args(inner)
+            }
+            internal::PseudoClassArgs::Nth {
+                value, of_selector, ..
+            } => {
+                let normalized = Self::normalize_an_plus_b(value);
+                match of_selector {
+                    None => d.concat(&[d.text("("), d.text_owned(normalized), d.text(")")]),
+                    Some(selectors) => {
+                        let list = self.build_nested_selector_list_doc(selectors);
+                        let inner = d.concat(&[d.text_owned(normalized), d.text(" of "), list]);
+                        self.wrap_pseudo_args(inner)
                     }
-                    self.write(combinator_text);
                 }
             }
-        }
-
-        for simple in relative.selectors {
-            self.print_simple_selector(simple, false);
+            internal::PseudoClassArgs::Slotted { selectors, .. } => {
+                // A compound selector (no combinators) — never breaks.
+                let mut parts = DocBuf::new();
+                let n = selectors.len();
+                for (j, simple) in selectors.iter().enumerate() {
+                    parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
+                }
+                d.concat(&[d.text("("), d.concat(&parts), d.text(")")])
+            }
+            internal::PseudoClassArgs::Part { idents, .. } => {
+                d.concat(&[d.text("("), d.text_owned(idents.join(" ")), d.text(")")])
+            }
+            internal::PseudoClassArgs::Identifier { value, .. } => {
+                d.concat(&[d.text("("), d.text_owned(value.to_string()), d.text(")")])
+            }
         }
     }
 
-    /// Drop a single trailing escape-terminator whitespace from the output buffer.
-    /// A hex escape consumes one following whitespace as its terminator (`.\1F600 `
-    /// before `{`), which is captured in the selector token; this strips that
-    /// *trailing* one so it doesn't double with a following separator (block `{`, a
-    /// between-combinator, or a `)`/`,` in pseudo args). The terminator may be a
-    /// space, tab, or — when the selector is the last before a line break in wrapped
-    /// source — a newline (`\r\n` or `\n`). An *internal* terminator (compound
-    /// `.\1F600 .b`) is mid-string and untouched (the char before it is non-whitespace).
-    pub(super) fn pop_selector_terminator(&mut self) {
-        self.buffer.pop_if_ends_with(' ');
-        self.buffer.pop_if_ends_with('\t');
-        self.buffer.pop_if_ends_with('\n');
-        self.buffer.pop_if_ends_with('\r');
-    }
-
-    /// Write a pseudo selector's `:name` / `::name` prefix raw from source,
-    /// preserving escape sequences. Svelte decodes the internal `name` field
-    /// (`:\41 ` → name "A"), but the formatter must keep `:\41 ` verbatim, like
-    /// class/id/type selectors. For a pseudo with args, only the part before the
-    /// args `(` is the name (args format separately); without args, the whole
-    /// span is written — including a hex escape's trailing terminator whitespace,
-    /// which `pop_selector_terminator` drops at the following separator.
-    fn write_pseudo_name(&mut self, span: tsv_lang::Span, has_args: bool) {
-        let raw = span.extract(self.source);
-        let name = if has_args {
-            raw.split_once('(').map_or(raw, |(before, _)| before)
-        } else {
-            raw
-        };
-        // Prettier lowercases pseudo-class/element names (case-insensitive
-        // keywords), e.g. `:HOVER` → `:hover`, `::-WEBKIT-` → `::-webkit-`.
-        // Custom `:--Name` pseudos are case-sensitive, so preserve them.
-        let after_colons = name.trim_start_matches(':');
-        if after_colons.starts_with("--") {
-            self.write(name);
-            return;
-        }
-        // For an escaped name prettier folds case only up to the first
-        // whitespace — a hex escape's terminator (`:\4A b` → `:\4a b`, folding
-        // the escape's hex digits and any leading literal) — and preserves
-        // everything from that whitespace on (`::\41 B` keeps the literal `B`;
-        // `:\4E \4F` keeps the second escape verbatim). With no terminator the
-        // whole name folds (`:HO\56ER` → `:ho\56er`). This is pseudo-specific:
-        // class/id/type selectors render raw (see `print_simple_selector`), so
-        // their hex escapes keep their case. Mirrors prettier's
-        // `maybeToLowerCase(node.value)`, where the escape terminator splits the
-        // pseudo's value token at the first whitespace.
-        let (head, tail) = match name.find(|c: char| c.is_ascii_whitespace()) {
-            Some(i) => name.split_at(i),
-            None => (name, ""),
-        };
-        if head.bytes().any(|b| b.is_ascii_uppercase()) {
-            self.write(&head.to_ascii_lowercase());
-        } else {
-            self.write(head);
-        }
-        if !tail.is_empty() {
-            self.write(tail);
-        }
-    }
-
-    /// Format a simple selector
-    ///
-    /// `extra_indent` is forwarded to a pseudo-class's args (the only kind that
-    /// can break across lines): in a multiline selector list whose complex
-    /// selectors have >2 simple selectors, prettier indents the broken pseudo
-    /// content one extra level. All other selector kinds ignore it. Callers that
-    /// aren't inside such a multiline list pass `false`.
-    pub(super) fn print_simple_selector(
-        &mut self,
-        simple: &internal::SimpleSelector<'_>,
-        extra_indent: bool,
-    ) {
-        match simple {
-            internal::SimpleSelector::Type {
-                namespace: _, // Namespace already included in span/source
-                span,
-            } => {
-                // SVELTE QUIRK: Extract raw from source to preserve escape sequences
-                // Type selectors can have escapes (uncommon but valid)
-                // Example: `d\69v` stays as `d\69v`, not `div`
-                // Example: `\30span` stays as `\30span`, not `0span`
-                //
-                // Namespace prefixes are also preserved in the raw source:
-                // Example: `svg|rect` is extracted as-is from the source
-                //
-                // See:
-                // - docs/conformance_svelte.md (CSS Compat Behaviors — escape preservation via raw-source extraction)
-                // - tests/fixtures/css/escapes/type_selector_escaped (demonstrates this behavior)
-                // - Svelte source: node_modules/svelte/src/compiler/phases/1-parse/read/style.js:575-611
-                let raw = span.extract(self.source);
-                self.write(raw);
-            }
-            internal::SimpleSelector::Universal { namespace, .. } => {
-                // Universal namespace prefix needs explicit handling since the span
-                // may not include the * (when parsing *|div, the span is for *|div)
-                if let Some(ns) = namespace {
-                    self.write(ns);
-                    self.write("|");
-                }
-                self.write("*");
-            }
-            internal::SimpleSelector::Class { span } => {
-                // SVELTE QUIRK: Extract raw from source to preserve escape sequences
-                // Svelte does NOT decode escape sequences in CSS identifiers (selectors, property names)
-                // Example: `.cl\41ss` stays as `.cl\41ss`, not `.clAss`
-                //
-                // See:
-                // - docs/conformance_svelte.md (CSS Compat Behaviors — escape preservation via raw-source extraction)
-                // - tests/fixtures/css/escapes/unicode_in_identifiers (demonstrates this behavior)
-                // - Svelte source: node_modules/svelte/src/compiler/phases/1-parse/read/style.js:575-611
-                let raw = span.extract(self.source);
-                self.write(raw); // Includes the '.' prefix
-            }
-            internal::SimpleSelector::Id { span } => {
-                // SVELTE QUIRK: Extract raw from source to preserve escape sequences
-                // Same behavior as class selectors - identifiers preserve raw escapes
-                // Example: `#\1F4A9-id` stays as `#\1F4A9-id` (escape not decoded)
-                //
-                // See docs/conformance_svelte.md (CSS Compat Behaviors) and tests/fixtures/css/escapes/unicode_in_identifiers
-                let raw = span.extract(self.source);
-                self.write(raw); // Includes the '#' prefix
-            }
-            internal::SimpleSelector::Attribute {
-                namespace,
-                name_span,
-                matcher,
-                value,
-                flags,
-                ..
-            } => {
-                let text = self.build_attribute_selector_text(
-                    *namespace, *name_span, *matcher, *value, *flags,
-                );
-                self.write(&text);
-            }
-            internal::SimpleSelector::PseudoClass { args, span, .. } => {
-                self.write_pseudo_name(*span, args.is_some());
-                if let Some(args) = args {
-                    self.print_pseudo_class_with_args(args, extra_indent);
-                }
-            }
-            internal::SimpleSelector::PseudoElement { args, span, .. } => {
-                self.write_pseudo_name(*span, args.is_some());
-                if let Some(args) = args {
-                    self.write("(");
-                    self.print_pseudo_element_args(args);
-                    // Drop a hex escape's terminator whitespace before `)`
-                    // (`::slotted(.\41 )` → `::slotted(.\41)`).
-                    self.pop_selector_terminator();
-                    self.write(")");
-                }
-            }
-            internal::SimpleSelector::Nesting { .. } => {
-                self.write("&");
-            }
-            internal::SimpleSelector::Percentage { value, .. } => {
-                self.write(&format!("{value}%"));
-            }
-            internal::SimpleSelector::Invalid { span } => {
-                // Forgiving selector list - preserve invalid selector as-is
-                // Used in :is() and :where() to maintain source fidelity
-                // Example: `:is(.a, ., .b)` preserves the `.` even though it's invalid
-                let raw = span.extract(self.source);
-                self.write(raw.trim());
-            }
-        }
+    /// Wrap pseudo-argument content in the standard breakable envelope:
+    /// `group("(" indent(softline inner) softline ")")`. Flat → `(inner)`; broken →
+    /// the content indents one level and the `)` returns to the pseudo's level.
+    fn wrap_pseudo_args(&self, inner: DocId) -> DocId {
+        let d = self.d();
+        d.group(d.concat(&[
+            d.text("("),
+            d.indent(d.concat(&[d.softline(), inner])),
+            d.softline(),
+            d.text(")"),
+        ]))
     }
 
     /// Normalize An+B notation spacing (better than prettier)
@@ -598,10 +462,6 @@ impl<'a> Printer<'a> {
     /// - `2n  +  1` → `2n + 1` (collapse multiple spaces)
     /// - `  n  ` → `n` (trim outer spaces)
     /// - `odd`, `even`, `3` → unchanged
-    ///
-    /// Why we normalize minus (unlike prettier):
-    /// The spec says whitespace is ignored, so `3n-2` === `3n - 2`.
-    /// Consistent spacing improves readability.
     fn normalize_an_plus_b(value: &str) -> String {
         let trimmed = value.trim();
 
@@ -645,311 +505,5 @@ impl<'a> Printer<'a> {
         }
 
         result.trim().to_string()
-    }
-
-    /// Format a pseudo-class with arguments, handling line breaks
-    ///
-    /// Matches Prettier's behavior:
-    /// - Short content: `:is(.a, .b)` (inline)
-    /// - Long content: `:is(\n  .a,\n  .b\n)` (broken with indent)
-    ///
-    /// - `extra_indent`: if true, add extra indentation for nested content (selector-selector >2 nodes)
-    fn print_pseudo_class_with_args(
-        &mut self,
-        args: &internal::PseudoClassArgs<'_>,
-        extra_indent: bool,
-    ) {
-        // Build a doc for the args to check if they fit
-        let args_doc = self.build_pseudo_class_args_doc(args);
-
-        // Calculate available width: account for `(` and `)` plus trailing content
-        // We need to leave room for `) {` (3 chars) at end of selector
-        let current_col = self.current_column();
-        let available_width = PRINT_WIDTH.saturating_sub(current_col + 4);
-        let fits = doc::arena_fits::<dyn doc::TextResolver>(
-            self.arena,
-            args_doc,
-            available_width,
-            Mode::Flat,
-            None,
-        );
-
-        // Also check if any nested content would need to break
-        // If a selector list has complex selectors with >2 simple selectors,
-        // or contains pseudo-classes that would break, we should break the outer too
-        let has_complex_content = self.args_have_complex_content(args);
-
-        if fits && !has_complex_content {
-            // Print inline
-            self.write("(");
-            self.print_pseudo_class_args_with_mode(args, false);
-            // Drop a hex escape's terminator whitespace before the closing `)`
-            // (`:not(.\41 )` → `:not(.\41)`), like other selector separators.
-            self.pop_selector_terminator();
-            self.write(")");
-        } else {
-            // Print with line breaks - matches Prettier's group pattern
-            // Apply extra_indent to content if this selector-selector has >2 nodes
-            self.write("(");
-            self.write("\n");
-            self.indent_level += 1;
-            if extra_indent {
-                self.indent_level += 1;
-            }
-            self.print_pseudo_class_args_with_mode(args, true);
-            // Drop the last arg's escape terminator before the closing newline-`)`. When
-            // the last selector is an escaped class, the source line break after it is
-            // absorbed as the escape's terminator into the span, so it renders as a
-            // trailing newline here — pop it so it doesn't double the structural break.
-            self.pop_selector_terminator();
-            self.write("\n");
-            // Only remove the inner indent, keep extra_indent for closing
-            self.indent_level -= 1;
-            self.write_indent();
-            self.write(")");
-            if extra_indent {
-                self.indent_level -= 1;
-            }
-        }
-    }
-
-    /// Check if pseudo-class args contain complex content that would cause breaks
-    fn args_have_complex_content(&self, args: &internal::PseudoClassArgs<'_>) -> bool {
-        match args {
-            internal::PseudoClassArgs::SelectorList { selectors, .. } => {
-                self.selector_list_has_complex_content(selectors)
-            }
-            internal::PseudoClassArgs::Nth {
-                of_selector: Some(selectors),
-                ..
-            } => self.selector_list_has_complex_content(selectors),
-            internal::PseudoClassArgs::Nth { .. } => false,
-            _ => false,
-        }
-    }
-
-    /// Check if a selector list contains complex selectors that would break
-    ///
-    /// We check for pseudo-classes that would break, not just >2 simple selectors.
-    /// The >2 check affects *indentation* when breaking, not *whether* to break.
-    fn selector_list_has_complex_content(&self, list: &internal::SelectorList<'_>) -> bool {
-        for complex in list.selectors {
-            // Check if any simple selector is a pseudo-class with long args
-            for rel in complex.children {
-                for simple in rel.selectors {
-                    if let internal::SimpleSelector::PseudoClass {
-                        args: Some(args), ..
-                    } = simple
-                    {
-                        // Check if this pseudo-class's args would break
-                        let args_doc = self.build_pseudo_class_args_doc(args);
-                        // Use a conservative width check
-                        let fits = doc::arena_fits::<dyn doc::TextResolver>(
-                            self.arena,
-                            args_doc,
-                            60,
-                            Mode::Flat,
-                            None,
-                        );
-                        if !fits {
-                            return true;
-                        }
-                        // Recursively check nested content
-                        if self.args_have_complex_content(args) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        false
-    }
-
-    /// Build a doc for pseudo-class args to check if they fit
-    fn build_pseudo_class_args_doc(&self, args: &internal::PseudoClassArgs<'_>) -> DocId {
-        let d = self.d();
-        match args {
-            internal::PseudoClassArgs::SelectorList { selectors, .. } => {
-                self.build_selector_list_doc(selectors)
-            }
-            internal::PseudoClassArgs::Nth {
-                value, of_selector, ..
-            } => {
-                let normalized = Self::normalize_an_plus_b(value);
-                if let Some(selectors) = of_selector {
-                    let norm_doc = d.text_owned(normalized);
-                    let of_doc = d.text(" of ");
-                    let sel_doc = self.build_selector_list_doc(selectors);
-                    d.concat(&[norm_doc, of_doc, sel_doc])
-                } else {
-                    d.text_owned(normalized)
-                }
-            }
-            internal::PseudoClassArgs::Slotted { selectors, .. } => {
-                let sel_docs: DocBuf = selectors
-                    .iter()
-                    .map(|s| self.build_simple_selector_doc(s))
-                    .collect();
-                d.concat(&sel_docs)
-            }
-            internal::PseudoClassArgs::Part { idents, .. } => d.text_owned(idents.join(" ")),
-            internal::PseudoClassArgs::Identifier { value, .. } => d.text_owned(value.to_string()),
-        }
-    }
-
-    /// Print pseudo-class args with specified mode
-    ///
-    /// - `multiline=false`: print on single line with `, ` separators
-    /// - `multiline=true`: print with indentation and line breaks
-    fn print_pseudo_class_args_with_mode(
-        &mut self,
-        args: &internal::PseudoClassArgs<'_>,
-        multiline: bool,
-    ) {
-        match args {
-            internal::PseudoClassArgs::Nth {
-                value, of_selector, ..
-            } => {
-                if multiline {
-                    self.write_indent();
-                }
-                let normalized = Self::normalize_an_plus_b(value);
-                self.write(&normalized);
-                if let Some(selectors) = of_selector {
-                    self.write(" of ");
-                    if multiline {
-                        self.print_selector_list_nested(selectors);
-                    } else {
-                        self.print_selector_list_inline(selectors);
-                    }
-                }
-            }
-            internal::PseudoClassArgs::SelectorList { selectors, .. } => {
-                if multiline {
-                    self.print_selector_list_multiline_with_extra_indent(selectors);
-                } else {
-                    self.print_selector_list_inline(selectors);
-                }
-            }
-            internal::PseudoClassArgs::Slotted { selectors, .. } => {
-                if multiline {
-                    self.write_indent();
-                }
-                for selector in selectors.iter() {
-                    self.print_simple_selector(selector, false);
-                }
-            }
-            internal::PseudoClassArgs::Part { idents, .. } => {
-                if multiline {
-                    self.write_indent();
-                }
-                for (i, ident) in idents.iter().enumerate() {
-                    if i > 0 {
-                        self.write(" ");
-                    }
-                    self.write(ident);
-                }
-            }
-            internal::PseudoClassArgs::Identifier { value, .. } => {
-                if multiline {
-                    self.write_indent();
-                }
-                self.write(value);
-            }
-        }
-    }
-
-    /// Print selector list in multiline mode with extra indent for complex selectors
-    ///
-    /// Matches Prettier's behavior: selector-selector with >2 nodes gets extra indent
-    /// The extra indent applies to the CONTENT of pseudo-classes within the selector,
-    /// not to the selector itself.
-    fn print_selector_list_multiline_with_extra_indent(
-        &mut self,
-        list: &internal::SelectorList<'_>,
-    ) {
-        for (i, complex) in list.selectors.iter().enumerate() {
-            if i > 0 {
-                self.write(",\n");
-            }
-
-            // Check if this complex selector needs extra indent
-            // Prettier: selector-selector with >2 nodes gets indent()
-            // Our equivalent: RelativeSelector with >2 simple selectors
-            let needs_extra_indent = complex.children.iter().any(|rel| rel.selectors.len() > 2);
-
-            self.write_indent();
-            self.print_complex_selector_with_extra_indent(complex, needs_extra_indent);
-        }
-    }
-
-    /// Print a complex selector, propagating extra indent flag to nested content
-    fn print_complex_selector_with_extra_indent(
-        &mut self,
-        complex: &internal::ComplexSelector<'_>,
-        extra_indent: bool,
-    ) {
-        for (i, relative) in complex.children.iter().enumerate() {
-            let is_first = i == 0;
-            self.print_relative_selector_with_extra_indent(relative, is_first, extra_indent);
-        }
-    }
-
-    /// Print a relative selector, propagating extra indent flag
-    fn print_relative_selector_with_extra_indent(
-        &mut self,
-        relative: &internal::RelativeSelector<'_>,
-        is_first: bool,
-        extra_indent: bool,
-    ) {
-        // Print combinator if present
-        if let Some(combinator) = relative.combinator {
-            let combinator_text = Self::get_combinator_str(combinator, is_first);
-            if !combinator_text.is_empty() {
-                self.write(combinator_text);
-            }
-        }
-
-        for simple in relative.selectors {
-            self.print_simple_selector(simple, extra_indent);
-        }
-    }
-
-    /// Format pseudo-element arguments with auto-wrapping for long selector lists
-    ///
-    /// Used for pseudo-elements like `::slotted()`, `::part()`, `::highlight()`.
-    /// Uses `print_selector_list_nested` which auto-wraps if content is too long.
-    fn print_pseudo_element_args(&mut self, args: &internal::PseudoClassArgs<'_>) {
-        match args {
-            internal::PseudoClassArgs::Nth {
-                value, of_selector, ..
-            } => {
-                let normalized = Self::normalize_an_plus_b(value);
-                self.write(&normalized);
-                if let Some(selectors) = of_selector {
-                    self.write(" of ");
-                    self.print_selector_list_nested(selectors);
-                }
-            }
-            internal::PseudoClassArgs::SelectorList { selectors, .. } => {
-                self.print_selector_list_nested(selectors);
-            }
-            internal::PseudoClassArgs::Slotted { selectors, .. } => {
-                for selector in selectors.iter() {
-                    self.print_simple_selector(selector, false);
-                }
-            }
-            internal::PseudoClassArgs::Part { idents, .. } => {
-                for (i, ident) in idents.iter().enumerate() {
-                    if i > 0 {
-                        self.write(" ");
-                    }
-                    self.write(ident);
-                }
-            }
-            internal::PseudoClassArgs::Identifier { value, .. } => {
-                self.write(value);
-            }
-        }
     }
 }

@@ -192,6 +192,10 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 
 - Column combinator `||` — Parser compat — [column](../tests/fixtures/css/selectors/combinators/column_prettier_divergence/)
 - :nth-child() An+B — Stable quirk — [nth_child](../tests/fixtures/css/selectors/pseudo_class/nth_child_prettier_divergence/)
+- Pseudo-args indent (single compound) — Design choice — [compound_args_indent](../tests/fixtures/css/selectors/pseudo_class/compound_args_indent_long_prettier_divergence/)
+- Nested pseudo-args indent — Design choice — [nested_where_is](../tests/fixtures/css/selectors/pseudo_class/nested_where_is_long_prettier_divergence/)
+
+**Pseudo-args indent**: When a pseudo-class/element's argument list breaks, prettier indents it an extra level if the enclosing compound's flat `selector-selector` node count exceeds 2 (`shouldIndent = node.nodes.length > 2` in `printer-postcss.js`). That extra `indent` exists to align the continuation lines of a complex selector broken at its combinators; for a *single* compound (no combinator) there is no continuation to align, so it only nests the pseudo args one level deeper than the rule body. tsv keys the indent on combinator presence instead — a complex selector that spans more than one compound indents its continuation (matching prettier), and a pseudo's broken args always indent exactly one level relative to their pseudo. So a combinator-bearing selector matches prettier, while a single compound's pseudo args sit one level in with the `)` aligned to the selector it closes. Uniform, and no node counting. Combinator-bearing case (which matches prettier): [combinators/pseudo_args_long](../tests/fixtures/css/selectors/combinators/pseudo_args_long/).
 
 ### CSS: Values
 

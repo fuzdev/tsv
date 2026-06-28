@@ -20,12 +20,10 @@ use crate::ast::internal;
 impl<'a> Printer<'a> {
     /// Format a CSS rule (selector + declarations block)
     pub(super) fn print_css_rule(&mut self, rule: &internal::CssRule<'_>) {
-        // Format selector (uses selectors module)
+        // Format selector (uses selectors module). A trailing hex-escape terminator
+        // (`.\1F600 ` before `{`) is dropped at the selector leaf, so the block
+        // separator below can't double it.
         self.print_selector_list(&rule.selector);
-
-        // Drop a hex escape's terminator whitespace (`.\1F600 ` before `{`) so it
-        // doesn't double with the block separator written below.
-        self.pop_selector_terminator();
 
         // Inline-print any comments between the selector and opening brace.
         // block_span.start is the position of the opening brace, so a leading
