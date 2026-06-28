@@ -23,6 +23,7 @@ use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -66,7 +67,9 @@ impl<'a> Printer<'a> {
             Statement::ContinueStatement(stmt) => self.build_continue_statement_doc(stmt),
             Statement::LabeledStatement(stmt) => self.build_labeled_statement_doc(stmt),
             Statement::EmptyStatement(_) => d.text(";"),
-            Statement::DebuggerStatement(_) => d.concat(&[d.text("debugger"), d.text(";")]),
+            Statement::DebuggerStatement(stmt) => {
+                self.build_bare_keyword_terminator_doc("debugger", stmt.span)
+            }
             Statement::TSInterfaceDeclaration(decl) => self.build_interface_declaration_doc(decl),
             Statement::TSDeclareFunction(decl) => self.build_declare_function_doc(decl),
             Statement::TSEnumDeclaration(decl) => self.build_enum_declaration_doc(decl),
@@ -96,13 +99,28 @@ impl<'a> Printer<'a> {
                 .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
                 || self.has_expression_statement_source_parens(stmt);
 
-            if needs_parens {
-                parts.push(d.text("("));
-            } else {
-                // When the whole expression isn't wrapped, a nested leftmost
-                // object/function/class still needs parens around itself:
-                // `(class {}).foo`, `({}).foo`, `(class {}) + 1`. The matching
-                // node's doc builder consumes this target and wraps itself.
+            // An own-line comment between a source `(` and the expression
+            // (`(// c⏎ expr)` / `(/* c */⏎ expr)` — e.g. a bare parenthesized
+            // decorated class expression) is preserved inside the parens, breaking
+            // them open; the flat `(`/`)` wrap below would drop it. Own-line = a line
+            // comment (never inline) or a block comment with a newline before it; a
+            // same-line block comment (`(/* c */ expr)`) is a separate, rarer case
+            // (inline) left to the default flow. `stmt.span.start < expr_start` means
+            // a real source `(` precedes the expression (see
+            // `has_expression_statement_source_parens`). prettier hoists the comment
+            // before `(` — a divergence (`decorated_expr_open_paren_comment`).
+            // TODO: a same-line block comment after `(` is still dropped here.
+            let expr_start = stmt.expression.span().start;
+            let paren_open_own_line_comment = needs_parens
+                && stmt.span.start < expr_start
+                && comments_in_range(self.comments, stmt.span.start + 1, expr_start)
+                    .any(|c| self.is_own_line_comment(c));
+
+            // When the whole expression isn't wrapped, a nested leftmost
+            // object/function/class still needs parens around itself
+            // (`(class {}).foo`, `({}).foo`, `(class {}) + 1`). The matching node's
+            // doc builder consumes this span-matched target and wraps itself.
+            if !needs_parens {
                 let leftmost = leftmost_no_lookahead(&stmt.expression);
                 if matches!(
                     leftmost,
@@ -114,20 +132,37 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Set context flags for chain handling
-            // is_expression_statement: allows short identifier names to merge with first call
-            // in_top_level_assignment: tells assignments to use regular layout (not chain formatting)
+            // Build the expression once. Context flags for chain handling:
+            // is_expression_statement allows short identifier names to merge with the
+            // first call; in_top_level_assignment selects the regular assignment
+            // layout (not chain formatting). Clear the (non-consuming, span-matched)
+            // paren target afterward so it can't leak into a sibling statement.
             self.is_expression_statement.set(true);
             self.in_top_level_assignment.set(true);
-            parts.push(self.build_expression_doc(&stmt.expression));
+            let expr_doc = self.build_expression_doc(&stmt.expression);
             self.in_top_level_assignment.set(false);
             self.is_expression_statement.set(false);
-            // Clear the (non-consuming, span-matched) target so it can't leak into a
-            // sibling statement.
             self.expr_stmt_paren_target.set(None);
 
-            if needs_parens {
+            if paren_open_own_line_comment {
+                let mut inner: DocBuf = smallvec![d.hardline()];
+                for comment in comments_in_range(self.comments, stmt.span.start + 1, expr_start) {
+                    inner.push(self.build_comment_doc(comment));
+                    inner.push(d.hardline());
+                }
+                inner.push(expr_doc);
+                parts.push(d.text("("));
+                parts.push(d.indent(d.concat(&inner)));
+                parts.push(d.hardline());
                 parts.push(d.text(")"));
+            } else {
+                if needs_parens {
+                    parts.push(d.text("("));
+                }
+                parts.push(expr_doc);
+                if needs_parens {
+                    parts.push(d.text(")"));
+                }
             }
         }
 
@@ -166,22 +201,43 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a return statement.
     fn build_return_statement_doc(&self, ret: &internal::ReturnStatement<'_>) -> DocId {
-        let d = self.d();
         let Some(arg) = &ret.argument else {
-            // Comments between `return` and `;`, with the `;` bound to the statement: a
-            // same-line block trails *after* it (`return /* c */;` → `return; /* c */`,
-            // prettier 3.9). See `split_separator_gap_comments`.
-            let keyword_end = ret.span.start + "return".len() as u32;
-            let semicolon_pos = ret.span.end.saturating_sub(1);
-            let mut parts: DocBuf = smallvec![d.text("return")];
-            let after =
-                self.split_separator_gap_comments(&mut parts, keyword_end, semicolon_pos, true);
-            parts.push(d.text(";"));
-            parts.extend(after);
-            return d.concat(&parts);
+            // No argument: a bare keyword closed by `;` (interior comments handled
+            // there) — `return; /* c */` etc.
+            return self.build_bare_keyword_terminator_doc("return", ret.span);
         };
 
         self.build_keyword_argument_doc("return", ret.span.start, ret.span.end, arg)
+    }
+
+    /// Build a Doc for a "bare" keyword-terminator statement — a keyword that takes
+    /// no operand and is closed by `;`: `debugger`, the no-arg `return`, and a
+    /// label-less `break`/`continue`.
+    ///
+    /// None has a `[no LineTerminator]` issue at this point (the operand/label is
+    /// absent), so when an explicit `;` follows on a later line the parser scans
+    /// forward to it and the `;` becomes the statement's terminator — any comment
+    /// between the keyword and that `;` sits *inside* the statement span (e.g.
+    /// `debugger\n\n// c\n;` → span swallows `// c` and the `;`). Emitting just
+    /// `keyword;` would drop them. Route the interior gap through
+    /// `split_separator_gap_comments`: a same-line block trails after `;`
+    /// (`debugger; /* c */`), a same-line line floats after `;` via `line_suffix`, an
+    /// own-line comment drops to its own line (preceding blank line preserved). `span`
+    /// is the full statement span — its end is the `;`, or the keyword end under ASI
+    /// when there is no explicit `;` (then the interior range is empty).
+    pub(in crate::printer::statements) fn build_bare_keyword_terminator_doc(
+        &self,
+        keyword: &'static str,
+        span: Span,
+    ) -> DocId {
+        let d = self.d();
+        let keyword_end = span.start + keyword.len() as u32;
+        let semicolon_pos = span.end.saturating_sub(1);
+        let mut parts: DocBuf = smallvec![d.text(keyword)];
+        let after = self.split_separator_gap_comments(&mut parts, keyword_end, semicolon_pos, true);
+        parts.push(d.text(";"));
+        parts.extend(after);
+        d.concat(&parts)
     }
 
     /// Shared dispatch for return/throw argument formatting.

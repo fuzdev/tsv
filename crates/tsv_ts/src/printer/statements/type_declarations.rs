@@ -222,7 +222,15 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
 
-        let force_break = self.comments_force_own_line_between(eq_pos + 1, type_start);
+        // A leading comment between `=` and the RHS forces the value onto its own
+        // line when it can't share the `=` line: a line comment or multiline block
+        // (`comments_force_own_line_between`), OR a single-line block comment that
+        // was *authored* on its own line (`type X =⏎/* c */⏎Y`). Prettier breaks
+        // after `=` and keeps such a comment on its own line rather than hugging it
+        // up to `=` — the union/intersection RHS then renders below it.
+        let force_break = self.comments_force_own_line_between(eq_pos + 1, type_start)
+            || comments_in_range(self.comments, eq_pos + 1, type_start)
+                .any(|c| c.is_block && self.is_own_line_comment(c));
 
         if force_break {
             // Line/multiline block comments force type to next line with indent.
@@ -232,14 +240,18 @@ impl<'a> Printer<'a> {
             let mut inline_parts = DocBuf::new();
             let mut indent_comment_parts = DocBuf::new();
 
-            // Only the first single-line comment hugs the `=` line; multiline
-            // blocks (any position) and every subsequent comment go on their own
-            // line in the indent. Two line comments must not merge onto one line —
-            // the second `//` would stop being a delimiter (a boundary loss).
+            // Only the first single-line comment hugs the `=` line, and only when
+            // it was *authored* on that line (`type A = /* c */ B`). An own-line
+            // comment (`type A =⏎/* c */⏎B`) keeps its own line — prettier breaks
+            // after `=` and never pulls it up. Multiline blocks (any position) and
+            // every subsequent comment go on their own line in the indent. Two line
+            // comments must not merge onto one line — the second `//` would stop
+            // being a delimiter (a boundary loss).
             let mut first = true;
             for comment in comments_in_range(self.comments, eq_pos + 1, type_start) {
                 let multiline_block = comment.is_block && self.is_multiline_comment(comment);
-                if first && !multiline_block {
+                let authored_on_eq_line = self.is_same_line(eq_pos, comment.span.start);
+                if first && !multiline_block && authored_on_eq_line {
                     inline_parts.push(d.text(" "));
                     inline_parts.push(self.build_comment_doc(comment));
                 } else {

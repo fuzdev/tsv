@@ -13,7 +13,7 @@ use super::helpers::{
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
-use crate::printer::analysis::{has_newline_after_position, has_newline_before_position};
+use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::hang_after_operator;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -70,7 +70,7 @@ impl<'a> Printer<'a> {
             }
             parts.push(self.build_comment_doc(comment));
             if has_newline_after_position(self.source, comment.span.end) {
-                if has_newline_before_position(self.source, comment.span.start) {
+                if self.is_own_line_comment(comment) {
                     parts.push(d.hardline());
                 } else {
                     parts.push(d.line());
@@ -189,7 +189,7 @@ impl<'a> Printer<'a> {
             |t| matches!(t, TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p)),
         );
         if has_leading_line_comments
-            || self.union_has_line_comments_between_members(union)
+            || self.union_has_own_line_member_comment(union)
             || has_paren_inner_leading_line_comments
         {
             return self.build_union_type_doc_with_line_comments(union);
@@ -526,6 +526,25 @@ impl<'a> Printer<'a> {
             .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start))
     }
 
+    /// True when an **own-line comment** sits between two consecutive members —
+    /// a line comment (which can never be inline), or a block comment with a
+    /// newline before it (`| 'x'⏎/* c */⏎| 'y'`), on either side of the `|`.
+    ///
+    /// Prettier emits such a comment via `printComments` with a hardline
+    /// (`union-type.js`), forcing the whole union group to break
+    /// one-member-per-line. A *same-line* block comment (`a /* c */ | b`) does
+    /// not count — it stays inline, matching `union_intersection_parens_comment`.
+    /// Subsumes the between-members case of `union_has_line_comments_between_members`
+    /// (a line comment is always own-line here) and additionally catches own-line
+    /// *block* comments, which the default (groupable) path would otherwise keep flat.
+    fn union_has_own_line_member_comment(&self, union: &TSUnionType<'_>) -> bool {
+        union.types.windows(2).any(|pair| {
+            let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
+            comments_in_range(self.comments, prev_end, next_start)
+                .any(|c| self.is_own_line_comment(c))
+        })
+    }
+
     //
     // Intersection Types
     //
@@ -584,7 +603,21 @@ impl<'a> Printer<'a> {
             .types
             .windows(2)
             .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start));
-        if has_line_comments_between_members {
+        // A non-first parenthesized **union** member with a leading line comment
+        // inside its parens (`(a | b) & (// c⏎ a | b)`) also forces the multiline
+        // layout: a line comment can't be inline, and tsv preserves it inside the
+        // parens (the paren member breaks open). The *first*-member case is already
+        // hoisted out above; this catches the rest, which would otherwise drop the
+        // comment. Restricted to a union inner because that is the only shape the
+        // multiline path renders comment-aware (`build_parenthesized_union_doc`).
+        // TODO: a paren-intersection / paren-function member with a leading line
+        // comment still drops it — extend when a real case appears.
+        let has_nonfirst_paren_leading_line_comment = intersection.types.iter().skip(1).any(|t| {
+            matches!(t, TSType::Parenthesized(p)
+                if matches!(p.type_annotation, TSType::Union(_))
+                    && self.paren_has_leading_line_comment(p))
+        });
+        if has_line_comments_between_members || has_nonfirst_paren_leading_line_comment {
             let doc = self.build_intersection_type_doc_with_line_comments(intersection);
             // The line-comment layout emits continuation members with a bare hardline
             // and no indent, relying on the caller to supply the hanging indent. When
@@ -823,8 +856,20 @@ impl<'a> Printer<'a> {
                 ));
             }
 
-            // Add the type
-            parts.push(self.build_type_doc_maybe_parens(t, member_parens));
+            // Add the type. A parenthesized-union member whose parens hold a
+            // leading line comment (`(// c⏎ a | b)`) is built through
+            // `build_parenthesized_union_doc` with the inner leading line comment
+            // emitted (it breaks the paren open, keeping the comment in place);
+            // `build_type_doc_maybe_parens` would re-wrap the parens but drop that
+            // comment. Block-only / non-union parens fall through to the default.
+            if let TSType::Parenthesized(p) = t
+                && let TSType::Union(inner_union) = p.type_annotation
+                && self.paren_has_leading_line_comment(p)
+            {
+                parts.push(self.build_parenthesized_union_doc(inner_union, Some(p), true));
+            } else {
+                parts.push(self.build_type_doc_maybe_parens(t, member_parens));
+            }
 
             // Add trailing `&` for all but last type
             if i < intersection.types.len() - 1 {
