@@ -424,6 +424,33 @@ tsv treats these like any other function call—no special-casing for module pat
 
 **Arrow type param trailing comma**: For a generic arrow with a **single type param that has no constraint** (`<T>`, default-only `<T = string>`, or `const`-modified `<const T>`), Prettier forces a trailing comma — `<T,>` — via `shouldForceTrailingComma` (`language-js/print/type-parameters.js`). It does so to keep the output valid as TSX, where a bare `<T>` is ambiguous with a JSX element; the guard fires whenever the file is not known to end in `.ts`, which is always the case for a Svelte `<script>` body (prettier-plugin-svelte hands it to prettier without a `.ts` filepath). tsv has no JSX — it never emits TSX, and Svelte's own parser accepts bare `<T>` in every TS position (`<script>`, template `{...}`, `{@const}`) — so the disambiguation is vestigial and tsv emits the bare canonical form. Multi-param (`<T, U>`), constrained (`<T extends X>`), and empty (`<>`) type params are unaffected; prettier never forces the comma for those and tsv matches. The accepted tradeoff: in a mixed-tool repo prettier rewrites `<T>` back to `<T,>`, so the two ping-pong on this construct (reviewed and accepted — bare `<T>` is correct for a non-JSX formatter). Fixtures: [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/), [const_type_param_arrow](../tests/fixtures/typescript/typescript_specific/generics/const_type_param_arrow_prettier_divergence/), and — stacked with the acorn-typescript async param-drop parser bug — [async_generic/stacked](../tests/fixtures/typescript/expressions/arrow/async_generic/stacked_svelte_prettier_divergence/), [async_generic/forms](../tests/fixtures/typescript/expressions/arrow/async_generic/forms_svelte_prettier_divergence/) (optional-param, object-`as`-body, and a type-vs-value-position contrast that pins the comma to value position) and [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/). The comment-relocation fixture [arrow_type_params_paren_comment](../tests/fixtures/typescript/declarations/function/arrow_type_params_paren_comment_prettier_divergence/) also exercises it.
 
+#### Import-phase proposals
+
+The Stage-3 **source-phase imports** and **import defer** proposals (`import source x
+from 'mod'` / `import.source('mod')`, `import defer * as ns from 'mod'` /
+`import.defer('mod')`) are a tsv-native parser divergence — acorn rejects them, so
+they are **not** in the "Prettier rejects valid input" set above (that set is keyed
+on acorn *accepting* the input). Prettier diverges two ways:
+
+- **`import defer` — phase dropped (information loss).** Prettier formats `import
+  defer * as ns from 'mod'` to `import * as ns from 'mod'`, silently deleting the
+  `defer` phase keyword and changing the import's semantics. tsv preserves it.
+- **`import source` — printer throws.** Prettier's `typescript` parser reads
+  `source` as a binding name and throws (`'=' expected`). tsv parses and keeps the
+  statement stable.
+
+The dynamic `import.source(…)` / `import.defer(…)` forms have no divergence —
+prettier formats them identically to tsv. None of these can be fixtures (acorn,
+the fixture parse oracle, rejects the syntax; prettier, the format oracle, drops or
+throws), so the printer's round-trips are covered by `tests/import_phase.rs` and
+the parser by the test262 suite. The `import source` throw is also live-pinned in
+`tests/prettier_error_bugs.rs`; the `import defer` phase-drop is documented-only
+(a live "prettier succeeds with wrong output" check would gate the suite on a
+sidecar call under load). See
+[conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals)
+and [conformance_test262.md](./conformance_test262.md). **Upstream candidate**:
+prettier import-phase support — promote to fixtures once it lands.
+
 ### Prettier rejects valid input
 
 These inputs are **valid** by tsv's parse oracle (Svelte / acorn-typescript) and our formatter keeps them stable, but prettier's `typescript` parser/printer **throws** on them — so there is no `output_prettier.*` oracle. Each fixture carries a `prettier_rejects.txt` marker pinning the exact error; rule F6 live-verifies that prettier still rejects the input (failing loudly if the bug is fixed upstream or the error morphs). All three reproduce in plain prettier (`parser: 'typescript'`, zero Svelte) and are fine under `babel-ts`; the 4.x prettier-plugin-svelte bump surfaced them because the plugin switched `lang="ts"` formatting from `babel-ts` to the real `typescript` parser.

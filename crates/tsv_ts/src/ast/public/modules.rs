@@ -114,6 +114,9 @@ pub struct ImportDeclaration<'src> {
     /// Omitted in Svelte (non-lang="ts") context when "value"; always present in TypeScript context
     #[serde(rename = "importKind", skip_serializing_if = "Option::is_none")]
     pub import_kind: Option<&'static str>,
+    /// Import phase (`"source"`/`"defer"`); omitted for an ordinary import.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<&'static str>,
     pub specifiers: Vec<ImportSpecifier<'src>>,
     pub source: Literal<'src>,
     /// Present in Svelte non-lang="ts" context (even when empty); omitted in TypeScript context when empty

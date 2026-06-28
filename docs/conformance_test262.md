@@ -14,15 +14,15 @@ Use test262 to validate that tsv's parser correctly:
 Regenerate with `cargo run -p tsv_debug test262` (expects a test262 checkout
 at `../test262`); refresh this list when the parser or the test262 snapshot
 changes — at minimum per release. Counts below are from a snapshot of ~49k
-discovered tests (46,148 graded after skips).
+discovered tests (46,544 graded after skips).
 
-- Positive (should parse) — 41,898 passed, 0 failed
-- Negative (should reject) — 1,795 passed, 2,455 failed
+- Positive (should parse) — 42,113 passed, 0 failed
+- Negative (should reject) — 1,995 passed, 2,436 failed
 
-- **Overall**: 43,693/46,148 (94.7%)
+- **Overall**: 44,108/46,544 (94.8%)
 - **Positive pass rate**: 100% — every test tsv grades and that should parse does,
   graded at each test's declared goal (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
-- **Skipped**: 2,988 (sloppy mode: 2,494, unimplemented feature: 422, runtime: 38, resolution: 34)
+- **Skipped**: 2,592 (sloppy mode: 2,520, unimplemented feature: 0, runtime: 38, resolution: 34)
 
 The remaining negative failures are early-error *under-enforcement* (programs that
 parse under the syntactic grammar but the spec rejects semantically — duplicate
@@ -31,11 +31,14 @@ design, not parser bugs.
 
 **Feature filtering.** Tests whose `features:` frontmatter names a syntactic
 proposal tsv does not implement are skipped, not graded — scoring them as parse
-failures would measure scope, not a conformance gap. Currently the two Stage-3
-import proposals (`source-phase-imports` / `import.source(…)` and `import-defer`
-/ `import.defer(…)`, ~422 files across both polarities) tsv rejects with
-`Expected 'meta' after 'import.'`. They drop out of both the headline pass rate
-and the differential manifest. See [Scope](#what-we-skip).
+failures would measure scope, not a conformance gap. The set
+(`UNIMPLEMENTED_FEATURES` in `crates/tsv_debug/src/test262/frontmatter.rs`) is
+**currently empty**: the two Stage-3 import-phase proposals that used to fill it
+(`source-phase-imports` / `import.source(…)` and `import-defer` /
+`import.defer(…)`, ~396 graded files) are now parsed — a deliberate divergence
+from acorn, which rejects them (see
+[conformance_svelte.md](./conformance_svelte.md#import-phase-proposals)).
+See [Scope](#what-we-skip).
 
 **Positive parse conformance is 100%.** Every test tsv grades and that should parse
 does — graded at the test's declared goal (`module`-flagged as `Module`, the
@@ -152,12 +155,14 @@ constraint left over-accepted.
   octal) — is skipped, like `noStrict`. That list (`SLOPPY_ONLY_RAW_TESTS` in
   `crates/tsv_debug/src/test262/runner.rs`) is currently the single
   `language/comments/hashbang/use-strict.js`
-- `features:` naming an **unimplemented syntactic proposal** - currently
-  `source-phase-imports` / `source-phase-imports-module-source` / `import-defer`
-  (the Stage-3 import proposals). Skipped in both polarities so the score
-  reflects conformance on syntax tsv aims to support, not unimplemented scope.
-  The skip set lives in `crates/tsv_debug/src/test262/frontmatter.rs`
-  (`UNIMPLEMENTED_FEATURES`) — remove a name when tsv implements that proposal.
+- `features:` naming an **unimplemented syntactic proposal** - skipped in both
+  polarities so the score reflects conformance on syntax tsv aims to support, not
+  unimplemented scope. The skip set lives in
+  `crates/tsv_debug/src/test262/frontmatter.rs` (`UNIMPLEMENTED_FEATURES`) and is
+  **currently empty** — the Stage-3 import-phase proposals
+  (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`)
+  that used to live here are now parsed, so their ~396 graded files count. Add a
+  name here when tsv meets a new proposal it doesn't parse; drop it once it lands.
 - `*_FIXTURE.js` files - Module dependencies, not standalone tests
 
 ### Test Directories
