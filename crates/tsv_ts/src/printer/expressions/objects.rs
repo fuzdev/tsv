@@ -36,14 +36,18 @@ impl<'a> Printer<'a> {
         // Check if object contains line comments or block comments on their own line (force multiline)
         let has_line_comments = self.has_line_comments_between(obj.span.start, obj.span.end);
 
-        // Check for block comments on their own line (not same line as any property)
-        let property_spans: Vec<_> = obj
-            .properties
-            .iter()
-            .map(internal::ObjectProperty::span)
-            .collect();
-        let has_standalone_block_comment =
-            self.has_standalone_block_comment(obj.span.start, obj.span.end, &property_spans);
+        // Check for block comments on their own line (not same line as any property).
+        // Only relevant when the object has comments at all — otherwise there are no
+        // block comments to be standalone, so skip the per-property span collection
+        // (the common comment-free object pays nothing).
+        let has_standalone_block_comment = has_comments && {
+            let property_spans: Vec<_> = obj
+                .properties
+                .iter()
+                .map(internal::ObjectProperty::span)
+                .collect();
+            self.has_standalone_block_comment(obj.span.start, obj.span.end, &property_spans)
+        };
 
         if obj.properties.is_empty() {
             // Handle empty object with comments
@@ -564,15 +568,17 @@ impl<'a> Printer<'a> {
                     self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key, None)
                 }
             } else {
-                // Comments around colon: check if any post-colon comment forces a break.
-                // Line comments always force break (they extend to end of line).
-                // Multiline block comments also force break-after-operator layout.
+                // A post-colon comment forces break-after-operator when it's a line
+                // comment (extends to end of line), a multiline block (its own newlines
+                // break the group), or the source put the value on a later line than the
+                // comment (an own-line leading comment); a single-line block glued to the
+                // value (`: /* c */ v`) stays inline.
                 // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
-                let has_line_comment_post_colon = post_colon_comments.iter().any(|c| !c.is_block);
-                let has_multiline_post_colon = has_line_comment_post_colon
-                    || self.has_multiline_block_comments_between(colon_pos + 1, value_start);
+                let has_own_line_comment_post_colon = post_colon_comments.iter().any(|c| {
+                    !c.is_block || c.multiline || !self.is_same_line(c.span.end, value_start)
+                });
 
-                if has_multiline_post_colon {
+                if has_own_line_comment_post_colon {
                     // Line comment or multiline block comment after colon: BreakAfterOperator
                     // Structure: group([group(key + pre_colon), ":", group(indent([line, rhs]))])
                     let mut lhs_parts: DocBuf = smallvec![key_doc];

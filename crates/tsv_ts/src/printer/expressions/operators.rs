@@ -104,7 +104,12 @@ impl<'a> Printer<'a> {
         let argument_doc = if leading_comments_opt.is_some() || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
             let inner = self.build_expression_doc(unary.argument);
-            let needs_paren_wrap = self.needs_parens(unary.argument, ParenContext::UnaryArgument);
+            // The outer comment-holder parens already group the operand, so the inner
+            // needs_parens layer is redundant for a binary/logical operand — prettier
+            // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their
+            // parens for clarity in both formatters, so leave those untouched.
+            let needs_paren_wrap = self.needs_parens(unary.argument, ParenContext::UnaryArgument)
+                && !matches!(unary.argument, Expression::BinaryExpression(_));
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {

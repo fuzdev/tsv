@@ -246,10 +246,10 @@ impl<'a> Printer<'a> {
     /// Build inline comments between two positions with line-comment-safe trailing spacing.
     ///
     /// A block comment keeps the following value (or next comment) on its `*/`
-    /// line when the source did (`/* comment */ expr`); a multiline block whose
-    /// value is on a later source line stays broken (`/* comment */\nexpr`) — the
-    /// author's layout is preserved. Line comments get a hardline
-    /// (`// comment\nexpr`) so they can't absorb the value as comment text.
+    /// line when the source did (`/* comment */ expr`), and stays on its own line
+    /// when the source broke (`/* comment */\nexpr`) — the author's layout is
+    /// preserved. Line comments always get a hardline (`// comment\nexpr`) so they
+    /// can't absorb the value as comment text.
     /// Use for any position where a comment appears before an expression (RHS of `=`,
     /// after keywords like `return`/`await`, after operators like `!`/`...`, etc.).
     pub(crate) fn build_rhs_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
@@ -261,16 +261,13 @@ impl<'a> Printer<'a> {
             // The next thing after this comment is the following comment, or the
             // value itself (`end`) for the last one.
             let next = comments.peek().map_or(end, |c| c.span.start);
-            if comment.is_block {
-                if comment.multiline && !self.is_same_line(comment.span.end, next) {
-                    // Multiline block whose value/next comment is on a later source
-                    // line: keep it broken there (preserve the author's layout).
-                    parts.push(d.hardline());
-                } else {
-                    // Value (or next comment) shares the `*/` line — keep it glued.
-                    parts.push(d.text(" "));
-                }
+            if comment.is_block && self.is_same_line(comment.span.end, next) {
+                // Value (or next comment) shares the `*/` line — keep it glued.
+                parts.push(d.text(" "));
             } else {
+                // Line comment, or a block whose value/next comment is on a later
+                // source line: keep them on separate lines (preserve the author's
+                // layout; a line comment must break so it can't absorb the value).
                 parts.push(d.hardline());
             }
         }

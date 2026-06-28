@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 670,
+	"end": 791,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,56 @@
 					"column": 24
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " single-line block comment on its own line stays on its own line (not collapsed)",
+			"start": 662,
+			"end": 744,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " own line ",
+			"start": 758,
+			"end": 772,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 2
+				},
+				"end": {
+					"line": 42,
+					"column": 16
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 669,
+		"end": 790,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 660,
+			"end": 781,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 39,
+					"line": 44,
 					"column": 9
 				}
 			},
@@ -938,6 +970,104 @@
 							"value": " inline block comment on variable declaration stays inline",
 							"start": 568,
 							"end": 628
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 746,
+					"end": 780,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 752,
+							"end": 779,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 7
+								},
+								"end": {
+									"line": 43,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 752,
+								"end": 753,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 7
+									},
+									"end": {
+										"line": 41,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 775,
+								"end": 779,
+								"loc": {
+									"start": {
+										"line": 43,
+										"column": 2
+									},
+									"end": {
+										"line": 43,
+										"column": 6
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 775,
+									"end": 777,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 2
+										},
+										"end": {
+											"line": 43,
+											"column": 4
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " own line ",
+										"start": 758,
+										"end": 772
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " single-line block comment on its own line stays on its own line (not collapsed)",
+							"start": 662,
+							"end": 744
 						}
 					]
 				}

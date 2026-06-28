@@ -597,10 +597,15 @@ impl<'a> Printer<'a> {
                 let has_line_comments_after_eq =
                     self.has_line_comments_between(equals_pos + 1, init_start);
 
-                // Check for multiline block comments after = which force break-after-operator
-                // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
-                let has_multiline_block_comment_after_eq = has_comments_after_eq
-                    && self.has_multiline_block_comments_between(rhs_comments_start, init_start);
+                // Check for a comment after `=` that forces break-after-operator.
+                // Prettier ref: hasLeadingOwnLineComment → break-after-operator in
+                // chooseLayout. A comment forces the break when it's multiline (its own
+                // newlines break the group) or the source put the value on a later line
+                // than the comment (an own-line leading comment); a single-line block
+                // glued to the value (`= /* c */ v`) stays inline.
+                let has_own_line_comment_after_eq = has_comments_after_eq
+                    && comments_in_range(self.comments, rhs_comments_start, init_start)
+                        .any(|c| c.multiline || !self.is_same_line(c.span.end, init_start));
 
                 // Curried arrows with return type always break after `=`
                 let is_curried_arrow = is_curried_arrow_with_return_type(init);
@@ -635,9 +640,9 @@ impl<'a> Printer<'a> {
                             self.build_init_value_doc(init, declarator.span.end),
                         ])));
                     }
-                } else if has_multiline_block_comment_after_eq {
-                    // Multiline block comment after `=` forces break-after-operator layout.
-                    // Prettier ref: hasLeadingOwnLineComment → break-after-operator
+                } else if has_own_line_comment_after_eq {
+                    // A multiline or own-line comment after `=` forces break-after-operator
+                    // layout. Prettier ref: hasLeadingOwnLineComment → break-after-operator
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
                     let comments_doc = self

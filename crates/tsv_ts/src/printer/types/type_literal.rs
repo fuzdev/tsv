@@ -455,13 +455,15 @@ impl<'a> Printer<'a> {
         let has_line_or_multiline_block =
             comments_in_range(self.comments, obj.span.start, obj.span.end)
                 .any(|c| !c.is_block || c.multiline);
-        let member_spans: Vec<_> = obj.members.iter().map(TSTypeElement::span).collect();
-        let has_standalone_block =
-            self.has_standalone_block_comment(obj.span.start, obj.span.end, &member_spans);
         source_is_multiline
             || first_member_on_new_line
             || has_line_or_multiline_block
-            || has_standalone_block
+            // Lazy: the per-member span collection only runs when the cheaper checks
+            // above didn't already force multiline.
+            || {
+                let member_spans: Vec<_> = obj.members.iter().map(TSTypeElement::span).collect();
+                self.has_standalone_block_comment(obj.span.start, obj.span.end, &member_spans)
+            }
     }
 
     /// Build aligned object literal doc with custom opening/closing.
