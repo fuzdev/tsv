@@ -656,34 +656,62 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let needs_parens = self.needs_parens(non_null_expr.expression, ParenContext::NonNull);
 
-        if needs_parens {
+        // A leading comment from the stripped grouping parens, before the operand
+        // (`(/* b */ x + y)!`), is emitted before the operand/`(`, matching prettier
+        // (`/* b */ (x + y)!`) — tsv previously dropped it. None of the branches below
+        // emit it, so it is prepended once here.
+        let argument_start = non_null_expr.expression.span().start;
+        let leading = self.build_rhs_comments_opt(non_null_expr.span.start, argument_start);
+
+        let core = if needs_parens {
             // For expressions that need parens, use a special doc structure
             // that indents continuations when breaking
             let inner_doc =
                 self.build_expression_doc_with_indent_on_break(non_null_expr.expression);
-            // Keep a comment from the stripped grouping parens INSIDE them, before
-            // the `)`, where the author wrote it (`(x + y /* c */)!`) — prettier
-            // relocates it outside, between `)` and `!`. tsv preserves the position.
             let argument_end = non_null_expr.expression.span().end;
+            // Keep comments from the stripped grouping parens INSIDE them, where the
+            // author wrote them — leading before the operand (`(/* b */ x + y)!`),
+            // trailing before the `)` (`(x + y /* c */)!`). Prettier relocates them
+            // outside (before `(` / between `)` and `!`); tsv preserves the position.
+            let mut parts: DocBuf = smallvec![d.text("(")];
+            if let Some(lead) = leading {
+                parts.push(lead);
+            }
+            parts.push(inner_doc);
             if self.has_comments_between(argument_end, non_null_expr.span.end) {
-                let mut parts: DocBuf = smallvec![d.text("("), inner_doc];
                 self.append_trailing_paren_comments(
                     &mut parts,
                     argument_end,
                     non_null_expr.span.end,
                 );
-                parts.push(d.text(")!"));
+            }
+            parts.push(d.text(")!"));
+            d.concat(&parts)
+        } else if Self::is_chain_expression(non_null_expr.expression) {
+            let argument_end = non_null_expr.expression.span().end;
+            if self.has_comments_between(argument_end, non_null_expr.span.end) {
+                // A comment between the chain operand and `!` (`p?.q /* c */!`, or from
+                // stripped grouping parens) trails the operand — preserve it rather
+                // than dropping it. The redundant grouping parens are stripped per
+                // tsv's non-null seal canonicalization (`(p?.q)!` → `p?.q!`); prettier
+                // keeps them when the source had them.
+                let inner_doc = self.build_expression_doc(non_null_expr.expression);
+                let mut parts: DocBuf = smallvec![inner_doc];
+                self.append_trailing_paren_comments(
+                    &mut parts,
+                    argument_end,
+                    non_null_expr.span.end,
+                );
+                parts.push(d.text("!"));
                 d.concat(&parts)
             } else {
-                d.concat(&[d.text("("), inner_doc, d.text(")!")])
+                // When inner expression is a chain (member or call), use chain architecture
+                // to properly handle breaking. This ensures the outer `!` is included
+                // in the linearized chain for proper segment grouping.
+                let nodes = chain::linearize_chain_from_non_null(non_null_expr);
+                let groups = chain::group_chain_nodes(&nodes);
+                chain::build_chain_doc(&groups, self)
             }
-        } else if Self::is_chain_expression(non_null_expr.expression) {
-            // When inner expression is a chain (member or call), use chain architecture
-            // to properly handle breaking. This ensures the outer `!` is included
-            // in the linearized chain for proper segment grouping.
-            let nodes = chain::linearize_chain_from_non_null(non_null_expr);
-            let groups = chain::group_chain_nodes(&nodes);
-            chain::build_chain_doc(&groups, self)
         } else {
             let inner_doc = self.build_expression_doc(non_null_expr.expression);
             // Check for trailing comments from stripped grouping parens: `(x /* c */)!`
@@ -702,6 +730,14 @@ impl<'a> Printer<'a> {
             } else {
                 d.concat(&[inner_doc, d.text("!")])
             }
+        };
+
+        // For paren-stripped branches the leading comment goes before the operand
+        // (parens are gone, matching prettier); the needs_parens branch above already
+        // placed it inside the kept parens.
+        match leading {
+            Some(lead) if !needs_parens => d.concat(&[lead, core]),
+            _ => core,
         }
     }
 

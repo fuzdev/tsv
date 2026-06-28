@@ -142,6 +142,7 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
             ChainNode::Base {
                 needs_parens: true,
                 expr,
+                ..
             } => !matches!(expr, Expression::BinaryExpression(_)),
             _ => false,
         });

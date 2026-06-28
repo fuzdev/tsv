@@ -33,9 +33,16 @@ pub type ChainNodeRefVec<'n, 'a> = SmallVec<[&'n ChainNode<'a>; 8]>;
 #[derive(Debug, Clone, Copy)]
 pub enum ChainNode<'a> {
     /// Base expression: identifier, literal, complex expr in parens
+    ///
+    /// `paren_comment_end`, when `Some`, marks the end of the region (just past the
+    /// stripped grouping `)` / following `!`) in which a trailing comment from the
+    /// parens should be emitted *inside* them, before the `)`. Used for a
+    /// parenthesized operand of a non-null assertion (`(x + y /* c */)!.foo`) so the
+    /// comment is preserved where the author wrote it rather than dropped.
     Base {
         expr: &'a internal::Expression<'a>,
         needs_parens: bool,
+        paren_comment_end: Option<u32>,
     },
     /// Call expression: ()
     Call {
@@ -73,7 +80,26 @@ pub enum ChainNode<'a> {
 impl<'a> ChainNode<'a> {
     /// Create a new base node
     pub fn base(expr: &'a internal::Expression<'a>, needs_parens: bool) -> Self {
-        Self::Base { expr, needs_parens }
+        Self::Base {
+            expr,
+            needs_parens,
+            paren_comment_end: None,
+        }
+    }
+
+    /// Create a parenthesized base node that preserves a trailing comment from the
+    /// stripped grouping parens, emitted inside them before `)`. `paren_comment_end`
+    /// bounds the region to scan for that comment (e.g. the non-null assertion's
+    /// span end).
+    pub fn base_with_paren_comment(
+        expr: &'a internal::Expression<'a>,
+        paren_comment_end: u32,
+    ) -> Self {
+        Self::Base {
+            expr,
+            needs_parens: true,
+            paren_comment_end: Some(paren_comment_end),
+        }
     }
 
     /// Create a new call node

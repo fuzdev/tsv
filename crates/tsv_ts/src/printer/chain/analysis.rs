@@ -138,6 +138,7 @@ fn fix_callee_base_parens(nodes: &mut [ChainNode<'_>]) {
         ChainNode::Base {
             expr,
             needs_parens: np,
+            ..
         },
         ChainNode::Call { .. },
         ..,
@@ -231,9 +232,21 @@ fn linearize_recursive<'a>(
             // parenthesized base + `!` so it renders `(a?.b)!.c`, not `a?.b!.c`.
             let inner = &non_null.expression;
             if non_null.seals_optional_chain() {
-                nodes.push(ChainNode::base(inner, true));
+                nodes.push(ChainNode::base_with_paren_comment(inner, non_null.span.end));
             } else {
                 linearize_recursive(inner, nodes, paren_gaps);
+                // A comment from the stripped grouping parens (`(x + y /* c */)!.foo`)
+                // lives between the operand and the `!`. When the operand is a
+                // parenthesized base, keep the comment INSIDE the parens, where the
+                // author wrote it, rather than dropping it.
+                if let Some(ChainNode::Base {
+                    needs_parens: true,
+                    paren_comment_end,
+                    ..
+                }) = nodes.last_mut()
+                {
+                    *paren_comment_end = Some(non_null.span.end);
+                }
             }
             nodes.push(ChainNode::non_null());
         }
