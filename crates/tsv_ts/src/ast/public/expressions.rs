@@ -222,6 +222,9 @@ pub struct ImportExpression<'src> {
     pub end: u32,
     pub loc: SourceLocation,
     pub source: Box<Expression<'src>>,
+    /// Import phase (`"source"`/`"defer"`); omitted for an ordinary dynamic import.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<&'static str>,
     /// Import arguments for import attributes: `import('mod', {with: {type: 'json'}})`
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub arguments: Vec<Expression<'src>>,

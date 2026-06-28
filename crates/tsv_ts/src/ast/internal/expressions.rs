@@ -460,12 +460,15 @@ pub struct NewExpression<'arena> {
     pub span: Span,
 }
 
-/// Dynamic import expression: `import('module')` or `import('module', options)`
+/// Dynamic import expression: `import('module')` or `import('module', options)`,
+/// optionally phased as `import.source(…)` / `import.defer(…)`.
 #[derive(Debug, Clone)]
 pub struct ImportExpression<'arena> {
     pub source: &'arena Expression<'arena>,
     /// Optional second argument for import attributes: `{with: {type: 'json'}}`
     pub options: Option<&'arena Expression<'arena>>,
+    /// Import phase: `Source`/`Defer` for `import.source(…)` / `import.defer(…)`.
+    pub phase: super::modules::ImportPhase,
     pub span: Span,
 }
 

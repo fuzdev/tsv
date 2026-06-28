@@ -28,6 +28,19 @@ async fn optional_arrow_param_comment_no_annotation() {
     .await;
 }
 
+#[tokio::test]
+async fn static_import_source_phase() {
+    // Stage-3 source-phase import `import source x from '…'`. acorn rejects it
+    // (so it can't be a fixture), and prettier's `typescript` parser reads `source`
+    // as a name and throws (`'=' expected`); ours parses + keeps it stable. The
+    // parser is graded by test262; see `tests/import_phase.rs` for the printer's
+    // round-trip coverage and `docs/conformance_prettier.md` for the catalog.
+    assert_prettier_errors_ours_stable(
+        "<script lang=\"ts\">\n\timport source x from 'x';\n</script>\n",
+    )
+    .await;
+}
+
 /// Asserts that prettier fails to format `input` while our printer keeps it
 /// stable (formats to itself) and idempotent.
 async fn assert_prettier_errors_ours_stable(input: &str) {

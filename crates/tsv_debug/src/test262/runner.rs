@@ -177,10 +177,12 @@ fn classify(relative_path: &str, content: &str) -> Classification {
     if frontmatter.is_negative_resolution() {
         return Classification::Skip(SkipReason::ResolutionPhase);
     }
-    // Drop tests whose syntax tsv hasn't implemented (Stage-3 import proposals)
-    // from the graded set: scoring them as parse failures measures scope, not a
-    // conformance gap. Both polarities go — we shouldn't claim credit for
-    // rejecting a negative whose feature we reject wholesale either.
+    // Drop tests whose syntax tsv hasn't implemented from the graded set: scoring
+    // them as parse failures measures scope, not a conformance gap. Both polarities
+    // go — we shouldn't claim credit for rejecting a negative whose feature we
+    // reject wholesale either. `UNIMPLEMENTED_FEATURES` is currently empty (the
+    // import-phase proposals it once held are now parsed), so nothing matches here
+    // until a new unimplemented proposal is added.
     if let Some(feature) = frontmatter.requires_unimplemented_feature() {
         return Classification::Skip(SkipReason::UnimplementedFeature(feature));
     }
@@ -376,18 +378,23 @@ pub fn format_failure(reason: &FailureReason) -> String {
 mod tests {
     use super::*;
 
-    /// A test requiring an unimplemented proposal is skipped, not graded — the
-    /// wiring from `frontmatter::requires_unimplemented_feature` through
-    /// `classify` into the skip bucket (the actual behavior change, beyond the
-    /// frontmatter predicate's own unit test).
+    /// The import-phase proposals are now parsed, so a test requiring one is
+    /// graded, not skipped — `UNIMPLEMENTED_FEATURES` is empty. (Were a future
+    /// proposal added to that list, `classify` would route it to the skip bucket;
+    /// the `frontmatter` predicate's own unit test covers the matching itself.)
     #[test]
-    fn classify_skips_unimplemented_feature() {
-        // The real shape: proposal name alongside `dynamic-import`.
-        let proposal =
+    fn classify_grades_implemented_proposals() {
+        let source_phase =
             "/*---\nfeatures: [source-phase-imports, dynamic-import]\n---*/\nimport.source('x');\n";
         assert!(matches!(
-            classify("test/x.js", proposal),
-            Classification::Skip(SkipReason::UnimplementedFeature("source-phase-imports"))
+            classify("test/x.js", source_phase),
+            Classification::Grade { .. }
+        ));
+
+        let import_defer = "/*---\nfeatures: [import-defer]\n---*/\nimport.defer('x');\n";
+        assert!(matches!(
+            classify("test/x.js", import_defer),
+            Classification::Grade { .. }
         ));
 
         // Plain dynamic import is implemented — graded, not skipped.
@@ -398,15 +405,14 @@ mod tests {
         ));
     }
 
-    /// The feature check runs before the sloppy-mode check, so a test that is
-    /// both noStrict and a proposal attributes to the feature bucket — keeps the
-    /// `unimplemented feature:` count the true scope of the unimplemented set.
+    /// With no features filtered, a noStrict test is skipped for sloppy mode
+    /// regardless of which proposal features it also carries.
     #[test]
-    fn classify_feature_precedes_sloppy() {
+    fn classify_nostrict_skips_sloppy() {
         let both = "/*---\nfeatures: [import-defer]\nflags: [noStrict]\n---*/\n";
         assert!(matches!(
             classify("test/x.js", both),
-            Classification::Skip(SkipReason::UnimplementedFeature("import-defer"))
+            Classification::Skip(SkipReason::SloppyModeRequired)
         ));
     }
 
