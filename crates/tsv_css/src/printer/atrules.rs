@@ -304,15 +304,7 @@ impl<'a> Printer<'a> {
 
         if fits {
             // Print inline with comments between parts
-            for (i, part) in parts.iter().enumerate() {
-                if i > 0 {
-                    self.write_condition_part_with_comments(parts[i - 1].span.end, part);
-                } else {
-                    self.write_leading_condition_comments(name_end_pos, part.span.start);
-                    self.write_connector(part.connector);
-                    self.write(&part.content);
-                }
-            }
+            self.write_condition_parts(parts, name_end_pos);
             // Print trailing comments after last part
             if let (Some(last_part), Some(span)) = (parts.last(), prelude_span) {
                 self.write_trailing_condition_comments(last_part.span.end, span.end);
@@ -322,15 +314,7 @@ impl<'a> Printer<'a> {
             let split_idx = self.find_condition_split_index(parts, current_col, suffix_len);
 
             // Print first line: parts[0..split_idx]
-            for (i, part) in parts[..split_idx].iter().enumerate() {
-                if i > 0 {
-                    self.write_condition_part_with_comments(parts[i - 1].span.end, part);
-                } else {
-                    self.write_leading_condition_comments(name_end_pos, part.span.start);
-                    self.write_connector(part.connector);
-                    self.write(&part.content);
-                }
-            }
+            self.write_condition_parts(&parts[..split_idx], name_end_pos);
 
             // Print trailing connector and continuation line
             if split_idx < parts.len() {
@@ -401,6 +385,26 @@ impl<'a> Printer<'a> {
             for comment in comments.iter() {
                 self.write(" ");
                 self.print_css_comment(comment);
+            }
+        }
+    }
+
+    /// Print a contiguous run of condition parts: leading comments + connector +
+    /// content for the first, then each subsequent part with its inter-part
+    /// comments. Shared by the fits-inline and wrapped-first-line branches (the
+    /// wrapped branch passes the `parts[..split_idx]` prefix).
+    fn write_condition_parts(
+        &mut self,
+        parts: &[NormalizedConditionPart<'_>],
+        name_end_pos: Option<u32>,
+    ) {
+        for (i, part) in parts.iter().enumerate() {
+            if i > 0 {
+                self.write_condition_part_with_comments(parts[i - 1].span.end, part);
+            } else {
+                self.write_leading_condition_comments(name_end_pos, part.span.start);
+                self.write_connector(part.connector);
+                self.write(&part.content);
             }
         }
     }
