@@ -49,6 +49,27 @@ fn dynamic_import_defer_stable() {
     assert_ours_stable("<script lang=\"ts\">\n\timport.defer('x');\n</script>\n");
 }
 
+/// The phase keyword is threaded into every dynamic-import layout, so the
+/// expandable-options break (`is_expandable_object` — the `state_flat` /
+/// `state_expand_last` / `state_expand_all` triad) must render with the phased
+/// `import.source(` / `import.defer(` open token, identical to plain `import(`
+/// apart from that token. Input is the already-broken (stable) form.
+#[test]
+fn dynamic_import_source_options_expand_stable() {
+    assert_ours_stable(
+        "<script lang=\"ts\">\n\tconst m = await import.source('some-module-specifier', {\n\t\twith: { type: 'json', resolution: 'import', extra: 'padding-x' }\n\t});\n</script>\n",
+    );
+}
+
+/// An own-line leading comment forces the parens open (`wrap_import_hardline`);
+/// that path must also carry the phased open token.
+#[test]
+fn dynamic_import_defer_own_line_comment_stable() {
+    assert_ours_stable(
+        "<script lang=\"ts\">\n\tconst m = import.defer(\n\t\t// pick the deferred module\n\t\tx\n\t);\n</script>\n",
+    );
+}
+
 #[test]
 fn static_import_defer_namespace_stable() {
     assert_ours_stable("<script lang=\"ts\">\n\timport defer * as ns from 'x';\n</script>\n");
@@ -68,6 +89,24 @@ fn assert_ours_rejects(input: &str) {
         tsv_svelte::parse(input, &arena).is_err(),
         "expected parse rejection (pinned divergence)"
     );
+}
+
+/// `import source ImportedBinding FromClause` takes exactly **one** binding — no
+/// namespace, no named clause, no second specifier. The phase commits on the
+/// leading `source <ident>` one-token lookahead, so a multi-specifier or
+/// non-default continuation (which has no valid non-phase reading either) is
+/// rejected after the binding. A phase keyword likewise has no import-equals form.
+#[test]
+fn static_import_source_single_binding_enforced() {
+    let w = |s: &str| format!("<script lang=\"ts\">\n\t{s}\n</script>\n");
+    assert_ours_rejects(&w("import source x, { a } from 'x';"));
+    assert_ours_rejects(&w("import source x, * as ns from 'x';"));
+    assert_ours_rejects(&w("import source type { a } from 'x';"));
+    assert_ours_rejects(&w("import source x = require('x');"));
+    // the lone-binding forms still parse + round-trip, including a binding whose
+    // name is a contextual keyword the lexer emits as an `Identifier` (`type`).
+    assert_ours_stable(&w("import source x from 'x';"));
+    assert_ours_stable(&w("import source type from 'x';"));
 }
 
 /// A source-phase binding whose name lexes as a contextual keyword (`from`, `as`)

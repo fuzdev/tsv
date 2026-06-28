@@ -559,6 +559,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Check for `import x = ...` (TSImportEqualsDeclaration)
             if matches!(self.current_kind(), TokenKind::Equals) {
+                // A phase keyword has no import-equals form (`import source x =
+                // require(…)` is not in the proposal grammar); reject rather than
+                // silently drop the phase. Only `Source` can reach here — `Defer`
+                // requires `* as`, so its leading token is `*`, not this binding.
+                if phase != ImportPhase::None {
+                    return Err(self.error_msg(
+                        "an import-phase keyword cannot precede an import-equals declaration",
+                    ));
+                }
                 return self.parse_import_equals_declaration(
                     start,
                     id_start,
@@ -718,6 +727,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             self.expect(&TokenKind::BraceClose)?;
+        }
+
+        // A source-phase import is `import source ImportedBinding FromClause` — a
+        // single binding, no namespace/named clause and no second specifier. The
+        // phase commits on the leading `source <ident>` one-token lookahead, so a
+        // multi-specifier or non-default clause that slipped past it is rejected
+        // here: `import source x, { a }`, `import source x, * as ns`, and (after a
+        // stray `type` modifier) `import source type { a }`. (`import defer` is held
+        // to its `* as ns` shape by the phase lookahead, so it needs no analogue.)
+        if phase == ImportPhase::Source
+            && !(specifiers.len() == 1 && matches!(specifiers[0], ImportSpecifier::Default(_)))
+        {
+            return Err(self.error_msg("a source-phase import takes a single binding"));
         }
 
         // Expect 'from' keyword
