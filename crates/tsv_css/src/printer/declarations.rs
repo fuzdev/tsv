@@ -121,6 +121,11 @@ impl<'a> Printer<'a> {
             CssValue::List { values, .. } => (values, " ", false),
             _ => return (false, false),
         };
+        // TODO: measure-then-emit — `doc` is built only to width-check here and then
+        // discarded; `print_decl_width_wrapped` re-builds a *different* fill to emit.
+        // Fold into one `group` whose own fit check decides flat-vs-wrapped (the
+        // doc-first shape `atrules.rs::print_media_prelude` now uses), so the wrap
+        // decision and emission can't drift.
         let doc = self.build_separated_values_doc(values, separator);
         let available = doc::available_width(
             self.effective_indent(),
@@ -153,6 +158,12 @@ impl<'a> Printer<'a> {
         }
 
         let d = self.d();
+        // TODO: measure-then-emit — `func_doc` is built only for this width check and
+        // discarded; the wrapped form is re-emitted imperatively in
+        // `print_wrapped_function`. The group form that wraps natively already exists
+        // (`values.rs::build_value_function_doc`, used by the inline path) — render it
+        // directly with a reserved `;` instead, deleting the measure + imperative fork
+        // (mirrors the at-rule prelude conversion). Highest-value of the three here.
         // Build inline doc representation for width checking
         // url() uses comma without space; others use ", "
         let separator = if name == "url" { "," } else { ", " };
@@ -596,6 +607,10 @@ impl<'a> Printer<'a> {
     /// Used to decide whether to use continuation-based fill printing.
     /// `trailing_reserve` accounts for characters after the list (comma, paren, semicolon).
     fn space_list_exceeds_width(&self, values: &[CssValue<'_>], trailing_reserve: usize) -> bool {
+        // TODO: measure-then-emit — `list_doc` is built only to width-check and
+        // discarded; the emitted fill already renders flat (identical bytes) when it
+        // fits, so this check is redundant once the value path is doc-first. Removable
+        // after the Site-1 function conversion drops one of this fn's two call sites.
         let list_doc = self.build_separated_values_doc(values, " ");
         let available = doc::available_width(self.effective_indent(), 0, trailing_reserve);
         !doc::arena_fits::<dyn doc::TextResolver>(self.arena, list_doc, available, Mode::Flat, None)

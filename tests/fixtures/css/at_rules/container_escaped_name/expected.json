@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 269,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 66,
+				"end": 134,
+				"name": "container",
+				"prelude": "\\@named (min-width: 100px)",
+				"block": {
+					"type": "Block",
+					"start": 104,
+					"end": 134,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 108,
+								"end": 110,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 108,
+										"end": 110,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 108,
+														"end": 110
+													}
+												],
+												"start": 108,
+												"end": 110
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 111,
+								"end": 131,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 116,
+										"end": 126,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 108,
+							"end": 131
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 205,
+				"end": 260,
+				"name": "container",
+				"prelude": "(\\@foo: bar)",
+				"block": {
+					"type": "Block",
+					"start": 229,
+					"end": 260,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 233,
+								"end": 235,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 233,
+										"end": 235,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "b",
+														"start": 233,
+														"end": 235
+													}
+												],
+												"start": 233,
+												"end": 235
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 236,
+								"end": 257,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 241,
+										"end": 252,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 233,
+							"end": 257
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 261,
+			"styles": "\n\t/* escaped @ in a container name keeps its backslash */\n\t@container \\@named (min-width: 100px) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* escaped @ in a container condition value keeps its backslash */\n\t@container (\\@foo: bar) {\n\t\t.b {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 270,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

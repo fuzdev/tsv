@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 140,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 88,
+				"end": 131,
+				"name": "container",
+				"prelude": "b",
+				"block": {
+					"type": "Block",
+					"start": 101,
+					"end": 131,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 105,
+								"end": 107,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 105,
+										"end": 107,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 105,
+														"end": 107
+													}
+												],
+												"start": 105,
+												"end": 107
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 108,
+								"end": 128,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 113,
+										"end": 123,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 105,
+							"end": 128
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 132,
+			"styles": "\n\t/* a container name with no condition gets a single space before the block */\n\t@container b {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 141,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
