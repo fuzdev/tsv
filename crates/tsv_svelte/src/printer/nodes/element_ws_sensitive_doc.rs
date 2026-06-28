@@ -91,21 +91,19 @@ impl<'a> Printer<'a> {
         if is_inline && content_has_newlines {
             let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
 
+            // Indents below are relative to this element's own (ambient) doc-indent,
+            // which its parent's body wrap already set to the element's nesting depth.
             // When content doesn't end with \n, the closing </tag> has its `>` split
-            // to a new line: `line2</span\n\t>` instead of `\n</span>`
+            // to a new line at the element level: `line2</span\n\t>`.
             let closing = if last_text_ends_with_newline {
                 self.end_tag(tag_sym)
             } else {
-                // </tag\n\t> — closing > on new line with indent
-                d.concat(&[
-                    d.text("</"),
-                    d.symbol(tag_sym),
-                    d.indent(d.concat(&[d.hardline(), d.text(">")])),
-                ])
+                // </tag\n> — closing > on its own line at the element's level
+                d.concat(&[d.text("</"), d.symbol(tag_sym), d.hardline(), d.text(">")])
             };
 
-            // Opening `>` at indent+2 (2 levels: one for element nesting, one for attr indent).
-            // Attrs (if any) go in a group at the same level — flat when short, wrapped when long.
+            // Opening `>` at element level + 1 (attr indent). Attrs (if any) go in a
+            // group at the same level — flat when short, wrapped when long.
             let opening_break = d.concat(&[d.hardline(), d.text(">")]);
             let opening_inner = if attr_docs.is_empty() {
                 opening_break
@@ -117,7 +115,7 @@ impl<'a> Printer<'a> {
             return d.concat(&[
                 d.text("<"),
                 d.symbol(tag_sym),
-                d.indent(d.indent(opening_inner)),
+                d.indent(opening_inner),
                 content_doc,
                 closing,
             ]);
@@ -286,7 +284,14 @@ impl<'a> Printer<'a> {
             .map(|node| self.build_whitespace_sensitive_node_doc(node))
             .collect();
         self.set_block_dangle_allowed(prev_dangle);
-        self.d().concat(&node_docs)
+        // One body-indent level per container (element body, block body), matching
+        // prettier's uniform "each container adds a level" model. Preserved text has
+        // no doc-hardlines so this never injects rendered whitespace into <pre> — it
+        // only accumulates the depth that nested elements' wrapped attributes and
+        // dangling `>` breaks resolve against. See nodes/element_ws_sensitive_doc.rs
+        // header + docs/conformance_prettier.md §Svelte.
+        let d = self.d();
+        d.indent(d.concat(&node_docs))
     }
 
     /// Build doc for a single node in whitespace-sensitive context.
@@ -324,57 +329,21 @@ impl<'a> Printer<'a> {
                 self.build_special_element_doc(element)
             }
 
-            // Expressions and blocks: format normally WITH indent wrapper
-            // This gives them proper indentation (e.g., expression args inside <pre> get
-            // double-indented: once for <pre>, once for call structure)
-            FragmentNode::ExpressionTag(tag) => {
-                let inner = self.build_expression_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::Comment(comment) => {
-                let inner = self.build_html_comment_doc(comment);
-                d.indent(inner)
-            }
-            FragmentNode::IfBlock(block) => {
-                let inner = self.build_ws_sensitive_if_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::EachBlock(block) => {
-                let inner = self.build_ws_sensitive_each_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::AwaitBlock(block) => {
-                let inner = self.build_await_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::KeyBlock(block) => {
-                let inner = self.build_key_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::SnippetBlock(block) => {
-                let inner = self.build_snippet_block_doc(block);
-                d.indent(inner)
-            }
-            FragmentNode::HtmlTag(tag) => {
-                let inner = self.build_html_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::ConstTag(tag) => {
-                let inner = self.build_const_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::DeclarationTag(tag) => {
-                let inner = self.build_declaration_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::DebugTag(tag) => {
-                let inner = self.build_debug_tag_doc(tag);
-                d.indent(inner)
-            }
-            FragmentNode::RenderTag(tag) => {
-                let inner = self.build_render_tag_doc(tag);
-                d.indent(inner)
-            }
+            // Expressions and blocks: format normally. The body-indent level is
+            // applied collectively by build_whitespace_sensitive_content_doc, so each
+            // node sits at the container's body level without its own wrapper.
+            FragmentNode::ExpressionTag(tag) => self.build_expression_tag_doc(tag),
+            FragmentNode::Comment(comment) => self.build_html_comment_doc(comment),
+            FragmentNode::IfBlock(block) => self.build_ws_sensitive_if_block_doc(block),
+            FragmentNode::EachBlock(block) => self.build_ws_sensitive_each_block_doc(block),
+            FragmentNode::AwaitBlock(block) => self.build_await_block_doc(block),
+            FragmentNode::KeyBlock(block) => self.build_key_block_doc(block),
+            FragmentNode::SnippetBlock(block) => self.build_snippet_block_doc(block),
+            FragmentNode::HtmlTag(tag) => self.build_html_tag_doc(tag),
+            FragmentNode::ConstTag(tag) => self.build_const_tag_doc(tag),
+            FragmentNode::DeclarationTag(tag) => self.build_declaration_tag_doc(tag),
+            FragmentNode::DebugTag(tag) => self.build_debug_tag_doc(tag),
+            FragmentNode::RenderTag(tag) => self.build_render_tag_doc(tag),
         }
     }
 
