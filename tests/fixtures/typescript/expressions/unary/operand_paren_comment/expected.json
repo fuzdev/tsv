@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 723,
+	"end": 686,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -140,9 +140,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " block comment after a binary/logical operand (redundant parens stripped, matching prettier)",
+			"value": " block comment after a binary/logical operand (redundant parens stripped)",
 			"start": 192,
-			"end": 286,
+			"end": 267,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -150,15 +150,15 @@
 				},
 				"end": {
 					"line": 12,
-					"column": 95
+					"column": 76
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 296,
-			"end": 303,
+			"start": 277,
+			"end": 284,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -173,8 +173,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 316,
-			"end": 323,
+			"start": 297,
+			"end": 304,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -189,8 +189,8 @@
 		{
 			"type": "Line",
 			"value": " block comment before a binary operand",
-			"start": 328,
-			"end": 368,
+			"start": 309,
+			"end": 349,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -205,8 +205,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 372,
-			"end": 379,
+			"start": 353,
+			"end": 360,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -220,9 +220,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " assignment and ternary operands keep their parens (both formatters)",
-			"start": 390,
-			"end": 460,
+			"value": " assignment and ternary operands keep their parens",
+			"start": 371,
+			"end": 423,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -230,15 +230,15 @@
 				},
 				"end": {
 					"line": 19,
-					"column": 71
+					"column": 53
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 472,
-			"end": 479,
+			"start": 435,
+			"end": 442,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -253,8 +253,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 497,
-			"end": 504,
+			"start": 460,
+			"end": 467,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -269,8 +269,8 @@
 		{
 			"type": "Line",
 			"value": " multiline block comment after a binary operand",
-			"start": 509,
-			"end": 558,
+			"start": 472,
+			"end": 521,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -285,8 +285,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 573,
-			"end": 580,
+			"start": 536,
+			"end": 543,
 			"loc": {
 				"start": {
 					"line": 26,
@@ -301,8 +301,8 @@
 		{
 			"type": "Line",
 			"value": " line comment after a binary operand",
-			"start": 587,
-			"end": 625,
+			"start": 550,
+			"end": 588,
 			"loc": {
 				"start": {
 					"line": 29,
@@ -317,8 +317,8 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 638,
-			"end": 642,
+			"start": 601,
+			"end": 605,
 			"loc": {
 				"start": {
 					"line": 31,
@@ -333,8 +333,8 @@
 		{
 			"type": "Line",
 			"value": " multiline block comment before operand",
-			"start": 649,
-			"end": 690,
+			"start": 612,
+			"end": 653,
 			"loc": {
 				"start": {
 					"line": 34,
@@ -349,8 +349,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 697,
-			"end": 704,
+			"start": 660,
+			"end": 667,
 			"loc": {
 				"start": {
 					"line": 36,
@@ -366,12 +366,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 722,
+		"end": 685,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 713,
+			"end": 676,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -737,8 +737,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 288,
-					"end": 305,
+					"start": 269,
+					"end": 286,
 					"loc": {
 						"start": {
 							"line": 13,
@@ -751,8 +751,8 @@
 					},
 					"expression": {
 						"type": "UnaryExpression",
-						"start": 288,
-						"end": 304,
+						"start": 269,
+						"end": 285,
 						"loc": {
 							"start": {
 								"line": 13,
@@ -767,8 +767,8 @@
 						"prefix": true,
 						"argument": {
 							"type": "BinaryExpression",
-							"start": 290,
-							"end": 295,
+							"start": 271,
+							"end": 276,
 							"loc": {
 								"start": {
 									"line": 13,
@@ -781,8 +781,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 290,
-								"end": 291,
+								"start": 271,
+								"end": 272,
 								"loc": {
 									"start": {
 										"line": 13,
@@ -798,8 +798,8 @@
 							"operator": "+",
 							"right": {
 								"type": "Identifier",
-								"start": 294,
-								"end": 295,
+								"start": 275,
+								"end": 276,
 								"loc": {
 									"start": {
 										"line": 13,
@@ -816,8 +816,8 @@
 								{
 									"type": "Block",
 									"value": " c ",
-									"start": 296,
-									"end": 303
+									"start": 277,
+									"end": 284
 								}
 							]
 						}
@@ -825,16 +825,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " block comment after a binary/logical operand (redundant parens stripped, matching prettier)",
+							"value": " block comment after a binary/logical operand (redundant parens stripped)",
 							"start": 192,
-							"end": 286
+							"end": 267
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 307,
-					"end": 325,
+					"start": 288,
+					"end": 306,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -847,8 +847,8 @@
 					},
 					"expression": {
 						"type": "UnaryExpression",
-						"start": 307,
-						"end": 324,
+						"start": 288,
+						"end": 305,
 						"loc": {
 							"start": {
 								"line": 14,
@@ -863,8 +863,8 @@
 						"prefix": true,
 						"argument": {
 							"type": "LogicalExpression",
-							"start": 309,
-							"end": 315,
+							"start": 290,
+							"end": 296,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -877,8 +877,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 309,
-								"end": 310,
+								"start": 290,
+								"end": 291,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -894,8 +894,8 @@
 							"operator": "||",
 							"right": {
 								"type": "Identifier",
-								"start": 314,
-								"end": 315,
+								"start": 295,
+								"end": 296,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -912,8 +912,8 @@
 								{
 									"type": "Block",
 									"value": " c ",
-									"start": 316,
-									"end": 323
+									"start": 297,
+									"end": 304
 								}
 							]
 						}
@@ -921,8 +921,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 370,
-					"end": 387,
+					"start": 351,
+					"end": 368,
 					"loc": {
 						"start": {
 							"line": 17,
@@ -935,8 +935,8 @@
 					},
 					"expression": {
 						"type": "UnaryExpression",
-						"start": 370,
-						"end": 386,
+						"start": 351,
+						"end": 367,
 						"loc": {
 							"start": {
 								"line": 17,
@@ -951,8 +951,8 @@
 						"prefix": true,
 						"argument": {
 							"type": "BinaryExpression",
-							"start": 380,
-							"end": 385,
+							"start": 361,
+							"end": 366,
 							"loc": {
 								"start": {
 									"line": 17,
@@ -965,8 +965,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 380,
-								"end": 381,
+								"start": 361,
+								"end": 362,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -982,8 +982,8 @@
 							"operator": "+",
 							"right": {
 								"type": "Identifier",
-								"start": 384,
-								"end": 385,
+								"start": 365,
+								"end": 366,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -1000,8 +1000,8 @@
 								{
 									"type": "Block",
 									"value": " c ",
-									"start": 372,
-									"end": 379
+									"start": 353,
+									"end": 360
 								}
 							]
 						}
@@ -1010,15 +1010,15 @@
 						{
 							"type": "Line",
 							"value": " block comment before a binary operand",
-							"start": 328,
-							"end": 368
+							"start": 309,
+							"end": 349
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 462,
-					"end": 481,
+					"start": 425,
+					"end": 444,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -1031,8 +1031,8 @@
 					},
 					"expression": {
 						"type": "UnaryExpression",
-						"start": 462,
-						"end": 480,
+						"start": 425,
+						"end": 443,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -1047,8 +1047,8 @@
 						"prefix": true,
 						"argument": {
 							"type": "AssignmentExpression",
-							"start": 465,
-							"end": 470,
+							"start": 428,
+							"end": 433,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -1062,8 +1062,8 @@
 							"operator": "=",
 							"left": {
 								"type": "Identifier",
-								"start": 465,
-								"end": 466,
+								"start": 428,
+								"end": 429,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -1078,8 +1078,8 @@
 							},
 							"right": {
 								"type": "Identifier",
-								"start": 469,
-								"end": 470,
+								"start": 432,
+								"end": 433,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -1096,8 +1096,8 @@
 								{
 									"type": "Block",
 									"value": " c ",
-									"start": 472,
-									"end": 479
+									"start": 435,
+									"end": 442
 								}
 							]
 						}
@@ -1105,16 +1105,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " assignment and ternary operands keep their parens (both formatters)",
-							"start": 390,
-							"end": 460
+							"value": " assignment and ternary operands keep their parens",
+							"start": 371,
+							"end": 423
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 483,
-					"end": 506,
+					"start": 446,
+					"end": 469,
 					"loc": {
 						"start": {
 							"line": 21,
@@ -1127,8 +1127,8 @@
 					},
 					"expression": {
 						"type": "UnaryExpression",
-						"start": 483,
-						"end": 505,
+						"start": 446,
+						"end": 468,
 						"loc": {
 							"start": {
 								"line": 21,
@@ -1143,8 +1143,8 @@
 						"prefix": true,
 						"argument": {
 							"type": "ConditionalExpression",
-							"start": 486,
-							"end": 495,
+							"start": 449,
+							"end": 458,
 							"loc": {
 								"start": {
 									"line": 21,
@@ -1157,8 +1157,8 @@
 							},
 							"test": {
 								"type": "Identifier",
-								"start": 486,
-								"end": 487,
+								"start": 449,
+								"end": 450,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -1173,8 +1173,8 @@
 							},
 							"consequent": {
 								"type": "Identifier",
-								"start": 490,
-								"end": 491,
+								"start": 453,
+								"end": 454,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -1189,8 +1189,8 @@
 							},
 							"alternate": {
 								"type": "Identifier",
-								"start": 494,
-								"end": 495,
+								"start": 457,
+								"end": 458,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -1207,8 +1207,8 @@
 								{
 									"type": "Block",
 									"value": " c ",
-									"start": 497,
-									"end": 504
+									"start": 460,
+									"end": 467
 								}
 							]
 						}
@@ -1216,8 +1216,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 560,
-					"end": 584,
+					"start": 523,
+					"end": 547,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -1230,8 +1230,8 @@
 					},
 					"expression": {
 						"type": "UnaryExpression",
-						"start": 560,
-						"end": 583,
+						"start": 523,
+						"end": 546,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -1246,8 +1246,8 @@
 						"prefix": true,
 						"argument": {
 							"type": "BinaryExpression",
-							"start": 565,
-							"end": 570,
+							"start": 528,
+							"end": 533,
 							"loc": {
 								"start": {
 									"line": 25,
@@ -1260,8 +1260,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 565,
-								"end": 566,
+								"start": 528,
+								"end": 529,
 								"loc": {
 									"start": {
 										"line": 25,
@@ -1277,8 +1277,8 @@
 							"operator": "+",
 							"right": {
 								"type": "Identifier",
-								"start": 569,
-								"end": 570,
+								"start": 532,
+								"end": 533,
 								"loc": {
 									"start": {
 										"line": 25,
@@ -1297,15 +1297,15 @@
 						{
 							"type": "Line",
 							"value": " multiline block comment after a binary operand",
-							"start": 509,
-							"end": 558
+							"start": 472,
+							"end": 521
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 627,
-					"end": 646,
+					"start": 590,
+					"end": 609,
 					"loc": {
 						"start": {
 							"line": 30,
@@ -1318,8 +1318,8 @@
 					},
 					"expression": {
 						"type": "UnaryExpression",
-						"start": 627,
-						"end": 645,
+						"start": 590,
+						"end": 608,
 						"loc": {
 							"start": {
 								"line": 30,
@@ -1334,8 +1334,8 @@
 						"prefix": true,
 						"argument": {
 							"type": "BinaryExpression",
-							"start": 632,
-							"end": 637,
+							"start": 595,
+							"end": 600,
 							"loc": {
 								"start": {
 									"line": 31,
@@ -1348,8 +1348,8 @@
 							},
 							"left": {
 								"type": "Identifier",
-								"start": 632,
-								"end": 633,
+								"start": 595,
+								"end": 596,
 								"loc": {
 									"start": {
 										"line": 31,
@@ -1365,8 +1365,8 @@
 							"operator": "+",
 							"right": {
 								"type": "Identifier",
-								"start": 636,
-								"end": 637,
+								"start": 599,
+								"end": 600,
 								"loc": {
 									"start": {
 										"line": 31,
@@ -1383,8 +1383,8 @@
 								{
 									"type": "Line",
 									"value": " c",
-									"start": 638,
-									"end": 642
+									"start": 601,
+									"end": 605
 								}
 							]
 						}
@@ -1393,21 +1393,21 @@
 						{
 							"type": "Block",
 							"value": " c ",
-							"start": 573,
-							"end": 580
+							"start": 536,
+							"end": 543
 						},
 						{
 							"type": "Line",
 							"value": " line comment after a binary operand",
-							"start": 587,
-							"end": 625
+							"start": 550,
+							"end": 588
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 692,
-					"end": 712,
+					"start": 655,
+					"end": 675,
 					"loc": {
 						"start": {
 							"line": 35,
@@ -1420,8 +1420,8 @@
 					},
 					"expression": {
 						"type": "UnaryExpression",
-						"start": 692,
-						"end": 711,
+						"start": 655,
+						"end": 674,
 						"loc": {
 							"start": {
 								"line": 35,
@@ -1436,8 +1436,8 @@
 						"prefix": true,
 						"argument": {
 							"type": "Identifier",
-							"start": 707,
-							"end": 708,
+							"start": 670,
+							"end": 671,
 							"loc": {
 								"start": {
 									"line": 37,
@@ -1453,8 +1453,8 @@
 								{
 									"type": "Block",
 									"value": " c ",
-									"start": 697,
-									"end": 704
+									"start": 660,
+									"end": 667
 								}
 							]
 						}
@@ -1463,8 +1463,8 @@
 						{
 							"type": "Line",
 							"value": " multiline block comment before operand",
-							"start": 649,
-							"end": 690
+							"start": 612,
+							"end": 653
 						}
 					]
 				}

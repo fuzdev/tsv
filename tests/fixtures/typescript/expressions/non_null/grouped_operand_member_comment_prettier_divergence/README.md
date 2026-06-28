@@ -7,7 +7,7 @@ inside the parens. The parens are required (`!` binds tighter than `+`/`? :`),
 and the trailing `.foo` routes the whole thing through the member-chain
 printer. Both formatters keep the parens; only the comment position differs.
 
-Prettier 3.9 relocates the comment **outside** the parens, between `)` and `!`
+Prettier relocates the comment **outside** the parens, between `)` and `!`
 (`(x + y) /* c */!.foo`).
 
 This is the member-followed sibling of

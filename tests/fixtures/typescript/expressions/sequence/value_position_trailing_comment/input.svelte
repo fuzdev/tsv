@@ -1,7 +1,6 @@
 <script lang="ts">
 	// A trailing comment on the last operand of a parenthesized sequence in a value
-	// position (return / variable init / assignment RHS) stays INSIDE the parens,
-	// rather than floating out after `)` (prettier #19263).
+	// position (return / variable init / assignment RHS) stays inside the parens.
 	function f() {
 		return (a, b /* c */);
 	}

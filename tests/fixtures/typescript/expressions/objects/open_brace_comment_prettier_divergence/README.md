@@ -4,23 +4,6 @@ A comment trailing an object literal's opening `{` on the same line (e.g.
 `{ // c` or `{ /* c */`) is preserved on the `{` line. Prettier relocates it to
 its own line as the first property's leading comment.
 
-tsv: keeps the comment trailing `{` where the user placed it
-Prettier: moves the comment down to its own line
-
-```
-// tsv                          // prettier
-const o = { // c1               const o = {
-	a: 1                               // c1
-};                                 a: 1
-                                 };
-
-// block comment, first property on a later line — same divergence
-const o = { /* c */             const o = {
-	a: 1                               /* c */
-};                                 a: 1
-                                 };
-```
-
 ## Reason
 
 tsv treats user comment placement as intentional (see Comment Position

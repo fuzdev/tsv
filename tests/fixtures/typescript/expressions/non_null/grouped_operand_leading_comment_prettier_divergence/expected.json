@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 181,
+	"end": 159,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " leading comment inside the required parens — kept where authored",
+			"value": " leading comment inside the required parens",
 			"start": 20,
-			"end": 87,
+			"end": 65,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 68
+					"column": 46
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " b ",
-			"start": 100,
-			"end": 107,
+			"start": 78,
+			"end": 85,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " ternary operand",
-			"start": 119,
-			"end": 137,
+			"start": 97,
+			"end": 115,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " b ",
-			"start": 150,
-			"end": 157,
+			"start": 128,
+			"end": 135,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 180,
+		"end": 158,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 171,
+			"end": 149,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -97,8 +97,8 @@
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 89,
-					"end": 116,
+					"start": 67,
+					"end": 94,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -112,8 +112,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 95,
-							"end": 115,
+							"start": 73,
+							"end": 93,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -126,8 +126,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 95,
-								"end": 96,
+								"start": 73,
+								"end": 74,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -142,8 +142,8 @@
 							},
 							"init": {
 								"type": "TSNonNullExpression",
-								"start": 99,
-								"end": 115,
+								"start": 77,
+								"end": 93,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -156,8 +156,8 @@
 								},
 								"expression": {
 									"type": "BinaryExpression",
-									"start": 108,
-									"end": 113,
+									"start": 86,
+									"end": 91,
 									"loc": {
 										"start": {
 											"line": 3,
@@ -170,8 +170,8 @@
 									},
 									"left": {
 										"type": "Identifier",
-										"start": 108,
-										"end": 109,
+										"start": 86,
+										"end": 87,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -187,8 +187,8 @@
 									"operator": "+",
 									"right": {
 										"type": "Identifier",
-										"start": 112,
-										"end": 113,
+										"start": 90,
+										"end": 91,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -205,8 +205,8 @@
 										{
 											"type": "Block",
 											"value": " b ",
-											"start": 100,
-											"end": 107
+											"start": 78,
+											"end": 85
 										}
 									]
 								}
@@ -217,16 +217,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " leading comment inside the required parens — kept where authored",
+							"value": " leading comment inside the required parens",
 							"start": 20,
-							"end": 87
+							"end": 65
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 139,
-					"end": 170,
+					"start": 117,
+					"end": 148,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -240,8 +240,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 145,
-							"end": 169,
+							"start": 123,
+							"end": 147,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -254,8 +254,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 145,
-								"end": 146,
+								"start": 123,
+								"end": 124,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -270,8 +270,8 @@
 							},
 							"init": {
 								"type": "TSNonNullExpression",
-								"start": 149,
-								"end": 169,
+								"start": 127,
+								"end": 147,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -284,8 +284,8 @@
 								},
 								"expression": {
 									"type": "ConditionalExpression",
-									"start": 158,
-									"end": 167,
+									"start": 136,
+									"end": 145,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -298,8 +298,8 @@
 									},
 									"test": {
 										"type": "Identifier",
-										"start": 158,
-										"end": 159,
+										"start": 136,
+										"end": 137,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -314,8 +314,8 @@
 									},
 									"consequent": {
 										"type": "Identifier",
-										"start": 162,
-										"end": 163,
+										"start": 140,
+										"end": 141,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -330,8 +330,8 @@
 									},
 									"alternate": {
 										"type": "Identifier",
-										"start": 166,
-										"end": 167,
+										"start": 144,
+										"end": 145,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -348,8 +348,8 @@
 										{
 											"type": "Block",
 											"value": " b ",
-											"start": 150,
-											"end": 157
+											"start": 128,
+											"end": 135
 										}
 									]
 								}
@@ -361,8 +361,8 @@
 						{
 							"type": "Line",
 							"value": " ternary operand",
-							"start": 119,
-							"end": 137
+							"start": 97,
+							"end": 115
 						}
 					]
 				}

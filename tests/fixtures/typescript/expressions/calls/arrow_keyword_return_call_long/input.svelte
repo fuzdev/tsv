@@ -20,7 +20,7 @@
 		)
 	};
 
-	// TSTypeReference return + call body - now expandable too (3.9), sig hugged
+	// TSTypeReference return + call body - sig hugged, body breaks after =>
 	const d = {
 		propAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: fn((x: string): Promise<any> =>
 			call(undefined)

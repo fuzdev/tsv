@@ -8,7 +8,7 @@ the comment where the author wrote it — inside the parens, before the operand.
 The parens are required (`!` binds tighter than `+`/`? :`); both formatters keep
 them, only the comment position differs.
 
-Prettier 3.9 relocates the comment **outside** the parens, before `(`
+Prettier relocates the comment **outside** the parens, before `(`
 (`/* b */ (x + y)!`).
 
 This is symmetric with the trailing case: tsv preserves an operand comment

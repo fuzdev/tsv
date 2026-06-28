@@ -6,7 +6,7 @@ comment where the author wrote it — inside the parens. The parens are
 required: `!` binds tighter than `+`/`? :`, so `x + y!` means `x + (y!)`.
 Both formatters keep the parens; only the comment position differs.
 
-Prettier 3.9 relocates the comment **outside** the parens, between `)` and
+Prettier relocates the comment **outside** the parens, between `)` and
 `!` (`(x + y) /* c */!`).
 
 Reason: comment preservation. See

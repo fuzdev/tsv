@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 825,
+	"end": 821,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -60,9 +60,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " TSTypeReference return + call body - now expandable too (3.9), sig hugged",
+			"value": " TSTypeReference return + call body - sig hugged, body breaks after =>",
 			"start": 613,
-			"end": 689,
+			"end": 685,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -70,7 +70,7 @@
 				},
 				"end": {
 					"line": 23,
-					"column": 77
+					"column": 73
 				}
 			}
 		}
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 824,
+		"end": 820,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 815,
+			"end": 811,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -1036,8 +1036,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 691,
-					"end": 814,
+					"start": 687,
+					"end": 810,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -1051,8 +1051,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 697,
-							"end": 813,
+							"start": 693,
+							"end": 809,
 							"loc": {
 								"start": {
 									"line": 24,
@@ -1065,8 +1065,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 697,
-								"end": 698,
+								"start": 693,
+								"end": 694,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -1081,8 +1081,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 701,
-								"end": 813,
+								"start": 697,
+								"end": 809,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -1096,8 +1096,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 705,
-										"end": 810,
+										"start": 701,
+										"end": 806,
 										"loc": {
 											"start": {
 												"line": 25,
@@ -1113,8 +1113,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 705,
-											"end": 754,
+											"start": 701,
+											"end": 750,
 											"loc": {
 												"start": {
 													"line": 25,
@@ -1129,8 +1129,8 @@
 										},
 										"value": {
 											"type": "CallExpression",
-											"start": 756,
-											"end": 810,
+											"start": 752,
+											"end": 806,
 											"loc": {
 												"start": {
 													"line": 25,
@@ -1143,8 +1143,8 @@
 											},
 											"callee": {
 												"type": "Identifier",
-												"start": 756,
-												"end": 758,
+												"start": 752,
+												"end": 754,
 												"loc": {
 													"start": {
 														"line": 25,
@@ -1160,8 +1160,8 @@
 											"arguments": [
 												{
 													"type": "ArrowFunctionExpression",
-													"start": 759,
-													"end": 806,
+													"start": 755,
+													"end": 802,
 													"loc": {
 														"start": {
 															"line": 25,
@@ -1174,8 +1174,8 @@
 													},
 													"returnType": {
 														"type": "TSTypeAnnotation",
-														"start": 770,
-														"end": 784,
+														"start": 766,
+														"end": 780,
 														"loc": {
 															"start": {
 																"line": 25,
@@ -1188,8 +1188,8 @@
 														},
 														"typeAnnotation": {
 															"type": "TSTypeReference",
-															"start": 772,
-															"end": 784,
+															"start": 768,
+															"end": 780,
 															"loc": {
 																"start": {
 																	"line": 25,
@@ -1202,8 +1202,8 @@
 															},
 															"typeName": {
 																"type": "Identifier",
-																"start": 772,
-																"end": 779,
+																"start": 768,
+																"end": 775,
 																"loc": {
 																	"start": {
 																		"line": 25,
@@ -1218,8 +1218,8 @@
 															},
 															"typeArguments": {
 																"type": "TSTypeParameterInstantiation",
-																"start": 779,
-																"end": 784,
+																"start": 775,
+																"end": 780,
 																"loc": {
 																	"start": {
 																		"line": 25,
@@ -1233,8 +1233,8 @@
 																"params": [
 																	{
 																		"type": "TSAnyKeyword",
-																		"start": 780,
-																		"end": 783,
+																		"start": 776,
+																		"end": 779,
 																		"loc": {
 																			"start": {
 																				"line": 25,
@@ -1257,8 +1257,8 @@
 													"params": [
 														{
 															"type": "Identifier",
-															"start": 760,
-															"end": 769,
+															"start": 756,
+															"end": 765,
 															"loc": {
 																"start": {
 																	"line": 25,
@@ -1272,8 +1272,8 @@
 															"name": "x",
 															"typeAnnotation": {
 																"type": "TSTypeAnnotation",
-																"start": 761,
-																"end": 769,
+																"start": 757,
+																"end": 765,
 																"loc": {
 																	"start": {
 																		"line": 25,
@@ -1286,8 +1286,8 @@
 																},
 																"typeAnnotation": {
 																	"type": "TSStringKeyword",
-																	"start": 763,
-																	"end": 769,
+																	"start": 759,
+																	"end": 765,
 																	"loc": {
 																		"start": {
 																			"line": 25,
@@ -1304,8 +1304,8 @@
 													],
 													"body": {
 														"type": "CallExpression",
-														"start": 791,
-														"end": 806,
+														"start": 787,
+														"end": 802,
 														"loc": {
 															"start": {
 																"line": 26,
@@ -1318,8 +1318,8 @@
 														},
 														"callee": {
 															"type": "Identifier",
-															"start": 791,
-															"end": 795,
+															"start": 787,
+															"end": 791,
 															"loc": {
 																"start": {
 																	"line": 26,
@@ -1335,8 +1335,8 @@
 														"arguments": [
 															{
 																"type": "Identifier",
-																"start": 796,
-																"end": 805,
+																"start": 792,
+																"end": 801,
 																"loc": {
 																	"start": {
 																		"line": 26,
@@ -1366,9 +1366,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " TSTypeReference return + call body - now expandable too (3.9), sig hugged",
+							"value": " TSTypeReference return + call body - sig hugged, body breaks after =>",
 							"start": 613,
-							"end": 689
+							"end": 685
 						}
 					]
 				}

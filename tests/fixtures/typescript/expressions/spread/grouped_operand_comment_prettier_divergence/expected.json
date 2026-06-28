@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 185,
+	"end": 152,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " binary operand in an array spread — parens kept by both formatters",
+			"value": " binary operand in an array spread",
 			"start": 10,
-			"end": 79,
+			"end": 46,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 70
+					"column": 37
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 102,
-			"end": 109,
+			"start": 69,
+			"end": 76,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " binary operand in a call spread",
-			"start": 115,
-			"end": 149,
+			"start": 82,
+			"end": 116,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -61,8 +61,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 164,
-			"end": 171,
+			"start": 131,
+			"end": 138,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 184,
+		"end": 151,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 175,
+			"end": 142,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -97,8 +97,8 @@
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 81,
-					"end": 112,
+					"start": 48,
+					"end": 79,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -112,8 +112,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 87,
-							"end": 111,
+							"start": 54,
+							"end": 78,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -126,8 +126,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 87,
-								"end": 88,
+								"start": 54,
+								"end": 55,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -142,8 +142,8 @@
 							},
 							"init": {
 								"type": "ArrayExpression",
-								"start": 91,
-								"end": 111,
+								"start": 58,
+								"end": 78,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -157,8 +157,8 @@
 								"elements": [
 									{
 										"type": "SpreadElement",
-										"start": 92,
-										"end": 110,
+										"start": 59,
+										"end": 77,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -171,8 +171,8 @@
 										},
 										"argument": {
 											"type": "BinaryExpression",
-											"start": 96,
-											"end": 101,
+											"start": 63,
+											"end": 68,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -185,8 +185,8 @@
 											},
 											"left": {
 												"type": "Identifier",
-												"start": 96,
-												"end": 97,
+												"start": 63,
+												"end": 64,
 												"loc": {
 													"start": {
 														"line": 3,
@@ -202,8 +202,8 @@
 											"operator": "+",
 											"right": {
 												"type": "Identifier",
-												"start": 100,
-												"end": 101,
+												"start": 67,
+												"end": 68,
 												"loc": {
 													"start": {
 														"line": 3,
@@ -220,8 +220,8 @@
 												{
 													"type": "Block",
 													"value": " c ",
-													"start": 102,
-													"end": 109
+													"start": 69,
+													"end": 76
 												}
 											]
 										}
@@ -234,16 +234,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " binary operand in an array spread — parens kept by both formatters",
+							"value": " binary operand in an array spread",
 							"start": 10,
-							"end": 79
+							"end": 46
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 151,
-					"end": 174,
+					"start": 118,
+					"end": 141,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -256,8 +256,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 151,
-						"end": 173,
+						"start": 118,
+						"end": 140,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -270,8 +270,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 151,
-							"end": 153,
+							"start": 118,
+							"end": 120,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -287,8 +287,8 @@
 						"arguments": [
 							{
 								"type": "SpreadElement",
-								"start": 154,
-								"end": 172,
+								"start": 121,
+								"end": 139,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -301,8 +301,8 @@
 								},
 								"argument": {
 									"type": "BinaryExpression",
-									"start": 158,
-									"end": 163,
+									"start": 125,
+									"end": 130,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -315,8 +315,8 @@
 									},
 									"left": {
 										"type": "Identifier",
-										"start": 158,
-										"end": 159,
+										"start": 125,
+										"end": 126,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -332,8 +332,8 @@
 									"operator": "+",
 									"right": {
 										"type": "Identifier",
-										"start": 162,
-										"end": 163,
+										"start": 129,
+										"end": 130,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -350,8 +350,8 @@
 										{
 											"type": "Block",
 											"value": " c ",
-											"start": 164,
-											"end": 171
+											"start": 131,
+											"end": 138
 										}
 									]
 								}
@@ -363,8 +363,8 @@
 						{
 							"type": "Line",
 							"value": " binary operand in a call spread",
-							"start": 115,
-							"end": 149
+							"start": 82,
+							"end": 116
 						}
 					]
 				}

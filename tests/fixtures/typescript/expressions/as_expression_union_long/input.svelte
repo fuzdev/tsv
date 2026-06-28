@@ -1,6 +1,6 @@
 <script lang="ts">
 	// union as-cast at the print-width boundary (100) stays inline
-	const a = value as Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb;
+	const a = value as Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb;
 
 	// one char over the boundary (101): break after `as`, union stays inline on the next line
 	const b = value as

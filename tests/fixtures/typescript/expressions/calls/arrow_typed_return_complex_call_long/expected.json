@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 496,
+	"end": 503,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,7 +12,7 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " TSTypeReference return + complex call body in chain: now expandable (3.9), sig hugged",
+			"value": " TSTypeReference return + complex call body in chain: sig hugged, body breaks after =>",
 			"start": 20,
 			"end": 108,
 			"loc": {
@@ -28,9 +28,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " Keyword return + complex call body in chain: IS expandable, sig hugged",
+			"value": " Keyword return + complex call body in chain: sig hugged, body breaks after =>",
 			"start": 258,
-			"end": 331,
+			"end": 338,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -38,7 +38,7 @@
 				},
 				"end": {
 					"line": 9,
-					"column": 74
+					"column": 81
 				}
 			}
 		}
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 495,
+		"end": 502,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 486,
+			"end": 493,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -480,7 +480,7 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " TSTypeReference return + complex call body in chain: now expandable (3.9), sig hugged",
+							"value": " TSTypeReference return + complex call body in chain: sig hugged, body breaks after =>",
 							"start": 20,
 							"end": 108
 						}
@@ -488,8 +488,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 333,
-					"end": 485,
+					"start": 340,
+					"end": 492,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -503,8 +503,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 339,
-							"end": 484,
+							"start": 346,
+							"end": 491,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -517,8 +517,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 339,
-								"end": 340,
+								"start": 346,
+								"end": 347,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -533,8 +533,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 343,
-								"end": 484,
+								"start": 350,
+								"end": 491,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -548,8 +548,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 347,
-										"end": 481,
+										"start": 354,
+										"end": 488,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -565,8 +565,8 @@
 										"computed": false,
 										"key": {
 											"type": "Identifier",
-											"start": 347,
-											"end": 384,
+											"start": 354,
+											"end": 391,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -581,8 +581,8 @@
 										},
 										"value": {
 											"type": "CallExpression",
-											"start": 386,
-											"end": 481,
+											"start": 393,
+											"end": 488,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -595,8 +595,8 @@
 											},
 											"callee": {
 												"type": "MemberExpression",
-												"start": 386,
-												"end": 396,
+												"start": 393,
+												"end": 403,
 												"loc": {
 													"start": {
 														"line": 11,
@@ -609,8 +609,8 @@
 												},
 												"object": {
 													"type": "Identifier",
-													"start": 386,
-													"end": 389,
+													"start": 393,
+													"end": 396,
 													"loc": {
 														"start": {
 															"line": 11,
@@ -625,8 +625,8 @@
 												},
 												"property": {
 													"type": "Identifier",
-													"start": 390,
-													"end": 396,
+													"start": 397,
+													"end": 403,
 													"loc": {
 														"start": {
 															"line": 11,
@@ -645,8 +645,8 @@
 											"arguments": [
 												{
 													"type": "ArrowFunctionExpression",
-													"start": 397,
-													"end": 477,
+													"start": 404,
+													"end": 484,
 													"loc": {
 														"start": {
 															"line": 11,
@@ -659,8 +659,8 @@
 													},
 													"returnType": {
 														"type": "TSTypeAnnotation",
-														"start": 408,
-														"end": 414,
+														"start": 415,
+														"end": 421,
 														"loc": {
 															"start": {
 																"line": 11,
@@ -673,8 +673,8 @@
 														},
 														"typeAnnotation": {
 															"type": "TSVoidKeyword",
-															"start": 410,
-															"end": 414,
+															"start": 417,
+															"end": 421,
 															"loc": {
 																"start": {
 																	"line": 11,
@@ -694,8 +694,8 @@
 													"params": [
 														{
 															"type": "Identifier",
-															"start": 398,
-															"end": 407,
+															"start": 405,
+															"end": 414,
 															"loc": {
 																"start": {
 																	"line": 11,
@@ -709,8 +709,8 @@
 															"name": "x",
 															"typeAnnotation": {
 																"type": "TSTypeAnnotation",
-																"start": 399,
-																"end": 407,
+																"start": 406,
+																"end": 414,
 																"loc": {
 																	"start": {
 																		"line": 11,
@@ -723,8 +723,8 @@
 																},
 																"typeAnnotation": {
 																	"type": "TSStringKeyword",
-																	"start": 401,
-																	"end": 407,
+																	"start": 408,
+																	"end": 414,
 																	"loc": {
 																		"start": {
 																			"line": 11,
@@ -741,8 +741,8 @@
 													],
 													"body": {
 														"type": "CallExpression",
-														"start": 421,
-														"end": 477,
+														"start": 428,
+														"end": 484,
 														"loc": {
 															"start": {
 																"line": 12,
@@ -755,8 +755,8 @@
 														},
 														"callee": {
 															"type": "Identifier",
-															"start": 421,
-															"end": 449,
+															"start": 428,
+															"end": 456,
 															"loc": {
 																"start": {
 																	"line": 12,
@@ -772,8 +772,8 @@
 														"arguments": [
 															{
 																"type": "ObjectExpression",
-																"start": 450,
-																"end": 476,
+																"start": 457,
+																"end": 483,
 																"loc": {
 																	"start": {
 																		"line": 12,
@@ -787,8 +787,8 @@
 																"properties": [
 																	{
 																		"type": "Property",
-																		"start": 452,
-																		"end": 474,
+																		"start": 459,
+																		"end": 481,
 																		"loc": {
 																			"start": {
 																				"line": 12,
@@ -804,8 +804,8 @@
 																		"computed": false,
 																		"key": {
 																			"type": "Identifier",
-																			"start": 452,
-																			"end": 455,
+																			"start": 459,
+																			"end": 462,
 																			"loc": {
 																				"start": {
 																					"line": 12,
@@ -820,8 +820,8 @@
 																		},
 																		"value": {
 																			"type": "Identifier",
-																			"start": 457,
-																			"end": 474,
+																			"start": 464,
+																			"end": 481,
 																			"loc": {
 																				"start": {
 																					"line": 12,
@@ -855,9 +855,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Keyword return + complex call body in chain: IS expandable, sig hugged",
+							"value": " Keyword return + complex call body in chain: sig hugged, body breaks after =>",
 							"start": 258,
-							"end": 331
+							"end": 338
 						}
 					]
 				}

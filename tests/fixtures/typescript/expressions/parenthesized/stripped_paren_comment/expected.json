@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 192,
+	"end": 159,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " assignment trailing comment trails after the semicolon (matches prettier 3.9)",
+			"value": " assignment trailing comment trails after the semicolon",
 			"start": 10,
-			"end": 90,
+			"end": 67,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 81
+					"column": 58
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 99,
-			"end": 106,
+			"start": 76,
+			"end": 83,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " leading comment preserved before the expression",
-			"start": 109,
-			"end": 159,
+			"value": " leading comment before the expression",
+			"start": 86,
+			"end": 126,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 51
+					"column": 41
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 171,
-			"end": 178,
+			"start": 138,
+			"end": 145,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -78,12 +78,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 191,
+		"end": 158,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 182,
+			"end": 149,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -97,8 +97,8 @@
 			"body": [
 				{
 					"type": "ExpressionStatement",
-					"start": 92,
-					"end": 98,
+					"start": 69,
+					"end": 75,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -111,8 +111,8 @@
 					},
 					"expression": {
 						"type": "AssignmentExpression",
-						"start": 92,
-						"end": 97,
+						"start": 69,
+						"end": 74,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -126,8 +126,8 @@
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
-							"start": 92,
-							"end": 93,
+							"start": 69,
+							"end": 70,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -142,8 +142,8 @@
 						},
 						"right": {
 							"type": "Identifier",
-							"start": 96,
-							"end": 97,
+							"start": 73,
+							"end": 74,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -160,24 +160,24 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " assignment trailing comment trails after the semicolon (matches prettier 3.9)",
+							"value": " assignment trailing comment trails after the semicolon",
 							"start": 10,
-							"end": 90
+							"end": 67
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " c ",
-							"start": 99,
-							"end": 106
+							"start": 76,
+							"end": 83
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 161,
-					"end": 181,
+					"start": 128,
+					"end": 148,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -191,8 +191,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 167,
-							"end": 180,
+							"start": 134,
+							"end": 147,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -205,8 +205,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 167,
-								"end": 168,
+								"start": 134,
+								"end": 135,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -221,8 +221,8 @@
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 179,
-								"end": 180,
+								"start": 146,
+								"end": 147,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -238,8 +238,8 @@
 									{
 										"type": "Block",
 										"value": " c ",
-										"start": 171,
-										"end": 178
+										"start": 138,
+										"end": 145
 									}
 								]
 							}
@@ -249,9 +249,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " leading comment preserved before the expression",
-							"start": 109,
-							"end": 159
+							"value": " leading comment before the expression",
+							"start": 86,
+							"end": 126
 						}
 					]
 				}

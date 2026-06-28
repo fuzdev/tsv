@@ -1,5 +1,5 @@
 <script lang="ts">
-	// line comment in a non-null grouped operand — kept inside, forcing multiline
+	// line comment in a non-null grouped operand forces the multiline paren layout
 	const a = (
 		x + y // c
 	)!.foo;

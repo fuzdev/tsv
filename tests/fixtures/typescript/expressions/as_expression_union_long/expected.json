@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1348,
+	"end": 1350,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,8 +29,8 @@
 		{
 			"type": "Line",
 			"value": " one char over the boundary (101): break after `as`, union stays inline on the next line",
-			"start": 184,
-			"end": 274,
+			"start": 186,
+			"end": 276,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -45,8 +45,8 @@
 		{
 			"type": "Line",
 			"value": " satisfies breaks its union the same way",
-			"start": 380,
-			"end": 422,
+			"start": 382,
+			"end": 424,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -61,8 +61,8 @@
 		{
 			"type": "Line",
 			"value": " breakable call LHS stays inline; the union is what breaks",
-			"start": 529,
-			"end": 589,
+			"start": 531,
+			"end": 591,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " union pushed to the next line fits at exactly 100: stays inline, no leading pipes",
-			"start": 706,
-			"end": 790,
+			"start": 708,
+			"end": 792,
 			"loc": {
 				"start": {
 					"line": 17,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " union pushed to the next line hits 101: members fully expand, one leading-pipe per line",
-			"start": 912,
-			"end": 1002,
+			"start": 914,
+			"end": 1004,
 			"loc": {
 				"start": {
 					"line": 21,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " satisfies with more members: same full leading-pipe expansion",
-			"start": 1129,
-			"end": 1193,
+			"start": 1131,
+			"end": 1195,
 			"loc": {
 				"start": {
 					"line": 26,
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 1347,
+		"end": 1349,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 1338,
+			"end": 1340,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -146,7 +146,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 85,
-					"end": 181,
+					"end": 183,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -154,14 +154,14 @@
 						},
 						"end": {
 							"line": 3,
-							"column": 97
+							"column": 99
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 91,
-							"end": 180,
+							"end": 182,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -169,7 +169,7 @@
 								},
 								"end": {
 									"line": 3,
-									"column": 96
+									"column": 98
 								}
 							},
 							"id": {
@@ -191,7 +191,7 @@
 							"init": {
 								"type": "TSAsExpression",
 								"start": 95,
-								"end": 180,
+								"end": 182,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -199,7 +199,7 @@
 									},
 									"end": {
 										"line": 3,
-										"column": 96
+										"column": 98
 									}
 								},
 								"expression": {
@@ -221,7 +221,7 @@
 								"typeAnnotation": {
 									"type": "TSUnionType",
 									"start": 104,
-									"end": 180,
+									"end": 182,
 									"loc": {
 										"start": {
 											"line": 3,
@@ -229,14 +229,14 @@
 										},
 										"end": {
 											"line": 3,
-											"column": 96
+											"column": 98
 										}
 									},
 									"types": [
 										{
 											"type": "TSTypeReference",
 											"start": 104,
-											"end": 147,
+											"end": 149,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -244,13 +244,13 @@
 												},
 												"end": {
 													"line": 3,
-													"column": 63
+													"column": 65
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
 												"start": 104,
-												"end": 147,
+												"end": 149,
 												"loc": {
 													"start": {
 														"line": 3,
@@ -258,38 +258,38 @@
 													},
 													"end": {
 														"line": 3,
-														"column": 63
+														"column": 65
 													}
 												},
-												"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+												"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 											}
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 150,
-											"end": 180,
+											"start": 152,
+											"end": 182,
 											"loc": {
 												"start": {
 													"line": 3,
-													"column": 66
+													"column": 68
 												},
 												"end": {
 													"line": 3,
-													"column": 96
+													"column": 98
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 150,
-												"end": 180,
+												"start": 152,
+												"end": 182,
 												"loc": {
 													"start": {
 														"line": 3,
-														"column": 66
+														"column": 68
 													},
 													"end": {
 														"line": 3,
-														"column": 96
+														"column": 98
 													}
 												},
 												"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -312,8 +312,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 276,
-					"end": 377,
+					"start": 278,
+					"end": 379,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -327,8 +327,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 282,
-							"end": 376,
+							"start": 284,
+							"end": 378,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -341,8 +341,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 282,
-								"end": 283,
+								"start": 284,
+								"end": 285,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -357,8 +357,8 @@
 							},
 							"init": {
 								"type": "TSAsExpression",
-								"start": 286,
-								"end": 376,
+								"start": 288,
+								"end": 378,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -371,8 +371,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 286,
-									"end": 291,
+									"start": 288,
+									"end": 293,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -387,8 +387,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 297,
-									"end": 376,
+									"start": 299,
+									"end": 378,
 									"loc": {
 										"start": {
 											"line": 7,
@@ -402,8 +402,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 297,
-											"end": 343,
+											"start": 299,
+											"end": 345,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -416,8 +416,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 297,
-												"end": 343,
+												"start": 299,
+												"end": 345,
 												"loc": {
 													"start": {
 														"line": 7,
@@ -433,8 +433,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 346,
-											"end": 376,
+											"start": 348,
+											"end": 378,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -447,8 +447,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 346,
-												"end": 376,
+												"start": 348,
+												"end": 378,
 												"loc": {
 													"start": {
 														"line": 7,
@@ -472,15 +472,15 @@
 						{
 							"type": "Line",
 							"value": " one char over the boundary (101): break after `as`, union stays inline on the next line",
-							"start": 184,
-							"end": 274
+							"start": 186,
+							"end": 276
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 424,
-					"end": 526,
+					"start": 426,
+					"end": 528,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -494,8 +494,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 430,
-							"end": 525,
+							"start": 432,
+							"end": 527,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -508,8 +508,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 430,
-								"end": 431,
+								"start": 432,
+								"end": 433,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -524,8 +524,8 @@
 							},
 							"init": {
 								"type": "TSSatisfiesExpression",
-								"start": 434,
-								"end": 525,
+								"start": 436,
+								"end": 527,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -538,8 +538,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 434,
-									"end": 439,
+									"start": 436,
+									"end": 441,
 									"loc": {
 										"start": {
 											"line": 10,
@@ -554,8 +554,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 452,
-									"end": 525,
+									"start": 454,
+									"end": 527,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -569,8 +569,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 452,
-											"end": 497,
+											"start": 454,
+											"end": 499,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -583,8 +583,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 452,
-												"end": 497,
+												"start": 454,
+												"end": 499,
 												"loc": {
 													"start": {
 														"line": 11,
@@ -600,8 +600,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 500,
-											"end": 525,
+											"start": 502,
+											"end": 527,
 											"loc": {
 												"start": {
 													"line": 11,
@@ -614,8 +614,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 500,
-												"end": 525,
+												"start": 502,
+												"end": 527,
 												"loc": {
 													"start": {
 														"line": 11,
@@ -639,15 +639,15 @@
 						{
 							"type": "Line",
 							"value": " satisfies breaks its union the same way",
-							"start": 380,
-							"end": 422
+							"start": 382,
+							"end": 424
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 591,
-					"end": 703,
+					"start": 593,
+					"end": 705,
 					"loc": {
 						"start": {
 							"line": 14,
@@ -661,8 +661,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 597,
-							"end": 702,
+							"start": 599,
+							"end": 704,
 							"loc": {
 								"start": {
 									"line": 14,
@@ -675,8 +675,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 597,
-								"end": 598,
+								"start": 599,
+								"end": 600,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -691,8 +691,8 @@
 							},
 							"init": {
 								"type": "TSAsExpression",
-								"start": 601,
-								"end": 702,
+								"start": 603,
+								"end": 704,
 								"loc": {
 									"start": {
 										"line": 14,
@@ -705,8 +705,8 @@
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 601,
-									"end": 623,
+									"start": 603,
+									"end": 625,
 									"loc": {
 										"start": {
 											"line": 14,
@@ -719,8 +719,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 601,
-										"end": 605,
+										"start": 603,
+										"end": 607,
 										"loc": {
 											"start": {
 												"line": 14,
@@ -736,8 +736,8 @@
 									"arguments": [
 										{
 											"type": "ArrayExpression",
-											"start": 606,
-											"end": 622,
+											"start": 608,
+											"end": 624,
 											"loc": {
 												"start": {
 													"line": 14,
@@ -751,8 +751,8 @@
 											"elements": [
 												{
 													"type": "Identifier",
-													"start": 607,
-													"end": 609,
+													"start": 609,
+													"end": 611,
 													"loc": {
 														"start": {
 															"line": 14,
@@ -767,8 +767,8 @@
 												},
 												{
 													"type": "Identifier",
-													"start": 611,
-													"end": 613,
+													"start": 613,
+													"end": 615,
 													"loc": {
 														"start": {
 															"line": 14,
@@ -783,8 +783,8 @@
 												},
 												{
 													"type": "Identifier",
-													"start": 615,
-													"end": 617,
+													"start": 617,
+													"end": 619,
 													"loc": {
 														"start": {
 															"line": 14,
@@ -799,8 +799,8 @@
 												},
 												{
 													"type": "Identifier",
-													"start": 619,
-													"end": 621,
+													"start": 621,
+													"end": 623,
 													"loc": {
 														"start": {
 															"line": 14,
@@ -820,8 +820,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 629,
-									"end": 702,
+									"start": 631,
+									"end": 704,
 									"loc": {
 										"start": {
 											"line": 15,
@@ -835,8 +835,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 629,
-											"end": 674,
+											"start": 631,
+											"end": 676,
 											"loc": {
 												"start": {
 													"line": 15,
@@ -849,8 +849,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 629,
-												"end": 674,
+												"start": 631,
+												"end": 676,
 												"loc": {
 													"start": {
 														"line": 15,
@@ -866,8 +866,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 677,
-											"end": 702,
+											"start": 679,
+											"end": 704,
 											"loc": {
 												"start": {
 													"line": 15,
@@ -880,8 +880,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 677,
-												"end": 702,
+												"start": 679,
+												"end": 704,
 												"loc": {
 													"start": {
 														"line": 15,
@@ -905,15 +905,15 @@
 						{
 							"type": "Line",
 							"value": " breakable call LHS stays inline; the union is what breaks",
-							"start": 529,
-							"end": 589
+							"start": 531,
+							"end": 591
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 792,
-					"end": 909,
+					"start": 794,
+					"end": 911,
 					"loc": {
 						"start": {
 							"line": 18,
@@ -927,8 +927,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 798,
-							"end": 908,
+							"start": 800,
+							"end": 910,
 							"loc": {
 								"start": {
 									"line": 18,
@@ -941,8 +941,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 798,
-								"end": 799,
+								"start": 800,
+								"end": 801,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -957,8 +957,8 @@
 							},
 							"init": {
 								"type": "TSAsExpression",
-								"start": 802,
-								"end": 908,
+								"start": 804,
+								"end": 910,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -971,8 +971,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 802,
-									"end": 807,
+									"start": 804,
+									"end": 809,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -987,8 +987,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 813,
-									"end": 908,
+									"start": 815,
+									"end": 910,
 									"loc": {
 										"start": {
 											"line": 19,
@@ -1002,8 +1002,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 813,
-											"end": 859,
+											"start": 815,
+											"end": 861,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -1016,8 +1016,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 813,
-												"end": 859,
+												"start": 815,
+												"end": 861,
 												"loc": {
 													"start": {
 														"line": 19,
@@ -1033,8 +1033,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 862,
-											"end": 908,
+											"start": 864,
+											"end": 910,
 											"loc": {
 												"start": {
 													"line": 19,
@@ -1047,8 +1047,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 862,
-												"end": 908,
+												"start": 864,
+												"end": 910,
 												"loc": {
 													"start": {
 														"line": 19,
@@ -1072,15 +1072,15 @@
 						{
 							"type": "Line",
 							"value": " union pushed to the next line fits at exactly 100: stays inline, no leading pipes",
-							"start": 706,
-							"end": 790
+							"start": 708,
+							"end": 792
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 1004,
-					"end": 1126,
+					"start": 1006,
+					"end": 1128,
 					"loc": {
 						"start": {
 							"line": 22,
@@ -1094,8 +1094,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 1010,
-							"end": 1125,
+							"start": 1012,
+							"end": 1127,
 							"loc": {
 								"start": {
 									"line": 22,
@@ -1108,8 +1108,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 1010,
-								"end": 1011,
+								"start": 1012,
+								"end": 1013,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -1124,8 +1124,8 @@
 							},
 							"init": {
 								"type": "TSAsExpression",
-								"start": 1014,
-								"end": 1125,
+								"start": 1016,
+								"end": 1127,
 								"loc": {
 									"start": {
 										"line": 22,
@@ -1138,8 +1138,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 1014,
-									"end": 1019,
+									"start": 1016,
+									"end": 1021,
 									"loc": {
 										"start": {
 											"line": 22,
@@ -1154,8 +1154,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 1025,
-									"end": 1125,
+									"start": 1027,
+									"end": 1127,
 									"loc": {
 										"start": {
 											"line": 23,
@@ -1169,8 +1169,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 1027,
-											"end": 1073,
+											"start": 1029,
+											"end": 1075,
 											"loc": {
 												"start": {
 													"line": 23,
@@ -1183,8 +1183,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 1027,
-												"end": 1073,
+												"start": 1029,
+												"end": 1075,
 												"loc": {
 													"start": {
 														"line": 23,
@@ -1200,8 +1200,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 1078,
-											"end": 1125,
+											"start": 1080,
+											"end": 1127,
 											"loc": {
 												"start": {
 													"line": 24,
@@ -1214,8 +1214,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 1078,
-												"end": 1125,
+												"start": 1080,
+												"end": 1127,
 												"loc": {
 													"start": {
 														"line": 24,
@@ -1239,15 +1239,15 @@
 						{
 							"type": "Line",
 							"value": " union pushed to the next line hits 101: members fully expand, one leading-pipe per line",
-							"start": 912,
-							"end": 1002
+							"start": 914,
+							"end": 1004
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 1195,
-					"end": 1337,
+					"start": 1197,
+					"end": 1339,
 					"loc": {
 						"start": {
 							"line": 27,
@@ -1261,8 +1261,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 1201,
-							"end": 1336,
+							"start": 1203,
+							"end": 1338,
 							"loc": {
 								"start": {
 									"line": 27,
@@ -1275,8 +1275,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 1201,
-								"end": 1202,
+								"start": 1203,
+								"end": 1204,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -1291,8 +1291,8 @@
 							},
 							"init": {
 								"type": "TSSatisfiesExpression",
-								"start": 1205,
-								"end": 1336,
+								"start": 1207,
+								"end": 1338,
 								"loc": {
 									"start": {
 										"line": 27,
@@ -1305,8 +1305,8 @@
 								},
 								"expression": {
 									"type": "Identifier",
-									"start": 1205,
-									"end": 1210,
+									"start": 1207,
+									"end": 1212,
 									"loc": {
 										"start": {
 											"line": 27,
@@ -1321,8 +1321,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 1223,
-									"end": 1336,
+									"start": 1225,
+									"end": 1338,
 									"loc": {
 										"start": {
 											"line": 28,
@@ -1336,8 +1336,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 1225,
-											"end": 1249,
+											"start": 1227,
+											"end": 1251,
 											"loc": {
 												"start": {
 													"line": 28,
@@ -1350,8 +1350,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 1225,
-												"end": 1249,
+												"start": 1227,
+												"end": 1251,
 												"loc": {
 													"start": {
 														"line": 28,
@@ -1367,8 +1367,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 1254,
-											"end": 1278,
+											"start": 1256,
+											"end": 1280,
 											"loc": {
 												"start": {
 													"line": 29,
@@ -1381,8 +1381,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 1254,
-												"end": 1278,
+												"start": 1256,
+												"end": 1280,
 												"loc": {
 													"start": {
 														"line": 29,
@@ -1398,8 +1398,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 1283,
-											"end": 1307,
+											"start": 1285,
+											"end": 1309,
 											"loc": {
 												"start": {
 													"line": 30,
@@ -1412,8 +1412,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 1283,
-												"end": 1307,
+												"start": 1285,
+												"end": 1309,
 												"loc": {
 													"start": {
 														"line": 30,
@@ -1429,8 +1429,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 1312,
-											"end": 1336,
+											"start": 1314,
+											"end": 1338,
 											"loc": {
 												"start": {
 													"line": 31,
@@ -1443,8 +1443,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 1312,
-												"end": 1336,
+												"start": 1314,
+												"end": 1338,
 												"loc": {
 													"start": {
 														"line": 31,
@@ -1468,8 +1468,8 @@
 						{
 							"type": "Line",
 							"value": " satisfies with more members: same full leading-pipe expansion",
-							"start": 1129,
-							"end": 1193
+							"start": 1131,
+							"end": 1195
 						}
 					]
 				}

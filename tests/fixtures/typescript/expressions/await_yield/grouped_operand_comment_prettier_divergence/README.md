@@ -7,12 +7,11 @@ required: `await` binds tighter than `+`/`||`/`? :`, so `await x + y` means
 `(await x) + y`. Both formatters keep the parens; only the comment position
 differs.
 
-Prettier 3.9 relocates the comment **outside** the parens, and is
-non-idempotent doing so:
-
-- Trailing: `await (x + y) /* c */` (pass 1), then `await (x + y); /* c */`
-  (pass 2, floats the comment past `;`) — see `audit_signature.txt`
-- Leading: `await /* c */ (x + y)` (comment moved before the parens)
+Prettier relocates the comment **outside** the parens, and is non-idempotent
+doing so: a trailing comment first moves after the parens (`await (x + y) /* c
+*/`) and then, on a second pass, floats past the `;` (`await (x + y); /* c */`
+— see `audit_signature.txt`); a leading comment moves before the parens
+(`await /* c */ (x + y)`).
 
 `yield` is **not** here: `yield` binds looser than `+`, so its parens are
 redundant and both formatters strip them (`yield x + y /* c */`) — a match,

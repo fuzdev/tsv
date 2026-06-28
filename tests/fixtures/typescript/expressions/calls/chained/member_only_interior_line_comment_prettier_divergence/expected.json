@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 651,
+	"end": 282,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " A member-only chain (no calls) with line comments between members: tsv breaks",
+			"value": " Two comments before `.baz`: the first trails `.bar`, the second on its own",
 			"start": 20,
-			"end": 100,
+			"end": 97,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 81
+					"column": 78
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " the chain and keeps each comment where the author wrote it. Prettier instead",
-			"start": 102,
-			"end": 181,
+			"value": " line; the chain breaks at every member.",
+			"start": 99,
+			"end": 141,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,86 +38,22 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 80
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " hoists the own-line comment before the whole expression and trails the rest,",
-			"start": 183,
-			"end": 262,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 80
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " merging consecutive line comments. tsv preserves position (no merge/reverse).",
-			"start": 264,
-			"end": 344,
-			"loc": {
-				"start": {
-					"line": 5,
-					"column": 1
-				},
-				"end": {
-					"line": 5,
-					"column": 81
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " Two comments before `.baz`: the first trails `.bar`, the second gets its own",
-			"start": 347,
-			"end": 426,
-			"loc": {
-				"start": {
-					"line": 7,
-					"column": 1
-				},
-				"end": {
-					"line": 7,
-					"column": 80
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " line. The chain breaks at every member (as it does once a call forces a break).",
-			"start": 428,
-			"end": 510,
-			"loc": {
-				"start": {
-					"line": 8,
-					"column": 1
-				},
-				"end": {
-					"line": 8,
-					"column": 83
+					"column": 43
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 533,
-			"end": 538,
+			"start": 164,
+			"end": 169,
 			"loc": {
 				"start": {
-					"line": 10,
+					"line": 5,
 					"column": 7
 				},
 				"end": {
-					"line": 10,
+					"line": 5,
 					"column": 12
 				}
 			}
@@ -125,15 +61,15 @@
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 541,
-			"end": 546,
+			"start": 172,
+			"end": 177,
 			"loc": {
 				"start": {
-					"line": 11,
+					"line": 6,
 					"column": 2
 				},
 				"end": {
-					"line": 11,
+					"line": 6,
 					"column": 7
 				}
 			}
@@ -141,15 +77,15 @@
 		{
 			"type": "Line",
 			"value": " A single own-line comment before a member.",
-			"start": 557,
-			"end": 602,
+			"start": 188,
+			"end": 233,
 			"loc": {
 				"start": {
-					"line": 14,
+					"line": 9,
 					"column": 1
 				},
 				"end": {
-					"line": 14,
+					"line": 9,
 					"column": 46
 				}
 			}
@@ -157,15 +93,15 @@
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 627,
-			"end": 632,
+			"start": 258,
+			"end": 263,
 			"loc": {
 				"start": {
-					"line": 17,
+					"line": 12,
 					"column": 2
 				},
 				"end": {
-					"line": 17,
+					"line": 12,
 					"column": 7
 				}
 			}
@@ -174,63 +110,63 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 650,
+		"end": 281,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 641,
+			"end": 272,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 19,
+					"line": 14,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 512,
-					"end": 554,
+					"start": 143,
+					"end": 185,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 4,
 							"column": 1
 						},
 						"end": {
-							"line": 12,
+							"line": 7,
 							"column": 7
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 518,
-							"end": 553,
+							"start": 149,
+							"end": 184,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 4,
 									"column": 7
 								},
 								"end": {
-									"line": 12,
+									"line": 7,
 									"column": 6
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 518,
-								"end": 519,
+								"start": 149,
+								"end": 150,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 4,
 										"column": 7
 									},
 									"end": {
-										"line": 9,
+										"line": 4,
 										"column": 8
 									}
 								},
@@ -238,43 +174,43 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 522,
-								"end": 553,
+								"start": 153,
+								"end": 184,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 4,
 										"column": 11
 									},
 									"end": {
-										"line": 12,
+										"line": 7,
 										"column": 6
 									}
 								},
 								"object": {
 									"type": "MemberExpression",
-									"start": 522,
-									"end": 532,
+									"start": 153,
+									"end": 163,
 									"loc": {
 										"start": {
-											"line": 9,
+											"line": 4,
 											"column": 11
 										},
 										"end": {
-											"line": 10,
+											"line": 5,
 											"column": 6
 										}
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 522,
-										"end": 525,
+										"start": 153,
+										"end": 156,
 										"loc": {
 											"start": {
-												"line": 9,
+												"line": 4,
 												"column": 11
 											},
 											"end": {
-												"line": 9,
+												"line": 4,
 												"column": 14
 											}
 										},
@@ -282,15 +218,15 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 529,
-										"end": 532,
+										"start": 160,
+										"end": 163,
 										"loc": {
 											"start": {
-												"line": 10,
+												"line": 5,
 												"column": 3
 											},
 											"end": {
-												"line": 10,
+												"line": 5,
 												"column": 6
 											}
 										},
@@ -302,22 +238,22 @@
 										{
 											"type": "Line",
 											"value": " c1",
-											"start": 533,
-											"end": 538
+											"start": 164,
+											"end": 169
 										}
 									]
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 550,
-									"end": 553,
+									"start": 181,
+									"end": 184,
 									"loc": {
 										"start": {
-											"line": 12,
+											"line": 7,
 											"column": 3
 										},
 										"end": {
-											"line": 12,
+											"line": 7,
 											"column": 6
 										}
 									},
@@ -326,8 +262,8 @@
 										{
 											"type": "Line",
 											"value": " c2",
-											"start": 541,
-											"end": 546
+											"start": 172,
+											"end": 177
 										}
 									]
 								},
@@ -340,82 +276,58 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " A member-only chain (no calls) with line comments between members: tsv breaks",
+							"value": " Two comments before `.baz`: the first trails `.bar`, the second on its own",
 							"start": 20,
-							"end": 100
+							"end": 97
 						},
 						{
 							"type": "Line",
-							"value": " the chain and keeps each comment where the author wrote it. Prettier instead",
-							"start": 102,
-							"end": 181
-						},
-						{
-							"type": "Line",
-							"value": " hoists the own-line comment before the whole expression and trails the rest,",
-							"start": 183,
-							"end": 262
-						},
-						{
-							"type": "Line",
-							"value": " merging consecutive line comments. tsv preserves position (no merge/reverse).",
-							"start": 264,
-							"end": 344
-						},
-						{
-							"type": "Line",
-							"value": " Two comments before `.baz`: the first trails `.bar`, the second gets its own",
-							"start": 347,
-							"end": 426
-						},
-						{
-							"type": "Line",
-							"value": " line. The chain breaks at every member (as it does once a call forces a break).",
-							"start": 428,
-							"end": 510
+							"value": " line; the chain breaks at every member.",
+							"start": 99,
+							"end": 141
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 604,
-					"end": 640,
+					"start": 235,
+					"end": 271,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 18,
+							"line": 13,
 							"column": 7
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 610,
-							"end": 639,
+							"start": 241,
+							"end": 270,
 							"loc": {
 								"start": {
-									"line": 15,
+									"line": 10,
 									"column": 7
 								},
 								"end": {
-									"line": 18,
+									"line": 13,
 									"column": 6
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 610,
-								"end": 611,
+								"start": 241,
+								"end": 242,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 10,
 										"column": 7
 									},
 									"end": {
-										"line": 15,
+										"line": 10,
 										"column": 8
 									}
 								},
@@ -423,43 +335,43 @@
 							},
 							"init": {
 								"type": "MemberExpression",
-								"start": 614,
-								"end": 639,
+								"start": 245,
+								"end": 270,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 10,
 										"column": 11
 									},
 									"end": {
-										"line": 18,
+										"line": 13,
 										"column": 6
 									}
 								},
 								"object": {
 									"type": "MemberExpression",
-									"start": 614,
-									"end": 624,
+									"start": 245,
+									"end": 255,
 									"loc": {
 										"start": {
-											"line": 15,
+											"line": 10,
 											"column": 11
 										},
 										"end": {
-											"line": 16,
+											"line": 11,
 											"column": 6
 										}
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 614,
-										"end": 617,
+										"start": 245,
+										"end": 248,
 										"loc": {
 											"start": {
-												"line": 15,
+												"line": 10,
 												"column": 11
 											},
 											"end": {
-												"line": 15,
+												"line": 10,
 												"column": 14
 											}
 										},
@@ -467,15 +379,15 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 621,
-										"end": 624,
+										"start": 252,
+										"end": 255,
 										"loc": {
 											"start": {
-												"line": 16,
+												"line": 11,
 												"column": 3
 											},
 											"end": {
-												"line": 16,
+												"line": 11,
 												"column": 6
 											}
 										},
@@ -486,15 +398,15 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 636,
-									"end": 639,
+									"start": 267,
+									"end": 270,
 									"loc": {
 										"start": {
-											"line": 18,
+											"line": 13,
 											"column": 3
 										},
 										"end": {
-											"line": 18,
+											"line": 13,
 											"column": 6
 										}
 									},
@@ -503,8 +415,8 @@
 										{
 											"type": "Line",
 											"value": " c1",
-											"start": 627,
-											"end": 632
+											"start": 258,
+											"end": 263
 										}
 									]
 								},
@@ -518,8 +430,8 @@
 						{
 							"type": "Line",
 							"value": " A single own-line comment before a member.",
-							"start": 557,
-							"end": 602
+							"start": 188,
+							"end": 233
 						}
 					]
 				}

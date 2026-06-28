@@ -1,5 +1,5 @@
 <script lang="ts">
-	// leading comment inside the required parens — kept where authored
+	// leading comment inside the required parens
 	const a = /* b */ (x + y)!;
 
 	// ternary operand

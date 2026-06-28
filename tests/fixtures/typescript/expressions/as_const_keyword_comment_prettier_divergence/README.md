@@ -3,22 +3,14 @@
 A comment between the `as` keyword and `const` in a const assertion. tsv keeps it
 where the author wrote it; prettier relocates it.
 
-**Block comment** (`1 as /* c */ const`):
+A **block comment** (`1 as /* c */ const`) stays between `as` and `const` for tsv
+(`1 as /* c */ const;`); prettier moves it before the whole expression
+(`1 /* c */ as const;`).
 
-- **tsv**: `1 as /* c */ const;` — stays between `as` and `const`.
-- **Prettier**: `1 /* c */ as const;` — moved before the whole expression.
-
-**Line comment** (`1 as // c` then `const`):
-
-- **tsv**: kept trailing the keyword, with `const` on the next line (emitting it
-  inline would swallow the `;` — `1 as const // c;`, a content loss):
-
-  ```
-  1 as // c
-  	const;
-  ```
-
-- **Prettier**: `1 as const; // c` — floated out past the statement.
+A **line comment** (`1 as // c` then `const`) trails the keyword for tsv, with
+`const` dropped to the next line — emitting it inline would swallow the `;`
+(`1 as const // c;`, a content loss); prettier floats it out past the statement
+(`1 as const; // c`).
 
 Per Comment Position Philosophy, tsv preserves comment position except around
 pure separators (`;`, `,`); the `as`…`const` gap is not a separator, so the

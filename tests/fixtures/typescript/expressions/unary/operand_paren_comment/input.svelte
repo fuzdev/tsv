@@ -9,14 +9,14 @@
 	!(/* c */ x);
 	typeof (/* c */ x);
 
-	// block comment after a binary/logical operand (redundant parens stripped, matching prettier)
+	// block comment after a binary/logical operand (redundant parens stripped)
 	!(x + y /* c */);
 	!(x || y /* c */);
 
 	// block comment before a binary operand
 	!(/* c */ x + y);
 
-	// assignment and ternary operands keep their parens (both formatters)
+	// assignment and ternary operands keep their parens
 	!((x = y) /* c */);
 	!((a ? b : c) /* c */);
 
