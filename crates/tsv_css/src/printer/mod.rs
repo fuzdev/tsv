@@ -212,6 +212,21 @@ impl<'a> Printer<'a> {
         self.write(&output);
     }
 
+    /// Like `write_arena_doc`, but reserving `suffix_width` columns for the
+    /// punctuation the caller appends after the doc (` {`/`;` after an at-rule
+    /// prelude, `) {`/`,` after a selector). The reservation rides
+    /// `EmbedContext::suffix_width` (read by every group's fit check); fill-based docs
+    /// additionally carry it as the fill's `trailing_reserve` (fills don't read
+    /// `suffix_width`). Shared by the selector and at-rule-prelude writers.
+    pub(crate) fn write_arena_doc_with_suffix(&mut self, d: DocId, suffix_width: usize) {
+        let current_col = self.current_column();
+        let mut embed = self.embed;
+        embed.suffix_width = suffix_width;
+        let output =
+            doc::arena_print_doc_with_indent(self.arena, d, &embed, current_col, self.indent_level);
+        self.write(&output);
+    }
+
     /// Get the formatted output
     pub(crate) fn into_string(self) -> String {
         self.buffer.into_string()

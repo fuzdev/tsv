@@ -7,8 +7,8 @@
 // ## Architecture
 //
 // Doc-first (like `selectors.rs`/`values.rs`): each prelude is built as one doc tree
-// and rendered through the renderer via `write_prelude_doc` (mirroring selectors.rs's
-// `write_selector_doc`), so the wrap decision and emission share a single
+// and rendered through the renderer via the shared `write_arena_doc_with_suffix` (the
+// same writer selectors.rs uses), so the wrap decision and emission share a single
 // representation — no measurement pass to drift from emission. `@supports`/`@container`
 // conditions and the `@media`/`@import` single-query `and`/`or` wrap are `fill`s; the
 // `@media` comma list is a `group`. The one holdout is the `@import` comma-separated
@@ -22,7 +22,7 @@ use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
-use tsv_lang::doc::{self, DocBuf, DocContext, arena::DocId};
+use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 use tsv_lang::source_scan;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
@@ -211,7 +211,7 @@ impl<'a> Printer<'a> {
     fn print_media_prelude(&mut self, content: &str, has_block: bool) {
         let suffix_width = if has_block { " {".len() } else { 0 };
         let doc = self.build_media_prelude_doc(content, suffix_width);
-        self.write_prelude_doc(doc, suffix_width);
+        self.write_arena_doc_with_suffix(doc, suffix_width);
     }
 
     /// Build the doc tree for an `@media` prelude (see `print_media_prelude`).
@@ -338,27 +338,7 @@ impl<'a> Printer<'a> {
             prelude_span,
             suffix_width,
         );
-        self.write_prelude_doc(doc, suffix_width);
-    }
-
-    /// Render an at-rule prelude doc, reserving `suffix_width` columns for the
-    /// punctuation the caller appends after it (` {` for a block, `;` for `@import`).
-    /// The reservation rides `EmbedContext::suffix_width` (read by every group's fit
-    /// check); fill-based preludes additionally carry it as the fill's
-    /// `trailing_reserve` (fills don't read `suffix_width`). Mirrors selectors.rs's
-    /// `write_selector_doc`.
-    fn write_prelude_doc(&mut self, doc: DocId, suffix_width: usize) {
-        let current_col = self.current_column();
-        let mut embed = self.embed;
-        embed.suffix_width = suffix_width;
-        let output = doc::arena_print_doc_with_indent(
-            self.arena,
-            doc,
-            &embed,
-            current_col,
-            self.indent_level,
-        );
-        self.write(&output);
+        self.write_arena_doc_with_suffix(doc, suffix_width);
     }
 
     /// Build the doc tree for an `@supports`/`@container` condition prelude.
@@ -560,7 +540,7 @@ impl<'a> Printer<'a> {
             .collect();
         if normalized.contains("/*") || queries.len() <= 1 {
             let doc = self.build_and_or_wrap_doc(&normalized, 1);
-            self.write_prelude_doc(doc, 1);
+            self.write_arena_doc_with_suffix(doc, 1);
         } else {
             self.print_import_media_query_fill(&queries);
         }

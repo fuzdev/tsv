@@ -9,7 +9,7 @@
 // ## Architecture
 //
 // Doc-first (like `values.rs`): every selector is built as ONE `group`/`indent`/
-// `line`/`softline` doc tree and rendered once via `write_selector_doc`. The
+// `line`/`softline` doc tree and rendered once via `write_arena_doc_with_suffix`. The
 // renderer makes the wrapping decisions, so width measurement and emission share a
 // single representation — there is no separate measurement pass to drift from
 // emission. The list level (the "2+ selectors always break" rule and the
@@ -31,7 +31,7 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::doc::{self, DocBuf, arena::DocId};
+use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan;
 use tsv_lang::{Span, has_comments_in_range};
 
@@ -92,7 +92,7 @@ impl<'a> Printer<'a> {
         }
         if has_comments_in_range(self.comments, list.span.start, list.span.end) {
             let doc = self.build_comma_list_doc(list, false);
-            self.write_selector_doc(doc, SELECTOR_SUFFIX_WIDTH);
+            self.write_arena_doc_with_suffix(doc, SELECTOR_SUFFIX_WIDTH);
             return;
         }
         if list.selectors.len() >= 2 {
@@ -123,7 +123,7 @@ impl<'a> Printer<'a> {
         // trailing softline so the closing `)` (written by the caller) lands at the
         // base level when broken. Reserve `) {`-ish via a 3-col suffix.
         let doc = d.group(d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]));
-        self.write_selector_doc(doc, 3);
+        self.write_arena_doc_with_suffix(doc, 3);
     }
 
     /// Build a doc for a selector list joined by `,`-`line` — the nested/forgiving
@@ -140,8 +140,9 @@ impl<'a> Printer<'a> {
     /// (the nested/forgiving form, where the enclosing group decides whether to break
     /// one-per-line) or a literal space (the top-level inline-with-comments form, which
     /// matches prettier by never breaking a comment-bearing list). Leading/trailing
-    /// comments (inside `:is()` parens) are added by the caller via
-    /// `selector_comments_text`, since they sit outside the list span.
+    /// comments (inside `:is()` parens) are added by the caller — `build_pseudo_args_doc`
+    /// via `comment_blocks_in_range` + `wrap_inner_with_comments` — since they sit
+    /// outside the list span.
     fn build_comma_list_doc(&self, list: &internal::SelectorList<'_>, breakable: bool) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
@@ -171,20 +172,7 @@ impl<'a> Printer<'a> {
     /// reserving the trailing `) {`/`,` so an over-width selector breaks.
     fn print_complex_selector(&mut self, complex: &internal::ComplexSelector<'_>) {
         let doc = self.build_complex_selector_doc(complex);
-        self.write_selector_doc(doc, SELECTOR_SUFFIX_WIDTH);
-    }
-
-    /// Render a selector doc, reserving `suffix_width` columns for the punctuation
-    /// the caller appends after it (` {`, `) {`). The reservation rides
-    /// `EmbedContext::suffix_width`, so every group's fit check leaves room for the
-    /// suffix on its line.
-    fn write_selector_doc(&mut self, d: DocId, suffix_width: usize) {
-        let current_col = self.current_column();
-        let mut embed = self.embed;
-        embed.suffix_width = suffix_width;
-        let output =
-            doc::arena_print_doc_with_indent(self.arena, d, &embed, current_col, self.indent_level);
-        self.write(&output);
+        self.write_arena_doc_with_suffix(doc, SELECTOR_SUFFIX_WIDTH);
     }
 
     //
