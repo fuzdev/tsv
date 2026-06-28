@@ -19,7 +19,6 @@ use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::{INDENT, PRINT_WIDTH};
 
-
 /// Build the fluid assignment layout: break after `=` only when the full line
 /// exceeds print_width. Uses indentIfBreak so the RHS is evaluated independently.
 /// Matches Prettier's assignment.js lines 59-67.
@@ -663,9 +662,7 @@ impl<'a> Printer<'a> {
                     // the arrow printer to use the assignment-RHS chain layout.
                     let init_doc = self.build_with_arrow_chain_context(
                         crate::printer::ArrowChainContext::AssignmentRhs,
-                        || {
-                            make_init_doc(self.build_init_value_doc(init, declarator.span.end))
-                        },
+                        || make_init_doc(self.build_init_value_doc(init, declarator.span.end)),
                     );
                     parts.push(build_fluid_assignment_doc(
                         d,

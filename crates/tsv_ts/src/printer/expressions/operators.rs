@@ -1064,7 +1064,11 @@ impl<'a> Printer<'a> {
         if tsv_lang::comments_in_range(self.comments, seq.span.start, trailing_end)
             .any(|c| !c.is_block)
         {
-            return self.build_sequence_doc_with_line_comments(seq, trailing_end, keep_trailing_inside);
+            return self.build_sequence_doc_with_line_comments(
+                seq,
+                trailing_end,
+                keep_trailing_inside,
+            );
         }
 
         let d = self.d();

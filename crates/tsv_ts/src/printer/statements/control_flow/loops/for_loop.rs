@@ -1066,8 +1066,7 @@ impl<'a> Printer<'a> {
             // flat/break on its own width (prettier 3.9 collapses `for (i; c; u)` and
             // trails the comment after `)`). Only comments *inside* the parens (handled
             // in `build_for_header_doc_impl`) or overflow expand the header.
-            let mut parts =
-                vec![self.build_for_header_doc_impl(stmt, keyword_comments)];
+            let mut parts = vec![self.build_for_header_doc_impl(stmt, keyword_comments)];
 
             // Post-header comments. Non-block bodies use Prettier's `adjustClause`
             // (`indent([line, body])`) wrapped with the header in an outer group, so

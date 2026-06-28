@@ -9,7 +9,6 @@
 // - Entity names: `A.B.C`
 
 use super::super::comments_in_range;
-use crate::printer::analysis::has_newline_after_position;
 use super::helpers::{
     should_hug_union_type, type_needs_parens_for_array_element,
     type_needs_parens_for_conditional_check, type_needs_parens_for_conditional_extends,
@@ -19,6 +18,7 @@ use super::{CommentSpacing, Printer};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
+use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::INDENT;
@@ -569,9 +569,9 @@ impl<'a> Printer<'a> {
         // comment, and any line/own-line comment, goes on its own line (and in a
         // single-line source forces the mapped type to break).
         let leading_n = leading_comments.len();
-        let leading_last_inline = leading_comments.last().is_some_and(|c| {
-            c.is_block && !has_newline_after_position(self.source, c.span.end)
-        });
+        let leading_last_inline = leading_comments
+            .last()
+            .is_some_and(|c| c.is_block && !has_newline_after_position(self.source, c.span.end));
         let leading_own_line_end = if leading_last_inline {
             leading_n - 1
         } else {
