@@ -51,7 +51,8 @@ fn sidecar_runtime() -> &'static Runtime {
         // One worker thread is plenty: the sidecars are I/O-bound and each
         // multiplexes its own requests; this thread only drives the actor loops
         // and the stdout/stderr readers.
-        #[allow(clippy::expect_used)] // runtime build fails only on catastrophic OS resource exhaustion, with no recovery path
+        #[allow(clippy::expect_used)]
+        // runtime build fails only on catastrophic OS resource exhaustion, with no recovery path
         Builder::new_multi_thread()
             .worker_threads(1)
             .enable_all()
