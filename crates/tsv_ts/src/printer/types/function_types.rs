@@ -120,7 +120,7 @@ impl<'a> Printer<'a> {
         // keep the match-on-original fall-through below.
         let value_type = self.unwrap_redundant_parens(return_type.type_annotation);
         if let TSType::Union(u) = value_type {
-            let type_doc = self.build_union_type_doc(u, false);
+            let type_doc = self.build_union_type_doc(u);
             return d.concat(&[
                 d.text_owned(format!("{sp}=>")),
                 hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
@@ -351,25 +351,20 @@ impl<'a> Printer<'a> {
             && self.has_comments_between(paren_pos + 1, close_pos)
         {
             // A line comment can't stay inline inside `()` — it would swallow the
-            // `)`. Keep it trailing the `(` (open-delimiter divergence: prettier
-            // floats it out after `)`) and drop `)` to the next line. Block
-            // comments stay inline, matching prettier.
+            // `)`. With no parameter to lead, prettier 3.9 (#18623) drops the
+            // comment to its own indented line and breaks the `()`; tsv matches.
+            // (Contrast a *non-empty* list, where a line comment trailing `(`
+            // stays on the `(` line via the open-delimiter divergence
+            // `delimiter_line_comment_prefix` — that path doesn't reach here.)
+            // Block comments stay inline (`(/* c */)`), matching prettier.
             if self.has_line_comments_between(paren_pos + 1, close_pos) {
-                let (prefix, pull_pos) = self.delimiter_line_comment_prefix(paren_pos, close_pos);
-                let mut parts = vec![d.text("(")];
-                parts.extend(prefix);
-                // Comments not pulled onto the `(` line (own-line) keep their lines.
                 let mut inner = DocBuf::new();
                 for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
-                    if pull_pos.is_some_and(|p| self.comment_on_delimiter_line(p, comment)) {
-                        continue;
-                    }
                     inner.push(d.hardline());
                     inner.push(self.build_comment_doc(comment));
                 }
-                if !inner.is_empty() {
-                    parts.push(d.indent(d.concat(&inner)));
-                }
+                let mut parts = vec![d.text("(")];
+                parts.push(d.indent(d.concat(&inner)));
                 parts.push(d.hardline());
                 parts.push(d.text(")"));
                 return d.concat(&parts);

@@ -219,7 +219,7 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression<'_>,
     ) -> DocId {
         if arr.elements.is_empty() {
-            return self.build_empty_brackets_with_comments_doc(arr.span);
+            return self.build_empty_brackets_inline_with_comments_doc(arr.span);
         }
 
         // Check for comments that force expansion: line comments (can't be inline),

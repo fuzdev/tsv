@@ -5,7 +5,7 @@
 	// Comment after comma (leading on second element)
 	const b = [A, /* c2 */ B];
 
-	// Both patterns combined - the bug
+	// Both patterns combined
 	const c = [A /* c1 */, /* c2 */ B];
 
 	// Leading on first element
@@ -48,9 +48,7 @@
 	const k = [A, B /* before close */];
 
 	// Empty array with comment
-	const l = [
-		/* inside empty */
-	];
+	const l = [/* inside empty */];
 
 	// Spread with comments
 	const m = [A, /* before spread */ ...B];

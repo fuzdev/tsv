@@ -105,7 +105,12 @@ impl<'a> Printer<'a> {
         let argument_doc = if leading_comments_opt.is_some() || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
             let inner = self.build_expression_doc(unary.argument);
-            let needs_paren_wrap = self.needs_parens(unary.argument, ParenContext::UnaryArgument);
+            // The outer comment-holder parens already group the operand, so the inner
+            // needs_parens layer is redundant for a binary/logical operand — prettier
+            // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their
+            // parens for clarity in both formatters, so leave those untouched.
+            let needs_paren_wrap = self.needs_parens(unary.argument, ParenContext::UnaryArgument)
+                && !matches!(unary.argument, Expression::BinaryExpression(_));
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {
@@ -924,13 +929,25 @@ impl<'a> Printer<'a> {
         let has_trailing_comments = self.has_comments_between(argument_end, await_expr.span.end);
 
         let argument_doc = if comments_opt.is_some() || has_trailing_comments {
+            // The grouping parens are required when the operand needs them (`await`
+            // binds tighter than a binary/ternary operand, so `await x + y` is
+            // `(await x) + y`). Keep them, and keep the comment INSIDE them where the
+            // author wrote it — prettier relocates it past `)` (and floats it past `;`
+            // on the next pass); tsv preserves the position. Mirrors `build_spread_doc`.
+            let needs_parens = self.needs_parens(await_expr.argument, ParenContext::AwaitArgument);
             let inner = self.build_expression_doc(await_expr.argument);
             let mut parts = DocBuf::new();
+            if needs_parens {
+                parts.push(d.text("("));
+            }
             if let Some(comments) = comments_opt {
                 parts.push(comments);
             }
             parts.push(inner);
             self.append_trailing_paren_comments(&mut parts, argument_end, await_expr.span.end);
+            if needs_parens {
+                parts.push(d.text(")"));
+            }
             d.concat(&parts)
         } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
             d.concat(&[
@@ -1012,15 +1029,56 @@ impl<'a> Printer<'a> {
     ///
     /// Interior operand comments (between two operands) stay stripped + inline on
     /// the comma-gap path below and match prettier — see operand_comments.
+    ///
+    /// This is the statement/throw/call-argument default (the comment floats out).
+    /// Value positions (return / variable init / assignment RHS) instead keep the
+    /// last operand's trailing comment INSIDE the parens — see
+    /// [`Self::build_sequence_doc_value`].
     pub(in crate::printer) fn build_sequence_doc(
         &self,
         seq: &internal::SequenceExpression<'_>,
     ) -> DocId {
-        // Line comments inside the sequence need break handling (a forced-multiline
-        // layout) the inline comma-gap path below doesn't do; route those to the
-        // breaking layout so the comment isn't swallowed by the following comma/operand.
-        if comments_in_range(self.comments, seq.span.start, seq.span.end).any(|c| !c.is_block) {
-            return self.build_sequence_doc_with_line_comments(seq);
+        // Float-out path: the last operand's trailing comment is the caller's job
+        // (it lives in the stripped grouping-paren gap, outside `seq.span`), so the
+        // in-sequence trailing scan stops at `seq.span.end`.
+        self.build_sequence_doc_inner(seq, seq.span.end, false)
+    }
+
+    /// Value-position variant: a trailing comment on the last operand stays
+    /// **inside** the parens (`return (a, b /* c */)` / `const x = (a, b // c)`)
+    /// rather than floating out after `)`. Prettier keeps sequence/assignment
+    /// trailing comments inside the added parens in value positions (return arg,
+    /// variable init, assignment RHS) — its #19263 — while floating them out in
+    /// statement / throw / call-argument positions. Callers in value positions use
+    /// this; everything else uses [`Self::build_sequence_doc`].
+    ///
+    /// `trailing_end` is where the stripped grouping `)` sits (the comment between
+    /// the last operand and it must be kept inside) — the caller finds it because
+    /// it falls *outside* `seq.span` (the grouping parens aren't part of the node).
+    pub(in crate::printer) fn build_sequence_doc_value(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+        trailing_end: u32,
+    ) -> DocId {
+        self.build_sequence_doc_inner(seq, trailing_end, true)
+    }
+
+    fn build_sequence_doc_inner(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+        trailing_end: u32,
+        keep_trailing_inside: bool,
+    ) -> DocId {
+        // Line comments anywhere up to `trailing_end` (incl. the last operand's
+        // trailing comment, which lives outside `seq.span` in value positions) need
+        // break handling so the comment isn't swallowed by the following comma/operand
+        // or the closing `)`.
+        if comments_in_range(self.comments, seq.span.start, trailing_end).any(|c| !c.is_block) {
+            return self.build_sequence_doc_with_line_comments(
+                seq,
+                trailing_end,
+                keep_trailing_inside,
+            );
         }
 
         let d = self.d();
@@ -1066,16 +1124,27 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_comments_between(expr_end, comma, CommentSpacing::Leading));
             }
         }
-        parts.push(d.text(")"));
-
-        // Last operand's trailing-edge comments float OUT, after the closing `)`.
-        // Same-line block comments stay inline (`(x, y) /* c */`); own-line block
-        // comments defer via `line_suffix` (`append_trailing_paren_comments`) so
-        // they land past the enclosing comma/semicolon — where they re-parse to,
-        // keeping the float idempotent. Line comments never reach this path (they
-        // route to the legacy layout above).
         let last_end = seq.expressions[n - 1].span().end;
-        self.append_trailing_paren_comments(&mut parts, last_end, seq.span.end);
+        if keep_trailing_inside {
+            // Value position: a same-line block comment stays INSIDE before `)`
+            // (`(a, b /* c */)`). Block-only path, so the comments are blocks. The
+            // comment lives between the last operand and the grouping `)`
+            // (`trailing_end`), outside `seq.span`.
+            for comment in comments_in_range(self.comments, last_end, trailing_end) {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
+            parts.push(d.text(")"));
+        } else {
+            parts.push(d.text(")"));
+            // Last operand's trailing-edge comments float OUT, after the closing `)`.
+            // Same-line block comments stay inline (`(x, y) /* c */`); own-line block
+            // comments defer via `line_suffix` (`append_trailing_paren_comments`) so
+            // they land past the enclosing comma/semicolon — where they re-parse to,
+            // keeping the float idempotent. Line comments never reach this path (they
+            // route to the legacy layout above).
+            self.append_trailing_paren_comments(&mut parts, last_end, seq.span.end);
+        }
 
         d.concat(&parts)
     }
@@ -1116,6 +1185,8 @@ impl<'a> Printer<'a> {
     fn build_sequence_doc_with_line_comments(
         &self,
         seq: &internal::SequenceExpression<'_>,
+        trailing_end: u32,
+        keep_trailing_inside: bool,
     ) -> DocId {
         let d = self.d();
         let n = seq.expressions.len();
@@ -1178,6 +1249,15 @@ impl<'a> Printer<'a> {
                     od.push(self.build_trailing_comment_doc(comment));
                     pos = comment.span.end;
                 }
+            } else if keep_trailing_inside {
+                // Value position: the last operand's trailing comment stays INSIDE the
+                // parens, trailing the operand (`b // c` then `)` on its own line) — a
+                // block inline, a line comment via `line_suffix`. The `softline` before
+                // `)` in the keep-inside assembly below flushes the `line_suffix`. The
+                // comment lives up to the grouping `)` (`trailing_end`), outside `seq.span`.
+                for comment in comments_in_range(self.comments, expr_end, trailing_end) {
+                    od.push(self.build_trailing_comment_doc(comment));
+                }
             }
 
             if i > 0 {
@@ -1185,6 +1265,18 @@ impl<'a> Printer<'a> {
                 inner.push(d.line());
             }
             inner.push(d.concat(&od));
+        }
+
+        if keep_trailing_inside {
+            // Value position: `(\n\ta,\n\tb // c\n)` — operands indented, the trailing
+            // comment kept inside (above). `break_parent` (in `inner`) forces it open.
+            outer.push(d.group(d.concat(&[
+                d.text("("),
+                d.indent(d.concat(&[d.softline(), d.concat(&inner)])),
+                d.softline(),
+                d.text(")"),
+            ])));
+            return d.concat(&outer);
         }
 
         outer.push(d.text("("));

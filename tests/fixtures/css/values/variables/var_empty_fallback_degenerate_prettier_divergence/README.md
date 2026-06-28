@@ -1,26 +1,23 @@
 # var_empty_fallback_degenerate_prettier_divergence
 
 A `var()` whose fallback contains no real token — only commas/whitespace, e.g.
-`var(--a,,)` — collapses to the canonical empty-fallback form `var(--a,)`.
-Per css-syntax-3 the fallback's whitespace is trimmed and a value-less
-`<declaration-value>?` is empty, so every value-less form is the same.
+`var(--a,,)` — has a value-less fallback. Per CSS Syntax 3 the fallback's
+whitespace is trimmed and a value-less `<declaration-value>?` is empty, so the
+canonical form is `var(--a,)`.
 
-Both formatters reach the same stable output (`var(--a,)`); the difference is
-only normalization speed:
-
-tsv: `var(--a,,)` → `var(--a,)` (1 pass, idempotent)
-Prettier: `var(--a,,)` → `var(--a, )` (pass 1) → `var(--a,)` (pass 2)
-
-Prettier is **non-idempotent** here — its first pass leaves a stray space
-(`var(--a, )`) that a second pass removes. tsv normalizes directly to the
-stable form. Not a real-world construct; the `prettier_intermediate_collapse`
-file pins prettier's unstable first-pass form so the fixture audit doesn't flag
-it as novel.
+**tsv** collapses the degenerate fallback to that canonical empty form
+(`var(--a,)`), following the spec. **Prettier** preserves the degenerate comma,
+normalizing only the spacing to `var(--a, ,)` — stable in one pass. So
+`prettier_variant_collapse` is the form prettier keeps stable that tsv normalizes
+to `input`, and `unformatted_ours_collapse` is the messy authoring tsv collapses
+to `input` in one pass.
 
 ## Reason
 
-**Prettier bug** (non-idempotency). tsv normalizes consistently to the fixed
-point in one pass; prettier needs two. See the valid empty-fallback round-trip
-in [var_empty_fallback](../var_empty_fallback/) and
+**Spec compliance**: tsv follows CSS Syntax 3 and collapses the value-less fallback
+to the canonical `var(--a,)`; prettier preserves the degenerate comma. Not a
+real-world construct. The valid empty-fallback round-trip — where tsv and prettier
+agree in one pass — is the regular fixture
+[var_empty_fallback](../var_empty_fallback/). See
 [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values)
 ("var() value-less fallback").

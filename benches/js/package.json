@@ -9,7 +9,7 @@
 		"acorn": "8.16.0",
 		"svelte": "5.56.1",
 		"@sveltejs/acorn-typescript": "1.0.10",
-		"prettier": "3.8.3",
+		"prettier": "3.9.0",
 		"prettier-plugin-svelte": "4.1.1",
 		"@biomejs/js-api": "4.0.0",
 		"@biomejs/wasm-bundler": "2.4.16",

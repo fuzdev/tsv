@@ -18,6 +18,7 @@ use super::{CommentSpacing, Printer};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
+use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::INDENT;
@@ -183,7 +184,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match self.unwrap_redundant_parens(check) {
             TSType::Union(u) if !should_hug_union_type(u) => {
-                let union_doc = self.build_union_type_doc(u, false);
+                let union_doc = self.build_union_type_doc(u);
                 d.group(d.indent(d.concat(&[d.softline(), union_doc])))
             }
             TSType::Intersection(i) => self.intersection_hanging_with_indent(i),
@@ -217,16 +218,22 @@ impl<'a> Printer<'a> {
 
     /// The branch tail of a conditional arm: the separator after `?`/`:` (and
     /// any comments already emitted by the caller) plus the branch itself.
-    /// A redundant-paren union/intersection branch hangs two levels deep —
-    /// matching Prettier's `printBranch` = `indent(print(branch))` layered over
-    /// the arm `indent`: a union puts its leading-pipe members two levels past
-    /// the operator (the `line` in `hang_after_operator` supplies the flat-case
-    /// space and the broken-case break, so the operator sits alone, untrailed);
-    /// an intersection keeps its first member on the operator's line with
-    /// continuations two levels in. Every other branch stays inline after the
-    /// separator. `on_new_line` means a line or multiline block comment ended
-    /// the operator's line (breaking layout only), so the branch starts on a
-    /// fresh line instead — one level in, two for union members.
+    /// Matches Prettier's `printBranch` = `indent(print(branch))` layered over
+    /// the arm `indent`:
+    /// - A **union** branch puts its leading-pipe members ONE level past the
+    ///   operator, with the first member glued to `? `/`: ` — Prettier 3.9's
+    ///   "remove extra indention for union type in conditional type" (#18827):
+    ///   `shouldIndentUnionType` is false for a conditional branch, so
+    ///   `printUnionType` returns the bare `printed = group(members)` and only the
+    ///   `printBranch` indent applies (pre-3.9 added a second `indent([line, …])`,
+    ///   dropping the operator onto its own line with members two levels in).
+    /// - An **intersection** branch keeps its first member on the operator's line
+    ///   with continuations two levels in (unchanged).
+    /// - Every other branch stays inline after the separator.
+    ///
+    /// `on_new_line` means a line or multiline block comment ended the operator's
+    /// line (breaking layout only), so the branch starts on a fresh line instead —
+    /// one level in (the first union member then taking its leading `| `).
     fn build_conditional_branch_tail_doc(
         &self,
         branch_type: &TSType<'_>,
@@ -236,11 +243,17 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match self.unwrap_redundant_parens(branch_type) {
             TSType::Union(u) if !should_hug_union_type(u) => {
-                let union_doc = self.build_union_type_doc(u, false);
+                // `build_union_type_doc` already returns `group(members)` (the bare
+                // `printed`); the branch supplies only one `indent`, so the member
+                // group breaks its continuations one level past the operator.
+                let union_doc = self.build_union_type_doc(u);
                 if on_new_line {
-                    d.indent(d.indent(d.concat(&[d.hardline(), d.group(union_doc)])))
+                    // A comment ended the operator's line; the union starts on a
+                    // fresh line one level in, its first member taking the `| `.
+                    d.indent(d.concat(&[d.hardline(), union_doc]))
                 } else {
-                    d.indent(hang_after_operator(d, union_doc))
+                    // First member glues after the operator's space.
+                    d.concat(&[d.text(" "), d.indent(union_doc)])
                 }
             }
             TSType::Intersection(i) => {
@@ -321,20 +334,20 @@ impl<'a> Printer<'a> {
             if union.types.is_empty() {
                 d.text(" ")
             } else {
-                let mut parts = DocBuf::new();
-                for (i, t) in union.types.iter().enumerate() {
-                    if i > 0 {
-                        parts.push(d.if_break(d.concat(&[d.line(), d.text("| ")]), d.text(" | ")));
-                    } else {
-                        // First type: line() + "| " when broken, space when flat
-                        parts.push(d.if_break(d.concat(&[d.line(), d.text("| ")]), d.text(" ")));
-                    }
-                    parts.push(self.build_type_doc(t));
-                }
+                // Extends-type union: `shouldIndentUnionType` is true (extendsType
+                // is not in the false list), so Prettier wraps the bare
+                // `printed = group(members)` in `group(indent([softline, printed]))`
+                // — break after `extends` onto an indented continuation line where
+                // the member group re-fits before exploding to leading-pipe members
+                // (Prettier 3.9 #18827). `build_union_type_doc` supplies the inner
+                // `group(members)` (with the per-member offset and member-paren rules
+                // the old hand-rolled loop lacked); the `softline` after the `text(" ")`
+                // keeps a single space when flat (the loop double-spaced `extends  A`).
+                let union_doc = self.build_union_type_doc(union);
                 d.concat(&[
                     d.text(" "),
                     comments_after_extends,
-                    d.group(d.indent(d.concat(&parts))),
+                    d.group(d.indent(d.concat(&[d.softline(), union_doc]))),
                 ])
             }
         } else {
@@ -534,14 +547,46 @@ impl<'a> Printer<'a> {
         let content_start = m.span.start + 1; // after `{`
         let param_name_start = m.type_parameter.span.start; // start of `K`
 
-        // Comments between `{` and `K`
-        // - Multiline: go on their own line BEFORE `[`
-        // - Single-line: go inline AFTER `[`
-        let comments_before_mapping: Vec<_> =
-            comments_in_range(self.comments, content_start, param_name_start).collect();
+        // The mapped bracket `[` splits the header comments into two positions:
+        //  - between `{` and `[`: LEADING the mapped type — prettier 3.9 (#18731)
+        //    keeps an inline-authored block comment before `[` (`{ /* c */ [K in T] }`);
+        //  - between `[` and the key: INSIDE the brackets, before the key
+        //    (`{ [/* c */ K in T] }`) — these stay after `[`.
+        let bracket_pos = find_char_skipping_comments(
+            self.source.as_bytes(),
+            content_start as usize,
+            param_name_start as usize,
+            b'[',
+        )
+        .map_or(param_name_start, |p| p as u32);
+        let leading_comments: Vec<_> =
+            comments_in_range(self.comments, content_start, bracket_pos).collect();
+        let bracket_inner_comments: Vec<_> =
+            comments_in_range(self.comments, bracket_pos + 1, param_name_start).collect();
+
+        // Leading comments (before `[`): the node-adjacent (LAST) comment stays
+        // inline iff it's a block comment with no newline after it; every earlier
+        // comment, and any line/own-line comment, goes on its own line (and in a
+        // single-line source forces the mapped type to break).
+        let leading_n = leading_comments.len();
+        let leading_last_inline = leading_comments
+            .last()
+            .is_some_and(|c| c.is_block && !has_newline_after_position(self.source, c.span.end));
+        let leading_own_line_end = if leading_last_inline {
+            leading_n - 1
+        } else {
+            leading_n
+        };
 
         // Build the mapping body (starting from `[`)
         let mut body_parts = smallvec![];
+
+        // The node-adjacent inline block comment leads the body, before the
+        // `readonly` modifier and `[` (prettier: `/* c */ readonly [K in T]`).
+        if leading_last_inline {
+            body_parts.push(self.build_comment_doc(leading_comments[leading_n - 1]));
+            body_parts.push(d.text(" "));
+        }
 
         // readonly modifier: `readonly`, `+readonly`, or `-readonly`
         if let Some(readonly) = m.readonly {
@@ -555,12 +600,11 @@ impl<'a> Printer<'a> {
         // [K in constraint]
         body_parts.push(d.text("["));
 
-        // For single-line: comments go after `[`
-        if !source_is_multiline {
-            for comment in &comments_before_mapping {
-                body_parts.push(self.build_comment_doc(comment));
-                body_parts.push(d.text(" "));
-            }
+        // Comments inside the brackets, before the key (`[/* c */ K in T]`) stay
+        // after `[`, inline ahead of the key.
+        for comment in &bracket_inner_comments {
+            body_parts.push(self.build_comment_doc(comment));
+            body_parts.push(d.text(" "));
         }
 
         body_parts.push(d.symbol(m.type_parameter.name.to_u32()));
@@ -630,6 +674,12 @@ impl<'a> Printer<'a> {
             bracket_close,
             CommentSpacing::Leading,
         ));
+        // A line comment trailing the key constraint (before `]`) must drop `]` to its
+        // own line: emitting `]` inline right after a `//` would swallow it (content
+        // loss). `[K in T // c⏎]` rather than `[K in T // c]`.
+        if self.has_line_comments_between(last_inner_end, bracket_close) {
+            body_parts.push(d.hardline());
+        }
         body_parts.push(d.text("]"));
 
         // optional modifier: `?`, `+?`, or `-?`
@@ -679,7 +729,7 @@ impl<'a> Printer<'a> {
                 // expansion.
                 match self.unwrap_redundant_parens(type_ann) {
                     TSType::Union(u) => {
-                        let type_doc = self.build_union_type_doc(u, false);
+                        let type_doc = self.build_union_type_doc(u);
                         // A hugging union (`{ ... } | null`) without forcing line comments
                         // keeps its inline `: ` since the object owns its own expansion;
                         // everything else hangs after `:` so it breaks to leading `| `
@@ -718,10 +768,11 @@ impl<'a> Printer<'a> {
         }
 
         if source_is_multiline {
-            // Multi-line source: preserve multi-line format with hardlines
-            // Comments before mapping go on their own line
+            // Multi-line source: preserve multi-line format with hardlines.
+            // Own-line leading comments each take their own line before `[`; the
+            // node-adjacent inline block comment (if any) already leads `body_parts`.
             let mut inner_parts: DocBuf = smallvec![];
-            for comment in &comments_before_mapping {
+            for comment in &leading_comments[..leading_own_line_end] {
                 inner_parts.push(d.hardline());
                 inner_parts.push(self.build_comment_doc(comment));
             }
@@ -738,8 +789,14 @@ impl<'a> Printer<'a> {
         } else {
             // One-line source: width-aware (stays inline if fits, wraps if too long).
             // bracketSpacing boundaries: a space when flat (`{ [K in T]: U }`), a
-            // newline when broken.
-            let mut all_parts: DocBuf = smallvec![d.line()];
+            // newline when broken. An own-line leading comment (a line comment, or a
+            // non-adjacent block) forces the break via its `hardline`.
+            let mut all_parts: DocBuf = smallvec![];
+            for comment in &leading_comments[..leading_own_line_end] {
+                all_parts.push(d.hardline());
+                all_parts.push(self.build_comment_doc(comment));
+            }
+            all_parts.push(d.line());
             all_parts.extend(body_parts);
             all_parts.push(d.if_break(d.text(";"), d.empty()));
 
@@ -762,7 +819,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_tuple_type_doc(&self, t: &TSTupleType<'_>) -> DocId {
         let d = self.d();
         if t.element_types.is_empty() {
-            return self.build_empty_brackets_with_comments_doc(t.span);
+            return self.build_empty_brackets_inline_with_comments_doc(t.span);
         }
 
         // Check for comments that force expansion: line comments, multiline block comments,

@@ -1498,16 +1498,12 @@ const comment_position: DivergencePattern = {
 		'typescript/statements/switch/empty_comment_prettier_divergence',
 		'typescript/statements/switch/case_block_comment_prettier_divergence',
 		'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence',
-		'typescript/statements/for/trailing_comment_prettier_divergence',
 		'typescript/statements/for/empty_clauses_comment_prettier_divergence',
 		'typescript/statements/for/of_line_comment_prettier_divergence',
 		'typescript/statements/do_while/open_paren_comment_prettier_divergence',
 		'typescript/statements/try/catch_between_comment_prettier_divergence',
 		'typescript/statements/try/line_comment_absorbed_prettier_divergence',
 		'typescript/statements/labeled/comment_prettier_divergence',
-		'typescript/statements/if/else_block_own_line_comment_prettier_divergence',
-		'typescript/statements/while/line_before_body_comment_prettier_divergence',
-		'typescript/statements/while/absorbed_body_comment_prettier_divergence',
 		'typescript/statements/do_while/line_before_while_comment_prettier_divergence',
 		// TypeScript chain comments
 		'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence',
@@ -1545,8 +1541,6 @@ const comment_position: DivergencePattern = {
 		'typescript/expressions/calls/type_args_open_angle_comment_prettier_divergence',
 		// Retained parenthesized union member: block comment kept inside the parens
 		'typescript/types/union_intersection_retained_paren_comment_prettier_divergence',
-		// Retained parenthesized union member: line comment kept inside (forces expansion)
-		'typescript/types/union_intersection_retained_paren_line_comment_prettier_divergence',
 		// Retained parenthesized union FIRST member: leading line comment kept inside the parens
 		'typescript/types/union_intersection_retained_paren_leading_line_comment_prettier_divergence',
 		// Retained parenthesized intersection member: block comment kept inside the parens

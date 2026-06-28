@@ -602,10 +602,15 @@ impl<'a> PartitionedComments<'a> {
         arg_end: u32,
         next_arg_start: u32,
     ) -> bool {
+        let comma_after = find_comma_pos(source, arg_end, next_arg_start).map(|c| c as u32 + 1);
         let check_start = if let Some(last) = self.trailing_line.last() {
-            last.span.end
+            // A line comment trailing the arg before its comma (`a // c⏎,⏎b`) ends on
+            // an earlier line than the comma, which sits on its own line. Scanning from
+            // the comment's end would straddle the comma's line and miscount it as a
+            // blank line, so start after whichever of (comment end, comma) is later.
+            comma_after.map_or(last.span.end, |c| last.span.end.max(c))
         } else {
-            find_comma_pos(source, arg_end, next_arg_start).map_or(arg_end, |c| c as u32 + 1)
+            comma_after.unwrap_or(arg_end)
         };
         let check_end = if !self.leading.is_empty() {
             self.leading[0].span.start

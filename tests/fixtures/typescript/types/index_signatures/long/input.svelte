@@ -2,11 +2,7 @@
 	// Long value type - wraps union across lines (exceeds 100 chars)
 	type LongValue = {
 		[key: string]:
-			| VeryLongTypeName
-			| AnotherLongTypeName
-			| ExtraLongTypeName
-			| MoreTypesHere
-			| EvenMoreTypes;
+			VeryLongTypeName | AnotherLongTypeName | ExtraLongTypeName | MoreTypesHere | EvenMoreTypes;
 	};
 
 	// Short value type - stays on one line (under 100 chars)
@@ -15,30 +11,20 @@
 	// Long readonly - wraps when exceeds 100 chars
 	type LongReadonly = {
 		readonly [key: string]:
-			| VeryLongTypeName
-			| AnotherLongTypeName
-			| ExtraLongTypeName
-			| MoreTypesNow;
+			VeryLongTypeName | AnotherLongTypeName | ExtraLongTypeName | MoreTypesNow;
 	};
 
 	// Long mixed - properties with long index signature value
 	type LongMixed = {
 		name: string;
 		[key: string]:
-			| VeryLongTypeName
-			| AnotherLongTypeName
-			| ThirdLongTypeName
-			| FourthLongType
-			| FifthLongType;
+			VeryLongTypeName | AnotherLongTypeName | ThirdLongTypeName | FourthLongType | FifthLongType;
 	};
 
 	// Long number index - wraps value type (exceeds 100 chars)
 	type LongNumIndex = {
 		[idx: number]:
-			| VeryLongTypeName
-			| AnotherLongTypeName
-			| ExtraLongTypeName
-			| MoreTypesNowHereNowX;
+			VeryLongTypeName | AnotherLongTypeName | ExtraLongTypeName | MoreTypesNowHereNowX;
 	};
 
 	// Long key type - brackets wrap to separate lines (exceeds 100 chars)

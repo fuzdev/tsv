@@ -16,12 +16,6 @@
 
 		// Union type - 101 chars (wraps)
 		property:
-			| string
-			| number
-			| boolean
-			| null
-			| undefined
-			| object
-			| symbolAAAAAAAAAAAAAAAAAAAAAAAA;
+			string | number | boolean | null | undefined | object | symbolAAAAAAAAAAAAAAAAAAAAAAAA;
 	}
 </script>

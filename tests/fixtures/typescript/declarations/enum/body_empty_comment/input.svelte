@@ -3,7 +3,5 @@
 		// line comment
 	}
 
-	enum B {
-		/* block comment */
-	}
+	enum B {/* block comment */}
 </script>

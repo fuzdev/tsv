@@ -45,48 +45,48 @@
 		{
 			"type": "Block",
 			"value": " ; ",
-			"start": 156,
-			"end": 163,
+			"start": 157,
+			"end": 164,
 			"loc": {
 				"start": {
 					"line": 5,
-					"column": 15
+					"column": 16
 				},
 				"end": {
 					"line": 5,
-					"column": 22
+					"column": 23
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " mid ",
-			"start": 164,
-			"end": 173,
+			"start": 165,
+			"end": 174,
 			"loc": {
 				"start": {
 					"line": 5,
-					"column": 23
+					"column": 24
 				},
 				"end": {
 					"line": 5,
-					"column": 32
+					"column": 33
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " x; ",
-			"start": 211,
-			"end": 219,
+			"start": 212,
+			"end": 220,
 			"loc": {
 				"start": {
 					"line": 9,
-					"column": 14
+					"column": 15
 				},
 				"end": {
 					"line": 9,
-					"column": 22
+					"column": 23
 				}
 			}
 		}
@@ -163,7 +163,7 @@
 							{
 								"type": "ReturnStatement",
 								"start": 143,
-								"end": 174,
+								"end": 156,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -171,7 +171,7 @@
 									},
 									"end": {
 										"line": 5,
-										"column": 33
+										"column": 15
 									}
 								},
 								"argument": {
@@ -220,22 +220,20 @@
 											}
 										},
 										"name": "b"
-									},
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " ; ",
-											"start": 156,
-											"end": 163
-										}
-									]
+									}
 								},
 								"trailingComments": [
 									{
 										"type": "Block",
+										"value": " ; ",
+										"start": 157,
+										"end": 164
+									},
+									{
+										"type": "Block",
 										"value": " mid ",
-										"start": 164,
-										"end": 173
+										"start": 165,
+										"end": 174
 									}
 								]
 							}
@@ -308,7 +306,7 @@
 							{
 								"type": "ThrowStatement",
 								"start": 199,
-								"end": 220,
+								"end": 211,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -316,7 +314,7 @@
 									},
 									"end": {
 										"line": 9,
-										"column": 23
+										"column": 14
 									}
 								},
 								"argument": {
@@ -365,16 +363,16 @@
 											}
 										},
 										"name": "b"
-									},
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " x; ",
-											"start": 211,
-											"end": 219
-										}
-									]
-								}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " x; ",
+										"start": 212,
+										"end": 220
+									}
+								]
 							}
 						]
 					}

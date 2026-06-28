@@ -1,7 +1,7 @@
 <script lang="ts">
-	// Method signature with leading union return type in nested object type
-	// Bug: at 2+ levels of nesting, our formatter keeps "=> |" on same line
-	// and fails to properly indent the second union member
+	// Method signature with a union return type in a nested object type.
+	// The union breaks after `=>` onto an indented continuation line and only
+	// stays inline when it fits.
 
 	// At exactly 100 chars - union stays inline (no wrapping needed)
 	type T100 = {
@@ -12,14 +12,13 @@
 		};
 	};
 
-	// At 101 chars - union wraps to leading form (THIS IS THE BUG)
+	// At 101 chars - union breaks after `=>` to an indented continuation line
 	type T101 = {
 		a?: {
 			b?: (
 				c: D
 			) =>
-				| Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee['f']
-				| Promise<Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee['f']>;
+				Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee['f'] | Promise<Eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee['f']>;
 		};
 	};
 </script>

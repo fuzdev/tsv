@@ -3,7 +3,7 @@
 		expr;
 	}
 
-	for (; cond; ) {
+	for (; cond;) {
 		expr;
 	}
 

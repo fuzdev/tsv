@@ -29,16 +29,16 @@
 		{
 			"type": "Block",
 			"value": " comment ",
-			"start": 89,
-			"end": 102,
+			"start": 90,
+			"end": 103,
 			"loc": {
 				"start": {
 					"line": 4,
-					"column": 9
+					"column": 10
 				},
 				"end": {
 					"line": 4,
-					"column": 22
+					"column": 23
 				}
 			}
 		},
@@ -275,7 +275,7 @@
 							{
 								"type": "ReturnStatement",
 								"start": 82,
-								"end": 103,
+								"end": 89,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -283,7 +283,7 @@
 									},
 									"end": {
 										"line": 4,
-										"column": 23
+										"column": 9
 									}
 								},
 								"argument": null,
@@ -291,8 +291,8 @@
 									{
 										"type": "Block",
 										"value": " comment ",
-										"start": 89,
-										"end": 102
+										"start": 90,
+										"end": 103
 									}
 								]
 							}

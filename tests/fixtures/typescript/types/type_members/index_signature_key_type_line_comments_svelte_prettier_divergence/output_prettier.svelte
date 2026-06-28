@@ -2,7 +2,8 @@
 	// Interface union key: comments break (none merge), the type indents one level
 	interface A {
 		[
-			k: // a
+			k:
+				// a
 				// b
 				string | number
 		]: boolean;
@@ -29,7 +30,8 @@
 	// Type-literal union key: same as the interface union case (separate printer)
 	type D = {
 		[
-			k: // g
+			k:
+				// g
 				// h
 				string | number
 		]: boolean;

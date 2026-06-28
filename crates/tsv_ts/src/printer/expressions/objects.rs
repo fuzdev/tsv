@@ -37,18 +37,22 @@ impl<'a> Printer<'a> {
         // Check if object contains line comments or block comments on their own line (force multiline)
         let has_line_comments = self.has_line_comments_between(obj.span.start, obj.span.end);
 
-        // Check for block comments on their own line (not same line as any property)
-        let property_spans: Vec<_> = obj
-            .properties
-            .iter()
-            .map(internal::ObjectProperty::span)
-            .collect();
-        let has_standalone_block_comment =
-            self.has_standalone_block_comment(obj.span.start, obj.span.end, &property_spans);
+        // Check for block comments on their own line (not same line as any property).
+        // Only relevant when the object has comments at all — otherwise there are no
+        // block comments to be standalone, so skip the per-property span collection
+        // (the common comment-free object pays nothing).
+        let has_standalone_block_comment = has_comments && {
+            let property_spans: Vec<_> = obj
+                .properties
+                .iter()
+                .map(internal::ObjectProperty::span)
+                .collect();
+            self.has_standalone_block_comment(obj.span.start, obj.span.end, &property_spans)
+        };
 
         if obj.properties.is_empty() {
             // Handle empty object with comments
-            return self.build_empty_body_with_comments_doc(obj.span);
+            return self.build_empty_braces_inline_with_comments_doc(obj.span);
         }
 
         // Check if source has newline after opening brace
@@ -78,12 +82,18 @@ impl<'a> Printer<'a> {
             let mut parts = DocBuf::new();
             let mut prev_end = obj.span.start + 1; // After opening brace
 
-            // A comment trailing the opening `{` on its own line is kept on the `{`
-            // line when the object expands (divergence from prettier, which relocates
-            // it to its own line as the first property's leading comment). See
-            // conformance_prettier.md §Comment relocation (Object literal `{`).
+            // A comment trailing the opening `{` is kept on the `{` line when the
+            // object expands — both a line comment and a block comment before a
+            // first property on a later line (divergence from prettier, which
+            // relocates it to its own line as the first property's leading
+            // comment). See conformance_prettier.md §Comment relocation (Object
+            // literal `{`).
             let (brace_line_prefix, brace_pull_pos) =
-                self.delimiter_line_comment_prefix(obj.span.start, first_prop_start);
+                self.delimiter_line_comment_prefix_object(obj.span.start, first_prop_start);
+            // The prefix is only emitted on the break path, so a fired pull forces
+            // must-break (an expanding object with a block on the `{` line breaks
+            // via has_source_newline, not the must_break conditions above).
+            let must_break = must_break || brace_pull_pos.is_some();
 
             for (i, prop) in obj.properties.iter().enumerate() {
                 let prop_start = prop.span().start;
@@ -559,15 +569,17 @@ impl<'a> Printer<'a> {
                     self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key, None)
                 }
             } else {
-                // Comments around colon: check if any post-colon comment forces a break.
-                // Line comments always force break (they extend to end of line).
-                // Multiline block comments also force break-after-operator layout.
+                // A post-colon comment forces break-after-operator when it's a line
+                // comment (extends to end of line), a multiline block (its own newlines
+                // break the group), or the source put the value on a later line than the
+                // comment (an own-line leading comment); a single-line block glued to the
+                // value (`: /* c */ v`) stays inline.
                 // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
-                let has_line_comment_post_colon = post_colon_comments.iter().any(|c| !c.is_block);
-                let has_multiline_post_colon = has_line_comment_post_colon
-                    || self.has_multiline_block_comments_between(colon_pos + 1, value_start);
+                let has_own_line_comment_post_colon = post_colon_comments.iter().any(|c| {
+                    !c.is_block || c.multiline || !self.is_same_line(c.span.end, value_start)
+                });
 
-                if has_multiline_post_colon {
+                if has_own_line_comment_post_colon {
                     // Line comment or multiline block comment after colon: BreakAfterOperator
                     // Structure: group([group(key + pre_colon), ":", group(indent([line, rhs]))])
                     let mut lhs_parts: DocBuf = smallvec![key_doc];
@@ -764,9 +776,9 @@ impl<'a> Printer<'a> {
     /// for following comments/modifiers.
     ///
     /// `unquote` drops quotes from an identifier-valid string-literal key: `true`
-    /// for property signatures (`'plain': T` → `plain: T`), `false` for method
-    /// signatures (`'foo'(): void` keeps its quotes — prettier's rule). Computed
-    /// keys are always emitted verbatim inside their brackets.
+    /// for property signatures (`'plain': T` → `plain: T`) and method signatures
+    /// (`'foo'(): void` → `foo(): void` — prettier 3.9 unquotes these too).
+    /// Computed keys are always emitted verbatim inside their brackets.
     pub(in crate::printer) fn build_type_member_key_doc(
         &self,
         search_start: u32,

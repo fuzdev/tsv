@@ -114,14 +114,15 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[d.text("{"), d.indent_line(inner), d.line(), d.text("}")]))
     }
 
-    /// Finish a module statement: emit any comments between the last content token
-    /// and the terminating `;`, then the `;` itself.
+    /// Finish a module statement: emit the `;` right after the content, then any
+    /// comments between the last content token and the `;`, deferred to **after** it
+    /// (prettier 3.9 — `} /* c */;` → `}; /* c */`).
     ///
     /// When `grouped`, `parts` is wrapped in a `group` for width-based wrapping and
-    /// the pre-`;` comments are emitted *outside* it, so a line-comment break can't
+    /// the trailing comments are emitted *outside* it, so a line-comment break can't
     /// expand the statement's specifier braces (import/export named declarations).
-    /// Otherwise the comments are appended inline to `parts` — used by export-all
-    /// and import-equals, which have no wrapping group.
+    /// Otherwise the comments are appended to `parts` — used by export-all and
+    /// import-equals, which have no wrapping group.
     pub(super) fn finish_with_pre_semi(
         &self,
         mut parts: DocBuf,
@@ -130,29 +131,19 @@ impl<'a> Printer<'a> {
         grouped: bool,
     ) -> DocId {
         let d = self.d();
+        let after = self.collect_post_semi_comments(content_end, decl_end);
         if !grouped {
-            if self.append_pre_semi_comments(&mut parts, content_end, decl_end) {
-                parts.push(d.hardline());
-            }
             parts.push(d.text(";"));
+            parts.extend(after);
             return d.concat(&parts);
         }
-        let mut trailing = DocBuf::new();
-        let broke = self.append_pre_semi_comments(&mut trailing, content_end, decl_end);
-        if trailing.is_empty() {
-            parts.push(d.text(";"));
-            // Wrap entire statement in a group for width-based wrapping
-            d.group(d.concat(&parts))
-        } else {
-            let group = d.group(d.concat(&parts));
-            trailing.insert(0, group);
-            // A line comment ends its line — the `;` must follow on a new line.
-            if broke {
-                trailing.push(d.hardline());
-            }
-            trailing.push(d.text(";"));
-            d.concat(&trailing)
-        }
+        // Wrap the content in a group for width-based wrapping; the `;` and trailing
+        // comments stay outside it so an own-line/line comment can't expand the braces.
+        let mut out = DocBuf::new();
+        out.push(d.group(d.concat(&parts)));
+        out.push(d.text(";"));
+        out.extend(after);
+        d.concat(&out)
     }
 
     /// The source offset of a closing `}` — the first `}` (outside comments, so a

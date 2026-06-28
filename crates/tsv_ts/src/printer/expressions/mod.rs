@@ -130,13 +130,12 @@ impl<'a> Printer<'a> {
                 self.build_ts_type_assertion_doc(type_assert)
             }
             Expression::TSAsExpression(as_expr) => {
-                self.build_binary_cast_doc(as_expr.expression, as_expr.type_annotation, "as", true)
+                self.build_binary_cast_doc(as_expr.expression, as_expr.type_annotation, "as")
             }
             Expression::TSSatisfiesExpression(sat_expr) => self.build_binary_cast_doc(
                 sat_expr.expression,
                 sat_expr.type_annotation,
                 "satisfies",
-                false,
             ),
             Expression::TSInstantiationExpression(inst_expr) => {
                 self.build_ts_instantiation_doc(inst_expr)
@@ -456,19 +455,18 @@ impl<'a> Printer<'a> {
     /// `expr satisfies Type`. Mirrors Prettier's `printBinaryCastExpression`,
     /// which prints both with one function (`isSatisfiesExpression ? "satisfies" : "as"`).
     ///
-    /// `keyword` is the bare keyword (`"as"` / `"satisfies"`); `is_as` gates the
-    /// `as const` special-case (comments move after `const`), which cannot apply
-    /// to `satisfies` (`satisfies const` is invalid TypeScript).
+    /// `keyword` is the bare keyword (`"as"` / `"satisfies"`).
     ///
-    /// Preserves comments between the expression and the keyword (Prettier 3.7
-    /// #18161 / #18162); comments between the keyword and the type are kept in
-    /// place except for `as const`, where Prettier relocates them after `const`.
+    /// Comments are preserved where the author wrote them — between the
+    /// expression and the keyword, and between the keyword and the type. `as
+    /// const` is no exception: its `const` is treated like any other cast type.
+    /// (Prettier relocates an `as const` inner comment before the whole
+    /// expression; tsv keeps it in place — a documented divergence.)
     fn build_binary_cast_doc(
         &self,
         expression: &Expression<'_>,
         type_annotation: &TSType<'_>,
         keyword: &'static str,
-        is_as: bool,
     ) -> DocId {
         let d = self.d();
         let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion);
@@ -486,11 +484,6 @@ impl<'a> Printer<'a> {
         let type_start = type_annotation.span().start;
         let keyword_pos = self.find_keyword_in_range(expr_end, type_start, keyword);
 
-        // `as const`: prettier relocates comments after `const` (cannot apply to
-        // `satisfies` — `satisfies const` is invalid TypeScript).
-        let is_as_const = is_as
-            && &self.source[type_start as usize..type_annotation.span().end as usize] == "const";
-
         // Comments between expression and keyword → place before the keyword
         if let Some(kw_pos) = keyword_pos {
             parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
@@ -499,10 +492,10 @@ impl<'a> Printer<'a> {
         // A line comment between the keyword and the type would otherwise be
         // emitted inline and swallow the type (`x as // c A`, a content/structure
         // loss). Keep it trailing the keyword (line_suffix) with the type on the
-        // next line. (`as const` relocates the comment instead — handled below.)
+        // next line. Applies uniformly, including `as const`.
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
-            if !is_as_const && self.has_line_comments_between(kw_end, type_start) {
+            if self.has_line_comments_between(kw_end, type_start) {
                 parts.push(d.text(" "));
                 parts.push(d.text(keyword));
                 let type_doc = self.build_type_doc_with_wrapping_type_args(type_annotation);
@@ -536,20 +529,12 @@ impl<'a> Printer<'a> {
         parts.push(d.text(keyword));
         parts.push(d.text(" "));
 
-        // Comments between keyword and type
+        // Comments between keyword and type → kept in place, trailing the keyword
+        // (uniform for every cast type, including `as const`).
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
-            if is_as_const {
-                parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
-                parts.push(self.build_inline_comments_between_doc(kw_end, type_start));
-            } else {
-                parts.push(self.build_comments_between(
-                    kw_end,
-                    type_start,
-                    CommentSpacing::Trailing,
-                ));
-                parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
-            }
+            parts.push(self.build_comments_between(kw_end, type_start, CommentSpacing::Trailing));
+            parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
         } else {
             parts.push(self.build_type_doc_with_wrapping_type_args(type_annotation));
         }
@@ -658,12 +643,53 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let needs_parens = self.needs_parens(non_null_expr.expression, ParenContext::NonNull);
 
-        if needs_parens {
+        // A leading comment from the stripped grouping parens, before the operand
+        // (`(/* b */ x + y)!`), is emitted before the operand/`(`, matching prettier
+        // (`/* b */ (x + y)!`) — tsv previously dropped it. None of the branches below
+        // emit it, so it is prepended once here.
+        let argument_start = non_null_expr.expression.span().start;
+        let leading = self.build_rhs_comments_opt(non_null_expr.span.start, argument_start);
+
+        let core = if needs_parens {
             // For expressions that need parens, use a special doc structure
             // that indents continuations when breaking
             let inner_doc =
                 self.build_expression_doc_with_indent_on_break(non_null_expr.expression);
-            d.concat(&[d.text("("), inner_doc, d.text(")!")])
+            let argument_end = non_null_expr.expression.span().end;
+            // Keep comments from the stripped grouping parens INSIDE them, where the
+            // author wrote them — leading before the operand (`(/* b */ x + y)!`),
+            // trailing before the `)` (`(x + y /* c */)!`). Prettier relocates them
+            // outside (before `(` / between `)` and `!`); tsv preserves the position.
+            let mut parts: DocBuf = smallvec![d.text("(")];
+            if let Some(lead) = leading {
+                parts.push(lead);
+            }
+            parts.push(inner_doc);
+            if self.has_comments_between(argument_end, non_null_expr.span.end) {
+                self.append_trailing_paren_comments(
+                    &mut parts,
+                    argument_end,
+                    non_null_expr.span.end,
+                );
+            }
+            parts.push(d.text(")!"));
+            d.concat(&parts)
+        } else if self
+            .has_comments_between(non_null_expr.expression.span().end, non_null_expr.span.end)
+        {
+            // A comment between the operand and `!` (`p?.q /* c */!`, or from stripped
+            // grouping parens `(x /* c */)!`) trails the operand — preserve it rather
+            // than dropping it. The redundant grouping parens are stripped per tsv's
+            // non-null seal canonicalization (`(p?.q)!` → `p?.q!`); prettier keeps them
+            // when the source had them. Comments can't be threaded through the
+            // linearized chain, so this path renders the operand directly for chain and
+            // non-chain operands alike.
+            let argument_end = non_null_expr.expression.span().end;
+            let inner_doc = self.build_expression_doc(non_null_expr.expression);
+            let mut parts: DocBuf = smallvec![inner_doc];
+            self.append_trailing_paren_comments(&mut parts, argument_end, non_null_expr.span.end);
+            parts.push(d.text("!"));
+            d.concat(&parts)
         } else if Self::is_chain_expression(non_null_expr.expression) {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included
@@ -673,22 +699,15 @@ impl<'a> Printer<'a> {
             chain::build_chain_doc(&groups, self)
         } else {
             let inner_doc = self.build_expression_doc(non_null_expr.expression);
-            // Check for trailing comments from stripped grouping parens: `(x /* c */)!`
-            let argument_end = non_null_expr.expression.span().end;
-            let has_trailing_comments =
-                self.has_comments_between(argument_end, non_null_expr.span.end);
-            if has_trailing_comments {
-                let mut parts: DocBuf = smallvec![inner_doc];
-                self.append_trailing_paren_comments(
-                    &mut parts,
-                    argument_end,
-                    non_null_expr.span.end,
-                );
-                parts.push(d.text("!"));
-                d.concat(&parts)
-            } else {
-                d.concat(&[inner_doc, d.text("!")])
-            }
+            d.concat(&[inner_doc, d.text("!")])
+        };
+
+        // For paren-stripped branches the leading comment goes before the operand
+        // (parens are gone, matching prettier); the needs_parens branch above already
+        // placed it inside the kept parens.
+        match leading {
+            Some(lead) if !needs_parens => d.concat(&[lead, core]),
+            _ => core,
         }
     }
 

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 102,
+	"end": 77,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -30,19 +30,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 101,
+		"end": 76,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 92,
+			"end": 67,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 5,
+					"line": 4,
 					"column": 9
 				}
 			},
@@ -185,72 +185,6 @@
 						},
 						"value": "y",
 						"raw": "'y'"
-					}
-				},
-				{
-					"type": "ImportDeclaration",
-					"start": 68,
-					"end": 91,
-					"loc": {
-						"start": {
-							"line": 4,
-							"column": 1
-						},
-						"end": {
-							"line": 4,
-							"column": 24
-						}
-					},
-					"importKind": "type",
-					"specifiers": [
-						{
-							"type": "ImportDefaultSpecifier",
-							"start": 80,
-							"end": 81,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 13
-								},
-								"end": {
-									"line": 4,
-									"column": 14
-								}
-							},
-							"local": {
-								"type": "Identifier",
-								"start": 80,
-								"end": 81,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 13
-									},
-									"end": {
-										"line": 4,
-										"column": 14
-									}
-								},
-								"name": "c"
-							}
-						}
-					],
-					"source": {
-						"type": "Literal",
-						"start": 87,
-						"end": 90,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 20
-							},
-							"end": {
-								"line": 4,
-								"column": 23
-							}
-						},
-						"value": "z",
-						"raw": "'z'"
 					}
 				}
 			],

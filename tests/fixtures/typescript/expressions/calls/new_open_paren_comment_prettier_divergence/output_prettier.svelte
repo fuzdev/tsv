@@ -1,12 +1,20 @@
 <script>
 	// line comment trailing `(` — single arg
-	new Foo(a); // c1
+	new Foo(
+		// c1
+		a
+	);
 
 	// line comment trailing `(` — multiple args
-	new Foo(a, b); // c2
+	new Foo(
+		// c2
+		a,
+		b
+	);
 
 	// block comment trailing `(`, then own-line leading comment
-	new Foo /* paren */(
+	new Foo(
+		/* paren */
 		// lead
 		a
 	);

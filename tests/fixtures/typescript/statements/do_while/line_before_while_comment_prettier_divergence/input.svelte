@@ -1,5 +1,5 @@
 <script>
-	// Line comment between } and while - we preserve, prettier moves into condition
+	// Line comment between } and while
 	do {
 		fn();
 	}

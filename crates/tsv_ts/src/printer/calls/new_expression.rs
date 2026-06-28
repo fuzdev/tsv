@@ -10,14 +10,15 @@ use super::arg_wrapping::{
 };
 use crate::ast::internal;
 use crate::printer::calls::arg_predicates::{
-    arrow_has_trailing_param_comments, is_array_or_object_unwrapped, is_concise_numeric_array,
-    is_function_composition_args, is_ternary_arrow_body, preceding_args_allow_expand_last,
+    arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
+    is_array_or_object_unwrapped, is_concise_numeric_array, is_function_composition_args,
+    is_ternary_arrow_body, preceding_args_allow_expand_last,
 };
 use crate::printer::calls::{
-    PartitionedComments, arrow_has_type_reference_return, build_args_joined_with_comments,
-    build_args_split_last, build_arrow_call_body_states, build_arrow_sig_doc,
-    build_break_body_state, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    could_expand_arrow_chain, emit_first_arg_leading_comments, has_blank_line_between_args,
+    PartitionedComments, build_args_joined_with_comments, build_args_split_last,
+    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
+    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
+    emit_first_arg_leading_comments, has_blank_line_between_args,
     has_inter_argument_comments_slice, has_trailing_comments_slice,
     has_trailing_line_comments_slice, last_two_args_same_type, prepend_arrow_body_comments,
     should_force_expansion_for_comments, wrap_call_with_hard_breaks,
@@ -128,9 +129,7 @@ impl<'a> Printer<'a> {
                 }
                 // Block arrow (or expandable arrow chain): use conditional_group to let Doc decide hug vs wrap
                 internal::Expression::ArrowFunctionExpression(arrow)
-                    if !arrow.body.is_expression()
-                        || (!arrow_has_type_reference_return(arrow)
-                            && could_expand_arrow_chain(arrow)) =>
+                    if !arrow.body.is_expression() || could_expand_arrow_chain(arrow) =>
                 {
                     let mut arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
 
@@ -198,10 +197,9 @@ impl<'a> Printer<'a> {
                         // Expandable body (ternary): conditional parens
                         // Flat: `new Xy((x) => (x ? y : z))`
                         // Break: `new Xy((x) =>\n  x ? y : z,\n)`
-                        // Arrows with TSTypeReference return types are NOT expandable.
-                        if is_ternary_arrow_body(body_expr)
-                            && !arrow_has_type_reference_return(arrow)
-                        {
+                        // couldExpandArg keys on the body type, looking through the
+                        // return-type annotation, so typed-return arrows are eligible.
+                        if is_ternary_arrow_body(body_expr) {
                             let sig_doc = build_arrow_sig_doc(self, arrow);
                             let body_doc = self.build_expression_doc(body_expr);
                             let body_doc = prepend_arrow_body_comments(
@@ -255,10 +253,9 @@ impl<'a> Printer<'a> {
                         }
 
                         // Simple call body: 2-state break at =>
-                        // Arrows with TSTypeReference return types are NOT expandable.
-                        if matches!(&**body_expr, internal::Expression::CallExpression(_))
-                            && !arrow_has_type_reference_return(arrow)
-                        {
+                        // couldExpandArg keys on the body type, looking through the
+                        // return-type annotation and a trailing non-null `!`.
+                        if arrow_body_is_call_through_non_null(body_expr) {
                             let arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
                             let body_doc = self.build_expression_doc(body_expr);
                             let body_doc = prepend_arrow_body_comments(
@@ -593,12 +590,11 @@ impl<'a> Printer<'a> {
                     if let Some(internal::Expression::ArrowFunctionExpression(arrow)) =
                         new_expr.arguments.last()
                         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
-                        && matches!(
-                            &**body_expr,
-                            internal::Expression::CallExpression(_)
-                                | internal::Expression::ConditionalExpression(_)
-                        )
-                        && !arrow_has_type_reference_return(arrow)
+                        && (arrow_body_is_call_through_non_null(body_expr)
+                            || matches!(
+                                &**body_expr,
+                                internal::Expression::ConditionalExpression(_)
+                            ))
                     {
                         let sig_doc = build_arrow_sig_doc(self, arrow);
                         let body_doc = self.build_expression_doc(body_expr);

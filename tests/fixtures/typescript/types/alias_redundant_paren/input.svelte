@@ -4,8 +4,7 @@
 
 	// Long union in redundant parens - stripped, breaks to leading-pipe form
 	type LongU =
-		| Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-		| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb;
+		Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb;
 
 	// Short intersection in redundant parens - stripped, stays inline
 	type ShortI = A & B;

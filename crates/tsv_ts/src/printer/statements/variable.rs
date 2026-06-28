@@ -20,19 +20,6 @@ use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{INDENT, PRINT_WIDTH};
 
-/// Wrap a doc in parentheses if the expression needs them for variable init context.
-/// `in_for_init` carries the for-header rule: a statement-level `const x = b in c`
-/// lexically under a for-header init (e.g. in a nested function body) parenthesizes
-/// the `in` like every other position there. (A for-header's *own* declarator is
-/// built in `build_for_init_doc`, not here.)
-fn wrap_init_doc(d: &DocArena, init_doc: DocId, init: &Expression<'_>, in_for_init: bool) -> DocId {
-    if needs_parens(init, ParenContext::VariableInit, in_for_init) {
-        d.parens(init_doc)
-    } else {
-        init_doc
-    }
-}
-
 /// Build the fluid assignment layout: break after `=` only when the full line
 /// exceeds print_width. Uses indentIfBreak so the RHS is evaluated independently.
 /// Matches Prettier's assignment.js lines 59-67.
@@ -48,6 +35,42 @@ fn build_fluid_assignment_doc(d: &DocArena, id_doc: DocId, init_doc: DocId) -> D
 }
 
 impl<'a> Printer<'a> {
+    /// Build a variable initializer value, wrapping it in parens for the value
+    /// position when needed (`const x = (a = b)`) — but NOT double-wrapping when
+    /// `build_expression_doc_with_paren_comments` already added its own parens around
+    /// a multiline trailing comment (`const y = (a = b // c)` stays single, not
+    /// `((a = b // c))`). The single paren then matches the assignment-RHS rendering.
+    ///
+    /// The paren decision carries the for-header rule via `self.in_for_init`: a
+    /// statement-level `const x = b in c` lexically under a for-header init (e.g. in a
+    /// nested function body) parenthesizes the `in` like every other position there.
+    /// (A for-header's *own* declarator is built in `build_for_init_doc`, not here.)
+    fn build_init_value_doc(&self, init: &Expression<'_>, boundary_end: u32) -> DocId {
+        let inner = self.build_expression_doc_with_paren_comments(init, boundary_end);
+        if needs_parens(init, ParenContext::VariableInit, self.in_for_init.get())
+            && !self.init_keeps_own_parens(init, boundary_end)
+        {
+            self.d().parens(inner)
+        } else {
+            inner
+        }
+    }
+
+    /// True when `build_expression_doc_with_paren_comments` wraps `init` in its own
+    /// parens (the keep-paren-comments path: a non-sequence with a multiline trailing
+    /// paren comment), so the value-position wrap must not add a second pair. A
+    /// sequence self-parenthesizes via `build_sequence_doc_value` and already reports
+    /// `needs_parens == false`, so it never double-wraps and is excluded here.
+    fn init_keeps_own_parens(&self, init: &Expression<'_>, boundary_end: u32) -> bool {
+        if matches!(init, Expression::SequenceExpression(_)) {
+            return false;
+        }
+        let expr_end = init.span().end;
+        self.has_trailing_paren_comments(expr_end, boundary_end)
+            && comments_in_range(self.comments, expr_end, boundary_end)
+                .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start))
+    }
+
     /// Build a doc for a variable binding pattern with optional definite assignment assertion.
     ///
     /// For identifiers with `definite: true`, builds doc for `name!: type` instead of `name: type`.
@@ -575,10 +598,15 @@ impl<'a> Printer<'a> {
                 let has_line_comments_after_eq =
                     self.has_line_comments_between(equals_pos + 1, init_start);
 
-                // Check for multiline block comments after = which force break-after-operator
-                // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
-                let has_multiline_block_comment_after_eq = has_comments_after_eq
-                    && self.has_multiline_block_comments_between(rhs_comments_start, init_start);
+                // Check for a comment after `=` that forces break-after-operator.
+                // Prettier ref: hasLeadingOwnLineComment → break-after-operator in
+                // chooseLayout. A comment forces the break when it's multiline (its own
+                // newlines break the group) or the source put the value on a later line
+                // than the comment (an own-line leading comment); a single-line block
+                // glued to the value (`= /* c */ v`) stays inline.
+                let has_own_line_comment_after_eq = has_comments_after_eq
+                    && comments_in_range(self.comments, rhs_comments_start, init_start)
+                        .any(|c| c.multiline || !self.is_same_line(c.span.end, init_start));
 
                 // Curried arrows with return type always break after `=`
                 let is_curried_arrow = is_curried_arrow_with_return_type(init);
@@ -605,44 +633,23 @@ impl<'a> Printer<'a> {
                         parts.push(d.indent(d.concat(&[
                             d.hardline(),
                             d.concat(&leading_comments),
-                            wrap_init_doc(
-                                d,
-                                self.build_expression_doc_with_paren_comments(
-                                    init,
-                                    declarator.span.end,
-                                ),
-                                init,
-                                self.in_for_init.get(),
-                            ),
+                            self.build_init_value_doc(init, declarator.span.end),
                         ])));
                     } else {
                         parts.push(d.indent(d.concat(&[
                             d.hardline(),
-                            wrap_init_doc(
-                                d,
-                                self.build_expression_doc_with_paren_comments(
-                                    init,
-                                    declarator.span.end,
-                                ),
-                                init,
-                                self.in_for_init.get(),
-                            ),
+                            self.build_init_value_doc(init, declarator.span.end),
                         ])));
                     }
-                } else if has_multiline_block_comment_after_eq {
-                    // Multiline block comment after `=` forces break-after-operator layout.
-                    // Prettier ref: hasLeadingOwnLineComment → break-after-operator
+                } else if has_own_line_comment_after_eq {
+                    // A multiline or own-line comment after `=` forces break-after-operator
+                    // layout. Prettier ref: hasLeadingOwnLineComment → break-after-operator
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
                     let comments_doc = self
                         .build_rhs_comments_opt(rhs_comments_start, init_start)
                         .unwrap_or_else(|| d.empty());
-                    let init_doc = wrap_init_doc(
-                        d,
-                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
-                        init,
-                        self.in_for_init.get(),
-                    );
+                    let init_doc = self.build_init_value_doc(init, declarator.span.end);
                     let rhs_doc = d.concat(&[comments_doc, init_doc]);
                     parts.push(hang_after_operator(d, rhs_doc));
                 } else if is_curried_arrow {
@@ -652,15 +659,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(" ="));
                     parts.push(d.indent(d.concat(&[
                         d.hardline(),
-                        wrap_init_doc(
-                            d,
-                            self.build_expression_doc_with_paren_comments(
-                                init,
-                                declarator.span.end,
-                            ),
-                            init,
-                            self.in_for_init.get(),
-                        ),
+                        self.build_init_value_doc(init, declarator.span.end),
                     ])));
                 } else if is_curried_arrow_chain(init) {
                     // Untyped curried arrow chain: fluid break after `=`. The chain's
@@ -669,17 +668,7 @@ impl<'a> Printer<'a> {
                     // the arrow printer to use the assignment-RHS chain layout.
                     let init_doc = self.build_with_arrow_chain_context(
                         crate::printer::ArrowChainContext::AssignmentRhs,
-                        || {
-                            make_init_doc(wrap_init_doc(
-                                d,
-                                self.build_expression_doc_with_paren_comments(
-                                    init,
-                                    declarator.span.end,
-                                ),
-                                init,
-                                self.in_for_init.get(),
-                            ))
-                        },
+                        || make_init_doc(self.build_init_value_doc(init, declarator.span.end)),
                     );
                     parts.push(build_fluid_assignment_doc(
                         d,
@@ -720,12 +709,8 @@ impl<'a> Printer<'a> {
 
                     // Add ` = rightDoc` (right side grouped)
                     parts.push(d.text(" = "));
-                    let init_doc = make_init_doc(wrap_init_doc(
-                        d,
-                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
-                        init,
-                        self.in_for_init.get(),
-                    ));
+                    let init_doc =
+                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
                     parts.push(d.group(init_doc));
                 } else if is_type_assertion_with_lhs_type
                     || is_single_call_member_chain
@@ -747,12 +732,8 @@ impl<'a> Printer<'a> {
                     } else {
                         id_doc
                     };
-                    let init_doc = make_init_doc(wrap_init_doc(
-                        d,
-                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
-                        init,
-                        self.in_for_init.get(),
-                    ));
+                    let init_doc =
+                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
                     parts.push(build_fluid_assignment_doc(
                         d,
                         make_fluid_lhs(fluid_id_doc),
@@ -767,12 +748,8 @@ impl<'a> Printer<'a> {
                     // indented together after the `=` break.
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
-                    let init_doc = make_init_doc(wrap_init_doc(
-                        d,
-                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
-                        init,
-                        self.in_for_init.get(),
-                    ));
+                    let init_doc =
+                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
                     parts.push(hang_after_operator(d, init_doc));
                 } else if is_layout_eligible && !is_simple_value(init) {
                     // Fluid layout (default for layout-eligible values)
@@ -780,12 +757,8 @@ impl<'a> Printer<'a> {
                     // Matches prettier's chooseLayout default: when no special layout
                     // applies, use fluid so the marker can break at `=` only if needed,
                     // while allowing the RHS to break internally first.
-                    let init_doc = make_init_doc(wrap_init_doc(
-                        d,
-                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
-                        init,
-                        self.in_for_init.get(),
-                    ));
+                    let init_doc =
+                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
                     parts.push(build_fluid_assignment_doc(
                         d,
                         make_fluid_lhs(id_doc),
@@ -794,12 +767,8 @@ impl<'a> Printer<'a> {
                 } else {
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" = "));
-                    let init_doc = make_init_doc(wrap_init_doc(
-                        d,
-                        self.build_expression_doc_with_paren_comments(init, declarator.span.end),
-                        init,
-                        self.in_for_init.get(),
-                    ));
+                    let init_doc =
+                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
                     parts.push(init_doc);
                 }
             } else if should_break || i == 0 {
@@ -814,15 +783,20 @@ impl<'a> Printer<'a> {
         }
 
         // Comments between the last declarator and the `;`, with the `;` bound to the
-        // declaration: a same-line block stays before it (`const x = 1 /* c */;` — a
-        // divergence; prettier moves it after), a same-line line trails after it via
+        // declaration: a same-line block trails *after* it (`const x = 1 /* c */;` →
+        // `const x = 1; /* c */`, prettier 3.9), a same-line line trails after it via
         // `line_suffix` (`const x = 1; // c`), an own-line comment drops to its own line
         // after it (`const x = 1;⏎// c`). See `split_separator_gap_comments`.
         if emit_semicolon {
             let mut after = DocBuf::new();
             if let Some(last) = decl.declarations.last() {
                 let semicolon_pos = decl.span.end.saturating_sub(1);
-                after = self.split_separator_gap_comments(&mut parts, last.span.end, semicolon_pos);
+                after = self.split_separator_gap_comments(
+                    &mut parts,
+                    last.span.end,
+                    semicolon_pos,
+                    true,
+                );
             }
             parts.push(d.text(";"));
             parts.extend(after);

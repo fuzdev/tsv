@@ -36,4 +36,9 @@
 
 	// inline block comment on variable declaration stays inline
 	const c = /** inline */ fn();
+
+	// single-line block comment on its own line stays on its own line (not collapsed)
+	const d =
+		/* own line */
+		fn();
 </script>

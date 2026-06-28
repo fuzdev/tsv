@@ -29,16 +29,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 80,
-			"end": 87,
+			"start": 81,
+			"end": 88,
 			"loc": {
 				"start": {
 					"line": 4,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 4,
-					"column": 18
+					"column": 19
 				}
 			}
 		},
@@ -125,16 +125,16 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 282,
-			"end": 289,
+			"start": 283,
+			"end": 290,
 			"loc": {
 				"start": {
 					"line": 16,
-					"column": 10
+					"column": 11
 				},
 				"end": {
 					"line": 16,
-					"column": 17
+					"column": 18
 				}
 			}
 		}
@@ -211,7 +211,7 @@
 							{
 								"type": "ReturnStatement",
 								"start": 71,
-								"end": 88,
+								"end": 80,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -219,7 +219,7 @@
 									},
 									"end": {
 										"line": 4,
-										"column": 19
+										"column": 11
 									}
 								},
 								"argument": {
@@ -236,15 +236,7 @@
 											"column": 10
 										}
 									},
-									"name": "x",
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " c ",
-											"start": 80,
-											"end": 87
-										}
-									]
+									"name": "x"
 								},
 								"leadingComments": [
 									{
@@ -252,6 +244,14 @@
 										"value": " trailing block comment after operand",
 										"start": 29,
 										"end": 68
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 81,
+										"end": 88
 									}
 								]
 							},
@@ -404,7 +404,7 @@
 							{
 								"type": "ThrowStatement",
 								"start": 274,
-								"end": 290,
+								"end": 282,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -412,7 +412,7 @@
 									},
 									"end": {
 										"line": 16,
-										"column": 18
+										"column": 10
 									}
 								},
 								"argument": {
@@ -429,15 +429,7 @@
 											"column": 9
 										}
 									},
-									"name": "x",
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " c ",
-											"start": 282,
-											"end": 289
-										}
-									]
+									"name": "x"
 								},
 								"leadingComments": [
 									{
@@ -445,6 +437,14 @@
 										"value": " trailing block comment after operand",
 										"start": 232,
 										"end": 271
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 283,
+										"end": 290
 									}
 								]
 							}

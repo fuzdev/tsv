@@ -38,11 +38,10 @@ pub(crate) use arg_comments::{
     skip_stripped_open_paren,
 };
 pub(crate) use arg_wrapping::{
-    arrow_has_type_reference_return, build_args_joined_with_comments, build_args_split_last,
-    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
-    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    last_two_args_same_type, prepend_arrow_body_comments, wrap_call_with_hard_breaks,
-    wrap_call_with_will_break_guard,
+    build_args_joined_with_comments, build_args_split_last, build_arrow_call_body_states,
+    build_arrow_sig_doc, build_break_body_state, build_expand_all_args, build_inline_args,
+    build_inline_or_expand_all, could_expand_arrow_chain, last_two_args_same_type,
+    prepend_arrow_body_comments, wrap_call_with_hard_breaks, wrap_call_with_will_break_guard,
 };
 
 use super::Printer;

@@ -77,32 +77,32 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 227,
-			"end": 234,
+			"start": 228,
+			"end": 235,
 			"loc": {
 				"start": {
 					"line": 13,
-					"column": 14
+					"column": 15
 				},
 				"end": {
 					"line": 13,
-					"column": 21
+					"column": 22
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 276,
-			"end": 283,
+			"start": 277,
+			"end": 284,
 			"loc": {
 				"start": {
 					"line": 17,
-					"column": 17
+					"column": 18
 				},
 				"end": {
 					"line": 17,
-					"column": 24
+					"column": 25
 				}
 			}
 		},
@@ -442,7 +442,7 @@
 								{
 									"type": "BreakStatement",
 									"start": 215,
-									"end": 235,
+									"end": 227,
 									"loc": {
 										"start": {
 											"line": 13,
@@ -450,7 +450,7 @@
 										},
 										"end": {
 											"line": 13,
-											"column": 22
+											"column": 14
 										}
 									},
 									"label": {
@@ -467,16 +467,16 @@
 												"column": 13
 											}
 										},
-										"name": "loop3",
-										"trailingComments": [
-											{
-												"type": "Block",
-												"value": " c ",
-												"start": 227,
-												"end": 234
-											}
-										]
-									}
+										"name": "loop3"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 228,
+											"end": 235
+										}
+									]
 								}
 							]
 						}
@@ -555,7 +555,7 @@
 								{
 									"type": "ContinueStatement",
 									"start": 261,
-									"end": 284,
+									"end": 276,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -563,7 +563,7 @@
 										},
 										"end": {
 											"line": 17,
-											"column": 25
+											"column": 17
 										}
 									},
 									"label": {
@@ -580,16 +580,16 @@
 												"column": 16
 											}
 										},
-										"name": "loop4",
-										"trailingComments": [
-											{
-												"type": "Block",
-												"value": " c ",
-												"start": 276,
-												"end": 283
-											}
-										]
-									}
+										"name": "loop4"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 277,
+											"end": 284
+										}
+									]
 								}
 							]
 						}

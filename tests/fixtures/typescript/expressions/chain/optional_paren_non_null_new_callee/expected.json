@@ -1,0 +1,361 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 371,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A non-null assertion on a parenthesized optional-chain base, used as a `new`",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " callee, keeps the parens. `new (a?.b)!()` constructs on the asserted result of",
+			"start": 101,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `a?.b`; stripping the parens to `new a?.b!()` is a syntax error (an optional",
+			"start": 184,
+			"end": 263,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " chain can't be a `new` callee), so the parens are required.",
+			"start": 265,
+			"end": 327,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 63
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 370,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 361,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 329,
+					"end": 343,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 329,
+						"end": 342,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 14
+							}
+						},
+						"callee": {
+							"type": "TSNonNullExpression",
+							"start": 333,
+							"end": 340,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 5
+								},
+								"end": {
+									"line": 6,
+									"column": 12
+								}
+							},
+							"expression": {
+								"type": "ChainExpression",
+								"start": 334,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 6
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 334,
+									"end": 338,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 6
+										},
+										"end": {
+											"line": 6,
+											"column": 10
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 334,
+										"end": 335,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 6
+											},
+											"end": {
+												"line": 6,
+												"column": 7
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 337,
+										"end": 338,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 9
+											},
+											"end": {
+												"line": 6,
+												"column": 10
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								}
+							}
+						},
+						"arguments": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A non-null assertion on a parenthesized optional-chain base, used as a `new`",
+							"start": 20,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " callee, keeps the parens. `new (a?.b)!()` constructs on the asserted result of",
+							"start": 101,
+							"end": 182
+						},
+						{
+							"type": "Line",
+							"value": " `a?.b`; stripping the parens to `new a?.b!()` is a syntax error (an optional",
+							"start": 184,
+							"end": 263
+						},
+						{
+							"type": "Line",
+							"value": " chain can't be a `new` callee), so the parens are required.",
+							"start": 265,
+							"end": 327
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 345,
+					"end": 360,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 16
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 345,
+						"end": 359,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 15
+							}
+						},
+						"callee": {
+							"type": "TSNonNullExpression",
+							"start": 349,
+							"end": 357,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 5
+								},
+								"end": {
+									"line": 7,
+									"column": 13
+								}
+							},
+							"expression": {
+								"type": "ChainExpression",
+								"start": 350,
+								"end": 355,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 6
+									},
+									"end": {
+										"line": 7,
+										"column": 11
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 350,
+									"end": 355,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 6
+										},
+										"end": {
+											"line": 7,
+											"column": 11
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 350,
+										"end": 351,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 6
+											},
+											"end": {
+												"line": 7,
+												"column": 7
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": true
+								}
+							}
+						},
+						"arguments": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

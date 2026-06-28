@@ -7,7 +7,7 @@
 	const b = [ A , 
 	 /* c2 */  B ];
 
-	// Both patterns combined - the bug
+	// Both patterns combined
 	const c = [ A  /* c1 */  , 
 	 /* c2 */  B ];
 

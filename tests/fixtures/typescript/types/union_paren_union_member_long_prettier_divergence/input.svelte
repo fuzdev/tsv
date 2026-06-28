@@ -7,11 +7,10 @@
 		| Z
 		| (Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb);
 
-	// Inner paren-union at 101 - breaks one member per line; closing `)` at the offset
+	// Inner paren-union at 101 - inner stays inline on its own line; closing `)` at the offset
 	type Brk =
 		| Z
 		| (
-				| Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-				| Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+				Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 			);
 </script>

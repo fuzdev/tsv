@@ -1,0 +1,229 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 142,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block comment between ) and {",
+			"start": 10,
+			"end": 42,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 54,
+			"end": 67,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 11
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Line comment between ) and {",
+			"start": 73,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 117,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 141,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 132,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "WhileStatement",
+					"start": 44,
+					"end": 70,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 27
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 51,
+						"end": 52,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 3,
+								"column": 9
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " comment ",
+								"start": 54,
+								"end": 67
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 68,
+						"end": 70,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 25
+							},
+							"end": {
+								"line": 3,
+								"column": 27
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment between ) and {",
+							"start": 10,
+							"end": 42
+						}
+					]
+				},
+				{
+					"type": "WhileStatement",
+					"start": 106,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 113,
+						"end": 114,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 8
+							},
+							"end": {
+								"line": 6,
+								"column": 9
+							}
+						},
+						"name": "a"
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 129,
+						"end": 131,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 3
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " comment",
+								"start": 117,
+								"end": 127
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment between ) and {",
+							"start": 73,
+							"end": 104
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

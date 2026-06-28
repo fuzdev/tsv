@@ -2,18 +2,21 @@
 	// Line comment between else and non-block body - block consequent
 	if (a) {
 		expr;
-	} // c1
-	else expr;
+	} else
+		// c1
+		expr;
 
 	// Line comment between else and non-block body - comments path
 	if (a) {
 		expr;
 	} // between
-	// c1
-	else expr;
+	else
+		// c1
+		expr;
 
 	// Line comment between else and non-block body - non-block consequent
-	if (a)
-		expr; // c1
-	else expr;
+	if (a) expr;
+	else
+		// c1
+		expr;
 </script>

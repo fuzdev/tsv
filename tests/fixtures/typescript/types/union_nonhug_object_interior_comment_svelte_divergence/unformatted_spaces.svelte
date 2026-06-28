@@ -8,6 +8,6 @@
 	// Object + undefined (not a void type for hugging): keeps the comment
 	type C   =   {   /* c */   a:   1   }   |   undefined;
 
-	// Union breaks (too long) but the object body stays inline: keeps the comment
+	// Union too long for the `=` line, drops to an indented continuation line; object body stays inline: keeps the comment
 	type D   =   {   /* c */   aaaaaaaaaaaaaaaaaaaa:   1;   bbbbbbbbbbbbbbbbbbbb:   2;   cccccccccccccccccccc:   3   }   |   boolean;
 </script>

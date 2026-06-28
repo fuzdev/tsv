@@ -9,6 +9,12 @@ match, and idempotent (the empty group is dropped in a single pass rather than
 the comment being duplicated each reformat). A *bare* empty group with no
 binding (`import {} from 'x'`) is preserved — see [basic](../basic/).
 
-The `unformatted_*` variants cover the three comment positions around the
-dropped group (before the comma, after it, after the braces); each normalizes to
-input under both formatters in one pass.
+The `unformatted_*` variants exercise compact and spaced authoring of the dropped
+group, including a comment in the dropped region (after the comma); each
+normalizes to input under both formatters in one pass.
+
+There is no type-only case here: `import type c, {} from 'z'` is invalid
+TypeScript (a type-only import cannot specify both a default import and named
+bindings), so although tsv leniently parses it (matching acorn-typescript),
+prettier rejects it outright — there is no valid type-import form that carries a
+droppable empty group.

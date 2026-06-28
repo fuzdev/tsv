@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 96,
+	"end": 91,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -29,16 +29,16 @@
 		{
 			"type": "Block",
 			"value": " block comment ",
-			"start": 63,
-			"end": 82,
+			"start": 60,
+			"end": 79,
 			"loc": {
 				"start": {
-					"line": 7,
-					"column": 2
+					"line": 6,
+					"column": 9
 				},
 				"end": {
-					"line": 7,
-					"column": 21
+					"line": 6,
+					"column": 28
 				}
 			}
 		}
@@ -46,19 +46,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 95,
+		"end": 90,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 86,
+			"end": 81,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 7,
 					"column": 9
 				}
 			},
@@ -98,15 +98,15 @@
 				{
 					"type": "TSEnumDeclaration",
 					"start": 52,
-					"end": 85,
+					"end": 80,
 					"loc": {
 						"start": {
 							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
-							"column": 2
+							"line": 6,
+							"column": 29
 						}
 					},
 					"id": {
@@ -138,8 +138,8 @@
 						{
 							"type": "Block",
 							"value": " block comment ",
-							"start": 63,
-							"end": 82
+							"start": 60,
+							"end": 79
 						}
 					]
 				}
