@@ -650,13 +650,14 @@ const user = fetchUserData(userId, sessionToken);
 - Nested selector lists: `:where(.a, .b, .c)`
 - Comma-separated value lists: `font-family: 'a', 'b', 'c'` (prettier divergence)
 - Space-separated value lists: `transform: fn1() fn2() fn3()` (prettier divergence)
+- Single-argument functions (non-`url`): `fn(<long-token>)` — the lone arg wraps onto its own line, just like a multi-arg list (matches prettier)
 
 **Features that DON'T wrap when long:**
 
 - Media query conditions: `@media (condition1) and (condition2) and (condition3)`
 - Transform function arguments: `matrix(1, 2, 3, 4, 5, 6)` stays inline
 - Filter function arguments: `drop-shadow(0 0 0 rgba(...))` stays inline
-- Single-argument functions: `url('very/long/path/...')`
+- `url()` content: `url('very/long/path/...')` stays inline — opaque, never wrapped (the lone exception to single-arg wrapping)
 
 ### HTML/Svelte Element Attribute Wrapping
 
