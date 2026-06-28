@@ -9,10 +9,12 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Write;
 use std::process::Stdio;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::NamedTempFile;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::process::{Child, ChildStdin, Command};
+use tokio::runtime::{Builder, Runtime};
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::{Duration, timeout};
 
@@ -27,6 +29,37 @@ const DENO_CONFIG: &str = r#"{"imports":{"acorn":"npm:acorn@8.16.0"}}"#;
 
 /// Request ID counter
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+
+/// Process-lifetime runtime that owns every sidecar's background tasks (the
+/// actor event loop plus the stdout/stderr reader tasks) and the child-process
+/// I/O registrations.
+///
+/// The sidecar pool is a process-global `static` (see `mod.rs`), but
+/// `tokio::spawn` binds a task to whatever runtime is current at spawn time.
+/// The production `tsv_debug` binary runs a single long-lived `#[tokio::main]`
+/// runtime, so that is harmless there — but the test suite runs many
+/// `#[tokio::test]`s, each with its own short-lived runtime. Binding the pool's
+/// tasks to whichever test runtime first initialized the pool meant the tasks
+/// were aborted the moment that test finished its runtime, so every later test
+/// pulled a now-dead actor from the pool and got [`DenoError::ActorShutdown`].
+/// Pinning the tasks (and the child-process I/O) to this dedicated runtime
+/// decouples the pool from any caller's runtime: it lives for the whole process
+/// regardless of which runtime first touched it.
+fn sidecar_runtime() -> &'static Runtime {
+    static SIDECAR_RT: OnceLock<Runtime> = OnceLock::new();
+    SIDECAR_RT.get_or_init(|| {
+        // One worker thread is plenty: the sidecars are I/O-bound and each
+        // multiplexes its own requests; this thread only drives the actor loops
+        // and the stdout/stderr readers.
+        #[allow(clippy::expect_used)] // runtime build fails only on catastrophic OS resource exhaustion, with no recovery path
+        Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .thread_name("tsv-deno-sidecar")
+            .build()
+            .expect("failed to build the deno sidecar runtime")
+    })
+}
 
 /// Internal request to the actor
 struct ActorRequest {
@@ -65,6 +98,14 @@ impl DenoActor {
         config_file
             .write_all(DENO_CONFIG.as_bytes())
             .map_err(DenoError::ScriptWrite)?;
+
+        // Bind the child process I/O and all three background tasks below to the
+        // process-lifetime sidecar runtime rather than whatever runtime is
+        // current here. This guard must stay live through the final
+        // `tokio::spawn` (it restores the previous context on drop), so it is a
+        // named binding — `let _` would drop it immediately. See
+        // `sidecar_runtime`.
+        let _rt_guard = sidecar_runtime().enter();
 
         // Spawn Deno process
         let mut child = Command::new("deno")
@@ -185,9 +226,11 @@ impl DenoActor {
 
 impl Drop for DenoActor {
     fn drop(&mut self) {
-        // Best-effort shutdown signal
+        // Best-effort shutdown signal, spawned on the dedicated sidecar runtime
+        // so the drop doesn't depend on an ambient runtime being current (in
+        // practice the pool is a process-lifetime static that never drops).
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        sidecar_runtime().spawn(async move {
             let _ = tx.send(ActorCommand::Shutdown).await;
         });
     }

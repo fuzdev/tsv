@@ -180,9 +180,10 @@ fn comment_drop_exact_output_and_idempotent() {
 }
 
 /// Oracle cross-check: prettier (with tsv's options) produces the same output for
-/// every case — confirming the comment is real content neither tool may drop. A
-/// single `#[tokio::test]` runs the cases sequentially to avoid the shared-sidecar
-/// multi-runtime race (mirrors `deno::tests::test_deno_tools`).
+/// every case — confirming the comment is real content neither tool may drop. The
+/// cases loop sequentially within one `#[tokio::test]`; the shared sidecar pool is
+/// safe to use from any number of separate `#[tokio::test]`s because its actor
+/// tasks live on a dedicated process-lifetime runtime, not on the per-test one.
 #[tokio::test]
 async fn comment_drop_cases_match_prettier() {
     for &(label, input, expected) in COMMENT_DROP_CASES {
