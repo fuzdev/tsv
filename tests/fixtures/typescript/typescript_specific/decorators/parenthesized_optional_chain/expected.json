@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 175,
+	"end": 171,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,8 +13,8 @@
 		{
 			"type": "Line",
 			"value": " a parenthesized optional-chain callee keeps an outer paren wrapping the",
-			"start": 36,
-			"end": 110,
+			"start": 32,
+			"end": 106,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -29,8 +29,8 @@
 		{
 			"type": "Line",
 			"value": " whole decorator expression",
-			"start": 113,
-			"end": 142,
+			"start": 109,
+			"end": 138,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 174,
+		"end": 170,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 165,
+			"end": 161,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
-					"end": 164,
+					"end": 160,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -80,7 +80,7 @@
 					"id": {
 						"type": "Identifier",
 						"start": 26,
-						"end": 31,
+						"end": 27,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -88,20 +88,20 @@
 							},
 							"end": {
 								"line": 2,
-								"column": 12
+								"column": 8
 							}
 						},
-						"name": "Crash"
+						"name": "A"
 					},
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 32,
-						"end": 164,
+						"start": 28,
+						"end": 160,
 						"loc": {
 							"start": {
 								"line": 2,
-								"column": 13
+								"column": 9
 							},
 							"end": {
 								"line": 7,
@@ -111,8 +111,8 @@
 						"body": [
 							{
 								"type": "PropertyDefinition",
-								"start": 145,
-								"end": 161,
+								"start": 141,
+								"end": 157,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -127,8 +127,8 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 159,
-									"end": 160,
+									"start": 155,
+									"end": 156,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -145,8 +145,8 @@
 								"decorators": [
 									{
 										"type": "Decorator",
-										"start": 145,
-										"end": 156,
+										"start": 141,
+										"end": 152,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -159,8 +159,8 @@
 										},
 										"expression": {
 											"type": "CallExpression",
-											"start": 147,
-											"end": 155,
+											"start": 143,
+											"end": 151,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -173,8 +173,8 @@
 											},
 											"callee": {
 												"type": "ChainExpression",
-												"start": 148,
-												"end": 152,
+												"start": 144,
+												"end": 148,
 												"loc": {
 													"start": {
 														"line": 5,
@@ -187,8 +187,8 @@
 												},
 												"expression": {
 													"type": "MemberExpression",
-													"start": 148,
-													"end": 152,
+													"start": 144,
+													"end": 148,
 													"loc": {
 														"start": {
 															"line": 5,
@@ -201,8 +201,8 @@
 													},
 													"object": {
 														"type": "Identifier",
-														"start": 148,
-														"end": 149,
+														"start": 144,
+														"end": 145,
 														"loc": {
 															"start": {
 																"line": 5,
@@ -217,8 +217,8 @@
 													},
 													"property": {
 														"type": "Identifier",
-														"start": 151,
-														"end": 152,
+														"start": 147,
+														"end": 148,
 														"loc": {
 															"start": {
 																"line": 5,
@@ -244,14 +244,14 @@
 									{
 										"type": "Line",
 										"value": " a parenthesized optional-chain callee keeps an outer paren wrapping the",
-										"start": 36,
-										"end": 110
+										"start": 32,
+										"end": 106
 									},
 									{
 										"type": "Line",
 										"value": " whole decorator expression",
-										"start": 113,
-										"end": 142
+										"start": 109,
+										"end": 138
 									}
 								]
 							}
