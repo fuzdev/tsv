@@ -396,11 +396,11 @@ impl<'a> Printer<'a> {
         let mut parts = smallvec![d.text("import ")];
 
         // Phase keyword for the import-phase proposals: `import source …` (binding)
-        // / `import defer …` (namespace). Mutually exclusive with `type`.
-        match decl.phase {
-            internal::ImportPhase::Source => parts.push(d.text("source ")),
-            internal::ImportPhase::Defer => parts.push(d.text("defer ")),
-            internal::ImportPhase::None => {}
+        // / `import defer …` (namespace). Mutually exclusive with `type`. The
+        // keyword spelling is `ImportPhase::as_str`'s — the single source of truth.
+        if let Some(kw) = decl.phase.as_str() {
+            parts.push(d.text(kw));
+            parts.push(d.text(" "));
         }
 
         // Add 'type' keyword for type-only imports

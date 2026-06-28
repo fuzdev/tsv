@@ -70,12 +70,9 @@ impl<'a> Printer<'a> {
         let is_type = decl.import_kind == internal::ImportKind::Type;
         let base = self.module_header_end(is_type, decl.span.start, search_end);
         // Skip the phase keyword (`source `/`defer `) for the import-phase proposals
-        // so the default-binding / namespace comment scan starts after it.
-        base + match decl.phase {
-            internal::ImportPhase::Source => "source ".len() as u32,
-            internal::ImportPhase::Defer => "defer ".len() as u32,
-            internal::ImportPhase::None => 0,
-        }
+        // so the default-binding / namespace comment scan starts after it. Derives
+        // from `ImportPhase::as_str` (single source of truth) plus its trailing space.
+        base + decl.phase.as_str().map_or(0, |kw| kw.len() as u32 + 1)
     }
 
     /// Position just past the leading keyword(s) of an export named declaration:

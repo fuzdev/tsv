@@ -226,6 +226,22 @@ with a `phase: 'source' | 'defer'` field (omitted for an ordinary import). `sour
 and `defer` stay contextual — `import defer from 'mod'` still imports a default
 binding named `defer`.
 
+**Known limitation — source-phase binding named like a contextual keyword.** The
+spec disambiguates `import source x from 'mod'` (phase, binding `x`) from `import
+source from 'mod'` (a default import named `source`) by which production yields a
+complete parse: the source-phase reading needs a trailing `from` FromClause after
+the binding. tsv approximates this with a one-token lookahead — `source` is the
+phase only when the next token lexes as an `Identifier`. That covers every binding
+except one whose name is itself a contextual keyword the lexer emits as a non-`Identifier`
+token (`from`, `as`): `import source from from 'mod'` is spec-valid (source-phase,
+binding named `from`) but tsv rejects it. This is **deliberately not closed** —
+spec-faithful resolution would need lookahead past the binding to the `from`, and a
+source-phase import whose binding is literally named `from`/`as` is vanishingly rare.
+It is also **never graded**: test262 encodes it only as a `_FIXTURE.js` (run by the
+host, not the parser grader), so it doesn't dent the 100% positive rate. Pinned in
+`tests/import_phase.rs` (`static_import_source_keyword_binding_rejected`). The
+identifier-named-`source` binding (`import source source from 'mod'`) parses fine.
+
 **No `_svelte_divergence` fixture** (the fixture pipeline needs acorn to produce
 `expected.json`, and acorn rejects the syntax). The parser is graded instead by the
 test262 suite — ~396 graded files, all passing; see

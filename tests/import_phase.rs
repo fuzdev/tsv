@@ -17,6 +17,11 @@
 //! (prettier silently drops the phase) is documented-only — a live "prettier
 //! succeeds with wrong output" assertion would gate the suite on a sidecar call
 //! under load, which is needless fragility for a niche Stage-3 divergence.
+//!
+//! One test also pins a *parser* divergence that the fixture/test262 path can't
+//! reach (the spec-valid input is a `_FIXTURE.js`, never graded): a source-phase
+//! binding whose name lexes as a contextual keyword. See
+//! `static_import_source_keyword_binding_rejected`.
 
 /// tsv parses + formats `input` to itself, then re-formats stably (idempotent).
 fn assert_ours_stable(input: &str) {
@@ -52,4 +57,32 @@ fn static_import_defer_namespace_stable() {
 #[test]
 fn static_import_source_binding_stable() {
     assert_ours_stable("<script lang=\"ts\">\n\timport source x from 'x';\n</script>\n");
+}
+
+/// tsv currently *rejects* `input`. Pins a known, documented parse divergence —
+/// flip to `assert_ours_stable` if/when the disambiguation is tightened to accept
+/// it. See `docs/conformance_svelte.md` §Import-phase proposals.
+fn assert_ours_rejects(input: &str) {
+    let arena = bumpalo::Bump::new();
+    assert!(
+        tsv_svelte::parse(input, &arena).is_err(),
+        "expected parse rejection (pinned divergence)"
+    );
+}
+
+/// A source-phase binding whose name lexes as a contextual keyword (`from`, `as`)
+/// is currently rejected. The disambiguation between `import source x from 'm'`
+/// (phase, binding `x`) and `import source from 'm'` (a default import named
+/// `source`) keys on `peek == Identifier`, so it only fires for an
+/// identifier-lexed binding. `import source from from 'm'` is spec-valid
+/// (source-phase, binding named `from`) — the spec resolves it by which
+/// production yields a complete parse (the trailing `from` FromClause) — but tsv
+/// rejects it. Spec-faithful resolution would need lookahead past the binding to
+/// that `from`. Vanishingly rare (a binding literally named `from`/`as`); pinned
+/// as a conscious limitation, not a silent gap. The identifier-named-`source`
+/// binding (`import source source from`) still parses — boundary check.
+#[test]
+fn static_import_source_keyword_binding_rejected() {
+    assert_ours_rejects("<script lang=\"ts\">\n\timport source from from 'x';\n</script>\n");
+    assert_ours_stable("<script lang=\"ts\">\n\timport source source from 'x';\n</script>\n");
 }
