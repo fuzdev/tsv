@@ -13,7 +13,7 @@ use super::helpers::{
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
-use crate::printer::analysis::{has_newline_after_position, has_newline_before_position};
+use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::hang_after_operator;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -70,7 +70,7 @@ impl<'a> Printer<'a> {
             }
             parts.push(self.build_comment_doc(comment));
             if has_newline_after_position(self.source, comment.span.end) {
-                if has_newline_before_position(self.source, comment.span.start) {
+                if self.is_own_line_comment(comment) {
                     parts.push(d.hardline());
                 } else {
                     parts.push(d.line());
@@ -541,7 +541,7 @@ impl<'a> Printer<'a> {
         union.types.windows(2).any(|pair| {
             let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
             comments_in_range(self.comments, prev_end, next_start)
-                .any(|c| !c.is_block || has_newline_before_position(self.source, c.span.start))
+                .any(|c| self.is_own_line_comment(c))
         })
     }
 

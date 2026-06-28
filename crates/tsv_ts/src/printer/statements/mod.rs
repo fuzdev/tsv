@@ -19,7 +19,6 @@ mod variable;
 pub(super) use super::{Printer, build_entity_name_doc, should_hug_union_type};
 
 use super::ParenContext;
-use super::analysis::has_newline_before_position;
 use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
@@ -115,7 +114,7 @@ impl<'a> Printer<'a> {
             let paren_open_own_line_comment = needs_parens
                 && stmt.span.start < expr_start
                 && comments_in_range(self.comments, stmt.span.start + 1, expr_start)
-                    .any(|c| !c.is_block || has_newline_before_position(self.source, c.span.start));
+                    .any(|c| self.is_own_line_comment(c));
 
             // When the whole expression isn't wrapped, a nested leftmost
             // object/function/class still needs parens around itself
