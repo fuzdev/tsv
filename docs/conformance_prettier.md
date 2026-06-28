@@ -240,6 +240,7 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 - @media long with `/* */` — Print width (the comment is incidental; the divergence is the over-width unwrapped query) — [media_long](../tests/fixtures/css/tokens/comments/media_long_prettier_divergence/)
 - Selector before `{` — [selector_before_opening_brace](../tests/fixtures/css/tokens/comments/selector_before_opening_brace_prettier_divergence/)
 - Selector before `{` (≥2) — [selector_before_opening_brace_multiple](../tests/fixtures/css/tokens/comments/selector_before_opening_brace_multiple_prettier_divergence/)
+- Selector before `{` (in at-rule) — [selector_before_opening_brace_in_atrule](../tests/fixtures/css/tokens/comments/selector_before_opening_brace_in_atrule_prettier_divergence/)
 - Selector list — [selector_list](../tests/fixtures/css/tokens/comments/selector_list_prettier_divergence/)
 
 ### Whitespace: BOM Handling

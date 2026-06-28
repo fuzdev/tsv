@@ -114,41 +114,22 @@ impl<'a> Printer<'a> {
     ///
     /// Returns (needs_wrapping, is_comma_separated)
     fn should_wrap_value_width_based(&self, value: &CssValue<'_>, property: &str) -> (bool, bool) {
-        match value {
-            CssValue::CommaSeparated { values, .. } => {
-                let doc = self.build_separated_values_doc(values, ", ");
-                let available = doc::available_width(
-                    self.effective_indent(),
-                    0,
-                    property.len() + 3, // property + ": " + ";"
-                );
-                let exceeds_width = !doc::arena_fits::<dyn doc::TextResolver>(
-                    self.arena,
-                    doc,
-                    available,
-                    Mode::Flat,
-                    None,
-                );
-                (exceeds_width, true)
-            }
-            CssValue::List { values, .. } => {
-                let doc = self.build_separated_values_doc(values, " ");
-                let available = doc::available_width(
-                    self.effective_indent(),
-                    0,
-                    property.len() + 3, // property + ": " + ";"
-                );
-                let exceeds_width = !doc::arena_fits::<dyn doc::TextResolver>(
-                    self.arena,
-                    doc,
-                    available,
-                    Mode::Flat,
-                    None,
-                );
-                (exceeds_width, false)
-            }
-            _ => (false, false),
-        }
+        // Comma- and space-separated lists differ only in separator and the
+        // is_comma flag returned; the width check is otherwise identical.
+        let (values, separator, is_comma) = match value {
+            CssValue::CommaSeparated { values, .. } => (values, ", ", true),
+            CssValue::List { values, .. } => (values, " ", false),
+            _ => return (false, false),
+        };
+        let doc = self.build_separated_values_doc(values, separator);
+        let available = doc::available_width(
+            self.effective_indent(),
+            0,
+            property.len() + 3, // property + ": " + ";"
+        );
+        let exceeds_width =
+            !doc::arena_fits::<dyn doc::TextResolver>(self.arena, doc, available, Mode::Flat, None);
+        (exceeds_width, is_comma)
     }
 
     /// Check if a function should wrap its arguments (with explicit context offset)
