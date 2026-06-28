@@ -21,9 +21,10 @@ use crate::printer::Printer;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::{Comment, comments_in_range};
 
 /// Small vector of comment references, stack-allocated for typical cases.
-type CommentVec<'a> = SmallVec<[&'a tsv_lang::Comment; 2]>;
+type CommentVec<'a> = SmallVec<[&'a Comment; 2]>;
 
 impl<'a> Printer<'a> {
     /// Partition comments between two positions into inline vs own-line.
@@ -44,7 +45,7 @@ impl<'a> Printer<'a> {
         let mut own_line = SmallVec::new();
         let mut inline_next = SmallVec::new();
 
-        for comment in tsv_lang::comments_in_range(self.comments, prev_end, next_start) {
+        for comment in comments_in_range(self.comments, prev_end, next_start) {
             let same_line_as_prev = self.is_same_line(prev_end, comment.span.start);
             let same_line_as_next = self.is_same_line(comment.span.end, next_start);
 
@@ -82,8 +83,8 @@ impl<'a> Printer<'a> {
     fn build_comments_between_parts(
         &self,
         parts: &mut DocBuf,
-        inline_prev: &[&tsv_lang::Comment],
-        own_line: &[&tsv_lang::Comment],
+        inline_prev: &[&Comment],
+        own_line: &[&Comment],
         prev_end: u32,
     ) -> u32 {
         let d = self.d();
@@ -325,7 +326,7 @@ impl<'a> Printer<'a> {
         // - "inline with open paren" = comment STARTS on same line as open paren
         // - "own line" = comment does NOT start on same line as open paren
         let leading_comments: Vec<_> = if has_leading {
-            tsv_lang::comments_in_range(self.comments, open_paren_pos + 1, test_start).collect()
+            comments_in_range(self.comments, open_paren_pos + 1, test_start).collect()
         } else {
             Vec::new()
         };

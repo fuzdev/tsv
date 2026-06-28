@@ -5,6 +5,7 @@
 
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::Printer;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, skip_comment};
@@ -190,7 +191,7 @@ impl<'a> Printer<'a> {
         inner_parts.push(d.hardline());
         inner_parts.push(d.text(";"));
         if let (Some(semi1), Some(semi2)) = (first_semi, second_semi) {
-            for comment in tsv_lang::comments_in_range(self.comments, semi1 + 1, semi2) {
+            for comment in comments_in_range(self.comments, semi1 + 1, semi2) {
                 if self.is_same_line(semi1, comment.span.start) {
                     inner_parts.push(d.text(" "));
                     inner_parts.push(self.build_comment_doc(comment));
@@ -205,7 +206,7 @@ impl<'a> Printer<'a> {
         // Comments after second semicolon: inline first, then own-line
         if let Some(semi2) = second_semi {
             let mut own_line_comments = Vec::new();
-            for comment in tsv_lang::comments_in_range(self.comments, semi2 + 1, close_paren) {
+            for comment in comments_in_range(self.comments, semi2 + 1, close_paren) {
                 if self.is_same_line(semi2, comment.span.start) {
                     inner_parts.push(d.text(" "));
                     inner_parts.push(self.build_comment_doc(comment));
@@ -316,7 +317,7 @@ impl<'a> Printer<'a> {
 
             // Inline block comments before the first clause (on the same line)
             // e.g., `for (/* before init */ let j = 0; ...)`
-            for comment in tsv_lang::comments_in_range(self.comments, open + 1, first_start) {
+            for comment in comments_in_range(self.comments, open + 1, first_start) {
                 if comment.is_block && self.is_same_line(comment.span.end, first_start) {
                     inner_parts.push(self.build_comment_doc(comment));
                     inner_parts.push(d.text(" "));
@@ -451,7 +452,7 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in tsv_lang::comments_in_range(self.comments, search_start, clause_start) {
+        for comment in comments_in_range(self.comments, search_start, clause_start) {
             // Only include comments that are:
             // 1. NOT on the same line as the next clause
             // 2. NOT on the same line as the previous expression (inline comments)
@@ -524,7 +525,7 @@ impl<'a> Printer<'a> {
             return;
         };
         let d = self.d();
-        for comment in tsv_lang::comments_in_range(self.comments, start, end) {
+        for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block == want_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -594,7 +595,7 @@ impl<'a> Printer<'a> {
         end: u32,
     ) {
         let d = self.d();
-        for comment in tsv_lang::comments_in_range(self.comments, range_start, boundary) {
+        for comment in comments_in_range(self.comments, range_start, boundary) {
             if self.is_same_line(end, comment.span.start) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -624,7 +625,7 @@ impl<'a> Printer<'a> {
 
         // Inline block comments on the same line just before the clause
         // e.g., `for (let i = 0; /* before test */ i < 10; ...)`
-        for comment in tsv_lang::comments_in_range(self.comments, search_start, clause_start) {
+        for comment in comments_in_range(self.comments, search_start, clause_start) {
             if comment.is_block
                 && self.is_same_line(comment.span.end, clause_start)
                 && prev_end.is_none_or(|pe| !self.is_same_line(pe, comment.span.start))
@@ -808,7 +809,7 @@ impl<'a> Printer<'a> {
 
         // Comments between ( and left
         if let Some(open) = open_paren {
-            for comment in tsv_lang::comments_in_range(self.comments, open + 1, left_start) {
+            for comment in comments_in_range(self.comments, open + 1, left_start) {
                 if comment.is_block {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
@@ -881,7 +882,7 @@ impl<'a> Printer<'a> {
 
         // Comments before left (after open paren)
         if let Some(open) = open_paren {
-            for comment in tsv_lang::comments_in_range(self.comments, open + 1, left_start) {
+            for comment in comments_in_range(self.comments, open + 1, left_start) {
                 inner.push(d.hardline());
                 inner.push(self.build_comment_doc(comment));
             }
@@ -892,7 +893,7 @@ impl<'a> Printer<'a> {
         inner.push(self.build_for_in_of_left_doc(left));
 
         // Comments after left, before keyword — emit all (own-line comments normalize to inline)
-        for comment in tsv_lang::comments_in_range(self.comments, left_end, keyword_pos) {
+        for comment in comments_in_range(self.comments, left_end, keyword_pos) {
             inner.push(d.text(" "));
             inner.push(self.build_comment_doc(comment));
         }
@@ -906,7 +907,7 @@ impl<'a> Printer<'a> {
         let mut keyword_parts = vec![d.hardline(), keyword_doc];
 
         // Comments after keyword, before right — emit all (own-line comments normalize to inline)
-        for comment in tsv_lang::comments_in_range(self.comments, keyword_end, right_start) {
+        for comment in comments_in_range(self.comments, keyword_end, right_start) {
             keyword_parts.push(d.text(" "));
             keyword_parts.push(self.build_comment_doc(comment));
         }
@@ -917,7 +918,7 @@ impl<'a> Printer<'a> {
 
         // Comments after right, before close paren
         if let Some(close) = close_paren {
-            for comment in tsv_lang::comments_in_range(self.comments, right_end, close) {
+            for comment in comments_in_range(self.comments, right_end, close) {
                 keyword_parts.push(d.text(" "));
                 keyword_parts.push(self.build_comment_doc(comment));
             }
@@ -1015,7 +1016,7 @@ impl<'a> Printer<'a> {
     fn append_for_in_of_block_comments(&self, parts: &mut DocBuf, start: u32, end: u32) -> bool {
         let d = self.d();
         let mut added = false;
-        for comment in tsv_lang::comments_in_range(self.comments, start, end) {
+        for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -1032,7 +1033,7 @@ impl<'a> Printer<'a> {
     /// Own-line comments normalize to inline. No trailing space.
     fn append_for_in_of_trailing_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
         let d = self.d();
-        for comment in tsv_lang::comments_in_range(self.comments, start, end) {
+        for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -1084,9 +1085,7 @@ impl<'a> Printer<'a> {
                     // adjustClause; multiple comments previously collapsed inline).
                     let mut inner = DocBuf::new();
                     let mut prev = header_end;
-                    for comment in
-                        tsv_lang::comments_in_range(self.comments, header_end, body_start)
-                    {
+                    for comment in comments_in_range(self.comments, header_end, body_start) {
                         if prev != header_end
                             && self.has_blank_line_between(prev, comment.span.start)
                         {

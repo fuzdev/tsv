@@ -8,6 +8,7 @@
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
 use tsv_lang::LocationTracker;
+use tsv_ts::ast::convert::convert_expression;
 
 use super::{convert_attribute_value, convert_expression_tag, span_to_name_loc, to_json_value};
 
@@ -20,7 +21,7 @@ pub(super) fn convert_on_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0));
 
     public::OnDirective {
         start: d.span.start,
@@ -138,7 +139,7 @@ pub(super) fn convert_use_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0));
 
     public::UseDirective {
         start: d.span.start,
@@ -160,7 +161,7 @@ pub(super) fn convert_transition_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0));
 
     public::TransitionDirective {
         start: d.span.start,
@@ -184,7 +185,7 @@ pub(super) fn convert_animate_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0));
 
     public::AnimateDirective {
         start: d.span.start,
@@ -206,7 +207,7 @@ pub(super) fn convert_let_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| tsv_ts::ast::convert::convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0));
 
     public::LetDirective {
         start: d.span.start,
@@ -233,7 +234,7 @@ fn convert_directive_expression(
 ) -> serde_json::Value {
     if has_expression_tag {
         // Explicit: normal conversion with loc
-        let converted = tsv_ts::ast::convert::convert_expression(expr, source, loc, interner, 0);
+        let converted = convert_expression(expr, source, loc, interner, 0);
         to_json_value(&converted)
     } else {
         // Shorthand: synthetic identifier without loc, Svelte field ordering.

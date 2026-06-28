@@ -50,7 +50,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use tsv_cli::cli::input::ParserType;
-use tsv_lang::{ByteToCharMap, LocationTracker};
+use tsv_lang::{ByteToCharMap, LocationTracker, estimated_ast_arena_capacity};
 
 use super::profile::{format_duration, format_size, lang_label, median_us, resolve_profile_files};
 use crate::cli::CliError;
@@ -230,7 +230,7 @@ fn profile_ts_once(
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
     // Arena allocated outside the timed region so its setup isn't counted.
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let t = Instant::now();
     let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
     steps.parse.push(t.elapsed());
@@ -354,7 +354,7 @@ fn profile_svelte_once(
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
     // Arena allocated outside the timed region so its setup isn't counted.
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let t = Instant::now();
     let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
     steps.parse.push(t.elapsed());
@@ -435,7 +435,7 @@ fn profile_css_once(
     meta: &mut Option<IterMeta>,
 ) -> Result<(), String> {
     // Arena allocated outside the timed region so its setup isn't counted.
-    let arena = bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(source.len()));
+    let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let t = Instant::now();
     let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
     steps.parse.push(t.elapsed());

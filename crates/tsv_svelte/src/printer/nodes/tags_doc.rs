@@ -5,8 +5,11 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
+use tsv_lang::Span;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
+use tsv_ts::Expression;
 
 // Opening-tag literals whose `.len()` locates the embedded expression past the
 // tag; sharing the literal keeps the emitted text and the scan offset in sync.
@@ -30,7 +33,7 @@ impl<'a> Printer<'a> {
         );
 
         // Assignment expressions need parens: {@html (a = b)}
-        let expr_doc = if matches!(tag.expression, tsv_ts::Expression::AssignmentExpression(_)) {
+        let expr_doc = if matches!(tag.expression, Expression::AssignmentExpression(_)) {
             d.parens(expr_doc)
         } else {
             expr_doc
@@ -73,9 +76,9 @@ impl<'a> Printer<'a> {
     fn build_assignment_tag_doc(
         &self,
         prefix: &'static str,
-        id: &tsv_ts::Expression<'_>,
-        init: &tsv_ts::Expression<'_>,
-        span: tsv_lang::Span,
+        id: &Expression<'_>,
+        init: &Expression<'_>,
+        span: Span,
     ) -> DocId {
         let d = self.d();
         let id_doc = self.build_ts_expression_doc_no_comments(id);
@@ -133,16 +136,14 @@ impl<'a> Printer<'a> {
     /// that appear in @const tags, delegating to tsv_ts's predicates so the
     /// rules can't drift from our own assignment printer.
     /// Prettier ref: assignment.js:196-226
-    fn const_should_break_after_op(expr: &tsv_ts::Expression<'_>) -> bool {
+    fn const_should_break_after_op(expr: &Expression<'_>) -> bool {
         match expr {
             // Binary expressions break after `=`, UNLESS it's a logical expression
             // with a self-expanding RHS (non-empty object/array). In that case, the
             // RHS handles its own expansion: `= item || { ... }` not `=\n  item || {}`
             // Prettier ref: assignment.js:199 `isBinaryish && !shouldInlineLogicalExpression`
-            tsv_ts::Expression::BinaryExpression(bin) => {
-                !tsv_ts::should_inline_logical_expression(bin)
-            }
-            tsv_ts::Expression::SequenceExpression(_) => true,
+            Expression::BinaryExpression(bin) => !tsv_ts::should_inline_logical_expression(bin),
+            Expression::SequenceExpression(_) => true,
             // Conditionals break only when the test is binary (and not inline
             // logical); simple identifier tests (e.g., `cond ? a : b`) use fluid
             // layout. False for every other expression type.
@@ -156,20 +157,14 @@ impl<'a> Printer<'a> {
     /// Like `build_expression_with_comments_doc` but uses `first_line_offset = 0`
     /// so binary chains use Grouped style (not ContinuationIndent). The @const
     /// assignment layout handles indentation; ContinuationIndent would stack.
-    fn build_const_init_doc(
-        &self,
-        expr: &tsv_ts::Expression<'_>,
-        span_start: u32,
-        span_end: u32,
-    ) -> DocId {
+    fn build_const_init_doc(&self, expr: &Expression<'_>, span_start: u32, span_end: u32) -> DocId {
         let d = self.d();
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
 
-        let leading_docs: Vec<DocId> =
-            tsv_lang::comments_in_range(self.comments, span_start, expr_start)
-                .map(|c| self.build_leading_js_comment_doc(c))
-                .collect();
+        let leading_docs: Vec<DocId> = comments_in_range(self.comments, span_start, expr_start)
+            .map(|c| self.build_leading_js_comment_doc(c))
+            .collect();
 
         // mode defaults to Standalone: binary chains use Grouped style, not ContinuationIndent
         let embed = tsv_lang::EmbedContext {
@@ -180,10 +175,9 @@ impl<'a> Printer<'a> {
         let expr_doc =
             tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
 
-        let trailing_docs: Vec<DocId> =
-            tsv_lang::comments_in_range(self.comments, expr_end, span_end)
-                .map(|c| self.build_trailing_js_comment_doc(c))
-                .collect();
+        let trailing_docs: Vec<DocId> = comments_in_range(self.comments, expr_end, span_end)
+            .map(|c| self.build_trailing_js_comment_doc(c))
+            .collect();
 
         self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }
@@ -199,7 +193,7 @@ impl<'a> Printer<'a> {
 
         // Comments within the tag's content (after "{@debug" and before "}").
         let tag_comments: Vec<&tsv_lang::Comment> =
-            tsv_lang::comments_in_range(self.comments, tag.span.start, tag.span.end).collect();
+            comments_in_range(self.comments, tag.span.start, tag.span.end).collect();
 
         if tag.identifiers.is_empty() && tag_comments.is_empty() {
             return d.text("{@debug}");

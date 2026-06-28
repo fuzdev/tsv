@@ -2,7 +2,7 @@
 
 use super::super::{internal, public};
 use super::declarations::convert_type_parameter;
-use super::{convert_expression, create_location};
+use super::{convert_expression, convert_identifier, convert_literal, create_location};
 use internal::TSKeywordKind;
 use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
@@ -181,7 +181,7 @@ pub(in crate::ast) fn convert_type<'src>(
                     loc: create_location(p.parameter_name.span, loc, offset),
                 })
             } else {
-                public::TSTypePredicateParameterName::Identifier(super::convert_identifier(
+                public::TSTypePredicateParameterName::Identifier(convert_identifier(
                     &p.parameter_name,
                     source,
                     loc,
@@ -276,7 +276,7 @@ pub(in crate::ast) fn convert_type<'src>(
             start: i.span.start,
             end: i.span.end,
             loc: create_location(i.span, loc, offset),
-            argument: super::convert_literal(&i.argument, source, loc, offset),
+            argument: convert_literal(&i.argument, source, loc, offset),
             options: i
                 .options
                 .as_ref()
@@ -343,7 +343,7 @@ pub(in crate::ast) fn convert_type<'src>(
                 start: n.span.start,
                 end: n.span.end,
                 loc: create_location(n.span, loc, offset),
-                label: super::convert_identifier(&n.label, source, loc, interner, offset),
+                label: convert_identifier(&n.label, source, loc, interner, offset),
                 element_type: Box::new(convert_type(n.element_type, source, loc, interner, offset)),
                 optional: n.optional,
             })
@@ -383,7 +383,7 @@ fn convert_type_query_expr_name<'src>(
     match expr_name {
         internal::TSTypeQueryExprName::EntityName(entity) => match entity {
             internal::TSEntityName::Identifier(id) => public::TSTypeQueryExprName::Identifier(
-                super::convert_identifier(id, source, loc, interner, offset),
+                convert_identifier(id, source, loc, interner, offset),
             ),
             internal::TSEntityName::QualifiedName(qn) => {
                 public::TSTypeQueryExprName::QualifiedName(public::TSQualifiedName {
@@ -392,7 +392,7 @@ fn convert_type_query_expr_name<'src>(
                     end: qn.span.end,
                     loc: create_location(qn.span, loc, offset),
                     left: Box::new(convert_entity_name(&qn.left, source, loc, interner, offset)),
-                    right: super::convert_identifier(&qn.right, source, loc, interner, offset),
+                    right: convert_identifier(&qn.right, source, loc, interner, offset),
                 })
             }
         },
@@ -402,7 +402,7 @@ fn convert_type_query_expr_name<'src>(
                 start: i.span.start,
                 end: i.span.end,
                 loc: create_location(i.span, loc, offset),
-                argument: super::convert_literal(&i.argument, source, loc, offset),
+                argument: convert_literal(&i.argument, source, loc, offset),
                 options: i
                     .options
                     .as_ref()
@@ -447,7 +447,7 @@ fn convert_literal_type<'src>(
                 start: literal.span.start,
                 end: literal.span.end,
                 loc: create_location(literal.span, loc, offset),
-                literal: public::TSLiteralTypeLiteral::Literal(super::convert_literal(
+                literal: public::TSLiteralTypeLiteral::Literal(convert_literal(
                     literal, source, loc, offset,
                 )),
             })
@@ -473,7 +473,7 @@ fn convert_literal_type<'src>(
                     loc: create_location(unary.span, loc, offset),
                     operator: unary.operator.as_str(),
                     prefix: unary.prefix,
-                    argument: Box::new(public::Expression::Literal(super::convert_literal(
+                    argument: Box::new(public::Expression::Literal(convert_literal(
                         arg_lit, source, loc, offset,
                     ))),
                 }),
@@ -571,9 +571,9 @@ pub(super) fn convert_entity_name<'src>(
     offset: usize,
 ) -> public::TSEntityName<'src> {
     match name {
-        internal::TSEntityName::Identifier(id) => public::TSEntityName::Identifier(
-            super::convert_identifier(id, source, loc, interner, offset),
-        ),
+        internal::TSEntityName::Identifier(id) => {
+            public::TSEntityName::Identifier(convert_identifier(id, source, loc, interner, offset))
+        }
         internal::TSEntityName::QualifiedName(qn) => {
             public::TSEntityName::QualifiedName(public::TSQualifiedName {
                 node_type: "TSQualifiedName",
@@ -581,7 +581,7 @@ pub(super) fn convert_entity_name<'src>(
                 end: qn.span.end,
                 loc: create_location(qn.span, loc, offset),
                 left: Box::new(convert_entity_name(&qn.left, source, loc, interner, offset)),
-                right: super::convert_identifier(&qn.right, source, loc, interner, offset),
+                right: convert_identifier(&qn.right, source, loc, interner, offset),
             })
         }
     }
@@ -784,7 +784,7 @@ pub(in crate::ast) fn convert_interface_declaration<'src>(
         start: iface.span.start,
         end: iface.span.end,
         loc: create_location(iface.span, loc, offset),
-        id: super::convert_identifier(&iface.id, source, loc, interner, offset),
+        id: convert_identifier(&iface.id, source, loc, interner, offset),
         type_parameters: iface
             .type_parameters
             .as_ref()
@@ -853,7 +853,7 @@ pub(in crate::ast) fn convert_declare_function<'src>(
         end: func.span.end,
         loc: create_location(func.span, loc, offset),
         declare: func.declare,
-        id: super::convert_identifier(&func.id, source, loc, interner, offset),
+        id: convert_identifier(&func.id, source, loc, interner, offset),
         expression: false, // Always false for declarations
         generator: func.generator,
         is_async: func.r#async,
@@ -887,7 +887,7 @@ pub(in crate::ast) fn convert_enum_declaration<'src>(
         start: enum_decl.span.start,
         end: enum_decl.span.end,
         loc: create_location(enum_decl.span, loc, offset),
-        id: super::convert_identifier(&enum_decl.id, source, loc, interner, offset),
+        id: convert_identifier(&enum_decl.id, source, loc, interner, offset),
         members: enum_decl
             .members
             .iter()
@@ -908,10 +908,10 @@ fn convert_enum_member<'src>(
 ) -> public::TSEnumMember<'src> {
     let id = match &member.id {
         internal::TSEnumMemberId::Identifier(id) => public::TSEnumMemberId::Identifier(
-            super::convert_identifier(id, source, loc, interner, offset),
+            convert_identifier(id, source, loc, interner, offset),
         ),
         internal::TSEnumMemberId::String(lit) => {
-            public::TSEnumMemberId::Literal(super::convert_literal(lit, source, loc, offset))
+            public::TSEnumMemberId::Literal(convert_literal(lit, source, loc, offset))
         }
     };
 

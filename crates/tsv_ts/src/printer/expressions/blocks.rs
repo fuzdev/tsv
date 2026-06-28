@@ -14,6 +14,7 @@ use smallvec::SmallVec;
 
 use crate::ast::internal;
 use crate::printer::Printer;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -70,8 +71,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
-        let comments: Vec<_> =
-            tsv_lang::comments_in_range(self.comments, block_start, block_end).collect();
+        let comments: Vec<_> = comments_in_range(self.comments, block_start, block_end).collect();
         let mut comment_parts = DocBuf::new();
         for (i, comment) in comments.iter().enumerate() {
             comment_parts.push(self.build_comment_doc(comment));
@@ -155,7 +155,7 @@ impl<'a> Printer<'a> {
         if let Some(last_stmt_end) = prev_stmt_end {
             let trailing_start = self.find_end_with_trailing_comments(last_stmt_end);
             let mut trailing_prev_end = trailing_start;
-            for comment in tsv_lang::comments_in_range(self.comments, trailing_start, block_end) {
+            for comment in comments_in_range(self.comments, trailing_start, block_end) {
                 if self.is_same_line(trailing_start, comment.span.start) {
                     continue; // Skip same-line comments (already handled above)
                 }
@@ -281,7 +281,7 @@ impl<'a> Printer<'a> {
         prev_stmt_end: Option<u32>,
     ) -> SmallVec<[&internal::Comment; 4]> {
         let comments: SmallVec<[_; 4]> =
-            tsv_lang::comments_in_range(self.comments, prev_end, stmt_start).collect();
+            comments_in_range(self.comments, prev_end, stmt_start).collect();
         if let Some(prev_stmt) = prev_stmt_end {
             comments
                 .into_iter()

@@ -15,6 +15,7 @@ use super::arg_comments::{
 };
 use super::arg_predicates::{is_block_function, is_short_second_arg_for_expand_first};
 use crate::ast::internal;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -434,7 +435,7 @@ pub(crate) fn build_args_split_last(
 
         // Add inline block comments around comma
         if let Some(cpos) = comma_pos {
-            for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start) {
+            for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
                 if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
                     head_parts.push(d.text(" "));
                     head_parts.push(printer.build_comment_doc(comment));
@@ -445,7 +446,7 @@ pub(crate) fn build_args_split_last(
         head_parts.push(d.text(", "));
 
         if let Some(cpos) = comma_pos {
-            for comment in tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start) {
+            for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
                 if is_inline_block_after_comma(comment, cpos, printer.line_breaks, arg_end) {
                     head_parts.push(printer.build_comment_doc(comment));
                     head_parts.push(d.text(" "));
@@ -475,9 +476,7 @@ pub(crate) fn build_args_split_last(
 
             // Only add inline block comments that are BEFORE the comma
             if let Some(cpos) = comma_pos {
-                for comment in
-                    tsv_lang::comments_in_range(printer.comments, arg_end, next_arg_start)
-                {
+                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
                     if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
                         all_args_parts.push(d.text(" "));
                         all_args_parts.push(printer.build_comment_doc(comment));

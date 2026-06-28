@@ -3,6 +3,7 @@
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -168,7 +169,7 @@ impl<'a> Printer<'a> {
     fn build_jump_statement_doc(
         &self,
         keyword: &'static str,
-        span: tsv_lang::Span,
+        span: Span,
         label: Option<&internal::Identifier<'_>>,
     ) -> DocId {
         let d = self.d();

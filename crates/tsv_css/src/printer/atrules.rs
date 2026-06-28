@@ -21,6 +21,7 @@
 use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
+use tsv_lang::Span;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 use tsv_lang::source_scan;
@@ -317,7 +318,7 @@ impl<'a> Printer<'a> {
         kind: ConditionKind<'_>,
         condition: &internal::ConditionQuery<'_>,
         has_block: bool,
-        prelude_span: Option<tsv_lang::Span>,
+        prelude_span: Option<Span>,
     ) {
         // Print optional name prefix (for @container)
         let name_end_pos = if let Some(n) = kind.name() {
@@ -358,7 +359,7 @@ impl<'a> Printer<'a> {
         kind: ConditionKind<'_>,
         condition: &internal::ConditionQuery<'_>,
         name_end_pos: Option<u32>,
-        prelude_span: Option<tsv_lang::Span>,
+        prelude_span: Option<Span>,
         suffix_width: usize,
     ) -> DocId {
         let d = self.d();

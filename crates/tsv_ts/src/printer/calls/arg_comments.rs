@@ -9,6 +9,7 @@ use smallvec::SmallVec;
 
 use super::super::Printer;
 use crate::ast::internal;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 
 impl<'a> Printer<'a> {
@@ -263,7 +264,7 @@ pub(crate) fn should_force_expansion_for_comments(
         return true;
     }
     // Check if any block comment is truly standalone (not inline with the next code)
-    for comment in tsv_lang::comments_in_range(printer.comments, start, next_code_pos) {
+    for comment in comments_in_range(printer.comments, start, next_code_pos) {
         if comment.is_block
             && !printer.is_same_line(start, comment.span.start)
             && !is_comment_inline_with_next(printer, comment.span.end, next_code_pos)

@@ -14,7 +14,7 @@ use tsv_lang::doc::{
     arena::{DocArena, DocId},
 };
 use tsv_lang::printing::has_blank_line_between_strict;
-use tsv_lang::{ClassifiedComments, Span, SymbolToU32};
+use tsv_lang::{ClassifiedComments, Comment, Span, SymbolToU32};
 
 //
 // Trait Definition
@@ -104,22 +104,22 @@ pub trait ChainPrinter: SymbolLookup {
 
     /// Build doc for trailing block comments from a pre-classified slice.
     /// Emits space before each comment: `method() /* c */`
-    fn build_trailing_block_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
+    fn build_trailing_block_doc(&self, comments: &[&Comment]) -> DocId;
 
     /// Build doc for trailing line comments from a pre-classified slice.
     /// Uses line_suffix to keep comments with preceding element.
-    fn build_trailing_line_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
+    fn build_trailing_line_doc(&self, comments: &[&Comment]) -> DocId;
 
     /// Build doc for a pre-classified slice of leading comments, each on its
     /// own line (hardline after each).
-    fn build_leading_comments_doc(&self, comments: &[&tsv_lang::Comment]) -> DocId;
+    fn build_leading_comments_doc(&self, comments: &[&Comment]) -> DocId;
 
     /// Build line_suffix docs for line comments WITHOUT a trailing boundary.
     ///
     /// Used for inline chain formatting where we want comments to defer to end
     /// of line without being flushed immediately. Unlike `build_trailing_line_doc`,
     /// this doesn't add a `line_suffix_boundary()` at the end.
-    fn build_line_comments_no_boundary(&self, comments: &[&tsv_lang::Comment]) -> DocId;
+    fn build_line_comments_no_boundary(&self, comments: &[&Comment]) -> DocId;
 
     /// Get the source code string
     fn get_source(&self) -> &str;

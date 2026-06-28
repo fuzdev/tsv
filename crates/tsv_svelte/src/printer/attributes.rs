@@ -12,8 +12,10 @@
 use crate::ast::internal;
 use crate::printer::Printer;
 use smallvec::smallvec;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_lang::{SymbolResolver, SymbolToU32};
+use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::{Span, SymbolResolver, SymbolToU32};
 use tsv_ts::ast::internal::Expression;
 
 // Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`
@@ -325,7 +327,7 @@ impl<'a> Printer<'a> {
 
         // Leading comments (between prefix and expression)
         let expr_start = expr.span().start;
-        for comment in tsv_lang::comments_in_range(self.comments, comment_start, expr_start) {
+        for comment in comments_in_range(self.comments, comment_start, expr_start) {
             parts.push(self.build_leading_js_comment_doc(comment));
         }
 
@@ -334,7 +336,7 @@ impl<'a> Printer<'a> {
 
         // Trailing comments (between expression and `}`)
         let expr_end = expr.span().end;
-        for comment in tsv_lang::comments_in_range(self.comments, expr_end, span_end - 1) {
+        for comment in comments_in_range(self.comments, expr_end, span_end - 1) {
             parts.push(self.build_trailing_js_comment_doc(comment));
         }
 
@@ -357,7 +359,7 @@ impl<'a> Printer<'a> {
         name: &str,
         modifiers: &[&str],
         expression: Option<&Expression<'_>>,
-        expression_tag_span: Option<tsv_lang::Span>,
+        expression_tag_span: Option<Span>,
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![prefix, d.text_owned(name.to_string())];
@@ -530,7 +532,7 @@ impl<'a> Printer<'a> {
     fn build_expression_doc_parts_with_span(
         &self,
         expr: &Expression<'_>,
-        tag_span: Option<tsv_lang::Span>,
+        tag_span: Option<Span>,
     ) -> Vec<DocId> {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
 
@@ -595,13 +597,13 @@ impl<'a> Printer<'a> {
     fn build_expression_content_with_comments(
         &self,
         expr: &Expression<'_>,
-        tag_span: Option<tsv_lang::Span>,
+        tag_span: Option<Span>,
     ) -> Vec<DocId> {
         // Collect leading comments
         let mut leading_comments = Vec::new();
         if let Some(span) = tag_span {
             let expr_start = expr.span().start;
-            for comment in tsv_lang::comments_in_range(self.comments, span.start + 1, expr_start) {
+            for comment in comments_in_range(self.comments, span.start + 1, expr_start) {
                 leading_comments.push(self.build_leading_js_comment_doc(comment));
             }
         }
@@ -612,7 +614,7 @@ impl<'a> Printer<'a> {
         let mut trailing_comments = Vec::new();
         if let Some(span) = tag_span {
             let expr_end = expr.span().end;
-            for comment in tsv_lang::comments_in_range(self.comments, expr_end, span.end - 1) {
+            for comment in comments_in_range(self.comments, expr_end, span.end - 1) {
                 trailing_comments.push(self.build_trailing_js_comment_doc(comment));
             }
         }
@@ -657,7 +659,7 @@ impl<'a> Printer<'a> {
     fn build_expression_doc_parts_with_span_for_bind(
         &self,
         expr: &Expression<'_>,
-        tag_span: Option<tsv_lang::Span>,
+        tag_span: Option<Span>,
     ) -> Vec<DocId> {
         let d = self.d();
         // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
@@ -736,7 +738,7 @@ impl<'a> Printer<'a> {
     fn build_bind_sequence_with_comments_doc(
         &self,
         seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
-        tag_span: tsv_lang::Span,
+        tag_span: Span,
     ) -> DocId {
         let d = self.d();
         let bytes = self.source.as_bytes();
@@ -748,7 +750,7 @@ impl<'a> Printer<'a> {
         // overflow or carry their own forced break (matching prettier, which keeps
         // `() => a, (v) => (a = v)` on one line under a leading comment).
         let first_start = seq.expressions[0].span().start;
-        for comment in tsv_lang::comments_in_range(self.comments, tag_span.start + 1, first_start) {
+        for comment in comments_in_range(self.comments, tag_span.start + 1, first_start) {
             if comment.is_block && comment.multiline {
                 // Multi-line block: own line(s), forcing the broken layout. Emitted
                 // without the inline trailing space so the line ends at `*/`.
@@ -769,16 +771,12 @@ impl<'a> Printer<'a> {
                 let cur_start = sub_expr.span().start;
                 // The separator comma, located in source so a comment on either side
                 // is attributed to the right operand (a comment's `,` can't fool it).
-                let comma_pos = tsv_lang::source_scan::find_char_skipping_comments(
-                    bytes,
-                    prev_end as usize,
-                    cur_start as usize,
-                    b',',
-                )
-                .map_or(prev_end, |c| c as u32);
+                let comma_pos =
+                    find_char_skipping_comments(bytes, prev_end as usize, cur_start as usize, b',')
+                        .map_or(prev_end, |c| c as u32);
 
                 // Comments before the comma trail the previous operand.
-                for comment in tsv_lang::comments_in_range(self.comments, prev_end, comma_pos) {
+                for comment in comments_in_range(self.comments, prev_end, comma_pos) {
                     items.push(self.build_trailing_js_comment_doc(comment));
                 }
 
@@ -787,7 +785,7 @@ impl<'a> Printer<'a> {
                 // Comments after the comma: an all-block run leads the next operand
                 // inline; a line comment trails the comma and forces the break.
                 let after: Vec<_> =
-                    tsv_lang::comments_in_range(self.comments, comma_pos + 1, cur_start).collect();
+                    comments_in_range(self.comments, comma_pos + 1, cur_start).collect();
                 if after.is_empty() {
                     items.push(d.line());
                 } else if after.iter().all(|c| c.is_block) {
@@ -824,7 +822,7 @@ impl<'a> Printer<'a> {
     fn build_expression_doc_parts_with_span_block_structure(
         &self,
         expr: &Expression<'_>,
-        tag_span: Option<tsv_lang::Span>,
+        tag_span: Option<Span>,
     ) -> Vec<DocId> {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
         vec![
@@ -848,7 +846,7 @@ impl<'a> Printer<'a> {
 
         // Add leading comments between { and expression (block inline, line + hardline)
         let expr_start = tag.expression.span().start;
-        for comment in tsv_lang::comments_in_range(self.comments, tag.span.start + 1, expr_start) {
+        for comment in comments_in_range(self.comments, tag.span.start + 1, expr_start) {
             parts.push(self.build_leading_js_comment_doc(comment));
         }
 
@@ -857,7 +855,7 @@ impl<'a> Printer<'a> {
         // Add trailing comments. A line comment forces `}` onto its own line (the
         // helper appends a hardline) so the `//` doesn't swallow the brace.
         let expr_end = tag.expression.span().end;
-        for comment in tsv_lang::comments_in_range(self.comments, expr_end, tag.span.end - 1) {
+        for comment in comments_in_range(self.comments, expr_end, tag.span.end - 1) {
             parts.push(self.build_trailing_js_comment_doc(comment));
         }
 

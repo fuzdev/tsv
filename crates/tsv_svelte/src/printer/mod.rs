@@ -35,6 +35,7 @@ use tsv_lang::{
     Comment, EmbedContext, INDENT, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH,
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
 };
+use tsv_ts::Expression;
 
 /// Which section a fragment comment should travel with during canonical reordering.
 /// Comments attach to the nearest section that follows them in source order.
@@ -227,7 +228,7 @@ impl<'a> Printer<'a> {
     /// Uses the standard parameters: self.comments, self.embed, self.line_breaks.
     /// For calls that need a custom embed context or empty comments, use the
     /// tsv_ts functions directly.
-    pub(crate) fn build_ts_expression_doc(&self, expr: &tsv_ts::Expression<'_>) -> DocId {
+    pub(crate) fn build_ts_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         tsv_ts::build_expression_doc_with_comments(self.d(), expr, &self.ts_inputs(), &self.embed)
     }
 
@@ -235,10 +236,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used for contexts like @const patterns or this={expr} where no comments
     /// are expected between the expression and its container.
-    pub(crate) fn build_ts_expression_doc_no_comments(
-        &self,
-        expr: &tsv_ts::Expression<'_>,
-    ) -> DocId {
+    pub(crate) fn build_ts_expression_doc_no_comments(&self, expr: &Expression<'_>) -> DocId {
         let inputs = tsv_ts::PrinterInputs {
             comments: &[],
             ..self.ts_inputs()

@@ -23,8 +23,10 @@ use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
 use smallvec::smallvec;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a statement
@@ -264,7 +266,7 @@ impl<'a> Printer<'a> {
         {
             // The grouping `)` sits outside `seq.span` (the parens aren't part of the
             // node); a trailing comment before it stays inside the parens.
-            let grouping_close = tsv_lang::source_scan::find_char_skipping_comments(
+            let grouping_close = find_char_skipping_comments(
                 self.source.as_bytes(),
                 argument_end as usize,
                 span_end as usize,
@@ -371,7 +373,7 @@ impl<'a> Printer<'a> {
     /// This matches Prettier's `hasLeadingOwnLineComment` which checks for
     /// comments with a newline after them that are leading on a node.
     fn has_leading_own_line_comment_in_range(&self, start: u32, end: u32) -> bool {
-        tsv_lang::comments_in_range(self.comments, start, end)
+        comments_in_range(self.comments, start, end)
             .any(|c| !self.is_same_line(start, c.span.start))
     }
 
@@ -438,13 +440,9 @@ impl<'a> Printer<'a> {
         // mistaken for the statement's terminator, which would drop the comments
         // after it.
         let expr_end = binary.span.end;
-        let semicolon_pos = tsv_lang::source_scan::find_char_skipping_comments(
-            self.source.as_bytes(),
-            expr_end as usize,
-            self.source.len(),
-            b';',
-        )
-        .map_or(expr_end, |p| p as u32);
+        let semicolon_pos =
+            find_char_skipping_comments(self.source.as_bytes(), expr_end as usize, self.source.len(), b';')
+                .map_or(expr_end, |p| p as u32);
 
         // Split the trailing comments: an operand-attached block (inside stripped
         // parens, `return (a + b /* c */);`) stays inside the parens before the `;`,
@@ -454,7 +452,7 @@ impl<'a> Printer<'a> {
         // break so it never lands on the flat `expr // c;` path. See
         // `split_terminator_gap_comments`.
         let has_operand_line_comment =
-            tsv_lang::comments_in_range(self.comments, expr_end, semicolon_pos)
+            comments_in_range(self.comments, expr_end, semicolon_pos)
                 .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
         let mut inline_trailing = DocBuf::new();
         let after_semi =

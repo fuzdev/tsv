@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 781,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 772,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 78,
+							"end": 173,
+							"property": "prop",
+							"value": "fn(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+						},
+						{
+							"type": "Declaration",
+							"start": 234,
+							"end": 337,
+							"property": "prop",
+							"value": "fn(\n\t\t\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t)"
+						},
+						{
+							"type": "Declaration",
+							"start": 419,
+							"end": 533,
+							"property": "prop",
+							"value": "outer(\n\t\t\tinner(11111111, 11111111, 11111111, 11111111, 11111111, 11111111, 11111111, 11111111, 1111111)\n\t\t)"
+						},
+						{
+							"type": "Declaration",
+							"start": 612,
+							"end": 768,
+							"property": "prop",
+							"value": "outer(\n\t\t\tinner(\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111\n\t\t\t)\n\t\t)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 772
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 773,
+			"styles": "\n\tdiv {\n\t\t/* 100 chars - single token fits inline at the boundary */\n\t\tprop: fn(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa);\n\t\t/* 101 chars - single token wraps onto its own line */\n\t\tprop: fn(\n\t\t\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n\t\t);\n\t\t/* nested 100: outer wraps, inner at boundary stays flat on its own line */\n\t\tprop: outer(\n\t\t\tinner(11111111, 11111111, 11111111, 11111111, 11111111, 11111111, 11111111, 11111111, 1111111)\n\t\t);\n\t\t/* nested 101: outer wraps, inner over boundary also breaks (cascade) */\n\t\tprop: outer(\n\t\t\tinner(\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111,\n\t\t\t\t11111111\n\t\t\t)\n\t\t);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 782,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

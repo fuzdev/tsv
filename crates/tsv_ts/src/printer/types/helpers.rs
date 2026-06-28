@@ -6,6 +6,7 @@
 // - Source scanning helpers
 
 use crate::ast::internal::{self, TSIntersectionType, TSKeywordKind, TSType, TSUnionType};
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 //
 // Type argument analysis
@@ -56,13 +57,8 @@ pub(super) fn find_separator_position(
     end: u32,
     separator: u8,
 ) -> Option<u32> {
-    tsv_lang::source_scan::find_char_skipping_comments(
-        source.as_bytes(),
-        start as usize,
-        end as usize,
-        separator,
-    )
-    .map(|pos| pos as u32)
+    find_char_skipping_comments(source.as_bytes(), start as usize, end as usize, separator)
+        .map(|pos| pos as u32)
 }
 
 //

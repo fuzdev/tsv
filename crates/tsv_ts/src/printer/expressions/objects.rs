@@ -20,6 +20,7 @@ use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for an object expression
@@ -801,7 +802,7 @@ impl<'a> Printer<'a> {
     /// Find the position of `:` after a position (for finding colon in property)
     /// Skips over comments to avoid matching colons inside them.
     pub(in crate::printer) fn find_colon_after(&self, start: u32) -> u32 {
-        tsv_lang::source_scan::find_char_skipping_comments(
+        find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,
             self.source.len(),
@@ -898,19 +899,14 @@ impl<'a> Printer<'a> {
     /// Find the opening `[` bracket between two positions (for computed properties).
     /// Returns the first `[` found outside comments in the range [start, end).
     pub(in crate::printer) fn find_opening_bracket_after(&self, start: u32, end: u32) -> u32 {
-        tsv_lang::source_scan::find_char_skipping_comments(
-            self.source.as_bytes(),
-            start as usize,
-            end as usize,
-            b'[',
-        )
-        .map_or(start, |pos| pos as u32)
+        find_char_skipping_comments(self.source.as_bytes(), start as usize, end as usize, b'[')
+            .map_or(start, |pos| pos as u32)
     }
 
     /// Find the closing `]` bracket after a position (for computed properties)
     /// Skips over comments to avoid matching brackets inside them.
     fn find_closing_bracket_after(&self, pos: u32) -> u32 {
-        tsv_lang::source_scan::find_char_skipping_comments(
+        find_char_skipping_comments(
             self.source.as_bytes(),
             pos as usize,
             self.source.len(),

@@ -8,6 +8,7 @@
 
 use super::Printer;
 use crate::ast::internal;
+use tsv_lang::Span;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -198,7 +199,7 @@ impl<'a> Printer<'a> {
         &self,
         container_start: u32,
         container_end: u32,
-        item_spans: &[tsv_lang::Span],
+        item_spans: &[Span],
     ) -> bool {
         let after_open_brace = container_start + 1;
         comments_in_range(self.comments, container_start, container_end).any(|c| {
@@ -553,7 +554,7 @@ impl<'a> Printer<'a> {
     /// containers that keep a fitting block comment inline (object literals and
     /// patterns, enum bodies, type literals) use the
     /// `build_empty_*_inline_with_comments_doc` helpers instead.
-    pub(crate) fn build_empty_body_with_comments_doc(&self, body_span: tsv_lang::Span) -> DocId {
+    pub(crate) fn build_empty_body_with_comments_doc(&self, body_span: Span) -> DocId {
         self.build_empty_delimited_with_comments_doc(body_span.start, body_span.end, "{", "}")
     }
 
@@ -605,7 +606,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_empty_inline_with_comments_doc`].
     pub(crate) fn build_empty_braces_inline_with_comments_doc(
         &self,
-        body_span: tsv_lang::Span,
+        body_span: Span,
     ) -> DocId {
         let d = self.d();
         let sep = d.softline();
@@ -621,7 +622,7 @@ impl<'a> Printer<'a> {
     /// unlike object literals. See [`Self::build_empty_inline_with_comments_doc`].
     pub(crate) fn build_empty_type_literal_inline_with_comments_doc(
         &self,
-        body_span: tsv_lang::Span,
+        body_span: Span,
     ) -> DocId {
         let d = self.d();
         let sep = d.line();
@@ -635,7 +636,7 @@ impl<'a> Printer<'a> {
     /// [`Self::build_empty_inline_with_comments_doc`].
     pub(crate) fn build_empty_brackets_inline_with_comments_doc(
         &self,
-        span: tsv_lang::Span,
+        span: Span,
     ) -> DocId {
         self.build_empty_brackets_inline_with_comments_doc_range(span.start, span.end)
     }
