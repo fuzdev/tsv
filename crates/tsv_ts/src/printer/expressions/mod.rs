@@ -687,49 +687,33 @@ impl<'a> Printer<'a> {
             }
             parts.push(d.text(")!"));
             d.concat(&parts)
-        } else if Self::is_chain_expression(non_null_expr.expression) {
+        } else if self.has_comments_between(
+            non_null_expr.expression.span().end,
+            non_null_expr.span.end,
+        ) {
+            // A comment between the operand and `!` (`p?.q /* c */!`, or from stripped
+            // grouping parens `(x /* c */)!`) trails the operand — preserve it rather
+            // than dropping it. The redundant grouping parens are stripped per tsv's
+            // non-null seal canonicalization (`(p?.q)!` → `p?.q!`); prettier keeps them
+            // when the source had them. Comments can't be threaded through the
+            // linearized chain, so this path renders the operand directly for chain and
+            // non-chain operands alike.
             let argument_end = non_null_expr.expression.span().end;
-            if self.has_comments_between(argument_end, non_null_expr.span.end) {
-                // A comment between the chain operand and `!` (`p?.q /* c */!`, or from
-                // stripped grouping parens) trails the operand — preserve it rather
-                // than dropping it. The redundant grouping parens are stripped per
-                // tsv's non-null seal canonicalization (`(p?.q)!` → `p?.q!`); prettier
-                // keeps them when the source had them.
-                let inner_doc = self.build_expression_doc(non_null_expr.expression);
-                let mut parts: DocBuf = smallvec![inner_doc];
-                self.append_trailing_paren_comments(
-                    &mut parts,
-                    argument_end,
-                    non_null_expr.span.end,
-                );
-                parts.push(d.text("!"));
-                d.concat(&parts)
-            } else {
-                // When inner expression is a chain (member or call), use chain architecture
-                // to properly handle breaking. This ensures the outer `!` is included
-                // in the linearized chain for proper segment grouping.
-                let nodes = chain::linearize_chain_from_non_null(non_null_expr);
-                let groups = chain::group_chain_nodes(&nodes);
-                chain::build_chain_doc(&groups, self)
-            }
+            let inner_doc = self.build_expression_doc(non_null_expr.expression);
+            let mut parts: DocBuf = smallvec![inner_doc];
+            self.append_trailing_paren_comments(&mut parts, argument_end, non_null_expr.span.end);
+            parts.push(d.text("!"));
+            d.concat(&parts)
+        } else if Self::is_chain_expression(non_null_expr.expression) {
+            // When inner expression is a chain (member or call), use chain architecture
+            // to properly handle breaking. This ensures the outer `!` is included
+            // in the linearized chain for proper segment grouping.
+            let nodes = chain::linearize_chain_from_non_null(non_null_expr);
+            let groups = chain::group_chain_nodes(&nodes);
+            chain::build_chain_doc(&groups, self)
         } else {
             let inner_doc = self.build_expression_doc(non_null_expr.expression);
-            // Check for trailing comments from stripped grouping parens: `(x /* c */)!`
-            let argument_end = non_null_expr.expression.span().end;
-            let has_trailing_comments =
-                self.has_comments_between(argument_end, non_null_expr.span.end);
-            if has_trailing_comments {
-                let mut parts: DocBuf = smallvec![inner_doc];
-                self.append_trailing_paren_comments(
-                    &mut parts,
-                    argument_end,
-                    non_null_expr.span.end,
-                );
-                parts.push(d.text("!"));
-                d.concat(&parts)
-            } else {
-                d.concat(&[inner_doc, d.text("!")])
-            }
+            d.concat(&[inner_doc, d.text("!")])
         };
 
         // For paren-stripped branches the leading comment goes before the operand
