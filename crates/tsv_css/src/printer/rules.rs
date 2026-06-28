@@ -9,9 +9,10 @@
 //!
 //! ## Architecture
 //!
-//! This module uses doc builders where practical. The complex block child
-//! handling with inline comments and blank line preservation is still
-//! imperative for clarity.
+//! This module handles a rule's selector, the pre-brace comments, and the braces.
+//! The block body itself — declarations/comments/nested rules with inline comments,
+//! blank-line preservation, and format-ignore — is iterated by the shared
+//! `print_css_block_children` (see `mod.rs`), also used by at-rule blocks.
 
 use super::Printer;
 use crate::ast::internal;

@@ -7,7 +7,8 @@
 // ## Architecture
 //
 // This module uses doc builders for width-based decisions (e.g., condition query
-// wrapping). The complex prelude and block handling remains imperative for clarity.
+// wrapping). The complex prelude handling remains imperative for clarity; the block
+// body is iterated by the shared `print_css_block_children` (see `mod.rs`).
 
 use std::borrow::Cow;
 

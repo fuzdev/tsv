@@ -4,7 +4,8 @@
 //
 // This module is organized by concern to support future expansion:
 //
-// - **mod.rs** (this file): Orchestration - coordinates printing of CSS nodes, core Printer
+// - **mod.rs** (this file): Orchestration - core Printer, top-level node printing, and
+//   the shared block-body routine (`print_css_block_children`, used by rules + at-rules)
 // - **selectors.rs**: Selector printing (reusable across rules and at-rules)
 // - **rules.rs**: CSS rule printing (selector + block structure)
 // - **declarations.rs**: Declaration printing + wrapping logic
@@ -16,7 +17,7 @@
 // 1. **Match Prettier**: Output matches prettier for compatibility
 // 2. **Preserve Semantics**: Never change CSS rendering semantics
 // 3. **Modularity**: Each module has single responsibility for future maintainability
-// 4. **Reusability**: Shared printing logic (selectors) used by multiple modules
+// 4. **Reusability**: Shared printing logic (selectors, block-body iteration) used by multiple modules
 // 5. **Hierarchy-Following**: Module structure mirrors CSS spec (rules → declarations → values)
 
 mod atrules;
