@@ -310,7 +310,7 @@ impl<'a> Printer<'a> {
     ///     (100vw - var(--a))
     /// )
     /// ```
-    fn build_space_fill_value_doc(&self, values: &[CssValue<'_>]) -> DocId {
+    pub(super) fn build_space_fill_value_doc(&self, values: &[CssValue<'_>]) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
         d.group(d.indent(d.fill(&parts)))

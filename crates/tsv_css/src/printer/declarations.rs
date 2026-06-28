@@ -408,20 +408,18 @@ impl<'a> Printer<'a> {
             // True one-per-line for shadow-like properties and wrappable functions
             for (i, val) in values.iter().enumerate() {
                 self.write_indent();
-                // Check if value is a List that exceeds width - use continuation fill
-                // Reserve 1 char for trailing comma
+                // A space-separated List value self-wraps: `build_space_fill_value_doc`'s
+                // `group(indent(fill))` stays flat when it fits and breaks into a
+                // continuation-indented fill when it doesn't, with the trailing `,`/`;`
+                // reserved (width 1) for the group's own fit decision. Non-List values
+                // print as-is.
                 if let CssValue::List {
                     values: list_values,
                     ..
                 } = val
-                    && self.space_list_exceeds_width(list_values, 1)
                 {
-                    // Use fill doc for long space-separated lists
-                    // Increment indent for continuation lines
-                    self.indent_level += 1;
-                    let fill_doc = self.build_space_fill_doc(list_values, 1);
-                    self.write_arena_doc(fill_doc);
-                    self.indent_level -= 1;
+                    let doc = self.build_space_fill_value_doc(list_values);
+                    self.write_arena_doc_reserving(doc, 1);
                 } else {
                     self.print_nested_value(val);
                 }
@@ -552,21 +550,6 @@ impl<'a> Printer<'a> {
         };
         let fill = d.fill(&parts);
         d.with_context(fill, context)
-    }
-
-    /// Check if a space-separated list would exceed width when printed inline
-    ///
-    /// Used to decide whether to use continuation-based fill printing.
-    /// `trailing_reserve` accounts for characters after the list (comma, paren, semicolon).
-    fn space_list_exceeds_width(&self, values: &[CssValue<'_>], trailing_reserve: usize) -> bool {
-        // TODO: measure-then-emit — `list_doc` is built only to width-check and
-        // discarded; the emitted fill already renders flat (identical bytes) when it
-        // fits, so this check is redundant once the value path is doc-first. The lone
-        // remaining caller is `print_css_value_multiline`; fold it into a self-deciding
-        // group there to retire this measure pass.
-        let list_doc = self.build_separated_values_doc(values, " ");
-        let available = doc::available_width(self.effective_indent(), 0, trailing_reserve);
-        !doc::arena_fits::<dyn doc::TextResolver>(self.arena, list_doc, available, Mode::Flat, None)
     }
 
     /// Print function arguments from source, preserving comments
