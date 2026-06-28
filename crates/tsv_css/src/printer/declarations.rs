@@ -409,21 +409,22 @@ impl<'a> Printer<'a> {
             // True one-per-line for shadow-like properties and wrappable functions
             for (i, val) in values.iter().enumerate() {
                 self.write_indent();
-                // A space-separated List value self-wraps: `build_space_fill_value_doc`'s
-                // `group(indent(fill))` stays flat when it fits and breaks into a
-                // continuation-indented fill when it doesn't, with the trailing `,`/`;`
-                // reserved (width 1) for the group's own fit decision. Non-List values
-                // print as-is.
-                if let CssValue::List {
+                // Every item reserves the trailing `,`/`;` (width 1) for its own fit
+                // decision, so a wrappable item breaks one column early rather than
+                // letting the terminator push the line to 101 (matching prettier and
+                // tsv's hard-print-width stance). A space-separated List value self-wraps
+                // via `build_space_fill_value_doc`'s `group(indent(fill))`; a non-List
+                // value (e.g. a gradient function) wraps via its own value group.
+                let doc = if let CssValue::List {
                     values: list_values,
                     ..
                 } = val
                 {
-                    let doc = self.build_space_fill_value_doc(list_values);
-                    self.write_arena_doc_reserving(doc, 1);
+                    self.build_space_fill_value_doc(list_values)
                 } else {
-                    self.print_nested_value(val);
-                }
+                    self.build_css_value_doc(val)
+                };
+                self.write_arena_doc_reserving(doc, 1);
                 if i < values.len() - 1 {
                     self.write(",\n");
                 }
