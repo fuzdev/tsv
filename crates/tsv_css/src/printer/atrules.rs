@@ -200,10 +200,11 @@ impl<'a> Printer<'a> {
     /// (comments preserved inline). The whole prelude is one doc tree: a
     /// comma-separated media-query *list* (Media Queries 4 §"media query list")
     /// becomes a `group` that breaks at every top-level comma (one query per line,
-    /// matching prettier); a single query becomes an `and`/`or` fill that wraps at
-    /// the last fitting boundary (a deliberate divergence — prettier never wraps a
-    /// single query). The trailing ` {` is reserved so the boundary breaks at print
-    /// width.
+    /// matching prettier); a single query becomes an `and`/`or` fill that wraps
+    /// greedily at its `and`/`or` boundaries — one break for a query that overflows
+    /// once, several for a very long one (a deliberate divergence — prettier never
+    /// wraps a single query). The trailing ` {` is reserved so the boundary breaks at
+    /// print width.
     /// ```css
     /// @media screen and (min-width: 768px) and (max-width: 1024px) and
     ///     (orientation: landscape) {
@@ -242,7 +243,7 @@ impl<'a> Printer<'a> {
             return d.group(d.indent(d.concat(&parts)));
         }
 
-        // Single query: wrap at the last fitting `and`/`or`.
+        // Single query: wrap greedily at its `and`/`or` boundaries.
         self.build_and_or_wrap_doc(&content, suffix_width)
     }
 
@@ -265,6 +266,9 @@ impl<'a> Printer<'a> {
         for atom in atoms {
             if matches!(atom, "and" | "or") && !segment.is_empty() {
                 has_connector = true;
+                // Map to the `&'static str` literal `d.text` needs: `atom` borrows
+                // `query`, not `'static`. The `matches!` guard already proved it's one
+                // of these two, so this isn't a redundant rebind.
                 let conn = if atom == "and" { "and" } else { "or" };
                 fill_parts.push(d.text_owned(std::mem::take(&mut segment)));
                 fill_parts.push(d.concat(&[d.text(" "), d.text(conn), d.line()]));
