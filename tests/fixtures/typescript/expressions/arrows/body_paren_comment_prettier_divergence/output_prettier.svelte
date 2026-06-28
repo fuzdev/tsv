@@ -17,6 +17,22 @@
 		x;
 		/* c */
 
+	// stacked line comments — each kept on its own line (no swallow)
+	const g = () =>
+		x; // c1
+		// c2
+
+	// leading + trailing — leading hugs `=>`, trailing keeps parens
+	const h = () => /* lead */ x /* trail */;
+
+	// same-line comment group after a body break — block + line stay together
+	const i = () =>
+		x;
+		/* i1 */ // i2
+
+	// object-literal body — parens are required, comment kept inside (not after `)`)
+	const j = () => ({ k: 1 }) /* c */;
+
 	// inside call arg — parens preserved
 	f(() => x /* c */);
 </script>

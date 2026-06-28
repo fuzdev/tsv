@@ -384,14 +384,22 @@ impl<'a> Printer<'a> {
         if has_multiline {
             let mut indent_parts = vec![d.hardline()];
             indent_parts.push(inner);
+            // Break before a comment that starts on a new line relative to the
+            // previous item (the body or the prior comment); otherwise trail it
+            // inline. Tracking the previous item's end — not `expr_end` — keeps a
+            // same-line comment group together (`x⏎ /* a */ // b`) while forcing a
+            // line comment that follows another comment onto its own line. A line
+            // comment runs to end-of-line, so trailing a second comment after one
+            // (`x // a` then `// b`) would swallow it — this break prevents that.
+            let mut prev_end = expr_end;
             for comment in comments_in_range(self.comments, expr_end, boundary_end) {
-                if !comment.is_block || !self.has_newline_between(expr_end, comment.span.start) {
-                    indent_parts.push(d.text(" "));
-                    indent_parts.push(self.build_comment_doc(comment));
-                } else {
+                if self.has_newline_between(prev_end, comment.span.start) {
                     indent_parts.push(d.hardline());
-                    indent_parts.push(self.build_comment_doc(comment));
+                } else {
+                    indent_parts.push(d.text(" "));
                 }
+                indent_parts.push(self.build_comment_doc(comment));
+                prev_end = comment.span.end;
             }
             d.concat(&[
                 d.text("("),
