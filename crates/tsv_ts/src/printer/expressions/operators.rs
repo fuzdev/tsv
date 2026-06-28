@@ -934,13 +934,25 @@ impl<'a> Printer<'a> {
         let has_trailing_comments = self.has_comments_between(argument_end, await_expr.span.end);
 
         let argument_doc = if comments_opt.is_some() || has_trailing_comments {
+            // The grouping parens are required when the operand needs them (`await`
+            // binds tighter than a binary/ternary operand, so `await x + y` is
+            // `(await x) + y`). Keep them, and keep the comment INSIDE them where the
+            // author wrote it — prettier relocates it past `)` (and floats it past `;`
+            // on the next pass); tsv preserves the position. Mirrors `build_spread_doc`.
+            let needs_parens = self.needs_parens(await_expr.argument, ParenContext::AwaitArgument);
             let inner = self.build_expression_doc(await_expr.argument);
             let mut parts = DocBuf::new();
+            if needs_parens {
+                parts.push(d.text("("));
+            }
             if let Some(comments) = comments_opt {
                 parts.push(comments);
             }
             parts.push(inner);
             self.append_trailing_paren_comments(&mut parts, argument_end, await_expr.span.end);
+            if needs_parens {
+                parts.push(d.text(")"));
+            }
             d.concat(&parts)
         } else if self.needs_parens(await_expr.argument, ParenContext::AwaitArgument) {
             d.concat(&[

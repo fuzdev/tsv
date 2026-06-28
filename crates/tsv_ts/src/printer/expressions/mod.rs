@@ -661,7 +661,22 @@ impl<'a> Printer<'a> {
             // that indents continuations when breaking
             let inner_doc =
                 self.build_expression_doc_with_indent_on_break(non_null_expr.expression);
-            d.concat(&[d.text("("), inner_doc, d.text(")!")])
+            // Keep a comment from the stripped grouping parens INSIDE them, before
+            // the `)`, where the author wrote it (`(x + y /* c */)!`) — prettier
+            // relocates it outside, between `)` and `!`. tsv preserves the position.
+            let argument_end = non_null_expr.expression.span().end;
+            if self.has_comments_between(argument_end, non_null_expr.span.end) {
+                let mut parts: DocBuf = smallvec![d.text("("), inner_doc];
+                self.append_trailing_paren_comments(
+                    &mut parts,
+                    argument_end,
+                    non_null_expr.span.end,
+                );
+                parts.push(d.text(")!"));
+                d.concat(&parts)
+            } else {
+                d.concat(&[d.text("("), inner_doc, d.text(")!")])
+            }
         } else if Self::is_chain_expression(non_null_expr.expression) {
             // When inner expression is a chain (member or call), use chain architecture
             // to properly handle breaking. This ensures the outer `!` is included
