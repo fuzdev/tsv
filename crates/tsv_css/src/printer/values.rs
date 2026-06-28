@@ -177,6 +177,22 @@ impl<'a> Printer<'a> {
         self.d().text_owned(formatted)
     }
 
+    /// Build a flat (non-wrapping) `name(args_doc)` function doc.
+    ///
+    /// The shared `name(` … `)` envelope for the url / var / single-simple-arg
+    /// paths, which have no internal break points. The wrapping path
+    /// (multi-arg functions) builds its own `group(…softline…)` structure
+    /// inline and does not use this.
+    fn flat_function_doc(&self, name: &str, args_doc: DocId) -> DocId {
+        let d = self.d();
+        d.concat(&[
+            d.text_owned(name.to_string()),
+            d.text("("),
+            args_doc,
+            d.text(")"),
+        ])
+    }
+
     /// Build a doc for a function value with automatic wrapping
     ///
     /// Uses proper doc structure with group/softline/indent so the renderer
@@ -206,11 +222,7 @@ impl<'a> Printer<'a> {
             // Quoted url() — a single string arg. Print it through the normal string
             // path so the quote is normalized (`"x"` → `'x'`), matching prettier.
             if let [arg @ CssValue::String { .. }] = args {
-                let name_doc = d.text_owned(name.to_string());
-                let open = d.text("(");
-                let args_doc = self.build_css_value_doc(arg);
-                let close = d.text(")");
-                return d.concat(&[name_doc, open, args_doc, close]);
+                return self.flat_function_doc(name, self.build_css_value_doc(arg));
             }
             // Unquoted url() — the content is opaque. Emit the raw source verbatim,
             // stripping only the whitespace right after `url(` and right before `)`
@@ -223,11 +235,8 @@ impl<'a> Printer<'a> {
                 return d.text_owned(raw);
             }
             // Fallback (span unavailable): rejoin args with no space after commas.
-            let name_doc = d.text_owned(name.to_string());
-            let open = d.text("(");
             let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ",");
-            let close = d.text(")");
-            return d.concat(&[name_doc, open, args_doc, close]);
+            return self.flat_function_doc(name, args_doc);
         }
 
         // var() empty fallback: `var(--a,)` — the trailing comma is kept with no space
@@ -237,22 +246,16 @@ impl<'a> Printer<'a> {
             && args.len() >= 2
             && matches!(args.last(), Some(CssValue::Identifier { span }) if span.extract(self.source).trim().is_empty())
         {
-            let name_doc = d.text_owned(name.to_string());
-            let open = d.text("(");
             let real = &args[..args.len() - 1];
             let args_doc = d.join(real.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
             let comma = d.text(",");
-            let close = d.text(")");
-            return d.concat(&[name_doc, open, args_doc, comma, close]);
+            return self.flat_function_doc(name, d.concat(&[args_doc, comma]));
         }
 
         if !has_wrappable_args(args) {
             // Single simple arg - inline only, no break points
-            let name_doc = d.text_owned(name.to_string());
-            let open = d.text("(");
             let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
-            let close = d.text(")");
-            return d.concat(&[name_doc, open, args_doc, close]);
+            return self.flat_function_doc(name, args_doc);
         }
 
         // Build with group/softline structure for automatic wrapping
