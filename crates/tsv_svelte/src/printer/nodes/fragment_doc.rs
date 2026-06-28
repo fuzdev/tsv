@@ -1105,10 +1105,16 @@ impl<'a> Printer<'a> {
     /// The dangle keys on whether the block actually renders multiline, not on how its
     /// body is authored — so it is a fixed point on its own output (the dangled form's
     /// own-line body would otherwise read as authored-multiline on a second pass):
-    /// - a block that unconditionally breaks (`will_break`: authored-multiline / forced)
-    ///   gets the `>` dangled unconditionally (`⏎>` prefix);
     /// - a conditional block (an inline-authored body that may stay inline or expand on
-    ///   width) folds the `>` into its own inline-vs-multiline `conditional_group`.
+    ///   width) folds the `>` into its own inline-vs-multiline `conditional_group`
+    ///   (`build_expanding_construct`/`build_expanding_block` via `fold_gt`);
+    /// - a block that unconditionally breaks (authored-multiline / forced) dangles the `>`
+    ///   onto its own line (`⏎>` prefix), applied on the non-expanding tails by `dangle_gt`.
+    ///
+    /// Both happen inside the single `build_block_node_doc_with_gt` build — the block is
+    /// built **once**, with the `>` threaded in, so a nested chain of dangles stays linear
+    /// (the earlier two-build probe-then-rebuild was O(2^depth); see grimoire
+    /// TODO_REBUILD_BLOWUP).
     ///
     /// Applies to all five block heads (`{#if}` / `{#each}` / `{#key}` / `{#await}` /
     /// `{#snippet}`). A control-flow block with any preceding sibling routes its block
@@ -1134,17 +1140,14 @@ impl<'a> Printer<'a> {
             return None;
         }
         let element_doc = self.build_inline_element_omit_close_gt(element)?;
-        let d = self.d();
-        let gt = d.text(">");
-        let block_normal = self.build_fragment_node_doc_in_multiline(block, true)?;
-        let block_doc = if d.will_break(block_normal) {
-            // Unconditionally multiline → dangle the `>` onto its own line.
-            d.concat(&[d.hardline(), gt, block_normal])
-        } else {
-            // Conditional → fold the `>` into the block's inline-vs-multiline decision so
-            // it hugs while inline and dangles when the block expands.
-            self.build_block_node_doc_with_gt(block, gt)?
-        };
+        let gt = self.d().text(">");
+        // Build the block exactly once with the `>` threaded in: the expanding path folds
+        // it into the inline-vs-multiline `conditional_group` (hug inline, dangle when the
+        // block expands); the non-expanding tails dangle it via `dangle_gt` when they break.
+        // (The earlier form built the block twice — a throwaway no-`gt` probe to test
+        // `will_break`, then a rebuild — which made nested dangles O(2^depth); see
+        // grimoire TODO_REBUILD_BLOWUP.)
+        let block_doc = self.build_block_node_doc_with_gt(block, gt)?;
         Some((element_doc, block_doc))
     }
 

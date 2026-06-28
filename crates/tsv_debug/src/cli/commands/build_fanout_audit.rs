@@ -51,12 +51,38 @@ fn gen_svelte_elements(depth: usize) -> String {
     format!("<div>{opens}{closes}</div>\n")
 }
 
-/// Nested `{#if}` blocks — routes through the if-block builder's
-/// build-each-tail-twice (×3 body) path.
+/// Nested `{#if}` blocks (single-child consequents) — the if-block fast path
+/// (`build_if_pieces` / `compose_if_tail`), which composes both expanding-construct
+/// tails from one shared set of body pieces.
 fn gen_svelte_if(depth: usize) -> String {
-    let opens = "{#if c}<span>t</span>".repeat(depth);
+    let opens = "{#if c}".repeat(depth);
     let closes = "{/if}".repeat(depth);
-    format!("{opens}{closes}\n")
+    format!("{opens}x{closes}\n")
+}
+
+/// Nested `{#each}` blocks (single-child bodies) — the each-block fast path
+/// (`build_each_pieces` / `compose_each_tail`).
+fn gen_svelte_each(depth: usize) -> String {
+    let opens = "{#each a as b}".repeat(depth);
+    let closes = "{/each}".repeat(depth);
+    format!("{opens}x{closes}\n")
+}
+
+/// Nested `{#await}` blocks (single-child pending sections) — the await-block fast path
+/// (`build_await_pieces` / `compose_await_tail`).
+fn gen_svelte_await(depth: usize) -> String {
+    let opens = "{#await p}".repeat(depth);
+    let closes = "{/await}".repeat(depth);
+    format!("{opens}x{closes}\n")
+}
+
+/// An inline element immediately followed (no whitespace) by a control-flow block —
+/// the sibling-`>` dangle path (`try_block_sibling_gt_dangle`), which probe-builds
+/// the block for a `will_break` test and then rebuilds it folded with the `>`.
+fn gen_svelte_block_sibling(depth: usize) -> String {
+    let opens = "<span>t</span>{#if c}".repeat(depth);
+    let closes = "{/if}".repeat(depth);
+    format!("{opens}x{closes}\n")
 }
 
 /// A member chain whose call argument is itself the inner chain — the axis the
@@ -168,9 +194,27 @@ impl BuildFanoutAuditCommand {
                 depths: &[4, 8, 12],
             },
             Construct {
-                name: "svelte_if_blocks",
+                name: "svelte_if_nested",
                 parser: ParserType::Svelte,
                 generate: gen_svelte_if,
+                depths: &[3, 6, 9],
+            },
+            Construct {
+                name: "svelte_each_nested",
+                parser: ParserType::Svelte,
+                generate: gen_svelte_each,
+                depths: &[3, 6, 9],
+            },
+            Construct {
+                name: "svelte_await_nested",
+                parser: ParserType::Svelte,
+                generate: gen_svelte_await,
+                depths: &[3, 6, 9],
+            },
+            Construct {
+                name: "svelte_block_sibling",
+                parser: ParserType::Svelte,
+                generate: gen_svelte_block_sibling,
                 depths: &[3, 6, 9],
             },
             Construct {

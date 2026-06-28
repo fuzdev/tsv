@@ -482,8 +482,19 @@ impl<'a> Printer<'a> {
                 ]))
             }
             (BoundaryMode::Hard, BoundaryMode::Hard) => {
-                // Full multiline
-                let multiline_children_doc = self.build_nodes_doc_multiline(element.fragment.nodes);
+                // Full multiline. Reuse the eagerly-built `children_doc` instead of
+                // rebuilding the whole subtree: when `multiline_children`, it was built (above)
+                // as `build_nodes_doc_trimmed(nodes, ctx.trim_boundaries, breakable, true)`, and
+                // `build_nodes_doc_multiline` is the same call with `trim=true` hardcoded — so the
+                // two are identical exactly when `ctx.trim_boundaries` is already true. Rebuilding
+                // here is what made deeply-nested block content O(2^depth) (each level rebuilt its
+                // children, which rebuilt theirs); the fallback keeps output byte-identical when the
+                // eager doc used a different mode. See the build-fanout audit.
+                let multiline_children_doc = if multiline_children && ctx.trim_boundaries {
+                    children_doc
+                } else {
+                    self.build_nodes_doc_multiline(element.fragment.nodes)
+                };
                 let indent_inner = d.indent(d.concat(&[d.hardline(), multiline_children_doc]));
                 d.concat(&[
                     opening_tag,
