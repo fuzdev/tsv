@@ -89,6 +89,14 @@ pub trait ChainPrinter: SymbolLookup {
     /// so only the outermost chain should see `true`.
     fn clear_expression_statement(&self);
 
+    /// Activate the chain arg-doc share for the outermost chain build; returns the prior
+    /// active state to restore via [`Self::exit_chain_arg_share`]. See the `Printer`
+    /// `chain_arg_share` field doc.
+    fn enter_chain_arg_share(&self) -> bool;
+
+    /// Restore the chain arg-doc share state captured by [`Self::enter_chain_arg_share`].
+    fn exit_chain_arg_share(&self, was_active: bool);
+
     /// Get the precomputed line breaks table for O(log n) line boundary lookups
     fn get_line_breaks(&self) -> &[u32];
 

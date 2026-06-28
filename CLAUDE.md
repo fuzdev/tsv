@@ -176,6 +176,7 @@ deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
 deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves + no stray READMEs on matching fixtures (gated in `deno task check`)
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
+deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 ```
 
 For direct `cargo run -p tsv_debug` usage, see [Debug Tooling](#debug-tooling).
@@ -734,6 +735,26 @@ cargo run -p tsv_debug swallow_audit ~/dev/zzz/src   # audit a real codebase
 # `swallow_check` cargo feature (off by default → compiled out of prod
 # wasm/cli/ffi; tsv_debug enables it). Gated in `deno task check` (via the
 # `swallow:audit` task) over tests/fixtures.
+```
+
+**Build-Fanout Audit (exponential-rebuild regression guard):**
+
+```bash
+# build_fanout_audit - guard the O(1)-doc-builds-per-source-node invariant. A
+# builder that assembles `conditional_group` candidates (flat vs expanded,
+# inline vs multiline) by RE-INVOKING the recursive builder on the same nodes —
+# instead of building the subtree once and reusing the DocId — makes the doc-node
+# count grow exponentially in nesting depth (the formatter can hang/OOM on a
+# deeply-nested but ordinary file). This builds synthetic nested inputs (block
+# elements, {#if} blocks, member chains) at increasing depth, formats each into a
+# fresh DocArena via `format_in`, and fails if the doc-node count (read straight
+# from `arena.borrow_nodes().len()` — no prod instrumentation) grows faster than
+# ~depth^3. Deterministic, pure Rust, no Deno. Exits 1 on any super-linear case.
+cargo run -p tsv_debug build_fanout_audit
+# Also: --json. Gated in `deno task check` via the `fanout:audit` task. Green: all
+# six axes (svelte elements / {#if} / {#each} / {#await} / sibling-`>` dangle, ts
+# member chains) build O(1) docs per node, so the audit holds the line against a
+# reintroduced per-candidate rebuild.
 ```
 
 **Raw-Find Scan Audit (delimiter-scan regression guard):**

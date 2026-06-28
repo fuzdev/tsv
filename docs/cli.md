@@ -31,7 +31,7 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
   in `scripts/test_npm.ts`'s CLI tests.
 - **`tsv_debug` (development)**: Uses embedded Deno sidecar for external tools
   - Reuses `tsv_cli` infrastructure
-  - Commands: `check`, `compare`, `ast_diff`, `line_width`, `canonical_parse`, `format_prettier`, `fixture_init`, `fixtures_validate`, `fixtures_update`, `fixtures_update_parsed`, `fixtures_update_formatted`, `fixtures_audit`, `ts_fixture_audit`, `conformance_audit`, `swallow_audit`, `scan_audit`, `authoring_audit`, `metrics`, `profile`, `json_profile`, `test262`
+  - Commands: `check`, `compare`, `ast_diff`, `line_width`, `canonical_parse`, `format_prettier`, `fixture_init`, `fixtures_validate`, `fixtures_update`, `fixtures_update_parsed`, `fixtures_update_formatted`, `fixtures_audit`, `ts_fixture_audit`, `conformance_audit`, `swallow_audit`, `scan_audit`, `authoring_audit`, `build_fanout_audit`, `metrics`, `profile`, `json_profile`, `test262`
 
 ### External Tools (via Embedded Deno Sidecar)
 
