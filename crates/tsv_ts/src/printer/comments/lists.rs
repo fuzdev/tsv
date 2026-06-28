@@ -604,10 +604,7 @@ impl<'a> Printer<'a> {
     /// No bracket spacing — used by object literals/patterns and enum bodies,
     /// which prettier prints as `{/* c */}` (no surrounding spaces). See
     /// [`Self::build_empty_inline_with_comments_doc`].
-    pub(crate) fn build_empty_braces_inline_with_comments_doc(
-        &self,
-        body_span: Span,
-    ) -> DocId {
+    pub(crate) fn build_empty_braces_inline_with_comments_doc(&self, body_span: Span) -> DocId {
         let d = self.d();
         let sep = d.softline();
         self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{", "}", sep)
@@ -634,10 +631,7 @@ impl<'a> Printer<'a> {
     ///
     /// Used by array literals/patterns and tuple types. See
     /// [`Self::build_empty_inline_with_comments_doc`].
-    pub(crate) fn build_empty_brackets_inline_with_comments_doc(
-        &self,
-        span: Span,
-    ) -> DocId {
+    pub(crate) fn build_empty_brackets_inline_with_comments_doc(&self, span: Span) -> DocId {
         self.build_empty_brackets_inline_with_comments_doc_range(span.start, span.end)
     }
 

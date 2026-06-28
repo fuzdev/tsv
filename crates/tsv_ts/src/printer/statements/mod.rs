@@ -440,9 +440,13 @@ impl<'a> Printer<'a> {
         // mistaken for the statement's terminator, which would drop the comments
         // after it.
         let expr_end = binary.span.end;
-        let semicolon_pos =
-            find_char_skipping_comments(self.source.as_bytes(), expr_end as usize, self.source.len(), b';')
-                .map_or(expr_end, |p| p as u32);
+        let semicolon_pos = find_char_skipping_comments(
+            self.source.as_bytes(),
+            expr_end as usize,
+            self.source.len(),
+            b';',
+        )
+        .map_or(expr_end, |p| p as u32);
 
         // Split the trailing comments: an operand-attached block (inside stripped
         // parens, `return (a + b /* c */);`) stays inside the parens before the `;`,
@@ -451,9 +455,8 @@ impl<'a> Printer<'a> {
         // (`return (a && b // c\n);`) likewise stays inside the parens — it forces the
         // break so it never lands on the flat `expr // c;` path. See
         // `split_terminator_gap_comments`.
-        let has_operand_line_comment =
-            comments_in_range(self.comments, expr_end, semicolon_pos)
-                .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
+        let has_operand_line_comment = comments_in_range(self.comments, expr_end, semicolon_pos)
+            .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
         let mut inline_trailing = DocBuf::new();
         let after_semi =
             self.split_terminator_gap_comments(&mut inline_trailing, expr_end, semicolon_pos, true);
