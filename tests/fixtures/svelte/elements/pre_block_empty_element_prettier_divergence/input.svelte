@@ -1,24 +1,24 @@
-<!-- An empty block-body element inside <pre> that overflows. tsv indents one level shallower than prettier and preserves the source close form for both a component and an HTML inline element: self-closing keeps `/>`, explicit-empty keeps its close tag. When the attrs fit they stay on one line (only the close moves to its own line); when they are too long they wrap one per line — the `/>` still drops to its own line, never hugging the last attr. output_prettier shows prettier's form. -->
+<!-- An empty block-body element inside <pre> that overflows. The wrapped attributes and close token indent off the element's nesting depth (one level per enclosing container, matching prettier), and the source close form is preserved: self-closing keeps `/>`, explicit-empty keeps its close tag. When the attributes fit within print width they stay on one line and only the close token drops to its own line; when they overflow they wrap one per line with `/>` on its own line, never hugging the last attribute. The divergence is print-width-as-hard-limit: output_prettier shows prettier full-breaking the self-closing elements' attributes even though they fit (the explicit-empty and overflowing cases now match prettier). -->
 <pre>{#if cond}<Comp prop1={value1} prop2={value2} prop3={value3} prop4={value4} prop5={value5}
-	/>{/if}</pre>
+		/>{/if}</pre>
 
 <pre>{#if cond}<Comp prop1={value1} prop2={value2} prop3={value3} prop4={value4} prop5={value5}
-	></Comp>{/if}</pre>
+		></Comp>{/if}</pre>
 
 <pre>{#if cond}<span data-a={value1} data-b={value2} data-c={value3} data-d={value4} data-e={value5}
-	/>{/if}</pre>
+		/>{/if}</pre>
 
 <pre>{#if cond}<span data-a={value1} data-b={value2} data-c={value3} data-d={value4} data-e={value5}
-	></span>{/if}</pre>
+		></span>{/if}</pre>
 
 <!-- attrs too long to fit on one line: they wrap one per line, the close form is still preserved, and `/>` drops to its own line rather than hugging the last attr -->
 <pre>{#if cond}<Comp
-		prop1="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		prop2={value2}
-		prop3={value3}
-	/>{/if}</pre>
+			prop1="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+			prop2={value2}
+			prop3={value3}
+		/>{/if}</pre>
 
 <pre>{#if cond}<Comp
-		prop1="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		prop2={value2}
-		prop3={value3}></Comp>{/if}</pre>
+			prop1="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+			prop2={value2}
+			prop3={value3}></Comp>{/if}</pre>
