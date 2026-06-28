@@ -786,7 +786,11 @@ impl<'a> Printer<'a> {
     ///   *returned* (deferred), so it trails **after** the separator (`X<sep> /* c */`);
     /// - an **own-line** comment is *returned* (not pushed), each on its own line
     ///   (`hardline` + comment), for the caller to emit **after** the separator so the
-    ///   author's line break is kept and a `//` can't swallow the separator.
+    ///   author's line break is kept and a `//` can't swallow the separator; when
+    ///   `block_after_separator` (the `;`-terminator case), a single blank line before it
+    ///   (relative to the content, then the previous comment) is also preserved
+    ///   (`literalline`), matching prettier — the `,`-separator case keeps no blank
+    ///   (prettier emits none in a list element→comma gap).
     ///
     /// `block_after_separator` is the prettier-3.9 behavior for the statement/member
     /// **`;` terminator** (the `;` is pure structure, so trailing a block past it is
@@ -809,6 +813,7 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
+        let mut prev = start;
         for comment in comments_in_range(self.comments, start, sep_pos) {
             if self.is_same_line(start, comment.span.start) {
                 if block_after_separator && comment.is_block {
@@ -817,9 +822,20 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_trailing_comment_doc(comment));
                 }
             } else {
+                // Own-line comment: after a `;` *terminator* (`block_after_separator`),
+                // preserve a single blank line before it when the author left one —
+                // prettier keeps one blank line between the content and an own-line
+                // trailing comment (`expr;\n\n// c`). A `,` *separator* does not: prettier
+                // emits no blank in a list element→comma gap (`1,\n// c\n2`), so the flag
+                // gates it. `prev` is the content/separator start for the first comment,
+                // then the previous comment's end.
+                if block_after_separator && self.has_blank_line_between(prev, comment.span.start) {
+                    deferred.push(d.literalline());
+                }
                 deferred.push(d.hardline());
                 deferred.push(self.build_comment_doc(comment));
             }
+            prev = comment.span.end;
         }
         deferred
     }

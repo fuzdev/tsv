@@ -196,14 +196,13 @@ impl<'a> Printer<'a> {
             parts.extend(after);
             d.concat(&parts)
         } else {
-            let keyword_end = span.start + keyword.len() as u32;
-            if let Some(comment_doc) =
-                self.build_inline_comments_between_doc_opt(keyword_end, span.end)
-            {
-                d.concat(&[d.text(keyword), d.text(";"), comment_doc])
-            } else {
-                d.concat(&[d.text(keyword), d.text(";")])
-            }
+            // No label: a bare keyword closed by `;`. It swallows a following explicit
+            // `;` as its terminator (no `[no LineTerminator]` issue once the label is
+            // absent), so any comment between the keyword and that `;` is interior to the
+            // span — the shared helper preserves it (own-line aware, blank line kept). The
+            // previous inline-only emission merged consecutive own-line comments onto one
+            // line (`break; // c1 // c2`, swallowing the second).
+            self.build_bare_keyword_terminator_doc(keyword, span)
         }
     }
 
