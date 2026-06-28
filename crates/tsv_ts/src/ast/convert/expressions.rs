@@ -516,6 +516,7 @@ pub(in crate::ast::convert) fn convert_expression_inner<'src>(
                     interner,
                     offset,
                 )),
+                phase: import_expr.phase.as_str(),
                 arguments: import_expr
                     .options
                     .as_ref()

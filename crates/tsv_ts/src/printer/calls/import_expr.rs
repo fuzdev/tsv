@@ -15,24 +15,34 @@ use tsv_lang::SymbolResolver;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
-/// Wrap import args in a breakable group: `import(` + softline-indented `inner` +
+/// The opening token of a (possibly phased) dynamic import: `import(`,
+/// `import.source(`, or `import.defer(`.
+fn import_open(phase: internal::ImportPhase) -> &'static str {
+    match phase {
+        internal::ImportPhase::None => "import(",
+        internal::ImportPhase::Source => "import.source(",
+        internal::ImportPhase::Defer => "import.defer(",
+    }
+}
+
+/// Wrap import args in a breakable group: `<open>` + softline-indented `inner` +
 /// softline + `)`. Stays inline when it fits, breaks each side onto its own line
 /// otherwise. The shared shell for every block-comment / no-line-comment layout.
-fn wrap_import_group(d: &DocArena, inner: DocId) -> DocId {
+fn wrap_import_group(d: &DocArena, open: &'static str, inner: DocId) -> DocId {
     d.group(d.concat(&[
-        d.text("import("),
+        d.text(open),
         d.indent_softline(inner),
         d.softline(),
         d.text(")"),
     ]))
 }
 
-/// Wrap import args in a forced-multiline layout: `import(` + hardline-indented
+/// Wrap import args in a forced-multiline layout: `<open>` + hardline-indented
 /// `inner` + hardline + `)`. Used whenever a line comment (which runs to EOL) or an
 /// own-line comment forces the parens open.
-fn wrap_import_hardline(d: &DocArena, inner: DocId) -> DocId {
+fn wrap_import_hardline(d: &DocArena, open: &'static str, inner: DocId) -> DocId {
     d.concat(&[
-        d.text("import("),
+        d.text(open),
         d.indent(d.concat(&[d.hardline(), inner])),
         d.hardline(),
         d.text(")"),
@@ -50,10 +60,14 @@ pub(super) fn build_import_expression_doc(
 ) -> DocId {
     let d = printer.d();
 
-    // Preserve comments between `import(` and the source expression, e.g.
+    // Opening token: `import(`, `import.source(`, or `import.defer(` (import-phase
+    // proposals). Threaded into every wrapper and used to bound the leading-comment scan.
+    let open = import_open(import_expr.phase);
+
+    // Preserve comments between the `(` and the source expression, e.g.
     // import(/* @vite-ignore */ expr) — they would otherwise be lost. Own-line
     // comments force the parens to break; `leading_forces_break` drives that below.
-    let open_paren_end = import_expr.span.start + "import(".len() as u32;
+    let open_paren_end = import_expr.span.start + open.len() as u32;
     let source_start = import_expr.source.span().start;
 
     // Parenthesize an `in` argument inside a for-header init (`for (a = import(m,
@@ -92,22 +106,22 @@ pub(super) fn build_import_expression_doc(
             // block stays inline and breaks only on width. (NOT isolated_group — it
             // causes indent issues; variable.rs special-cases the assignment break.)
             if pc.has_trailing_line() || !pc.leading.is_empty() || leading_forces_break {
-                return wrap_import_hardline(d, inner);
+                return wrap_import_hardline(d, open, inner);
             }
-            return wrap_import_group(d, inner);
+            return wrap_import_group(d, open, inner);
         }
 
         // Own-line leading comment: force hardline layout to preserve comment position.
         // Prettier's printLeadingComment() keeps own-line comments on their own line.
         if leading_forces_break {
-            return wrap_import_hardline(d, source_doc);
+            return wrap_import_hardline(d, open, source_doc);
         }
 
         // Group with softline break points so the outer import() can break when the
         // line exceeds print width, matching Prettier's call-arg expansion. Without
         // this, only the inner arg's groups can break (e.g., `import(fn(\n  'long',\n))`
         // instead of the correct `import(\n  fn('long')\n)`).
-        return wrap_import_group(d, source_doc);
+        return wrap_import_group(d, open, source_doc);
     };
 
     let options_doc = printer.wrap_for_init_in(options, printer.build_expression_doc(options));
@@ -201,9 +215,9 @@ pub(super) fn build_import_expression_doc(
 
         let body = d.concat(&[d.concat(&head), sep, d.concat(&tail)]);
         if force_break {
-            return wrap_import_hardline(d, body);
+            return wrap_import_hardline(d, open, body);
         }
-        return wrap_import_group(d, body);
+        return wrap_import_group(d, open, body);
     }
 
     if is_expandable_object(options) {
@@ -212,7 +226,7 @@ pub(super) fn build_import_expression_doc(
         // State 1: expand-last — import('source', {\n\twith: ...\n})
         // State 2: expand-all — import(\n\t'source',\n\t{...}\n)
         let state_flat = d.concat(&[
-            d.text("import("),
+            d.text(open),
             source_doc,
             d.text(", "),
             options_doc,
@@ -221,7 +235,7 @@ pub(super) fn build_import_expression_doc(
 
         let expanded_options = d.group_break(options_doc);
         let state_expand_last = d.concat(&[
-            d.text("import("),
+            d.text(open),
             source_doc,
             d.text(", "),
             expanded_options,
@@ -230,7 +244,7 @@ pub(super) fn build_import_expression_doc(
 
         let arg_parts = d.join_doc([source_doc, options_doc], d.comma_line());
         let state_expand_all = d.concat(&[
-            d.text("import("),
+            d.text(open),
             d.indent_softline(arg_parts),
             d.softline(),
             d.text(")"),
@@ -240,7 +254,7 @@ pub(super) fn build_import_expression_doc(
     } else {
         // Standard group wrapping for non-expandable options
         let arg_parts = d.join_doc([source_doc, options_doc], d.comma_line());
-        wrap_import_group(d, arg_parts)
+        wrap_import_group(d, open, arg_parts)
     }
 }
 

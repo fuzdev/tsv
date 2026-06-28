@@ -242,6 +242,7 @@ Foundation for all parsing.
 
 - `import()` expression - ES2020
 - `import.meta` meta-property
+- Phased dynamic import (`import.source(…)` / `import.defer(…)`) - Stage 3; tsv-native, acorn rejects (see [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals))
 
 ---
 
@@ -361,6 +362,7 @@ ES2015 module syntax with ES2024 additions.
 - String import name (`import {'str' as b} from 'mod'`) - ES2022
 - Side-effect import (`import 'mod'`)
 - Import attributes (`import x from 'y' with {}`) - ES2024
+- Phased import (`import source x from 'mod'` / `import defer * as ns from 'mod'`) - Stage 3; tsv-native, acorn rejects (see [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals))
 
 ### Export Declarations
 
@@ -648,8 +650,6 @@ Stage 2 proposals and experimental features tsv does not yet parse.
 
 ## Stage 3 Proposals (Not Widely Adopted)
 
-- Import source phase (`import source x from "mod"`)
-- Deferred import evaluation (`import defer * as ns from "mod"`)
 - RegExp modifiers (`(?i:pattern)` inline modifiers)
 
 ## Stage 2 Proposals

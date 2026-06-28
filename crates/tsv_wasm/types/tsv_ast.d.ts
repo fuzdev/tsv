@@ -470,6 +470,8 @@ export interface ImportExpression {
 	end: number;
 	loc: SourceLocation;
 	source: Expression;
+	/** Import phase (`'source'`/`'defer'`) for `import.source(…)` / `import.defer(…)`; omitted otherwise. */
+	phase?: 'source' | 'defer';
 	/** Import attribute arguments. Omitted from JSON when empty. */
 	arguments?: Expression[];
 }
@@ -1077,6 +1079,8 @@ export interface ImportDeclaration {
 	loc: SourceLocation;
 	/** Omitted in Svelte non-`lang="ts"` context when `"value"`. */
 	importKind?: string;
+	/** Import phase (`'source'`/`'defer'`) for `import source …` / `import defer …`; omitted otherwise. */
+	phase?: 'source' | 'defer';
 	specifiers: ImportSpecifier[];
 	source: Literal;
 	/** Present in Svelte non-`lang="ts"` context (even when empty); omitted in TS context when empty. */

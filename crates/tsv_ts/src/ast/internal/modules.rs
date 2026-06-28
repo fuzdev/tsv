@@ -119,6 +119,32 @@ pub enum ImportKind {
     Type,
 }
 
+/// Import phase for the Stage-3 import-phase proposals (source-phase imports and
+/// import defer). `None` is an ordinary import; `Source`/`Defer` tag the static
+/// `import source …` / `import defer …` declaration or the dynamic
+/// `import.source(…)` / `import.defer(…)` call. Neither proposal is in acorn yet,
+/// so parsing them is a deliberate divergence from the Svelte/acorn oracle — see
+/// `docs/conformance_svelte.md`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ImportPhase {
+    #[default]
+    None,
+    Source,
+    Defer,
+}
+
+impl ImportPhase {
+    /// The public-AST `phase` string (`"source"`/`"defer"`), or `None` for an
+    /// ordinary import (the field is omitted from the JSON in that case).
+    pub fn as_str(self) -> Option<&'static str> {
+        match self {
+            ImportPhase::None => None,
+            ImportPhase::Source => Some("source"),
+            ImportPhase::Defer => Some("defer"),
+        }
+    }
+}
+
 /// Import declaration: `import x from "y"`, `import { a, b } from "y"`, etc.
 #[derive(Debug, Clone)]
 pub struct ImportDeclaration<'arena> {
@@ -131,6 +157,8 @@ pub struct ImportDeclaration<'arena> {
     pub attributes: Option<&'arena [ImportAttribute<'arena>]>,
     /// Import kind: "value" or "type" (for `import type { ... }`)
     pub import_kind: ImportKind,
+    /// Import phase: `Source`/`Defer` for `import source …` / `import defer …`.
+    pub phase: ImportPhase,
     pub span: Span,
 }
 

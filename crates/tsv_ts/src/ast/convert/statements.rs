@@ -288,6 +288,7 @@ pub(in crate::ast) fn convert_statement<'src>(
                 end: import_decl.span.end,
                 loc: create_location(import_decl.span, loc, offset),
                 import_kind,
+                phase: import_decl.phase.as_str(),
                 specifiers: import_decl
                     .specifiers
                     .iter()

@@ -207,6 +207,56 @@ Conversely, acorn-typescript *over-accepts* three or more arguments
 spec-faithful in both directions. **Upstream candidate**: acorn-typescript
 `ImportCall` argument handling.
 
+#### Import-phase proposals
+
+The Stage-3 **source-phase imports** and **import defer** proposals add a phase to
+both static and dynamic imports:
+
+- `import source x from 'mod'` / `import.source('mod')` — phase `'source'`
+- `import defer * as ns from 'mod'` / `import.defer('mod')` — phase `'defer'`
+
+acorn-typescript implements neither (`import source x` → `Unexpected token`,
+`import.source(…)` → `The only valid meta property for import is 'import.meta'`),
+so accepting them is a deliberate, forward-looking divergence from the
+Svelte/acorn oracle. tsv parses the valid forms and rejects the invalid ones per
+the proposals' grammars (`import source ImportedBinding FromClause` takes a
+**single** binding — no namespace, no named clause, no second specifier, so
+`import source x, { a }` / `import source x, * as ns` are rejected; `import defer`
+allows only the `* as ns` namespace shape; `import.source`/`import.defer` must be a
+call, never a bare meta-property or member access; neither dynamic form takes a
+spread argument), and tags the public AST node with a `phase: 'source' | 'defer'`
+field (omitted for an ordinary import). `source` and `defer` stay contextual —
+`import defer from 'mod'` still imports a default binding named `defer`.
+
+**Known limitation — source-phase binding named like a contextual keyword.** The
+spec disambiguates `import source x from 'mod'` (phase, binding `x`) from `import
+source from 'mod'` (a default import named `source`) by which production yields a
+complete parse: the source-phase reading needs a trailing `from` FromClause after
+the binding. tsv approximates this with a one-token lookahead — `source` is the
+phase only when the next token lexes as an `Identifier`, then enforces the
+single-binding restriction after parsing it. That covers every binding except one
+whose name is itself a contextual keyword the lexer emits as a non-`Identifier`
+token (`from`, `as`): `import source from from 'mod'` is spec-valid (source-phase,
+binding named `from`) but tsv rejects it. This is **deliberately not closed** —
+spec-faithful resolution would need lookahead past the binding to the `from` plus a
+binding parser that accepts keyword-lexed names, and a source-phase import whose
+binding is literally named `from`/`as` is vanishingly rare. It is also **never
+graded**: test262 encodes it only as a `_FIXTURE.js` (run by the host, not the
+parser grader), so it doesn't dent the 100% positive rate. Pinned in
+`tests/import_phase.rs` (`static_import_source_keyword_binding_rejected`, alongside
+`static_import_source_single_binding_enforced`). The identifier-named-`source`
+binding (`import source source from 'mod'`) parses fine.
+
+**No `_svelte_divergence` fixture** (the fixture pipeline needs acorn to produce
+`expected.json`, and acorn rejects the syntax). The parser is graded instead by the
+test262 suite — ~396 graded files, all passing; see
+[conformance_test262.md](./conformance_test262.md). Prettier diverges too (it drops
+`import defer`'s phase and throws on `import source`), so the *printer* is covered by
+`tests/import_phase.rs` rather than a fixture; the prettier side is cataloged in
+[conformance_prettier.md](./conformance_prettier.md#import-phase-proposals).
+**Upstream candidate**: acorn-typescript import-phase support — drop the divergence
+and promote to fixtures once it lands.
+
 ### TypeScript Parser Corrections (corpus-enforced)
 
 Intentional AST divergences from acorn-typescript that have no prettier-stable
