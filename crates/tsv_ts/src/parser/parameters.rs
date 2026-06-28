@@ -131,6 +131,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(pattern)
     }
 
+    /// Consume the contextual keyword `kw` as a parameter-property modifier iff
+    /// the current token is the identifier `kw` and the next token begins a
+    /// parameter binding — otherwise `kw` is itself the parameter name
+    /// (`constructor(readonly)`, `f(override: T)`, `constructor(public readonly)`).
+    /// The parameter-list analog of `class.rs`'s `eat_modifier_keyword` (which
+    /// keys on a class-member-name lookahead). Returns whether it was consumed.
+    fn eat_param_modifier_keyword(&mut self, kw: &str) -> Result<bool, ParseError> {
+        if matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == kw
+            && self.peek_starts_parameter_binding()
+        {
+            self.advance()?; // consume the modifier keyword
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// Parse a parenthesized parameter list: `(a, b, c)`
     ///
     /// Used by function declarations, method shorthand, and arrow functions.
@@ -169,13 +187,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     TokenKind::Identifier => {
                         let param_start = self.current_pos().0;
 
-                        // Check for parameter property modifiers: public, private, protected, readonly
-                        // TODO: `readonly` is eaten greedily below, so `constructor(readonly)` /
-                        // `constructor(readonly, x)` (readonly as a plain param name) fail where
-                        // acorn accepts them — a pre-existing divergence. Fixing needs the same
-                        // `peek_starts_parameter_binding` lookahead `override` uses, but acorn's
-                        // per-keyword rules differ (it rejects bare `public` here), so it warrants
-                        // its own fixture-first pass.
+                        // Check for parameter property modifiers: public, private, protected, readonly.
+                        // Accessibility keywords are strict-mode reserved words, so they cannot be
+                        // ordinary parameter names (acorn rejects bare `public`/`private`/`protected`
+                        // here too) — eating them greedily is correct. `override` and `readonly`,
+                        // by contrast, are contextual keywords that ARE valid parameter names, so
+                        // each is treated as a modifier only when a binding follows it (see below).
                         let accessibility = if self.eat_contextual_keyword("public") {
                             Some(Accessibility::Public)
                         } else if self.eat_contextual_keyword("private") {
@@ -186,21 +203,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             None
                         };
 
-                        // Check for `override` modifier (TS order: accessibility →
-                        // override → readonly). Unlike accessibility/readonly,
-                        // `override` is commonly a real identifier, so only treat it
-                        // as a modifier when the next token starts a binding;
-                        // otherwise it is itself the parameter name
-                        // (`constructor(override)`, `constructor(override: T)`).
-                        let is_override = matches!(self.current_kind(), TokenKind::Identifier)
-                            && self.current_value() == "override"
-                            && self.peek_starts_parameter_binding();
-                        if is_override {
-                            self.advance()?; // consume 'override'
-                        }
-
-                        // Check for readonly modifier (can appear alone or after accessibility)
-                        let readonly = self.eat_contextual_keyword("readonly");
+                        // Check for `override` then `readonly` modifiers (TS order:
+                        // accessibility → override → readonly). Both are contextual
+                        // keywords and valid parameter names, so each is a modifier
+                        // only when a binding follows it (see `eat_param_modifier_keyword`).
+                        let is_override = self.eat_param_modifier_keyword("override")?;
+                        let readonly = self.eat_param_modifier_keyword("readonly")?;
 
                         // If we have modifiers, this is a parameter property
                         if accessibility.is_some() || is_override || readonly {

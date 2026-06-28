@@ -479,27 +479,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Note: declare must be parsed BEFORE accessibility because `declare public a` is valid
         let is_declare = self.eat_modifier_keyword("declare");
 
-        // Handle accessibility modifiers (public, private, protected)
-        // Only consume as modifier if followed by a class member name or `*` (generator)
-        // Otherwise the keyword itself is the property name: `private = 1;`
-        let accessibility = if matches!(self.current_kind(), TokenKind::Identifier)
-            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
-        {
-            match self.current_value() {
-                "public" => {
-                    self.advance().ok();
-                    Some(Accessibility::Public)
-                }
-                "private" => {
-                    self.advance().ok();
-                    Some(Accessibility::Private)
-                }
-                "protected" => {
-                    self.advance().ok();
-                    Some(Accessibility::Protected)
-                }
-                _ => None,
-            }
+        // Handle accessibility modifiers (public, private, protected). Like the
+        // other shared detectors, each is consumed only if followed by a class
+        // member name or `*` (generator); otherwise the keyword itself is the
+        // property name (`private = 1;`).
+        let accessibility = if self.eat_modifier_keyword("public") {
+            Some(Accessibility::Public)
+        } else if self.eat_modifier_keyword("private") {
+            Some(Accessibility::Private)
+        } else if self.eat_modifier_keyword("protected") {
+            Some(Accessibility::Protected)
         } else {
             None
         };
