@@ -27,9 +27,7 @@ mod selectors;
 pub mod value_normalization;
 mod values;
 
-use crate::ast::internal::{
-    Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet, CssValue,
-};
+use crate::ast::internal::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};
 use tsv_lang::{
     CommentPosition, EmbedContext, INDENT, OutputBuffer, TAB_WIDTH, classify_comment_fast,
     comments_in_range,
@@ -39,17 +37,6 @@ use tsv_lang::{
     },
     is_format_ignore_directive, printing,
 };
-
-/// Check if function args have wrappable content (break points)
-///
-/// Returns true if:
-/// 1. Multiple comma-separated args (linear-gradient, rgb, etc.)
-/// 2. Single arg that is a List with multiple space-separated items (drop-shadow)
-pub(crate) fn has_wrappable_args(args: &[CssValue<'_>]) -> bool {
-    args.len() >= 2
-        || (args.len() == 1
-            && matches!(&args[0], CssValue::List { values, .. } if values.len() >= 2))
-}
 
 /// Printer state for building output
 pub(crate) struct Printer<'a> {

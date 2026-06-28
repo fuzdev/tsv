@@ -14,7 +14,7 @@
 //! The main entry point is `build_css_value_doc()`, which dispatches to
 //! specialized doc builders for each value type.
 
-use super::{Printer, has_wrappable_args, value_normalization};
+use super::{Printer, value_normalization};
 use crate::ast::internal::{CssValue, StringCooked};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -179,10 +179,11 @@ impl<'a> Printer<'a> {
 
     /// Build a flat (non-wrapping) `name(args_doc)` function doc.
     ///
-    /// The shared `name(` … `)` envelope for the url / var / single-simple-arg
-    /// paths, which have no internal break points. The wrapping path
-    /// (multi-arg functions) builds its own `group(…softline…)` structure
-    /// inline and does not use this.
+    /// The shared `name(` … `)` envelope for the `url()` and `var(--a,)`
+    /// empty-fallback paths, which are kept flat by design (opaque / no break
+    /// points). Every other function goes through the wrapping path
+    /// (`build_value_function_doc`'s `group(…softline…)` structure) so it can
+    /// break when it exceeds width.
     fn flat_function_doc(&self, name: &str, args_doc: DocId) -> DocId {
         let d = self.d();
         d.concat(&[
@@ -196,11 +197,17 @@ impl<'a> Printer<'a> {
     /// Build a doc for a function value with automatic wrapping
     ///
     /// Uses proper doc structure with group/softline/indent so the renderer
-    /// decides wrapping based on actual line position (like Prettier).
+    /// decides wrapping based on actual line position (like Prettier). Every
+    /// function gets break points (a softline after `(` and before `)`), so a
+    /// single over-width arg wraps onto its own line just like a multi-arg list
+    /// — matching prettier's `parenthesized-value-group`.
     ///
     /// - Multi-arg functions: wrap each arg on its own line when exceeds width
     /// - Single-arg List (e.g., drop-shadow): wrap on space separators
-    /// - Single-arg non-List (e.g., url): never wraps
+    /// - Single-arg non-List (e.g., `fn(token)`): wrap the arg onto its own line
+    ///   when it exceeds width
+    /// - `url()` and the `var(--a,)` empty fallback: kept flat — handled before
+    ///   this point
     pub(super) fn build_value_function_doc(
         &self,
         name: &str,
@@ -255,12 +262,6 @@ impl<'a> Printer<'a> {
             let args_doc = d.join(real.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
             let comma = d.text(",");
             return self.flat_function_doc(name, d.concat(&[args_doc, comma]));
-        }
-
-        if !has_wrappable_args(args) {
-            // Single simple arg - inline only, no break points
-            let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
-            return self.flat_function_doc(name, args_doc);
         }
 
         // Build with group/softline structure for automatic wrapping
