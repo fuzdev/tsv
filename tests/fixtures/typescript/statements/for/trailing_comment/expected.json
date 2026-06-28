@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 87,
+	"end": 78,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,16 +13,16 @@
 		{
 			"type": "Line",
 			"value": " trailing comment",
-			"start": 44,
-			"end": 63,
+			"start": 35,
+			"end": 54,
 			"loc": {
 				"start": {
-					"line": 6,
-					"column": 3
+					"line": 2,
+					"column": 26
 				},
 				"end": {
-					"line": 6,
-					"column": 22
+					"line": 2,
+					"column": 45
 				}
 			}
 		}
@@ -30,19 +30,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 86,
+		"end": 77,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 77,
+			"end": 68,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 10,
+					"line": 6,
 					"column": 9
 				}
 			},
@@ -50,60 +50,60 @@
 				{
 					"type": "ForStatement",
 					"start": 10,
-					"end": 76,
+					"end": 67,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 9,
+							"line": 5,
 							"column": 2
 						}
 					},
 					"init": {
 						"type": "AssignmentExpression",
-						"start": 18,
-						"end": 23,
+						"start": 15,
+						"end": 20,
 						"loc": {
 							"start": {
-								"line": 3,
-								"column": 2
+								"line": 2,
+								"column": 6
 							},
 							"end": {
-								"line": 3,
-								"column": 7
+								"line": 2,
+								"column": 11
 							}
 						},
 						"operator": "=",
 						"left": {
 							"type": "Identifier",
-							"start": 18,
-							"end": 19,
+							"start": 15,
+							"end": 16,
 							"loc": {
 								"start": {
-									"line": 3,
-									"column": 2
+									"line": 2,
+									"column": 6
 								},
 								"end": {
-									"line": 3,
-									"column": 3
+									"line": 2,
+									"column": 7
 								}
 							},
 							"name": "i"
 						},
 						"right": {
 							"type": "Literal",
-							"start": 22,
-							"end": 23,
+							"start": 19,
+							"end": 20,
 							"loc": {
 								"start": {
-									"line": 3,
-									"column": 6
+									"line": 2,
+									"column": 10
 								},
 								"end": {
-									"line": 3,
-									"column": 7
+									"line": 2,
+									"column": 11
 								}
 							},
 							"value": 0,
@@ -112,30 +112,30 @@
 					},
 					"test": {
 						"type": "BinaryExpression",
-						"start": 27,
-						"end": 33,
+						"start": 22,
+						"end": 28,
 						"loc": {
 							"start": {
-								"line": 4,
-								"column": 2
+								"line": 2,
+								"column": 13
 							},
 							"end": {
-								"line": 4,
-								"column": 8
+								"line": 2,
+								"column": 19
 							}
 						},
 						"left": {
 							"type": "Identifier",
-							"start": 27,
-							"end": 28,
+							"start": 22,
+							"end": 23,
 							"loc": {
 								"start": {
-									"line": 4,
-									"column": 2
+									"line": 2,
+									"column": 13
 								},
 								"end": {
-									"line": 4,
-									"column": 3
+									"line": 2,
+									"column": 14
 								}
 							},
 							"name": "i"
@@ -143,16 +143,16 @@
 						"operator": "<",
 						"right": {
 							"type": "Literal",
-							"start": 31,
-							"end": 33,
+							"start": 26,
+							"end": 28,
 							"loc": {
 								"start": {
-									"line": 4,
-									"column": 6
+									"line": 2,
+									"column": 17
 								},
 								"end": {
-									"line": 4,
-									"column": 8
+									"line": 2,
+									"column": 19
 								}
 							},
 							"value": 10,
@@ -161,91 +161,99 @@
 					},
 					"update": {
 						"type": "UpdateExpression",
-						"start": 37,
-						"end": 40,
+						"start": 30,
+						"end": 33,
 						"loc": {
 							"start": {
-								"line": 5,
-								"column": 2
+								"line": 2,
+								"column": 21
 							},
 							"end": {
-								"line": 5,
-								"column": 5
+								"line": 2,
+								"column": 24
 							}
 						},
 						"operator": "++",
 						"prefix": false,
 						"argument": {
 							"type": "Identifier",
-							"start": 37,
-							"end": 38,
+							"start": 30,
+							"end": 31,
 							"loc": {
 								"start": {
-									"line": 5,
-									"column": 2
+									"line": 2,
+									"column": 21
 								},
 								"end": {
-									"line": 5,
-									"column": 3
+									"line": 2,
+									"column": 22
 								}
 							},
 							"name": "i"
-						}
+						},
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " trailing comment",
+								"start": 35,
+								"end": 54
+							}
+						]
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 65,
-						"end": 76,
+						"start": 56,
+						"end": 67,
 						"loc": {
 							"start": {
-								"line": 7,
+								"line": 3,
 								"column": 1
 							},
 							"end": {
-								"line": 9,
+								"line": 5,
 								"column": 2
 							}
 						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 69,
-								"end": 73,
+								"start": 60,
+								"end": 64,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 4,
 										"column": 2
 									},
 									"end": {
-										"line": 8,
+										"line": 4,
 										"column": 6
 									}
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 69,
-									"end": 72,
+									"start": 60,
+									"end": 63,
 									"loc": {
 										"start": {
-											"line": 8,
+											"line": 4,
 											"column": 2
 										},
 										"end": {
-											"line": 8,
+											"line": 4,
 											"column": 5
 										}
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 69,
-										"end": 70,
+										"start": 60,
+										"end": 61,
 										"loc": {
 											"start": {
-												"line": 8,
+												"line": 4,
 												"column": 2
 											},
 											"end": {
-												"line": 8,
+												"line": 4,
 												"column": 3
 											}
 										},
@@ -254,14 +262,6 @@
 									"arguments": [],
 									"optional": false
 								}
-							}
-						],
-						"leadingComments": [
-							{
-								"type": "Line",
-								"value": " trailing comment",
-								"start": 44,
-								"end": 63
 							}
 						]
 					}

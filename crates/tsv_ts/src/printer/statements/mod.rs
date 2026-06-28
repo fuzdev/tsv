@@ -219,18 +219,40 @@ impl<'a> Printer<'a> {
         // (which adds inner assignment parens separately).
         if matches!(arg, Expression::AssignmentExpression(_)) {
             let expr_doc = self.build_expression_doc(arg);
-            return if let Some(comments_doc) = inline_comments {
-                d.concat(&[
+            let mut parts: DocBuf = if let Some(comments_doc) = inline_comments {
+                smallvec![
                     d.text(keyword),
                     d.text(" "),
                     comments_doc,
                     d.text("("),
                     expr_doc,
-                    d.text(");"),
-                ])
+                ]
             } else {
-                d.concat(&[d.text(keyword), d.text(" ("), expr_doc, d.text(");")])
+                smallvec![d.text(keyword), d.text(" ("), expr_doc]
             };
+            // Trailing comments in the operand→`;` gap were previously DROPPED here.
+            // A line comment trails after the `;` in both keywords (`(a = b); // c`).
+            // A same-line block comment differs (prettier is inconsistent between the
+            // two): `return` keeps it INSIDE the parens (`return (a = b /* c */);`,
+            // #19263 — operand-attached), `throw` floats it OUT after `)`
+            // (`throw (a = b) /* c */;`).
+            if keyword == "return" {
+                let after = if has_trailing_comments {
+                    self.split_terminator_gap_comments(&mut parts, argument_end, span_end, false)
+                } else {
+                    DocBuf::new()
+                };
+                parts.push(d.text(")"));
+                parts.push(d.text(";"));
+                parts.extend(after);
+            } else {
+                parts.push(d.text(")"));
+                if has_trailing_comments {
+                    self.append_trailing_paren_comments(&mut parts, argument_end, span_end);
+                }
+                parts.push(d.text(";"));
+            }
+            return d.concat(&parts);
         }
 
         if let Expression::BinaryExpression(binary) = arg {

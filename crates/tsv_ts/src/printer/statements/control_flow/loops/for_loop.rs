@@ -164,7 +164,7 @@ impl<'a> Printer<'a> {
     /// ) {
     /// ```
     fn build_for_header_doc(&self, stmt: &internal::ForStatement<'_>) -> DocId {
-        self.build_for_header_doc_impl(stmt, false, None)
+        self.build_for_header_doc_impl(stmt, None)
     }
 
     /// Build doc for empty for (;;) with comments inside
@@ -229,7 +229,6 @@ impl<'a> Printer<'a> {
     fn build_for_header_doc_impl(
         &self,
         stmt: &internal::ForStatement<'_>,
-        force_break: bool,
         keyword_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();
@@ -294,9 +293,8 @@ impl<'a> Printer<'a> {
             } else {
                 false
             };
-        let has_own_line_comments = force_break
-            || has_line_comment_in_header
-            || self.for_header_has_own_line_comments(&spans);
+        let has_own_line_comments =
+            has_line_comment_in_header || self.for_header_has_own_line_comments(&spans);
 
         // Extract span positions for use throughout this function
         let init_start = spans.init_start;
@@ -1063,10 +1061,13 @@ impl<'a> Printer<'a> {
             // Check if we have line comments (need special handling)
             let has_line_comment = self.has_line_comments_between(header_end, body_start);
 
-            // Build parts with proper comment handling. A line comment between `)` and
-            // the body forces the header to break (block comments can stay inline).
+            // Build parts with proper comment handling. A comment between `)` and the
+            // body does NOT force the header to break — the header decides its own
+            // flat/break on its own width (prettier 3.9 collapses `for (i; c; u)` and
+            // trails the comment after `)`). Only comments *inside* the parens (handled
+            // in `build_for_header_doc_impl`) or overflow expand the header.
             let mut parts =
-                vec![self.build_for_header_doc_impl(stmt, has_line_comment, keyword_comments)];
+                vec![self.build_for_header_doc_impl(stmt, keyword_comments)];
 
             // Post-header comments. Non-block bodies use Prettier's `adjustClause`
             // (`indent([line, body])`) wrapped with the header in an outer group, so

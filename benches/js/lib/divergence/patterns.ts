@@ -1498,7 +1498,6 @@ const comment_position: DivergencePattern = {
 		'typescript/statements/switch/empty_comment_prettier_divergence',
 		'typescript/statements/switch/case_block_comment_prettier_divergence',
 		'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence',
-		'typescript/statements/for/trailing_comment_prettier_divergence',
 		'typescript/statements/for/empty_clauses_comment_prettier_divergence',
 		'typescript/statements/for/of_line_comment_prettier_divergence',
 		'typescript/statements/do_while/open_paren_comment_prettier_divergence',

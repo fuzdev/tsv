@@ -11,6 +11,11 @@
 		[K in keyof T]: V;
 	};
 
+	// Block comment authored inline before `[` (multiline mapped type) - kept inline (prettier 3.9)
+	type BInline = {
+		/* comment */ [K in keyof T]: V;
+	};
+
 	// Block comment inline (single-line mapped type)
 	type C = { [/* inline */ K in keyof T]: V };
 

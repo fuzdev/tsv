@@ -9,6 +9,7 @@
 // - Entity names: `A.B.C`
 
 use super::super::comments_in_range;
+use crate::printer::analysis::has_newline_after_position;
 use super::helpers::{
     should_hug_union_type, type_needs_parens_for_array_element,
     type_needs_parens_for_conditional_check, type_needs_parens_for_conditional_extends,
@@ -546,14 +547,46 @@ impl<'a> Printer<'a> {
         let content_start = m.span.start + 1; // after `{`
         let param_name_start = m.type_parameter.span.start; // start of `K`
 
-        // Comments between `{` and `K`
-        // - Multiline: go on their own line BEFORE `[`
-        // - Single-line: go inline AFTER `[`
-        let comments_before_mapping: Vec<_> =
-            comments_in_range(self.comments, content_start, param_name_start).collect();
+        // The mapped bracket `[` splits the header comments into two positions:
+        //  - between `{` and `[`: LEADING the mapped type — prettier 3.9 (#18731)
+        //    keeps an inline-authored block comment before `[` (`{ /* c */ [K in T] }`);
+        //  - between `[` and the key: INSIDE the brackets, before the key
+        //    (`{ [/* c */ K in T] }`) — these stay after `[`.
+        let bracket_pos = find_char_skipping_comments(
+            self.source.as_bytes(),
+            content_start as usize,
+            param_name_start as usize,
+            b'[',
+        )
+        .map_or(param_name_start, |p| p as u32);
+        let leading_comments: Vec<_> =
+            comments_in_range(self.comments, content_start, bracket_pos).collect();
+        let bracket_inner_comments: Vec<_> =
+            comments_in_range(self.comments, bracket_pos + 1, param_name_start).collect();
+
+        // Leading comments (before `[`): the node-adjacent (LAST) comment stays
+        // inline iff it's a block comment with no newline after it; every earlier
+        // comment, and any line/own-line comment, goes on its own line (and in a
+        // single-line source forces the mapped type to break).
+        let leading_n = leading_comments.len();
+        let leading_last_inline = leading_comments.last().is_some_and(|c| {
+            c.is_block && !has_newline_after_position(self.source, c.span.end)
+        });
+        let leading_own_line_end = if leading_last_inline {
+            leading_n - 1
+        } else {
+            leading_n
+        };
 
         // Build the mapping body (starting from `[`)
         let mut body_parts = smallvec![];
+
+        // The node-adjacent inline block comment leads the body, before the
+        // `readonly` modifier and `[` (prettier: `/* c */ readonly [K in T]`).
+        if leading_last_inline {
+            body_parts.push(self.build_comment_doc(leading_comments[leading_n - 1]));
+            body_parts.push(d.text(" "));
+        }
 
         // readonly modifier: `readonly`, `+readonly`, or `-readonly`
         if let Some(readonly) = m.readonly {
@@ -567,12 +600,11 @@ impl<'a> Printer<'a> {
         // [K in constraint]
         body_parts.push(d.text("["));
 
-        // For single-line: comments go after `[`
-        if !source_is_multiline {
-            for comment in &comments_before_mapping {
-                body_parts.push(self.build_comment_doc(comment));
-                body_parts.push(d.text(" "));
-            }
+        // Comments inside the brackets, before the key (`[/* c */ K in T]`) stay
+        // after `[`, inline ahead of the key.
+        for comment in &bracket_inner_comments {
+            body_parts.push(self.build_comment_doc(comment));
+            body_parts.push(d.text(" "));
         }
 
         body_parts.push(d.symbol(m.type_parameter.name.to_u32()));
@@ -736,10 +768,11 @@ impl<'a> Printer<'a> {
         }
 
         if source_is_multiline {
-            // Multi-line source: preserve multi-line format with hardlines
-            // Comments before mapping go on their own line
+            // Multi-line source: preserve multi-line format with hardlines.
+            // Own-line leading comments each take their own line before `[`; the
+            // node-adjacent inline block comment (if any) already leads `body_parts`.
             let mut inner_parts: DocBuf = smallvec![];
-            for comment in &comments_before_mapping {
+            for comment in &leading_comments[..leading_own_line_end] {
                 inner_parts.push(d.hardline());
                 inner_parts.push(self.build_comment_doc(comment));
             }
@@ -756,8 +789,14 @@ impl<'a> Printer<'a> {
         } else {
             // One-line source: width-aware (stays inline if fits, wraps if too long).
             // bracketSpacing boundaries: a space when flat (`{ [K in T]: U }`), a
-            // newline when broken.
-            let mut all_parts: DocBuf = smallvec![d.line()];
+            // newline when broken. An own-line leading comment (a line comment, or a
+            // non-adjacent block) forces the break via its `hardline`.
+            let mut all_parts: DocBuf = smallvec![];
+            for comment in &leading_comments[..leading_own_line_end] {
+                all_parts.push(d.hardline());
+                all_parts.push(self.build_comment_doc(comment));
+            }
+            all_parts.push(d.line());
             all_parts.extend(body_parts);
             all_parts.push(d.if_break(d.text(";"), d.empty()));
 
