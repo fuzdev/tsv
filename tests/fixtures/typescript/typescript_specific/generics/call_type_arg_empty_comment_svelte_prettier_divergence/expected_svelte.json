@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 176,
+	"end": 169,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -43,6 +43,22 @@
 			}
 		},
 		{
+			"type": "Block",
+			"value": " empty ",
+			"start": 71,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 16
+				},
+				"end": {
+					"line": 3,
+					"column": 27
+				}
+			}
+		},
+		{
 			"type": "Line",
 			"value": " Empty object with line comment",
 			"start": 91,
@@ -61,16 +77,32 @@
 		{
 			"type": "Line",
 			"value": " empty",
-			"start": 147,
-			"end": 155,
+			"start": 143,
+			"end": 151,
 			"loc": {
 				"start": {
-					"line": 8,
-					"column": 3
+					"line": 7,
+					"column": 2
 				},
 				"end": {
-					"line": 8,
-					"column": 11
+					"line": 7,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " empty",
+			"start": 143,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 10
 				}
 			}
 		}
@@ -78,19 +110,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 175,
+		"end": 168,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 166,
+			"end": 159,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 11,
+					"line": 9,
 					"column": 9
 				}
 			},
@@ -220,30 +252,30 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 126,
-					"end": 165,
+					"end": 158,
 					"loc": {
 						"start": {
 							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 10,
-							"column": 5
+							"line": 8,
+							"column": 6
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 132,
-							"end": 164,
+							"end": 157,
 							"loc": {
 								"start": {
 									"line": 6,
 									"column": 7
 								},
 								"end": {
-									"line": 10,
-									"column": 4
+									"line": 8,
+									"column": 5
 								}
 							},
 							"id": {
@@ -265,15 +297,15 @@
 							"init": {
 								"type": "CallExpression",
 								"start": 136,
-								"end": 164,
+								"end": 157,
 								"loc": {
 									"start": {
 										"line": 6,
 										"column": 11
 									},
 									"end": {
-										"line": 10,
-										"column": 4
+										"line": 8,
+										"column": 5
 									}
 								},
 								"callee": {
@@ -296,30 +328,30 @@
 								"typeArguments": {
 									"type": "TSTypeParameterInstantiation",
 									"start": 138,
-									"end": 162,
+									"end": 155,
 									"loc": {
 										"start": {
 											"line": 6,
 											"column": 13
 										},
 										"end": {
-											"line": 10,
-											"column": 2
+											"line": 8,
+											"column": 3
 										}
 									},
 									"params": [
 										{
 											"type": "TSTypeLiteral",
-											"start": 142,
-											"end": 159,
+											"start": 139,
+											"end": 154,
 											"loc": {
 												"start": {
-													"line": 7,
-													"column": 2
+													"line": 6,
+													"column": 14
 												},
 												"end": {
-													"line": 9,
-													"column": 3
+													"line": 8,
+													"column": 2
 												}
 											},
 											"members": []
@@ -338,6 +370,12 @@
 							"end": 82
 						},
 						{
+							"type": "Block",
+							"value": " empty ",
+							"start": 71,
+							"end": 82
+						},
+						{
 							"type": "Line",
 							"value": " Empty object with line comment",
 							"start": 91,
@@ -348,8 +386,14 @@
 						{
 							"type": "Line",
 							"value": " empty",
-							"start": 147,
-							"end": 155
+							"start": 143,
+							"end": 151
+						},
+						{
+							"type": "Line",
+							"value": " empty",
+							"start": 143,
+							"end": 151
 						}
 					]
 				}

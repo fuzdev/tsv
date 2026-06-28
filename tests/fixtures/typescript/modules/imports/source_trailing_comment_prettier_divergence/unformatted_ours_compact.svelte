@@ -2,7 +2,7 @@
 	// block comment between source and `;` trails after the `;`
 	import {a} from './a'/* c */;
 
-	// line comment trails after `;`; own-line `// 2` stays with this statement
+	// trailing `// 1` and an own-line `// 2`
 	import {b} from './b'// 1
 	// 2
 	;

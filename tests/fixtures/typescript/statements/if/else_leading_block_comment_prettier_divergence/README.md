@@ -1,26 +1,15 @@
 # else_leading_block_comment_prettier_divergence
 
 A block comment leading the `else` keyword. When the author writes it on its
-**own line** before `else` (`}\n/* b */\nelse`), both formatters now keep it
-there — prettier 3.9 (#18813) stopped relocating own-line comments into the else
-body, so `prettier(input) == input` and there is no `output_prettier` oracle.
+**own line** before `else` (`}\n/* b */\nelse`), both formatters keep it there,
+so `prettier(input) == input` and there is no `output_prettier` oracle.
 
 The divergence survives in the **same-line** authoring, pinned by
 `unformatted_ours_leading.svelte` (`/* b */ else if`): tsv splits the comment
-onto its own line before `else` (normalizing to `input`), while prettier 3.9
-keeps it cuddled on the `else` line (`/* b */ else if`), so prettier does **not**
-normalize that variant to `input`. Prettier's cuddled output is itself
-prettier-stable, pinned as `prettier_variant_leading.svelte` (tsv normalizes it
-back to `input`).
-
-```ts
-// prettier 3.9 (same-line, cuddled)   // tsv (own line before else)
-}                                       }
-/* b */ else if (cond) {                /* b */
-	fn2();                              else if (cond) {
-}                                           fn2();
-                                        }
-```
+onto its own line before `else` (normalizing to `input`), while prettier keeps it
+cuddled on the `else` line, so prettier does **not** normalize that variant to
+`input`. Prettier's cuddled output is itself prettier-stable, pinned as
+`prettier_variant_leading.svelte` (tsv normalizes it back to `input`).
 
 ## Reason
 

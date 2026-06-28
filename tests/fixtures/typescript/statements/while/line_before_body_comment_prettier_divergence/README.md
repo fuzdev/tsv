@@ -2,21 +2,10 @@
 
 Line comments between a `while (…)` header's `)` and the body `{`.
 
-Prettier 3.9 no longer absorbs these comments into the block body — a trailing
-comment (`while (a) // c`) and an own-line comment before `{` (`while (a)\n// c\n{`)
-now stay where the author wrote them in both formatters. The remaining divergence
-is the **blank line**: when the author leaves a blank line between `)` and an
-own-line comment, tsv preserves it; prettier 3.9 drops it.
-
-```ts
-// prettier 3.9 (blank dropped)   // tsv (blank preserved)
-while (a)                          while (a)
-
-// blank before                   // blank before
-{                                  {
-	fn();                              fn();
-}                                  }
-```
+A trailing comment (`while (a) // c`) and an own-line comment before `{`
+(`while (a)\n// c\n{`) stay where the author wrote them in both formatters. The
+divergence is the **blank line**: when the author leaves a blank line between `)`
+and an own-line comment, tsv preserves it while prettier drops it.
 
 ## Reason
 

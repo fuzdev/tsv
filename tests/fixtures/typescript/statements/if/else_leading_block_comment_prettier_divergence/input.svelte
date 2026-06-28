@@ -22,7 +22,7 @@
 		fn2();
 	}
 
-	// Non-block consequent - comment preserved before else
+	// Non-block consequent - comment on own line before else
 	if (cond) a();
 	/* b */
 	else if (cond) a();

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 617,
+	"end": 533,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " first union member is a parenthesized union with a leading line comment inside",
+			"value": " first union member is a parenthesized union with a leading line comment inside the",
 			"start": 20,
-			"end": 101,
+			"end": 105,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 82
+					"column": 86
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " the parens - tsv keeps the comment inside the member (prettier moves it out, before",
-			"start": 103,
-			"end": 189,
+			"value": " parens, kept inside the member - the comment takes its own line inside the parens,",
+			"start": 107,
+			"end": 192,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,15 +38,15 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 87
+					"column": 86
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " the member); the comment takes its own line inside the parens, above the inline union",
-			"start": 191,
-			"end": 279,
+			"value": " above the inline union",
+			"start": 194,
+			"end": 219,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 89
+					"column": 26
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 304,
-			"end": 308,
+			"start": 244,
+			"end": 248,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " a leading line comment inside a LATER member's parens relocates to trail the",
-			"start": 333,
-			"end": 412,
+			"start": 273,
+			"end": 352,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -92,9 +92,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " previous member (both formatters agree); only the first member - with no previous",
-			"start": 414,
-			"end": 498,
+			"value": " previous member; only the first member - with no previous member to relocate",
+			"start": 354,
+			"end": 433,
 			"loc": {
 				"start": {
 					"line": 13,
@@ -102,15 +102,15 @@
 				},
 				"end": {
 					"line": 13,
-					"column": 85
+					"column": 80
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " member to relocate onto - keeps the comment inside the parens",
-			"start": 500,
-			"end": 564,
+			"value": " onto - keeps the comment inside the parens",
+			"start": 435,
+			"end": 480,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -118,15 +118,15 @@
 				},
 				"end": {
 					"line": 14,
-					"column": 65
+					"column": 46
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 583,
-			"end": 587,
+			"start": 499,
+			"end": 503,
 			"loc": {
 				"start": {
 					"line": 16,
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 616,
+		"end": 532,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 607,
+			"end": 523,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -161,8 +161,8 @@
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 281,
-					"end": 330,
+					"start": 221,
+					"end": 270,
 					"loc": {
 						"start": {
 							"line": 5,
@@ -175,8 +175,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 286,
-						"end": 291,
+						"start": 226,
+						"end": 231,
 						"loc": {
 							"start": {
 								"line": 5,
@@ -191,8 +191,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 296,
-						"end": 329,
+						"start": 236,
+						"end": 269,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -206,8 +206,8 @@
 						"types": [
 							{
 								"type": "TSParenthesizedType",
-								"start": 298,
-								"end": 323,
+								"start": 238,
+								"end": 263,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -220,8 +220,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 313,
-									"end": 318,
+									"start": 253,
+									"end": 258,
 									"loc": {
 										"start": {
 											"line": 8,
@@ -235,8 +235,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 313,
-											"end": 314,
+											"start": 253,
+											"end": 254,
 											"loc": {
 												"start": {
 													"line": 8,
@@ -249,8 +249,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 313,
-												"end": 314,
+												"start": 253,
+												"end": 254,
 												"loc": {
 													"start": {
 														"line": 8,
@@ -266,8 +266,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 317,
-											"end": 318,
+											"start": 257,
+											"end": 258,
 											"loc": {
 												"start": {
 													"line": 8,
@@ -280,8 +280,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 317,
-												"end": 318,
+												"start": 257,
+												"end": 258,
 												"loc": {
 													"start": {
 														"line": 8,
@@ -300,16 +300,16 @@
 										{
 											"type": "Line",
 											"value": " c",
-											"start": 304,
-											"end": 308
+											"start": 244,
+											"end": 248
 										}
 									]
 								}
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 328,
-								"end": 329,
+								"start": 268,
+								"end": 269,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -322,8 +322,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 328,
-									"end": 329,
+									"start": 268,
+									"end": 269,
 									"loc": {
 										"start": {
 											"line": 10,
@@ -342,28 +342,28 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " first union member is a parenthesized union with a leading line comment inside",
+							"value": " first union member is a parenthesized union with a leading line comment inside the",
 							"start": 20,
-							"end": 101
+							"end": 105
 						},
 						{
 							"type": "Line",
-							"value": " the parens - tsv keeps the comment inside the member (prettier moves it out, before",
-							"start": 103,
-							"end": 189
+							"value": " parens, kept inside the member - the comment takes its own line inside the parens,",
+							"start": 107,
+							"end": 192
 						},
 						{
 							"type": "Line",
-							"value": " the member); the comment takes its own line inside the parens, above the inline union",
-							"start": 191,
-							"end": 279
+							"value": " above the inline union",
+							"start": 194,
+							"end": 219
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 566,
-					"end": 606,
+					"start": 482,
+					"end": 522,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -376,8 +376,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 571,
-						"end": 574,
+						"start": 487,
+						"end": 490,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -392,8 +392,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 579,
-						"end": 605,
+						"start": 495,
+						"end": 521,
 						"loc": {
 							"start": {
 								"line": 16,
@@ -407,8 +407,8 @@
 						"types": [
 							{
 								"type": "TSTypeReference",
-								"start": 581,
-								"end": 582,
+								"start": 497,
+								"end": 498,
 								"loc": {
 									"start": {
 										"line": 16,
@@ -421,8 +421,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 581,
-									"end": 582,
+									"start": 497,
+									"end": 498,
 									"loc": {
 										"start": {
 											"line": 16,
@@ -439,15 +439,15 @@
 									{
 										"type": "Line",
 										"value": " c",
-										"start": 583,
-										"end": 587
+										"start": 499,
+										"end": 503
 									}
 								]
 							},
 							{
 								"type": "TSParenthesizedType",
-								"start": 592,
-								"end": 599,
+								"start": 508,
+								"end": 515,
 								"loc": {
 									"start": {
 										"line": 17,
@@ -460,8 +460,8 @@
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 593,
-									"end": 598,
+									"start": 509,
+									"end": 514,
 									"loc": {
 										"start": {
 											"line": 17,
@@ -475,8 +475,8 @@
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 593,
-											"end": 594,
+											"start": 509,
+											"end": 510,
 											"loc": {
 												"start": {
 													"line": 17,
@@ -489,8 +489,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 593,
-												"end": 594,
+												"start": 509,
+												"end": 510,
 												"loc": {
 													"start": {
 														"line": 17,
@@ -506,8 +506,8 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 597,
-											"end": 598,
+											"start": 513,
+											"end": 514,
 											"loc": {
 												"start": {
 													"line": 17,
@@ -520,8 +520,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 597,
-												"end": 598,
+												"start": 513,
+												"end": 514,
 												"loc": {
 													"start": {
 														"line": 17,
@@ -540,8 +540,8 @@
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 604,
-								"end": 605,
+								"start": 520,
+								"end": 521,
 								"loc": {
 									"start": {
 										"line": 18,
@@ -554,8 +554,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 604,
-									"end": 605,
+									"start": 520,
+									"end": 521,
 									"loc": {
 										"start": {
 											"line": 18,
@@ -575,20 +575,20 @@
 						{
 							"type": "Line",
 							"value": " a leading line comment inside a LATER member's parens relocates to trail the",
-							"start": 333,
-							"end": 412
+							"start": 273,
+							"end": 352
 						},
 						{
 							"type": "Line",
-							"value": " previous member (both formatters agree); only the first member - with no previous",
-							"start": 414,
-							"end": 498
+							"value": " previous member; only the first member - with no previous member to relocate",
+							"start": 354,
+							"end": 433
 						},
 						{
 							"type": "Line",
-							"value": " member to relocate onto - keeps the comment inside the parens",
-							"start": 500,
-							"end": 564
+							"value": " onto - keeps the comment inside the parens",
+							"start": 435,
+							"end": 480
 						}
 					]
 				}

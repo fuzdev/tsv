@@ -11,7 +11,7 @@ inline `type W = A | B; // c` in a single pass, but prettier takes two. Its firs
 pass spuriously breaks the union value onto its own line
 (`prettier_intermediate_before_semi`: `type W =\n\tA | B; // c`), and only a second
 pass collapses it back to `input`. A non-union value (`type D = E`) doesn't trigger
-the break; only a union/intersection value does (prettier 3.9, #18827-adjacent).
+the break; only a union/intersection value does.
 
 Chain: `unformatted_ours_before_semi` → prettier → `prettier_intermediate_before_semi`
 (unstable) → prettier → `input`. tsv reaches `input` in one pass.

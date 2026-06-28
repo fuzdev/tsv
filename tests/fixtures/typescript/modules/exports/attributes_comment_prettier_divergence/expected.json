@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 566,
+	"end": 481,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " re-export named: source → with (block, dual-stable)",
+			"value": " re-export named: source → with (block comment)",
 			"start": 10,
-			"end": 64,
+			"end": 59,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 55
+					"column": 50
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 88,
-			"end": 96,
+			"start": 83,
+			"end": 91,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " re-export named: with → brace (tsv keeps; prettier relocates before `with`)",
-			"start": 122,
-			"end": 200,
+			"value": " re-export named: with → brace",
+			"start": 117,
+			"end": 149,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 79
+					"column": 33
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 229,
-			"end": 237,
+			"start": 178,
+			"end": 186,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -76,9 +76,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " re-export named: after attributes (both trail the comment past `;`)",
-			"start": 258,
-			"end": 328,
+			"value": " re-export named: after attributes",
+			"start": 207,
+			"end": 243,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -86,15 +86,15 @@
 				},
 				"end": {
 					"line": 8,
-					"column": 71
+					"column": 37
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c3 ",
-			"start": 375,
-			"end": 383,
+			"start": 290,
+			"end": 298,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -109,8 +109,8 @@
 		{
 			"type": "Line",
 			"value": " re-export all: with → brace",
-			"start": 386,
-			"end": 416,
+			"start": 301,
+			"end": 331,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -125,8 +125,8 @@
 		{
 			"type": "Block",
 			"value": " c4 ",
-			"start": 441,
-			"end": 449,
+			"start": 356,
+			"end": 364,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -141,8 +141,8 @@
 		{
 			"type": "Line",
 			"value": " re-export all: after attributes",
-			"start": 470,
-			"end": 504,
+			"start": 385,
+			"end": 419,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -157,8 +157,8 @@
 		{
 			"type": "Block",
 			"value": " c5 ",
-			"start": 547,
-			"end": 555,
+			"start": 462,
+			"end": 470,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -174,12 +174,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 565,
+		"end": 480,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 556,
+			"end": 471,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -193,8 +193,8 @@
 			"body": [
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 66,
-					"end": 119,
+					"start": 61,
+					"end": 114,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -209,8 +209,8 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 75,
-							"end": 76,
+							"start": 70,
+							"end": 71,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -223,8 +223,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 75,
-								"end": 76,
+								"start": 70,
+								"end": 71,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -239,8 +239,8 @@
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 75,
-								"end": 76,
+								"start": 70,
+								"end": 71,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -257,8 +257,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 84,
-						"end": 87,
+						"start": 79,
+						"end": 82,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -275,16 +275,16 @@
 							{
 								"type": "Block",
 								"value": " c1 ",
-								"start": 88,
-								"end": 96
+								"start": 83,
+								"end": 91
 							}
 						]
 					},
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 104,
-							"end": 116,
+							"start": 99,
+							"end": 111,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -297,8 +297,8 @@
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 104,
-								"end": 108,
+								"start": 99,
+								"end": 103,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -313,8 +313,8 @@
 							},
 							"value": {
 								"type": "Literal",
-								"start": 110,
-								"end": 116,
+								"start": 105,
+								"end": 111,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -333,16 +333,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " re-export named: source → with (block, dual-stable)",
+							"value": " re-export named: source → with (block comment)",
 							"start": 10,
-							"end": 64
+							"end": 59
 						}
 					]
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 202,
-					"end": 255,
+					"start": 151,
+					"end": 204,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -357,8 +357,8 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 211,
-							"end": 212,
+							"start": 160,
+							"end": 161,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -371,8 +371,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 211,
-								"end": 212,
+								"start": 160,
+								"end": 161,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -387,8 +387,8 @@
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 211,
-								"end": 212,
+								"start": 160,
+								"end": 161,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -405,8 +405,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 220,
-						"end": 223,
+						"start": 169,
+						"end": 172,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -423,8 +423,8 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 240,
-							"end": 252,
+							"start": 189,
+							"end": 201,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -437,8 +437,8 @@
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 240,
-								"end": 244,
+								"start": 189,
+								"end": 193,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -453,8 +453,8 @@
 							},
 							"value": {
 								"type": "Literal",
-								"start": 246,
-								"end": 252,
+								"start": 195,
+								"end": 201,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -472,8 +472,8 @@
 								{
 									"type": "Block",
 									"value": " c2 ",
-									"start": 229,
-									"end": 237
+									"start": 178,
+									"end": 186
 								}
 							]
 						}
@@ -481,16 +481,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " re-export named: with → brace (tsv keeps; prettier relocates before `with`)",
-							"start": 122,
-							"end": 200
+							"value": " re-export named: with → brace",
+							"start": 117,
+							"end": 149
 						}
 					]
 				},
 				{
 					"type": "ExportNamedDeclaration",
-					"start": 330,
-					"end": 374,
+					"start": 245,
+					"end": 289,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -505,8 +505,8 @@
 					"specifiers": [
 						{
 							"type": "ExportSpecifier",
-							"start": 339,
-							"end": 340,
+							"start": 254,
+							"end": 255,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -519,8 +519,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 339,
-								"end": 340,
+								"start": 254,
+								"end": 255,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -535,8 +535,8 @@
 							},
 							"exported": {
 								"type": "Identifier",
-								"start": 339,
-								"end": 340,
+								"start": 254,
+								"end": 255,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -553,8 +553,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 348,
-						"end": 351,
+						"start": 263,
+						"end": 266,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -571,8 +571,8 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 359,
-							"end": 371,
+							"start": 274,
+							"end": 286,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -585,8 +585,8 @@
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 359,
-								"end": 363,
+								"start": 274,
+								"end": 278,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -601,8 +601,8 @@
 							},
 							"value": {
 								"type": "Literal",
-								"start": 365,
-								"end": 371,
+								"start": 280,
+								"end": 286,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -621,24 +621,24 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " re-export named: after attributes (both trail the comment past `;`)",
-							"start": 258,
-							"end": 328
+							"value": " re-export named: after attributes",
+							"start": 207,
+							"end": 243
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " c3 ",
-							"start": 375,
-							"end": 383
+							"start": 290,
+							"end": 298
 						}
 					]
 				},
 				{
 					"type": "ExportAllDeclaration",
-					"start": 418,
-					"end": 467,
+					"start": 333,
+					"end": 382,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -652,8 +652,8 @@
 					"exported": null,
 					"source": {
 						"type": "Literal",
-						"start": 432,
-						"end": 435,
+						"start": 347,
+						"end": 350,
 						"loc": {
 							"start": {
 								"line": 12,
@@ -670,8 +670,8 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 452,
-							"end": 464,
+							"start": 367,
+							"end": 379,
 							"loc": {
 								"start": {
 									"line": 12,
@@ -684,8 +684,8 @@
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 452,
-								"end": 456,
+								"start": 367,
+								"end": 371,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -700,8 +700,8 @@
 							},
 							"value": {
 								"type": "Literal",
-								"start": 458,
-								"end": 464,
+								"start": 373,
+								"end": 379,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -719,8 +719,8 @@
 								{
 									"type": "Block",
 									"value": " c4 ",
-									"start": 441,
-									"end": 449
+									"start": 356,
+									"end": 364
 								}
 							]
 						}
@@ -729,15 +729,15 @@
 						{
 							"type": "Line",
 							"value": " re-export all: with → brace",
-							"start": 386,
-							"end": 416
+							"start": 301,
+							"end": 331
 						}
 					]
 				},
 				{
 					"type": "ExportAllDeclaration",
-					"start": 506,
-					"end": 546,
+					"start": 421,
+					"end": 461,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -751,8 +751,8 @@
 					"exported": null,
 					"source": {
 						"type": "Literal",
-						"start": 520,
-						"end": 523,
+						"start": 435,
+						"end": 438,
 						"loc": {
 							"start": {
 								"line": 15,
@@ -769,8 +769,8 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 531,
-							"end": 543,
+							"start": 446,
+							"end": 458,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -783,8 +783,8 @@
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 531,
-								"end": 535,
+								"start": 446,
+								"end": 450,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -799,8 +799,8 @@
 							},
 							"value": {
 								"type": "Literal",
-								"start": 537,
-								"end": 543,
+								"start": 452,
+								"end": 458,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -820,16 +820,16 @@
 						{
 							"type": "Line",
 							"value": " re-export all: after attributes",
-							"start": 470,
-							"end": 504
+							"start": 385,
+							"end": 419
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " c5 ",
-							"start": 547,
-							"end": 555
+							"start": 462,
+							"end": 470
 						}
 					]
 				}

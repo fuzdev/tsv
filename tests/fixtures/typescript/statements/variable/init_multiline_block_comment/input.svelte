@@ -1,9 +1,9 @@
 <script lang="ts">
-	// Multiline block comment before init value: breaks `=`, value stays glued to `*/` (3.9 #19180)
+	// Multiline block comment before init value: breaks `=`, value stays glued to `*/`
 	const foo =
 		/*
 		 * comment
 		 */ bar;
-	// Single-line block comment: stays inline (both formatters)
+	// Single-line block comment: stays inline
 	const baz = /* comment */ qux;
 </script>

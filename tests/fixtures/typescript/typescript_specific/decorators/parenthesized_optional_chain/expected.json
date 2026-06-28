@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 213,
+	"end": 175,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " a parenthesized optional-chain callee normalizes to parens around the",
+			"value": " a parenthesized optional-chain callee keeps an outer paren wrapping the",
 			"start": 36,
-			"end": 108,
+			"end": 110,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 74
+					"column": 76
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " whole expression — valid, but it crashes prettier's estree printer",
-			"start": 111,
-			"end": 180,
+			"value": " whole decorator expression",
+			"start": 113,
+			"end": 142,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -38,7 +38,7 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 71
+					"column": 31
 				}
 			}
 		}
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 212,
+		"end": 174,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 203,
+			"end": 165,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -66,7 +66,7 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
-					"end": 202,
+					"end": 164,
 					"loc": {
 						"start": {
 							"line": 2,
@@ -97,7 +97,7 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 32,
-						"end": 202,
+						"end": 164,
 						"loc": {
 							"start": {
 								"line": 2,
@@ -111,8 +111,8 @@
 						"body": [
 							{
 								"type": "PropertyDefinition",
-								"start": 183,
-								"end": 199,
+								"start": 145,
+								"end": 161,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -127,8 +127,8 @@
 								"computed": false,
 								"key": {
 									"type": "Identifier",
-									"start": 197,
-									"end": 198,
+									"start": 159,
+									"end": 160,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -145,8 +145,8 @@
 								"decorators": [
 									{
 										"type": "Decorator",
-										"start": 183,
-										"end": 194,
+										"start": 145,
+										"end": 156,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -159,8 +159,8 @@
 										},
 										"expression": {
 											"type": "CallExpression",
-											"start": 185,
-											"end": 193,
+											"start": 147,
+											"end": 155,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -173,8 +173,8 @@
 											},
 											"callee": {
 												"type": "ChainExpression",
-												"start": 186,
-												"end": 190,
+												"start": 148,
+												"end": 152,
 												"loc": {
 													"start": {
 														"line": 5,
@@ -187,8 +187,8 @@
 												},
 												"expression": {
 													"type": "MemberExpression",
-													"start": 186,
-													"end": 190,
+													"start": 148,
+													"end": 152,
 													"loc": {
 														"start": {
 															"line": 5,
@@ -201,8 +201,8 @@
 													},
 													"object": {
 														"type": "Identifier",
-														"start": 186,
-														"end": 187,
+														"start": 148,
+														"end": 149,
 														"loc": {
 															"start": {
 																"line": 5,
@@ -217,8 +217,8 @@
 													},
 													"property": {
 														"type": "Identifier",
-														"start": 189,
-														"end": 190,
+														"start": 151,
+														"end": 152,
 														"loc": {
 															"start": {
 																"line": 5,
@@ -243,15 +243,15 @@
 								"leadingComments": [
 									{
 										"type": "Line",
-										"value": " a parenthesized optional-chain callee normalizes to parens around the",
+										"value": " a parenthesized optional-chain callee keeps an outer paren wrapping the",
 										"start": 36,
-										"end": 108
+										"end": 110
 									},
 									{
 										"type": "Line",
-										"value": " whole expression — valid, but it crashes prettier's estree printer",
-										"start": 111,
-										"end": 180
+										"value": " whole decorator expression",
+										"start": 113,
+										"end": 142
 									}
 								]
 							}

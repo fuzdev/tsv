@@ -672,10 +672,9 @@ impl<'a> Printer<'a> {
             }
             parts.push(d.text(")!"));
             d.concat(&parts)
-        } else if self.has_comments_between(
-            non_null_expr.expression.span().end,
-            non_null_expr.span.end,
-        ) {
+        } else if self
+            .has_comments_between(non_null_expr.expression.span().end, non_null_expr.span.end)
+        {
             // A comment between the operand and `!` (`p?.q /* c */!`, or from stripped
             // grouping parens `(x /* c */)!`) trails the operand — preserve it rather
             // than dropping it. The redundant grouping parens are stripped per tsv's

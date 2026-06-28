@@ -1,8 +1,8 @@
 <script>
-	// Block comment - preserved between ) and {
+	// Block comment between ) and {
 	while (a) /* comment */ {}
 
-	// Line comment - preserved between ) and {
+	// Line comment between ) and {
 	while (a)
 	// comment
 	{}

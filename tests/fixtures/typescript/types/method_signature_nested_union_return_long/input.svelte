@@ -1,7 +1,7 @@
 <script lang="ts">
 	// Method signature with a union return type in a nested object type.
 	// The union breaks after `=>` onto an indented continuation line and only
-	// stays inline when it fits — prettier 3.9 "don't break union when it fits".
+	// stays inline when it fits.
 
 	// At exactly 100 chars - union stays inline (no wrapping needed)
 	type T100 = {

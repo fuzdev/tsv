@@ -4,18 +4,9 @@ Inline block comments between an `if` block's closing `}` and the `else` keyword
 (`} /* inline */ else`).
 
 A **single** inline block comment stays on the `} … else` line in both
-formatters — no divergence. **Multiple** inline block comments diverge under
-prettier 3.9: prettier drops every comment after the first onto its own line
-(`} /* c1 */\n/* c2 */ else`), while tsv keeps them all inline on the `} … else`
-line (`} /* c1 */ /* c2 */ else`).
-
-```ts
-// prettier 3.9 (splits after the first)   // tsv (keeps all inline)
-} /* c1 */                                  } /* c1 */ /* c2 */ else {
-/* c2 */ else {                                 fn2();
-	fn2();                                  }
-}
-```
+formatters — no divergence. **Multiple** inline block comments diverge: prettier
+drops every comment after the first onto its own line, while tsv keeps them all
+cuddled inline on the `} … else` line (`} /* c1 */ /* c2 */ else`).
 
 ## Reason
 

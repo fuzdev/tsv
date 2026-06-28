@@ -1,5 +1,5 @@
 <script>
-	// Own-line block comment - we preserve position, prettier moves inside else
+	// Own-line block comment before else
 	if (a) {
 		fn1();
 	}

@@ -201,17 +201,21 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 if let Some(end) = *paren_comment_end {
                     let start = expr.span().end;
                     let classified = printer.classify_comments(start, end);
-                    let has_line = !classified.trailing_line.is_empty()
-                        || !classified.leading_line.is_empty();
+                    let has_line =
+                        !classified.trailing_line.is_empty() || !classified.leading_line.is_empty();
                     if has_line {
                         // A line comment can't trail inline before `)` (the `//` would
                         // swallow it), so force the multiline operand layout, keeping
                         // the comment inside — the same shape as a unary line-comment
                         // operand (`!(\n\tx + y // c\n)`).
-                        let leading_block = printer.build_leading_comments_doc(&classified.leading_block);
-                        let leading_line = printer.build_leading_comments_doc(&classified.leading_line);
-                        let trailing_block = printer.build_trailing_block_doc(&classified.trailing_block);
-                        let trailing_line = printer.build_trailing_line_doc(&classified.trailing_line);
+                        let leading_block =
+                            printer.build_leading_comments_doc(&classified.leading_block);
+                        let leading_line =
+                            printer.build_leading_comments_doc(&classified.leading_line);
+                        let trailing_block =
+                            printer.build_trailing_block_doc(&classified.trailing_block);
+                        let trailing_line =
+                            printer.build_trailing_line_doc(&classified.trailing_line);
                         return d.concat(&[
                             d.text("("),
                             d.indent(d.concat(&[

@@ -1,5 +1,5 @@
 <script lang="ts">
-// Inline `=` line comment is zero-width, so the constraint union stays inline.
+// Long inline trailing `=` line comment: the constraint union stays inline.
 type Default<P extends undefined|A,R extends A|B|void=// inline trailing comment that is intentionally long to exceed the width
 // own-line comment about the default
 C> = R;

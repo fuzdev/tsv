@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 452,
+	"end": 363,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -60,9 +60,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " the chain (short-circuits to undefined). Prettier's member-chain printer drops",
+			"value": " the chain (short-circuits to undefined).",
 			"start": 263,
-			"end": 344,
+			"end": 306,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -70,23 +70,7 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 82
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " the parens here — its own bug; tsv keeps them.",
-			"start": 346,
-			"end": 395,
-			"loc": {
-				"start": {
-					"line": 6,
-					"column": 1
-				},
-				"end": {
-					"line": 6,
-					"column": 50
+					"column": 44
 				}
 			}
 		}
@@ -94,118 +78,118 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 451,
+		"end": 362,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 442,
+			"end": 353,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 10,
+					"line": 9,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "ExpressionStatement",
-					"start": 397,
-					"end": 409,
+					"start": 308,
+					"end": 320,
 					"loc": {
 						"start": {
-							"line": 7,
+							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 7,
+							"line": 6,
 							"column": 13
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 397,
-						"end": 408,
+						"start": 308,
+						"end": 319,
 						"loc": {
 							"start": {
-								"line": 7,
+								"line": 6,
 								"column": 1
 							},
 							"end": {
-								"line": 7,
+								"line": 6,
 								"column": 12
 							}
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 397,
-							"end": 406,
+							"start": 308,
+							"end": 317,
 							"loc": {
 								"start": {
-									"line": 7,
+									"line": 6,
 									"column": 1
 								},
 								"end": {
-									"line": 7,
+									"line": 6,
 									"column": 10
 								}
 							},
 							"object": {
 								"type": "TSNonNullExpression",
-								"start": 397,
-								"end": 404,
+								"start": 308,
+								"end": 315,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 6,
 										"column": 1
 									},
 									"end": {
-										"line": 7,
+										"line": 6,
 										"column": 8
 									}
 								},
 								"expression": {
 									"type": "ChainExpression",
-									"start": 398,
-									"end": 402,
+									"start": 309,
+									"end": 313,
 									"loc": {
 										"start": {
-											"line": 7,
+											"line": 6,
 											"column": 2
 										},
 										"end": {
-											"line": 7,
+											"line": 6,
 											"column": 6
 										}
 									},
 									"expression": {
 										"type": "MemberExpression",
-										"start": 398,
-										"end": 402,
+										"start": 309,
+										"end": 313,
 										"loc": {
 											"start": {
-												"line": 7,
+												"line": 6,
 												"column": 2
 											},
 											"end": {
-												"line": 7,
+												"line": 6,
 												"column": 6
 											}
 										},
 										"object": {
 											"type": "Identifier",
-											"start": 398,
-											"end": 399,
+											"start": 309,
+											"end": 310,
 											"loc": {
 												"start": {
-													"line": 7,
+													"line": 6,
 													"column": 2
 												},
 												"end": {
-													"line": 7,
+													"line": 6,
 													"column": 3
 												}
 											},
@@ -213,15 +197,15 @@
 										},
 										"property": {
 											"type": "Identifier",
-											"start": 401,
-											"end": 402,
+											"start": 312,
+											"end": 313,
 											"loc": {
 												"start": {
-													"line": 7,
+													"line": 6,
 													"column": 5
 												},
 												"end": {
-													"line": 7,
+													"line": 6,
 													"column": 6
 												}
 											},
@@ -234,15 +218,15 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 405,
-								"end": 406,
+								"start": 316,
+								"end": 317,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 6,
 										"column": 9
 									},
 									"end": {
-										"line": 7,
+										"line": 6,
 										"column": 10
 									}
 								},
@@ -275,127 +259,121 @@
 						},
 						{
 							"type": "Line",
-							"value": " the chain (short-circuits to undefined). Prettier's member-chain printer drops",
+							"value": " the chain (short-circuits to undefined).",
 							"start": 263,
-							"end": 344
-						},
-						{
-							"type": "Line",
-							"value": " the parens here — its own bug; tsv keeps them.",
-							"start": 346,
-							"end": 395
+							"end": 306
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 411,
-					"end": 425,
+					"start": 322,
+					"end": 336,
 					"loc": {
 						"start": {
-							"line": 8,
+							"line": 7,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
+							"line": 7,
 							"column": 15
 						}
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 411,
-						"end": 424,
+						"start": 322,
+						"end": 335,
 						"loc": {
 							"start": {
-								"line": 8,
+								"line": 7,
 								"column": 1
 							},
 							"end": {
-								"line": 8,
+								"line": 7,
 								"column": 14
 							}
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 411,
-							"end": 422,
+							"start": 322,
+							"end": 333,
 							"loc": {
 								"start": {
-									"line": 8,
+									"line": 7,
 									"column": 1
 								},
 								"end": {
-									"line": 8,
+									"line": 7,
 									"column": 12
 								}
 							},
 							"object": {
 								"type": "MemberExpression",
-								"start": 411,
-								"end": 420,
+								"start": 322,
+								"end": 331,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 7,
 										"column": 1
 									},
 									"end": {
-										"line": 8,
+										"line": 7,
 										"column": 10
 									}
 								},
 								"object": {
 									"type": "TSNonNullExpression",
-									"start": 411,
-									"end": 418,
+									"start": 322,
+									"end": 329,
 									"loc": {
 										"start": {
-											"line": 8,
+											"line": 7,
 											"column": 1
 										},
 										"end": {
-											"line": 8,
+											"line": 7,
 											"column": 8
 										}
 									},
 									"expression": {
 										"type": "ChainExpression",
-										"start": 412,
-										"end": 416,
+										"start": 323,
+										"end": 327,
 										"loc": {
 											"start": {
-												"line": 8,
+												"line": 7,
 												"column": 2
 											},
 											"end": {
-												"line": 8,
+												"line": 7,
 												"column": 6
 											}
 										},
 										"expression": {
 											"type": "MemberExpression",
-											"start": 412,
-											"end": 416,
+											"start": 323,
+											"end": 327,
 											"loc": {
 												"start": {
-													"line": 8,
+													"line": 7,
 													"column": 2
 												},
 												"end": {
-													"line": 8,
+													"line": 7,
 													"column": 6
 												}
 											},
 											"object": {
 												"type": "Identifier",
-												"start": 412,
-												"end": 413,
+												"start": 323,
+												"end": 324,
 												"loc": {
 													"start": {
-														"line": 8,
+														"line": 7,
 														"column": 2
 													},
 													"end": {
-														"line": 8,
+														"line": 7,
 														"column": 3
 													}
 												},
@@ -403,15 +381,15 @@
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 415,
-												"end": 416,
+												"start": 326,
+												"end": 327,
 												"loc": {
 													"start": {
-														"line": 8,
+														"line": 7,
 														"column": 5
 													},
 													"end": {
-														"line": 8,
+														"line": 7,
 														"column": 6
 													}
 												},
@@ -424,15 +402,15 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 419,
-									"end": 420,
+									"start": 330,
+									"end": 331,
 									"loc": {
 										"start": {
-											"line": 8,
+											"line": 7,
 											"column": 9
 										},
 										"end": {
-											"line": 8,
+											"line": 7,
 											"column": 10
 										}
 									},
@@ -443,15 +421,15 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 421,
-								"end": 422,
+								"start": 332,
+								"end": 333,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 7,
 										"column": 11
 									},
 									"end": {
-										"line": 8,
+										"line": 7,
 										"column": 12
 									}
 								},
@@ -466,113 +444,113 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 427,
-					"end": 441,
+					"start": 338,
+					"end": 352,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 8,
 							"column": 1
 						},
 						"end": {
-							"line": 9,
+							"line": 8,
 							"column": 15
 						}
 					},
 					"expression": {
 						"type": "MemberExpression",
-						"start": 427,
-						"end": 440,
+						"start": 338,
+						"end": 351,
 						"loc": {
 							"start": {
-								"line": 9,
+								"line": 8,
 								"column": 1
 							},
 							"end": {
-								"line": 9,
+								"line": 8,
 								"column": 14
 							}
 						},
 						"object": {
 							"type": "CallExpression",
-							"start": 427,
-							"end": 438,
+							"start": 338,
+							"end": 349,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 8,
 									"column": 1
 								},
 								"end": {
-									"line": 9,
+									"line": 8,
 									"column": 12
 								}
 							},
 							"callee": {
 								"type": "MemberExpression",
-								"start": 427,
-								"end": 436,
+								"start": 338,
+								"end": 347,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 8,
 										"column": 1
 									},
 									"end": {
-										"line": 9,
+										"line": 8,
 										"column": 10
 									}
 								},
 								"object": {
 									"type": "TSNonNullExpression",
-									"start": 427,
-									"end": 434,
+									"start": 338,
+									"end": 345,
 									"loc": {
 										"start": {
-											"line": 9,
+											"line": 8,
 											"column": 1
 										},
 										"end": {
-											"line": 9,
+											"line": 8,
 											"column": 8
 										}
 									},
 									"expression": {
 										"type": "ChainExpression",
-										"start": 428,
-										"end": 432,
+										"start": 339,
+										"end": 343,
 										"loc": {
 											"start": {
-												"line": 9,
+												"line": 8,
 												"column": 2
 											},
 											"end": {
-												"line": 9,
+												"line": 8,
 												"column": 6
 											}
 										},
 										"expression": {
 											"type": "MemberExpression",
-											"start": 428,
-											"end": 432,
+											"start": 339,
+											"end": 343,
 											"loc": {
 												"start": {
-													"line": 9,
+													"line": 8,
 													"column": 2
 												},
 												"end": {
-													"line": 9,
+													"line": 8,
 													"column": 6
 												}
 											},
 											"object": {
 												"type": "Identifier",
-												"start": 428,
-												"end": 429,
+												"start": 339,
+												"end": 340,
 												"loc": {
 													"start": {
-														"line": 9,
+														"line": 8,
 														"column": 2
 													},
 													"end": {
-														"line": 9,
+														"line": 8,
 														"column": 3
 													}
 												},
@@ -580,15 +558,15 @@
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 431,
-												"end": 432,
+												"start": 342,
+												"end": 343,
 												"loc": {
 													"start": {
-														"line": 9,
+														"line": 8,
 														"column": 5
 													},
 													"end": {
-														"line": 9,
+														"line": 8,
 														"column": 6
 													}
 												},
@@ -601,15 +579,15 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 435,
-									"end": 436,
+									"start": 346,
+									"end": 347,
 									"loc": {
 										"start": {
-											"line": 9,
+											"line": 8,
 											"column": 9
 										},
 										"end": {
-											"line": 9,
+											"line": 8,
 											"column": 10
 										}
 									},
@@ -623,15 +601,15 @@
 						},
 						"property": {
 							"type": "Identifier",
-							"start": 439,
-							"end": 440,
+							"start": 350,
+							"end": 351,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 8,
 									"column": 13
 								},
 								"end": {
-									"line": 9,
+									"line": 8,
 									"column": 14
 								}
 							},

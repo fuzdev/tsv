@@ -1,7 +1,7 @@
 <script lang="ts">
-	// Trailing comment on a parenthesized return/throw assignment operand — must be
-	// preserved (it was being dropped). return keeps a same-line block inside the
-	// parens; throw trails it past the `;` (matching prettier in both cases).
+	// Trailing block comment on a parenthesized assignment operand in return/throw
+	// position. return keeps it inside the parens on the same line; throw trails it
+	// after the `;`.
 	function f() {
 		return (a = b /* c */);
 	}

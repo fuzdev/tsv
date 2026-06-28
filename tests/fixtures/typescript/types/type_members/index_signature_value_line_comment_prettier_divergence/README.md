@@ -7,15 +7,9 @@ A line comment in the value-`:`→type gap of an index signature
 wrote it and the type drops to a continuation line **indented one level** so it
 reads as part of the member, not a sibling.
 
-```ts
-// tsv (comment trails `:`, type indents) // prettier 3.9 (non-union)
-[k: string]: // c                         [k: string]: // c
-	A & B;                                A & B;
-```
-
-- **Union value** (`A | B`, cases I/T) — **diverges**: prettier 3.9 drops the
-  comment onto its own line (`[k: string]:\n\t// c\n\tA | B`); tsv keeps it
-  trailing the `:` and indents the union one level.
+- **Union value** (`A | B`, cases I/T) — **diverges**: prettier drops the comment
+  onto its own line (`[k: string]:` then the comment and the union, indented); tsv
+  keeps it trailing the `:` and indents the union one level.
 - **Intersection value** (`A & B`, cases J/U) — **diverges**: both keep the
   comment trailing `:`, but tsv indents the type one level while prettier leaves
   it flush.

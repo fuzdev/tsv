@@ -1,8 +1,8 @@
 <script lang="ts">
-	// The non-null `!` authored INSIDE the sealing parens (`(a?.b!).c`) is preserved
-	// as written — prettier 3.9 (#18661) stopped lifting it to the `!`-outside form
-	// `(a?.b)!.c`. The two are semantically identical (the `!` is type-only) but have
-	// different ASTs, so tsv keeps the author's placement.
+	// A non-null `!` authored INSIDE the sealing parens (`(a?.b!).c`) is kept where
+	// written. `(a?.b!).c` and the `!`-outside form `(a?.b)!.c` are semantically
+	// identical (the `!` is type-only) but parse to different ASTs, so the inner
+	// placement is preserved.
 	( a?.b! ) . c ;
 	( a?.b! ) (  ) ;
 	( a?.b! ) [ c ] ;

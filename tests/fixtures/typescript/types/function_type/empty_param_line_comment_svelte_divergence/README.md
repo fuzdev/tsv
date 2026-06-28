@@ -8,10 +8,9 @@ parameter to trail.
 ## Format
 
 tsv and Prettier agree: the comment lands on its own indented line and `=> void`
-follows the `)` (`type F = (\n // c\n) => void;`). Earlier Prettier (3.8) floated
-the comment out after `)` (`() // c\n => void`); 3.9 (#18623) breaks the parens
-instead, and tsv matches. An inline block comment (`(/* c */)`) stays inline.
-Covers function types and constructor (`new (...)`) types.
+follows the `)` (`type F = (\n // c\n) => void;`). An inline block comment
+(`(/* c */)`) stays inline. Covers function types and constructor (`new (...)`)
+types.
 
 This is the empty-params sibling of
 [open_paren_comment](../open_paren_comment_prettier_divergence/) (non-empty

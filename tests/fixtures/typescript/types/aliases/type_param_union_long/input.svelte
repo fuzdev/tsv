@@ -1,5 +1,5 @@
 <script lang="ts">
-	// union `extends` constraint breaks after `extends` with leading-pipe members
+	// union `extends` constraint breaks after `extends`; the union stays inline
 	type Constraint<
 		AAAAAAAAAAAAAAAAAAAAAAAAA extends
 			Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | Cccccccccccccccccccccccccccccccccc

@@ -1,25 +1,10 @@
 # type_alias_equals_prettier_divergence
 
-A line comment between a type alias's `=` and its value type
-(`type A = // c\n\tB`).
+A line comment between a type alias's `=` and its value type (`type A = // c\n\tB`).
 
-**tsv**: keeps the comment trailing the `=`, with the value type dropped to a
-continuation line indented one level:
-
-```
-type A = // comment
-	B;
-```
-
-**Prettier 3.9**: relocates the comment to its own line after the `=`:
-
-```
-type A =
-	// comment
-	B;
-```
-
-Both forms are stable under their respective formatters.
+**tsv** keeps the comment trailing the `=`, with the value type dropped to a
+continuation line indented one level. **Prettier** relocates the comment to its
+own line after the `=`. Both forms are stable under their respective formatters.
 
 ## Reason
 

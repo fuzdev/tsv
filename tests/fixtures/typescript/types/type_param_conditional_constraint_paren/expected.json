@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 395,
+	"end": 364,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Conditional type in `extends` constraint: parens kept (3.9 #18760)",
+			"value": " Conditional type in `extends` constraint: parens kept",
 			"start": 20,
-			"end": 89,
+			"end": 76,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 70
+					"column": 57
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " Conditional type in `=` default: parens stripped (both formatters)",
-			"start": 145,
-			"end": 214,
+			"value": " Conditional type in `=` default: parens stripped",
+			"start": 132,
+			"end": 183,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -38,15 +38,15 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 70
+					"column": 52
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " Nested conditional in constraint: parens kept",
-			"start": 262,
-			"end": 310,
+			"start": 231,
+			"end": 279,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -62,12 +62,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 394,
+		"end": 363,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 385,
+			"end": 354,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -81,8 +81,8 @@
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 91,
-					"end": 143,
+					"start": 78,
+					"end": 130,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -95,8 +95,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 96,
-						"end": 97,
+						"start": 83,
+						"end": 84,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -111,8 +111,8 @@
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 97,
-						"end": 136,
+						"start": 84,
+						"end": 123,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -126,8 +126,8 @@
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 98,
-								"end": 135,
+								"start": 85,
+								"end": 122,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -141,8 +141,8 @@
 								"name": "Foo",
 								"constraint": {
 									"type": "TSParenthesizedType",
-									"start": 110,
-									"end": 135,
+									"start": 97,
+									"end": 122,
 									"loc": {
 										"start": {
 											"line": 3,
@@ -155,8 +155,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSConditionalType",
-										"start": 111,
-										"end": 134,
+										"start": 98,
+										"end": 121,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -169,8 +169,8 @@
 										},
 										"checkType": {
 											"type": "TSTypeReference",
-											"start": 111,
-											"end": 114,
+											"start": 98,
+											"end": 101,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -183,8 +183,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 111,
-												"end": 114,
+												"start": 98,
+												"end": 101,
 												"loc": {
 													"start": {
 														"line": 3,
@@ -200,8 +200,8 @@
 										},
 										"extendsType": {
 											"type": "TSTypeReference",
-											"start": 123,
-											"end": 126,
+											"start": 110,
+											"end": 113,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -214,8 +214,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 123,
-												"end": 126,
+												"start": 110,
+												"end": 113,
 												"loc": {
 													"start": {
 														"line": 3,
@@ -231,8 +231,8 @@
 										},
 										"trueType": {
 											"type": "TSTypeReference",
-											"start": 129,
-											"end": 130,
+											"start": 116,
+											"end": 117,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -245,8 +245,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 129,
-												"end": 130,
+												"start": 116,
+												"end": 117,
 												"loc": {
 													"start": {
 														"line": 3,
@@ -262,8 +262,8 @@
 										},
 										"falseType": {
 											"type": "TSTypeReference",
-											"start": 133,
-											"end": 134,
+											"start": 120,
+											"end": 121,
 											"loc": {
 												"start": {
 													"line": 3,
@@ -276,8 +276,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 133,
-												"end": 134,
+												"start": 120,
+												"end": 121,
 												"loc": {
 													"start": {
 														"line": 3,
@@ -298,8 +298,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 139,
-						"end": 142,
+						"start": 126,
+						"end": 129,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -312,8 +312,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 139,
-							"end": 142,
+							"start": 126,
+							"end": 129,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -330,16 +330,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Conditional type in `extends` constraint: parens kept (3.9 #18760)",
+							"value": " Conditional type in `extends` constraint: parens kept",
 							"start": 20,
-							"end": 89
+							"end": 76
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 216,
-					"end": 260,
+					"start": 185,
+					"end": 229,
 					"loc": {
 						"start": {
 							"line": 5,
@@ -352,8 +352,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 221,
-						"end": 222,
+						"start": 190,
+						"end": 191,
 						"loc": {
 							"start": {
 								"line": 5,
@@ -368,8 +368,8 @@
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 222,
-						"end": 253,
+						"start": 191,
+						"end": 222,
 						"loc": {
 							"start": {
 								"line": 5,
@@ -383,8 +383,8 @@
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 223,
-								"end": 252,
+								"start": 192,
+								"end": 221,
 								"loc": {
 									"start": {
 										"line": 5,
@@ -398,8 +398,8 @@
 								"name": "Foo",
 								"default": {
 									"type": "TSConditionalType",
-									"start": 229,
-									"end": 252,
+									"start": 198,
+									"end": 221,
 									"loc": {
 										"start": {
 											"line": 5,
@@ -412,8 +412,8 @@
 									},
 									"checkType": {
 										"type": "TSTypeReference",
-										"start": 229,
-										"end": 232,
+										"start": 198,
+										"end": 201,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -426,8 +426,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 229,
-											"end": 232,
+											"start": 198,
+											"end": 201,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -443,8 +443,8 @@
 									},
 									"extendsType": {
 										"type": "TSTypeReference",
-										"start": 241,
-										"end": 244,
+										"start": 210,
+										"end": 213,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -457,8 +457,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 241,
-											"end": 244,
+											"start": 210,
+											"end": 213,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -474,8 +474,8 @@
 									},
 									"trueType": {
 										"type": "TSTypeReference",
-										"start": 247,
-										"end": 248,
+										"start": 216,
+										"end": 217,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -488,8 +488,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 247,
-											"end": 248,
+											"start": 216,
+											"end": 217,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -505,8 +505,8 @@
 									},
 									"falseType": {
 										"type": "TSTypeReference",
-										"start": 251,
-										"end": 252,
+										"start": 220,
+										"end": 221,
 										"loc": {
 											"start": {
 												"line": 5,
@@ -519,8 +519,8 @@
 										},
 										"typeName": {
 											"type": "Identifier",
-											"start": 251,
-											"end": 252,
+											"start": 220,
+											"end": 221,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -540,8 +540,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 256,
-						"end": 259,
+						"start": 225,
+						"end": 228,
 						"loc": {
 							"start": {
 								"line": 5,
@@ -554,8 +554,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 256,
-							"end": 259,
+							"start": 225,
+							"end": 228,
 							"loc": {
 								"start": {
 									"line": 5,
@@ -572,16 +572,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Conditional type in `=` default: parens stripped (both formatters)",
-							"start": 145,
-							"end": 214
+							"value": " Conditional type in `=` default: parens stripped",
+							"start": 132,
+							"end": 183
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 312,
-					"end": 384,
+					"start": 281,
+					"end": 353,
 					"loc": {
 						"start": {
 							"line": 7,
@@ -594,8 +594,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 317,
-						"end": 318,
+						"start": 286,
+						"end": 287,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -610,8 +610,8 @@
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 318,
-						"end": 377,
+						"start": 287,
+						"end": 346,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -625,8 +625,8 @@
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 319,
-								"end": 376,
+								"start": 288,
+								"end": 345,
 								"loc": {
 									"start": {
 										"line": 7,
@@ -640,8 +640,8 @@
 								"name": "Foo",
 								"constraint": {
 									"type": "TSParenthesizedType",
-									"start": 331,
-									"end": 376,
+									"start": 300,
+									"end": 345,
 									"loc": {
 										"start": {
 											"line": 7,
@@ -654,8 +654,8 @@
 									},
 									"typeAnnotation": {
 										"type": "TSConditionalType",
-										"start": 332,
-										"end": 375,
+										"start": 301,
+										"end": 344,
 										"loc": {
 											"start": {
 												"line": 7,
@@ -668,8 +668,8 @@
 										},
 										"checkType": {
 											"type": "TSTypeReference",
-											"start": 332,
-											"end": 335,
+											"start": 301,
+											"end": 304,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -682,8 +682,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 332,
-												"end": 335,
+												"start": 301,
+												"end": 304,
 												"loc": {
 													"start": {
 														"line": 7,
@@ -699,8 +699,8 @@
 										},
 										"extendsType": {
 											"type": "TSTypeReference",
-											"start": 344,
-											"end": 347,
+											"start": 313,
+											"end": 316,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -713,8 +713,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 344,
-												"end": 347,
+												"start": 313,
+												"end": 316,
 												"loc": {
 													"start": {
 														"line": 7,
@@ -730,8 +730,8 @@
 										},
 										"trueType": {
 											"type": "TSParenthesizedType",
-											"start": 350,
-											"end": 371,
+											"start": 319,
+											"end": 340,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -744,8 +744,8 @@
 											},
 											"typeAnnotation": {
 												"type": "TSConditionalType",
-												"start": 351,
-												"end": 370,
+												"start": 320,
+												"end": 339,
 												"loc": {
 													"start": {
 														"line": 7,
@@ -758,8 +758,8 @@
 												},
 												"checkType": {
 													"type": "TSTypeReference",
-													"start": 351,
-													"end": 352,
+													"start": 320,
+													"end": 321,
 													"loc": {
 														"start": {
 															"line": 7,
@@ -772,8 +772,8 @@
 													},
 													"typeName": {
 														"type": "Identifier",
-														"start": 351,
-														"end": 352,
+														"start": 320,
+														"end": 321,
 														"loc": {
 															"start": {
 																"line": 7,
@@ -789,8 +789,8 @@
 												},
 												"extendsType": {
 													"type": "TSTypeReference",
-													"start": 361,
-													"end": 362,
+													"start": 330,
+													"end": 331,
 													"loc": {
 														"start": {
 															"line": 7,
@@ -803,8 +803,8 @@
 													},
 													"typeName": {
 														"type": "Identifier",
-														"start": 361,
-														"end": 362,
+														"start": 330,
+														"end": 331,
 														"loc": {
 															"start": {
 																"line": 7,
@@ -820,8 +820,8 @@
 												},
 												"trueType": {
 													"type": "TSTypeReference",
-													"start": 365,
-													"end": 366,
+													"start": 334,
+													"end": 335,
 													"loc": {
 														"start": {
 															"line": 7,
@@ -834,8 +834,8 @@
 													},
 													"typeName": {
 														"type": "Identifier",
-														"start": 365,
-														"end": 366,
+														"start": 334,
+														"end": 335,
 														"loc": {
 															"start": {
 																"line": 7,
@@ -851,8 +851,8 @@
 												},
 												"falseType": {
 													"type": "TSTypeReference",
-													"start": 369,
-													"end": 370,
+													"start": 338,
+													"end": 339,
 													"loc": {
 														"start": {
 															"line": 7,
@@ -865,8 +865,8 @@
 													},
 													"typeName": {
 														"type": "Identifier",
-														"start": 369,
-														"end": 370,
+														"start": 338,
+														"end": 339,
 														"loc": {
 															"start": {
 																"line": 7,
@@ -884,8 +884,8 @@
 										},
 										"falseType": {
 											"type": "TSTypeReference",
-											"start": 374,
-											"end": 375,
+											"start": 343,
+											"end": 344,
 											"loc": {
 												"start": {
 													"line": 7,
@@ -898,8 +898,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 374,
-												"end": 375,
+												"start": 343,
+												"end": 344,
 												"loc": {
 													"start": {
 														"line": 7,
@@ -920,8 +920,8 @@
 					},
 					"typeAnnotation": {
 						"type": "TSTypeReference",
-						"start": 380,
-						"end": 383,
+						"start": 349,
+						"end": 352,
 						"loc": {
 							"start": {
 								"line": 7,
@@ -934,8 +934,8 @@
 						},
 						"typeName": {
 							"type": "Identifier",
-							"start": 380,
-							"end": 383,
+							"start": 349,
+							"end": 352,
 							"loc": {
 								"start": {
 									"line": 7,
@@ -953,8 +953,8 @@
 						{
 							"type": "Line",
 							"value": " Nested conditional in constraint: parens kept",
-							"start": 262,
-							"end": 310
+							"start": 231,
+							"end": 279
 						}
 					]
 				}

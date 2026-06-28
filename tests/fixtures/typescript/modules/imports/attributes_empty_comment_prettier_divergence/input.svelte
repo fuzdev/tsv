@@ -1,13 +1,13 @@
 <script>
-	// source → with: both keep the block comment in place (dual-stable)
+	// source → with (block comment)
 	import a from 'a' /* c1 */ with {};
 
-	// with → brace: tsv keeps it in place; prettier relocates before `with`
+	// with → brace
 	import b from 'b' with /* c2 */ {};
 
-	// inside empty braces: tsv keeps it in place; prettier relocates before `with`
+	// inside empty braces
 	import c from 'c' with {/* c3 */};
 
-	// after empty braces: both trail the comment past `;`
+	// after empty braces
 	import d from 'd' with {}; /* c4 */
 </script>

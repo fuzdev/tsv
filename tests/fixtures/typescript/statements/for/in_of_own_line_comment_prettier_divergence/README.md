@@ -4,21 +4,11 @@ Line comments authored **inside** a broken `for-in`/`for-of` header — between 
 binding and the `in`/`of` keyword, or between the keyword and the iterable
 (`for (\n\tx // a\n\t\tin\n\t\tobj\n)`).
 
-Prettier 3.9 collapses the header back inline and relocates the interior line
+Prettier collapses the header back inline and relocates the interior line
 comment out to after `)` (`for (x in obj) // a`); tsv keeps the header broken
 with each comment where the author placed it (between the operands). A **block**
 comment authored inline in the same gaps (`for (x /* a */ in obj)`) stays inline
 in both formatters — no divergence.
-
-```ts
-// prettier 3.9 (collapsed, comment after `)`)   // tsv (header kept broken)
-for (x in obj) // a                              for (
-	expr;                                            x // a
-                                                     in
-                                                     obj
-                                                 )
-                                                     expr;
-```
 
 ## Reason
 

@@ -1,11 +1,11 @@
 <script>
-	// re-export named: source → with (block, dual-stable)
+	// re-export named: source → with (block comment)
 	export { a } from 'a' /* c1 */ with { type: 'json' };
 
-	// re-export named: with → brace (tsv keeps; prettier relocates before `with`)
+	// re-export named: with → brace
 	export { b } from 'b' /* c2 */ with { type: 'json' };
 
-	// re-export named: after attributes (both trail the comment past `;`)
+	// re-export named: after attributes
 	export { c } from 'c' with { type: 'json' }; /* c3 */
 
 	// re-export all: with → brace

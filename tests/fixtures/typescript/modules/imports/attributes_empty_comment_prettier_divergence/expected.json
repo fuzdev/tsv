@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 450,
+	"end": 267,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " source → with: both keep the block comment in place (dual-stable)",
+			"value": " source → with (block comment)",
 			"start": 10,
-			"end": 78,
+			"end": 42,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 69
+					"column": 33
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c1 ",
-			"start": 98,
-			"end": 106,
+			"start": 62,
+			"end": 70,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " with → brace: tsv keeps it in place; prettier relocates before `with`",
-			"start": 118,
-			"end": 190,
+			"value": " with → brace",
+			"start": 82,
+			"end": 97,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 73
+					"column": 16
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c2 ",
-			"start": 215,
-			"end": 223,
+			"start": 122,
+			"end": 130,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -76,9 +76,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " inside empty braces: tsv keeps it in place; prettier relocates before `with`",
-			"start": 230,
-			"end": 309,
+			"value": " inside empty braces",
+			"start": 137,
+			"end": 159,
 			"loc": {
 				"start": {
 					"line": 8,
@@ -86,15 +86,15 @@
 				},
 				"end": {
 					"line": 8,
-					"column": 80
+					"column": 23
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c3 ",
-			"start": 335,
-			"end": 343,
+			"start": 185,
+			"end": 193,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -108,9 +108,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " after empty braces: both trail the comment past `;`",
-			"start": 348,
-			"end": 402,
+			"value": " after empty braces",
+			"start": 198,
+			"end": 219,
 			"loc": {
 				"start": {
 					"line": 11,
@@ -118,15 +118,15 @@
 				},
 				"end": {
 					"line": 11,
-					"column": 55
+					"column": 22
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " c4 ",
-			"start": 431,
-			"end": 439,
+			"start": 248,
+			"end": 256,
 			"loc": {
 				"start": {
 					"line": 12,
@@ -142,12 +142,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 449,
+		"end": 266,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 440,
+			"end": 257,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -161,8 +161,8 @@
 			"body": [
 				{
 					"type": "ImportDeclaration",
-					"start": 80,
-					"end": 115,
+					"start": 44,
+					"end": 79,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -176,8 +176,8 @@
 					"specifiers": [
 						{
 							"type": "ImportDefaultSpecifier",
-							"start": 87,
-							"end": 88,
+							"start": 51,
+							"end": 52,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -190,8 +190,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 87,
-								"end": 88,
+								"start": 51,
+								"end": 52,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -208,8 +208,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 94,
-						"end": 97,
+						"start": 58,
+						"end": 61,
 						"loc": {
 							"start": {
 								"line": 3,
@@ -226,8 +226,8 @@
 							{
 								"type": "Block",
 								"value": " c1 ",
-								"start": 98,
-								"end": 106
+								"start": 62,
+								"end": 70
 							}
 						]
 					},
@@ -235,16 +235,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " source → with: both keep the block comment in place (dual-stable)",
+							"value": " source → with (block comment)",
 							"start": 10,
-							"end": 78
+							"end": 42
 						}
 					]
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 192,
-					"end": 227,
+					"start": 99,
+					"end": 134,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -258,8 +258,8 @@
 					"specifiers": [
 						{
 							"type": "ImportDefaultSpecifier",
-							"start": 199,
-							"end": 200,
+							"start": 106,
+							"end": 107,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -272,8 +272,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 199,
-								"end": 200,
+								"start": 106,
+								"end": 107,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -290,8 +290,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 206,
-						"end": 209,
+						"start": 113,
+						"end": 116,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -309,16 +309,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " with → brace: tsv keeps it in place; prettier relocates before `with`",
-							"start": 118,
-							"end": 190
+							"value": " with → brace",
+							"start": 82,
+							"end": 97
 						}
 					]
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 311,
-					"end": 345,
+					"start": 161,
+					"end": 195,
 					"loc": {
 						"start": {
 							"line": 9,
@@ -332,8 +332,8 @@
 					"specifiers": [
 						{
 							"type": "ImportDefaultSpecifier",
-							"start": 318,
-							"end": 319,
+							"start": 168,
+							"end": 169,
 							"loc": {
 								"start": {
 									"line": 9,
@@ -346,8 +346,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 318,
-								"end": 319,
+								"start": 168,
+								"end": 169,
 								"loc": {
 									"start": {
 										"line": 9,
@@ -364,8 +364,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 325,
-						"end": 328,
+						"start": 175,
+						"end": 178,
 						"loc": {
 							"start": {
 								"line": 9,
@@ -384,21 +384,21 @@
 						{
 							"type": "Block",
 							"value": " c2 ",
-							"start": 215,
-							"end": 223
+							"start": 122,
+							"end": 130
 						},
 						{
 							"type": "Line",
-							"value": " inside empty braces: tsv keeps it in place; prettier relocates before `with`",
-							"start": 230,
-							"end": 309
+							"value": " inside empty braces",
+							"start": 137,
+							"end": 159
 						}
 					]
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 404,
-					"end": 430,
+					"start": 221,
+					"end": 247,
 					"loc": {
 						"start": {
 							"line": 12,
@@ -412,8 +412,8 @@
 					"specifiers": [
 						{
 							"type": "ImportDefaultSpecifier",
-							"start": 411,
-							"end": 412,
+							"start": 228,
+							"end": 229,
 							"loc": {
 								"start": {
 									"line": 12,
@@ -426,8 +426,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 411,
-								"end": 412,
+								"start": 228,
+								"end": 229,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -444,8 +444,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 418,
-						"end": 421,
+						"start": 235,
+						"end": 238,
 						"loc": {
 							"start": {
 								"line": 12,
@@ -464,22 +464,22 @@
 						{
 							"type": "Block",
 							"value": " c3 ",
-							"start": 335,
-							"end": 343
+							"start": 185,
+							"end": 193
 						},
 						{
 							"type": "Line",
-							"value": " after empty braces: both trail the comment past `;`",
-							"start": 348,
-							"end": 402
+							"value": " after empty braces",
+							"start": 198,
+							"end": 219
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " c4 ",
-							"start": 431,
-							"end": 439
+							"start": 248,
+							"end": 256
 						}
 					]
 				}

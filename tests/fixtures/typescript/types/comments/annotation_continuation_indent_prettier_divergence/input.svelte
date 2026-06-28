@@ -25,17 +25,13 @@
 		return null as any;
 	}
 
-	// Interface property, intersection type: continuation indents one level.
-	// Prettier keeps it flush here (unlike a simple property-signature type, which
-	// it relocates to end-of-line — see annotation_simple), so this is the
-	// type-element face of the "intersection in any position" divergence.
+	// Interface property, intersection type: continuation indents one level
 	interface I {
 		m: // c6
 			A & B;
 	}
 
 	// Arrow-function return type, simple type: continuation indents one level
-	// (same shared path as the function-declaration return above).
 	const h = (): // c7
 		X => null as any;
 

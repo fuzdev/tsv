@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 270,
+	"end": 232,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -28,9 +28,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " its own line so the `//` can't swallow it. tsv keeps `K in T` on the `[` line;",
+			"value": " its own line so the `//` can't swallow it, keeping `K in T` on the `[` line.",
 			"start": 103,
-			"end": 184,
+			"end": 182,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,38 +38,22 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 82
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " prettier also breaks after `[`.",
-			"start": 186,
-			"end": 220,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 35
+					"column": 80
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 243,
-			"end": 247,
+			"start": 205,
+			"end": 209,
 			"loc": {
 				"start": {
-					"line": 6,
+					"line": 5,
 					"column": 10
 				},
 				"end": {
-					"line": 6,
+					"line": 5,
 					"column": 14
 				}
 			}
@@ -78,48 +62,48 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 269,
+		"end": 231,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 260,
+			"end": 222,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 8,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 222,
-					"end": 259,
+					"start": 184,
+					"end": 221,
 					"loc": {
 						"start": {
-							"line": 5,
+							"line": 4,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
+							"line": 7,
 							"column": 3
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 227,
-						"end": 228,
+						"start": 189,
+						"end": 190,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 4,
 								"column": 6
 							},
 							"end": {
-								"line": 5,
+								"line": 4,
 								"column": 7
 							}
 						},
@@ -127,58 +111,58 @@
 					},
 					"typeAnnotation": {
 						"type": "TSMappedType",
-						"start": 231,
-						"end": 258,
+						"start": 193,
+						"end": 220,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 4,
 								"column": 10
 							},
 							"end": {
-								"line": 8,
+								"line": 7,
 								"column": 2
 							}
 						},
 						"typeParameter": {
 							"type": "TSTypeParameter",
-							"start": 236,
-							"end": 242,
+							"start": 198,
+							"end": 204,
 							"loc": {
 								"start": {
-									"line": 6,
+									"line": 5,
 									"column": 3
 								},
 								"end": {
-									"line": 6,
+									"line": 5,
 									"column": 9
 								}
 							},
 							"name": "K",
 							"constraint": {
 								"type": "TSTypeReference",
-								"start": 241,
-								"end": 242,
+								"start": 203,
+								"end": 204,
 								"loc": {
 									"start": {
-										"line": 6,
+										"line": 5,
 										"column": 8
 									},
 									"end": {
-										"line": 6,
+										"line": 5,
 										"column": 9
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 241,
-									"end": 242,
+									"start": 203,
+									"end": 204,
 									"loc": {
 										"start": {
-											"line": 6,
+											"line": 5,
 											"column": 8
 										},
 										"end": {
-											"line": 6,
+											"line": 5,
 											"column": 9
 										}
 									},
@@ -189,37 +173,37 @@
 								{
 									"type": "Line",
 									"value": " c",
-									"start": 243,
-									"end": 247
+									"start": 205,
+									"end": 209
 								}
 							]
 						},
 						"nameType": null,
 						"typeAnnotation": {
 							"type": "TSTypeReference",
-							"start": 253,
-							"end": 254,
+							"start": 215,
+							"end": 216,
 							"loc": {
 								"start": {
-									"line": 7,
+									"line": 6,
 									"column": 5
 								},
 								"end": {
-									"line": 7,
+									"line": 6,
 									"column": 6
 								}
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 253,
-								"end": 254,
+								"start": 215,
+								"end": 216,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 6,
 										"column": 5
 									},
 									"end": {
-										"line": 7,
+										"line": 6,
 										"column": 6
 									}
 								},
@@ -236,15 +220,9 @@
 						},
 						{
 							"type": "Line",
-							"value": " its own line so the `//` can't swallow it. tsv keeps `K in T` on the `[` line;",
+							"value": " its own line so the `//` can't swallow it, keeping `K in T` on the `[` line.",
 							"start": 103,
-							"end": 184
-						},
-						{
-							"type": "Line",
-							"value": " prettier also breaks after `[`.",
-							"start": 186,
-							"end": 220
+							"end": 182
 						}
 					]
 				}

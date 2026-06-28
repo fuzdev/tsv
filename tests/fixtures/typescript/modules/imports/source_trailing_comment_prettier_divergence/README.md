@@ -3,7 +3,7 @@
 A same-line block comment after an import's source literal (or `with {...}`
 attributes), and a same-line trailing line comment, both trail **after** the `;`
 in both formatters (`import { a } from './a'; /* c */`, `import { b } from './b'; // 1`)
-— tsv adopts prettier 3.9 here, no divergence. `input.svelte` is dual-stable: tsv
+— tsv matches prettier here, no divergence. `input.svelte` is dual-stable: tsv
 and prettier both keep it.
 
 The divergence is one statement: an **own-line line comment in pre-`;` position

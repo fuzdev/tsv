@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 346,
+	"end": 312,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " line comment trails after `;`; own-line `// 2` stays with this statement",
+			"value": " trailing `// 1` and an own-line `// 2`",
 			"start": 107,
-			"end": 182,
+			"end": 148,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -54,15 +54,15 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 76
+					"column": 42
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " 1",
-			"start": 209,
-			"end": 213,
+			"start": 175,
+			"end": 179,
 			"loc": {
 				"start": {
 					"line": 6,
@@ -77,8 +77,8 @@
 		{
 			"type": "Line",
 			"value": " 2",
-			"start": 215,
-			"end": 219,
+			"start": 181,
+			"end": 185,
 			"loc": {
 				"start": {
 					"line": 7,
@@ -93,8 +93,8 @@
 		{
 			"type": "Line",
 			"value": " block comment after import attributes trails after the `;`",
-			"start": 222,
-			"end": 283,
+			"start": 188,
+			"end": 249,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -109,8 +109,8 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 328,
-			"end": 335,
+			"start": 294,
+			"end": 301,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -126,12 +126,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 345,
+		"end": 311,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 336,
+			"end": 302,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -243,8 +243,8 @@
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 184,
-					"end": 208,
+					"start": 150,
+					"end": 174,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -258,8 +258,8 @@
 					"specifiers": [
 						{
 							"type": "ImportSpecifier",
-							"start": 193,
-							"end": 194,
+							"start": 159,
+							"end": 160,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -272,8 +272,8 @@
 							},
 							"imported": {
 								"type": "Identifier",
-								"start": 193,
-								"end": 194,
+								"start": 159,
+								"end": 160,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -288,8 +288,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 193,
-								"end": 194,
+								"start": 159,
+								"end": 160,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -306,8 +306,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 202,
-						"end": 207,
+						"start": 168,
+						"end": 173,
 						"loc": {
 							"start": {
 								"line": 6,
@@ -325,24 +325,24 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " line comment trails after `;`; own-line `// 2` stays with this statement",
+							"value": " trailing `// 1` and an own-line `// 2`",
 							"start": 107,
-							"end": 182
+							"end": 148
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Line",
 							"value": " 1",
-							"start": 209,
-							"end": 213
+							"start": 175,
+							"end": 179
 						}
 					]
 				},
 				{
 					"type": "ImportDeclaration",
-					"start": 285,
-					"end": 327,
+					"start": 251,
+					"end": 293,
 					"loc": {
 						"start": {
 							"line": 10,
@@ -356,8 +356,8 @@
 					"specifiers": [
 						{
 							"type": "ImportDefaultSpecifier",
-							"start": 292,
-							"end": 293,
+							"start": 258,
+							"end": 259,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -370,8 +370,8 @@
 							},
 							"local": {
 								"type": "Identifier",
-								"start": 292,
-								"end": 293,
+								"start": 258,
+								"end": 259,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -388,8 +388,8 @@
 					],
 					"source": {
 						"type": "Literal",
-						"start": 299,
-						"end": 304,
+						"start": 265,
+						"end": 270,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -406,8 +406,8 @@
 					"attributes": [
 						{
 							"type": "ImportAttribute",
-							"start": 312,
-							"end": 324,
+							"start": 278,
+							"end": 290,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -420,8 +420,8 @@
 							},
 							"key": {
 								"type": "Identifier",
-								"start": 312,
-								"end": 316,
+								"start": 278,
+								"end": 282,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -436,8 +436,8 @@
 							},
 							"value": {
 								"type": "Literal",
-								"start": 318,
-								"end": 324,
+								"start": 284,
+								"end": 290,
 								"loc": {
 									"start": {
 										"line": 10,
@@ -457,22 +457,22 @@
 						{
 							"type": "Line",
 							"value": " 2",
-							"start": 215,
-							"end": 219
+							"start": 181,
+							"end": 185
 						},
 						{
 							"type": "Line",
 							"value": " block comment after import attributes trails after the `;`",
-							"start": 222,
-							"end": 283
+							"start": 188,
+							"end": 249
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Block",
 							"value": " c ",
-							"start": 328,
-							"end": 335
+							"start": 294,
+							"end": 301
 						}
 					]
 				}

@@ -1,15 +1,12 @@
 # line_before_while_comment_prettier_divergence
 
 An own-line line comment between a do-while's `}` and its `while`
-(`}⏎// c⏎while (a);`) is preserved on its own line before `while`. Prettier
-relocates it inside the while condition parens, breaking the condition.
-
-- Input: `}⏎\t// comment before while⏎\twhile (a);`
-- Prettier: `} while (⏎\t// comment before while⏎\ta⏎);` (moved into the parens)
-- Ours: keeps the comment on its own line before `while`
+(`}\n// c\nwhile (a);`) is kept on its own line before `while`. Prettier
+relocates it inside the `while` condition parens, breaking the condition across
+lines.
 
 Covers both the directly-preceding comment and a blank-line-before-comment case
-(`variant_spaces` pins prettier's stable blank-line-inside-parens form).
+(`variant_spaces.svelte` pins prettier's stable blank-line-inside-parens form).
 
 ## Reason
 

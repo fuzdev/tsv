@@ -2,8 +2,8 @@
 
 A parenthesized union member (`Z | (A | B)`) whose inner union exceeds the print
 width, so the inner union drops onto its own line inside the parens (it stays
-inline there — Prettier 3.9 "don't break union when it fits", #18827). No
-comments — this is the plain main-path counterpart to
+inline there — Prettier "don't break union when it fits"). No comments — this is
+the plain main-path counterpart to
 [union_paren_member_long_line_comment](../comments/union_paren_member_long_line_comment_prettier_divergence/).
 
 The `Short` and `Fit` cases (inner stays inline beside `| (`) match Prettier

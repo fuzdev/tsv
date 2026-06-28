@@ -8,18 +8,11 @@ leading-pipe members) and stay inline.
 
 The single divergence is the false branch whose value is a **breaking union**
 preceded by a block comment (`: /* c */ A | B | C`, where the union is too wide
-and explodes to leading-pipe members):
-
-```
-// tsv                                  // prettier 3.9
-: /* c */ Aaaa…                         : | /* c */ Aaaa…
-  | Bbbb…                                 | Bbbb…
-  | Cccc…                                 | Cccc…
-```
+and explodes to leading-pipe members).
 
 tsv keeps the comment where the author wrote it — **before** the union, on the
-`:` line, ahead of the first member's `|`. Prettier 3.9 relocates it **across
-the `|` separator, into the first union member** (`| /* c */ Aaaa`), changing the
+`:` line, ahead of the first member's `|`. Prettier relocates it **across the
+`|` separator, into the first union member** (`| /* c */ Aaaa`), changing the
 comment's association from the union as a whole to its first member. Per the
 [Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 tsv treats the authored position as intentional and does not move the comment

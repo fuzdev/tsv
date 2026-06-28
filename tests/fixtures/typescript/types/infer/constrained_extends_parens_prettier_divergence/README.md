@@ -26,8 +26,7 @@ parens and tsv matches — see `../constrained_extends_parens/`).
 Two contrast cases keep their parens in **both** formatters:
 
 - `CondConstraint` (`X extends infer U extends (A extends B ? C : D) ? …`) — a
-  conditional-type infer constraint. Prettier 3.9 keeps the parens here (earlier
-  versions stripped them); tsv matches.
+  conditional-type infer constraint. Prettier keeps the parens here; tsv matches.
 - `SingleArrow` (`M extends (() => infer U extends string) ? …`) — Prettier's
   single-level rule covers it.
 
