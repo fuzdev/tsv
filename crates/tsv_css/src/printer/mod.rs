@@ -32,6 +32,7 @@ use crate::ast::internal::{
 };
 use tsv_lang::{
     CommentPosition, EmbedContext, INDENT, OutputBuffer, TAB_WIDTH, classify_comment_fast,
+    comments_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -151,8 +152,8 @@ impl<'a> Printer<'a> {
 
     /// Write indentation at the current level plus `extra` additional levels.
     ///
-    /// For continuation lines in wrapped at-rule preludes / media queries, which
-    /// indent one or two levels past the statement. The caller writes the preceding
+    /// For continuation lines in the imperative `@import` media-query list wrap, which
+    /// indents one or two levels past the statement. The caller writes the preceding
     /// newline; this only emits the (deeper) indentation.
     pub(crate) fn write_indent_extra(&mut self, extra: usize) {
         self.indent_level += extra;
@@ -442,6 +443,41 @@ impl<'a> Printer<'a> {
         self.write("/*");
         self.write(comment.content(self.source));
         self.write("*/");
+    }
+
+    /// Join the comments fully within `[start, end)` as space-separated `/*…*/`
+    /// blocks (empty string when there are none). The single source-to-string form of
+    /// a comment run, shared by the at-rule prelude and selector comment interleaving.
+    pub(crate) fn comment_blocks_in_range(&self, start: u32, end: u32) -> String {
+        let mut out = String::new();
+        for comment in comments_in_range(self.comments, start, end) {
+            if !out.is_empty() {
+                out.push(' ');
+            }
+            out.push_str("/*");
+            out.push_str(comment.content(self.source));
+            out.push_str("*/");
+        }
+        out
+    }
+
+    /// Split the comments in `[start, end)` around `split_pos` (a delimiter byte
+    /// offset — a comma or an `and`/`or` keyword), returning the joined `/*…*/` text
+    /// before and after it. With no split position the whole run goes to the first
+    /// element. Comments never straddle a delimiter, so the range split is exact.
+    pub(crate) fn split_comments_at(
+        &self,
+        start: u32,
+        end: u32,
+        split_pos: Option<u32>,
+    ) -> (String, String) {
+        match split_pos {
+            Some(pos) => (
+                self.comment_blocks_in_range(start, pos),
+                self.comment_blocks_in_range(pos, end),
+            ),
+            None => (self.comment_blocks_in_range(start, end), String::new()),
+        }
     }
 
     /// Try to print inline comments after the current item

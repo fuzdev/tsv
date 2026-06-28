@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 138,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 76,
+				"end": 129,
+				"name": "supports",
+				"prelude": "(\\@foo: bar)",
+				"block": {
+					"type": "Block",
+					"start": 99,
+					"end": 129,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 103,
+								"end": 105,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 103,
+										"end": 105,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 103,
+														"end": 105
+													}
+												],
+												"start": 103,
+												"end": 105
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 106,
+								"end": 126,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 111,
+										"end": 121,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 103,
+							"end": 126
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 130,
+			"styles": "\n\t/* escaped @ in a supports condition value keeps its backslash */\n\t@supports (\\@foo: bar) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 139,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -31,4 +31,13 @@
 			color: yellow;
 		}
 	}
+
+	/* very long - the continuation re-wraps greedily across multiple lines (both agree) */
+	@supports (aaaaaaaaaaaaaaaa: 1) and (bbbbbbbbbbbbbbbb: 1) and (cccccccccccccccc: 1) and
+		(dddddddddddddddd: 1) and (eeeeeeeeeeeeeeee: 1) and (ffffffffffffffff: 1) and
+		(gggggggggggggggg: 1) {
+		.e {
+			color: orange;
+		}
+	}
 </style>

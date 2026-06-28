@@ -6,30 +6,25 @@
 //
 // ## Architecture
 //
-// This module uses doc builders for width-based decisions (e.g., condition query
-// wrapping). The complex prelude handling remains imperative for clarity; the block
-// body is iterated by the shared `print_css_block_children` (see `mod.rs`).
-
-use std::borrow::Cow;
+// Doc-first (like `selectors.rs`/`values.rs`): each prelude is built as one doc tree
+// and rendered through the renderer via `write_prelude_doc` (mirroring selectors.rs's
+// `write_selector_doc`), so the wrap decision and emission share a single
+// representation — no measurement pass to drift from emission. `@supports`/`@container`
+// conditions and the `@media`/`@import` single-query `and`/`or` wrap are `fill`s; the
+// `@media` comma list is a `group`. The one holdout is the `@import` comma-separated
+// query *list* (`print_import_media_query_fill`), whose two-level greedy fill keeps the
+// first query on the `@import` line and breaks it internally — tsv's renderer fill moves
+// an over-wide first item to its own line instead (the load-bearing `at_line_start`
+// divergence kept for Svelte), so that one prelude stays imperative. The block body is
+// iterated by the shared `print_css_block_children` (see `mod.rs`).
 
 use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
 use tsv_lang::comments_in_range;
-use tsv_lang::doc::{self, DocBuf, Mode, arena::DocId};
+use tsv_lang::doc::{self, DocBuf, DocContext, arena::DocId};
+use tsv_lang::source_scan;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
-
-/// A condition-query part with its content prepared for printing.
-///
-/// `@supports` parts are value-normalized into a fresh `String`; `@container`
-/// parts print verbatim, so they borrow the AST's `&'arena str`
-/// (`ConditionPart::content`) directly. The `Cow` carries either form without
-/// forcing an allocation on the verbatim path.
-struct NormalizedConditionPart<'c> {
-    connector: Option<internal::ConditionConnector>,
-    content: Cow<'c, str>,
-    span: tsv_lang::Span,
-}
 
 /// Convert a condition connector to its string representation
 fn connector_str(conn: internal::ConditionConnector) -> &'static str {
@@ -37,23 +32,6 @@ fn connector_str(conn: internal::ConditionConnector) -> &'static str {
         internal::ConditionConnector::And => "and",
         internal::ConditionConnector::Or => "or",
     }
-}
-
-/// Render a comment's content as a `/*content*/` block (String form, for
-/// condition-prelude comment splitting where the text is assembled before printing).
-fn comment_block(content: &str) -> String {
-    format!("/*{content}*/")
-}
-
-/// How a media-query prelude wraps when it exceeds print width.
-#[derive(Clone, Copy)]
-enum MediaWrap {
-    /// `@media` — a comma-separated media-query list; break at every top-level
-    /// comma (one query per line). A single `and`-joined query still falls back
-    /// to `AndOr` wrapping.
-    CommaList,
-    /// `@import` media conditions — wrap only at the last fitting `and`/`or`.
-    AndOr,
 }
 
 /// A `@supports`/`@container` condition prelude. The two differ only in that
@@ -216,27 +194,116 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Format @media prelude with line-width wrapping at `and`/`or` boundaries
+    /// Format an `@media` prelude (doc-first).
     ///
-    /// Unlike @supports/@container, @media uses raw string parsing to preserve comments.
-    /// Wrapping is done by finding `and`/`or` boundaries in the raw string.
-    ///
+    /// Unlike `@supports`/`@container`, `@media` keeps the raw prelude string
+    /// (comments preserved inline). The whole prelude is one doc tree: a
+    /// comma-separated media-query *list* (Media Queries 4 §"media query list")
+    /// becomes a `group` that breaks at every top-level comma (one query per line,
+    /// matching prettier); a single query becomes an `and`/`or` fill that wraps at
+    /// the last fitting boundary (a deliberate divergence — prettier never wraps a
+    /// single query). The trailing ` {` is reserved so the boundary breaks at print
+    /// width.
     /// ```css
     /// @media screen and (min-width: 768px) and (max-width: 1024px) and
     ///     (orientation: landscape) {
     /// ```
     fn print_media_prelude(&mut self, content: &str, has_block: bool) {
-        let suffix_len = if has_block { " {".len() } else { 0 };
-        // A `@media` prelude is a comma-separated media-query list (Media Queries 4
-        // §"media query list"); prettier breaks it at the commas (one query per
-        // line) when it exceeds print width, so we do too.
-        self.print_media_query_with_wrapping(content, suffix_len, MediaWrap::CommaList);
+        let suffix_width = if has_block { " {".len() } else { 0 };
+        let doc = self.build_media_prelude_doc(content, suffix_width);
+        self.write_prelude_doc(doc, suffix_width);
     }
 
-    /// Format @supports/@container condition with line-width wrapping at `and`/`or` boundaries
+    /// Build the doc tree for an `@media` prelude (see `print_media_prelude`).
+    fn build_media_prelude_doc(&self, content: &str, suffix_width: usize) -> DocId {
+        let d = self.d();
+        // Normalize numbers + string quotes in the raw prelude (`.5px` → `0.5px`,
+        // `"x"` → `'x'`), matching the declaration-value path. Comments preserved.
+        let content = value_normalization::normalize_value_text(content);
+
+        let queries: Vec<&str> = value_normalization::split_args_by_comma(&content)
+            .into_iter()
+            .map(str::trim)
+            .filter(|q| !q.is_empty())
+            .collect();
+
+        if queries.len() > 1 {
+            // Comma-separated query list: a group that breaks at every comma (one
+            // query per line, one indent level). Each query is emitted verbatim — the
+            // list breaks all-or-nothing, queries don't wrap internally.
+            let mut parts = DocBuf::new();
+            for (i, query) in queries.iter().enumerate() {
+                if i > 0 {
+                    parts.push(d.text(","));
+                    parts.push(d.line());
+                }
+                parts.push(d.text_owned((*query).to_string()));
+            }
+            return d.group(d.indent(d.concat(&parts)));
+        }
+
+        // Single query: wrap at the last fitting `and`/`or`.
+        self.build_and_or_wrap_doc(&content, suffix_width)
+    }
+
+    /// Build an `and`/`or`-wrapping fill for a single media query (raw string).
     ///
-    /// The `and`/`or` keyword stays on line 1, with the condition going to line 2.
-    /// Example (wraps at 101 chars):
+    /// Splits the query into segments at its top-level `and`/`or` keywords (paren-,
+    /// quote- and comment-aware via `split_by_space_preserving_parens`) and joins
+    /// them with breakable separators that keep the keyword on the line before the
+    /// break (`… and⏎\t…`). A query with no top-level `and`/`or` has no break point,
+    /// so it's emitted verbatim. Shared by `@media` and `@import` single queries.
+    fn build_and_or_wrap_doc(&self, query: &str, suffix_width: usize) -> DocId {
+        let d = self.d();
+        let atoms = value_normalization::split_by_space_preserving_parens(query);
+
+        // Re-group atoms into segments split at `and`/`or` keyword atoms. The
+        // connector rides the separator before the following segment.
+        let mut fill_parts = DocBuf::new();
+        let mut segment = String::new();
+        let mut has_connector = false;
+        for atom in atoms {
+            if matches!(atom, "and" | "or") && !segment.is_empty() {
+                has_connector = true;
+                let conn = if atom == "and" { "and" } else { "or" };
+                fill_parts.push(d.text_owned(std::mem::take(&mut segment)));
+                fill_parts.push(d.concat(&[d.text(" "), d.text(conn), d.line()]));
+            } else {
+                if !segment.is_empty() {
+                    segment.push(' ');
+                }
+                segment.push_str(atom);
+            }
+        }
+        if !segment.is_empty() {
+            fill_parts.push(d.text_owned(segment));
+        }
+
+        // No `and`/`or` boundary → no break point, emit verbatim.
+        if !has_connector {
+            return d.text_owned(query.to_string());
+        }
+
+        let fill = d.fill(&fill_parts);
+        let fill = d.with_context(
+            fill,
+            DocContext {
+                trailing_reserve: suffix_width,
+                ..Default::default()
+            },
+        );
+        d.indent(fill)
+    }
+
+    /// Format an `@supports`/`@container` condition prelude (doc-first).
+    ///
+    /// The whole prelude is one doc tree rendered through the renderer, so the
+    /// wrap decision and emission share a single representation (no measure pass to
+    /// drift from emission). The condition parts join into a `fill` whose `line`s
+    /// break at the `and`/`or` boundaries — the keyword stays on line 1, the
+    /// condition wraps to line 2 — with the trailing ` {` reserved so the boundary
+    /// breaks at print width. tsv wraps where prettier never does (a deliberate,
+    /// cataloged divergence — see conformance_prettier.md §CSS: At-Rules):
     /// ```css
     /// @supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and
     ///     (flex: 1aaa) {
@@ -251,319 +318,196 @@ impl<'a> Printer<'a> {
         // Print optional name prefix (for @container)
         let name_end_pos = if let Some(n) = kind.name() {
             self.write(n);
-            self.write(" ");
+            // Separate the name from its condition with a space — but a name with no
+            // condition (`@container b {`) takes none, else the block's ` {` would
+            // stack into a double space.
+            if !condition.parts.is_empty() {
+                self.write(" ");
+            }
             // Find where the name ends in source (name length from prelude start)
             prelude_span.map(|s| s.start + n.len() as u32)
         } else {
             prelude_span.map(|s| s.start)
         };
 
-        // Normalize numbers in each part's content (`.5px` → `0.5px`), matching
-        // the declaration-value path. Comments/strings within a part are
-        // preserved; inter-part comments come from source spans, unaffected.
-        let normalized_parts: Vec<NormalizedConditionPart<'_>> = condition
-            .parts
-            .iter()
-            .map(|p| NormalizedConditionPart {
-                connector: p.connector,
-                content: if kind.normalizes() {
-                    Cow::Owned(value_normalization::normalize_value_text(p.content))
-                } else {
-                    Cow::Borrowed(p.content)
-                },
-                span: p.span,
-            })
-            .collect();
-        let parts = &normalized_parts;
+        let suffix_width = if has_block { " {".len() } else { 0 };
+        let doc = self.build_condition_query_doc(
+            kind,
+            condition,
+            name_end_pos,
+            prelude_span,
+            suffix_width,
+        );
+        self.write_prelude_doc(doc, suffix_width);
+    }
+
+    /// Render an at-rule prelude doc, reserving `suffix_width` columns for the
+    /// punctuation the caller appends after it (` {` for a block, `;` for `@import`).
+    /// The reservation rides `EmbedContext::suffix_width` (read by every group's fit
+    /// check); fill-based preludes additionally carry it as the fill's
+    /// `trailing_reserve` (fills don't read `suffix_width`). Mirrors selectors.rs's
+    /// `write_selector_doc`.
+    fn write_prelude_doc(&mut self, doc: DocId, suffix_width: usize) {
+        let current_col = self.current_column();
+        let mut embed = self.embed;
+        embed.suffix_width = suffix_width;
+        let output = doc::arena_print_doc_with_indent(
+            self.arena,
+            doc,
+            &embed,
+            current_col,
+            self.indent_level,
+        );
+        self.write(&output);
+    }
+
+    /// Build the doc tree for an `@supports`/`@container` condition prelude.
+    ///
+    /// A single condition has no break point — it's a plain concat (leading comment,
+    /// content, then trailing comment), emitted inline like prettier. Two or more
+    /// conditions become `indent(fill([...]))`: the connector (`and`/`or`) and any
+    /// comments split around it ride a breakable separator (the connector stays on
+    /// the line before the break), and the trailing ` {`/`;` is reserved via the
+    /// fill's `trailing_reserve` so the boundary breaks at print width.
+    fn build_condition_query_doc(
+        &self,
+        kind: ConditionKind<'_>,
+        condition: &internal::ConditionQuery<'_>,
+        name_end_pos: Option<u32>,
+        prelude_span: Option<tsv_lang::Span>,
+        suffix_width: usize,
+    ) -> DocId {
+        let d = self.d();
+        let parts = condition.parts;
+
+        // `@supports` values are number-normalized (`.5px` → `0.5px`); `@container`
+        // is emitted verbatim, both matching prettier.
+        let content_doc = |part: &internal::ConditionPart<'_>| {
+            if kind.normalizes() {
+                d.text_owned(value_normalization::normalize_value_text(part.content))
+            } else {
+                d.text_owned(part.content.to_string())
+            }
+        };
+
+        // The leading comments before the first part (after the optional name).
+        let leading_first = |part: &internal::ConditionPart<'_>| -> DocId {
+            let leading = name_end_pos
+                .map(|start| self.comment_blocks_in_range(start, part.span.start))
+                .unwrap_or_default();
+            if leading.is_empty() {
+                content_doc(part)
+            } else {
+                d.concat(&[d.text_owned(leading), d.text(" "), content_doc(part)])
+            }
+        };
 
         if parts.len() <= 1 {
-            // Single condition - emit leading comments, content, and trailing comments
-            if let Some(first_part) = parts.first() {
-                self.write_leading_condition_comments(name_end_pos, first_part.span.start);
-                self.write(&first_part.content);
-                // Print trailing comments after the single part
-                if let Some(span) = prelude_span {
-                    self.write_trailing_condition_comments(first_part.span.end, span.end);
+            // Single condition: no break point, emit inline (leading + content + trailing).
+            let Some(first) = parts.first() else {
+                return d.text("");
+            };
+            let mut chunk = DocBuf::new();
+            chunk.push(leading_first(first));
+            if let Some(span) = prelude_span {
+                let trailing = self.comment_blocks_in_range(first.span.end, span.end);
+                if !trailing.is_empty() {
+                    chunk.push(d.text(" "));
+                    chunk.push(d.text_owned(trailing));
                 }
             }
-            return;
+            return d.concat(&chunk);
         }
 
-        // Build doc to check if it fits on one line
-        let prelude_doc = self.build_condition_doc(parts);
-        let suffix_len = if has_block { " {".len() } else { 0 };
-
-        let current_col = self.current_column();
-        let available = PRINT_WIDTH.saturating_sub(current_col + suffix_len);
-        let fits = doc::arena_fits::<dyn doc::TextResolver>(
-            self.arena,
-            prelude_doc,
-            available,
-            Mode::Flat,
-            None,
-        );
-
-        if fits {
-            // Print inline with comments between parts
-            self.write_condition_parts(parts, name_end_pos);
-            // Print trailing comments after last part
-            if let (Some(last_part), Some(span)) = (parts.last(), prelude_span) {
-                self.write_trailing_condition_comments(last_part.span.end, span.end);
-            }
-        } else {
-            // Find split point: which part should start line 2
-            let split_idx = self.find_condition_split_index(parts, current_col, suffix_len);
-
-            // Print first line: parts[0..split_idx]
-            self.write_condition_parts(&parts[..split_idx], name_end_pos);
-
-            // Print trailing connector and continuation line
-            if split_idx < parts.len() {
-                let prev_end = parts[split_idx - 1].span.end;
-                let split_part = &parts[split_idx];
-                let (before_conn, after_conn) = self.extract_comments_split_by_connector(
-                    prev_end,
-                    split_part.span.start,
-                    split_part.connector,
-                );
-
-                if !before_conn.is_empty() {
-                    self.write(" ");
-                    self.write(&before_conn);
-                }
-
-                if let Some(conn) = split_part.connector {
-                    self.write(" ");
-                    self.write(connector_str(conn));
-                }
-
-                // Print continuation line
-                self.write("\n");
-                self.write_indent_extra(1);
-
-                // Comments after connector go on the new line
-                if !after_conn.is_empty() {
-                    self.write(&after_conn);
-                    self.write(" ");
-                }
-
-                self.write(&split_part.content);
-
-                // Print remaining parts
-                for (i, part) in parts[split_idx + 1..].iter().enumerate() {
-                    self.write_condition_part_with_comments(parts[split_idx + i].span.end, part);
-                }
-
-                // Print trailing comments after last part
-                if let (Some(last_part), Some(span)) = (parts.last(), prelude_span) {
-                    self.write_trailing_condition_comments(last_part.span.end, span.end);
-                }
-            }
-        }
-    }
-
-    /// Write comments that appear before the first condition part
-    fn write_leading_condition_comments(&mut self, start_pos: Option<u32>, part_start: u32) {
-        if let Some(start) = start_pos {
-            let comments: Vec<_> = comments_in_range(self.comments, start, part_start).collect();
-            if !comments.is_empty() {
-                for (i, comment) in comments.iter().enumerate() {
-                    if i > 0 {
-                        self.write(" ");
-                    }
-                    self.print_css_comment(comment);
-                }
-                self.write(" ");
-            }
-        }
-    }
-
-    /// Write comments that appear after the last condition part
-    fn write_trailing_condition_comments(&mut self, last_part_end: u32, prelude_end: u32) {
-        let comments: Vec<_> =
-            comments_in_range(self.comments, last_part_end, prelude_end).collect();
-        if !comments.is_empty() {
-            for comment in comments.iter() {
-                self.write(" ");
-                self.print_css_comment(comment);
-            }
-        }
-    }
-
-    /// Print a contiguous run of condition parts: leading comments + connector +
-    /// content for the first, then each subsequent part with its inter-part
-    /// comments. Shared by the fits-inline and wrapped-first-line branches (the
-    /// wrapped branch passes the `parts[..split_idx]` prefix).
-    fn write_condition_parts(
-        &mut self,
-        parts: &[NormalizedConditionPart<'_>],
-        name_end_pos: Option<u32>,
-    ) {
+        // Multiple conditions: a fill whose separators carry the connectors.
+        let mut fill_parts = DocBuf::new();
         for (i, part) in parts.iter().enumerate() {
-            if i > 0 {
-                self.write_condition_part_with_comments(parts[i - 1].span.end, part);
-            } else {
-                self.write_leading_condition_comments(name_end_pos, part.span.start);
-                self.write_connector(part.connector);
-                self.write(&part.content);
+            if i == 0 {
+                fill_parts.push(leading_first(part));
+                continue;
+            }
+            // Separator: ` <before-comments>? <connector> line`. The connector and any
+            // pre-connector comment stay on the previous line; the `line` breaks before
+            // the content. Post-connector comments lead the content on the next line.
+            let (before, after) = self.extract_comments_split_by_connector(
+                parts[i - 1].span.end,
+                part.span.start,
+                part.connector,
+            );
+            let mut sep = DocBuf::new();
+            if !before.is_empty() {
+                sep.push(d.text(" "));
+                sep.push(d.text_owned(before));
+            }
+            if let Some(conn) = part.connector {
+                sep.push(d.text(" "));
+                sep.push(d.text(connector_str(conn)));
+            }
+            sep.push(d.line());
+            fill_parts.push(d.concat(&sep));
+
+            let mut chunk = DocBuf::new();
+            if !after.is_empty() {
+                chunk.push(d.text_owned(after));
+                chunk.push(d.text(" "));
+            }
+            chunk.push(content_doc(part));
+            fill_parts.push(d.concat(&chunk));
+        }
+
+        // Trailing comments after the last part ride its line.
+        if let (Some(last), Some(span)) = (parts.last(), prelude_span) {
+            let trailing = self.comment_blocks_in_range(last.span.end, span.end);
+            if !trailing.is_empty()
+                && let Some(last_chunk) = fill_parts.pop()
+            {
+                fill_parts.push(d.concat(&[last_chunk, d.text(" "), d.text_owned(trailing)]));
             }
         }
+
+        let fill = d.fill(&fill_parts);
+        let fill = d.with_context(
+            fill,
+            DocContext {
+                trailing_reserve: suffix_width,
+                ..Default::default()
+            },
+        );
+        d.indent(fill)
     }
 
-    /// Write a condition part with its preceding comments and connector
-    fn write_condition_part_with_comments(
-        &mut self,
-        prev_end: u32,
-        part: &NormalizedConditionPart<'_>,
-    ) {
-        let (before_conn, after_conn) =
-            self.extract_comments_split_by_connector(prev_end, part.span.start, part.connector);
-
-        if !before_conn.is_empty() {
-            self.write(" ");
-            self.write(&before_conn);
-        }
-        self.write(" ");
-        self.write_connector(part.connector);
-        if !after_conn.is_empty() {
-            self.write(&after_conn);
-            self.write(" ");
-        }
-        self.write(&part.content);
-    }
-
-    /// Join a run of comments as space-separated `/*content*/` blocks.
-    fn join_condition_comments(&self, comments: &[&internal::Comment]) -> String {
-        comments
-            .iter()
-            .map(|c| comment_block(c.content(self.source)))
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-
-    /// Extract comments from source range, split around connector keyword
+    /// Extract comments from a source range, split around the connector keyword.
     ///
-    /// Returns (comments_before_connector, comments_after_connector)
-    /// For `/* a */ and /* b */` returns (`/* a */`, `/* b */`)
+    /// Returns (comments_before_connector, comments_after_connector); for
+    /// `/* a */ and /* b */` → (`/* a */`, `/* b */`). The connector is located
+    /// comment-aware via `find_keyword` (CSS trivia profile), so a `and`/`or` buried
+    /// in a comment (`/* x and y */ and …`) doesn't move the split into the comment —
+    /// which would drop it (a straddling comment is in neither half-range). The parser
+    /// only accepts lowercase `and`/`or`, so a case-sensitive byte match suffices. With
+    /// no connector (or none found) the whole run goes before. Delegates the binning +
+    /// join to the shared `split_comments_at`.
     fn extract_comments_split_by_connector(
         &self,
         start: u32,
         end: u32,
         connector: Option<internal::ConditionConnector>,
     ) -> (String, String) {
-        let comments: Vec<_> = comments_in_range(self.comments, start, end).collect();
-
-        if comments.is_empty() {
-            return (String::new(), String::new());
-        }
-
-        // Find the connector keyword position in the source range
         let connector_keyword = match connector {
             Some(internal::ConditionConnector::And) => "and",
             Some(internal::ConditionConnector::Or) => "or",
-            None => {
-                // No connector - all comments go to "before"
-                return (self.join_condition_comments(&comments), String::new());
-            }
+            None => return self.split_comments_at(start, end, None),
         };
 
-        // Find connector position in source (case-insensitive)
-        let range_text = &self.source[start as usize..end as usize];
-        let range_lower = range_text.to_lowercase();
-        let connector_pos = range_lower
-            .find(&format!(" {connector_keyword} "))
-            .or_else(|| range_lower.find(connector_keyword));
+        let connector_pos = source_scan::find_keyword(
+            self.source.as_bytes(),
+            start as usize,
+            end as usize,
+            connector_keyword.as_bytes(),
+            source_scan::TriviaProfile::CSS,
+        )
+        .map(|pos| pos as u32);
 
-        let connector_abs_pos = match connector_pos {
-            Some(pos) => start + pos as u32,
-            None => {
-                // Connector not found - all comments go to "before"
-                return (self.join_condition_comments(&comments), String::new());
-            }
-        };
-
-        // Split comments based on whether they're before or after the connector
-        let mut before = String::new();
-        let mut after = String::new();
-
-        for comment in comments {
-            let formatted = comment_block(comment.content(self.source));
-            if comment.span.end <= connector_abs_pos {
-                if !before.is_empty() {
-                    before.push(' ');
-                }
-                before.push_str(&formatted);
-            } else {
-                if !after.is_empty() {
-                    after.push(' ');
-                }
-                after.push_str(&formatted);
-            }
-        }
-
-        (before, after)
-    }
-
-    /// Write a condition connector (if present) with trailing space
-    fn write_connector(&mut self, connector: Option<internal::ConditionConnector>) {
-        if let Some(conn) = connector {
-            self.write(connector_str(conn));
-            self.write(" ");
-        }
-    }
-
-    /// Find the split index for condition query wrapping
-    ///
-    /// Returns the index of the first part that should go on line 2.
-    fn find_condition_split_index(
-        &self,
-        parts: &[NormalizedConditionPart<'_>],
-        current_col: usize,
-        suffix_len: usize,
-    ) -> usize {
-        let mut line_width = current_col;
-
-        for (i, part) in parts.iter().enumerate() {
-            // Width of connector before this part (if any)
-            let space_before = if i > 0 { 1 } else { 0 };
-            let conn_width = if let Some(conn) = part.connector {
-                space_before + connector_str(conn).len() + 1 // " and " or "and "
-            } else {
-                space_before // Just space between parts
-            };
-
-            let part_width = part.content.len();
-
-            // Check if adding this part + suffix exceeds width
-            let projected = line_width + conn_width + part_width + suffix_len;
-
-            if projected > PRINT_WIDTH && i > 0 {
-                // Split before this part
-                return i;
-            }
-
-            line_width += conn_width + part_width;
-        }
-
-        parts.len()
-    }
-
-    /// Build a doc representation of condition query for width checking
-    fn build_condition_doc(&self, parts: &[NormalizedConditionPart<'_>]) -> DocId {
-        let d = self.d();
-        let mut docs = DocBuf::new();
-        for (i, part) in parts.iter().enumerate() {
-            if i > 0 {
-                docs.push(d.text(" "));
-            }
-            if let Some(conn) = part.connector {
-                docs.push(d.text(connector_str(conn)));
-                docs.push(d.text(" "));
-            }
-            docs.push(d.text_owned(part.content.to_string()));
-        }
-
-        d.concat(&docs)
+        self.split_comments_at(start, end, connector_pos)
     }
 
     /// Reconstruct comments sitting in an `@import` prelude gap (before a value).
@@ -594,42 +538,36 @@ impl<'a> Printer<'a> {
         self.write(" ");
     }
 
-    /// Format an @import media query with line-width wrapping.
+    /// Format an `@import` media query (doc-first).
     ///
-    /// Prettier value-parses `@import` preludes (`isModuleRuleName`) and emits the
-    /// media condition as `group(indent(fill(...)))`. A single query wraps only at
-    /// the last fitting `and`/`or` (`print_media_query_with_wrapping`); a
-    /// comma-separated query *list* packs greedily — see
-    /// `print_import_media_query_fill`. The trailing `;` is the only suffix (1).
+    /// Prettier value-parses `@import` preludes and emits the media condition as
+    /// `group(indent(fill(...)))`; the trailing `;` is the only suffix (1).
+    ///
+    /// A comment-bearing condition or a single query takes the doc-first `and`/`or`
+    /// wrap (a whitespace fill would shatter `/* … */` comments). A comma-separated
+    /// query *list* is the one prelude that stays imperative
+    /// (`print_import_media_query_fill`): its two-level greedy fill keeps the first
+    /// query on the `@import` line and breaks it *internally*, but tsv's renderer
+    /// fill moves an over-wide first item to its own line (the load-bearing
+    /// `at_line_start` divergence kept for Svelte), so nested doc fills can't
+    /// reproduce prettier's layout. Confirmed: the list does **not** map to `fill()`.
     fn print_import_media_query(&mut self, content: &str) {
         let normalized = value_normalization::normalize_value_text(content);
-        // Fits inline (counting the trailing `;`) — emit verbatim.
-        let total_width = self.current_column() + normalized.len() + 1;
-        if total_width <= PRINT_WIDTH {
-            self.write(&normalized);
-            return;
-        }
-        // Comment-bearing conditions keep the comment-aware `and`/`or` wrapping — the
-        // fill splits on whitespace and would shatter `/* … */` comments. (Comment-only
-        // comma lists never reach here; the caller routes them to the value path.)
-        if normalized.contains("/*") {
-            self.print_media_query_with_wrapping(&normalized, 1, MediaWrap::AndOr);
-            return;
-        }
         let queries: Vec<&str> = value_normalization::split_args_by_comma(&normalized)
             .into_iter()
             .map(str::trim)
             .filter(|q| !q.is_empty())
             .collect();
-        if queries.len() <= 1 {
-            // Single query: wrap at the last fitting `and`/`or`.
-            self.print_media_query_with_wrapping(&normalized, 1, MediaWrap::AndOr);
-            return;
+        if normalized.contains("/*") || queries.len() <= 1 {
+            let doc = self.build_and_or_wrap_doc(&normalized, 1);
+            self.write_prelude_doc(doc, 1);
+        } else {
+            self.print_import_media_query_fill(&queries);
         }
-        self.print_import_media_query_fill(&queries);
     }
 
-    /// Greedy two-level fill for a comma-separated `@import` media-query list.
+    /// Greedy two-level fill for a comma-separated `@import` media-query list
+    /// (imperative — see `print_import_media_query` for why it can't be a doc fill).
     ///
     /// Mirrors prettier's nested `group(indent(fill(...)))` — an outer fill over the
     /// comma-separated queries, each query an inner fill over its space-separated
@@ -710,81 +648,5 @@ impl<'a> Printer<'a> {
             }
         }
         col
-    }
-
-    /// Shared helper for media query wrapping.
-    ///
-    /// Used by both @media prelude and @import media conditions. `suffix_len`
-    /// accounts for trailing content (` {` for @media, `;` for @import). For
-    /// `MediaWrap::CommaList` (the `@media` query-list case) an overflowing prelude
-    /// breaks each top-level comma-separated query onto its own line; otherwise
-    /// (and for a single query) we wrap at the last fitting `and`/`or`.
-    fn print_media_query_with_wrapping(
-        &mut self,
-        content: &str,
-        suffix_len: usize,
-        wrap: MediaWrap,
-    ) {
-        // Normalize numbers and string quotes in the raw prelude (`.5px` → `0.5px`,
-        // `"x"` → `'x'`), matching the declaration-value path. Comments preserved.
-        let content = value_normalization::normalize_value_text(content);
-        let content = content.as_str();
-
-        let current_col = self.current_column();
-        let total_width = current_col + content.len() + suffix_len;
-
-        if total_width <= PRINT_WIDTH {
-            self.write(content);
-            return;
-        }
-
-        // Comma-separated media-query list: break at every top-level comma, one
-        // query per line (prettier's `group(indent(join(line, …)))`). A single
-        // query (no top-level comma) falls through to `and`/`or` wrapping below.
-        if matches!(wrap, MediaWrap::CommaList) {
-            let queries: Vec<&str> = value_normalization::split_args_by_comma(content)
-                .into_iter()
-                .map(str::trim)
-                .filter(|q| !q.is_empty())
-                .collect();
-            if queries.len() > 1 {
-                for (i, query) in queries.iter().enumerate() {
-                    if i > 0 {
-                        self.write_indent_extra(1);
-                    }
-                    self.write(query);
-                    if i + 1 < queries.len() {
-                        self.write(",\n");
-                    }
-                }
-                return;
-            }
-        }
-
-        // Find the last `and`/`or` break point that keeps first line under print_width
-        let mut best_break = None;
-
-        for (idx, _) in content.match_indices(" and ") {
-            let break_pos = idx + " and".len();
-            if current_col + break_pos <= PRINT_WIDTH {
-                best_break = Some(break_pos);
-            }
-        }
-
-        for (idx, _) in content.match_indices(" or ") {
-            let break_pos = idx + " or".len();
-            if current_col + break_pos <= PRINT_WIDTH && best_break.is_none_or(|b| break_pos > b) {
-                best_break = Some(break_pos);
-            }
-        }
-
-        if let Some(break_pos) = best_break {
-            self.write(&content[..break_pos]);
-            self.write("\n");
-            self.write_indent_extra(1);
-            self.write(content[break_pos..].trim_start());
-        } else {
-            self.write(content);
-        }
     }
 }

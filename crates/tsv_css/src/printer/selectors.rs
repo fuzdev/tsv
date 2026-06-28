@@ -31,8 +31,9 @@
 
 use super::Printer;
 use crate::ast::internal;
-use tsv_lang::Span;
 use tsv_lang::doc::{self, DocBuf, arena::DocId};
+use tsv_lang::source_scan;
+use tsv_lang::{Span, has_comments_in_range};
 
 /// Trailing punctuation that follows a selector on its last line (`) {` / `,`),
 /// reserved so a selector that would overflow once the brace is appended breaks
@@ -55,33 +56,21 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Normalize spacing around comments in selector source text
-    ///
-    /// Ensures proper spacing:
-    /// - Space after comma before comment: `,/*` → `, /*`
-    /// - Space after comment before class selector: `*/.` → `*/ .`
-    /// - Reduce double spaces: `,  /*` → `, /*`, `*/  .` → `*/ .`
-    fn normalize_selector_comment_spacing(source_text: &str) -> String {
-        source_text
-            .replace(",/*", ", /*")
-            .replace("*/.", "*/ .")
-            .replace(",  /*", ", /*")
-            .replace("*/  .", "*/ .")
-    }
-
-    /// The raw-source seam for comment-bearing selectors: selector comments aren't
-    /// modeled in the AST, so a selector containing one is emitted verbatim (with
-    /// spacing normalized) rather than rebuilt from the doc tree. Returns `true`
-    /// when it handled the selector (the caller stops), `false` for the comment-free
-    /// doc-first path.
-    fn try_write_selector_comment_seam(&mut self, list: &internal::SelectorList<'_>) -> bool {
-        let source_text = list.span.extract(self.source);
-        if source_text.contains("/*") {
-            let normalized = Self::normalize_selector_comment_spacing(source_text);
-            self.write(&normalized);
-            return true;
-        }
-        false
+    /// Split the comments in `[start, end)` — the gap between two selectors, which
+    /// holds the separating comma — into the comments before the comma and those
+    /// after, each joined as `/*…*/` text. The comma is found comment-aware (a `,`
+    /// inside a comment is not the separator). This is the principled replacement for
+    /// the old `normalize_selector_comment_spacing` string-replace: it preserves each
+    /// comment's side of the comma while normalizing the surrounding whitespace.
+    fn split_selector_comments_around_comma(&self, start: u32, end: u32) -> (String, String) {
+        let comma = source_scan::find_char_skipping_comments(
+            self.source.as_bytes(),
+            start as usize,
+            end as usize,
+            b',',
+        )
+        .map(|pos| pos as u32);
+        self.split_comments_at(start, end, comma)
     }
 
     //
@@ -91,15 +80,19 @@ impl<'a> Printer<'a> {
     /// Format a top-level selector list (a rule's selector).
     ///
     /// Prettier's rule: a top-level list of 2+ selectors ALWAYS breaks (one per
-    /// line); a single selector wraps only on width. Comment-bearing selectors take
-    /// the raw-source seam (see `normalize_selector_comment_spacing`) — selector
-    /// comments aren't modeled in the AST and their spacing is a deliberate,
-    /// cataloged divergence.
+    /// line); a single selector wraps only on width. A comment at a comma boundary
+    /// keeps the whole list **inline** (matching prettier — a comment-bearing list is
+    /// not subject to the always-break rule), with the comments interleaved at their
+    /// boundaries and the surrounding whitespace normalized (the cataloged spacing
+    /// divergence — prettier preserves the source whitespace; see conformance_prettier.md
+    /// §CSS: Comments).
     pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList<'_>) {
-        if self.try_write_selector_comment_seam(list) {
+        if list.selectors.is_empty() {
             return;
         }
-        if list.selectors.is_empty() {
+        if has_comments_in_range(self.comments, list.span.start, list.span.end) {
+            let doc = self.build_comma_list_doc(list, false);
+            self.write_selector_doc(doc, SELECTOR_SUFFIX_WIDTH);
             return;
         }
         if list.selectors.len() >= 2 {
@@ -124,9 +117,6 @@ impl<'a> Printer<'a> {
         if list.selectors.is_empty() {
             return;
         }
-        if self.try_write_selector_comment_seam(list) {
-            return;
-        }
         let d = self.d();
         let inner = self.build_nested_selector_list_doc(list);
         // The caller already wrote `(`; emit `softline inner` indented, then a
@@ -141,12 +131,36 @@ impl<'a> Printer<'a> {
     /// complex-selector doc; the group around it (added by the caller) decides
     /// whether the `line`s flatten to `, ` or break one-per-line.
     fn build_nested_selector_list_doc(&self, list: &internal::SelectorList<'_>) -> DocId {
+        self.build_comma_list_doc(list, true)
+    }
+
+    /// Build a comma-joined selector-list doc with comments interleaved at each comma
+    /// boundary (pre-comma comments trail the previous selector, post-comma comments
+    /// lead the next). `breakable` selects the separator after the comma: a `line`
+    /// (the nested/forgiving form, where the enclosing group decides whether to break
+    /// one-per-line) or a literal space (the top-level inline-with-comments form, which
+    /// matches prettier by never breaking a comment-bearing list). Leading/trailing
+    /// comments (inside `:is()` parens) are added by the caller via
+    /// `selector_comments_text`, since they sit outside the list span.
+    fn build_comma_list_doc(&self, list: &internal::SelectorList<'_>, breakable: bool) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         for (i, complex) in list.selectors.iter().enumerate() {
             if i > 0 {
+                let (before, after) = self.split_selector_comments_around_comma(
+                    list.selectors[i - 1].span.end,
+                    complex.span.start,
+                );
+                if !before.is_empty() {
+                    parts.push(d.text(" "));
+                    parts.push(d.text_owned(before));
+                }
                 parts.push(d.text(","));
-                parts.push(d.line());
+                parts.push(if breakable { d.line() } else { d.text(" ") });
+                if !after.is_empty() {
+                    parts.push(d.text_owned(after));
+                    parts.push(d.text(" "));
+                }
             }
             parts.push(self.build_complex_selector_doc(complex));
         }
@@ -403,8 +417,15 @@ impl<'a> Printer<'a> {
     fn build_pseudo_args_doc(&self, args: &internal::PseudoClassArgs<'_>) -> DocId {
         let d = self.d();
         match args {
-            internal::PseudoClassArgs::SelectorList { selectors, .. } => {
+            internal::PseudoClassArgs::SelectorList { selectors, span } => {
                 let inner = self.build_nested_selector_list_doc(selectors);
+                // Interleave leading/trailing comments that sit inside the parens but
+                // outside the inner list span (`:is(/* lead */ .a /* trail */)`). The
+                // args `span` covers `(content)`; the `)` is its last byte.
+                let leading = self.comment_blocks_in_range(span.start, selectors.span.start);
+                let trailing =
+                    self.comment_blocks_in_range(selectors.span.end, span.end.saturating_sub(1));
+                let inner = self.wrap_inner_with_comments(inner, &leading, &trailing);
                 self.wrap_pseudo_args(inner)
             }
             internal::PseudoClassArgs::Nth {
@@ -436,6 +457,27 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text("("), d.text_owned(value.to_string()), d.text(")")])
             }
         }
+    }
+
+    /// Prepend a leading comment and append a trailing comment around an inner doc,
+    /// each separated by a single space (a no-op for an empty side). Used for the
+    /// comments inside a pseudo's parens that sit outside the inner selector list.
+    fn wrap_inner_with_comments(&self, inner: DocId, leading: &str, trailing: &str) -> DocId {
+        let d = self.d();
+        if leading.is_empty() && trailing.is_empty() {
+            return inner;
+        }
+        let mut parts = DocBuf::new();
+        if !leading.is_empty() {
+            parts.push(d.text_owned(leading.to_string()));
+            parts.push(d.text(" "));
+        }
+        parts.push(inner);
+        if !trailing.is_empty() {
+            parts.push(d.text(" "));
+            parts.push(d.text_owned(trailing.to_string()));
+        }
+        d.concat(&parts)
     }
 
     /// Wrap pseudo-argument content in the standard breakable envelope:
