@@ -6,7 +6,7 @@
 //! - Width-based wrapping for long lists
 //! - Doc building for width calculations
 
-use super::{Printer, has_wrappable_args, value_normalization};
+use super::{Printer, value_normalization};
 use crate::ast::internal::{self, CssValue};
 use tsv_lang::PRINT_WIDTH;
 use tsv_lang::doc::{self, DocBuf, DocContext, Mode, arena::DocId};
@@ -137,47 +137,6 @@ impl<'a> Printer<'a> {
         (exceeds_width, is_comma)
     }
 
-    /// Check if a function should wrap its arguments (with explicit context offset)
-    ///
-    /// Prettier wraps ALL multi-arg functions when they exceed print width.
-    /// This includes: gradients, polygon(), calc(), clamp(), min(), max(), var(), rgb(), hsl(), etc.
-    ///
-    /// Single-arg functions (like url('long-path')) never wrap because they have no
-    /// natural break points. But functions with space-separated args (like drop-shadow)
-    /// CAN wrap because they have multiple logical items.
-    ///
-    /// `context_offset` should be: property.len() + 3 (for ": " + ";")
-    fn should_wrap_function_with_offset(
-        &self,
-        name: &str,
-        args: &[CssValue<'_>],
-        context_offset: usize,
-    ) -> bool {
-        if !has_wrappable_args(args) {
-            return false;
-        }
-
-        let d = self.d();
-        // TODO: measure-then-emit — `func_doc` is built only for this width check and
-        // discarded; the wrapped form is re-emitted imperatively in
-        // `print_wrapped_function`. The group form that wraps natively already exists
-        // (`values.rs::build_value_function_doc`, used by the inline path) — render it
-        // directly with a reserved `;` instead, deleting the measure + imperative fork
-        // (mirrors the at-rule prelude conversion). Highest-value of the three here.
-        // Build inline doc representation for width checking
-        // url() uses comma without space; others use ", "
-        let separator = if name == "url" { "," } else { ", " };
-        let args_doc = d.join(
-            args.iter().map(|arg| self.build_css_value_doc(arg)),
-            separator,
-        );
-        let name_doc = d.text_owned(name.to_string());
-        let func_doc = d.concat(&[name_doc, d.parens(args_doc)]);
-
-        let available = doc::available_width(self.effective_indent(), 0, context_offset);
-        !doc::arena_fits::<dyn doc::TextResolver>(self.arena, func_doc, available, Mode::Flat, None)
-    }
-
     /// Format a CSS declaration (property: value;)
     pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write_indent();
@@ -234,7 +193,14 @@ impl<'a> Printer<'a> {
         self.write_declaration_end(decl);
     }
 
-    /// Print declaration with function value
+    /// Print declaration with function value.
+    ///
+    /// A comment-free value renders through the shared `build_value_function_doc`
+    /// group: the renderer's own fit check — with the trailing `;` reserved via
+    /// `write_arena_doc_reserving` — decides flat-vs-wrapped, so the wrap decision
+    /// and the emission are a single doc and cannot drift. A value with comments
+    /// stays on the imperative source-extraction path, since CSS value comments
+    /// aren't stored in the AST and so can't be expressed as a doc.
     fn print_decl_function(
         &mut self,
         decl: &internal::CssDeclaration<'_>,
@@ -243,97 +209,83 @@ impl<'a> Printer<'a> {
         args: &[CssValue<'_>],
         span: tsv_lang::Span,
     ) {
-        let has_comments = self.has_value_comments_in_decl(decl);
-        let needs_wrap = self.function_needs_wrapping(decl, has_comments, name, args, span);
-
-        if needs_wrap {
-            self.print_wrapped_function(decl, has_comments, name, args);
+        if self.has_value_comments_in_decl(decl) {
+            self.print_decl_function_with_comments(decl, decl_source, name, args, span);
         } else {
-            self.print_inline_function(decl_source, has_comments, &decl.value);
+            self.write(": ");
+            let doc = self.build_value_function_doc(name, args, span);
+            // Reserve the trailing `;` for the OUTERMOST function group only (the
+            // property + `: ` + `;` boundary the old measure pass used). `!important`
+            // is not counted, so a function value carrying `!important` wraps on the
+            // function alone.
+            self.write_arena_doc_reserving(doc, 1);
         }
         self.write_declaration_end(decl);
     }
 
-    /// Check if a function needs wrapping
-    fn function_needs_wrapping(
-        &self,
+    /// Render a value doc, reserving `reserve` columns of trailing punctuation
+    /// (the declaration's `;`) for the **outermost** group's fit decision only.
+    ///
+    /// Unlike `write_arena_doc_with_suffix` — whose `EmbedContext::suffix_width`
+    /// every group's fit check subtracts — this appends a measurement-only trailing
+    /// node (it renders nothing) after the doc. The outermost group's flat line
+    /// reaches that node and counts it, but a nested group (a nested `calc`, a paren
+    /// group) is separated from it by the outermost group's softline break, so its
+    /// lookahead stops there and it never reserves the column. That keeps prettier's
+    /// exact-width-boundary layout for nested groups, which a global suffix would
+    /// wrongly break (e.g. a 100-column nested paren group).
+    fn write_arena_doc_reserving(&mut self, doc: DocId, reserve: usize) {
+        let reserved = {
+            let d = self.d();
+            let marker = d.with_context(
+                d.empty(),
+                DocContext {
+                    trailing_reserve: reserve,
+                    ..Default::default()
+                },
+            );
+            d.concat(&[doc, marker])
+        };
+        self.write_arena_doc(reserved);
+    }
+
+    /// Print a function-valued declaration whose value contains comments.
+    ///
+    /// CSS value comments aren't stored in the AST, so the value is reconstructed
+    /// from source text: a wrapped function splits its args from source (preserving
+    /// the comments in place), an inline one re-emits the normalized value verbatim.
+    fn print_decl_function_with_comments(
+        &mut self,
         decl: &internal::CssDeclaration<'_>,
-        has_comments: bool,
+        decl_source: &str,
         name: &str,
         args: &[CssValue<'_>],
         span: tsv_lang::Span,
-    ) -> bool {
-        if has_comments {
-            // Use NORMALIZED source length for accurate width
-            let func_source = span.extract(self.source);
-            let normalized = value_normalization::normalize_value_spacing(func_source);
-            let inline_len = decl.property.len() + 2 + normalized.len() + 1;
-            self.indent_width() + inline_len > PRINT_WIDTH
-        } else {
-            let context_offset = decl.property.len() + 3;
-            self.should_wrap_function_with_offset(name, args, context_offset)
-        }
-    }
-
-    /// Print wrapped function: func(\n\targ1,\n\targ2\n)
-    fn print_wrapped_function(
-        &mut self,
-        decl: &internal::CssDeclaration<'_>,
-        has_comments: bool,
-        name: &str,
-        args: &[CssValue<'_>],
     ) {
-        self.write(": ");
-        self.write(name);
-        self.write("(\n");
-        self.indent_level += 1;
+        // Width check uses the NORMALIZED source length (comments included), since the
+        // comments aren't in the doc and the value must round-trip verbatim.
+        let func_source = span.extract(self.source);
+        let normalized = value_normalization::normalize_value_spacing(func_source);
+        let inline_len = decl.property.len() + 2 + normalized.len() + 1;
+        let needs_wrap = self.indent_width() + inline_len > PRINT_WIDTH;
 
-        if has_comments {
+        self.write(": ");
+        if needs_wrap {
+            // Wrapped: func(\n\targ1,\n\targ2\n)
+            self.write(name);
+            self.write("(\n");
+            self.indent_level += 1;
             self.print_function_args_from_source(decl, name, args);
-        } else {
-            self.print_function_args_semantic_wrapped(args);
-        }
-
-        self.indent_level -= 1;
-        self.write("\n");
-        self.write_indent();
-        self.write(")");
-    }
-
-    /// Print function args with semantic formatting and wrapping
-    fn print_function_args_semantic_wrapped(&mut self, args: &[CssValue<'_>]) {
-        for (i, arg) in args.iter().enumerate() {
+            self.indent_level -= 1;
+            self.write("\n");
             self.write_indent();
-            if let CssValue::List { values, .. } = arg
-                && self.space_list_exceeds_width(values, 2)
-            {
-                self.indent_level += 1;
-                let fill_doc = self.build_space_fill_doc(values, 0);
-                self.write_arena_doc(fill_doc);
-                self.indent_level -= 1;
-            } else {
-                self.print_nested_value(arg);
-            }
-            if i < args.len() - 1 {
-                self.write(",\n");
-            }
-        }
-    }
-
-    /// Print inline function (no wrapping)
-    fn print_inline_function(
-        &mut self,
-        decl_source: &str,
-        has_comments: bool,
-        value: &CssValue<'_>,
-    ) {
-        self.write(": ");
-        if has_comments
-            && let Some(normalized) = value_normalization::extract_value_with_comments(decl_source)
+            self.write(")");
+        } else if let Some(normalized) =
+            value_normalization::extract_value_with_comments(decl_source)
         {
             self.write(&normalized);
         } else {
-            self.print_css_value(value);
+            self.print_css_value(&decl.value);
         }
     }
 
@@ -609,8 +561,9 @@ impl<'a> Printer<'a> {
     fn space_list_exceeds_width(&self, values: &[CssValue<'_>], trailing_reserve: usize) -> bool {
         // TODO: measure-then-emit — `list_doc` is built only to width-check and
         // discarded; the emitted fill already renders flat (identical bytes) when it
-        // fits, so this check is redundant once the value path is doc-first. Removable
-        // after the Site-1 function conversion drops one of this fn's two call sites.
+        // fits, so this check is redundant once the value path is doc-first. The lone
+        // remaining caller is `print_css_value_multiline`; fold it into a self-deciding
+        // group there to retire this measure pass.
         let list_doc = self.build_separated_values_doc(values, " ");
         let available = doc::available_width(self.effective_indent(), 0, trailing_reserve);
         !doc::arena_fits::<dyn doc::TextResolver>(self.arena, list_doc, available, Mode::Flat, None)
