@@ -751,9 +751,10 @@ cargo run -p tsv_debug swallow_audit ~/dev/zzz/src   # audit a real codebase
 # from `arena.borrow_nodes().len()` — no prod instrumentation) grows faster than
 # ~depth^3. Deterministic, pure Rust, no Deno. Exits 1 on any super-linear case.
 cargo run -p tsv_debug build_fanout_audit
-# Also: --json. Gated in `deno task check` via the `fanout:audit` task. NOTE:
-# currently RED — the per-layout-candidate rebuild blowup it guards is a known,
-# open bug; the audit fails until that build-once-reuse fix lands.
+# Also: --json. Gated in `deno task check` via the `fanout:audit` task. Green: all
+# six axes (svelte elements / {#if} / {#each} / {#await} / sibling-`>` dangle, ts
+# member chains) build O(1) docs per node, so the audit holds the line against a
+# reintroduced per-candidate rebuild.
 ```
 
 **Raw-Find Scan Audit (delimiter-scan regression guard):**
