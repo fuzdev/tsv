@@ -91,6 +91,14 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.is_expression_statement.set(false);
     }
 
+    fn enter_chain_arg_share(&self) -> bool {
+        Printer::enter_chain_arg_share(self)
+    }
+
+    fn exit_chain_arg_share(&self, was_active: bool) {
+        Printer::exit_chain_arg_share(self, was_active);
+    }
+
     fn get_line_breaks(&self) -> &[u32] {
         self.line_breaks
     }

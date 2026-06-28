@@ -62,7 +62,8 @@ pub(crate) use types::{should_hug_union_type, unwrap_parenthesized};
 
 use crate::PrinterInputs;
 use crate::ast::internal;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 use tsv_lang::{
     EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, TAB_WIDTH, comments_in_range,
@@ -182,6 +183,24 @@ pub struct Printer<'a> {
     /// `needs_parens` check (assignment RHS, ternary branches/test).
     /// Uses Cell for interior mutability so doc builders (&self) can set this.
     pub(crate) in_for_init: Cell<bool>,
+    /// Scoped argument-doc share map for member-chain building: an argument
+    /// expression's pointer → its already-built [`Self::build_arg_expression_doc`]
+    /// `DocId`. A member chain renders the same group **flat** (`print_group`) and
+    /// **expanded** (`print_group_expanded`) across `conditional_group` candidates;
+    /// without sharing, the recursive arg build runs once per candidate and a nested
+    /// chain in a call arg compounds to O(4^depth) (the member-chain rebuild blowup —
+    /// see grimoire TODO_REBUILD_BLOWUP). The flat and expanded builds differ in
+    /// Printer state **only** via `skip_arrow_chain` / `expand_last_arg_flat_params`
+    /// (the sole `.set` sites in `calls/chain_args.rs`); every other flag is
+    /// statement-constant during a chain or set identically by the shared AST
+    /// traversal, so a given node is reached under identical state in both candidates.
+    /// Hence the cache is consulted only when [`Self::chain_arg_share_eligible`]
+    /// (active + both of those flags clear), making a hit byte-identical to a rebuild.
+    /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
+    /// `build_chain_doc`); keyed by node pointer (stable — the AST arena is immutable
+    /// during formatting).
+    pub(crate) chain_arg_share: RefCell<HashMap<usize, DocId>>,
+    pub(crate) chain_arg_share_active: Cell<bool>,
 }
 
 impl<'a> Printer<'a> {
@@ -217,6 +236,8 @@ impl<'a> Printer<'a> {
             expr_stmt_paren_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
+            chain_arg_share: RefCell::new(HashMap::new()),
+            chain_arg_share_active: Cell::new(false),
         }
     }
 
@@ -375,6 +396,39 @@ impl<'a> Printer<'a> {
             d.isolated_group(base_doc)
         } else {
             base_doc
+        }
+    }
+
+    /// Whether `build_arg_expression_doc` may share its result via `chain_arg_share`.
+    /// True only while a member chain is building (`chain_arg_share_active`) AND the two
+    /// flags that make the flat vs expanded chain-group builds diverge are clear — see
+    /// the `chain_arg_share` field doc. When either is set we're building an arrow arg in
+    /// the expand-last / curried path, which the expanded candidate builds under different
+    /// state, so it must not share.
+    pub(crate) fn chain_arg_share_eligible(&self) -> bool {
+        self.chain_arg_share_active.get()
+            && !self.skip_arrow_chain.get()
+            && !self.expand_last_arg_flat_params.get()
+    }
+
+    /// Activate `chain_arg_share` for the outermost `build_chain_doc` only. Returns the
+    /// prior active state; nested chains observe `true` and become no-ops (the map
+    /// persists across the whole top-level chain so every nesting level shares).
+    pub(crate) fn enter_chain_arg_share(&self) -> bool {
+        let was_active = self.chain_arg_share_active.get();
+        if !was_active {
+            self.chain_arg_share_active.set(true);
+            self.chain_arg_share.borrow_mut().clear();
+        }
+        was_active
+    }
+
+    /// Deactivate + clear `chain_arg_share` when leaving the outermost `build_chain_doc`
+    /// (`was_active` false). Nested exits are no-ops.
+    pub(crate) fn exit_chain_arg_share(&self, was_active: bool) {
+        if !was_active {
+            self.chain_arg_share_active.set(false);
+            self.chain_arg_share.borrow_mut().clear();
         }
     }
 
