@@ -8,8 +8,9 @@
 
 use super::{Printer, value_normalization};
 use crate::ast::internal::{self, CssValue};
-use tsv_lang::PRINT_WIDTH;
 use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
+use tsv_lang::printing::visual_width;
+use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 impl<'a> Printer<'a> {
     /// Write the declaration ending: optional `!important` tail and the semicolon with newline.
@@ -18,37 +19,53 @@ impl<'a> Printer<'a> {
     /// comments around it (`blue /* a */ !important /* b */;`) — is invisible to the
     /// value printers. Re-emit it from source here with comments preserved in place
     /// (like prettier) and `!`/`important` normalized to a single ` !important`.
-    fn write_declaration_end(&mut self, decl: &internal::CssDeclaration<'_>) {
-        if decl.is_important() {
-            let bytes = self.source.as_bytes();
-            let mut i = decl.span.end_usize();
-            let mut out = String::new();
-            while i < bytes.len() {
-                match bytes[i] {
-                    b';' | b'}' => break,
-                    b'/' if bytes.get(i + 1) == Some(&b'*') => {
-                        let end = self.source[i + 2..]
-                            .find("*/")
-                            .map_or(bytes.len(), |rel| i + 2 + rel + 2);
-                        out.push(' ');
-                        out.push_str(&self.source[i..end]);
-                        i = end;
-                    }
-                    b'!' => {
-                        out.push_str(" !important");
+    /// Build the declaration's trailing text after the value: the `!important`
+    /// keyword (normalized to ` !important`) plus any comments trailing it, or
+    /// empty when the declaration isn't important.
+    ///
+    /// Single source of truth for the tail, shared by the emit
+    /// (`write_declaration_end`) and the function paths' inline-vs-wrap width
+    /// decisions — so the wrap check counts exactly the bytes the emit appends.
+    /// A value carrying `!important` therefore reserves the tail and wraps when it
+    /// would overrun the print width, matching prettier (the old measure pass
+    /// omitted the tail and overran by its width).
+    fn declaration_tail(&self, decl: &internal::CssDeclaration<'_>) -> String {
+        if !decl.is_important() {
+            return String::new();
+        }
+        let bytes = self.source.as_bytes();
+        let mut i = decl.span.end_usize();
+        let mut out = String::new();
+        while i < bytes.len() {
+            match bytes[i] {
+                b';' | b'}' => break,
+                b'/' if bytes.get(i + 1) == Some(&b'*') => {
+                    let end = self.source[i + 2..]
+                        .find("*/")
+                        .map_or(bytes.len(), |rel| i + 2 + rel + 2);
+                    out.push(' ');
+                    out.push_str(&self.source[i..end]);
+                    i = end;
+                }
+                b'!' => {
+                    out.push_str(" !important");
+                    i += 1;
+                }
+                c if c.is_ascii_alphabetic() => {
+                    // the `important` keyword itself — already emitted at the `!`
+                    while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
                         i += 1;
                     }
-                    c if c.is_ascii_alphabetic() => {
-                        // the `important` keyword itself — already emitted at the `!`
-                        while i < bytes.len() && bytes[i].is_ascii_alphabetic() {
-                            i += 1;
-                        }
-                    }
-                    _ => i += 1,
                 }
+                _ => i += 1,
             }
-            self.write(&out);
         }
+        out
+    }
+
+    fn write_declaration_end(&mut self, decl: &internal::CssDeclaration<'_>) {
+        let tail = self.declaration_tail(decl);
+        self.write(&tail);
         self.write(";\n");
     }
 
@@ -215,11 +232,14 @@ impl<'a> Printer<'a> {
         } else {
             self.write(": ");
             let doc = self.build_value_function_doc(name, args, span);
-            // Reserve the trailing `;` for the OUTERMOST function group only (the
-            // property + `: ` + `;` boundary the old measure pass used). `!important`
-            // is not counted, so a function value carrying `!important` wraps on the
-            // function alone.
-            self.write_arena_doc_reserving(doc, 1);
+            // Reserve the trailing `;` plus any ` !important` tail for the OUTERMOST
+            // function group's fit decision (the property + `: ` + tail + `;` boundary).
+            // Counting the tail makes an `!important` function wrap when the keyword
+            // would push it past the print width, instead of overrunning — matching
+            // prettier. The tail comes from `declaration_tail`, the same string the
+            // emit appends, so measure and emit can't drift.
+            let tail_width = visual_width(&self.declaration_tail(decl), TAB_WIDTH);
+            self.write_arena_doc_reserving(doc, 1 + tail_width);
         }
         self.write_declaration_end(decl);
     }
@@ -267,7 +287,15 @@ impl<'a> Printer<'a> {
         // comments aren't in the doc and the value must round-trip verbatim.
         let func_source = span.extract(self.source);
         let normalized = value_normalization::normalize_value_spacing(func_source);
-        let inline_len = decl.property.len() + 2 + normalized.len() + 1;
+        // Visual width (not byte length) of `property: value !important;`. The multibyte
+        // comment's byte inflation is excluded by `visual_width`; the ` !important` tail is
+        // counted via `declaration_tail` (the same string the emit appends) so an important
+        // value wraps rather than overrunning the print width. `: ` is 2 cols, `;` is 1.
+        let inline_len = visual_width(decl.property, TAB_WIDTH)
+            + 2
+            + visual_width(&normalized, TAB_WIDTH)
+            + visual_width(&self.declaration_tail(decl), TAB_WIDTH)
+            + 1;
         let needs_wrap = self.indent_width() + inline_len > PRINT_WIDTH;
 
         self.write(": ");
@@ -576,8 +604,12 @@ impl<'a> Printer<'a> {
     }
 
     /// Check if an arg string would exceed width when printed at current position
+    ///
+    /// Width is the arg's **visual** width (`visual_width`), not its byte length —
+    /// a multibyte arg (e.g. an accented comment) is narrower than `str::len()`
+    /// reports, and byte math would wrongly route it to the wrapping path.
     fn arg_string_exceeds_width(&self, arg: &str) -> bool {
-        self.indent_width() + arg.len() > PRINT_WIDTH
+        self.indent_width() + visual_width(arg, TAB_WIDTH) > PRINT_WIDTH
     }
 
     /// Print space-separated values with fill wrapping
@@ -593,10 +625,13 @@ impl<'a> Printer<'a> {
             return;
         }
 
-        // Check if first part is a comment that fills the line
+        // Check if first part is a comment that fills the line. Widths are visual
+        // (`visual_width`), not byte length: a multibyte first part (e.g. an accented
+        // comment) is narrower than `str::len()`, and byte math would wrongly split it
+        // onto its own line where it actually fits inline alongside the next value.
         let first_is_comment = parts[0].trim().starts_with("/*");
-        let first_len = parts[0].len();
-        let second_len = parts[1].len();
+        let first_len = visual_width(parts[0], TAB_WIDTH);
+        let second_len = visual_width(parts[1], TAB_WIDTH);
         let first_fills_line = self.indent_width() + first_len + 1 + second_len > PRINT_WIDTH;
 
         // When comment fills line: print it separately, then handle values with continuation
@@ -606,9 +641,9 @@ impl<'a> Printer<'a> {
                 self.write("\n");
                 self.write_indent();
 
-                // Check if value parts need continuation indent
-                let val1_len = parts[1].len();
-                let val2_len = parts[2].len();
+                // Check if value parts need continuation indent (visual width)
+                let val1_len = visual_width(parts[1], TAB_WIDTH);
+                let val2_len = visual_width(parts[2], TAB_WIDTH);
                 let needs_wrap = self.indent_width() + val1_len + 1 + val2_len > PRINT_WIDTH;
                 (&parts[1..], needs_wrap)
             } else {
