@@ -1,0 +1,843 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 621,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A trailing comment on the last operand of a parenthesized sequence in a value",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " position (return / variable init / assignment RHS) stays INSIDE the parens,",
+			"start": 102,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " rather than floating out after `)` (prettier #19263).",
+			"start": 182,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 270,
+			"end": 277,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 15
+				},
+				"end": {
+					"line": 6,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " trailing block ",
+			"start": 361,
+			"end": 381,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 62
+				},
+				"end": {
+					"line": 9,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment forces the sequence to break, the comment trailing the last",
+			"start": 405,
+			"end": 482,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " operand inside the parens",
+			"start": 485,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing line",
+			"start": 538,
+			"end": 554,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 6
+				},
+				"end": {
+					"line": 16,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 580,
+			"end": 587,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 17
+				},
+				"end": {
+					"line": 19,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 601,
+			"end": 608,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 11
+				},
+				"end": {
+					"line": 20,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 620,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 611,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 240,
+					"end": 282,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 249,
+						"end": 250,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 11
+							}
+						},
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 253,
+						"end": 282,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 14
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 257,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 24
+									}
+								},
+								"argument": {
+									"type": "SequenceExpression",
+									"start": 265,
+									"end": 269,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 10
+										},
+										"end": {
+											"line": 6,
+											"column": 14
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 265,
+											"end": 266,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 10
+												},
+												"end": {
+													"line": 6,
+													"column": 11
+												}
+											},
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 268,
+											"end": 269,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 13
+												},
+												"end": {
+													"line": 6,
+													"column": 14
+												}
+											},
+											"name": "b"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 270,
+											"end": 277
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A trailing comment on the last operand of a parenthesized sequence in a value",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " position (return / variable init / assignment RHS) stays INSIDE the parens,",
+							"start": 102,
+							"end": 180
+						},
+						{
+							"type": "Line",
+							"value": " rather than floating out after `)` (prettier #19263).",
+							"start": 182,
+							"end": 238
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 284,
+					"end": 386,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 293,
+						"end": 294,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 11
+							}
+						},
+						"name": "g"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 297,
+						"end": 386,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 14
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 301,
+								"end": 383,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 84
+									}
+								},
+								"argument": {
+									"type": "SequenceExpression",
+									"start": 309,
+									"end": 360,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 10
+										},
+										"end": {
+											"line": 9,
+											"column": 61
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 309,
+											"end": 333,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 10
+												},
+												"end": {
+													"line": 9,
+													"column": 34
+												}
+											},
+											"name": "aaaaaaaaaaaaaaaaaaaaaaaa"
+										},
+										{
+											"type": "Identifier",
+											"start": 335,
+											"end": 360,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 36
+												},
+												"end": {
+													"line": 9,
+													"column": 61
+												}
+											},
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " trailing block ",
+											"start": 361,
+											"end": 381
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 388,
+					"end": 562,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 397,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 11
+							}
+						},
+						"name": "h"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 401,
+						"end": 562,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 14
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 516,
+								"end": 559,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "SequenceExpression",
+									"start": 528,
+									"end": 537,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 16,
+											"column": 5
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 528,
+											"end": 530,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 3
+												},
+												"end": {
+													"line": 15,
+													"column": 5
+												}
+											},
+											"name": "aa"
+										},
+										{
+											"type": "Identifier",
+											"start": 535,
+											"end": 537,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 3
+												},
+												"end": {
+													"line": 16,
+													"column": 5
+												}
+											},
+											"name": "bb"
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " trailing line",
+											"start": 538,
+											"end": 554
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a line comment forces the sequence to break, the comment trailing the last",
+										"start": 405,
+										"end": 482
+									},
+									{
+										"type": "Line",
+										"value": " operand inside the parens",
+										"start": 485,
+										"end": 513
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 564,
+					"end": 589,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 570,
+							"end": 588,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 570,
+								"end": 571,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "SequenceExpression",
+								"start": 575,
+								"end": 579,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 12
+									},
+									"end": {
+										"line": 19,
+										"column": 16
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 575,
+										"end": 576,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 12
+											},
+											"end": {
+												"line": 19,
+												"column": 13
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 578,
+										"end": 579,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 15
+											},
+											"end": {
+												"line": 19,
+												"column": 16
+											}
+										},
+										"name": "b"
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 580,
+										"end": 587
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 591,
+					"end": 610,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 20
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 591,
+						"end": 609,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 1
+							},
+							"end": {
+								"line": 20,
+								"column": 19
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 591,
+							"end": 592,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 1
+								},
+								"end": {
+									"line": 20,
+									"column": 2
+								}
+							},
+							"name": "y"
+						},
+						"right": {
+							"type": "SequenceExpression",
+							"start": 596,
+							"end": 600,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 6
+								},
+								"end": {
+									"line": 20,
+									"column": 10
+								}
+							},
+							"expressions": [
+								{
+									"type": "Identifier",
+									"start": 596,
+									"end": 597,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 6
+										},
+										"end": {
+											"line": 20,
+											"column": 7
+										}
+									},
+									"name": "a"
+								},
+								{
+									"type": "Identifier",
+									"start": 599,
+									"end": 600,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 9
+										},
+										"end": {
+											"line": 20,
+											"column": 10
+										}
+									},
+									"name": "b"
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 601,
+									"end": 608
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

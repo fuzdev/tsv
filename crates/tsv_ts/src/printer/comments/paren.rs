@@ -323,6 +323,23 @@ impl<'a> Printer<'a> {
             return self.build_expression_doc(expr);
         }
 
+        // A sequence operand in this (value) position keeps its trailing comment
+        // INSIDE its own required parens — `const x = (a, b /* c */)` / `(a, b // c)`
+        // — instead of floating it out (`(a, b) /* c */`) or doubling the grouping
+        // paren (`((a, b) // c)`). Prettier keeps sequence trailing comments inside
+        // the parens in value positions (#19263). The grouping `)` sits outside
+        // `seq.span` (the parens aren't part of the node), so scan to it.
+        if let internal::Expression::SequenceExpression(seq) = expr {
+            let grouping_close = tsv_lang::source_scan::find_char_skipping_comments(
+                self.source.as_bytes(),
+                expr_end as usize,
+                boundary_end as usize,
+                b')',
+            )
+            .map_or(boundary_end, |p| p as u32);
+            return self.build_sequence_doc_value(seq, grouping_close);
+        }
+
         // Line / own-line comments need the paren wrapping (a bare line comment
         // would swallow the following `;`); defer those to the keep variant.
         let has_multiline = comments_in_range(self.comments, expr_end, boundary_end)
@@ -340,10 +357,12 @@ impl<'a> Printer<'a> {
     /// Build expression doc re-adding the stripped grouping parens around trailing
     /// comments, producing `(expr /* c */)` or `(\n\texpr // c\n)`.
     ///
-    /// Used where stripping the parens would relocate the comment: arrow bodies
-    /// (prettier moves the comment into the params) and sequence operands (prettier
-    /// floats it out of the sequence). Keeping the parens preserves the comment where
-    /// the user wrote it.
+    /// Used where stripping the parens would relocate the comment — arrow bodies
+    /// (prettier moves the comment into the params) and other non-sequence operands
+    /// with an own-line/line trailing comment. Keeping the parens preserves the
+    /// comment where the user wrote it. (Sequence operands take the dedicated
+    /// `build_sequence_doc_value` path, which keeps the comment inside the sequence's
+    /// own parens instead of adding a second pair.)
     pub(crate) fn build_expression_doc_keep_paren_comments(
         &self,
         expr: &internal::Expression<'_>,

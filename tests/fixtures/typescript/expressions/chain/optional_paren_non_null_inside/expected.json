@@ -1,0 +1,841 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 482,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The non-null `!` authored INSIDE the sealing parens (`(a?.b!).c`) is preserved",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " as written — prettier 3.9 (#18661) stopped lifting it to the `!`-outside form",
+			"start": 103,
+			"end": 183,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `(a?.b)!.c`. The two are semantically identical (the `!` is type-only) but have",
+			"start": 185,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " different ASTs, so tsv keeps the author's placement.",
+			"start": 269,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `!` inside, after an optional call",
+			"start": 363,
+			"end": 400,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `!` inside, then a further member chain",
+			"start": 415,
+			"end": 457,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 43
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 481,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 326,
+					"end": 336,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 326,
+						"end": 335,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 10
+							}
+						},
+						"object": {
+							"type": "ChainExpression",
+							"start": 327,
+							"end": 332,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 7
+								}
+							},
+							"expression": {
+								"type": "TSNonNullExpression",
+								"start": 327,
+								"end": 332,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 327,
+									"end": 331,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 327,
+										"end": 328,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 330,
+										"end": 331,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 5
+											},
+											"end": {
+												"line": 6,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								}
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 334,
+							"end": 335,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 9
+								},
+								"end": {
+									"line": 6,
+									"column": 10
+								}
+							},
+							"name": "c"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The non-null `!` authored INSIDE the sealing parens (`(a?.b!).c`) is preserved",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " as written — prettier 3.9 (#18661) stopped lifting it to the `!`-outside form",
+							"start": 103,
+							"end": 183
+						},
+						{
+							"type": "Line",
+							"value": " `(a?.b)!.c`. The two are semantically identical (the `!` is type-only) but have",
+							"start": 185,
+							"end": 267
+						},
+						{
+							"type": "Line",
+							"value": " different ASTs, so tsv keeps the author's placement.",
+							"start": 269,
+							"end": 324
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 338,
+					"end": 348,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 338,
+						"end": 347,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 10
+							}
+						},
+						"callee": {
+							"type": "ChainExpression",
+							"start": 339,
+							"end": 344,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 7
+								}
+							},
+							"expression": {
+								"type": "TSNonNullExpression",
+								"start": 339,
+								"end": 344,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 339,
+									"end": 343,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 339,
+										"end": 340,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 342,
+										"end": 343,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 5
+											},
+											"end": {
+												"line": 7,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								}
+							}
+						},
+						"arguments": [],
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 350,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 350,
+						"end": 360,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 11
+							}
+						},
+						"object": {
+							"type": "ChainExpression",
+							"start": 351,
+							"end": 356,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 2
+								},
+								"end": {
+									"line": 8,
+									"column": 7
+								}
+							},
+							"expression": {
+								"type": "TSNonNullExpression",
+								"start": 351,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "MemberExpression",
+									"start": 351,
+									"end": 355,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 351,
+										"end": 352,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 354,
+										"end": 355,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 5
+											},
+											"end": {
+												"line": 8,
+												"column": 6
+											}
+										},
+										"name": "b"
+									},
+									"computed": false,
+									"optional": true
+								}
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 358,
+							"end": 359,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 9
+								},
+								"end": {
+									"line": 8,
+									"column": 10
+								}
+							},
+							"name": "c"
+						},
+						"computed": true,
+						"optional": false
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 402,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 402,
+						"end": 412,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 11
+							}
+						},
+						"object": {
+							"type": "ChainExpression",
+							"start": 403,
+							"end": 409,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 8
+								}
+							},
+							"expression": {
+								"type": "TSNonNullExpression",
+								"start": 403,
+								"end": 409,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 403,
+									"end": 408,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 7
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 403,
+										"end": 404,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									"arguments": [],
+									"optional": true
+								}
+							}
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 411,
+							"end": 412,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 10
+								},
+								"end": {
+									"line": 10,
+									"column": 11
+								}
+							},
+							"name": "c"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `!` inside, after an optional call",
+							"start": 363,
+							"end": 400
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 459,
+					"end": 471,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 13
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 459,
+						"end": 470,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 12
+							}
+						},
+						"object": {
+							"type": "MemberExpression",
+							"start": 459,
+							"end": 468,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 10
+								}
+							},
+							"object": {
+								"type": "ChainExpression",
+								"start": 460,
+								"end": 465,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "TSNonNullExpression",
+									"start": 460,
+									"end": 465,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 7
+										}
+									},
+									"expression": {
+										"type": "MemberExpression",
+										"start": 460,
+										"end": 464,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 6
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 460,
+											"end": 461,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 2
+												},
+												"end": {
+													"line": 12,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 463,
+											"end": 464,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 5
+												},
+												"end": {
+													"line": 12,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"computed": false,
+										"optional": true
+									}
+								}
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 467,
+								"end": 468,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 9
+									},
+									"end": {
+										"line": 12,
+										"column": 10
+									}
+								},
+								"name": "c"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 469,
+							"end": 470,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 11
+								},
+								"end": {
+									"line": 12,
+									"column": 12
+								}
+							},
+							"name": "d"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `!` inside, then a further member chain",
+							"start": 415,
+							"end": 457
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

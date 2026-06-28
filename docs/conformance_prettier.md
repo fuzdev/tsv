@@ -395,7 +395,6 @@ Same layout inside an inline element (head wraps + body expands, element hugs th
 - Module path calls — Print width — [path_calls_long](../tests/fixtures/typescript/modules/imports/path_calls_long_prettier_divergence/)
 - Instantiation expression parens — Semantic preservation — [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/)
 - Non-null parenthesized base — Design choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
-- Non-null assertion in optional-chain parens — Canonicalization — [optional_paren_non_null_boundary](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_boundary_prettier_divergence/)
 - Constrained infer extends-operand parens — Prettier bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
 - Arrow type param trailing comma — Design choice — [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)
 
@@ -755,6 +754,7 @@ Prettier has multiple stable forms for comment positioning. tsv normalizes to a 
 - Member access after-call comment — [trailing_member_after_call_comment](../tests/fixtures/typescript/expressions/calls/chained/trailing_member_after_call_comment_prettier_divergence/)
 - Type-alias union value before-`;` line comment (2-pass: spurious union break, then collapse) — [type_alias_value_trailing_comment](../tests/fixtures/typescript/types/comments/type_alias_value_trailing_comment_prettier_divergence/)
 - Sequence operand edge comment — [operand_edge_comment](../tests/fixtures/typescript/expressions/sequence/operand_edge_comment_prettier_divergence/)
+- Value-position parenthesized-assignment trailing line comment → Floated out past `;` (`const y = (a = b); // c`); tsv keeps it inside the parens, consistent with the sequence/block cases (prettier itself keeps the *block* case inside) — [init_assignment_paren_line_comment](../tests/fixtures/typescript/statements/variable/init_assignment_paren_line_comment_prettier_divergence/)
 - Block comment mid-chain — [block_comment_chain](../tests/fixtures/typescript/expressions/calls/chained/block_comment_chain_prettier_divergence/)
 - Property signature leading line comment — [annotation_simple](../tests/fixtures/typescript/types/comments/annotation_simple_prettier_divergence/)
 - Property signature leading block — [annotation_leading_block](../tests/fixtures/typescript/types/comments/annotation_leading_block_prettier_divergence/)

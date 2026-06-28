@@ -255,6 +255,41 @@ impl<'a> Printer<'a> {
             return d.concat(&parts);
         }
 
+        // Sequence operand: `return (a, b)`. In `return` (a value position) a trailing
+        // comment stays INSIDE the parens (`return (a, b /* c */);`, prettier #19263),
+        // built via the value-position sequence printer. `throw` floats it out, so it
+        // falls through to the generic path (which uses the default `build_sequence_doc`).
+        if keyword == "return"
+            && let Expression::SequenceExpression(seq) = arg
+        {
+            // The grouping `)` sits outside `seq.span` (the parens aren't part of the
+            // node); a trailing comment before it stays inside the parens.
+            let grouping_close = tsv_lang::source_scan::find_char_skipping_comments(
+                self.source.as_bytes(),
+                argument_end as usize,
+                span_end as usize,
+                b')',
+            )
+            .map_or(argument_end, |p| p as u32);
+            let seq_doc = self.build_sequence_doc_value(seq, grouping_close);
+            let mut parts: DocBuf = if let Some(comments_doc) = inline_comments {
+                smallvec![d.text(keyword), d.text(" "), comments_doc, seq_doc]
+            } else {
+                smallvec![d.text(keyword), d.text(" "), seq_doc]
+            };
+            // Any comment AFTER the grouping `)` (before the `;`) trails after the `;`;
+            // the in-paren comment is already inside `seq_doc`.
+            let after_start = grouping_close.saturating_add(1).min(span_end);
+            let after = if self.has_comments_between(after_start, span_end) {
+                self.split_terminator_gap_comments(&mut parts, after_start, span_end, false)
+            } else {
+                DocBuf::new()
+            };
+            parts.push(d.text(";"));
+            parts.extend(after);
+            return d.concat(&parts);
+        }
+
         if let Expression::BinaryExpression(binary) = arg {
             return self.build_binary_paren_doc(keyword, binary, inline_comments);
         }
