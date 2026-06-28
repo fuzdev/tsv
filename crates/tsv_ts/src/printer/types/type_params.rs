@@ -6,8 +6,10 @@
 
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
+use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::fluid_after_operator;
 use tsv_lang::SymbolToU32;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
@@ -490,6 +492,17 @@ impl<'a> Printer<'a> {
         if inst.params.len() == 1
             && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
         {
+            // A node-level interior comment disqualifies the hug — prettier 3.9
+            // (#18619) breaks the `<…>` onto its own lines instead of keeping
+            // `<{` together. See `type_arg_curly_comment_breaks_angles`.
+            if self.type_arg_curly_comment_breaks_angles(&inst.params[0]) {
+                return d.concat(&[
+                    d.text("<"),
+                    d.indent(d.concat(&[d.hardline(), type_doc])),
+                    d.hardline(),
+                    d.text(">"),
+                ]);
+            }
             return d.concat(&[d.text("<"), type_doc, d.text(">")]);
         }
 
@@ -656,6 +669,41 @@ impl<'a> Printer<'a> {
             // Mapped type: { [K in keyof T]: V }
             TSType::Mapped(mapped) => Some(self.build_mapped_type_doc(mapped)),
             _ => None,
+        }
+    }
+
+    /// Whether a single curly-brace type argument carries a node-level interior
+    /// comment that disqualifies the `<{` hug, forcing the enclosing `<…>` to
+    /// break onto its own lines.
+    ///
+    /// Mirrors prettier 3.9's `printTypeParameters` `shouldInline` disqualifier
+    /// (#18619): a comment attached to the type-argument *node itself* drops the
+    /// hug. Two such node-level positions exist for a curly type:
+    ///
+    /// - a leading comment in a **mapped type**'s header (between `{` and the
+    ///   `[K in …]` body) — a line comment, or an own-line block comment (one
+    ///   followed by a newline);
+    /// - a dangling **line** comment in an **empty** object type literal
+    ///   (a block-only empty body, `fn<{ /* empty */ }>()`, still hugs).
+    ///
+    /// Comments that attach to an inner member (a populated object literal's
+    /// first property) or that trail the body keep hugging — those never reach
+    /// the node-level positions checked here.
+    fn type_arg_curly_comment_breaks_angles(&self, ty: &TSType<'_>) -> bool {
+        match ty {
+            TSType::TypeLiteral(type_lit) if type_lit.members.is_empty() => self
+                .has_line_comments_between(
+                    type_lit.span.start + 1,
+                    type_lit.span.end.saturating_sub(1),
+                ),
+            TSType::Mapped(mapped) => {
+                let header_start = mapped.span.start + 1;
+                let header_end = mapped.type_parameter.span.start;
+                self.has_line_comments_between(header_start, header_end)
+                    || comments_in_range(self.comments, header_start, header_end)
+                        .any(|c| c.is_block && has_newline_after_position(self.source, c.span.end))
+            }
+            _ => false,
         }
     }
 }

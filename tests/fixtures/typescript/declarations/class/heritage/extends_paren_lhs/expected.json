@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 155,
+	"end": 153,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,12 +13,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 154,
+		"end": 152,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 145,
+			"end": 143,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -355,7 +355,7 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 118,
-					"end": 144,
+					"end": 142,
 					"loc": {
 						"start": {
 							"line": 5,
@@ -363,7 +363,7 @@
 						},
 						"end": {
 							"line": 5,
-							"column": 27
+							"column": 25
 						}
 					},
 					"id": {
@@ -384,30 +384,30 @@
 					},
 					"superClass": {
 						"type": "TSNonNullExpression",
-						"start": 135,
-						"end": 140,
+						"start": 134,
+						"end": 139,
 						"loc": {
 							"start": {
 								"line": 5,
-								"column": 18
+								"column": 17
 							},
 							"end": {
 								"line": 5,
-								"column": 23
+								"column": 22
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 135,
-							"end": 139,
+							"start": 134,
+							"end": 138,
 							"loc": {
 								"start": {
 									"line": 5,
-									"column": 18
+									"column": 17
 								},
 								"end": {
 									"line": 5,
-									"column": 22
+									"column": 21
 								}
 							},
 							"name": "Base"
@@ -415,16 +415,16 @@
 					},
 					"body": {
 						"type": "ClassBody",
-						"start": 142,
-						"end": 144,
+						"start": 140,
+						"end": 142,
 						"loc": {
 							"start": {
 								"line": 5,
-								"column": 25
+								"column": 23
 							},
 							"end": {
 								"line": 5,
-								"column": 27
+								"column": 25
 							}
 						},
 						"body": []

@@ -15,12 +15,14 @@ forced-continuation indent** as every other `: Type` context: the comment trails
 ]: boolean;                               ]: boolean;
 ```
 
-- **Union key** (`string | number`, cases A/D) — **matches** prettier: both indent
-  the continuation one level.
-- **Simple key** (`string`, cases B/C/E) — **diverges**: tsv indents, prettier
-  leaves the type flush. Case B also carries a pre-`:` block comment
-  (`k /* x */ :`), which both formatters keep inline; only the post-`:` line
-  comment's continuation indent differs.
+- **Union key** (`string | number`, cases A/D) — **diverges**: prettier 3.9 drops
+  the first comment onto its own line (`k:` then `// a` / `// b` / the type, all
+  indented); tsv keeps the first comment trailing the `:` and indents.
+- **Simple key** (`string`, cases B/C/E) — **diverges**: both keep the comment
+  trailing `:`, but tsv indents the type one level while prettier leaves it flush.
+  Case B also carries a pre-`:` block comment (`k /* x */ :`), which both
+  formatters keep inline; only the post-`:` line comment's continuation indent
+  differs.
 
 A **block** comment in this gap stays inline in both formatters and is not a
 divergence — only a line comment (which runs to EOL, forcing the type onto its

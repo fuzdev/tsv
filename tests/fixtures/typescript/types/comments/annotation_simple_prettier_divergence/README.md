@@ -20,8 +20,10 @@ This fixture is the **relocation** face of the rule. The other faces:
 - prettier keeps the type **flush** (variable / class-prop / fn-param / return /
   intersection) — tsv still indents → see
   [annotation_continuation_indent](../annotation_continuation_indent_prettier_divergence/).
-- prettier also **indents** (multi-member union) — a **match**, not a divergence
-  — see the non-divergent [annotation](../annotation/) fixture for the boundary.
+- prettier 3.9 also drops the comment onto its **own line** (multi-member union)
+  — tsv keeps it trailing the `:` → see
+  [annotation](../annotation_prettier_divergence/) (a match under 3.8, a
+  divergence under 3.9).
 
 ## Reason
 

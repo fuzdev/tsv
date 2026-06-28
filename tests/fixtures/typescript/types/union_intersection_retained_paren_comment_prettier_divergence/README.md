@@ -4,11 +4,13 @@ Block comment inside a **retained** parenthesized union member — a `(x | y)`
 whose parens are kept because it nests inside an outer union or intersection
 (`a | (b | c /* c */)`, `(a | b /* c */) | c`, `a & (b | c /* c */)`).
 
-**Prettier**: relocates the comment out of the parens — a trailing comment moves
-after `)`, a leading comment moves before `(`:
+**Prettier 3.9**: hoists a **trailing** comment out of the parens to after `)`
+(trailing the whole member); a **leading** comment stays inside the parens:
 ```
 type A1 = a | (b | c) /* c */;
-type A2 = a | /* c */ (b | c);
+type A3 = (a | b) /* c */ | c;
+type A4 = a & (b | c) /* c */;
+type A2 = a | (/* c */ b | c);  // leading — unchanged, matches tsv
 ```
 
 **tsv**: keeps the comment where the user wrote it, inside the parens:

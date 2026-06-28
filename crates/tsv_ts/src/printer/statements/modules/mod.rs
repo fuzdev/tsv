@@ -258,8 +258,12 @@ impl<'a> Printer<'a> {
                 let has_trailing_comments = self.has_comments_between(argument_end, decl.span.end);
                 if has_trailing_comments {
                     let mut parts = smallvec![expr_doc];
-                    let after =
-                        self.split_terminator_gap_comments(&mut parts, argument_end, decl.span.end);
+                    let after = self.split_terminator_gap_comments(
+                        &mut parts,
+                        argument_end,
+                        decl.span.end,
+                        false,
+                    );
                     parts.push(d.text(";"));
                     parts.extend(after);
                     d.concat(&parts)

@@ -1,14 +1,32 @@
 # line_before_body_comment_prettier_divergence
 
-Prettier absorbs line comments between `)` and `{` in while loops into the block body.
+Line comments between a `while (…)` header's `)` and the body `{`.
 
-tsv: preserves comments where the user placed them (trailing, own-line, blank-line-separated)
-Prettier: relocates comments inside the block
+Prettier 3.9 no longer absorbs these comments into the block body — a trailing
+comment (`while (a) // c`) and an own-line comment before `{` (`while (a)\n// c\n{`)
+now stay where the author wrote them in both formatters. The remaining divergence
+is the **blank line**: when the author leaves a blank line between `)` and an
+own-line comment, tsv preserves it; prettier 3.9 drops it.
+
+```ts
+// prettier 3.9 (blank dropped)   // tsv (blank preserved)
+while (a)                          while (a)
+
+// blank before                   // blank before
+{                                  {
+	fn();                              fn();
+}                                  }
+```
 
 ## Reason
 
-tsv treats user comment placement as intentional. Consistent with tsv's handling across if/else, try/catch, switch, for, while, do-while, labeled statements, and call chains.
+tsv treats the author's vertical spacing as intentional, preserving the blank
+line before the comment. Consistent with tsv's comment-position handling across
+control-flow statements.
 
-The absorbed form (`variant_spaces.svelte`) is dual-stable: both formatters keep it as-is, so it is a `variant_*`, not the canonical input. `unformatted_ours_spaces.svelte` normalizes back to input under tsv only.
+`variant_spaces.svelte` is a dual-stable form prettier reaches from the
+extra-whitespace `unformatted_ours_spaces.svelte` (it keeps a blank line *after*
+the comment instead); `unformatted_ours_*` variants normalize back to input under
+tsv only.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

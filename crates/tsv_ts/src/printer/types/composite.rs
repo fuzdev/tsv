@@ -642,6 +642,12 @@ impl<'a> Printer<'a> {
             bracket_close,
             CommentSpacing::Leading,
         ));
+        // A line comment trailing the key constraint (before `]`) must drop `]` to its
+        // own line: emitting `]` inline right after a `//` would swallow it (content
+        // loss). `[K in T // c⏎]` rather than `[K in T // c]`.
+        if self.has_line_comments_between(last_inner_end, bracket_close) {
+            body_parts.push(d.hardline());
+        }
         body_parts.push(d.text("]"));
 
         // optional modifier: `?`, `+?`, or `-?`

@@ -8,6 +8,6 @@
 	// inside empty braces: tsv keeps it in place; prettier relocates before `with`
 	import c from 'c' with {/* c3 */};
 
-	// after empty braces: tsv keeps it after `}`; prettier relocates before `with`
-	import d from 'd' with {} /* c4 */;
+	// after empty braces: both trail the comment past `;`
+	import d from 'd' with {}; /* c4 */
 </script>

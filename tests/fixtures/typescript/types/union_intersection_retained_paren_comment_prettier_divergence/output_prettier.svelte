@@ -3,7 +3,7 @@
 	type A1 = a | (b | c) /* c */;
 
 	// leading comment inside a retained parenthesized union member
-	type A2 = a | /* c */ (b | c);
+	type A2 = a | (/* c */ b | c);
 
 	// retained parenthesized union as the first member
 	type A3 = (a | b) /* c */ | c;

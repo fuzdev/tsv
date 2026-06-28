@@ -1,12 +1,30 @@
 # trailing_comment_prettier_divergence
 
-Prettier moves trailing comments from after for statement parens to inline with the update clause (`i++ // comment` instead of `i++\n) // comment`).
+A line comment after a C-style `for (…)` header's closing `)`, before the body
+(`for (…) // comment\n{`).
 
-tsv: preserves comments where the user placed them
-Prettier: relocates comments to a different position
+Both formatters keep the comment after `)`. The divergence is **header layout**:
+the gap line comment forces tsv to keep the C-style header expanded (one clause
+per line), while prettier collapses the header back inline (it fits) and trails
+the comment after `)`.
+
+```ts
+// prettier (collapses the header)    // tsv (keeps the header expanded)
+for (i = 0; i < 10; i++) // comment   for (
+{                                         i = 0;
+	a();                                  i < 10;
+}                                         i++
+                                      ) // comment
+                                      {
+                                          a();
+                                      }
+```
 
 ## Reason
 
-tsv treats user comment placement as intentional. Consistent with tsv's handling across if/else, try/catch, switch, for, while, do-while, labeled statements, and call chains.
+A line comment after `)` runs to end-of-line, so the body `{` follows on its own
+line in both formatters. tsv keeps the header structurally open whenever a gap
+comment trails `)`, treating the layout as intentional — consistent with tsv's
+handling across if/else, try/catch, switch, for, while, do-while.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

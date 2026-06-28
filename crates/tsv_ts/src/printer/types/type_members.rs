@@ -156,7 +156,7 @@ impl<'a> Printer<'a> {
             _ => {}
         }
         let (key_doc, key_region_end) =
-            self.build_type_member_key_doc(method.span.start, &method.key, method.computed, false);
+            self.build_type_member_key_doc(method.span.start, &method.key, method.computed, true);
         parts.push(key_doc);
 
         // Find `(` in source (skip comments so a `(` inside one isn't matched).

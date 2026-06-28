@@ -1,15 +1,19 @@
 <script lang="ts">
 	// Mapped type-arg, leading line comment
-	const a = fn<{
-		// comment
-		[K in keyof T]: V;
-	}>();
+	const a = fn<
+		{
+			// comment
+			[K in keyof T]: V;
+		}
+	>();
 
 	// Mapped type-arg, leading block comment
-	const b = fn<{
-		/* comment */
-		[K in keyof T]: V;
-	}>();
+	const b = fn<
+		{
+			/* comment */
+			[K in keyof T]: V;
+		}
+	>();
 
 	// Object type-literal type-arg, leading line comment
 	const c = fn<{

@@ -1,6 +1,7 @@
 <script lang="ts">
 	interface I {
-		[k: string]: // c1
+		[k: string]:
+			// c1
 			A | B;
 	}
 
@@ -10,7 +11,8 @@
 	}
 
 	type T = {
-		[k: string]: // c3
+		[k: string]:
+			// c3
 			A | B;
 	};
 

@@ -8,7 +8,9 @@
 	// line. The chain breaks at every member (as it does once a call forces a break).
 	const a =
 		// c2
-		foo.bar.baz; // c1
+		foo
+			.bar // c1
+		.baz;
 
 	// A single own-line comment before a member.
 	const b =

@@ -253,7 +253,7 @@ impl<'a> Printer<'a> {
 
         let mut result_parts = smallvec![d.text(keyword), d.text(" "), rhs_doc];
         let after = if has_trailing_comments {
-            self.split_terminator_gap_comments(&mut result_parts, argument_end, span_end)
+            self.split_terminator_gap_comments(&mut result_parts, argument_end, span_end, false)
         } else {
             DocBuf::new()
         };
@@ -392,17 +392,24 @@ impl<'a> Printer<'a> {
         // Split the trailing comments: an operand-attached block (inside stripped
         // parens, `return (a + b /* c */);`) stays inside the parens before the `;`,
         // while a statement-trailing comment trails *after* the `;` (prettier 3.9:
-        // `return a + b; /* c */`). See `split_terminator_gap_comments`.
+        // `return a + b; /* c */`). An operand-attached *line* comment
+        // (`return (a && b // c\n);`) likewise stays inside the parens — it forces the
+        // break so it never lands on the flat `expr // c;` path. See
+        // `split_terminator_gap_comments`.
+        let has_operand_line_comment =
+            tsv_lang::comments_in_range(self.comments, expr_end, semicolon_pos)
+                .any(|c| !c.is_block && self.gap_has_close_paren(c.span.end, semicolon_pos));
         let mut inline_trailing = DocBuf::new();
         let after_semi =
-            self.split_terminator_gap_comments(&mut inline_trailing, expr_end, semicolon_pos);
+            self.split_terminator_gap_comments(&mut inline_trailing, expr_end, semicolon_pos, true);
         let trailing_comments_doc = d.concat(&inline_trailing);
 
         // When the expression contains hardlines (e.g., multi-line callback in a
         // chain), the group must break to produce parens. In Prettier, hardline
         // includes breakParent which propagateBreaks cascades up. Our will_break
-        // can't see through IfBreak, so we check the expression doc directly.
-        let force_break = d.will_break(expr_doc);
+        // can't see through IfBreak, so we check the expression doc directly. An
+        // operand-attached line comment must also break (it sits inside the parens).
+        let force_break = d.will_break(expr_doc) || has_operand_line_comment;
 
         // Broken: keyword (\n  expr\n);
         // Flat: keyword expr;

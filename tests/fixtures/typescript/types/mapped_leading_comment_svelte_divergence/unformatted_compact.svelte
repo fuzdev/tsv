@@ -1,7 +1,8 @@
 <script lang="ts">
 	// Block comment on own line (multiline mapped type)
 	type A = {
-		/* comment */ [K in keyof T]: V;
+		/* comment */
+		[K in keyof T]: V;
 	};
 
 	// Line comment on own line (multiline mapped type)

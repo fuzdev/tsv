@@ -24,10 +24,11 @@ the param's own indent (`U = // c\n\tV`), and a second pass adds the extra inden
 
 Per Comment Position Philosophy: the user wrote the comment on its own line, so
 tsv preserves that placement rather than collapsing it onto the keyword line.
-A comment that is *already* on the keyword line (`U = // c\n…`) is dual-stable —
-tsv emits it inline via `line_suffix` (zero width, so a long trailing comment
-never forces a preceding constraint union to break), matching prettier; see the
-regular [type_param_keyword_line_comment](../type_param_keyword_line_comment/)
-fixture. Only an own-line first comment diverges.
+A comment that is *already* on the keyword line (`U = // c\n…`): tsv emits it
+inline via `line_suffix` (zero width, so a long trailing comment never forces a
+preceding constraint union to break). Prettier 3.9 instead breaks the `extends`
+constraint under a long trailing comment, so that case is a separate divergence;
+see [type_param_keyword_line_comment](../type_param_keyword_line_comment_prettier_divergence/).
+Only an own-line first comment diverges here.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

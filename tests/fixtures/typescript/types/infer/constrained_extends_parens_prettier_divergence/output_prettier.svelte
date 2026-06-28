@@ -4,8 +4,8 @@
 	type NestedArrow<M> = M extends () => () => infer U extends string ? U : never;
 
 	// Conditional-type infer constraint: the parens are required (without them the
-	// enclosing `? :` rebinds); prettier strips them — also unparseable
-	type CondConstraint<X> = X extends infer U extends A extends B ? C : D ? U : never;
+	// enclosing `? :` rebinds); both formatters keep them (prettier 3.9 matches tsv)
+	type CondConstraint<X> = X extends infer U extends (A extends B ? C : D) ? U : never;
 
 	// Sibling that does NOT diverge: a single-arrow constrained-infer return keeps
 	// its parens in both formatters

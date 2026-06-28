@@ -1,12 +1,30 @@
 # else_leading_block_comment_prettier_divergence
 
-Block comments on the same line as `else` keyword (leading the keyword, e.g., `/* b */ else if`) are preserved before `else` on their own line. Prettier cuddles `} else` and relocates the comment inside the else body.
+A block comment leading the `else` keyword. When the author writes it on its
+**own line** before `else` (`}\n/* b */\nelse`), both formatters now keep it
+there — prettier 3.9 (#18813) stopped relocating own-line comments into the else
+body, so `prettier(input) == input` and there is no `output_prettier` oracle.
 
-tsv: preserves comments before the `else` keyword
-Prettier: relocates comments inside the else block body
+The divergence survives in the **same-line** authoring, pinned by
+`unformatted_ours_leading.svelte` (`/* b */ else if`): tsv splits the comment
+onto its own line before `else` (normalizing to `input`), while prettier 3.9
+keeps it cuddled on the `else` line (`/* b */ else if`), so prettier does **not**
+normalize that variant to `input`.
+
+```ts
+// prettier 3.9 (same-line, cuddled)   // tsv (own line before else)
+}                                       }
+/* b */ else if (cond) {                /* b */
+	fn2();                              else if (cond) {
+}                                           fn2();
+                                        }
+```
 
 ## Reason
 
-tsv treats user comment placement as intentional. Consistent with tsv's handling of own-line comments before `else` ([else_block_own_line_comment](../else_block_own_line_comment/)) and across other control flow statements (try/catch, while, do-while, switch).
+tsv treats user comment placement as intentional, keeping a leading `else`
+comment on its own line. Consistent with tsv's handling of own-line comments
+before `else` ([else_block_own_line_comment](../else_block_own_line_comment/)) and
+across other control flow statements (try/catch, while, do-while, switch).
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

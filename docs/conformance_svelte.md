@@ -318,7 +318,7 @@ The constructs acorn re-parses (root `comments` duplication tsv corrects):
 
 - **Function type parameter list — a comment in the parens before the param colon (the `tsIsUnambiguouslyStartOfFunctionType` lookahead; typed params are not exempt):**
   - [function_type_empty_param_comment_svelte_divergence](../tests/fixtures/typescript/types/function_type_empty_param_comment_svelte_divergence/)
-  - [empty_param_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/function_type/empty_param_line_comment_svelte_prettier_divergence/)
+  - [empty_param_line_comment_svelte_divergence](../tests/fixtures/typescript/types/function_type/empty_param_line_comment_svelte_divergence/)
   - [typed_param_comment_positions_svelte_divergence](../tests/fixtures/typescript/types/function_type/typed_param_comment_positions_svelte_divergence/)
   - [function_type_param_trailing_svelte_divergence](../tests/fixtures/typescript/types/comments/function_type_param_trailing_svelte_divergence/)
 

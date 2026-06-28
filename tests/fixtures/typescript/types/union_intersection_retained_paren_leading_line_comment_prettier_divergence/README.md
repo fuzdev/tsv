@@ -15,15 +15,15 @@ type First =
 ```
 
 **tsv**: keeps the comment where the user wrote it, inside the parens leading the
-inner union. Because a line comment must end its line, the parenthesized union
-expands to its broken form (one member per line) with `)` on its own line:
+inner union. Because a line comment must end its line, the parens expand (`(` and
+`)` on their own lines) with the comment on its own line above the inner union —
+but the inner union itself stays inline (`A | B`) when it fits:
 
 ```
 type First =
 	| (
 			// c
-			| A
-			| B
+			A | B
 		)
 	| C;
 ```

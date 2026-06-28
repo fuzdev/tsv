@@ -763,9 +763,9 @@ impl<'a> Printer<'a> {
     /// for following comments/modifiers.
     ///
     /// `unquote` drops quotes from an identifier-valid string-literal key: `true`
-    /// for property signatures (`'plain': T` → `plain: T`), `false` for method
-    /// signatures (`'foo'(): void` keeps its quotes — prettier's rule). Computed
-    /// keys are always emitted verbatim inside their brackets.
+    /// for property signatures (`'plain': T` → `plain: T`) and method signatures
+    /// (`'foo'(): void` → `foo(): void` — prettier 3.9 unquotes these too).
+    /// Computed keys are always emitted verbatim inside their brackets.
     pub(in crate::printer) fn build_type_member_key_doc(
         &self,
         search_start: u32,

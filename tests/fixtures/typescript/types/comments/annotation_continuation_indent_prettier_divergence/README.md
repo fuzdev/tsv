@@ -23,8 +23,9 @@ This is one of three faces of the same rule, split by prettier's behavior:
   return / intersection. tsv indents → divergence.
 - **prettier relocates** past the implicit `;` (property signatures): see
   [annotation_simple](../annotation_simple_prettier_divergence/).
-- **prettier also indents** (union types): a **match**, not a divergence — see
-  the non-divergent [annotation](../annotation/) fixture.
+- **prettier 3.9 drops the comment to its own line** (union types): tsv keeps it
+  trailing the `:` → see [annotation](../annotation_prettier_divergence/) (a match
+  under 3.8, a divergence under 3.9).
 
 A **block** comment in this gap (`const e: /* c */ X`) stays inline in both
 formatters and is not a divergence — only a line comment (which runs to EOL,

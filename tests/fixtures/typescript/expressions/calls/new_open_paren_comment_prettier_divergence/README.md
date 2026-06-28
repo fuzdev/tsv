@@ -1,19 +1,19 @@
 # new_open_paren_comment_prettier_divergence
 
 A comment trailing a `new` expression's opening `(` on the same line
-(e.g. `new Foo( // c` or `new Foo( /* c */`) is preserved on the `(` line.
-Prettier moves it — a line comment floats out to a statement-trailing comment
-(`new Foo(a); // c`), and a block comment is relocated before the `(`
-(`new Foo /* c */(…)`).
+(e.g. `new Foo( // c` or `new Foo( /* paren */`) is preserved on the `(` line.
+Prettier 3.9 drops it onto its **own line** inside the parens, as the first
+argument's leading comment.
 
 tsv: keeps the comment trailing `(` where the user placed it
-Prettier: floats the line comment past the statement / moves the block before `(`
+Prettier 3.9: relocates the comment to its own line inside the parens
 
 ```
-// tsv                          // prettier
-new Foo( // c1                 new Foo(a); // c1
-	a,
-);
+// tsv               // prettier 3.9
+new Foo( // c1       new Foo(
+	a                    // c1
+);                       a
+                     );
 ```
 
 ## Reason

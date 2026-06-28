@@ -1,6 +1,6 @@
 <script>
 	// inline block comment — parens preserved for comment
-	const a = (/* c */) => x;
+	const a = () => x /* c */;
 
 	// curried arrow — outer parens preserved for comment
 	const b = (a) => (b) => z /* c */;
@@ -18,5 +18,5 @@
 		/* c */
 
 	// inside call arg — parens preserved
-	f((/* c */) => x);
+	f(() => x /* c */);
 </script>

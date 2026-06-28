@@ -12,11 +12,14 @@ type M = {
 };
 ```
 
-**Prettier**: relocates the comment to trail the member's `;`:
+**Prettier 3.9**: breaks the `[K in T]` mapped-key brackets and trails the
+comment after the key type, inside the brackets:
 
 ```
 type M = {
-	[K in T]: V; // c
+	[
+		K in T // c
+	]: V;
 };
 ```
 

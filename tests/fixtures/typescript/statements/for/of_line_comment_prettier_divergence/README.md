@@ -1,10 +1,11 @@
 # of_line_comment_prettier_divergence
 
 Prettier scatters the line comments authored inside a broken for-of header to
-several different positions: `// before const` floats before the entire `for`
-statement, `// after left` trails the header's `{` line, and the remaining
-gap comments (`// after of`, `// trailing`) are pushed into the body and merged
-onto one line.
+several different positions: it collapses the header inline, keeps `// before
+const` trailing the `(` (`for (// before const`), trails `// after left` on the
+header's `{` line, and pushes the remaining gap comments (`// after of`,
+`// trailing`) into the body, merged onto one line. (Prettier needs two passes
+to settle the body comments — pinned by `audit_signature.txt`.)
 
 tsv: preserves each comment where the user placed it (inside the header)
 Prettier: relocates the comments to different positions

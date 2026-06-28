@@ -104,16 +104,26 @@ impl<'a> Printer<'a> {
     /// comments are pushed into `parts`; the rest are returned.
     ///
     /// Caller idiom: `let after = self.split_terminator_gap_comments(parts, arg_end,
-    /// span_end); parts.push(";"); parts.extend(after);`. Used by return/throw,
-    /// `export default`, and `export =` — the terminator callers whose argument may be
-    /// parenthesized (unlike the expression-statement/var/class-property terminators,
-    /// whose operand parens are consumed by inner printers — they use
-    /// `split_separator_gap_comments`).
+    /// span_end, keep_operand_line_inline); parts.push(";"); parts.extend(after);`.
+    /// Used by return/throw, `export default`, and `export =` — the terminator callers
+    /// whose argument may be parenthesized (unlike the expression-statement/var/
+    /// class-property terminators, whose operand parens are consumed by inner printers —
+    /// they use `split_separator_gap_comments`).
+    ///
+    /// `keep_operand_line_inline` is set by callers that render the operand inside
+    /// conditional grouping parens (the binary return/throw path). A same-line **line**
+    /// comment still enclosed by a stripped grouping paren (`return (a && b // c\n);`) is
+    /// operand-attached: keeping it after the `;` would float it out of the parens
+    /// (a #18837 over-reach). With the flag set it stays inline before the `)` (pushed to
+    /// `parts`); the caller must force the group to break so the line comment never lands
+    /// on the flat `expr // c;` path (which would swallow the `;`). Callers that render the
+    /// operand bare (no parens) leave the flag `false` — there's nothing to keep it inside.
     pub(crate) fn split_terminator_gap_comments(
         &self,
         parts: &mut DocBuf,
         argument_end: u32,
         span_end: u32,
+        keep_operand_line_inline: bool,
     ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
@@ -129,6 +139,17 @@ impl<'a> Printer<'a> {
                     deferred.push(d.text(" "));
                     deferred.push(self.build_comment_doc(comment));
                 }
+            } else if !comment.is_block
+                && keep_operand_line_inline
+                && same_line
+                && self.gap_has_close_paren(comment.span.end, span_end)
+            {
+                // Operand-attached line comment (inside stripped parens):
+                // `return (a && b // c\n);`. Stays inline before the `)`. Emitted as
+                // plain text — the caller's forced break means the following softline
+                // becomes the newline before `)`, so the comment never swallows it.
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
             } else if !comment.is_block {
                 // Line comment: trails after the `;` via `line_suffix` (`return x; // c`).
                 deferred
@@ -145,7 +166,7 @@ impl<'a> Printer<'a> {
     /// Whether a (comment-skipping) `)` appears in `[start, end)` — i.e. a stripped
     /// grouping paren follows a trailing comment before the terminator, marking the
     /// comment as operand-enclosed rather than statement-trailing.
-    fn gap_has_close_paren(&self, start: u32, end: u32) -> bool {
+    pub(crate) fn gap_has_close_paren(&self, start: u32, end: u32) -> bool {
         tsv_lang::source_scan::find_char_skipping_comments(
             self.source.as_bytes(),
             start as usize,
