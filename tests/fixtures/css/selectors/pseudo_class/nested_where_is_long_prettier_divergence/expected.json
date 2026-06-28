@@ -2,20 +2,20 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 347,
+		"end": 397,
 		"attributes": [],
 		"children": [
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 104,
-					"end": 320,
+					"start": 170,
+					"end": 370,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 104,
-							"end": 320,
+							"start": 170,
+							"end": 370,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -26,13 +26,13 @@
 											"name": "where",
 											"args": {
 												"type": "SelectorList",
-												"start": 114,
-												"end": 317,
+												"start": 180,
+												"end": 367,
 												"children": [
 													{
 														"type": "ComplexSelector",
-														"start": 114,
-														"end": 317,
+														"start": 180,
+														"end": 367,
 														"children": [
 															{
 																"type": "RelativeSelector",
@@ -43,13 +43,13 @@
 																		"name": "is",
 																		"args": {
 																			"type": "SelectorList",
-																			"start": 123,
-																			"end": 280,
+																			"start": 188,
+																			"end": 331,
 																			"children": [
 																				{
 																					"type": "ComplexSelector",
-																					"start": 123,
-																					"end": 124,
+																					"start": 188,
+																					"end": 189,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -58,19 +58,19 @@
 																								{
 																									"type": "TypeSelector",
 																									"name": "p",
-																									"start": 123,
-																									"end": 124
+																									"start": 188,
+																									"end": 189
 																								}
 																							],
-																							"start": 123,
-																							"end": 124
+																							"start": 188,
+																							"end": 189
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 130,
-																					"end": 132,
+																					"start": 194,
+																					"end": 196,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -79,19 +79,19 @@
 																								{
 																									"type": "TypeSelector",
 																									"name": "ul",
-																									"start": 130,
-																									"end": 132
+																									"start": 194,
+																									"end": 196
 																								}
 																							],
-																							"start": 130,
-																							"end": 132
+																							"start": 194,
+																							"end": 196
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 138,
-																					"end": 140,
+																					"start": 201,
+																					"end": 203,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -100,123 +100,18 @@
 																								{
 																									"type": "TypeSelector",
 																									"name": "ol",
-																									"start": 138,
-																									"end": 140
+																									"start": 201,
+																									"end": 203
 																								}
 																							],
-																							"start": 138,
-																							"end": 140
+																							"start": 201,
+																							"end": 203
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 146,
-																					"end": 150,
-																					"children": [
-																						{
-																							"type": "RelativeSelector",
-																							"combinator": null,
-																							"selectors": [
-																								{
-																									"type": "TypeSelector",
-																									"name": "menu",
-																									"start": 146,
-																									"end": 150
-																								}
-																							],
-																							"start": 146,
-																							"end": 150
-																						}
-																					]
-																				},
-																				{
-																					"type": "ComplexSelector",
-																					"start": 156,
-																					"end": 160,
-																					"children": [
-																						{
-																							"type": "RelativeSelector",
-																							"combinator": null,
-																							"selectors": [
-																								{
-																									"type": "TypeSelector",
-																									"name": "form",
-																									"start": 156,
-																									"end": 160
-																								}
-																							],
-																							"start": 156,
-																							"end": 160
-																						}
-																					]
-																				},
-																				{
-																					"type": "ComplexSelector",
-																					"start": 166,
-																					"end": 174,
-																					"children": [
-																						{
-																							"type": "RelativeSelector",
-																							"combinator": null,
-																							"selectors": [
-																								{
-																									"type": "TypeSelector",
-																									"name": "fieldset",
-																									"start": 166,
-																									"end": 174
-																								}
-																							],
-																							"start": 166,
-																							"end": 174
-																						}
-																					]
-																				},
-																				{
-																					"type": "ComplexSelector",
-																					"start": 180,
-																					"end": 185,
-																					"children": [
-																						{
-																							"type": "RelativeSelector",
-																							"combinator": null,
-																							"selectors": [
-																								{
-																									"type": "TypeSelector",
-																									"name": "table",
-																									"start": 180,
-																									"end": 185
-																								}
-																							],
-																							"start": 180,
-																							"end": 185
-																						}
-																					]
-																				},
-																				{
-																					"type": "ComplexSelector",
-																					"start": 191,
-																					"end": 198,
-																					"children": [
-																						{
-																							"type": "RelativeSelector",
-																							"combinator": null,
-																							"selectors": [
-																								{
-																									"type": "TypeSelector",
-																									"name": "details",
-																									"start": 191,
-																									"end": 198
-																								}
-																							],
-																							"start": 191,
-																							"end": 198
-																						}
-																					]
-																				},
-																				{
-																					"type": "ComplexSelector",
-																					"start": 204,
+																					"start": 208,
 																					"end": 212,
 																					"children": [
 																						{
@@ -225,20 +120,20 @@
 																							"selectors": [
 																								{
 																									"type": "TypeSelector",
-																									"name": "textarea",
-																									"start": 204,
+																									"name": "menu",
+																									"start": 208,
 																									"end": 212
 																								}
 																							],
-																							"start": 204,
+																							"start": 208,
 																							"end": 212
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 218,
-																					"end": 224,
+																					"start": 217,
+																					"end": 221,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -246,20 +141,20 @@
 																							"selectors": [
 																								{
 																									"type": "TypeSelector",
-																									"name": "select",
-																									"start": 218,
-																									"end": 224
+																									"name": "form",
+																									"start": 217,
+																									"end": 221
 																								}
 																							],
-																							"start": 218,
-																							"end": 224
+																							"start": 217,
+																							"end": 221
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 230,
-																					"end": 235,
+																					"start": 226,
+																					"end": 234,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -267,19 +162,19 @@
 																							"selectors": [
 																								{
 																									"type": "TypeSelector",
-																									"name": "label",
-																									"start": 230,
-																									"end": 235
+																									"name": "fieldset",
+																									"start": 226,
+																									"end": 234
 																								}
 																							],
-																							"start": 230,
-																							"end": 235
+																							"start": 226,
+																							"end": 234
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 241,
+																					"start": 239,
 																					"end": 244,
 																					"children": [
 																						{
@@ -288,20 +183,20 @@
 																							"selectors": [
 																								{
 																									"type": "TypeSelector",
-																									"name": "pre",
-																									"start": 241,
+																									"name": "table",
+																									"start": 239,
 																									"end": 244
 																								}
 																							],
-																							"start": 241,
+																							"start": 239,
 																							"end": 244
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 250,
-																					"end": 260,
+																					"start": 249,
+																					"end": 256,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -309,20 +204,20 @@
 																							"selectors": [
 																								{
 																									"type": "TypeSelector",
-																									"name": "blockquote",
-																									"start": 250,
-																									"end": 260
+																									"name": "details",
+																									"start": 249,
+																									"end": 256
 																								}
 																							],
-																							"start": 250,
-																							"end": 260
+																							"start": 249,
+																							"end": 256
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 266,
-																					"end": 271,
+																					"start": 261,
+																					"end": 269,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -330,19 +225,19 @@
 																							"selectors": [
 																								{
 																									"type": "TypeSelector",
-																									"name": "aside",
-																									"start": 266,
-																									"end": 271
+																									"name": "textarea",
+																									"start": 261,
+																									"end": 269
 																								}
 																							],
-																							"start": 266,
-																							"end": 271
+																							"start": 261,
+																							"end": 269
 																						}
 																					]
 																				},
 																				{
 																					"type": "ComplexSelector",
-																					"start": 277,
+																					"start": 274,
 																					"end": 280,
 																					"children": [
 																						{
@@ -351,33 +246,138 @@
 																							"selectors": [
 																								{
 																									"type": "TypeSelector",
-																									"name": "nav",
-																									"start": 277,
+																									"name": "select",
+																									"start": 274,
 																									"end": 280
 																								}
 																							],
-																							"start": 277,
+																							"start": 274,
 																							"end": 280
+																						}
+																					]
+																				},
+																				{
+																					"type": "ComplexSelector",
+																					"start": 285,
+																					"end": 290,
+																					"children": [
+																						{
+																							"type": "RelativeSelector",
+																							"combinator": null,
+																							"selectors": [
+																								{
+																									"type": "TypeSelector",
+																									"name": "label",
+																									"start": 285,
+																									"end": 290
+																								}
+																							],
+																							"start": 285,
+																							"end": 290
+																						}
+																					]
+																				},
+																				{
+																					"type": "ComplexSelector",
+																					"start": 295,
+																					"end": 298,
+																					"children": [
+																						{
+																							"type": "RelativeSelector",
+																							"combinator": null,
+																							"selectors": [
+																								{
+																									"type": "TypeSelector",
+																									"name": "pre",
+																									"start": 295,
+																									"end": 298
+																								}
+																							],
+																							"start": 295,
+																							"end": 298
+																						}
+																					]
+																				},
+																				{
+																					"type": "ComplexSelector",
+																					"start": 303,
+																					"end": 313,
+																					"children": [
+																						{
+																							"type": "RelativeSelector",
+																							"combinator": null,
+																							"selectors": [
+																								{
+																									"type": "TypeSelector",
+																									"name": "blockquote",
+																									"start": 303,
+																									"end": 313
+																								}
+																							],
+																							"start": 303,
+																							"end": 313
+																						}
+																					]
+																				},
+																				{
+																					"type": "ComplexSelector",
+																					"start": 318,
+																					"end": 323,
+																					"children": [
+																						{
+																							"type": "RelativeSelector",
+																							"combinator": null,
+																							"selectors": [
+																								{
+																									"type": "TypeSelector",
+																									"name": "aside",
+																									"start": 318,
+																									"end": 323
+																								}
+																							],
+																							"start": 318,
+																							"end": 323
+																						}
+																					]
+																				},
+																				{
+																					"type": "ComplexSelector",
+																					"start": 328,
+																					"end": 331,
+																					"children": [
+																						{
+																							"type": "RelativeSelector",
+																							"combinator": null,
+																							"selectors": [
+																								{
+																									"type": "TypeSelector",
+																									"name": "nav",
+																									"start": 328,
+																									"end": 331
+																								}
+																							],
+																							"start": 328,
+																							"end": 331
 																						}
 																					]
 																				}
 																			]
 																		},
-																		"start": 114,
-																		"end": 285
+																		"start": 180,
+																		"end": 335
 																	},
 																	{
 																		"type": "PseudoClassSelector",
 																		"name": "not",
 																		"args": {
 																			"type": "SelectorList",
-																			"start": 290,
-																			"end": 301,
+																			"start": 340,
+																			"end": 351,
 																			"children": [
 																				{
 																					"type": "ComplexSelector",
-																					"start": 290,
-																					"end": 301,
+																					"start": 340,
+																					"end": 351,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -387,32 +387,32 @@
 																									"type": "PseudoClassSelector",
 																									"name": "last-child",
 																									"args": null,
-																									"start": 290,
-																									"end": 301
+																									"start": 340,
+																									"end": 351
 																								}
 																							],
-																							"start": 290,
-																							"end": 301
+																							"start": 340,
+																							"end": 351
 																						}
 																					]
 																				}
 																			]
 																		},
-																		"start": 285,
-																		"end": 302
+																		"start": 335,
+																		"end": 352
 																	},
 																	{
 																		"type": "PseudoClassSelector",
 																		"name": "not",
 																		"args": {
 																			"type": "SelectorList",
-																			"start": 307,
-																			"end": 316,
+																			"start": 357,
+																			"end": 366,
 																			"children": [
 																				{
 																					"type": "ComplexSelector",
-																					"start": 307,
-																					"end": 316,
+																					"start": 357,
+																					"end": 366,
 																					"children": [
 																						{
 																							"type": "RelativeSelector",
@@ -421,34 +421,34 @@
 																								{
 																									"type": "ClassSelector",
 																									"name": "unstyled",
-																									"start": 307,
-																									"end": 316
+																									"start": 357,
+																									"end": 366
 																								}
 																							],
-																							"start": 307,
-																							"end": 316
+																							"start": 357,
+																							"end": 366
 																						}
 																					]
 																				}
 																			]
 																		},
-																		"start": 302,
-																		"end": 317
+																		"start": 352,
+																		"end": 367
 																	}
 																],
-																"start": 114,
-																"end": 317
+																"start": 180,
+																"end": 367
 															}
 														]
 													}
 												]
 											},
-											"start": 104,
-											"end": 320
+											"start": 170,
+											"end": 370
 										}
 									],
-									"start": 104,
-									"end": 320
+									"start": 170,
+									"end": 370
 								}
 							]
 						}
@@ -456,32 +456,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 321,
-					"end": 338,
+					"start": 371,
+					"end": 388,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 325,
-							"end": 334,
+							"start": 375,
+							"end": 384,
 							"property": "margin",
 							"value": "0"
 						}
 					]
 				},
-				"start": 104,
-				"end": 338
+				"start": 170,
+				"end": 388
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 339,
-			"styles": "\n\t/* Nested :where(:is()) - exceeds 100 chars, wraps with extra indent for complex selectors */\n\t:where(\n\t\t:is(\n\t\t\t\tp,\n\t\t\t\tul,\n\t\t\t\tol,\n\t\t\t\tmenu,\n\t\t\t\tform,\n\t\t\t\tfieldset,\n\t\t\t\ttable,\n\t\t\t\tdetails,\n\t\t\t\ttextarea,\n\t\t\t\tselect,\n\t\t\t\tlabel,\n\t\t\t\tpre,\n\t\t\t\tblockquote,\n\t\t\t\taside,\n\t\t\t\tnav\n\t\t\t):not(:last-child):not(.unstyled)\n\t) {\n\t\tmargin: 0;\n\t}\n",
+			"end": 389,
+			"styles": "\n\t/* Nested :where(:is()) exceeds 100 chars and wraps; the :is() args indent one\n\t   level (uniform), not the extra level prettier adds for a >2-node compound */\n\t:where(\n\t\t:is(\n\t\t\tp,\n\t\t\tul,\n\t\t\tol,\n\t\t\tmenu,\n\t\t\tform,\n\t\t\tfieldset,\n\t\t\ttable,\n\t\t\tdetails,\n\t\t\ttextarea,\n\t\t\tselect,\n\t\t\tlabel,\n\t\t\tpre,\n\t\t\tblockquote,\n\t\t\taside,\n\t\t\tnav\n\t\t):not(:last-child):not(.unstyled)\n\t) {\n\t\tmargin: 0;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 348,
+	"end": 398,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

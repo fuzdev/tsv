@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 289,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 88,
+				"end": 150,
+				"name": "supports",
+				"prelude": "(not (display: grid))",
+				"block": {
+					"type": "Block",
+					"start": 120,
+					"end": 150,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 124,
+								"end": 126,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 124,
+										"end": 126,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 124,
+														"end": 126
+													}
+												],
+												"start": 124,
+												"end": 126
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 127,
+								"end": 147,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 132,
+										"end": 142,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 124,
+							"end": 147
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 200,
+				"end": 280,
+				"name": "supports",
+				"prelude": "((display: grid) and (not (gap: 1px)))",
+				"block": {
+					"type": "Block",
+					"start": 249,
+					"end": 280,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 253,
+								"end": 255,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 253,
+										"end": 255,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "b",
+														"start": 253,
+														"end": 255
+													}
+												],
+												"start": 253,
+												"end": 255
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 256,
+								"end": 277,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 261,
+										"end": 272,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 253,
+							"end": 277
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 281,
+			"styles": "\n\t/* a `not` directly inside a parenthesized condition keeps the paren tight */\n\t@supports (not (display: grid)) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* nested `not` inside an and-joined group */\n\t@supports ((display: grid) and (not (gap: 1px))) {\n\t\t.b {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 290,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

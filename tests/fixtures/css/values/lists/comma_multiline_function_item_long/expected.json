@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 644,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 635,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 93,
+							"end": 214,
+							"property": "background",
+							"value": "linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(255, 255, 255, 1) 100000000000000000000%),\n\t\t\ttop left"
+						},
+						{
+							"type": "Declaration",
+							"start": 280,
+							"end": 419,
+							"property": "background",
+							"value": "linear-gradient(\n\t\t\t\tto right,\n\t\t\t\trgba(0, 0, 0, 0) 0%,\n\t\t\t\trgba(255, 255, 255, 1) 1000000000000000000000%\n\t\t\t),\n\t\t\ttop left"
+						},
+						{
+							"type": "Declaration",
+							"start": 492,
+							"end": 631,
+							"property": "background",
+							"value": "top left,\n\t\t\tlinear-gradient(\n\t\t\t\tto right,\n\t\t\t\trgba(0, 0, 0, 0) 0%,\n\t\t\t\trgba(255, 255, 255, 1) 1000000000000000000000%\n\t\t\t)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 635
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 636,
+			"styles": "\n\tdiv {\n\t\t/* Function comma-item at 100 - stays inline within the multiline list */\n\t\tbackground:\n\t\t\tlinear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(255, 255, 255, 1) 100000000000000000000%),\n\t\t\ttop left;\n\t\t/* Function comma-item at 101 - wraps to stay within 100 */\n\t\tbackground:\n\t\t\tlinear-gradient(\n\t\t\t\tto right,\n\t\t\t\trgba(0, 0, 0, 0) 0%,\n\t\t\t\trgba(255, 255, 255, 1) 1000000000000000000000%\n\t\t\t),\n\t\t\ttop left;\n\t\t/* Final function item at 101 - trailing ; reserved, also wraps */\n\t\tbackground:\n\t\t\ttop left,\n\t\t\tlinear-gradient(\n\t\t\t\tto right,\n\t\t\t\trgba(0, 0, 0, 0) 0%,\n\t\t\t\trgba(255, 255, 255, 1) 1000000000000000000000%\n\t\t\t);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 645,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

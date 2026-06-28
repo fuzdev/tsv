@@ -201,7 +201,12 @@ impl<'a> Printer<'a> {
     /// - Multi-arg functions: wrap each arg on its own line when exceeds width
     /// - Single-arg List (e.g., drop-shadow): wrap on space separators
     /// - Single-arg non-List (e.g., url): never wraps
-    fn build_value_function_doc(&self, name: &str, args: &[CssValue<'_>], span: Span) -> DocId {
+    pub(super) fn build_value_function_doc(
+        &self,
+        name: &str,
+        args: &[CssValue<'_>],
+        span: Span,
+    ) -> DocId {
         let d = self.d();
         // For functions with no parsed args (like supports()), extract from source
         if args.is_empty() && span.end_usize() <= self.source.len() {
@@ -305,7 +310,7 @@ impl<'a> Printer<'a> {
     ///     (100vw - var(--a))
     /// )
     /// ```
-    fn build_space_fill_value_doc(&self, values: &[CssValue<'_>]) -> DocId {
+    pub(super) fn build_space_fill_value_doc(&self, values: &[CssValue<'_>]) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
         d.group(d.indent(d.fill(&parts)))

@@ -1,0 +1,190 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 273,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 107,
+					"end": 128,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 107,
+							"end": 128,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 111,
+												"end": 127,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 111,
+														"end": 113,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "a",
+																		"start": 111,
+																		"end": 113
+																	}
+																],
+																"start": 111,
+																"end": 113
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 125,
+														"end": 127,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "b",
+																		"start": 125,
+																		"end": 127
+																	}
+																],
+																"start": 125,
+																"end": 127
+															}
+														]
+													}
+												]
+											},
+											"start": 107,
+											"end": 128
+										}
+									],
+									"start": 107,
+									"end": 128
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 129,
+					"end": 147,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 133,
+							"end": 143,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 107,
+				"end": 147
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 225,
+					"end": 244,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 225,
+							"end": 227,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "c",
+											"start": 225,
+											"end": 227
+										}
+									],
+									"start": 225,
+									"end": 227
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 242,
+							"end": 244,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "d",
+											"start": 242,
+											"end": 244
+										}
+									],
+									"start": 242,
+									"end": 244
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 245,
+					"end": 264,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 249,
+							"end": 260,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 225,
+				"end": 264
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 265,
+			"styles": "\n\t/* comment spacing inside a forgiving list (:is/:where/:not/:has) normalizes to single spaces */\n\t:is(.a, /* mid */ .b) {\n\t\tcolor: red;\n\t}\n\n\t/* a comment before the comma keeps its side; spacing still normalizes */\n\t.c /* before */, .d {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 274,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

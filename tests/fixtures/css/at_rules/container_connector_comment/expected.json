@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 318,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 60,
+				"end": 145,
+				"name": "container",
+				"prelude": "(width > 0px)  and (height > 0px)",
+				"block": {
+					"type": "Block",
+					"start": 115,
+					"end": 145,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 119,
+								"end": 121,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 119,
+										"end": 121,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 119,
+														"end": 121
+													}
+												],
+												"start": 119,
+												"end": 121
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 122,
+								"end": 142,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 127,
+										"end": 137,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 119,
+							"end": 142
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 220,
+				"end": 309,
+				"name": "container",
+				"prelude": "(width > 0px)  and (height > 0px)",
+				"block": {
+					"type": "Block",
+					"start": 278,
+					"end": 309,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 282,
+								"end": 284,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 282,
+										"end": 284,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "b",
+														"start": 282,
+														"end": 284
+													}
+												],
+												"start": 282,
+												"end": 284
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 285,
+								"end": 306,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 290,
+										"end": 301,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 282,
+							"end": 306
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 310,
+			"styles": "\n\t/* a comment between conditions stays in place */\n\t@container (width > 0px) /* note */ and (height > 0px) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* a comment whose text contains the `and` connector word stays put */\n\t@container (width > 0px) /* a and b */ and (height > 0px) {\n\t\t.b {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 319,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 466,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 60,
+				"end": 142,
+				"name": "supports",
+				"prelude": "(display: grid)  and (gap: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 112,
+					"end": 142,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 116,
+								"end": 118,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 116,
+										"end": 118,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "a",
+														"start": 116,
+														"end": 118
+													}
+												],
+												"start": 116,
+												"end": 118
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 119,
+								"end": 139,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 124,
+										"end": 134,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 116,
+							"end": 139
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 217,
+				"end": 303,
+				"name": "supports",
+				"prelude": "(display: grid)  and (gap: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 272,
+					"end": 303,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 276,
+								"end": 278,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 276,
+										"end": 278,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "b",
+														"start": 276,
+														"end": 278
+													}
+												],
+												"start": 276,
+												"end": 278
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 279,
+								"end": 300,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 284,
+										"end": 295,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 276,
+							"end": 300
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 372,
+				"end": 457,
+				"name": "supports",
+				"prelude": "(display: grid)  or (gap: 1px)",
+				"block": {
+					"type": "Block",
+					"start": 425,
+					"end": 457,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 429,
+								"end": 431,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 429,
+										"end": 431,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "ClassSelector",
+														"name": "c",
+														"start": 429,
+														"end": 431
+													}
+												],
+												"start": 429,
+												"end": 431
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 432,
+								"end": 454,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 437,
+										"end": 449,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 429,
+							"end": 454
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 458,
+			"styles": "\n\t/* a comment between conditions stays in place */\n\t@supports (display: grid) /* note */ and (gap: 1px) {\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* a comment whose text contains the `and` connector word stays put */\n\t@supports (display: grid) /* x and y */ and (gap: 1px) {\n\t\t.b {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n\n\t/* the same when the comment contains the `or` connector word */\n\t@supports (display: grid) /* p or q */ or (gap: 1px) {\n\t\t.c {\n\t\t\tcolor: green;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 467,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
