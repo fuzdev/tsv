@@ -19,6 +19,7 @@ mod variable;
 pub(super) use super::{Printer, build_entity_name_doc, should_hug_union_type};
 
 use super::ParenContext;
+use super::analysis::has_newline_before_position;
 use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
@@ -96,13 +97,28 @@ impl<'a> Printer<'a> {
                 .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
                 || self.has_expression_statement_source_parens(stmt);
 
-            if needs_parens {
-                parts.push(d.text("("));
-            } else {
-                // When the whole expression isn't wrapped, a nested leftmost
-                // object/function/class still needs parens around itself:
-                // `(class {}).foo`, `({}).foo`, `(class {}) + 1`. The matching
-                // node's doc builder consumes this target and wraps itself.
+            // An own-line comment between a source `(` and the expression
+            // (`(// c⏎ expr)` / `(/* c */⏎ expr)` — e.g. a bare parenthesized
+            // decorated class expression) is preserved inside the parens, breaking
+            // them open; the flat `(`/`)` wrap below would drop it. Own-line = a line
+            // comment (never inline) or a block comment with a newline before it; a
+            // same-line block comment (`(/* c */ expr)`) is a separate, rarer case
+            // (inline) left to the default flow. `stmt.span.start < expr_start` means
+            // a real source `(` precedes the expression (see
+            // `has_expression_statement_source_parens`). prettier hoists the comment
+            // before `(` — a divergence (`decorated_expr_open_paren_comment`).
+            // TODO: a same-line block comment after `(` is still dropped here.
+            let expr_start = stmt.expression.span().start;
+            let paren_open_own_line_comment = needs_parens
+                && stmt.span.start < expr_start
+                && comments_in_range(self.comments, stmt.span.start + 1, expr_start)
+                    .any(|c| !c.is_block || has_newline_before_position(self.source, c.span.start));
+
+            // When the whole expression isn't wrapped, a nested leftmost
+            // object/function/class still needs parens around itself
+            // (`(class {}).foo`, `({}).foo`, `(class {}) + 1`). The matching node's
+            // doc builder consumes this span-matched target and wraps itself.
+            if !needs_parens {
                 let leftmost = leftmost_no_lookahead(&stmt.expression);
                 if matches!(
                     leftmost,
@@ -114,20 +130,37 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Set context flags for chain handling
-            // is_expression_statement: allows short identifier names to merge with first call
-            // in_top_level_assignment: tells assignments to use regular layout (not chain formatting)
+            // Build the expression once. Context flags for chain handling:
+            // is_expression_statement allows short identifier names to merge with the
+            // first call; in_top_level_assignment selects the regular assignment
+            // layout (not chain formatting). Clear the (non-consuming, span-matched)
+            // paren target afterward so it can't leak into a sibling statement.
             self.is_expression_statement.set(true);
             self.in_top_level_assignment.set(true);
-            parts.push(self.build_expression_doc(&stmt.expression));
+            let expr_doc = self.build_expression_doc(&stmt.expression);
             self.in_top_level_assignment.set(false);
             self.is_expression_statement.set(false);
-            // Clear the (non-consuming, span-matched) target so it can't leak into a
-            // sibling statement.
             self.expr_stmt_paren_target.set(None);
 
-            if needs_parens {
+            if paren_open_own_line_comment {
+                let mut inner: DocBuf = smallvec![d.hardline()];
+                for comment in comments_in_range(self.comments, stmt.span.start + 1, expr_start) {
+                    inner.push(self.build_comment_doc(comment));
+                    inner.push(d.hardline());
+                }
+                inner.push(expr_doc);
+                parts.push(d.text("("));
+                parts.push(d.indent(d.concat(&inner)));
+                parts.push(d.hardline());
                 parts.push(d.text(")"));
+            } else {
+                if needs_parens {
+                    parts.push(d.text("("));
+                }
+                parts.push(expr_doc);
+                if needs_parens {
+                    parts.push(d.text(")"));
+                }
             }
         }
 
