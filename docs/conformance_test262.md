@@ -33,88 +33,82 @@ design, not parser bugs.
 proposal tsv does not implement are skipped, not graded — scoring them as parse
 failures would measure scope, not a conformance gap. The set
 (`UNIMPLEMENTED_FEATURES` in `crates/tsv_debug/src/test262/frontmatter.rs`) is
-**currently empty**: the two Stage-3 import-phase proposals that used to fill it
+**currently empty**: tsv parses the Stage-3 import-phase proposals
 (`source-phase-imports` / `import.source(…)` and `import-defer` /
-`import.defer(…)`, ~396 graded files) are now parsed — a deliberate divergence
-from acorn, which rejects them (see
+`import.defer(…)`, ~396 graded files) rather than skipping them — a deliberate
+divergence from acorn, which rejects them (see
 [conformance_svelte.md](./conformance_svelte.md#import-phase-proposals)).
 See [Scope](#what-we-skip).
 
-**Positive parse conformance is 100%.** Every test tsv grades and that should parse
-does — graded at the test's declared goal (`module`-flagged as `Module`, the
-run-both-ways default + `onlyStrict` as a strict `Script`). The one sloppy-by-content
-`raw` test, `language/comments/hashbang/use-strict.js`, is **skipped** rather than
-graded: there the `#!` hashbang turns the following `"use strict"` into a comment
-rather than a directive, so the program is **sloppy** and its `with ({}) {}` is valid;
-tsv, being strict-only, rejects `with`. That test is genuinely out of scope for a
-strict-only parser — the same reason `noStrict` tests are skipped — so it joins the
-sloppy-mode skip bucket (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis)),
-while the 27 other in-scope `raw` tests (mode-independent hashbang / directive-prologue
-syntax) stay graded. The former positive-failure cluster was the `await`-as-identifier
-tests, valid only in a strict Script; with [Script-goal support](#design-decision-strict-mode-only-explicit-goal-axis)
-they now parse. _(Methodology for any future failure: parse each `../test262/<path>`
-with `canonical_parse` and bucket on whether it yields an AST.)_
+**Positive parse conformance is 100%** at each test's declared goal (`module`-flagged
+→ `Module`; the run-both-ways default + `onlyStrict` → strict `Script`). The lone
+exception — the sloppy-by-content `raw` test `language/comments/hashbang/use-strict.js`
+— is **skipped** as out of scope for a strict-only parser (the sloppy-mode bucket; see
+[Goal axis](#design-decision-strict-mode-only-explicit-goal-axis)), not graded; the
+other 27 in-scope `raw` tests stay graded. _(Methodology for any future failure: parse
+each `../test262/<path>` with `canonical_parse` and bucket on whether it yields an AST.)_
 
-**The drop-in positive-conformance backlog is closed** — every gap acorn accepts and
-tsv rejected has been fixed (fixtures-first per the repo TDD gate): ✅ **rest parameter
-with a destructuring pattern** — `function f(...[a, b]) {}` / `function f(...{ a }) {}`
-(a rest element can be a `BindingPattern`, not only an identifier); ✅ **`for await`
-with an async LHS** — `for await (async of [7])` parses `async` as an
-`IdentifierReference`, while plain `for (async of …)` stays rejected (the for-of
-`[lookahead ∉ { async of }]` restriction); ✅ **a decorated class *expression*** —
-`x = @dec class {}` parses (decorators were wired into statement position only), and the
-assignment breaks after `=` with each decorator on its own line, like prettier; ✅ the
-tagged-template invalid-escape gap (ES2018); ✅ the `[+In]` for-header reset — the for-init disables `in`
-(`[~In]`), but nested sub-expressions restore `[+In]` (computed class member name,
-ternary consequent, dynamic-import argument, function/class bodies). tsv had leaked
-the for-header `[~In]` into them; now they parse, and the formatter parenthesizes an
-`in` anywhere under a for-init (matching prettier, keeping it distinct from the
-`for (x in y)` separator); and ✅ **Unicode identifier code points in `ID_Start` /
-`ID_Continue` but not `XID_Start` / `XID_Continue`** — the lexer keyed identifier
-validity on `unicode-ident`'s `XID_*` sets, but ECMAScript uses the `ID_*`
-properties (ecma262 §sec-names-and-keywords → UAX #31), a superset. The gap is the
-`Other_ID_Start` voiced/semi-voiced sound marks (`゛` U+309B, `゜` U+309C) plus
-letters whose NFKC decomposition leaves the set (U+037A, U+0E33, U+0EB3, the
-halfwidth katakana marks, and the Arabic ligature/presentation forms); the lexer
-now adds them back (covering the four `other_id_*` test262 files and the broader
-NFKC-excluded set); ✅ **the hashbang line/paragraph-separator terminators** — a
-`#!…` comment ends at U+2028 / U+2029, like any other LineTerminator; ✅
-**ECMAScript-exact inter-token whitespace** — U+FEFF (ZWNBSP) is WhiteSpace and is
-skipped mid-stream, not only as a leading BOM, while U+0085 (NEL), which ECMAScript
-excludes, is not; ✅ **do-while ASI** — a `;` is inserted unconditionally after the
-`)` (`do x; while (c) y`); ✅ **`undefined` as an ordinary identifier** — a valid
-binding name (`var undefined`) and assignment target (`undefined = 12`), modeled as
-an `Identifier` like acorn rather than a literal; and ✅ **`new import.meta()`** —
-`import.meta` is a valid `new` callee (a MetaProperty), while `new import(…)` stays
-rejected.
+**tsv's positive conformance exceeds the drop-in oracle** in several places —
+constructs acorn rejects but the spec accepts, which tsv parses per spec. Each is
+pinned by a fixture (fixtures-first per the repo TDD gate):
 
-**`await`-as-identifier — landed.** Previously the largest positive-failure cluster,
-the strict-Script `await`-as-identifier tests (top-level `var await = 1`, `function
-foo(await)`, `await => x` single-param arrow, `class await {}`, `await:` label,
-`break await` / `continue await` label targets, `({ await })` shorthand, `catch
-(await)`, `function await(){}` declaration/expression name, `new await()` callee, and
-the `static-init-await` nests) now parse: tsv grades them at `Goal::Script`, where
-`await` is an ordinary identifier in a `[~Await]` context. The same `await_is_identifier`
-read sites are gated the other way at `Goal::Module` / `[+Await]`, where `await` stays a
-reserved `BindingIdentifier`/`LabelIdentifier` (so `function await(){}` is rejected in a
-module, matching acorn). This is a deliberate,
-more-spec-correct divergence from acorn-*as-module* (acorn-as-script accepts them —
-that's the fixtures' oracle). `yield` is unaffected — a strict reserved word in both
-goals. The constructs still out of scope are **sloppy-mode-only** (`with`, AnnexB
-`f() = g()` / `for (var a = x in b)`, legacy octal — tsv is strict-only, those tests
-skipped) and **plugin-gated syntax** (some decorator forms, not in the oracle config).
-(The Stage-3 import proposals that acorn-via-oxc also rejects don't appear here —
-they're skipped by feature filtering above, not graded.)
+- **Rest parameter with a destructuring pattern** — `function f(...[a, b]) {}` /
+  `function f(...{ a }) {}` (a rest element can be a `BindingPattern`, not only an
+  identifier).
+- **`for await` with an async LHS** — `for await (async of [7])` parses `async` as an
+  `IdentifierReference`, while plain `for (async of …)` stays rejected (the for-of
+  `[lookahead ∉ { async of }]` restriction).
+- **Decorated class *expression*** — `x = @dec class {}` (decorators in expression
+  position, not only statement position); the assignment breaks after `=` with each
+  decorator on its own line, like prettier.
+- **Tagged-template invalid escapes** (ES2018) — tolerated in a tagged template
+  (cooked `undefined`, raw preserved).
+- **`[+In]` for-header reset** — the for-init disables `in` (`[~In]`), but nested
+  sub-expressions restore `[+In]` (computed class member name, ternary consequent,
+  dynamic-import argument, function/class bodies). The formatter parenthesizes an `in`
+  anywhere under a for-init (matching prettier), keeping it distinct from the
+  `for (x in y)` separator.
+- **Unicode identifiers per `ID_Start` / `ID_Continue`** — ECMAScript keys identifier
+  validity on the `ID_*` properties (ecma262 §sec-names-and-keywords → UAX #31), a
+  superset of `unicode-ident`'s `XID_*` sets: the `Other_ID_Start` voiced/semi-voiced
+  sound marks (`゛` U+309B, `゜` U+309C) plus letters whose NFKC decomposition leaves
+  the set (U+037A, U+0E33, U+0EB3, the halfwidth katakana marks, the Arabic
+  ligature/presentation forms).
+- **Hashbang line/paragraph-separator terminators** — a `#!…` comment ends at U+2028 /
+  U+2029, like any other LineTerminator.
+- **ECMAScript-exact inter-token whitespace** — U+FEFF (ZWNBSP) is WhiteSpace and is
+  skipped mid-stream, not only as a leading BOM, while U+0085 (NEL), which ECMAScript
+  excludes, is not.
+- **do-while ASI** — a `;` is inserted unconditionally after the `)`
+  (`do x; while (c) y`).
+- **`undefined` as an ordinary identifier** — a valid binding name (`var undefined`)
+  and assignment target (`undefined = 12`), modeled as an `Identifier` like acorn
+  rather than a literal.
+- **`new import.meta()`** — `import.meta` is a valid `new` callee (a MetaProperty),
+  while `new import(…)` stays rejected.
+- **`await` as an identifier in a strict Script** — `var await = 1`, `function
+  foo(await)`, `await => x`, `class await {}`, `await:` / `break await` / `continue
+  await` labels, `({ await })` shorthand, `catch (await)`, `function await(){}`,
+  `new await()`, and the `static-init-await` nests. tsv grades these at `Goal::Script`,
+  where `await` is an ordinary identifier in a `[~Await]` context; the same
+  `await_is_identifier` read sites are gated the other way at `Goal::Module` /
+  `[+Await]`, where `await` stays reserved (so `function await(){}` is rejected in a
+  module, matching acorn). This makes tsv more spec-correct than acorn-*as-module*,
+  which is module-only. See [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis).
 
-Most negative failures are over-acceptance of _early errors_ — programs that
-parse under the syntactic grammar but that the spec rejects semantically
-(duplicate parameter names, escaped reserved words, strict-mode-only
-restrictions). tsv currently enforces the syntactic grammar; early-error
-enforcement is future diagnostics-layer work.
+`yield` is unaffected by the goal axis — a strict reserved word in both `Script` and
+`Module`. Out of scope (skipped, not graded as failures): **sloppy-mode-only**
+constructs (`with`, the AnnexB `f() = g()` / `for (var a = x in b)` forms, legacy
+octal — tsv is strict-only) and **plugin-gated syntax** not in the oracle config
+(some decorator forms).
 
-A smaller share were genuinely _syntactic_ over-acceptances — the grammar
-itself forbids the construct — which tsv fixes as they surface. The
-rest-element constraints are now enforced: a rest/spread element must be the
+Most negative failures are the early-error under-enforcement noted above (duplicate
+parameter names, escaped reserved words, strict-mode-only restrictions) — tsv enforces
+the syntactic grammar; early-error enforcement is future diagnostics-layer work.
+
+A smaller share are genuinely _syntactic_ over-acceptances — the grammar
+itself forbids the construct — which tsv rejects. The rest-element
+constraints: a rest/spread element must be the
 final element of a parameter list (value and TS function-type) or an
 array/object destructuring pattern (binding and assignment targets), with no
 element or trailing comma after it and no default initializer — so
@@ -124,13 +118,13 @@ element or trailing comma after it and no default initializer — so
 recovered from a `spread_trailing_comma` flag the array/object literal parser
 records (the literal itself is valid, so the parser can't reject it outright;
 the cover-grammar conversion consults the flag). A for-in/of destructuring LHS
-is now routed through the same cover-grammar conversion (`to_assignable`), so
+is routed through the same cover-grammar conversion (`to_assignable`), so
 the rest constraints hold there too (`for ([...a, b] of y)`,
 `for ([...x = 1] of y)`, `for ({...a, b} of y)` are rejected) — matching the
 spec's "an `ObjectLiteral`/`ArrayLiteral` for-in/of LHS must cover an
 `AssignmentPattern`" rule, which additionally drops invalid non-pattern LHS
 targets like `for (a + b of y)` and `for ((a, b) of y)`. A still-open adjacent
-gap: the object rest _target_ shape — `({...[a]} = c)` / `const {...[a]} = c`
+gap is the object rest _target_ shape — `({...[a]} = c)` / `const {...[a]} = c`
 (the spec forbids an `ArrayLiteral`/`ObjectLiteral` target on an object rest,
 and a `BindingRestProperty` must be a plain identifier) — is a separate
 constraint left over-accepted.
@@ -159,10 +153,10 @@ constraint left over-accepted.
   polarities so the score reflects conformance on syntax tsv aims to support, not
   unimplemented scope. The skip set lives in
   `crates/tsv_debug/src/test262/frontmatter.rs` (`UNIMPLEMENTED_FEATURES`) and is
-  **currently empty** — the Stage-3 import-phase proposals
-  (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`)
-  that used to live here are now parsed, so their ~396 graded files count. Add a
-  name here when tsv meets a new proposal it doesn't parse; drop it once it lands.
+  **currently empty** — tsv parses the Stage-3 import-phase proposals
+  (`source-phase-imports` / `source-phase-imports-module-source` / `import-defer`),
+  so their ~396 graded files count. Add a name here when tsv meets a new proposal it
+  doesn't parse; drop it once it lands.
 - `*_FIXTURE.js` files - Module dependencies, not standalone tests
 
 ### Test Directories
@@ -347,8 +341,7 @@ module-only. This is a deliberate, spec-grounded divergence from the drop-in ora
 *module-mode* behavior, not a bug. The context tracking is a single `[Await]` flag
 saved/restored at every function-like scope boundary (async → `[+Await]`, non-async
 → `[~Await]`, class static block → `[+Await]`); a side effect is that `await` as an
-*expression* in a non-async function is now correctly rejected in module code too
-(previously over-accepted).
+*expression* in a non-async function is correctly rejected in module code too.
 
 ## Differential Comparison (tsv vs oxc-parser)
 
@@ -383,9 +376,9 @@ tests tsv grades (the strict, non-sloppy, parse-phase subset), parsing each at t
 is **sloppy** while tsv's `Goal::Script` is strict, so a *sloppy-by-content* script
 would show up as a positive "tsv rejects, oxc accepts" candidate even though it's a
 sanctioned strict-only divergence, not a bug. The one known such test
-(`hashbang/use-strict.js`, whose `#!` turns `"use strict"` into a comment, leaving a
-sloppy `with`) is skipped before grading, so it never enters the manifest; any future
-sloppy-by-content script would surface here and want the same treatment. The two
+(`hashbang/use-strict.js` — see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
+is skipped before grading, so it never enters the manifest; any future sloppy-by-content
+script would surface here and want the same treatment. The two
 actionable buckets:
 
 - **positives where tsv rejects but oxc accepts** → tsv real-bug candidates (modulo

@@ -209,7 +209,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Optional render (`{@render snippet?.()}`)
 - Dynamic snippet (`{@render children?.()}`)
 
-### Attach Tag (5.29+)
+### Attach Tag
 
 - Basic attach (`{@attach handler}`)
 - Attach with arguments (`{@attach tooltip(content)}`)
@@ -302,7 +302,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - `bind:value` (single select)
 - `bind:value` (multiple select)
 
-**Form Reset Support (5.6+)**:
+**Form Reset Support**:
 
 - `defaultValue` attribute (input reverts on form reset)
 - `defaultChecked` attribute (checkbox reverts on form reset)
@@ -337,7 +337,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 - `bind:open`
 
-**Function Bindings (5.9+)**:
+**Function Bindings**:
 
 - Get/set form (`bind:value={() => val, (v) => val = v}`)
 - Readonly with setter (`bind:clientWidth={null, callback}`)
@@ -353,7 +353,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Shorthand form (`class:name`)
 - Multiple class directives
 
-**Class Attribute (5.16+)**:
+**Class Attribute**:
 
 - Object form (`class={{ active: true }}`)
 - Array form (`class={[cond && 'name']}`)
@@ -455,7 +455,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Non-DOM wrapper
 - With slot attribute
 
-### svelte:boundary (5.3+)
+### svelte:boundary
 
 - Basic boundary
 - `pending` snippet
@@ -508,7 +508,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 - Basic derived (`let y = $derived(expr)`)
 - With function body (`$derived.by(() => { ... })`)
-- Overriding derived values (5.25+)
+- Overriding derived values
 
 ### Effect Runes
 
@@ -548,7 +548,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Bindable prop (`let { x = $bindable() } = $props()`)
 - With fallback value
 
-**$props.id (5.20+)**:
+**$props.id**:
 
 - Unique component instance ID (`$props.id()`)
 - For attribute linking (`for`, `aria-labelledby`)
@@ -559,7 +559,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 - Basic inspect (`$inspect(value)`)
 - With custom formatter (`$inspect(x).with(fn)`)
-- Trace dependencies (`$inspect.trace()`) (5.14+)
+- Trace dependencies (`$inspect.trace()`)
 
 **$host**:
 
@@ -631,7 +631,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 
 Experimental features requiring `experimental: { async: true }` in svelte.config.js. The flag will be removed in Svelte 6 (becomes stable).
 
-## Async Expressions (5.36+)
+## Async Expressions
 
 ### await in Script
 
