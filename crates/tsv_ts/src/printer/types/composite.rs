@@ -622,14 +622,11 @@ impl<'a> Printer<'a> {
         let in_end = in_start.map_or(name_end, |p| (p + "in".len()) as u32);
         let in_start = in_start.map_or(name_end, |p| p as u32);
         // Comments between key name and `in` keyword
-        body_parts.push(self.build_comments_between(name_end, in_start, CommentSpacing::Leading));
+        // Comment gaps break a line comment onto its own line so it can't swallow the
+        // following `in`/constraint.
+        body_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
         body_parts.push(d.text(" in "));
-        // Comments between `in` keyword and constraint type
-        body_parts.push(self.build_comments_between(
-            in_end,
-            constraint_start,
-            CommentSpacing::Trailing,
-        ));
+        body_parts.push(self.build_trailing_comments_break_for_line(in_end, constraint_start));
         body_parts.push(self.build_type_doc(m.type_parameter.constraint));
 
         // as clause: `as NewKeyType`
@@ -648,19 +645,10 @@ impl<'a> Printer<'a> {
             );
             let as_end = as_start.map_or(constraint_end, |p| (p + "as".len()) as u32);
             let as_start = as_start.map_or(constraint_end, |p| p as u32);
-            // Comments between constraint and `as` keyword
-            body_parts.push(self.build_comments_between(
-                constraint_end,
-                as_start,
-                CommentSpacing::Leading,
-            ));
+            // Comment gaps break a line comment so it can't swallow `as`/the name type.
+            body_parts.push(self.build_leading_comments_break_for_line(constraint_end, as_start));
             body_parts.push(d.text(" as "));
-            // Comments between `as` keyword and name type
-            body_parts.push(self.build_comments_between(
-                as_end,
-                name_type_start,
-                CommentSpacing::Trailing,
-            ));
+            body_parts.push(self.build_trailing_comments_break_for_line(as_end, name_type_start));
             body_parts.push(self.build_type_doc(name_type));
             last_inner_end = name_type.span().end;
         }

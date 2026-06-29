@@ -1,0 +1,872 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 785,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Own-line block comment after a prefix type operator, before the operand:",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " kept on its own line with the operand hanging indented one level (the shared",
+			"start": 97,
+			"end": 176,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keyword→value layout).",
+			"start": 178,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 222,
+			"end": 229,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " typeof (a TypeQuery node) hangs the same way.",
+			"start": 237,
+			"end": 285,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 305,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " readonly (a TypeOperator, like keyof) hangs the same way.",
+			"start": 320,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 402,
+			"end": 409,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank line after the comment is preserved.",
+			"start": 424,
+			"end": 471,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 490,
+			"end": 497,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A same-line block comment with the operand authored on the next line keeps",
+			"start": 506,
+			"end": 583,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the comment trailing the operator and the operand hanging.",
+			"start": 585,
+			"end": 646,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 663,
+			"end": 670,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 16
+				},
+				"end": {
+					"line": 27,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A same-line block comment glued to the operand stays fully inline.",
+			"start": 678,
+			"end": 747,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 1
+				},
+				"end": {
+					"line": 30,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " f ",
+			"start": 764,
+			"end": 771,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 16
+				},
+				"end": {
+					"line": 31,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 784,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 775,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 205,
+					"end": 234,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 210,
+						"end": 211,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 214,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 3
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 232,
+							"end": 233,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 232,
+								"end": 233,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " a ",
+									"start": 222,
+									"end": 229
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line block comment after a prefix type operator, before the operand:",
+							"start": 20,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " kept on its own line with the operand hanging indented one level (the shared",
+							"start": 97,
+							"end": 176
+						},
+						{
+							"type": "Line",
+							"value": " keyword→value layout).",
+							"start": 178,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 287,
+					"end": 317,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 292,
+						"end": 293,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeQuery",
+						"start": 296,
+						"end": 316,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 12,
+								"column": 3
+							}
+						},
+						"exprName": {
+							"type": "Identifier",
+							"start": 315,
+							"end": 316,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 3
+								}
+							},
+							"name": "x",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " b ",
+									"start": 305,
+									"end": 312
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " typeof (a TypeQuery node) hangs the same way.",
+							"start": 237,
+							"end": 285
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 382,
+					"end": 421,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 387,
+						"end": 388,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 391,
+						"end": 420,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 10
+							},
+							"end": {
+								"line": 17,
+								"column": 10
+							}
+						},
+						"operator": "readonly",
+						"typeAnnotation": {
+							"type": "TSArrayType",
+							"start": 412,
+							"end": 420,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 10
+								}
+							},
+							"elementType": {
+								"type": "TSStringKeyword",
+								"start": 412,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 8
+									}
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 402,
+									"end": 409
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " readonly (a TypeOperator, like keyof) hangs the same way.",
+							"start": 320,
+							"end": 380
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 473,
+					"end": 503,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 478,
+						"end": 479,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 6
+							},
+							"end": {
+								"line": 20,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 482,
+						"end": 502,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 10
+							},
+							"end": {
+								"line": 23,
+								"column": 3
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 501,
+							"end": 502,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 2
+								},
+								"end": {
+									"line": 23,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 501,
+								"end": 502,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " d ",
+									"start": 490,
+									"end": 497
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line after the comment is preserved.",
+							"start": 424,
+							"end": 471
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 648,
+					"end": 675,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 653,
+						"end": 654,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 657,
+						"end": 674,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 10
+							},
+							"end": {
+								"line": 28,
+								"column": 3
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 673,
+							"end": 674,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 673,
+								"end": 674,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " e ",
+									"start": 663,
+									"end": 670
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A same-line block comment with the operand authored on the next line keeps",
+							"start": 506,
+							"end": 583
+						},
+						{
+							"type": "Line",
+							"value": " the comment trailing the operator and the operand hanging.",
+							"start": 585,
+							"end": 646
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 749,
+					"end": 774,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 26
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 754,
+						"end": 755,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 6
+							},
+							"end": {
+								"line": 31,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 758,
+						"end": 773,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 10
+							},
+							"end": {
+								"line": 31,
+								"column": 25
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 772,
+							"end": 773,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 24
+								},
+								"end": {
+									"line": 31,
+									"column": 25
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 772,
+								"end": 773,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 24
+									},
+									"end": {
+										"line": 31,
+										"column": 25
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " f ",
+									"start": 764,
+									"end": 771
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A same-line block comment glued to the operand stays fully inline.",
+							"start": 678,
+							"end": 747
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

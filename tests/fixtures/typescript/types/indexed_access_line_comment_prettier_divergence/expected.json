@@ -1,0 +1,245 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 170,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment in an indexed access's `[`→index gap, kept where written with",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the index type on the next line.",
+			"start": 99,
+			"end": 134,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 149,
+			"end": 153,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 4
+				},
+				"end": {
+					"line": 5,
+					"column": 8
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 169,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 136,
+					"end": 159,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 141,
+						"end": 142,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSIndexedAccessType",
+						"start": 147,
+						"end": 158,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 4
+							}
+						},
+						"objectType": {
+							"type": "TSTypeReference",
+							"start": 147,
+							"end": 148,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 147,
+								"end": 148,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "A"
+							}
+						},
+						"indexType": {
+							"type": "TSTypeReference",
+							"start": 156,
+							"end": 157,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 156,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 3
+									}
+								},
+								"name": "K"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 149,
+									"end": 153
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment in an indexed access's `[`→index gap, kept where written with",
+							"start": 20,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " the index type on the next line.",
+							"start": 99,
+							"end": 134
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
