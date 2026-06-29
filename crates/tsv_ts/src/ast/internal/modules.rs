@@ -64,7 +64,7 @@ pub enum ExportDefaultValue<'arena> {
     // Variants held inline by value: the `Expression` variant already sizes this
     // enum (it is the largest), so inlining the declaration variants is free, avoids
     // a pointer-chase on the format read path, and matches `ExportFunctionDeclaration`
-    // (which holds the same structs inline). See TODO_BUMPALO_ARENA.md follow-up (d).
+    // (which holds the same structs inline).
     Expression(Expression<'arena>),
     FunctionDeclaration(FunctionDeclaration<'arena>),
     /// For ambient function declarations (no body)

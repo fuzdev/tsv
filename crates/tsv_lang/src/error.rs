@@ -104,6 +104,18 @@ pub enum ParseError {
 /// Result type alias for parsing operations
 pub type Result<T> = std::result::Result<T, ParseError>;
 
+/// Unbox a lexer error. The lexer returns `Result<_, Box<ParseError>>` so the hot
+/// `next_token` Ok path stays pointer-sized (a 96-byte `ParseError` inline would
+/// bloat the `Result` and block inlining/SROA of the token pump). The parser's
+/// functions return the unboxed `Result<_, ParseError>`, so this `From` lets their
+/// `?` on a lexer call auto-unbox on the (rare) error path.
+impl From<Box<ParseError>> for ParseError {
+    #[inline]
+    fn from(boxed: Box<ParseError>) -> Self {
+        *boxed
+    }
+}
+
 impl ParseError {
     /// Add source context to an error
     ///

@@ -1,3 +1,4 @@
+use super::lex_err;
 use super::token::{Token, TokenKind};
 use tsv_lang::ParseError;
 
@@ -8,40 +9,41 @@ use tsv_lang::ParseError;
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
 /// block comments happens in the conversion layer (matching Svelte's behavior).
-pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
+pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, Box<ParseError>> {
     let start = *pos;
+    let bytes = source.as_bytes();
+    let len = bytes.len();
 
-    // Skip //
-    *pos += 1; // /
-    *pos += 1; // /
-
-    // Scan to the end of the comment without copying — the content is recovered
-    // on demand as a source slice (`[start + 2, end)`).
+    // Scan to the end of the comment over raw bytes — the content is recovered on
+    // demand as a source slice (`[start + 2, end)`), never copied here.
     //
-    // Read until line terminator or EOF — U+2028/U+2029 terminate line
-    // comments like LF/CR per the spec
-    loop {
-        let current_char = source[*pos..].chars().next();
-        match current_char {
-            None | Some('\n' | '\r' | '\u{2028}' | '\u{2029}') => {
-                // End of line comment
-                // Don't consume the line terminator - it's whitespace for the next token
+    // A line comment ends at the first LineTerminator — LF, CR, or the UTF-8
+    // line/paragraph separators U+2028/U+2029 (`e2 80 a8`/`a9`) — or EOF. The
+    // terminator is NOT consumed; it's whitespace for the next token.
+    //
+    // Byte-at-a-time is sound: none of LF/CR/`0xe2` ever appears as a UTF-8
+    // continuation byte (those are `0x80..=0xbf`), and in valid UTF-8 `0xe2` is
+    // always a 3-byte lead, so the LS/PS peek lands on a char boundary. This
+    // tight loop auto-vectorizes (vs the former per-char `chars().next()` decode).
+    let mut p = start + 2; // skip //
+    while p < len {
+        match bytes[p] {
+            b'\n' | b'\r' => break,
+            0xe2 if p + 2 < len && bytes[p + 1] == 0x80 && matches!(bytes[p + 2], 0xa8 | 0xa9) => {
                 break;
             }
-            Some(ch) => {
-                *pos += ch.len_utf8();
-            }
+            _ => p += 1,
         }
     }
+    *pos = p;
 
     Ok(Token {
         kind: TokenKind::Comment {
             is_block: false,
-            content_start: start + 2,
+            content_start: (start + 2) as u32,
         },
-        start,
-        end: *pos,
-        decoded: None,
+        start: start as u32,
+        end: *pos as u32,
     })
 }
 
@@ -52,48 +54,39 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
 /// comments happens in the conversion layer (matching Svelte's behavior).
-pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
+pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token, Box<ParseError>> {
     let start = *pos;
+    let bytes = source.as_bytes();
+    let len = bytes.len();
 
-    // Skip /*
-    *pos += 1; // /
-    *pos += 1; // *
-
-    // Scan to the closing `*/` without copying — the content is recovered on
-    // demand as a source slice (`[start + 2, end - 2)`).
+    // Scan to the closing `*/` over raw bytes — the content is recovered on demand
+    // as a source slice (`[start + 2, end - 2)`), never copied here. The inner
+    // `!= b'*'` run is a single-byte search the compiler auto-vectorizes; `*`
+    // (`0x2a`) is ASCII and never a UTF-8 continuation byte, so byte-at-a-time is
+    // sound (vs the former per-char `chars().next()` decode).
+    let mut p = start + 2; // skip /*
     loop {
-        let current_char = source[*pos..].chars().next();
-        match current_char {
-            None => {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Unterminated block comment".to_string(),
-                    position: start,
-                    context: None,
-                });
-            }
-            Some('*') => {
-                // Check for closing */
-                let peek_char = source[*pos + 1..].chars().next();
-                if peek_char == Some('/') {
-                    *pos += 1; // *
-                    *pos += 1; // /
-                    break;
-                }
-                *pos += 1;
-            }
-            Some(ch) => {
-                *pos += ch.len_utf8();
-            }
+        while p < len && bytes[p] != b'*' {
+            p += 1;
         }
+        if p >= len {
+            return Err(lex_err("Unterminated block comment", start));
+        }
+        // bytes[p] == b'*'
+        if bytes.get(p + 1) == Some(&b'/') {
+            p += 2; // consume */
+            break;
+        }
+        p += 1; // a `*` not followed by `/` — keep scanning
     }
+    *pos = p;
 
     Ok(Token {
         kind: TokenKind::Comment {
             is_block: true,
-            content_start: start + 2,
+            content_start: (start + 2) as u32,
         },
-        start,
-        end: *pos,
-        decoded: None,
+        start: start as u32,
+        end: *pos as u32,
     })
 }

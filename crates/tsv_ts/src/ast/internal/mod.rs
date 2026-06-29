@@ -268,4 +268,4 @@ pub struct PrivateIdentifier {
 // reads constantly inline (`Expression`/`Statement`/`TSType` fields and the fat
 // variants) rather than arena-boxing them for a smaller enum. Boxing them shrank
 // the slice element but added a pointer-chase on hot format-read paths that cost
-// more than the density win, so the inline form stands. See TODO_BUMPALO_ARENA.md.
+// more than the density win, so the inline form stands.

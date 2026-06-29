@@ -16,7 +16,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Object/tuple/literal types: `<{ a: T }>`, `<[T, U]>`, `<"foo">`
     pub(super) fn is_type_arguments_start(&self) -> bool {
         let bytes = self.source.as_bytes();
-        let start = self.current_start;
+        let start = self.current.start as usize;
 
         // Must start with '<'
         if start >= bytes.len() || bytes[start] != b'<' {

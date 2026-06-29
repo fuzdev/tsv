@@ -56,7 +56,7 @@ pub struct Fragment<'arena> {
 ///
 /// All variants are inline by value: the layout favors traversal locality over
 /// node size (boxing the fat variants added a pointer-chase on hot format-read
-/// paths that cost more than the slice-density win). See TODO_BUMPALO_ARENA.md.
+/// paths that cost more than the slice-density win).
 #[derive(Debug, Clone)]
 pub enum FragmentNode<'arena> {
     Element(Element<'arena>),
@@ -980,7 +980,7 @@ pub struct Style<'arena> {
 // `FragmentNode` / `AttributeNode` variant inline by value rather than
 // arena-boxing the fat ones for a smaller enum. Boxing them shrank the slice
 // element but added a pointer-chase on hot format-read paths that cost more than
-// the density win, so the inline form stands. See TODO_BUMPALO_ARENA.md.
+// the density win, so the inline form stands.
 
 #[cfg(test)]
 mod tests {

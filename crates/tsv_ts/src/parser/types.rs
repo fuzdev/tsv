@@ -453,14 +453,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the expression can be any expression followed by `]`.
     pub(in crate::parser) fn is_index_signature_start(&self) -> bool {
         // Must start with '['
-        if !matches!(self.current_kind, TokenKind::BracketOpen) {
+        if !matches!(self.current.kind, TokenKind::BracketOpen) {
             return false;
         }
 
         // Lookahead: check if pattern is `[identifier:`
         // We need to look past the '[', then the identifier, then check for ':'
         let bytes = self.source.as_bytes();
-        let pos = skip_whitespace_and_comments(bytes, self.current_start + 1); // skip '[' and whitespace/comments
+        let pos = skip_whitespace_and_comments(bytes, self.current.start as usize + 1); // skip '[' and whitespace/comments
 
         // Must be followed by an identifier
         if pos >= bytes.len() || !is_identifier_start(bytes[pos]) {
@@ -490,11 +490,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// acorn.
     fn is_mapped_type_start(&self) -> bool {
         let bytes = self.source.as_bytes();
-        let mut pos = self.current_start;
+        let mut pos = self.current.start as usize;
 
         // Optional leading `readonly` modifier (bare; `+readonly` / `-readonly`
         // are handled by the caller's `+`/`-` check).
-        if matches!(self.current_kind, TokenKind::Identifier) && self.current_value() == "readonly"
+        if matches!(self.current.kind, TokenKind::Identifier) && self.current_value() == "readonly"
         {
             pos = skip_whitespace_and_comments(bytes, skip_identifier(bytes, pos));
         }
