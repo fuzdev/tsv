@@ -1,0 +1,862 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 586,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment after the left operand, before the operator: tsv keeps it",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing the operand and drops the operator (glued to its right operand) to",
+			"start": 97,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the next line. Prettier relocates the comment past the operator.",
+			"start": 177,
+			"end": 244,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " arithmetic operator",
+			"start": 247,
+			"end": 269,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 285,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 4
+				},
+				"end": {
+					"line": 8,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " logical operator",
+			"start": 299,
+			"end": 318,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 334,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 4
+				},
+				"end": {
+					"line": 13,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keyword-binary operator: in",
+			"start": 349,
+			"end": 379,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 395,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 4
+				},
+				"end": {
+					"line": 18,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keyword-binary operator: instanceof",
+			"start": 412,
+			"end": 450,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 466,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 4
+				},
+				"end": {
+					"line": 23,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a same-line block comment stays inline (not a divergence)",
+			"start": 489,
+			"end": 549,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 563,
+			"end": 570,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 13
+				},
+				"end": {
+					"line": 27,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 585,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 576,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 271,
+					"end": 296,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 277,
+							"end": 295,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 277,
+								"end": 278,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 283,
+								"end": 295,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 5
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 283,
+									"end": 284,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 3
+										}
+									},
+									"value": 1,
+									"raw": "1",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 285,
+											"end": 289
+										}
+									]
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 294,
+									"end": 295,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 4
+										},
+										"end": {
+											"line": 9,
+											"column": 5
+										}
+									},
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment after the left operand, before the operator: tsv keeps it",
+							"start": 20,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " trailing the operand and drops the operator (glued to its right operand) to",
+							"start": 97,
+							"end": 175
+						},
+						{
+							"type": "Line",
+							"value": " the next line. Prettier relocates the comment past the operator.",
+							"start": 177,
+							"end": 244
+						},
+						{
+							"type": "Line",
+							"value": " arithmetic operator",
+							"start": 247,
+							"end": 269
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 320,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 326,
+							"end": 345,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 326,
+								"end": 327,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 332,
+								"end": 345,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 6
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 332,
+									"end": 333,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 3
+										}
+									},
+									"name": "x",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 334,
+											"end": 338
+										}
+									]
+								},
+								"operator": "&&",
+								"right": {
+									"type": "Identifier",
+									"start": 344,
+									"end": 345,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 5
+										},
+										"end": {
+											"line": 14,
+											"column": 6
+										}
+									},
+									"name": "y"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " logical operator",
+							"start": 299,
+							"end": 318
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 381,
+					"end": 409,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 387,
+							"end": 408,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 387,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 7
+									},
+									"end": {
+										"line": 17,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 393,
+								"end": 408,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 8
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 393,
+									"end": 394,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 3
+										}
+									},
+									"name": "k",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 395,
+											"end": 399
+										}
+									]
+								},
+								"operator": "in",
+								"right": {
+									"type": "Identifier",
+									"start": 405,
+									"end": 408,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 5
+										},
+										"end": {
+											"line": 19,
+											"column": 8
+										}
+									},
+									"name": "obj"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " keyword-binary operator: in",
+							"start": 349,
+							"end": 379
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 452,
+					"end": 486,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 458,
+							"end": 485,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 458,
+								"end": 459,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 464,
+								"end": 485,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 14
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 464,
+									"end": 465,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"name": "x",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 466,
+											"end": 470
+										}
+									]
+								},
+								"operator": "instanceof",
+								"right": {
+									"type": "Identifier",
+									"start": 484,
+									"end": 485,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 13
+										},
+										"end": {
+											"line": 24,
+											"column": 14
+										}
+									},
+									"name": "C"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " keyword-binary operator: instanceof",
+							"start": 412,
+							"end": 450
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 551,
+					"end": 575,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 557,
+							"end": 574,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 557,
+								"end": 558,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 561,
+								"end": 574,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 11
+									},
+									"end": {
+										"line": 27,
+										"column": 24
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 561,
+									"end": 562,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 11
+										},
+										"end": {
+											"line": 27,
+											"column": 12
+										}
+									},
+									"value": 1,
+									"raw": "1",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 563,
+											"end": 570
+										}
+									]
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 573,
+									"end": 574,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 23
+										},
+										"end": {
+											"line": 27,
+											"column": 24
+										}
+									},
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a same-line block comment stays inline (not a divergence)",
+							"start": 489,
+							"end": 549
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

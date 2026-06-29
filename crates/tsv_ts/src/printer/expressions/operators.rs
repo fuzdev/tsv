@@ -505,7 +505,6 @@ impl<'a> Printer<'a> {
         operators: &[BinaryOperator],
         should_inline_last: bool,
     ) -> (DocBuf, DocBuf) {
-        let d = self.d();
         if operands.is_empty() || operands.len() == 1 {
             // Edge cases handled by callers
             return (DocBuf::new(), DocBuf::new());
@@ -514,18 +513,20 @@ impl<'a> Printer<'a> {
         // First operand + first operator (stays at base indent)
         let mut head_parts: DocBuf = smallvec![operands[0].doc];
 
-        let first_op = operators[0];
-        let first_op_str = first_op.as_str();
+        let first_op_str = operators[0].as_str();
 
         let first_op_pos =
             self.find_operator_position(operands[0].span.end, operands[1].span.start, first_op_str);
 
-        // Comments before first operator
-        let comments_before_first_op =
-            self.build_inline_comments_between_doc(operands[0].span.end, first_op_pos.start);
-        head_parts.push(comments_before_first_op);
-        head_parts.push(d.text(" "));
-        head_parts.push(d.text(first_op_str));
+        // operand[0] → first operator. A line comment in this gap would swallow the
+        // operator if emitted inline; the helper keeps it trailing the operand and
+        // reports whether it forced the operator onto the next line.
+        let mut prev_forced_break = self.push_operand_operator_gap(
+            &mut head_parts,
+            operands[0].span.end,
+            first_op_pos.start,
+            first_op_str,
+        );
 
         // Build continuation parts
         let mut continuation_parts: DocBuf = DocBuf::new();
@@ -533,8 +534,7 @@ impl<'a> Printer<'a> {
         for i in 1..operands.len() {
             let operand = &operands[i];
             let prev_operand = &operands[i - 1];
-            let operator = operators[i - 1];
-            let op_str = operator.as_str();
+            let op_str = operators[i - 1].as_str();
             let op_pos =
                 self.find_operator_position(prev_operand.span.end, operand.span.start, op_str);
 
@@ -542,30 +542,32 @@ impl<'a> Printer<'a> {
             // uses a space instead of line(), keeping operator and RHS on the same line.
             let allow_breaks = !(i == operands.len() - 1 && should_inline_last);
 
+            // When the previous operand→operator gap forced a break, the operator now
+            // leads this operand on the same line, so hug it with a space (not a line).
             self.append_post_operator_parts(
                 &mut continuation_parts,
                 op_pos.end,
                 prev_operand.span.end,
                 operand,
                 allow_breaks,
+                prev_forced_break,
             );
 
-            // Add next operator (if not last operand)
+            // operand[i] → next operator (if not last operand)
             if i < operands.len() - 1 {
-                let next_op = operators[i];
-                let next_op_str = next_op.as_str();
+                let next_op_str = operators[i].as_str();
                 let next_op_pos = self.find_operator_position(
                     operand.span.end,
                     operands[i + 1].span.start,
                     next_op_str,
                 );
 
-                // Comments before next operator
-                let comments_before_next_op =
-                    self.build_inline_comments_between_doc(operand.span.end, next_op_pos.start);
-                continuation_parts.push(comments_before_next_op);
-                continuation_parts.push(d.text(" "));
-                continuation_parts.push(d.text(next_op_str));
+                prev_forced_break = self.push_operand_operator_gap(
+                    &mut continuation_parts,
+                    operand.span.end,
+                    next_op_pos.start,
+                    next_op_str,
+                );
             }
         }
 
@@ -685,10 +687,64 @@ impl<'a> Printer<'a> {
         d.concat(&[d.concat(&first_parts), continuation_doc])
     }
 
+    /// Emit a binary chain's operand→operator gap, returning whether a line comment
+    /// in the gap forced the operator onto the next line.
+    ///
+    /// Without a line comment the gap renders inline as it always has
+    /// (`operand <inline block comments> operator`). With a line comment, emitting it
+    /// inline would run to end-of-line and **swallow the operator**
+    /// (`1 // c⏎+ 2` → `1 // c + 2`, the `+ 2` absorbed into the comment — content
+    /// loss). Instead the comment is kept trailing the operand where the author wrote
+    /// it — the first, on the operand's own line, via `line_suffix` (zero width); any
+    /// later ones on their own line — and a hardline then forces the operator down to
+    /// hug its right operand (`1 // c⏎+ 2`). Returns `true` in that case so the caller
+    /// hugs the following operand with a space rather than a breakable line (avoiding
+    /// the `1 // c⏎+⏎2` over-break). Prettier instead relocates the comment past the
+    /// operator; see conformance_prettier.md §Comment relocation.
+    fn push_operand_operator_gap(
+        &self,
+        parts: &mut DocBuf,
+        operand_end: u32,
+        op_start: u32,
+        op_str: &'static str,
+    ) -> bool {
+        let d = self.d();
+
+        if !self.has_line_comments_between(operand_end, op_start) {
+            // No line comment — inline gap (block comments stay inline, as before).
+            parts.push(self.build_inline_comments_between_doc(operand_end, op_start));
+            parts.push(d.text(" "));
+            parts.push(d.text(op_str));
+            return false;
+        }
+
+        // Keep each comment where the author wrote it, then break before the operator.
+        let mut pos = operand_end;
+        for (i, comment) in comments_in_range(self.comments, operand_end, op_start).enumerate() {
+            if i == 0 && !self.has_newline_between(pos, comment.span.start) {
+                // On the operand's line (`1 // c`): trail via `line_suffix` (zero width)
+                // so a long comment never forces the preceding operand group to break.
+                parts.push(self.build_trailing_comment_doc(comment));
+            } else {
+                // On its own line — preserve an author blank line before it.
+                self.push_blank_preserving_hardline(parts, pos, comment.span.start);
+                parts.push(self.build_comment_doc(comment));
+            }
+            pos = comment.span.end;
+        }
+
+        parts.push(d.hardline());
+        parts.push(d.text(op_str));
+        true
+    }
+
     /// Append post-operator parts (comments and line breaks) to a parts vector
     ///
     /// Handles line comments vs block comments appropriately.
     /// When `allow_breaks` is true, uses `line()` (space when flat, newline when broken).
+    /// When `lead_with_space` is true, the leading separator is a hard space instead of a
+    /// breakable line — used when the previous operand→operator gap forced a break, so the
+    /// operator now leads this operand on the same line (`1 // c⏎+ 2`, not `1 // c⏎+⏎2`).
     ///
     /// Handles multiple consecutive comments by preserving their line structure:
     /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
@@ -699,6 +755,7 @@ impl<'a> Printer<'a> {
         _prev_operand_end: u32,
         operand: &ChainOperand,
         allow_breaks: bool,
+        lead_with_space: bool,
     ) {
         let d = self.d();
         // Collect all comments in the range between operator and next operand
@@ -707,7 +764,7 @@ impl<'a> Printer<'a> {
 
         if comments.is_empty() {
             // No comments - simple case
-            if allow_breaks {
+            if allow_breaks && !lead_with_space {
                 parts.push(d.line());
             } else {
                 parts.push(d.text(" "));
@@ -730,7 +787,7 @@ impl<'a> Printer<'a> {
             // In break mode: `a ||\n<indent>/* comment */ b` (comment leads continuation line)
             let comments_doc =
                 self.build_comments_between(op_end, operand.span.start, CommentSpacing::Trailing);
-            if allow_breaks {
+            if allow_breaks && !lead_with_space {
                 parts.push(d.line());
             } else {
                 parts.push(d.text(" "));
