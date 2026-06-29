@@ -9,6 +9,9 @@ default = ["convert"]
 # Public AST + JSON serialization layer. Off in the @fuzdev/tsv_format_wasm
 # build; on for every other consumer.
 convert = ["dep:serde", "dep:serde_json"]
+# Exposes `debug_token_stream` for the differential lexer harness (`tsv_debug
+# lex_diff`). Off in production builds; enabled only by `tsv_debug`.
+debug_lex = []
 
 [dependencies]
 tsv_lang.workspace = true

@@ -34,9 +34,32 @@ use strings::read_string;
 pub use token::{Token, TokenKind};
 use tsv_lang::ParseError;
 
+/// Construct a boxed lexer error. The lexer returns `Result<_, Box<ParseError>>`
+/// (see `From<Box<ParseError>>` in `tsv_lang`): boxing keeps the hot `next_token`
+/// Ok path pointer-sized. `#[cold]` / `#[inline(never)]` outlines the error
+/// construction so it never bloats the inlined token-scan fast path. Shared by the
+/// scanner submodules (each reaches it via `super::lex_err`).
+#[cold]
+#[inline(never)]
+#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
+fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
+    Box::new(ParseError::InvalidSyntax {
+        message: message.into(),
+        position,
+        context: None,
+    })
+}
+
 pub struct Lexer<'a> {
     source: &'a str,
     pos: usize,
+    /// Out-of-band decoded value for the **last token produced**, set only when an
+    /// identifier actually contained an escape sequence (the no-escape common case
+    /// leaves it `None`, so the token's text is recovered as a verbatim source
+    /// slice). The parser drains it with `take_decoded` right after each token.
+    /// `Box<String>` keeps the slot pointer-sized. Mirrors `tsv_ts`'s lexer.
+    #[allow(clippy::box_collection)]
+    decoded: Option<Box<String>>,
 }
 
 impl<'a> Lexer<'a> {
@@ -49,7 +72,19 @@ impl<'a> Lexer<'a> {
         } else {
             0
         };
-        Self { source, pos }
+        Self {
+            source,
+            pos,
+            decoded: None,
+        }
+    }
+
+    /// Take the decoded value of the most recently produced token, if it required
+    /// escape processing (only escaped identifiers do). Leaves the slot `None`.
+    #[allow(clippy::box_collection)]
+    #[inline]
+    pub fn take_decoded(&mut self) -> Option<Box<String>> {
+        self.decoded.take()
     }
 
     #[inline]
@@ -73,28 +108,39 @@ impl<'a> Lexer<'a> {
         }
         Token {
             kind: TokenKind::Whitespace,
-            start,
-            end: self.pos,
-            decoded: None,
+            start: start as u32,
+            end: self.pos as u32,
         }
     }
 
-    pub fn next_token(&mut self) -> Result<Token, ParseError> {
+    /// Lex an identifier, stashing any decoded escape value out-of-band in
+    /// `self.decoded`. Thin wrapper over the free `identifiers::read_identifier`
+    /// so both dispatch arms (`$`-prefixed and plain) share the handoff.
+    fn read_identifier(&mut self) -> Result<Token, Box<ParseError>> {
+        let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
+        self.decoded = decoded;
+        Ok(token)
+    }
+
+    pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
+        // Clear any decoded value carried from the previous token (the parser has
+        // already drained it via `take_decoded`); only an escaped identifier below
+        // sets it again.
+        self.decoded = None;
+
         if self.pos >= self.source.len() {
             return Ok(Token {
                 kind: TokenKind::Eof,
-                start: self.pos,
-                end: self.pos,
-                decoded: None,
+                start: self.pos as u32,
+                end: self.pos as u32,
             });
         }
 
         let Some(ch) = self.current_char() else {
             return Ok(Token {
                 kind: TokenKind::Eof,
-                start: self.pos,
-                end: self.pos,
-                decoded: None,
+                start: self.pos as u32,
+                end: self.pos as u32,
             });
         };
 
@@ -105,9 +151,8 @@ impl<'a> Lexer<'a> {
                 self.pos += ch.len_utf8();
                 Ok(Token {
                     kind: $kind,
-                    start,
-                    end: self.pos,
-                    decoded: None,
+                    start: start as u32,
+                    end: self.pos as u32,
                 })
             }};
         }
@@ -177,9 +222,7 @@ impl<'a> Lexer<'a> {
             // `$`-prefixed identifier (SCSS variable / property name like `$foo`).
             // Svelte's parseCss treats it as a single identifier. A bare `$` (e.g.
             // the `$=` attribute selector) falls through to the Dollar token below.
-            '$' if self.peek_char(1).is_some_and(is_identifier_start) => {
-                read_identifier(self.source, &mut self.pos)
-            }
+            '$' if self.peek_char(1).is_some_and(is_identifier_start) => self.read_identifier(),
             '$' => single_char_token!(TokenKind::Dollar),
             '!' => single_char_token!(TokenKind::Bang),
             '|' => {
@@ -190,9 +233,8 @@ impl<'a> Lexer<'a> {
                     self.pos += 1; // skip second |
                     Ok(Token {
                         kind: TokenKind::ColumnCombinator,
-                        start,
-                        end: self.pos,
-                        decoded: None,
+                        start: start as u32,
+                        end: self.pos as u32,
                     })
                 } else {
                     single_char_token!(TokenKind::Pipe)
@@ -200,14 +242,13 @@ impl<'a> Lexer<'a> {
             }
 
             // Identifiers (including those with unicode escapes)
-            _ if is_identifier_start(ch) => read_identifier(self.source, &mut self.pos),
+            _ if is_identifier_start(ch) => self.read_identifier(),
 
             // Unknown character
-            _ => Err(ParseError::InvalidSyntax {
-                message: format!("Unexpected character in CSS: '{ch}'"),
-                position: self.pos,
-                context: None,
-            }),
+            _ => Err(lex_err(
+                format!("Unexpected character in CSS: '{ch}'"),
+                self.pos,
+            )),
         }
     }
 }

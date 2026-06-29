@@ -43,9 +43,7 @@ pub(super) fn parse_condition_query<'arena>(
 
         // Check for `and`/`or` connector
         if parser.check(TokenKind::Identifier) {
-            let ident = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value());
+            let ident = parser.current_identifier();
 
             if ident == "and" || ident == "or" {
                 // This is a connector between parts
@@ -74,9 +72,7 @@ pub(super) fn parse_condition_query<'arena>(
 
         // Check for leading `not`
         if parser.check(TokenKind::Identifier) {
-            let ident = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value());
+            let ident = parser.current_identifier();
             if ident == "not" {
                 part_content.push("not".to_string());
                 parser.advance()?;
@@ -179,7 +175,7 @@ pub(super) fn parse_condition_query<'arena>(
             // Match on the decoded value, not the now-verbatim `part`, so an escaped
             // operator still spaces correctly.
             let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
-                && matches!(parser.current_identifier(), Some("and" | "or" | "not"));
+                && matches!(parser.current_identifier(), "and" | "or" | "not");
 
             // Add space before boolean operators if not preceded by whitespace — but
             // not right after an opening paren (`(not (…))` keeps the paren tight,
@@ -289,7 +285,7 @@ pub(super) fn parse_container_prelude<'arena>(
     // survive (`\@named` stays `\@named`).
     let container_name = if parser.check(TokenKind::Identifier)
         && parser.source.get(parser.current_end..=parser.current_end) != Some("(")
-        && !matches!(parser.current_identifier(), Some("not" | "and" | "or"))
+        && !matches!(parser.current_identifier(), "not" | "and" | "or")
     {
         // Copy into the arena only on the path that stores the name as a node.
         let name = parser.alloc_str_in(parser.current_value());
@@ -350,9 +346,7 @@ pub(super) fn parse_scope_prelude<'arena>(
     // Check for optional "to" clause
     parser.skip_whitespace()?;
     let (limit, end_pos) = if parser.check(TokenKind::Identifier) {
-        let identifier = parser
-            .current_identifier()
-            .unwrap_or_else(|| parser.current_value());
+        let identifier = parser.current_identifier();
         if identifier == "to" {
             parser.advance()?; // consume "to"
             parser.skip_whitespace()?;
@@ -457,9 +451,7 @@ pub(super) fn parse_import_prelude<'arena>(
             parser.skip_whitespace_registering_comments()?;
         } else if parser.check(TokenKind::Identifier) {
             // Check for bare "layer" keyword or media query
-            let ident = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value());
+            let ident = parser.current_identifier();
 
             if ident == "layer" {
                 // Bare "layer" keyword (without function call); text recovered from
@@ -524,11 +516,7 @@ fn parse_function_value<'arena>(
 
     // Get function name (current token should be identifier)
     let name = if parser.check(TokenKind::Identifier) {
-        parser.alloc_str_in(
-            parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value()),
-        )
+        parser.alloc_str_in(parser.current_identifier())
     } else {
         return Err(parser.error_expected("function name"));
     };
@@ -614,10 +602,7 @@ fn parse_function_value<'arena>(
             }
 
             let part = match &parser.current_kind {
-                TokenKind::Identifier => parser
-                    .current_identifier()
-                    .unwrap_or_else(|| parser.current_value())
-                    .to_string(),
+                TokenKind::Identifier => parser.current_identifier().to_string(),
                 TokenKind::String { quote } => {
                     let content =
                         &parser.source()[parser.current_start + 1..parser.current_end - 1];

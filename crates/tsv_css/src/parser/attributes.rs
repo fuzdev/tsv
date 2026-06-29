@@ -40,11 +40,7 @@ pub(crate) fn parse_attribute_selector<'arena>(
             start: (parser.base_offset() + parser.current_start) as u32,
             end: (parser.base_offset() + parser.current_end) as u32,
         };
-        let maybe_namespace = parser.alloc_str_in(
-            parser
-                .current_identifier()
-                .ok_or_else(|| parser.error_expected("identifier"))?,
-        );
+        let maybe_namespace = parser.alloc_str_in(parser.current_identifier());
         parser.advance()?;
         parser.skip_whitespace()?;
 
@@ -226,9 +222,7 @@ fn parse_attribute_value<'arena>(
         match &parser.current_kind {
             // Internal AST: use decoded value (spec-compliant)
             TokenKind::Identifier => {
-                let v = parser
-                    .current_identifier()
-                    .unwrap_or_else(|| parser.current_value());
+                let v = parser.current_identifier();
                 Some(parser.alloc_str_in(v))
             }
             TokenKind::String { .. } => {

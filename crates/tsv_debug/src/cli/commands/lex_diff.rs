@@ -16,7 +16,8 @@ use std::path::{Path, PathBuf};
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "lex_diff")]
 pub struct LexDiffCommand {
-    /// files/dirs to lex (recursive; `.ts` / `.mts` / `.cts` / `.svelte.ts`)
+    /// files/dirs to lex (recursive; `.ts` / `.mts` / `.cts` / `.svelte.ts` /
+    /// `.css` — dispatched per file to the matching language lexer)
     #[argh(positional)]
     paths: Vec<PathBuf>,
 
@@ -44,22 +45,28 @@ impl LexDiffCommand {
         }
         let mut files = Vec::new();
         for p in &self.paths {
-            collect_ts_files(p, &mut files);
+            collect_lex_files(p, &mut files);
         }
         files.sort();
         files.dedup();
         if files.is_empty() {
-            eprintln!("lex_diff: no .ts files found under {:?}", self.paths);
+            eprintln!("lex_diff: no lexable files found under {:?}", self.paths);
             return Err(CliError::Failed);
         }
 
-        // Build the current token-stream map (path → stream).
+        // Build the current token-stream map (path → stream), dispatching each
+        // file to the lexer for its language.
         let mut streams: BTreeMap<String, String> = BTreeMap::new();
         for f in &files {
             let key = f.to_string_lossy().into_owned();
             match std::fs::read_to_string(f) {
                 Ok(src) => {
-                    streams.insert(key, tsv_ts::debug_token_stream(&src));
+                    let stream = if is_css_file(f) {
+                        tsv_css::debug_token_stream(&src)
+                    } else {
+                        tsv_ts::debug_token_stream(&src)
+                    };
+                    streams.insert(key, stream);
                 }
                 Err(e) => {
                     eprintln!("lex_diff: skip {key}: {e}");
@@ -203,10 +210,11 @@ fn combined_digest(streams: &BTreeMap<String, String>) -> u64 {
     h
 }
 
-/// Collect `.ts` / `.mts` / `.cts` / `.svelte.ts` files, skipping the usual nests.
-fn collect_ts_files(path: &Path, out: &mut Vec<PathBuf>) {
+/// Collect lexable files (`.ts` / `.mts` / `.cts` / `.svelte.ts` / `.css`),
+/// skipping the usual nests.
+fn collect_lex_files(path: &Path, out: &mut Vec<PathBuf>) {
     if path.is_file() {
-        if is_ts_file(path) {
+        if is_lex_file(path) {
             out.push(path.to_path_buf());
         }
         return;
@@ -221,11 +229,15 @@ fn collect_ts_files(path: &Path, out: &mut Vec<PathBuf>) {
             if matches!(name, "node_modules" | ".git" | "target" | "dist" | "build") {
                 continue;
             }
-            collect_ts_files(&p, out);
-        } else if is_ts_file(&p) {
+            collect_lex_files(&p, out);
+        } else if is_lex_file(&p) {
             out.push(p);
         }
     }
+}
+
+fn is_lex_file(path: &Path) -> bool {
+    is_ts_file(path) || is_css_file(path)
 }
 
 fn is_ts_file(path: &Path) -> bool {
@@ -233,4 +245,9 @@ fn is_ts_file(path: &Path) -> bool {
     // Any TypeScript source, including `.d.ts` declaration files — they lex like
     // any other `.ts` and are worth diffing.
     name.ends_with(".ts") || name.ends_with(".mts") || name.ends_with(".cts")
+}
+
+fn is_css_file(path: &Path) -> bool {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    name.ends_with(".css")
 }

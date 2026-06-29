@@ -19,7 +19,7 @@ pub(crate) struct CssParser<'a, 'arena> {
     pub(crate) current_kind: TokenKind,
     pub(crate) current_start: usize,
     pub(crate) current_end: usize,
-    current_decoded: Option<String>, // Decoded value for current token (e.g., identifier escapes)
+    current_decoded: Option<String>, // Decoded value for current token (only set for escaped identifiers)
     peek_cache: Option<PeekData<TokenKind>>,
     base_offset: usize, // Offset in full source (when parsing embedded CSS)
     pub(crate) comments: Vec<Comment>,
@@ -38,16 +38,14 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
-        let (kind, start, end, decoded) = {
-            let token = lexer.next_token()?;
-            (token.kind, token.start, token.end, token.decoded)
-        };
+        let token = lexer.next_token()?;
+        let decoded = lexer.take_decoded().map(|b| *b);
         Ok(Self {
             source,
             lexer,
-            current_kind: kind,
-            current_start: start,
-            current_end: end,
+            current_kind: token.kind,
+            current_start: token.start as usize,
+            current_end: token.end as usize,
             current_decoded: decoded,
             peek_cache: None,
             base_offset,
@@ -112,9 +110,9 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         } else {
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
-            self.current_start = token.start;
-            self.current_end = token.end;
-            self.current_decoded = token.decoded;
+            self.current_start = token.start as usize;
+            self.current_end = token.end as usize;
+            self.current_decoded = self.lexer.take_decoded().map(|b| *b);
         }
         Ok(())
     }
@@ -124,7 +122,11 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     pub(crate) fn peek(&mut self) -> Result<&TokenKind, ParseError> {
         if self.peek_cache.is_none() {
             let token = self.lexer.next_token()?;
-            self.peek_cache = Some(PeekData::new(token.kind, token.start, token.end));
+            self.peek_cache = Some(PeekData::new(
+                token.kind,
+                token.start as usize,
+                token.end as usize,
+            ));
         }
         // peek_cache is guaranteed Some after the if block above
         match &self.peek_cache {
@@ -220,10 +222,17 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         &self.source[self.current_start..self.current_end]
     }
 
-    /// Get the decoded identifier value (for Identifier tokens only)
-    /// Returns None if not an identifier or no decoded value available
-    pub(crate) fn current_identifier(&self) -> Option<&str> {
-        self.current_decoded.as_deref()
+    /// Get the current identifier's resolved text.
+    ///
+    /// Returns the decoded value when the identifier contained escapes, otherwise
+    /// the verbatim source slice (the no-escape common case, where the lexer keeps
+    /// `current_decoded` `None` to avoid an allocation). Only meaningful when the
+    /// current token is an `Identifier`; for other tokens it returns the raw token
+    /// slice, so callers gate on the kind first (as they already did).
+    pub(crate) fn current_identifier(&self) -> &str {
+        self.current_decoded
+            .as_deref()
+            .unwrap_or_else(|| self.current_value())
     }
 
     pub(crate) fn current_start(&self) -> usize {

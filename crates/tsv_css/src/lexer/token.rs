@@ -93,13 +93,19 @@ impl fmt::Display for TokenKind {
     }
 }
 
-#[derive(Debug)]
+/// A lexed CSS token: a 16-byte POD (`kind` + two `u32` spans) returned by value
+/// from `next_token`. The decoded value of an escaped identifier is kept
+/// **out-of-band** on the `Lexer` (`take_decoded`) rather than inline here, so the
+/// common no-escape identifier costs no allocation and the hot token does not carry
+/// a `String`. `Clone` (not `Copy`) mirrors `tsv_ts::Token`.
+#[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
-    pub start: usize,
-    pub end: usize,
-    /// Decoded value for tokens that require escape sequence processing
-    /// - For Identifier: decoded CSS identifier (escapes resolved)
-    /// - For other tokens: None
-    pub decoded: Option<String>,
+    pub start: u32,
+    pub end: u32,
 }
+
+// The 16-byte size is load-bearing: it keeps `next_token`'s by-value return in
+// registers. `TokenKind`'s widest payload is `String { quote: char }` (align 4),
+// so `kind` is 8 bytes + two `u32` spans = 16.
+const _: () = assert!(size_of::<Token>() == 16);
