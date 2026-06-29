@@ -1,0 +1,526 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 265,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Valid numeric separators sit between two digits, in every base and position",
+			"start": 10,
+			"end": 88,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 264,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 255,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 90,
+					"end": 112,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 96,
+							"end": 111,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 96,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "dec"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 102,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 22
+									}
+								},
+								"value": 1000000,
+								"raw": "1_000_000"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Valid numeric separators sit between two digits, in every base and position",
+							"start": 10,
+							"end": 88
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 114,
+					"end": 134,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 120,
+							"end": 133,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 120,
+								"end": 123,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"name": "hex"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 126,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"value": 65535,
+								"raw": "0xff_ff"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 136,
+					"end": 160,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 142,
+							"end": 159,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 142,
+								"end": 145,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 10
+									}
+								},
+								"name": "bin"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 148,
+								"end": 159,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 13
+									},
+									"end": {
+										"line": 5,
+										"column": 24
+									}
+								},
+								"value": 170,
+								"raw": "0b1010_1010"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 162,
+					"end": 182,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 168,
+							"end": 181,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 168,
+								"end": 171,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"name": "oct"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 174,
+								"end": 181,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 13
+									},
+									"end": {
+										"line": 6,
+										"column": 20
+									}
+								},
+								"value": 511,
+								"raw": "0o7_7_7"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 184,
+					"end": 209,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 190,
+							"end": 208,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 190,
+								"end": 194,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 11
+									}
+								},
+								"name": "frac"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 197,
+								"end": 208,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 14
+									},
+									"end": {
+										"line": 7,
+										"column": 25
+									}
+								},
+								"value": 1000.0005,
+								"raw": "1_000.000_5"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 211,
+					"end": 233,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 217,
+							"end": 232,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 217,
+								"end": 220,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 10
+									}
+								},
+								"name": "exp"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 223,
+								"end": 232,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 13
+									},
+									"end": {
+										"line": 8,
+										"column": 22
+									}
+								},
+								"value": 10000000000000,
+								"raw": "1_000e1_0"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 235,
+					"end": 254,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 241,
+							"end": 253,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 241,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 10
+									}
+								},
+								"name": "big"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 247,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 13
+									},
+									"end": {
+										"line": 9,
+										"column": 19
+									}
+								},
+								"value": "1000",
+								"raw": "1_000n",
+								"bigint": "1000"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

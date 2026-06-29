@@ -1,0 +1,398 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 209,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The BigInt suffix `n` attaches only to integer literals (no fraction, no exponent)",
+			"start": 10,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 208,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 97,
+					"end": 114,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 103,
+							"end": 113,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 103,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "dec"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 109,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 17
+									}
+								},
+								"value": "123",
+								"raw": "123n",
+								"bigint": "123"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The BigInt suffix `n` attaches only to integer literals (no fraction, no exponent)",
+							"start": 10,
+							"end": 95
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 116,
+					"end": 134,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 19
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 122,
+							"end": 133,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 18
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 122,
+								"end": 125,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 10
+									}
+								},
+								"name": "hex"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 128,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 13
+									},
+									"end": {
+										"line": 4,
+										"column": 18
+									}
+								},
+								"value": "255",
+								"raw": "0xffn",
+								"bigint": "255"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 136,
+					"end": 156,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 142,
+							"end": 155,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 142,
+								"end": 145,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 10
+									}
+								},
+								"name": "bin"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 148,
+								"end": 155,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 13
+									},
+									"end": {
+										"line": 5,
+										"column": 20
+									}
+								},
+								"value": "10",
+								"raw": "0b1010n",
+								"bigint": "10"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 158,
+					"end": 177,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 164,
+							"end": 176,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 164,
+								"end": 167,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"name": "oct"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 170,
+								"end": 176,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 13
+									},
+									"end": {
+										"line": 6,
+										"column": 19
+									}
+								},
+								"value": "511",
+								"raw": "0o777n",
+								"bigint": "511"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 179,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 20
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 185,
+							"end": 197,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 19
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 185,
+								"end": 188,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 10
+									}
+								},
+								"name": "sep"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 191,
+								"end": 197,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 13
+									},
+									"end": {
+										"line": 7,
+										"column": 19
+									}
+								},
+								"value": "1000",
+								"raw": "1_000n",
+								"bigint": "1000"
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

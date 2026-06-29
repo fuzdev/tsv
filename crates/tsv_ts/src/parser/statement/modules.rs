@@ -920,9 +920,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 expression,
                 span: Span::new(ref_start as u32, ref_end as u32),
             })
-        } else {
-            // `A.B.C` (entity name)
+        } else if matches!(self.current_kind(), TokenKind::Identifier) {
+            // `A.B.C` (entity name) — must start with an identifier; a string /
+            // number / empty reference (`import x = 'foo'`, `import x = 5`,
+            // `import x =`) is a syntax error, matching acorn-typescript.
             TSModuleReference::EntityName(self.parse_entity_name()?)
+        } else {
+            return Err(self.error_expected("'require(...)' or a module reference after '='"));
         };
 
         let end = self.semicolon_end()?;

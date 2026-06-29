@@ -1209,7 +1209,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut body = self.bvec();
 
         while self.current.kind != TokenKind::Eof {
-            body.push(self.parse_statement()?);
+            body.push(self.parse_module_item()?);
         }
         self.adapt_directive_prologue(&mut body);
 

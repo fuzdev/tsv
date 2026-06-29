@@ -17,9 +17,9 @@ changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,544 graded after skips).
 
 - Positive (should parse) — 42,113 passed, 0 failed
-- Negative (should reject) — 1,995 passed, 2,436 failed
+- Negative (should reject) — 2,151 passed, 2,280 failed
 
-- **Overall**: 44,108/46,544 (94.8%)
+- **Overall**: 44,264/46,544 (95.1%)
 - **Positive pass rate**: 100% — every test tsv grades and that should parse does,
   graded at each test's declared goal (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
 - **Skipped**: 2,592 (sloppy mode: 2,520, unimplemented feature: 0, runtime: 38, resolution: 34)
@@ -128,6 +128,44 @@ gap is the object rest _target_ shape — `({...[a]} = c)` / `const {...[a]} = c
 (the spec forbids an `ArrayLiteral`/`ObjectLiteral` target on an object rest,
 and a `BindingRestProperty` must be a plain identifier) — is a separate
 constraint left over-accepted.
+
+tsv also enforces the **`[no LineTerminator here]` restricted productions**: a
+line terminator between an arrow's parameters and `=>` (`(a)⏎=> x`), a conditional
+type's check type and `extends` (`U⏎extends T ? 1 : 2`), a type predicate's
+parameter and `is` (`x⏎is T`), or a definite-assignment binding and `!`
+(`let x⏎!: T`) is a syntax error — matching acorn-typescript's
+`hasPrecedingLineBreak` guards (a line comment in the gap counts, since it ends in
+a newline). And three **positional grammar** rules: a for-in/of head binds exactly
+one declarator (`for (let a, b of x)` rejected), a labeled statement's body is a
+`Statement` or `FunctionDeclaration` and never a lexical/class declaration
+(`a: class C {}`, `a: let x = 1`, `a: function f(){}` rejected; `a: var x = 1`,
+`a: enum E {}` and ordinary statements accepted), and `import`/`export`
+declarations appear only at the module top level or inside a TS
+`namespace`/`module` body (`{ import x from 'y' }`, `function () { export … }`,
+`if (c) import …` rejected, while `import(…)` / `import.meta` expressions stay
+valid in any position).
+
+tsv also enforces the **numeric-literal lexical grammar**. A
+`NumericLiteralSeparator` (`_`) must sit between two digits, so it is rejected at
+the start of a digit group, at the end, when doubled, or adjacent to a
+prefix/`.`/`e` (`0x_12`, `12_`, `1__2`, `1.5_`, `1e_3` rejected; `1_000`,
+`0xff_ff`, `1_000.000_5`, `1_000e1_0` accepted). A radix literal must carry at
+least one digit after its prefix (`0x`, `0b`, `0o` with no digits rejected). And
+the BigInt suffix `n` attaches only to an integer-form literal — never to a
+fraction or exponent (`1.5n`, `1e3n` rejected; `123n`, `0xffn`, `0o7n`, `1_000n`
+accepted) — matching acorn's "Identifier directly after number". Two adjacent
+edges stay accepted, tangled with the intentional sloppy-mode `08`/`09`
+carve-out: `0_1` (separator in a legacy-octal-shaped literal) and `5.n` (lexed as
+member access `(5).n`). A `\u{…}` string escape must be terminated with `}`
+(`'\u{41'` rejected).
+
+Three **TypeScript-grammar** over-acceptances are likewise rejected. A mapped-type
+`+`/`-` modifier is a single optional sign that must be followed by `readonly`
+(key position) or `?` (value position): a stray sign (`{ [K in S]+: V }`,
+`{ +[K in S]: V }`, `{ -+readonly [K in S]: V }`) is a syntax error, not a
+silently dropped token. An `import X = …` reference must be `require('…')` or an
+entity name (`A.B.C`): a string/number/empty reference (`import x = 'foo'`,
+`import x = 5`, `import x =`) is rejected.
 
 ## Scope
 
