@@ -748,9 +748,12 @@ The fat inline nodes carry no by-value-return penalty in the parser, either: eac
 node is built in the arena and threaded up the recursive descent **by reference**
 (the expression parser's transient `ParsedExpr` wrapper holds an `&'arena
 Expression`, not the node), so the recursion moves pointers regardless of node
-size. The two concerns are decoupled — node *layout* is tuned for the format
-traversal, while the parse-time recursion cost is paid in pointer moves — so a fat
-inline variant is not a reason to box it.
+size. The wrapper is kept register-returnable end to end — an 8-byte reference plus
+two `u32` paren-bound positions (16 bytes), with the error boxed so the fallible
+`Result<ParsedExpr, Box<ParseError>>` stays 16 bytes and returns in registers rather
+than through an sret stack slot. The two concerns are decoupled — node *layout* is
+tuned for the format traversal, while the parse-time recursion cost is paid in
+pointer moves — so a fat inline variant is not a reason to box it.
 
 **Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
 `MultiArrayList`) were benchmarked early in development and were slower —
