@@ -744,6 +744,14 @@ and the extra pointer-chases that size-minimization adds on hot traversal paths
 cost more than the cache-density they buy. (The arena allocation itself is the
 win; the node *layout* favors traversal locality over byte size.)
 
+The fat inline nodes carry no by-value-return penalty in the parser, either: each
+node is built in the arena and threaded up the recursive descent **by reference**
+(the expression parser's transient `ParsedExpr` wrapper holds an `&'arena
+Expression`, not the node), so the recursion moves pointers regardless of node
+size. The two concerns are decoupled — node *layout* is tuned for the format
+traversal, while the parse-time recursion cost is paid in pointer moves — so a fat
+inline variant is not a reason to box it.
+
 **Rationale vs flat/indexed:** Flat/indexed layouts (index arrays, à la Zig's
 `MultiArrayList`) were benchmarked early in development and were slower —
 traversal replaced direct pointer/reference access with index lookups, and a
