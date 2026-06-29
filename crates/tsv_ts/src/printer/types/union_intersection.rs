@@ -383,8 +383,6 @@ impl<'a> Printer<'a> {
                         parts.push(self.build_trailing_line_comment_doc(comment));
                     }
 
-                    parts.push(d.hardline());
-
                     // Comments after the pipe lead this member. Line comments (and
                     // own-line block comments) go on their own line BEFORE the `| `
                     // separator so the pipe stays attached to the type
@@ -393,11 +391,30 @@ impl<'a> Printer<'a> {
                     // trail the previous member — see
                     // union_infix_pipe_line_comment_prettier_divergence.
                     let after_pipe = pipe_pos + 1;
-                    for comment in comments_in_range(self.comments, after_pipe, type_start) {
-                        if !(comment.is_block && self.is_same_line(comment.span.end, type_start)) {
-                            parts.push(self.build_comment_doc(comment));
-                            parts.push(d.hardline());
+                    let own_line: Vec<_> = comments_in_range(self.comments, after_pipe, type_start)
+                        .filter(|c| !(c.is_block && self.is_same_line(c.span.end, type_start)))
+                        .collect();
+                    // A blank line the author left *before* the first own-line comment
+                    // (`A |⏎⏎/* c */⏎B`) and *between* two own-line comments is preserved,
+                    // matching prettier — but NOT one after the last comment before the
+                    // member (prettier emits none there). This mirrors the intersection
+                    // own-line path with the axes swapped: prettier's union and
+                    // intersection printers preserve blanks in opposite member-gap
+                    // positions.
+                    if let Some(first) = own_line.first()
+                        && self.has_blank_line_between(prev_type_end, first.span.start)
+                    {
+                        parts.push(d.literalline());
+                    }
+                    parts.push(d.hardline());
+                    for (j, comment) in own_line.iter().enumerate() {
+                        parts.push(self.build_comment_doc(comment));
+                        if let Some(next) = own_line.get(j + 1)
+                            && self.has_blank_line_between(comment.span.end, next.span.start)
+                        {
+                            parts.push(d.literalline());
                         }
+                        parts.push(d.hardline());
                     }
                     parts.push(d.text("| "));
                     for comment in comments_in_range(self.comments, after_pipe, type_start) {
@@ -545,6 +562,31 @@ impl<'a> Printer<'a> {
         })
     }
 
+    /// True when a comment between two consecutive intersection members forces the
+    /// whole intersection one-member-per-line.
+    ///
+    /// A **line** comment always forces it. A **block** comment forces it only when
+    /// it sits on its OWN line between the members — *not* inline-adjacent to the
+    /// previous member (`A /* c */⏎& B`) nor to the following one (`A &⏎/* c */ B`),
+    /// both of which prettier keeps inline (`A /* c */ & B`). Only a block isolated
+    /// from both neighbors (`A &⏎/* c */⏎B`) breaks (`intersection-type.js`).
+    ///
+    /// This deliberately differs from the union's `union_has_own_line_member_comment`
+    /// (which keys on `is_own_line_comment` — the preceding newline alone): prettier's
+    /// **union** printer expands a block adjacent to its member, but the
+    /// **intersection** printer collapses it, so keying on the preceding newline here
+    /// would over-expand the `A &⏎/* c */ B` case.
+    fn intersection_has_isolated_member_comment(
+        &self,
+        intersection: &TSIntersectionType<'_>,
+    ) -> bool {
+        intersection.types.windows(2).any(|pair| {
+            let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
+            comments_in_range(self.comments, prev_end, next_start)
+                .any(|c| self.comment_isolated_from_neighbors(prev_end, c, next_start))
+        })
+    }
+
     //
     // Intersection Types
     //
@@ -597,12 +639,13 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Check for line comments between intersection members (force multiline)
-        // Only check the gaps between member types, not inside member types
-        let has_line_comments_between_members = intersection
-            .types
-            .windows(2)
-            .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start));
+        // Check for isolated comments between intersection members (force multiline).
+        // Only the gaps between member types, not inside them. A block comment on its
+        // own line between the members counts (`X &⏎/* c */⏎Y`), as does any line
+        // comment — but a block inline-adjacent to either member stays inline (unlike
+        // the union path, which expands an adjacent block).
+        let has_isolated_comment_between_members =
+            self.intersection_has_isolated_member_comment(intersection);
         // A non-first parenthesized **union** member with a leading line comment
         // inside its parens (`(a | b) & (// c⏎ a | b)`) also forces the multiline
         // layout: a line comment can't be inline, and tsv preserves it inside the
@@ -617,7 +660,7 @@ impl<'a> Printer<'a> {
                 if matches!(p.type_annotation, TSType::Union(_))
                     && self.paren_has_leading_line_comment(p))
         });
-        if has_line_comments_between_members || has_nonfirst_paren_leading_line_comment {
+        if has_isolated_comment_between_members || has_nonfirst_paren_leading_line_comment {
             let doc = self.build_intersection_type_doc_with_line_comments(intersection);
             // The line-comment layout emits continuation members with a bare hardline
             // and no indent, relying on the caller to supply the hanging indent. When
@@ -827,18 +870,21 @@ impl<'a> Printer<'a> {
                     // Newline for continuation
                     parts.push(d.hardline());
 
-                    // Leading comments on their own line (come after hardline)
-                    for comment in comments_after_amp
+                    // Leading comments on their own line (come after hardline). A
+                    // block comment inline-adjacent to the member it leads hugs it
+                    // with a space (`/* c */ Y`); an own-line block (separated from
+                    // the member by a newline) and every line comment take a hardline
+                    // so the member drops to its own line — the same split the union
+                    // renderer applies after `| ` (keyed on the *following* member,
+                    // not on block-vs-line alone). A blank line the author left between
+                    // an own-line comment and what follows it (the next own-line comment
+                    // or the member) is preserved (`literalline`), matching prettier.
+                    let own_line: Vec<_> = comments_after_amp
                         .iter()
+                        .copied()
                         .filter(|c| !self.is_same_line(amp_pos, c.span.start))
-                    {
-                        parts.push(self.build_comment_doc(comment));
-                        if comment.is_block {
-                            parts.push(d.text(" "));
-                        } else {
-                            parts.push(d.hardline());
-                        }
-                    }
+                        .collect();
+                    self.emit_member_leading_comments(&mut parts, &own_line, type_start);
                 } else {
                     // No ampersand found, just add newline
                     parts.push(d.hardline());

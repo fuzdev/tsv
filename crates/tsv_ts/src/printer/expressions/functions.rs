@@ -976,7 +976,9 @@ impl<'a> Printer<'a> {
             let is_own_line = comment.is_block && !self.is_same_line(comment.span.end, next_start);
 
             if is_line_comment || is_own_line {
-                parts.push(d.hardline());
+                // Preserve an author blank line before the next comment / the body,
+                // matching prettier.
+                self.push_blank_preserving_hardline(&mut parts, comment.span.end, next_start);
             } else {
                 // Inline block comment → space
                 parts.push(d.text(" "));
@@ -1267,10 +1269,18 @@ impl<'a> Printer<'a> {
                 .iter()
                 .any(|p| matches!(p, internal::Expression::TSParameterProperty(_)));
 
-        // Force multiline when comments or param-property modifiers require it.
+        // A blank line the author left between two params forces the list to expand,
+        // and the separator emission preserves it — matching prettier and tsv's own
+        // object-literal behavior (a bare blank is authorial intent, like one around
+        // a comment).
+        let has_blank_line_between_params = self.has_blank_line_between_params(params);
+
+        // Force multiline when comments, param-property modifiers, or an author blank
+        // line require it.
         let force_break = has_trailing_line_comment
             || has_leading_own_line_comment
-            || should_break_for_param_properties;
+            || should_break_for_param_properties
+            || has_blank_line_between_params;
 
         let mut inner_parts: DocBuf = DocBuf::new();
         // Block comment trailing the last param after its source comma — emitted past
@@ -1293,7 +1303,14 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 // Use hardline when forcing break (trailing line comments or param properties)
                 if force_break {
-                    inner_parts.push(d.hardline());
+                    // Preserve a blank line the author left before this param's
+                    // leading comment (or the param itself) — prettier keeps one blank
+                    // line in the expanded list. `search_start` is the previous param's
+                    // end, so the gap spans the comma too.
+                    let check_pos = comments_in_range(self.comments, search_start, param_start)
+                        .next()
+                        .map_or(param_start, |c| c.span.start);
+                    self.push_blank_preserving_hardline(&mut inner_parts, search_start, check_pos);
                 } else {
                     inner_parts.push(d.line());
                 }
@@ -1378,11 +1395,18 @@ impl<'a> Printer<'a> {
             // Own-line comments (on their own line after last param, before `)`)
             // Only for the last param - non-last param comments are handled as leading for next param
             if is_last {
+                let mut prev_own = param.span().end;
                 for comment in comments_in_range(self.comments, param.span().end, search_end)
                     .filter(|c| !self.is_same_line(param.span().end, c.span.start))
                 {
-                    inner_parts.push(d.hardline());
+                    // Preserve an author blank line before the own-line trailing comment.
+                    self.push_blank_preserving_hardline(
+                        &mut inner_parts,
+                        prev_own,
+                        comment.span.start,
+                    );
                     inner_parts.push(self.build_comment_doc(comment));
+                    prev_own = comment.span.end;
                 }
             }
         }
@@ -1431,20 +1455,34 @@ impl<'a> Printer<'a> {
         false
     }
 
-    /// Check if there's a line comment on its own line between two positions
+    /// Whether a comment between two params forces the param list to expand.
+    ///
+    /// A **line** comment always forces it (it runs to end-of-line, so the
+    /// following param can't share the line). A **block** comment forces it only
+    /// when it sits on its OWN line — isolated from *both* neighbors: not
+    /// inline-adjacent to the previous param at `start` (`a /* c */,`), nor to the
+    /// following one at `end` (`/* c */ b`). Either adjacency stays inline, matching
+    /// prettier, which collapses `a,⏎/* c */ b` and `a /* c */,⏎b` both back to
+    /// `a, /* c */ b`. (Same isolated-from-both rule as the intersection member
+    /// gate; keying only on the following param over-expanded a block that trailed
+    /// the previous one before its comma.)
     fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
-        for comment in comments_in_range(self.comments, start, end) {
-            // Line comments are always on their own line (they extend to EOL)
-            // Block comments on their own line have a newline before them
-            if !comment.is_block {
-                return true;
-            }
-            // Check if block comment is on its own line (newline before it)
-            if !self.is_same_line(start, comment.span.start) {
-                return true;
-            }
-        }
-        false
+        comments_in_range(self.comments, start, end)
+            .any(|c| self.comment_isolated_from_neighbors(start, c, end))
+    }
+
+    /// Whether the author left a blank line between any two consecutive params.
+    /// A bare blank is authorial intent (like one around a comment), so it forces
+    /// the param list to expand and the separator emission preserves it — matching
+    /// prettier. Shared by regular function params and the type-level param lists
+    /// (function/constructor types, method/call/construct signatures).
+    pub(in crate::printer) fn has_blank_line_between_params(
+        &self,
+        params: &[internal::Expression<'_>],
+    ) -> bool {
+        params
+            .windows(2)
+            .any(|pair| self.has_blank_line_between(pair[0].span().end, pair[1].span().start))
     }
 
     /// Build doc for leading comments before a parameter
@@ -1487,8 +1525,9 @@ impl<'a> Printer<'a> {
             let on_own_line = !self.is_same_line(prev_pos, comment.span.start);
 
             if on_own_line && i > 0 {
-                // Comment on its own line (not first) - add hardline before it
-                parts.push(d.hardline());
+                // Comment on its own line (not first) - add hardline before it,
+                // preserving a blank line the author left between the two comments.
+                self.push_blank_preserving_hardline(&mut parts, prev_pos, comment.span.start);
             }
             parts.push(self.build_comment_doc(comment));
         }
@@ -1498,7 +1537,8 @@ impl<'a> Printer<'a> {
         let param_on_own_line = !self.is_same_line(last_comment_end, end);
 
         if param_on_own_line {
-            parts.push(d.hardline());
+            // Preserve a blank line between the last leading comment and the param.
+            self.push_blank_preserving_hardline(&mut parts, last_comment_end, end);
         } else {
             // Inline - add space after comment
             parts.push(d.text(" "));

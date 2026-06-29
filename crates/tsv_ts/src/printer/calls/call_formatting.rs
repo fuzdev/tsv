@@ -449,10 +449,9 @@ fn try_single_arg_comment_paths(
         gap_pc.emit_trailing_comments(&mut paren_line_prefix, printer);
 
         let mut inner = DocBuf::new();
-        for comment in &gap_pc.leading {
-            inner.push(printer.build_comment_doc(comment));
-            inner.push(d.hardline());
-        }
+        // Own-line comments each take their own line (author blanks preserved); a
+        // block that hugs the arg stays inline with it (`/* b */ a`).
+        gap_pc.emit_leading_comments_inline_aware(&mut inner, printer);
         // Use the argument-context builder so a binary/logical chain (or
         // conditional) gets its continuation indent — matching the no-leading-
         // comment path. `build_expression_doc` would emit the Grouped chain
@@ -1183,39 +1182,58 @@ fn build_call_with_arg_comments(
                 !gap_pc.trailing_block.is_empty() || !gap_pc.trailing_line.is_empty();
 
             if force_expansion && has_paren_line {
-                // Comments trailing the `(` stay on the `(` line; own-line
-                // comments stay on their own lines before the first arg.
-                // (Inline-collapse cases keep the old behavior below, so a
-                // block comment that hugs the arg — `fn(/* c */ a)` — is
-                // unchanged when the call doesn't expand.)
+                // Comments trailing the `(` stay on the `(` line; the own-line set
+                // then leads the first arg via the shared emitter (a block hugging
+                // the arg stays inline, own-line/line comments break, author blanks
+                // preserved).
                 gap_pc.emit_trailing_comments(&mut paren_line_prefix_parts, printer);
-                for comment in &gap_pc.leading {
-                    arg_parts.push(printer.build_comment_doc(comment));
-                    arg_parts.push(d.hardline());
-                }
+                gap_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
+            } else if !has_paren_line {
+                // No comment on the `(` line → every gap comment leads the first
+                // arg. Same shared emitter; it ends with the right separator before
+                // the arg (space after a hug, hardline after an own-line comment).
+                gap_pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
             } else {
-                // Build leading comments before first arg.
-                // Inline block comments use space between them (staying on one line).
-                // Line comments and standalone block comments use hardline.
-                let all_inline_block =
-                    printer.all_comments_are_inline_block(paren_open, first_arg_start);
-                let mut has_prev_comment = false;
-                for comment in comments_in_range(printer.comments, paren_open, first_arg_start) {
-                    if has_prev_comment {
-                        if all_inline_block {
-                            arg_parts.push(d.text(" "));
-                        } else {
-                            arg_parts.push(d.hardline());
-                        }
+                // A block trails the `(` but nothing forces expansion. Every comment
+                // in this gap is a block (no line comment reaches here) that is
+                // paren-trailing or hugs an arg — all collapsible.
+                // Prettier joins consecutive blocks (and the hugged arg) onto one
+                // line; an author blank line in the gap breaks the run and is
+                // preserved (and forces the call open). A space keeps a block glued
+                // to its arg, so a hug (`/* c */ a`) stays inline.
+                let comments: Vec<_> =
+                    comments_in_range(printer.comments, paren_open, first_arg_start).collect();
+                // A blank between two comments, or between the last and the arg, expands
+                // the call (the comment interiors are skipped — only the gaps matter).
+                let blank_in_gap = comments
+                    .windows(2)
+                    .any(|w| printer.has_blank_line_between(w[0].span.end, w[1].span.start))
+                    || comments.last().is_some_and(|last| {
+                        printer.has_blank_line_between(last.span.end, first_arg_start)
+                    });
+                if blank_in_gap {
+                    force_expansion = true;
+                }
+                let mut prev_end: Option<u32> = None;
+                let push_sep = |arg_parts: &mut DocBuf, from: u32, to: u32| {
+                    if printer.has_blank_line_between(from, to) {
+                        arg_parts.push(d.literalline());
+                        arg_parts.push(d.hardline());
+                    } else {
+                        arg_parts.push(d.text(" "));
+                    }
+                };
+                for comment in &comments {
+                    if let Some(pe) = prev_end {
+                        push_sep(&mut arg_parts, pe, comment.span.start);
                     }
                     arg_parts.push(printer.build_comment_doc(comment));
-                    has_prev_comment = true;
+                    prev_end = Some(comment.span.end);
                 }
-                // After last comment: inline block comments use space, others use line.
-                if all_inline_block {
-                    arg_parts.push(d.text(" "));
-                } else {
-                    arg_parts.push(d.line());
+                // Separator to the first arg: a space keeps a hugging block glued to
+                // it; an author blank line breaks (and is preserved).
+                if let Some(pe) = prev_end {
+                    push_sep(&mut arg_parts, pe, first_arg_start);
                 }
             }
         }
@@ -1252,12 +1270,7 @@ fn build_call_with_arg_comments(
                 // below finish it.
                 let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
 
-                let has_blank_line = pc.has_blank_line_in_gap(
-                    printer.source,
-                    printer.line_breaks,
-                    arg_end,
-                    next_arg_start,
-                );
+                let has_blank_line = pc.has_blank_line_in_gap(printer.source, printer.line_breaks);
                 if has_blank_line || pc.has_trailing_line() {
                     force_expansion = true;
                 }
@@ -1274,7 +1287,7 @@ fn build_call_with_arg_comments(
 
                 // Leading: own-line comments + after-comma comments that hug the next arg
                 // (`C`), emitted inline with it.
-                pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_arg_start);
+                pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
             } else {
                 let has_blank_line = has_blank_line_between_args(
                     printer.source,

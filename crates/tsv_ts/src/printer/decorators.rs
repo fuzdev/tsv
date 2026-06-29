@@ -49,6 +49,15 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         for (i, decorator) in decorators.iter().enumerate() {
             parts.push(d.text("@"));
+            // A comment between `@` and the decorator expression (`@/* c */ dec`,
+            // including inside stripped parens `@(/* c */ dec)`) must be emitted —
+            // otherwise it is dropped (content loss). Inline when glued to the
+            // expression, else the expression breaks onto the next line (prettier).
+            if let Some(c) = self
+                .build_rhs_comments_opt(decorator.span.start + 1, decorator.expression.span().start)
+            {
+                parts.push(c);
+            }
             parts.push(self.build_decorator_expression_doc(decorator));
             // Check for trailing comments after decorator: `@expr /* c */`
             // Boundary is next decorator's start, or next_token_start for the last one
@@ -128,6 +137,13 @@ impl<'a> Printer<'a> {
                 dec_parts.push(d.text(" "));
             }
             dec_parts.push(d.text("@"));
+            // Preserve a comment between `@` and the decorator expression (else it is
+            // dropped — content loss); see `build_decorators_doc`.
+            if let Some(c) = self
+                .build_rhs_comments_opt(decorator.span.start + 1, decorator.expression.span().start)
+            {
+                dec_parts.push(c);
+            }
             dec_parts.push(self.build_decorator_expression_doc(decorator));
 
             // Handle comments between this decorator and the next boundary.

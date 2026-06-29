@@ -651,11 +651,18 @@ impl<'a> Printer<'a> {
                     if !next_is_separated_by_blank {
                         let inline_block =
                             comment.is_block && self.is_same_line(comment.span.end, elem_start);
-                        parts.push(if inline_block {
-                            d.text(" ")
+                        if inline_block {
+                            parts.push(d.text(" "));
                         } else {
-                            d.hardline()
-                        });
+                            // Last comment before the element: preserve a blank line
+                            // the author left between the comment and the element.
+                            if leading_comments.get(ci + 1).is_none()
+                                && self.has_blank_line_between(comment.span.end, elem_start)
+                            {
+                                parts.push(d.literalline());
+                            }
+                            parts.push(d.hardline());
+                        }
                     }
                 }
             }
@@ -769,10 +776,13 @@ impl<'a> Printer<'a> {
         // Final comments before closing bracket. Skip what trailing-hole emission
         // already handled.
         let final_scan_start = trailing_hole_comments_end.unwrap_or(last_real_emit_end);
+        let mut prev_end = final_scan_start;
         for comment in comments_in_range(self.comments, final_scan_start, arr.span.end - 1) {
             if !self.is_same_line(final_scan_start, comment.span.start) {
-                parts.push(d.hardline());
+                // Preserve an author blank line before an own-line trailing comment.
+                self.push_blank_preserving_hardline(&mut parts, prev_end, comment.span.start);
                 parts.push(self.build_comment_doc(comment));
+                prev_end = comment.span.end;
             }
         }
 

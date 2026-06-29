@@ -1,0 +1,928 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 707,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Own-line block comment after `as`, before the type: kept on its own line,",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " type on the next line (tsv preserves the author's placement).",
+			"start": 98,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 181,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `satisfies` behaves the same.",
+			"start": 196,
+			"end": 228,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 254,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank line after the comment is preserved.",
+			"start": 269,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 335,
+			"end": 342,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A same-line block comment with the type authored on the next line keeps the",
+			"start": 351,
+			"end": 429,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " type on that line (comment trailing the keyword); preserving the author's break.",
+			"start": 431,
+			"end": 514,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 531,
+			"end": 538,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 16
+				},
+				"end": {
+					"line": 21,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A same-line block comment with the type glued to it stays fully inline (not a",
+			"start": 546,
+			"end": 626,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " divergence — both formatters keep it).",
+			"start": 628,
+			"end": 669,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 686,
+			"end": 693,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 16
+				},
+				"end": {
+					"line": 26,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 706,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 697,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 164,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 170,
+							"end": 192,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 170,
+								"end": 171,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 174,
+								"end": 192,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 174,
+									"end": 175,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 11
+										},
+										"end": {
+											"line": 4,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 191,
+									"end": 192,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 191,
+										"end": 192,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 3
+											}
+										},
+										"name": "A"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " a ",
+											"start": 181,
+											"end": 188
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line block comment after `as`, before the type: kept on its own line,",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " type on the next line (tsv preserves the author's placement).",
+							"start": 98,
+							"end": 162
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 230,
+					"end": 266,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 236,
+							"end": 265,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 236,
+								"end": 237,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 240,
+								"end": 265,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 240,
+									"end": 241,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 11
+										},
+										"end": {
+											"line": 9,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 264,
+									"end": 265,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 264,
+										"end": 265,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 3
+											}
+										},
+										"name": "B"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " b ",
+											"start": 254,
+											"end": 261
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `satisfies` behaves the same.",
+							"start": 196,
+							"end": 228
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 318,
+					"end": 348,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 324,
+							"end": 347,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 17,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 324,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 328,
+								"end": 347,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 328,
+									"end": 329,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 11
+										},
+										"end": {
+											"line": 14,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 346,
+									"end": 347,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 346,
+										"end": 347,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 3
+											}
+										},
+										"name": "C"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 335,
+											"end": 342
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line after the comment is preserved.",
+							"start": 269,
+							"end": 316
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 516,
+					"end": 543,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 522,
+							"end": 542,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 22,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 522,
+								"end": 523,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 526,
+								"end": 542,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 526,
+									"end": 527,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 541,
+									"end": 542,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 541,
+										"end": 542,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 3
+											}
+										},
+										"name": "D"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " d ",
+											"start": 531,
+											"end": 538
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A same-line block comment with the type authored on the next line keeps the",
+							"start": 351,
+							"end": 429
+						},
+						{
+							"type": "Line",
+							"value": " type on that line (comment trailing the keyword); preserving the author's break.",
+							"start": 431,
+							"end": 514
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 671,
+					"end": 696,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 677,
+							"end": 695,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 7
+								},
+								"end": {
+									"line": 26,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 677,
+								"end": 678,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 7
+									},
+									"end": {
+										"line": 26,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 681,
+								"end": 695,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 11
+									},
+									"end": {
+										"line": 26,
+										"column": 25
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 681,
+									"end": 682,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 11
+										},
+										"end": {
+											"line": 26,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 694,
+									"end": 695,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 24
+										},
+										"end": {
+											"line": 26,
+											"column": 25
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 694,
+										"end": 695,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 24
+											},
+											"end": {
+												"line": 26,
+												"column": 25
+											}
+										},
+										"name": "E"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " e ",
+											"start": 686,
+											"end": 693
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A same-line block comment with the type glued to it stays fully inline (not a",
+							"start": 546,
+							"end": 626
+						},
+						{
+							"type": "Line",
+							"value": " divergence — both formatters keep it).",
+							"start": 628,
+							"end": 669
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

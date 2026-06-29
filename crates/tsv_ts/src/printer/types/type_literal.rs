@@ -95,9 +95,11 @@ impl<'a> Printer<'a> {
     ///
     /// Returns docs for: `[space + comment]* ";" [space + comment]*`
     ///
-    /// Comments are positioned relative to the first semicolon found in the
-    /// source range `member_end..upper_bound`. If no semicolon exists in source,
-    /// all comments are placed before the semicolon. Each comment is emitted via
+    /// Comments are positioned relative to the source member separator (`;` or
+    /// `,`) found in the range `member_end..upper_bound`. With no source separator
+    /// (newline/ASI-separated members) the `;` is synthesized right after the
+    /// member, so every comment in the gap leads the next member (after `;`). Each
+    /// comment is emitted via
     /// `build_trailing_comment_doc` — block inline, line through `line_suffix` so a
     /// long trailing comment never forces the member's own type (e.g. a union) to
     /// break (matches prettier and the interface-member path).
@@ -108,14 +110,24 @@ impl<'a> Printer<'a> {
         upper_bound: u32,
     ) -> DocBuf {
         let d = self.d();
-        // Comment-aware so a `;` inside a comment in this gap isn't taken for the
-        // member separator (which would partition the comments incorrectly).
-        let semi_pos = self.find_char_outside_comments(member_end, upper_bound, b';');
+        // Find the source member separator — `;` OR `,` (both are valid type-member
+        // separators; tsv normalizes either to `;`). Comment-aware so a separator
+        // glyph inside a comment in this gap isn't mistaken for the real one. Taking
+        // the earlier of the two handles whichever the author used; with neither
+        // (newline/ASI-separated members) there is no anchor and all comments are
+        // "before". Keying only on `;` here put a comment that followed a `,`
+        // separator on the wrong side (`a: 1 /* c */;` instead of `a: 1; /* c */`).
+        let semi = self.find_char_outside_comments(member_end, upper_bound, b';');
+        let comma = self.find_char_outside_comments(member_end, upper_bound, b',');
+        let sep_pos = [semi, comma].into_iter().flatten().min();
 
         let (before_semi, after_semi): (Vec<_>, Vec<_>) =
-            comments.iter().partition(|c| match semi_pos {
+            comments.iter().partition(|c| match sep_pos {
                 Some(pos) => c.span.start < pos,
-                None => true, // No semicolon in source, all comments are "before"
+                // No source separator (newline/ASI-separated members): the `;` is
+                // synthesized right after the member, so every comment in the gap
+                // leads the next member and goes after the `;`.
+                None => false,
             });
 
         let mut docs = DocBuf::with_capacity(before_semi.len() + after_semi.len() + 1);

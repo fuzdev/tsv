@@ -633,7 +633,7 @@ impl<'a> Printer<'a> {
             // (`isBlockElement(prevNode) && !startsWithLinebreak → trimTextNodeLeft`); the block's
             // `handle_block_child` break_after already supplies the separating line, so there is NO
             // fold/group here (the inline-element fold below would pop that break_after doc and
-            // strand a leading space — `prettier_bug_space_after_block`).
+            // strand a leading space — `space_after_block_prettier_divergence`).
             trim_left = true;
             add_leading_space = false;
         } else if has_leading_ws && !is_first && position.prev_is_inline() {

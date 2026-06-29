@@ -1,0 +1,911 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 623,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " block comment + blank line in the consequent gap forces the ternary to break",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 118,
+			"end": 125,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 4
+				},
+				"end": {
+					"line": 4,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment + blank in the alternate gap",
+			"start": 141,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 211,
+			"end": 218,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 4
+				},
+				"end": {
+					"line": 12,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment + blank: blank preserved in the broken layout",
+			"start": 228,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 308,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 4
+				},
+				"end": {
+					"line": 18,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment with no blank stays inline (both formatters)",
+			"start": 328,
+			"end": 389,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 406,
+			"end": 413,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 16
+				},
+				"end": {
+					"line": 24,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " two comments with a blank between: the blank is preserved and the second",
+			"start": 423,
+			"end": 498,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment (now on its own line) drops the consequent below it",
+			"start": 500,
+			"end": 562,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 581,
+			"end": 588,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 4
+				},
+				"end": {
+					"line": 29,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 593,
+			"end": 600,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 3
+				},
+				"end": {
+					"line": 31,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 622,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 613,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 34,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 101,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 107,
+							"end": 137,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 107,
+								"end": 109,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "t1"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 112,
+								"end": 137,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 7,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 112,
+									"end": 113,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 12
+										},
+										"end": {
+											"line": 3,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 130,
+									"end": 131,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 3
+										},
+										"end": {
+											"line": 6,
+											"column": 4
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 118,
+											"end": 125
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 136,
+									"end": 137,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 4
+										},
+										"end": {
+											"line": 7,
+											"column": 5
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment + blank line in the consequent gap forces the ternary to break",
+							"start": 20,
+							"end": 99
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 188,
+					"end": 225,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 194,
+							"end": 224,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 194,
+								"end": 196,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"name": "t2"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 199,
+								"end": 224,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 12
+									},
+									"end": {
+										"line": 14,
+										"column": 4
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 199,
+									"end": 200,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 12
+										},
+										"end": {
+											"line": 10,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 205,
+									"end": 206,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 4
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 223,
+									"end": 224,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 4
+										}
+									},
+									"name": "c",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 211,
+											"end": 218
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment + blank in the alternate gap",
+							"start": 141,
+							"end": 186
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 291,
+					"end": 325,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 297,
+							"end": 324,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 7
+								},
+								"end": {
+									"line": 21,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 297,
+								"end": 299,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 7
+									},
+									"end": {
+										"line": 17,
+										"column": 9
+									}
+								},
+								"name": "t3"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 302,
+								"end": 324,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 12
+									},
+									"end": {
+										"line": 21,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 302,
+									"end": 303,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 12
+										},
+										"end": {
+											"line": 17,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 317,
+									"end": 318,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 3
+										},
+										"end": {
+											"line": 20,
+											"column": 4
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 308,
+											"end": 312
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 323,
+									"end": 324,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 4
+										},
+										"end": {
+											"line": 21,
+											"column": 5
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment + blank: blank preserved in the broken layout",
+							"start": 228,
+							"end": 289
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 391,
+					"end": 420,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 397,
+							"end": 419,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 397,
+								"end": 399,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 24,
+										"column": 9
+									}
+								},
+								"name": "t4"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 402,
+								"end": 419,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 12
+									},
+									"end": {
+										"line": 24,
+										"column": 29
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 402,
+									"end": 403,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 12
+										},
+										"end": {
+											"line": 24,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 414,
+									"end": 415,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 24
+										},
+										"end": {
+											"line": 24,
+											"column": 25
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 406,
+											"end": 413
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 418,
+									"end": 419,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 28
+										},
+										"end": {
+											"line": 24,
+											"column": 29
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment with no blank stays inline (both formatters)",
+							"start": 328,
+							"end": 389
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 564,
+					"end": 612,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 570,
+							"end": 611,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 570,
+								"end": 572,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 7
+									},
+									"end": {
+										"line": 28,
+										"column": 9
+									}
+								},
+								"name": "t5"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 575,
+								"end": 611,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 12
+									},
+									"end": {
+										"line": 33,
+										"column": 5
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 575,
+									"end": 576,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 12
+										},
+										"end": {
+											"line": 28,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 604,
+									"end": 605,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 3
+										},
+										"end": {
+											"line": 32,
+											"column": 4
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " a ",
+											"start": 581,
+											"end": 588
+										},
+										{
+											"type": "Block",
+											"value": " b ",
+											"start": 593,
+											"end": 600
+										}
+									]
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 610,
+									"end": 611,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 4
+										},
+										"end": {
+											"line": 33,
+											"column": 5
+										}
+									},
+									"name": "c"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " two comments with a blank between: the blank is preserved and the second",
+							"start": 423,
+							"end": 498
+						},
+						{
+							"type": "Line",
+							"value": " comment (now on its own line) drops the consequent below it",
+							"start": 500,
+							"end": 562
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

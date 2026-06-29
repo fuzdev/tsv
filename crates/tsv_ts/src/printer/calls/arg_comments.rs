@@ -35,8 +35,8 @@ impl<'a> Printer<'a> {
     ) -> PartitionedComments<'a> {
         let mut pc =
             PartitionedComments::new(self.comments, self.line_breaks, arg_end, next_arg_start);
-        pc.route_after_comma_hugging_to_leading(self, arg_end, next_arg_start);
-        pc.emit_trailing_comments_around_comma(parts, self, arg_end, next_arg_start);
+        pc.route_after_comma_hugging_to_leading(self);
+        pc.emit_trailing_comments_around_comma(parts, self);
         pc
     }
 }
@@ -450,7 +450,7 @@ pub(crate) fn emit_first_arg_leading_comments(
         parts.push(printer.build_comment_doc(comment));
         parts.push(d.text(" "));
     }
-    pc.emit_leading_comments_inline_aware(parts, printer, first_arg_start);
+    pc.emit_leading_comments_inline_aware(parts, printer);
 }
 
 /// Check if there are trailing comments (line OR block) on any arguments
@@ -516,6 +516,12 @@ pub(crate) struct PartitionedComments<'a> {
     pub trailing_line: SmallVec<[&'a internal::Comment; 2]>,
     pub trailing_block: SmallVec<[&'a internal::Comment; 2]>,
     pub leading: SmallVec<[&'a internal::Comment; 2]>,
+    /// The gap the comments were partitioned over: `start` is the preceding element's
+    /// end, `end` the following element's start. The emit/query methods operate on
+    /// this gap (comma scan, blank-line check, dangling-comment base), so they read
+    /// these rather than re-receiving the bounds the caller already passed to `new`.
+    start: u32,
+    end: u32,
 }
 
 impl<'a> PartitionedComments<'a> {
@@ -540,6 +546,8 @@ impl<'a> PartitionedComments<'a> {
             trailing_line: classified.trailing_line,
             trailing_block: classified.trailing_block,
             leading,
+            start,
+            end,
         }
     }
 
@@ -555,19 +563,14 @@ impl<'a> PartitionedComments<'a> {
     /// [`emit_trailing_comments_around_comma`], the line break, then `leading` (own-line
     /// comments + hugged after-comma) via [`emit_leading_comments_inline_aware`] — so the
     /// rule lives here once and every argument path inherits it.
-    pub fn route_after_comma_hugging_to_leading(
-        &mut self,
-        printer: &Printer<'_>,
-        arg_end: u32,
-        next_arg_start: u32,
-    ) {
-        let Some(comma_pos) = find_comma_pos(printer.source, arg_end, next_arg_start) else {
+    pub fn route_after_comma_hugging_to_leading(&mut self, printer: &Printer<'_>) {
+        let Some(comma_pos) = find_comma_pos(printer.source, self.start, self.end) else {
             return;
         };
         let mut kept: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
         for comment in self.trailing_block.drain(..) {
             if is_comment_after_comma(comment, comma_pos)
-                && is_comment_inline_with_next(printer, comment.span.end, next_arg_start)
+                && is_comment_inline_with_next(printer, comment.span.end, self.end)
             {
                 // Hugs the next arg → leads it. Source order holds: the hug sits on the
                 // next arg's line, after any own-line leading comments, so appending keeps
@@ -593,16 +596,10 @@ impl<'a> PartitionedComments<'a> {
     /// When comments exist between arguments, we can't check the full arg-to-arg
     /// range for blank lines because intermediate comment newlines would create
     /// false positives. Instead, check the sub-range from:
-    /// - Start: after the last trailing line comment, or after the comma, or arg_end
-    /// - End: before the first leading comment, or next_arg_start
-    pub fn has_blank_line_in_gap(
-        &self,
-        source: &str,
-        line_breaks: &[u32],
-        arg_end: u32,
-        next_arg_start: u32,
-    ) -> bool {
-        let comma_after = find_comma_pos(source, arg_end, next_arg_start).map(|c| c as u32 + 1);
+    /// - Start: after the last trailing line comment, or after the comma, or the gap start
+    /// - End: before the first leading comment, or the gap end
+    pub fn has_blank_line_in_gap(&self, source: &str, line_breaks: &[u32]) -> bool {
+        let comma_after = find_comma_pos(source, self.start, self.end).map(|c| c as u32 + 1);
         let check_start = if let Some(last) = self.trailing_line.last() {
             // A line comment trailing the arg before its comma (`a // c⏎,⏎b`) ends on
             // an earlier line than the comma, which sits on its own line. Scanning from
@@ -610,12 +607,12 @@ impl<'a> PartitionedComments<'a> {
             // blank line, so start after whichever of (comment end, comma) is later.
             comma_after.map_or(last.span.end, |c| last.span.end.max(c))
         } else {
-            comma_after.unwrap_or(arg_end)
+            comma_after.unwrap_or(self.start)
         };
         let check_end = if !self.leading.is_empty() {
             self.leading[0].span.start
         } else {
-            next_arg_start
+            self.end
         };
         tsv_lang::printing::has_blank_line_between_fast(line_breaks, check_start, check_end)
     }
@@ -647,15 +644,9 @@ impl<'a> PartitionedComments<'a> {
     /// its authored position. Shared by the `new`-argument non-last paths
     /// (`build_new_doc_with_wrapping` and `build_args_with_blank_lines`) so they
     /// can't drift — both used to relocate the block past the comma.
-    pub fn emit_trailing_comments_around_comma(
-        &self,
-        parts: &mut DocBuf,
-        printer: &Printer<'_>,
-        arg_end: u32,
-        next_arg_start: u32,
-    ) {
+    pub fn emit_trailing_comments_around_comma(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         let d = printer.d();
-        let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
+        let comma_pos = find_comma_pos(printer.source, self.start, self.end);
         if let Some(cpos) = comma_pos {
             for comment in &self.trailing_block {
                 if is_comment_before_comma(comment, cpos) {
@@ -690,15 +681,9 @@ impl<'a> PartitionedComments<'a> {
     /// block if none is found, whereas the last arg has no trailing comma, so a block
     /// with no source comma must still precede the closing paren. Shared by the
     /// member-chain and `new` last-arg paths so the split rule lives in one place.
-    pub fn emit_last_arg_trailing_around_comma(
-        &self,
-        parts: &mut DocBuf,
-        printer: &Printer<'_>,
-        arg_end: u32,
-        boundary: u32,
-    ) {
+    pub fn emit_last_arg_trailing_around_comma(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         let d = printer.d();
-        let comma_pos = find_comma_pos(printer.source, arg_end, boundary);
+        let comma_pos = find_comma_pos(printer.source, self.start, self.end);
         for comment in &self.trailing_block {
             if comma_pos.is_none_or(|cp| is_comment_before_comma(comment, cp)) {
                 parts.push(d.text(" "));
@@ -723,11 +708,17 @@ impl<'a> PartitionedComments<'a> {
     /// path (no trailing comma precedes them — trailingComma: 'none') and by comma-less
     /// shapes (dynamic `import()`). Without it, own-line comments before the closing paren
     /// are dropped (content loss).
+    /// The dangling comments follow the gap `start` (the preceding element's end);
+    /// that is the base for preserving an author blank line before the first own-line
+    /// comment.
     pub fn emit_dangling_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
-        let d = printer.d();
+        let mut prev_end = self.start;
         for comment in &self.leading {
-            parts.push(d.hardline());
+            // Preserve an author blank line before an own-line trailing comment
+            // (`arg⏎⏎/* c */` before the closing `)`), matching prettier.
+            printer.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
             parts.push(printer.build_comment_doc(comment));
+            prev_end = comment.span.end;
         }
     }
 
@@ -741,35 +732,26 @@ impl<'a> PartitionedComments<'a> {
     /// one place. (`call_formatting` keeps its own same-line handling — it defers
     /// after-comma blocks into a separate doc and feeds `force_expansion` — and so calls
     /// only `emit_dangling_comments` directly.)
-    pub fn emit_last_arg_comments(
-        &self,
-        parts: &mut DocBuf,
-        printer: &Printer<'_>,
-        arg_end: u32,
-        boundary: u32,
-    ) {
+    pub fn emit_last_arg_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         if self.has_trailing_line() || self.has_trailing_block() {
-            self.emit_last_arg_trailing_around_comma(parts, printer, arg_end, boundary);
+            self.emit_last_arg_trailing_around_comma(parts, printer);
         }
         self.emit_dangling_comments(parts, printer);
     }
 
-    /// Emit leading comments, keeping inline block comments on the same line as `next_pos`.
+    /// Emit leading comments, keeping inline block comments on the same line as the
+    /// gap `end` (the following element's start).
     ///
-    /// For comments on the same line as `next_pos`, emits them inline (comment + space).
+    /// For comments on the same line as `end`, emits them inline (comment + space).
     /// For comments on their own line, emits them with hardline after.
     ///
     /// For nested JSDoc casts like `/** @type {A} */ (\n\t/** @type {B} */ (expr))`,
     /// after paren stripping both comments become leading. The inner comment is inline
     /// with the arg, and the outer comment is followed by a stripped `(` on the same line.
     /// Both should stay inline: `/** @type {A} */ /** @type {B} */ expr`.
-    pub fn emit_leading_comments_inline_aware(
-        &self,
-        parts: &mut DocBuf,
-        printer: &Printer<'_>,
-        next_pos: u32,
-    ) {
+    pub fn emit_leading_comments_inline_aware(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         let d = printer.d();
+        let next_pos = self.end;
 
         // Pre-compute which comments should be inline. Walk backwards: if the last
         // block comment is inline with next_pos, check preceding block comments — if
@@ -797,7 +779,10 @@ impl<'a> PartitionedComments<'a> {
             if inline_flags[i] {
                 parts.push(d.text(" "));
             } else {
-                parts.push(d.hardline());
+                // Preserve a blank line the author left between this comment and what
+                // follows it (the next leading comment, or the argument itself).
+                let next = self.leading.get(i + 1).map_or(next_pos, |c| c.span.start);
+                printer.push_blank_preserving_hardline(parts, comment.span.end, next);
             }
         }
     }

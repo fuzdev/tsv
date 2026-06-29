@@ -71,15 +71,18 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut parts = DocBuf::new();
-        for comment in comments_in_range(self.comments, start, end) {
-            if skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, comment)) {
-                continue; // pulled onto the delimiter line
-            }
+        let mut comments = comments_in_range(self.comments, start, end)
+            .filter(|c| !skip_delim.is_some_and(|pos| self.comment_on_delimiter_line(pos, c)))
+            .peekable();
+        while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
             if comment.is_block && self.is_same_line(comment.span.end, end) {
                 parts.push(d.text(" "));
             } else {
-                parts.push(d.hardline());
+                // Preserve a blank line the author left between this comment and what
+                // follows it (the next own-line comment, or the element at `end`).
+                let next = comments.peek().map_or(end, |c| c.span.start);
+                self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
             }
         }
         parts
@@ -110,6 +113,7 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut parts = DocBuf::new();
+        let mut prev_end = start;
         for comment in comments_in_range(self.comments, start, end) {
             if self.is_same_line(start, comment.span.start) {
                 if suffix_same_line_lines {
@@ -121,10 +125,14 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_comment_doc(comment));
                 }
             } else {
-                // Own line comment (block or line)
-                parts.push(d.hardline());
+                // Own line comment (block or line), preserving an author blank line
+                // before it (`elem⏎⏎/* c */` before the closing delimiter) — prettier
+                // keeps one blank in every list position (tuple, function/-type params,
+                // signatures, type args/params).
+                self.push_blank_preserving_hardline(&mut parts, prev_end, comment.span.start);
                 parts.push(self.build_comment_doc(comment));
             }
+            prev_end = comment.span.end;
         }
         parts
     }
@@ -144,30 +152,6 @@ impl<'a> Printer<'a> {
             .filter(|c| c.is_block)
             .filter(|c| same_line == self.is_same_line(start, c.span.start))
             .collect()
-    }
-
-    /// Check if there's a newline between start position and the first comment in the range
-    ///
-    /// Returns true if there's at least one comment in the range and a newline
-    /// exists between `start` and the first comment's start position.
-    /// Check if ALL comments in the range are inline block comments on the same line as `end`.
-    ///
-    /// Returns true when every comment is a block comment AND on the same line as `end`
-    /// (the next expression). Used to keep `/** @type {T} */ arg` as a unit.
-    /// Returns false for line comments or block comments on their own line.
-    pub(crate) fn all_comments_are_inline_block(&self, start: u32, end: u32) -> bool {
-        let first_idx = tsv_lang::find_first_comment_from(self.comments, start);
-        let mut found_any = false;
-        for comment in self.comments[first_idx..]
-            .iter()
-            .take_while(|c| c.span.end <= end)
-        {
-            found_any = true;
-            if !comment.is_block || !self.is_same_line(comment.span.end, end) {
-                return false;
-            }
-        }
-        found_any
     }
 
     /// True when a block comment in `(search_start, end)` sits on its own line —
@@ -210,9 +194,16 @@ impl<'a> Printer<'a> {
             if self.is_same_line(after_open_brace, c.span.start) {
                 return false;
             }
-            // Must not be on same line as any item
+            // Must not be on same line as any item. An item *before* the comment
+            // shares its line when the item's end and the comment's start match
+            // (`item /* c */`); an item *after* the comment shares its line when the
+            // comment's end and the item's start match (`/* c */ item`). Each
+            // `is_same_line` call must pass its earlier position first — the helper
+            // returns false for out-of-order args, so anchoring the leading-item check
+            // on `s.start` (which follows the comment) wrongly reported "standalone"
+            // for an inline-adjacent comment and force-expanded the container.
             !item_spans.iter().any(|s| {
-                self.is_same_line(s.start, c.span.start) || self.is_same_line(s.end, c.span.start)
+                self.is_same_line(s.end, c.span.start) || self.is_same_line(c.span.end, s.start)
             })
         })
     }
@@ -910,11 +901,18 @@ impl<'a> Printer<'a> {
     /// 4. Hardline separator
     ///
     /// Returns the new `prev_end` position.
+    /// `preserve_blank_before` keeps a blank line the author left *before* the next
+    /// element (or its own-line leading comment, `A,⏎⏎/* c */⏎B`). Prettier preserves
+    /// it for **tuples** and **function-type param lists** (function/constructor
+    /// types, method/call/construct signatures — same as regular function params) but
+    /// collapses it for type-parameter / type-argument lists, so those two caller
+    /// families pass `true` and the type-param/type-arg callers pass `false`.
     pub(crate) fn emit_multiline_comma_with_comments(
         &self,
         parts: &mut DocBuf,
         elem_end: u32,
         next_start: u32,
+        preserve_blank_before: bool,
     ) -> u32 {
         let d = self.d();
         let comma_pos = self.find_list_comma(elem_end, next_start);
@@ -941,7 +939,16 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Hardline to separate from next element
+        // Hardline to separate from next element, optionally preserving an author
+        // blank line before the next own-line leading comment (tuple only).
+        if preserve_blank_before {
+            let next_lead = comments_in_range(self.comments, after_comma_end, next_start)
+                .find(|c| !self.is_same_line(elem_end, c.span.start))
+                .map_or(next_start, |c| c.span.start);
+            if self.has_blank_line_between(after_comma_end, next_lead) {
+                parts.push(d.literalline());
+            }
+        }
         parts.push(d.hardline());
 
         after_comma_end

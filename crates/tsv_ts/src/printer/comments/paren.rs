@@ -259,29 +259,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Detect a block comment that should be promoted from after `=` to before `=`.
-    ///
-    /// When JSDoc cast parens are stripped (e.g., `var a = /** @type {T} */ (\n\texpr\n)`),
-    /// multiple block comments end up after `=`. Prettier places the first one before `=`
-    /// when it's on a different source line than the second. Returns the promoted comment's
-    /// doc (with leading space) and the end position to use as the new RHS comment start.
-    pub(crate) fn promote_block_comment_before_eq(
-        &self,
-        start: u32,
-        end: u32,
-    ) -> Option<(DocId, u32)> {
-        let d = self.d();
-        let blocks: Vec<_> = comments_in_range(self.comments, start, end)
-            .filter(|c| c.is_block)
-            .collect();
-        if blocks.len() >= 2 && !self.is_same_line(blocks[0].span.start, blocks[1].span.start) {
-            let doc = d.concat(&[d.text(" "), self.build_comment_doc(blocks[0])]);
-            Some((doc, blocks[0].span.end))
-        } else {
-            None
-        }
-    }
-
     /// Check if stripped grouping parens left trailing comments.
     ///
     /// Returns true when there are comments between `expr_end` and `boundary_end`
