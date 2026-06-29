@@ -1,16 +1,20 @@
 // helper fns here aren't `#[test]`, so clippy.toml's allow-expect-in-tests doesn't reach them
 #![allow(clippy::expect_used)]
 
-/// Tests for cases where prettier has idempotency bugs but our printer is correct.
-///
-/// These tests demonstrate that:
-/// 1. Prettier requires multiple format passes to reach stable output (idempotency bug)
-/// 2. Our printer produces correct output in a single pass
-///
-/// See: tests/fixtures/svelte/elements/prettier_bug_space_after_block/README.md
+//! Tests for cases where prettier has idempotency bugs but our printer is correct.
+//!
+//! These tests demonstrate that:
+//! 1. Prettier requires multiple format passes to reach stable output (idempotency bug)
+//! 2. Our printer produces correct output in a single pass
+//!
+//! See: tests/fixtures/svelte/elements/prettier_bug_space_after_block/README.md
 
-#[tokio::test]
-async fn prettier_bug_space_after_block() {
+// Every sidecar (prettier) check lives in ONE `#[tokio::test]`
+// (`sidecar_prettier_checks` below) — the persistent Deno sidecar pool is shared
+// process-wide, and two concurrent tokio runtimes hammering it race (flaky output).
+// Each check is a plain `async fn` the single test awaits in sequence.
+
+async fn check_space_after_block_idempotency_bug() {
     // Prettier preserves leading space after block element on first pass,
     // but removes it on second pass (non-idempotent behavior)
     assert_prettier_idempotency_bug(
@@ -179,13 +183,20 @@ fn comment_drop_exact_output_and_idempotent() {
     }
 }
 
-/// Oracle cross-check: prettier (with tsv's options) produces the same output for
-/// every case — confirming the comment is real content neither tool may drop. A
-/// single `#[tokio::test]` runs the cases sequentially to avoid the shared-sidecar
-/// multi-runtime race (mirrors `deno::tests::test_deno_tools`).
+/// The single sidecar-using test (see the note above `check_space_after_block_…`):
+/// every prettier oracle check runs here, sequentially, in one tokio runtime.
+/// Cross-checks that prettier (with tsv's options) produces the same output as tsv
+/// for every typescript comment case (drop + separator-normalization) — confirming
+/// each comment is real content tsv must match — plus the Svelte space-after-block
+/// idempotency-bug probe (mirrors `deno::tests::test_deno_tools`).
 #[tokio::test]
-async fn comment_drop_cases_match_prettier() {
-    for &(label, input, expected) in COMMENT_DROP_CASES {
+async fn sidecar_prettier_checks() {
+    check_space_after_block_idempotency_bug().await;
+
+    let cases = COMMENT_DROP_CASES
+        .iter()
+        .chain(SEPARATOR_NORMALIZED_COMMENT_CASES);
+    for &(label, input, expected) in cases {
         let prettier = tsv_debug::deno::run_prettier(
             input,
             tsv_debug::deno::PrettierParser::Parser("typescript"),
@@ -193,5 +204,99 @@ async fn comment_drop_cases_match_prettier() {
         .await
         .expect("prettier formatting failed");
         assert_eq!(prettier, expected, "case `{label}`: prettier should agree");
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Comment placement around a normalized type-member separator
+//
+// A type member's separator may be `;`, `,`, or absent (newline/ASI) — in a type
+// literal (`type T = { … }`) AND an interface body (`interface I { … }`). tsv
+// always emits `;`, so a `,`-separated or newline-separated member with a gap
+// comment is non-idempotent input — prettier rewrites the separator, so the diff
+// is token-level (not whitespace-only), ruling out both an `input.*` fixture and
+// an `unformatted_*` variant. The bug: keying the partition only on `;` placed a
+// comment that followed a `,` (or no separator) on the wrong side of the emitted
+// `;` (`a: 1 /* c */; b: 2` instead of prettier's `a: 1; /* c */ b: 2`). The type
+// literal and the interface use separate printers; both must partition on `,`/`;`.
+
+/// `(label, input, expected)` — each `input` is a non-idempotent type member list
+/// (prettier normalizes the separator to `;`); `expected` is the fixed output with
+/// the comment on prettier's side of the `;`.
+const SEPARATOR_NORMALIZED_COMMENT_CASES: &[(&str, &str, &str)] = &[
+    // ── type literal ──
+    // `,` separator: the comment follows the comma, so it leads the next member.
+    (
+        "comma separator",
+        "type T = { a: 1, /* c */ b: 2 };",
+        "type T = { a: 1; /* c */ b: 2 };\n",
+    ),
+    // No separator, comment on its own line leading the next member.
+    (
+        "newline separator, leads next",
+        "type T = { a: 1\n/* c */ b: 2 };",
+        "type T = { a: 1; /* c */ b: 2 };\n",
+    ),
+    // No separator, comment trailing the previous member on its line; the
+    // synthesized `;` still goes right after the member, so the comment follows it.
+    (
+        "newline separator, trails prev line",
+        "type T = { a: 1 /* c */\nb: 2 };",
+        "type T = { a: 1; /* c */ b: 2 };\n",
+    ),
+    // ── interface body (separate printer; always expands multiline) ──
+    // `,` separator after a property: the comment leads the next member.
+    (
+        "interface comma separator",
+        "interface I { a: 1, /* c */ b: 2 }",
+        "interface I {\n\ta: 1;\n\t/* c */ b: 2;\n}\n",
+    ),
+    // `,` after an index signature.
+    (
+        "interface index-signature comma",
+        "interface I { [k: string]: number, /* c */ b: 2 }",
+        "interface I {\n\t[k: string]: number;\n\t/* c */ b: 2;\n}\n",
+    ),
+    // `,` after a method signature.
+    (
+        "interface method comma",
+        "interface I { m(): void, /* c */ b: 2 }",
+        "interface I {\n\tm(): void;\n\t/* c */ b: 2;\n}\n",
+    ),
+    // No separator, comment leads the next member (already correct — regression guard).
+    (
+        "interface newline, leads next",
+        "interface I { a: 1\n/* c */ b: 2 }",
+        "interface I {\n\ta: 1;\n\t/* c */ b: 2;\n}\n",
+    ),
+    // No separator, comment trails the previous member's line before the synthesized
+    // `;` (already correct — regression guard).
+    (
+        "interface newline, trails prev line",
+        "interface I { a: 1 /* c */\nb: 2 }",
+        "interface I {\n\ta: 1; /* c */\n\tb: 2;\n}\n",
+    ),
+];
+
+/// Pure-Rust guard: each case formats to its `expected` (comment on the correct
+/// side of the normalized `;`) and the output is idempotent. No sidecar.
+#[test]
+fn separator_normalized_comment_exact_output_and_idempotent() {
+    for &(label, input, expected) in SEPARATOR_NORMALIZED_COMMENT_CASES {
+        let arena = bumpalo::Bump::new();
+        let program = tsv_ts::parse(input, &arena).expect("parse failed");
+        let ours = tsv_ts::format(&program, input);
+        assert_eq!(
+            ours, expected,
+            "case `{label}`: comment on the wrong side of `;`"
+        );
+
+        let arena_twice = bumpalo::Bump::new();
+        let program_twice = tsv_ts::parse(&ours, &arena_twice).expect("reparse failed");
+        let ours_twice = tsv_ts::format(&program_twice, &ours);
+        assert_eq!(
+            ours_twice, ours,
+            "case `{label}`: output should be idempotent"
+        );
     }
 }

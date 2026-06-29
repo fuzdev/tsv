@@ -291,9 +291,20 @@ impl<'a> Printer<'a> {
             internal::ExportDefaultValue::TSDeclareFunction(func) => func.span.start,
             internal::ExportDefaultValue::ClassDeclaration(class) => class.span.start,
         };
-        // `export default`→value gap: a line comment indents the value one level
-        // (uniform header rule); block/no-comment cases stay inline. Routes through
-        // the shared continuation helper.
+        // A comment that can't stay inline (a line comment, or a block comment with
+        // the value authored on a later line) forces the value onto its own indented
+        // line, keeping the comment where the author wrote it: own-line stays on its
+        // own line, a same-line comment trails the keyword. This is the value
+        // counterpart of `build_keyword_to_name_continuation`, parallel to the
+        // `as`/`satisfies` cast gap — prettier relocates the comment instead. A
+        // same-line block glued to the value (`export default /* c */ x`) stays inline.
+        if self.comment_forces_following_own_line(keyword_end, decl_start) {
+            let mut parts: DocBuf = smallvec![d.text("export default")];
+            self.append_keyword_value_line_comments(&mut parts, keyword_end, decl_start, value_doc);
+            return d.concat(&parts);
+        }
+        // No forcing comment (inline block / none): the value stays on the keyword
+        // line via the shared continuation helper.
         d.concat(&[
             d.text("export default"),
             self.build_keyword_to_name_continuation(keyword_end, decl_start, value_doc),

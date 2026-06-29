@@ -586,11 +586,14 @@ impl<'a> Printer<'a> {
                             parts.push(self.build_inline_comments_between_doc(key_end, eq_pos));
                         }
                         parts.push(d.text(" = "));
-                        // Comments after `=` stay after `=`
-                        if let Some(comment_doc) =
-                            self.build_rhs_comments_opt(eq_pos + 1, rhs_start)
-                        {
-                            parts.push(comment_doc);
+                        // A block comment after `=` inlines onto the value; a line
+                        // comment breaks before it. Matches the param-default rule in
+                        // `build_assignment_pattern_doc` (collapse an own-line block);
+                        // prettier moves a block before `=` instead.
+                        if self.has_comments_between(eq_pos + 1, rhs_start) {
+                            parts.push(
+                                self.build_trailing_comments_break_for_line(eq_pos + 1, rhs_start),
+                            );
                         }
                         parts.push(self.build_expression_doc(rhs));
                         d.concat(&parts)
@@ -905,16 +908,19 @@ impl<'a> Printer<'a> {
             parts.push(self.build_inline_comments_between_doc(left_end, eq_pos));
         }
 
-        // Comments after `=` stay after `=`
-        let inline_comments = self.build_rhs_comments_opt(eq_pos + 1, rhs_start);
-
+        // A block comment after `=` inlines onto the value (`a = /* c */ b`),
+        // collapsing an own-line authoring; a line comment forces the value onto
+        // the next line (it can't share the `//` line). Prettier instead moves a
+        // block before `=` (`a /* c */ = b`) or floats a line past the value
+        // (`a = b // c`) — see param_default_*_comment_prettier_divergence.
         let rhs_doc = self.build_expression_doc(pattern.right);
         let rhs_doc = if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
             d.parens(rhs_doc)
         } else {
             rhs_doc
         };
-        let value_doc = if let Some(comments_doc) = inline_comments {
+        let value_doc = if self.has_comments_between(eq_pos + 1, rhs_start) {
+            let comments_doc = self.build_trailing_comments_break_for_line(eq_pos + 1, rhs_start);
             d.concat(&[comments_doc, rhs_doc])
         } else {
             rhs_doc

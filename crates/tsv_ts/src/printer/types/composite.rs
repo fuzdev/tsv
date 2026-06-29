@@ -921,8 +921,14 @@ impl<'a> Printer<'a> {
 
             if !is_last {
                 let next_start = t.element_types[i + 1].span().start;
-                prev_end =
-                    self.emit_multiline_comma_with_comments(&mut inner_parts, elem_end, next_start);
+                // Tuples preserve an author blank line before a member's own-line
+                // leading comment (prettier does; type-param/arg lists do not).
+                prev_end = self.emit_multiline_comma_with_comments(
+                    &mut inner_parts,
+                    elem_end,
+                    next_start,
+                    true,
+                );
             } else {
                 // Last element: no trailing comma under `trailingComma: 'none'`, then
                 // comments before `]`.

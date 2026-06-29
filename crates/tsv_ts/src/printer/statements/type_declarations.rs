@@ -247,18 +247,25 @@ impl<'a> Printer<'a> {
             // every subsequent comment go on their own line in the indent. Two line
             // comments must not merge onto one line — the second `//` would stop
             // being a delimiter (a boundary loss).
-            let mut first = true;
-            for comment in comments_in_range(self.comments, eq_pos + 1, type_start) {
+            let comments: Vec<_> =
+                comments_in_range(self.comments, eq_pos + 1, type_start).collect();
+            for (idx, comment) in comments.iter().enumerate() {
                 let multiline_block = comment.is_block && self.is_multiline_comment(comment);
                 let authored_on_eq_line = self.is_same_line(eq_pos, comment.span.start);
-                if first && !multiline_block && authored_on_eq_line {
+                if idx == 0 && !multiline_block && authored_on_eq_line {
                     inline_parts.push(d.text(" "));
                     inline_parts.push(self.build_comment_doc(comment));
                 } else {
                     indent_comment_parts.push(self.build_comment_doc(comment));
-                    indent_comment_parts.push(d.hardline());
+                    // Preserve an author blank line before the next comment, or before
+                    // the value itself (`type X =⏎/* c */⏎⏎Y`), matching prettier.
+                    let next = comments.get(idx + 1).map_or(type_start, |c| c.span.start);
+                    self.push_blank_preserving_hardline(
+                        &mut indent_comment_parts,
+                        comment.span.end,
+                        next,
+                    );
                 }
-                first = false;
             }
 
             parts.extend(inline_parts);
@@ -646,7 +653,15 @@ impl<'a> Printer<'a> {
                             return true;
                         }
                         // Also keep multi-line block comments (they're always leading, never trailing)
-                        self.is_multiline_comment(c)
+                        if self.is_multiline_comment(c) {
+                            return true;
+                        }
+                        // An inline comment that hugs this member on its line leads it
+                        // (`a: 1, /* c */ b`), even though it shares the previous
+                        // member's line — keep it here rather than letting it trail the
+                        // previous member. (A comment with a newline after it instead
+                        // trails the previous member: the `is_same_line` is false.)
+                        self.is_same_line(c.span.end, member_start)
                     })
                     .copied()
                     .collect()
@@ -691,13 +706,20 @@ impl<'a> Printer<'a> {
             let upper_bound = members
                 .get(i + 1)
                 .map_or(body_end, |next| next.span().start);
+            let next_start = members.get(i + 1).map(|next| next.span().start);
             for comment in comments_in_range(self.comments, member.span().end, upper_bound) {
                 if self.is_same_line(member.span().end, comment.span.start) {
                     // Skip multi-line block comments (they're leading comments for next element)
                     if self.is_multiline_comment(comment) {
                         continue;
                     }
-
+                    // An inline comment that hugs the next member on its line leads that
+                    // member (`a: 1, /* c */ b`) — the leading filter emits it — so it
+                    // must not also trail this one (which would duplicate it). A comment
+                    // with a newline after it (next member on a later line) trails here.
+                    if next_start.is_some_and(|ns| self.is_same_line(comment.span.end, ns)) {
+                        break;
+                    }
                     parts.push(self.build_trailing_comment_doc(comment));
                 } else {
                     break; // Only same-line comments
@@ -843,22 +865,11 @@ impl<'a> Printer<'a> {
                     } else {
                         comments[0].span.start
                     };
-                    if self.has_blank_line_between(prev_end, check_pos) {
-                        member_parts.push(d.literalline());
-                    }
-                    member_parts.push(d.hardline());
+                    self.push_blank_preserving_hardline(&mut member_parts, prev_end, check_pos);
                 }
 
                 // Process leading comments
-                for comment in &comments {
-                    member_parts.push(self.build_comment_doc(comment));
-                    // Block comment on same line as member gets space, otherwise hardline
-                    if comment.is_block && self.is_same_line(comment.span.end, member_start) {
-                        member_parts.push(d.text(" "));
-                    } else {
-                        member_parts.push(d.hardline());
-                    }
-                }
+                self.emit_member_leading_comments(&mut member_parts, &comments, member_start);
 
                 // A preceding format-ignore directive keeps the member's source
                 // verbatim. The member span excludes the

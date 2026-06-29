@@ -1,0 +1,1225 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 883,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " call args: blank line before a trailing comment (before `)`) is preserved",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 114,
+			"end": 121,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " new args: blank before a trailing comment (before `)`) is preserved",
+			"start": 128,
+			"end": 198,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " n ",
+			"start": 219,
+			"end": 226,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " array: blank before a trailing comment (before `]`) is preserved",
+			"start": 233,
+			"end": 300,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 328,
+			"end": 335,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tuple: blank before a trailing comment (before `]`) is preserved",
+			"start": 342,
+			"end": 409,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " d ",
+			"start": 436,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " function params: blank before a trailing comment (before `)`) is preserved",
+			"start": 450,
+			"end": 527,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 553,
+			"end": 560,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 2
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " function-type params: blank before a trailing comment (before `)`) is preserved",
+			"start": 569,
+			"end": 651,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " g ",
+			"start": 692,
+			"end": 699,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 2
+				},
+				"end": {
+					"line": 47,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " method signature params: blank before a trailing comment (before `)`) is preserved",
+			"start": 714,
+			"end": 799,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " h ",
+			"start": 851,
+			"end": 858,
+			"loc": {
+				"start": {
+					"line": 56,
+					"column": 3
+				},
+				"end": {
+					"line": 56,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 882,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 873,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 59,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 98,
+					"end": 125,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 98,
+						"end": 124,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 98,
+							"end": 100,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 104,
+								"end": 105,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 109,
+								"end": 110,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " call args: blank line before a trailing comment (before `)`) is preserved",
+							"start": 20,
+							"end": 96
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 200,
+					"end": 230,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 200,
+						"end": 229,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 204,
+							"end": 205,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 5
+								},
+								"end": {
+									"line": 11,
+									"column": 6
+								}
+							},
+							"name": "C"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 209,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 214,
+								"end": 215,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 3
+									}
+								},
+								"name": "b"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 114,
+							"end": 121
+						},
+						{
+							"type": "Line",
+							"value": " new args: blank before a trailing comment (before `)`) is preserved",
+							"start": 128,
+							"end": 198
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 302,
+					"end": 339,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 308,
+							"end": 338,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 308,
+								"end": 311,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 10
+									}
+								},
+								"name": "arr"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 314,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 13
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 318,
+										"end": 319,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 323,
+										"end": 324,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 3
+											}
+										},
+										"name": "y",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " a ",
+												"start": 328,
+												"end": 335
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " n ",
+							"start": 219,
+							"end": 226
+						},
+						{
+							"type": "Line",
+							"value": " array: blank before a trailing comment (before `]`) is preserved",
+							"start": 233,
+							"end": 300
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 411,
+					"end": 447,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 416,
+						"end": 419,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 9
+							}
+						},
+						"name": "Tup"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 422,
+						"end": 446,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 12
+							},
+							"end": {
+								"line": 32,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSTypeReference",
+								"start": 426,
+								"end": 427,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 426,
+									"end": 427,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 2
+										},
+										"end": {
+											"line": 28,
+											"column": 3
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 431,
+								"end": 432,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 431,
+									"end": 432,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 3
+										}
+									},
+									"name": "B"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " tuple: blank before a trailing comment (before `]`) is preserved",
+							"start": 342,
+							"end": 409
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 529,
+					"end": 566,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 538,
+						"end": 539,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 10
+							},
+							"end": {
+								"line": 35,
+								"column": 11
+							}
+						},
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 543,
+							"end": 544,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 2
+								},
+								"end": {
+									"line": 36,
+									"column": 3
+								}
+							},
+							"name": "a"
+						},
+						{
+							"type": "Identifier",
+							"start": 548,
+							"end": 549,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 2
+								},
+								"end": {
+									"line": 37,
+									"column": 3
+								}
+							},
+							"name": "b"
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 564,
+						"end": 566,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 3
+							},
+							"end": {
+								"line": 40,
+								"column": 5
+							}
+						},
+						"body": [],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " e ",
+								"start": 553,
+								"end": 560
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " d ",
+							"start": 436,
+							"end": 443
+						},
+						{
+							"type": "Line",
+							"value": " function params: blank before a trailing comment (before `)`) is preserved",
+							"start": 450,
+							"end": 527
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 653,
+					"end": 711,
+					"loc": {
+						"start": {
+							"line": 43,
+							"column": 1
+						},
+						"end": {
+							"line": 48,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 658,
+						"end": 659,
+						"loc": {
+							"start": {
+								"line": 43,
+								"column": 6
+							},
+							"end": {
+								"line": 43,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 662,
+						"end": 710,
+						"loc": {
+							"start": {
+								"line": 43,
+								"column": 10
+							},
+							"end": {
+								"line": 48,
+								"column": 10
+							}
+						},
+						"parameters": [
+							{
+								"type": "Identifier",
+								"start": 666,
+								"end": 675,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 11
+									}
+								},
+								"name": "a",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 667,
+									"end": 675,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 3
+										},
+										"end": {
+											"line": 44,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 669,
+										"end": 675,
+										"loc": {
+											"start": {
+												"line": 44,
+												"column": 5
+											},
+											"end": {
+												"line": 44,
+												"column": 11
+											}
+										}
+									}
+								}
+							},
+							{
+								"type": "Identifier",
+								"start": 679,
+								"end": 688,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 2
+									},
+									"end": {
+										"line": 45,
+										"column": 11
+									}
+								},
+								"name": "b",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 680,
+									"end": 688,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 3
+										},
+										"end": {
+											"line": 45,
+											"column": 11
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 682,
+										"end": 688,
+										"loc": {
+											"start": {
+												"line": 45,
+												"column": 5
+											},
+											"end": {
+												"line": 45,
+												"column": 11
+											}
+										}
+									}
+								}
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 703,
+							"end": 710,
+							"loc": {
+								"start": {
+									"line": 48,
+									"column": 3
+								},
+								"end": {
+									"line": 48,
+									"column": 10
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 706,
+								"end": 710,
+								"loc": {
+									"start": {
+										"line": 48,
+										"column": 6
+									},
+									"end": {
+										"line": 48,
+										"column": 10
+									}
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " g ",
+									"start": 692,
+									"end": 699
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " function-type params: blank before a trailing comment (before `)`) is preserved",
+							"start": 569,
+							"end": 651
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 801,
+					"end": 872,
+					"loc": {
+						"start": {
+							"line": 51,
+							"column": 1
+						},
+						"end": {
+							"line": 58,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 811,
+						"end": 812,
+						"loc": {
+							"start": {
+								"line": 51,
+								"column": 11
+							},
+							"end": {
+								"line": 51,
+								"column": 12
+							}
+						},
+						"name": "I"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 813,
+						"end": 872,
+						"loc": {
+							"start": {
+								"line": 51,
+								"column": 13
+							},
+							"end": {
+								"line": 58,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSMethodSignature",
+								"start": 817,
+								"end": 869,
+								"loc": {
+									"start": {
+										"line": 52,
+										"column": 2
+									},
+									"end": {
+										"line": 57,
+										"column": 10
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 817,
+									"end": 818,
+									"loc": {
+										"start": {
+											"line": 52,
+											"column": 2
+										},
+										"end": {
+											"line": 52,
+											"column": 3
+										}
+									},
+									"name": "m"
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 823,
+										"end": 832,
+										"loc": {
+											"start": {
+												"line": 53,
+												"column": 3
+											},
+											"end": {
+												"line": 53,
+												"column": 12
+											}
+										},
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 824,
+											"end": 832,
+											"loc": {
+												"start": {
+													"line": 53,
+													"column": 4
+												},
+												"end": {
+													"line": 53,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSNumberKeyword",
+												"start": 826,
+												"end": 832,
+												"loc": {
+													"start": {
+														"line": 53,
+														"column": 6
+													},
+													"end": {
+														"line": 53,
+														"column": 12
+													}
+												}
+											}
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 837,
+										"end": 846,
+										"loc": {
+											"start": {
+												"line": 54,
+												"column": 3
+											},
+											"end": {
+												"line": 54,
+												"column": 12
+											}
+										},
+										"name": "b",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 838,
+											"end": 846,
+											"loc": {
+												"start": {
+													"line": 54,
+													"column": 4
+												},
+												"end": {
+													"line": 54,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSNumberKeyword",
+												"start": 840,
+												"end": 846,
+												"loc": {
+													"start": {
+														"line": 54,
+														"column": 6
+													},
+													"end": {
+														"line": 54,
+														"column": 12
+													}
+												}
+											}
+										}
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 862,
+									"end": 868,
+									"loc": {
+										"start": {
+											"line": 57,
+											"column": 3
+										},
+										"end": {
+											"line": 57,
+											"column": 9
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 864,
+										"end": 868,
+										"loc": {
+											"start": {
+												"line": 57,
+												"column": 5
+											},
+											"end": {
+												"line": 57,
+												"column": 9
+											}
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " h ",
+											"start": 851,
+											"end": 858
+										}
+									]
+								},
+								"kind": "method"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " method signature params: blank before a trailing comment (before `)`) is preserved",
+							"start": 714,
+							"end": 799
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

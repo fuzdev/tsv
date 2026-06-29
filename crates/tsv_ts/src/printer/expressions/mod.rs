@@ -489,13 +489,16 @@ impl<'a> Printer<'a> {
             parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
         }
 
-        // A line comment between the keyword and the type would otherwise be
-        // emitted inline and swallow the type (`x as // c A`, a content/structure
-        // loss). Keep it trailing the keyword (line_suffix) with the type on the
-        // next line. Applies uniformly, including `as const`.
+        // A comment between the keyword and the type that can't stay inline forces
+        // the type onto the next line, keeping the comment with the cast: a line
+        // comment (inlining would let `//` swallow the type — `x as // c A`), or a
+        // block comment with the type authored on a later line (inlining would reflow
+        // the author's break). A block glued to the type (`x as /* c */ A`, type on
+        // the same line) stays inline. Applies uniformly, including `as const`. See
+        // as_satisfies_value_line_comment / as_satisfies_value_own_line_block_comment.
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
-            if self.has_line_comments_between(kw_end, type_start) {
+            if self.comment_forces_following_own_line(kw_end, type_start) {
                 parts.push(d.text(" "));
                 parts.push(d.text(keyword));
                 let type_doc = self.build_type_doc_with_wrapping_type_args(type_annotation);

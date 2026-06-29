@@ -1,0 +1,699 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 537,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " inline-adjacent block comment between params stays inline",
+			"start": 10,
+			"end": 70,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 88,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 17
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment before a param expands the list (a line comment cannot be inline)",
+			"start": 104,
+			"end": 185,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d",
+			"start": 208,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment on its own line before a param expands the list",
+			"start": 225,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 312,
+			"end": 319,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank lines around an own-line comment are preserved",
+			"start": 332,
+			"end": 387,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " f ",
+			"start": 411,
+			"end": 418,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " block comment trailing a param before its comma stays inline",
+			"start": 432,
+			"end": 495,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " g ",
+			"start": 512,
+			"end": 519,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 16
+				},
+				"end": {
+					"line": 29,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 536,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 527,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 72,
+					"end": 101,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 30
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 81,
+						"end": 84,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 85,
+							"end": 86,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 14
+								},
+								"end": {
+									"line": 3,
+									"column": 15
+								}
+							},
+							"name": "a",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 88,
+									"end": 95
+								}
+							]
+						},
+						{
+							"type": "Identifier",
+							"start": 96,
+							"end": 97,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 25
+								},
+								"end": {
+									"line": 3,
+									"column": 26
+								}
+							},
+							"name": "b"
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 99,
+						"end": 101,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 28
+							},
+							"end": {
+								"line": 3,
+								"column": 30
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " inline-adjacent block comment between params stays inline",
+							"start": 10,
+							"end": 70
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 187,
+					"end": 222,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 196,
+						"end": 199,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 13
+							}
+						},
+						"name": "fn2"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 203,
+							"end": 204,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"name": "a"
+						},
+						{
+							"type": "Identifier",
+							"start": 215,
+							"end": 216,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 3
+								}
+							},
+							"name": "b",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " d",
+									"start": 208,
+									"end": 212
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 220,
+						"end": 222,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 3
+							},
+							"end": {
+								"line": 10,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment before a param expands the list (a line comment cannot be inline)",
+							"start": 104,
+							"end": 185
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 291,
+					"end": 329,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 300,
+						"end": 303,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 10
+							},
+							"end": {
+								"line": 13,
+								"column": 13
+							}
+						},
+						"name": "fn3"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 307,
+							"end": 308,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 14,
+									"column": 3
+								}
+							},
+							"name": "a"
+						},
+						{
+							"type": "Identifier",
+							"start": 322,
+							"end": 323,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 3
+								}
+							},
+							"name": "b",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " e ",
+									"start": 312,
+									"end": 319
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 327,
+						"end": 329,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 3
+							},
+							"end": {
+								"line": 17,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment on its own line before a param expands the list",
+							"start": 225,
+							"end": 289
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 389,
+					"end": 429,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 398,
+						"end": 401,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 10
+							},
+							"end": {
+								"line": 20,
+								"column": 13
+							}
+						},
+						"name": "fn4"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 405,
+							"end": 406,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 2
+								},
+								"end": {
+									"line": 21,
+									"column": 3
+								}
+							},
+							"name": "a"
+						},
+						{
+							"type": "Identifier",
+							"start": 422,
+							"end": 423,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 2
+								},
+								"end": {
+									"line": 25,
+									"column": 3
+								}
+							},
+							"name": "b",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " f ",
+									"start": 411,
+									"end": 418
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 427,
+						"end": 429,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 3
+							},
+							"end": {
+								"line": 26,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blank lines around an own-line comment are preserved",
+							"start": 332,
+							"end": 387
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 497,
+					"end": 526,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 30
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 506,
+						"end": 509,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 10
+							},
+							"end": {
+								"line": 29,
+								"column": 13
+							}
+						},
+						"name": "fn5"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 510,
+							"end": 511,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 14
+								},
+								"end": {
+									"line": 29,
+									"column": 15
+								}
+							},
+							"name": "a",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " g ",
+									"start": 512,
+									"end": 519
+								}
+							]
+						},
+						{
+							"type": "Identifier",
+							"start": 521,
+							"end": 522,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 25
+								},
+								"end": {
+									"line": 29,
+									"column": 26
+								}
+							},
+							"name": "b"
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 524,
+						"end": 526,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 28
+							},
+							"end": {
+								"line": 29,
+								"column": 30
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " block comment trailing a param before its comma stays inline",
+							"start": 432,
+							"end": 495
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

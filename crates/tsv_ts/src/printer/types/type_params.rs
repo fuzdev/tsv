@@ -113,6 +113,7 @@ impl<'a> Printer<'a> {
                     &mut inner_parts,
                     param_end,
                     next_start,
+                    false,
                 );
             } else {
                 // Last param: no trailing comma under `trailingComma: 'none'`, then
@@ -617,6 +618,7 @@ impl<'a> Printer<'a> {
                     &mut inner_parts,
                     param_end,
                     next_start,
+                    false,
                 );
             } else {
                 // Last param: trailing comments before `>`

@@ -1,0 +1,1083 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 405,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " inline-adjacent block comment between members stays inline",
+			"start": 20,
+			"end": 81,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 101,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 19
+				},
+				"end": {
+					"line": 3,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line block comment between members expands",
+			"start": 119,
+			"end": 168,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 192,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment between members expands",
+			"start": 214,
+			"end": 253,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " d",
+			"start": 277,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank line around an own-line comment is preserved",
+			"start": 296,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 374,
+			"end": 381,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 404,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 395,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 83,
+					"end": 116,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 34
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 88,
+						"end": 90,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "T1"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 93,
+						"end": 115,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 33
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 95,
+								"end": 100,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 13
+									},
+									"end": {
+										"line": 3,
+										"column": 18
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 95,
+									"end": 96,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 13
+										},
+										"end": {
+											"line": 3,
+											"column": 14
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 96,
+									"end": 99,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 14
+										},
+										"end": {
+											"line": 3,
+											"column": 17
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 98,
+										"end": 99,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 16
+											},
+											"end": {
+												"line": 3,
+												"column": 17
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 98,
+											"end": 99,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 16
+												},
+												"end": {
+													"line": 3,
+													"column": 17
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 101,
+										"end": 108
+									}
+								]
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 109,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 27
+									},
+									"end": {
+										"line": 3,
+										"column": 31
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 109,
+									"end": 110,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 27
+										},
+										"end": {
+											"line": 3,
+											"column": 28
+										}
+									},
+									"name": "b"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 110,
+									"end": 113,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 28
+										},
+										"end": {
+											"line": 3,
+											"column": 31
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 112,
+										"end": 113,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 30
+											},
+											"end": {
+												"line": 3,
+												"column": 31
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 112,
+											"end": 113,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 30
+												},
+												"end": {
+													"line": 3,
+													"column": 31
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " inline-adjacent block comment between members stays inline",
+							"start": 20,
+							"end": 81
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 170,
+					"end": 211,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 175,
+						"end": 177,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 8
+							}
+						},
+						"name": "T2"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 180,
+						"end": 210,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 11
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 184,
+								"end": 189,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 184,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 185,
+									"end": 188,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 187,
+										"end": 188,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 5
+											},
+											"end": {
+												"line": 7,
+												"column": 6
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 187,
+											"end": 188,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 5
+												},
+												"end": {
+													"line": 7,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								}
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 202,
+								"end": 207,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 202,
+									"end": 203,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 203,
+									"end": 206,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 205,
+										"end": 206,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 5
+											},
+											"end": {
+												"line": 9,
+												"column": 6
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 205,
+											"end": 206,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 5
+												},
+												"end": {
+													"line": 9,
+													"column": 6
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 192,
+										"end": 199
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " own-line block comment between members expands",
+							"start": 119,
+							"end": 168
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 255,
+					"end": 293,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 260,
+						"end": 262,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 6
+							},
+							"end": {
+								"line": 13,
+								"column": 8
+							}
+						},
+						"name": "T3"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 265,
+						"end": 292,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 11
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 269,
+								"end": 274,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 269,
+									"end": 270,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 270,
+									"end": 273,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 3
+										},
+										"end": {
+											"line": 14,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 272,
+										"end": 273,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 5
+											},
+											"end": {
+												"line": 14,
+												"column": 6
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 272,
+											"end": 273,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 5
+												},
+												"end": {
+													"line": 14,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								}
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 284,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 284,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 285,
+									"end": 288,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 3
+										},
+										"end": {
+											"line": 16,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 287,
+										"end": 288,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 5
+											},
+											"end": {
+												"line": 16,
+												"column": 6
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 287,
+											"end": 288,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 5
+												},
+												"end": {
+													"line": 16,
+													"column": 6
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " d",
+										"start": 277,
+										"end": 281
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " line comment between members expands",
+							"start": 214,
+							"end": 253
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 351,
+					"end": 394,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 356,
+						"end": 358,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 6
+							},
+							"end": {
+								"line": 20,
+								"column": 8
+							}
+						},
+						"name": "T4"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 361,
+						"end": 393,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 11
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 365,
+								"end": 370,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 365,
+									"end": 366,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 2
+										},
+										"end": {
+											"line": 21,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 366,
+									"end": 369,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 368,
+										"end": 369,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 5
+											},
+											"end": {
+												"line": 21,
+												"column": 6
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 368,
+											"end": 369,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 5
+												},
+												"end": {
+													"line": 21,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								}
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 385,
+								"end": 390,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 7
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 385,
+									"end": 386,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 386,
+									"end": 389,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 3
+										},
+										"end": {
+											"line": 25,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 388,
+										"end": 389,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 5
+											},
+											"end": {
+												"line": 25,
+												"column": 6
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 388,
+											"end": 389,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 5
+												},
+												"end": {
+													"line": 25,
+													"column": 6
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " e ",
+										"start": 374,
+										"end": 381
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blank line around an own-line comment is preserved",
+							"start": 296,
+							"end": 349
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

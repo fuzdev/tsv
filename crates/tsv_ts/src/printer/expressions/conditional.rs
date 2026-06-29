@@ -77,6 +77,15 @@ impl<'a> Printer<'a> {
         let has_line_comments = self.has_line_comments_between(test_end, consequent_start)
             || self.has_line_comments_between(consequent_end, alternate_start);
 
+        // A branch-gap comment separated from its value by a blank line forces the
+        // break too — prettier breaks on `a ? /* c */⏎⏎b` even though an own-line
+        // block comment with no blank stays inline (`a ? /* c */⏎b`). Scan the whole
+        // test→consequent / consequent→alternate ranges (the `?`/`:` sit before the
+        // gap comments, so the blank-after-comment check is unaffected by them).
+        let has_blank_separated_comment = self
+            .comment_followed_by_blank(test_end, consequent_start)
+            || self.comment_followed_by_blank(consequent_end, alternate_start);
+
         // Check for multiline template literals in test, consequent, or alternate
         // Template literals with embedded newlines should force the ternary to break,
         // even though those newlines don't appear in the doc structure.
@@ -84,9 +93,10 @@ impl<'a> Printer<'a> {
             || is_multiline_template_literal(cond.consequent)
             || is_multiline_template_literal(cond.alternate);
 
-        // If there are line comments or multiline template literals, use a breaking layout.
-        // Block comments after ? or : are handled inline in the non-breaking path.
-        if has_line_comments || has_multiline_template {
+        // If there are line comments, a blank-separated branch comment, or multiline
+        // template literals, use a breaking layout. Other block comments after ? or :
+        // are handled inline in the non-breaking path.
+        if has_line_comments || has_blank_separated_comment || has_multiline_template {
             return self.build_conditional_doc_with_line_comments(cond, is_chained);
         }
 
@@ -328,26 +338,12 @@ impl<'a> Printer<'a> {
         q_parts.push(d.hardline());
         q_parts.push(d.text("?"));
 
-        // Comments between ? and consequent
-        // When multiple comments exist, each subsequent one goes on its own line
-        let mut has_line_comment_before_consequent = false;
-        let mut has_prev_comment_after_q = false;
-        if let Some(q_pos) = question_pos {
-            for comment in comments_in_range(self.comments, q_pos + 1, consequent_start) {
-                if has_prev_comment_after_q {
-                    // Subsequent comments go on their own line
-                    q_parts.push(d.hardline());
-                    q_parts.push(d.text(INDENT));
-                } else {
-                    q_parts.push(d.text(" "));
-                }
-                q_parts.push(self.build_comment_doc(comment));
-                has_prev_comment_after_q = true;
-                if !comment.is_block {
-                    has_line_comment_before_consequent = true;
-                }
-            }
-        }
+        // Comments between ? and consequent: first trails `?` inline, later ones take
+        // their own indented line (author blanks preserved). `consequent_on_own_line`
+        // is set when a comment can't share the consequent's line (the blank, if any,
+        // is preserved below).
+        let (consequent_on_own_line, blank_before_consequent) =
+            self.emit_ternary_branch_comments(&mut q_parts, question_pos, consequent_start);
 
         // Consequent expression — when the outer ternary enters breaking layout
         // (line comments or multiline templates), nested conditionals in the
@@ -367,8 +363,12 @@ impl<'a> Printer<'a> {
                     false,
                 )
             };
-        if has_line_comment_before_consequent {
-            // Line comment — consequent on new line
+        if consequent_on_own_line {
+            // A comment can't share the consequent's line — consequent on a new line
+            // (preserving an author blank line before it).
+            if blank_before_consequent {
+                q_parts.push(d.literalline());
+            }
             q_parts.push(d.hardline());
             q_parts.push(d.text(INDENT));
             q_parts.push(consequent);
@@ -401,26 +401,9 @@ impl<'a> Printer<'a> {
         q_parts.push(d.hardline());
         q_parts.push(d.text(":"));
 
-        // Comments between : and alternate
-        // When multiple comments exist, each subsequent one goes on its own line
-        let mut has_line_comment_before_alternate = false;
-        let mut has_prev_comment_after_colon = false;
-        if let Some(c_pos) = colon_pos {
-            for comment in comments_in_range(self.comments, c_pos + 1, alternate_start) {
-                if has_prev_comment_after_colon {
-                    // Subsequent comments go on their own line
-                    q_parts.push(d.hardline());
-                    q_parts.push(d.text(INDENT));
-                } else {
-                    q_parts.push(d.text(" "));
-                }
-                q_parts.push(self.build_comment_doc(comment));
-                has_prev_comment_after_colon = true;
-                if !comment.is_block {
-                    has_line_comment_before_alternate = true;
-                }
-            }
-        }
+        // Comments between : and alternate — same shape as the ?→consequent gap.
+        let (alternate_on_own_line, blank_before_alternate) =
+            self.emit_ternary_branch_comments(&mut q_parts, colon_pos, alternate_start);
 
         // Alternate expression - nested conditionals cascade the break without extra indent
         let alternate_doc = if let internal::Expression::ConditionalExpression(nested) =
@@ -435,7 +418,10 @@ impl<'a> Printer<'a> {
             )
         };
 
-        if has_line_comment_before_alternate {
+        if alternate_on_own_line {
+            if blank_before_alternate {
+                q_parts.push(d.literalline());
+            }
             q_parts.push(d.hardline());
             q_parts.push(d.text(INDENT));
         } else {
@@ -446,6 +432,54 @@ impl<'a> Printer<'a> {
         parts.push(d.indent(d.concat(&q_parts)));
 
         d.concat(&parts)
+    }
+
+    /// Emit the comments between a ternary operator (`?` or `:`) and its branch value
+    /// into `parts`: the first trails the operator inline (`? /* c */`), each later one
+    /// takes its own indented line (author blanks preserved). Shared by the
+    /// ?→consequent and :→alternate gaps.
+    ///
+    /// Returns `(value_on_own_line, blank_before_value)`: the value drops onto its own
+    /// line when a comment can't share it — a line comment, a later own-line comment,
+    /// or a blank line before the value — and the caller preserves that trailing blank.
+    fn emit_ternary_branch_comments(
+        &self,
+        parts: &mut DocBuf,
+        op_pos: Option<u32>,
+        value_start: u32,
+    ) -> (bool, bool) {
+        let d = self.d();
+        let comments: Vec<_> = op_pos
+            .map(|p| comments_in_range(self.comments, p + 1, value_start).collect())
+            .unwrap_or_default();
+        let mut has_line_comment = false;
+        let mut last_own_line = false;
+        for (i, comment) in comments.iter().enumerate() {
+            if i == 0 {
+                // First comment trails the operator inline (`? /* c */`).
+                parts.push(d.text(" "));
+            } else {
+                // Subsequent comments take their own line (author blank preserved).
+                self.push_blank_preserving_hardline(
+                    parts,
+                    comments[i - 1].span.end,
+                    comment.span.start,
+                );
+                parts.push(d.text(INDENT));
+                last_own_line = true;
+            }
+            parts.push(self.build_comment_doc(comment));
+            if !comment.is_block {
+                has_line_comment = true;
+            }
+        }
+        let blank_before_value = comments
+            .last()
+            .is_some_and(|c| self.has_blank_line_between(c.span.end, value_start));
+        (
+            has_line_comment || last_own_line || blank_before_value,
+            blank_before_value,
+        )
     }
 
     /// Split the comments in a ternary operand→operator gap into trailing vs
