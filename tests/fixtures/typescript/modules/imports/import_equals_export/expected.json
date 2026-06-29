@@ -1,0 +1,322 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 147,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 146,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 137,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSImportEqualsDeclaration",
+					"start": 20,
+					"end": 58,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 39
+						}
+					},
+					"importKind": "value",
+					"isExport": true,
+					"id": {
+						"type": "Identifier",
+						"start": 34,
+						"end": 39,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 15
+							},
+							"end": {
+								"line": 2,
+								"column": 20
+							}
+						},
+						"name": "Types"
+					},
+					"moduleReference": {
+						"type": "TSQualifiedName",
+						"start": 42,
+						"end": 57,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 23
+							},
+							"end": {
+								"line": 2,
+								"column": 38
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 42,
+							"end": 51,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 23
+								},
+								"end": {
+									"line": 2,
+									"column": 32
+								}
+							},
+							"name": "Namespace"
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 52,
+							"end": 57,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 33
+								},
+								"end": {
+									"line": 2,
+									"column": 38
+								}
+							},
+							"name": "Types"
+						}
+					}
+				},
+				{
+					"type": "TSImportEqualsDeclaration",
+					"start": 60,
+					"end": 99,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 40
+						}
+					},
+					"importKind": "value",
+					"isExport": true,
+					"id": {
+						"type": "Identifier",
+						"start": 74,
+						"end": 79,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"name": "Inner"
+					},
+					"moduleReference": {
+						"type": "TSQualifiedName",
+						"start": 82,
+						"end": 98,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 23
+							},
+							"end": {
+								"line": 3,
+								"column": 39
+							}
+						},
+						"left": {
+							"type": "TSQualifiedName",
+							"start": 82,
+							"end": 93,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 23
+								},
+								"end": {
+									"line": 3,
+									"column": 34
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 82,
+								"end": 87,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 23
+									},
+									"end": {
+										"line": 3,
+										"column": 28
+									}
+								},
+								"name": "Outer"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 88,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 29
+									},
+									"end": {
+										"line": 3,
+										"column": 34
+									}
+								},
+								"name": "Inner"
+							}
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 94,
+							"end": 98,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 35
+								},
+								"end": {
+									"line": 3,
+									"column": 39
+								}
+							},
+							"name": "Deep"
+						}
+					}
+				},
+				{
+					"type": "TSImportEqualsDeclaration",
+					"start": 101,
+					"end": 136,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 36
+						}
+					},
+					"importKind": "value",
+					"isExport": true,
+					"id": {
+						"type": "Identifier",
+						"start": 115,
+						"end": 118,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 15
+							},
+							"end": {
+								"line": 4,
+								"column": 18
+							}
+						},
+						"name": "Ext"
+					},
+					"moduleReference": {
+						"type": "TSExternalModuleReference",
+						"start": 121,
+						"end": 135,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 21
+							},
+							"end": {
+								"line": 4,
+								"column": 35
+							}
+						},
+						"expression": {
+							"type": "Literal",
+							"start": 129,
+							"end": 134,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 29
+								},
+								"end": {
+									"line": 4,
+									"column": 34
+								}
+							},
+							"value": "mod",
+							"raw": "'mod'"
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

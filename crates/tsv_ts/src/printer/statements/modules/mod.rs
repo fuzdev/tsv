@@ -709,4 +709,23 @@ impl<'a> Printer<'a> {
         parts.extend(after);
         d.concat(&parts)
     }
+
+    /// `export as namespace Foo;` — TypeScript UMD global export declaration.
+    pub(super) fn build_namespace_export_declaration_doc(
+        &self,
+        decl: &internal::TSNamespaceExportDeclaration<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        parts.push(d.text("export as namespace "));
+        parts.push(d.symbol(decl.id.name.to_u32()));
+        // Trailing comment between the name and `;` (mirrors `export =` / import-equals):
+        // a same-line block comment stays before `;`, a line comment floats after it.
+        let semicolon_pos = decl.span.end.saturating_sub(1);
+        let after =
+            self.split_separator_gap_comments(&mut parts, decl.id.span.end, semicolon_pos, false);
+        parts.push(d.text(";"));
+        parts.extend(after);
+        d.concat(&parts)
+    }
 }

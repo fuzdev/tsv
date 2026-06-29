@@ -10,6 +10,7 @@ use crate::ast::internal::{
     YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::expression_assignable::AssignableContext;
 use tsv_lang::printing::visual_width;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
@@ -371,8 +372,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Parse right-hand side (assignment is right-associative, so same precedence)
             let right = self.parse_expression_bp(BP_ASSIGNMENT)?;
 
-            // Convert left side to pattern if needed (cover grammar)
-            let left_pattern = self.to_assignable(left.expr)?;
+            // Convert left side to pattern if needed (cover grammar). Assignment is
+            // the one context that accepts a type-assertion target (`(x as T) = …`).
+            let left_pattern = self.to_assignable(left.expr, AssignableContext::Assignment)?;
 
             let span = Span::new(expr_start as u32, right.actual_end as u32);
             left = ParsedExpr {

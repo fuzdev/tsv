@@ -54,6 +54,54 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     span: Span::new(start as u32, end),
                 }))
             }
+            // export import X = ... (TypeScript import-equals re-export). The only
+            // valid `export import` form is import-equals — `export import X from`,
+            // `export import { … }`, and `export import type X =` are all rejected by
+            // acorn-typescript, so the binding must be followed by `=`.
+            TokenKind::Keyword(KeywordKind::Import) => {
+                self.advance()?; // consume 'import'
+                if !matches!(self.current_kind(), TokenKind::Identifier) {
+                    return Err(self.error_expected_after("an identifier", "export import"));
+                }
+                let (id_start, id_end) = self.current_pos();
+                let symbol = self.intern_identifier();
+                self.advance()?;
+                if !matches!(self.current_kind(), TokenKind::Equals) {
+                    return Err(self.error_expected("'=' in import-equals declaration"));
+                }
+                self.parse_import_equals_declaration(
+                    start,
+                    id_start,
+                    id_end,
+                    symbol,
+                    ImportKind::Value,
+                    true, // is_export
+                )
+            }
+            // export as namespace Foo; (TypeScript UMD global export declaration)
+            TokenKind::Keyword(KeywordKind::As) => {
+                self.advance()?; // consume 'as'
+                if !matches!(self.current_kind(), TokenKind::Identifier)
+                    || self.current_value() != "namespace"
+                {
+                    return Err(self.error_expected_after("'namespace'", "export as"));
+                }
+                self.advance()?; // consume 'namespace'
+                if !matches!(self.current_kind(), TokenKind::Identifier) {
+                    return Err(self.error_expected_after("an identifier", "export as namespace"));
+                }
+                let (id_start, id_end) = self.current_pos();
+                let symbol = self.intern_identifier();
+                self.advance()?;
+                let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+                let end = self.semicolon_end()?;
+                Ok(Statement::TSNamespaceExportDeclaration(
+                    TSNamespaceExportDeclaration {
+                        id,
+                        span: Span::new(start as u32, end),
+                    },
+                ))
+            }
             // export default ...
             TokenKind::Keyword(KeywordKind::Default) => {
                 self.parse_export_default_declaration(start as u32)

@@ -109,6 +109,22 @@ impl<'arena> Expression<'arena> {
         }
     }
 
+    /// Peel type-assertion wrappers (`as` / `satisfies` / non-null `!` / `<T>`),
+    /// returning the innermost wrapped expression (e.g. the `x` in `(x as T)!`).
+    /// The single source of truth for "what counts as a type assertion" used by
+    /// the assignment-target validation (parser) and the simple-`=` left unwrap
+    /// (convert). `TSInstantiationExpression` (`f<T>`) is deliberately **not**
+    /// peeled — it is not an assertion.
+    pub fn skip_type_assertions(&self) -> &Expression<'arena> {
+        match self {
+            Expression::TSAsExpression(e) => e.expression.skip_type_assertions(),
+            Expression::TSSatisfiesExpression(e) => e.expression.skip_type_assertions(),
+            Expression::TSNonNullExpression(e) => e.expression.skip_type_assertions(),
+            Expression::TSTypeAssertion(e) => e.expression.skip_type_assertions(),
+            _ => self,
+        }
+    }
+
     /// Check if this expression is a chain root that needs ChainExpression wrapping.
     ///
     /// Returns true if this is a MemberExpression/CallExpression (or TSNonNullExpression
