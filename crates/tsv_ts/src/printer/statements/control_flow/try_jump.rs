@@ -5,6 +5,7 @@ use crate::printer::Printer;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::SymbolToU32;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -224,23 +225,18 @@ impl<'a> Printer<'a> {
         .unwrap_or(label_end as usize);
         let colon_end = colon_pos as u32 + 1;
 
-        let mut parts: DocBuf = smallvec![d.symbol(stmt.label.name.to_u32())];
-
-        // Comments between label name and colon: `label /* c */:`
-        parts.push(self.build_inline_comments_between_doc(label_end, colon_pos as u32));
-
-        // Check for comments between colon and body
+        // Build the `: body` tail (including any colon→body comments).
+        let mut tail_parts: DocBuf = smallvec![];
         if self.has_comments_between(colon_end, body_start) {
             let has_line_comment = self.has_line_comments_between(colon_end, body_start);
-            parts.push(d.text(":"));
-            parts.push(self.build_inline_comments_between_doc(colon_end, body_start));
-            if has_line_comment {
-                parts.push(d.hardline());
+            tail_parts.push(d.text(":"));
+            tail_parts.push(self.build_inline_comments_between_doc(colon_end, body_start));
+            tail_parts.push(if has_line_comment {
+                d.hardline()
             } else {
-                parts.push(d.text(" "));
-            }
-            parts.push(self.build_statement_doc(stmt.body));
-            d.concat(&parts)
+                d.text(" ")
+            });
+            tail_parts.push(self.build_statement_doc(stmt.body));
         } else {
             // No space before empty statement: `label:;` not `label: ;`
             let separator = if matches!(stmt.body, Statement::EmptyStatement(_)) {
@@ -248,9 +244,41 @@ impl<'a> Printer<'a> {
             } else {
                 ": "
             };
-            parts.push(d.text(separator));
-            parts.push(self.build_statement_doc(stmt.body));
-            d.concat(&parts)
+            tail_parts.push(d.text(separator));
+            tail_parts.push(self.build_statement_doc(stmt.body));
         }
+        let tail = d.concat(&tail_parts);
+
+        // An **own-line** comment in the label→`:` gap — a line comment, or a block
+        // comment the author put on its own line — is relocated onto its own line(s)
+        // before the label (matching prettier). A line comment must move (emitting it
+        // inline would let the `//` swallow the `:` + body); an own-line block follows
+        // the same rule rather than reflowing inline. A purely **same-line** block
+        // stays inline before `:` (`label /* c */: body`), matching prettier.
+        let gap_comments: Vec<_> =
+            comments_in_range(self.comments, label_end, colon_pos as u32).collect();
+        let relocate = gap_comments.iter().any(|c| self.is_own_line_comment(c));
+
+        let mut parts: DocBuf = smallvec![];
+        if relocate {
+            for (i, comment) in gap_comments.iter().enumerate() {
+                parts.push(self.build_comment_doc(comment));
+                // A space keeps a same-line block + line pair together (`/* c */ // d`);
+                // otherwise break. The last comment always breaks before the label.
+                match gap_comments.get(i + 1) {
+                    Some(next) if self.is_same_line(comment.span.end, next.span.start) => {
+                        parts.push(d.text(" "));
+                    }
+                    _ => parts.push(d.hardline()),
+                }
+            }
+            parts.push(d.symbol(stmt.label.name.to_u32()));
+            parts.push(tail);
+        } else {
+            parts.push(d.symbol(stmt.label.name.to_u32()));
+            parts.push(self.build_inline_comments_between_doc(label_end, colon_pos as u32));
+            parts.push(tail);
+        }
+        d.concat(&parts)
     }
 }

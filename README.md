@@ -121,13 +121,9 @@ Hard non-goals:
   possibly WASM plugins if the weight is deemed worth it
 - no style config settings, so on-disk state and caller params
   never change the output for a given input
-- no full Prettier conformance - see [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
-
-Deferred rather than refused:
-
-- N-API native bindings - npm is WASM-only for now
-- internal AST stabilization - not any time soon; the public JSON AST is the
-  stable surface, tracking Svelte's
+- no strict Prettier conformance -
+  see the [conformance doc](https://github.com/fuzdev/tsv/blob/main/docs/conformance_prettier.md)
+  and [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
 
 tsv is derived from:
 

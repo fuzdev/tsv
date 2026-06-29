@@ -244,6 +244,29 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Leading-spacing counterpart of `build_trailing_comments_break_for_line`: a
+    /// leading space before each comment, and a line comment forces the *following*
+    /// content onto a new line (`hardline`) so it can't be swallowed. A block comment
+    /// glues to the following token (` /* c */X`), matching the inline `Leading` form.
+    /// Use where the comment leads the next token across a gap that would otherwise
+    /// glue it (e.g. an indexed-access object→`[` gap, `A // c⏎[K]`).
+    pub(crate) fn build_leading_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        for comment in comments_in_range(self.comments, start, end) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+            if !comment.is_block {
+                parts.push(d.hardline());
+            }
+        }
+        if parts.is_empty() {
+            d.empty()
+        } else {
+            d.concat(&parts)
+        }
+    }
+
     /// Build a Doc for inline comments, returning None if no comments.
     ///
     /// Use this instead of `has_comments_between` + `build_inline_comments_between_doc`

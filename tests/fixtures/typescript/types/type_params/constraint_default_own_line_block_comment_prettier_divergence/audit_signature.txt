@@ -1,0 +1,28 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// Own-line block comment after a type parameter's `extends` constraint: the
+	// `<…>` expands and the constraint type hangs indented one level.
+	type F<T /* a */ extends U> = T;
+
+	// A same-line block comment trailing `extends` (no preceding newline) with the
+	// constraint type below stays trailing `extends`, type hanging.
+	type G<T /* b */ extends U> = T;
+
+	// A same-line block comment glued to the constraint type stays fully inline.
+	type H<T extends /* c */ U> = T;
+
+	// Same three cases for a type parameter's `=` default.
+	type I<T /* d */ = U> = T;
+
+	type J<T /* e */ = U> = T;
+
+	type K<T = /* f */ U> = T;
+</script>

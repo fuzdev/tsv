@@ -7,7 +7,7 @@
 // - Unary expression types: `-1`
 // - Template literal types: `\`prefix${T}suffix\``
 
-use super::{CommentSpacing, Printer};
+use super::Printer;
 use crate::ast::internal::{TSLiteralType, TSType, TemplateLiteralType};
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -89,11 +89,9 @@ impl<'a> Printer<'a> {
                         search_start + p as u32 + "${".len() as u32
                     });
                 let type_start = t.span().start;
-                let comments_doc = self.build_comments_between(
-                    dollar_brace_end,
-                    type_start,
-                    CommentSpacing::Trailing,
-                );
+                // A line comment breaks so it can't swallow the interpolation type.
+                let comments_doc =
+                    self.build_trailing_comments_break_for_line(dollar_brace_end, type_start);
                 let type_doc = self.build_type_doc(t);
                 let flat_str = self.render_arena_doc_flat(type_doc);
 

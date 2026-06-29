@@ -155,7 +155,10 @@ impl<'a> Printer<'a> {
             || decl
                 .params
                 .iter()
-                .any(|p| self.has_line_comments_between(p.span.start, p.span.end))
+                // A comment forcing a param's constraint/default onto its own line
+                // (`<T extends /* c */⏎U>`) also forces the whole `<…>` to expand, so
+                // the hang renders inside the broken list rather than collapsing.
+                .any(|p| self.comment_forces_following_own_line(p.span.start, p.span.end))
     }
 
     /// Build enriched param docs with surrounding block comments from the declaration.
@@ -385,11 +388,13 @@ impl<'a> Printer<'a> {
             ]));
             return;
         }
-        if self.has_line_comments_between(keyword_end, value_start) {
-            // A line comment after the keyword forces the value onto its own line;
-            // the shared helper keeps a same-line comment trailing the keyword
-            // (line comment via `line_suffix`, so its width never force-breaks a
-            // preceding constraint union) and each own-line comment on its own line.
+        if self.comment_forces_following_own_line(keyword_end, value_start) {
+            // A comment after the keyword that can't share its line — a line comment,
+            // or a block comment with the value on a later line — forces the value
+            // onto its own line; the shared helper keeps a same-line comment trailing
+            // the keyword (line comment via `line_suffix`, so its width never
+            // force-breaks a preceding constraint union) and each own-line comment on
+            // its own line.
             let value_doc = self.build_type_doc(value_type);
             self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
             return;
