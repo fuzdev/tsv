@@ -230,7 +230,7 @@ fn collect_ts_files(path: &Path, out: &mut Vec<PathBuf>) {
 
 fn is_ts_file(path: &Path) -> bool {
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    // exclude declaration files (no runtime tokens worth diffing differently, but
-    // they DO lex — keep them; only skip nothing for now)
+    // Any TypeScript source, including `.d.ts` declaration files — they lex like
+    // any other `.ts` and are worth diffing.
     name.ends_with(".ts") || name.ends_with(".mts") || name.ends_with(".cts")
 }

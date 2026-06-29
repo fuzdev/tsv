@@ -25,6 +25,13 @@ const fn is_ascii_id_start(b: u8) -> bool {
     b.is_ascii_alphabetic() || b == b'_' || b == b'$'
 }
 
+/// ASCII subset of `ID_Continue` (`a-z A-Z 0-9 _ $`) — the byte-cursor fast path
+/// for an identifier body before falling back to the full Unicode `is_id_continue`.
+#[inline]
+const fn is_ascii_id_continue(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_' || b == b'$'
+}
+
 /// Construct a boxed lexer error. The lexer returns `Result<_, Box<ParseError>>`
 /// (see `From<Box<ParseError>>` in `tsv_lang`): boxing keeps the hot `next_token`
 /// Ok path pointer-sized. `#[cold]`/`#[inline(never)]` outlines the error
@@ -182,7 +189,7 @@ impl<'a> Lexer<'a> {
 
     /// The byte `offset` bytes ahead of the cursor, or `None` past EOF.
     #[inline]
-    fn byte_at(&self, offset: usize) -> Option<u8> {
+    fn byte_ahead(&self, offset: usize) -> Option<u8> {
         self.bytes.get(self.position + offset).copied()
     }
 
@@ -299,11 +306,7 @@ impl<'a> Lexer<'a> {
             if first_char.is_ascii() {
                 let bytes = self.bytes;
                 let mut pos = self.position;
-                while pos < bytes.len()
-                    && (bytes[pos].is_ascii_alphanumeric()
-                        || bytes[pos] == b'_'
-                        || bytes[pos] == b'$')
-                {
+                while pos < bytes.len() && is_ascii_id_continue(bytes[pos]) {
                     pos += 1;
                 }
                 if pos != self.position {
@@ -550,7 +553,7 @@ impl<'a> Lexer<'a> {
             Some(b) if b.is_ascii_digit() => {
                 // Handle different number formats
                 if b == b'0' {
-                    let next = self.byte_at(1);
+                    let next = self.byte_ahead(1);
                     match next {
                         Some(b'x' | b'X') => {
                             // Hex: 0xff, 0xFF
@@ -697,13 +700,13 @@ impl<'a> Lexer<'a> {
             }
             Some(b'.') => {
                 // `.`, `..`, `...` and digits are all ASCII, so peek the next two bytes.
-                if self.byte_at(1) == Some(b'.') && self.byte_at(2) == Some(b'.') {
+                if self.byte_ahead(1) == Some(b'.') && self.byte_ahead(2) == Some(b'.') {
                     // Spread operator: ...
                     self.advance(); // consume first .
                     self.advance(); // consume second .
                     self.advance(); // consume third .
                     self.make_token(TokenKind::DotDotDot, start)
-                } else if self.byte_at(1).is_some_and(|b| b.is_ascii_digit()) {
+                } else if self.byte_ahead(1).is_some_and(|b| b.is_ascii_digit()) {
                     // Number starting with a decimal point: .5
                     self.advance(); // consume '.'
                     self.scan_digits(|c| c.is_ascii_digit());
@@ -749,7 +752,7 @@ impl<'a> Lexer<'a> {
             Some(b'/') => {
                 // Could be: // line comment, /* block comment */, or / division operator
                 // Peek ahead to determine which
-                let peek = self.byte_at(1);
+                let peek = self.byte_ahead(1);
                 match peek {
                     Some(b'/') => {
                         // Line comment
@@ -924,7 +927,7 @@ impl<'a> Lexer<'a> {
                     // Check for optional chaining `?.`
                     // Must not be followed by a digit (to avoid ambiguity with `?.0` which should be `?` `.0`)
                     // Cursor is on `.`; the byte after it is `position + 1`.
-                    let next = self.byte_at(1);
+                    let next = self.byte_ahead(1);
                     if next.is_none_or(|b| !b.is_ascii_digit()) {
                         self.advance();
                         self.make_token(TokenKind::QuestionDot, start)
