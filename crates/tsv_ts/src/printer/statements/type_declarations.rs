@@ -192,20 +192,22 @@ impl<'a> Printer<'a> {
     /// `=` (true for the inline `... =` form, false when the caller has already
     /// emitted a hardline, e.g. after an own-line pre-`=` comment).
     /// A prefix type operator (`keyof` / `typeof`) whose keyword→operand gap holds
-    /// a line comment. Such a value carries a comment-forced hardline, so the
-    /// type-alias RHS keeps the operator on the `=` line (the operand hangs on the
-    /// next line via the operator's own layout) instead of breaking after `=` —
-    /// matching prettier and the conditional / internal-breaking arms. A long
-    /// *comment-free* operator still breaks after `=` (the hanging-indent arm).
-    fn type_operator_has_leading_line_comment(&self, ty: &TSType<'_>) -> bool {
+    /// a comment that forces the operand onto its own line (a line comment, or a
+    /// block comment with the operand on a later line). Such a value carries a
+    /// comment-forced hardline, so the type-alias RHS keeps the operator on the `=`
+    /// line (the operand hangs on the next line via the operator's own layout)
+    /// instead of breaking after `=` — consistent with the conditional /
+    /// internal-breaking arms. A long *comment-free* operator still breaks after `=`
+    /// (the hanging-indent arm).
+    fn type_operator_comment_forces_operand_own_line(&self, ty: &TSType<'_>) -> bool {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
-                self.has_line_comments_between(kw_end, o.type_annotation.span().start)
+                self.comment_forces_following_own_line(kw_end, o.type_annotation.span().start)
             }
             TSType::TypeQuery(q) => {
                 let kw_end = q.span.start + "typeof".len() as u32;
-                self.has_line_comments_between(kw_end, q.expr_name.span().start)
+                self.comment_forces_following_own_line(kw_end, q.expr_name.span().start)
             }
             _ => false,
         }
@@ -341,10 +343,11 @@ impl<'a> Printer<'a> {
                 let type_doc = self.build_type_doc(value_type);
                 parts.push(d.text(" "));
                 parts.push(type_doc);
-            } else if self.type_operator_has_leading_line_comment(value_type) {
-                // keyof/typeof with a line comment after the operator: keep the
-                // operator on the `=` line; its operand hangs on the next line
-                // (consistent with the conditional / internal-breaking arms).
+            } else if self.type_operator_comment_forces_operand_own_line(value_type) {
+                // keyof/typeof with a comment after the operator that forces the
+                // operand down: keep the operator on the `=` line; its operand hangs
+                // on the next line (consistent with the conditional / internal-breaking
+                // arms).
                 let type_doc = self.build_type_doc(value_type);
                 parts.push(d.text(" "));
                 parts.push(type_doc);

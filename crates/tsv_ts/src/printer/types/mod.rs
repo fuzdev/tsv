@@ -132,11 +132,14 @@ impl<'a> Printer<'a> {
                         b'i',
                     )
                     .map(|i_pos| (i_pos + "is".len()) as u32);
-                    // A line comment after `is` stays trailing it, with the
-                    // predicate type on the next line (preserve-in-place; prettier
-                    // relocates the comment to trail the body `{`).
+                    // A comment after `is` that can't share its line — a line comment,
+                    // or a block comment with the predicate type on a later line —
+                    // stays trailing `is`, predicate type on the next line
+                    // (preserve-in-place; prettier collapses + relocates the comment
+                    // before/after `is`). See predicate_is_line_comment /
+                    // predicate_is_own_line_block_comment.
                     if let Some(is_end) = is_end
-                        && self.has_line_comments_between(is_end, type_start)
+                        && self.comment_forces_following_own_line(is_end, type_start)
                     {
                         let value_doc = self.build_type_doc(type_ann);
                         parts.push(d.text(" is"));
@@ -198,9 +201,14 @@ impl<'a> Printer<'a> {
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
                 let operand_start = o.type_annotation.span().start;
-                // A line comment after the operator stays trailing it, with the
-                // operand on the next line (matches prettier).
-                if self.has_line_comments_between(keyword_end, operand_start) {
+                // A comment that can't share the operator's line — a line comment, or
+                // a block comment with the operand authored on a later line — keeps the
+                // comment with the operator and hangs the operand on the next line,
+                // indented one level (the shared keyword→value layout). The own-line
+                // block case preserves the author's break, diverging from prettier
+                // (which pulls the comment onto the keyword line); see
+                // type_operator_keyword_line_comment / type_operator_keyword_own_line_block_comment.
+                if self.comment_forces_following_own_line(keyword_end, operand_start) {
                     let operand_doc = self.build_type_doc(o.type_annotation);
                     let value_doc = if needs_parens {
                         d.parens(operand_doc)
@@ -245,9 +253,12 @@ impl<'a> Printer<'a> {
                 // Comments between `typeof` and the expression
                 let typeof_end = q.span.start + "typeof".len() as u32;
                 let expr_start = q.expr_name.span().start;
-                // A line comment after `typeof` stays trailing it, with the
-                // expression on the next line (matches prettier).
-                if self.has_line_comments_between(typeof_end, expr_start) {
+                // A comment that can't share `typeof`'s line — a line comment, or a
+                // block comment with the expression authored on a later line — keeps
+                // the comment with `typeof` and hangs the expression on the next line
+                // (the shared keyword→value layout; own-line block preserves the
+                // author's break, diverging from prettier).
+                if self.comment_forces_following_own_line(typeof_end, expr_start) {
                     let mut value_parts: DocBuf =
                         smallvec![self.build_type_query_expr_name_doc(&q.expr_name)];
                     if let Some(type_args) = &q.type_arguments {
@@ -301,11 +312,13 @@ impl<'a> Printer<'a> {
                 // Comments in the object→`[` gap (`A /* c */[K]`) trail the object
                 // in place; comments in the `[`→index gap (`A[/* c */ K]`) lead the
                 // index — both preserved where the user placed them.
-                let object_comments = bracket_open.and_then(|bp| {
-                    self.build_inline_comments_between_doc_opt(bracket_area_start, bp)
-                });
+                // Both gaps break a line comment onto its own line so it can't
+                // swallow the following `[`/index (the comment-aware delimiter scan
+                // keeps a `[`/`]` glyph inside a comment from being read as the bracket).
+                let object_comments = bracket_open
+                    .map(|bp| self.build_leading_comments_break_for_line(bracket_area_start, bp));
                 let index_comments = bracket_open.map(|bp| {
-                    self.build_comments_between(bp + 1, index_type_start, CommentSpacing::Trailing)
+                    self.build_trailing_comments_break_for_line(bp + 1, index_type_start)
                 });
                 let index_doc = self.build_type_doc(i.index_type);
                 let mut parts: DocBuf = if needs_parens {
@@ -327,8 +340,9 @@ impl<'a> Printer<'a> {
                 // Comments between `...` and the type
                 let dots_end = r.span.start + "...".len() as u32;
                 let type_start = r.type_annotation.span().start;
+                // Break a line comment so it can't swallow the rest-element type.
                 let comments_doc =
-                    self.build_comments_between(dots_end, type_start, CommentSpacing::Trailing);
+                    self.build_trailing_comments_break_for_line(dots_end, type_start);
                 d.concat(&[
                     d.text("..."),
                     comments_doc,
@@ -360,22 +374,21 @@ impl<'a> Printer<'a> {
                     b':',
                 )
                 .map(|p| (p + 1) as u32); // +1 for after `:`
-                // Comments between label/`?` and `:` (e.g., `[b /* c */: T]`)
+                // Comments between label/`?` and `:` (e.g., `[b /* c */: T]`); a line
+                // comment breaks so it can't swallow the `:`.
                 if let Some(after_colon) = after_colon
                     && self.has_comments_between(after_modifier, after_colon - 1)
                 {
                     parts.push(
-                        self.build_inline_comments_between_doc(after_modifier, after_colon - 1),
+                        self.build_leading_comments_break_for_line(after_modifier, after_colon - 1),
                     );
                 }
+                // Comments between `:` and the element type; a line comment breaks so it
+                // can't swallow the type.
                 let comments_doc = after_colon.map_or_else(
                     || d.empty(),
                     |after_colon| {
-                        self.build_comments_between(
-                            after_colon,
-                            type_start,
-                            CommentSpacing::Trailing,
-                        )
+                        self.build_trailing_comments_break_for_line(after_colon, type_start)
                     },
                 );
                 // A long union/intersection element hangs after `:` (redundant parens
@@ -403,8 +416,9 @@ impl<'a> Printer<'a> {
                 // Comments between `infer` and the type parameter name
                 let infer_end = i.span.start + "infer".len() as u32;
                 let name_start = i.type_parameter.name.span.start;
+                // Break a line comment so it can't swallow the inferred type name.
                 let comments_doc =
-                    self.build_comments_between(infer_end, name_start, CommentSpacing::Trailing);
+                    self.build_trailing_comments_break_for_line(infer_end, name_start);
                 // Delegate the name + optional `extends C` constraint to the shared
                 // type-parameter doc builder — prettier's `printInferType` is
                 // `["infer ", print("typeParameter")]`, so an infer constraint lays
@@ -463,15 +477,13 @@ impl<'a> Printer<'a> {
 
         let mut parts: DocBuf = smallvec![self.build_import_type_call_doc(i, paren_close)];
         if let Some(qualifier) = &i.qualifier {
-            // Comments between `)` and qualifier (e.g. `import('a') /* c */ .Foo`)
+            // Comments between `)` and qualifier (e.g. `import('a') /* c */ .Foo`); a
+            // line comment breaks so it can't swallow the qualifier.
             let dot_area_start = paren_close + 1;
             let qualifier_start = qualifier.span().start;
             parts.push(d.text("."));
-            parts.push(self.build_comments_between(
-                dot_area_start,
-                qualifier_start,
-                CommentSpacing::Trailing,
-            ));
+            parts
+                .push(self.build_trailing_comments_break_for_line(dot_area_start, qualifier_start));
             parts.push(self.build_entity_name_doc(qualifier));
         }
         if let Some(type_args) = &i.type_arguments {

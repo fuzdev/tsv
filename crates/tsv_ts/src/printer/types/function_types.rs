@@ -597,11 +597,11 @@ impl<'a> Printer<'a> {
                 self.build_identifier_doc_with_wrapping_type(id)
             }
             internal::Expression::RestElement(rest) => {
-                // Comments between `...` and the argument (e.g., `.../* c */ args`)
+                // Comments between `...` and the argument (e.g., `.../* c */ args`); a
+                // line comment breaks so it can't swallow the rest parameter.
                 let dots_end = rest.span.start + "...".len() as u32;
                 let arg_start = rest.argument.span().start;
-                let comments_doc =
-                    self.build_comments_between(dots_end, arg_start, CommentSpacing::Trailing);
+                let comments_doc = self.build_trailing_comments_break_for_line(dots_end, arg_start);
                 let mut parts = vec![
                     d.text("..."),
                     comments_doc,
