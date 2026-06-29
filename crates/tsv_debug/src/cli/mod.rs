@@ -10,9 +10,10 @@ use commands::{
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
-    json_profile::JsonProfileCommand, line_width::LineWidthCommand, metrics::MetricsCommand,
-    profile::ProfileCommand, scan_audit::ScanAuditCommand, swallow_audit::SwallowAuditCommand,
-    test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
+    json_profile::JsonProfileCommand, lex_diff::LexDiffCommand, line_width::LineWidthCommand,
+    metrics::MetricsCommand, profile::ProfileCommand, scan_audit::ScanAuditCommand,
+    swallow_audit::SwallowAuditCommand, test262::Test262Command,
+    ts_fixture_audit::TsFixtureAuditCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -70,6 +71,7 @@ pub enum Subcommand {
     FixturesAudit(FixturesAuditCommand),
     Profile(ProfileCommand),
     JsonProfile(JsonProfileCommand),
+    LexDiff(LexDiffCommand),
     Metrics(MetricsCommand),
     ScanAudit(ScanAuditCommand),
     SwallowAudit(SwallowAuditCommand),
@@ -103,6 +105,7 @@ impl TopLevel {
             Subcommand::FixturesAudit(c) => c.run(),
             Subcommand::Profile(c) => c.run(),
             Subcommand::JsonProfile(c) => c.run(),
+            Subcommand::LexDiff(c) => c.run(),
             Subcommand::Metrics(c) => c.run(),
             Subcommand::ScanAudit(c) => c.run(),
             Subcommand::SwallowAudit(c) => c.run(),

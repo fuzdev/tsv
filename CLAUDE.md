@@ -890,8 +890,9 @@ fn to_json(lit: &Literal, source: &str) -> Value {
 ### Position Types: u32 vs usize
 
 - **Span**: `u32` for start/end (8 bytes total, 50% memory savings vs usize)
-- **Lexer/Parser/Token**: `usize` (natural for `source[pos]` indexing)
-- **Conversions**: At boundaries only - `as u32` when creating Spans, `as usize` when extracting
+- **`Token`**: `u32` for start/end — `Token` is a 16-byte `Copy`-free POD (`{kind, start: u32, end: u32}`) returned from `next_token` in registers; the decoded value (escapes only) lives out-of-band on the lexer (`Lexer::take_decoded`). A `const _: () = assert!(size_of::<Token>() == 16)` guards the size. See [docs/performance.md] and the lexer's byte cursor (`bytes: &[u8]` + `position: usize`).
+- **Lexer/Parser positions**: `usize` (natural for `source[pos]` indexing); the lexer dispatches on raw bytes (`cur_byte`) and decodes a `char` only at non-ASCII branches.
+- **Conversions**: At boundaries only - `as u32` when creating Spans / `Token` fields, `as usize` when extracting
 - **Helpers**: Use `span.extract(source)` or `span.range()` instead of manual casts
 
 ### Comment Handling: Detached Model

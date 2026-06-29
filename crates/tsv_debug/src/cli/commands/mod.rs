@@ -13,6 +13,7 @@ pub mod fixtures_update_parsed;
 pub mod fixtures_validate;
 pub mod format_prettier;
 pub mod json_profile;
+pub mod lex_diff;
 pub mod line_width;
 pub mod metrics;
 pub mod profile;

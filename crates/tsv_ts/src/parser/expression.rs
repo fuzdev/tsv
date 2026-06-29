@@ -1025,7 +1025,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`extends Base<T>`, left for the `super_type_parameters` split).
     fn is_type_args_followed_by_call(&self) -> bool {
         let bytes = self.source.as_bytes();
-        let mut pos = self.current_start;
+        let mut pos = self.current.start as usize;
 
         // Must start with '<'
         if pos >= bytes.len() || bytes[pos] != b'<' {
@@ -1205,12 +1205,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // would leave a stale token behind, and comments drained by that peek
                 // would be re-read as regex pattern chars.
                 debug_assert!(
-                    self.peek_cache.is_none(),
+                    self.peek.is_none(),
                     "regex relex with populated peek cache"
                 );
-                let lexer_start = self.current_start;
+                let lexer_start = self.current.start as usize;
                 let (regex_token, pattern_end) = self.lexer.read_regex_literal(lexer_start)?;
-                let lexer_end = regex_token.end;
+                let lexer_end = regex_token.end as usize;
 
                 // Calculate span with base_offset for the AST
                 let span_start = lexer_start + self.base_offset;

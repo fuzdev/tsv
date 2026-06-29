@@ -28,7 +28,7 @@ pub enum Expression<'arena> {
     ConditionalExpression(ConditionalExpression<'arena>),
     // Inline by value: the layout favors traversal locality over node size, so
     // fat variants are kept inline rather than arena-boxed (boxing added a
-    // pointer-chase on hot format-read paths). See TODO_BUMPALO_ARENA.md.
+    // pointer-chase on hot format-read paths).
     ArrowFunctionExpression(ArrowFunctionExpression<'arena>),
     FunctionExpression(FunctionExpression<'arena>),
     ClassExpression(ClassExpression<'arena>),

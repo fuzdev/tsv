@@ -19,8 +19,7 @@ pub enum Statement<'arena> {
     ExpressionStatement(ExpressionStatement<'arena>),
     VariableDeclaration(VariableDeclaration<'arena>),
     // Inline by value: the layout favors traversal locality over node size, so
-    // these declarations are kept inline rather than arena-boxed. See
-    // TODO_BUMPALO_ARENA.md.
+    // these declarations are kept inline rather than arena-boxed.
     TSTypeAliasDeclaration(TSTypeAliasDeclaration<'arena>),
     TSInterfaceDeclaration(TSInterfaceDeclaration<'arena>),
     TSDeclareFunction(TSDeclareFunction<'arena>),

@@ -188,8 +188,8 @@ pub struct Printer<'a> {
     /// `DocId`. A member chain renders the same group **flat** (`print_group`) and
     /// **expanded** (`print_group_expanded`) across `conditional_group` candidates;
     /// without sharing, the recursive arg build runs once per candidate and a nested
-    /// chain in a call arg compounds to O(4^depth) (the member-chain rebuild blowup —
-    /// see grimoire TODO_REBUILD_BLOWUP). The flat and expanded builds differ in
+    /// chain in a call arg compounds to O(4^depth) — the member-chain rebuild blowup.
+    /// The flat and expanded builds differ in
     /// Printer state **only** via `skip_arrow_chain` / `expand_last_arg_flat_params`
     /// (the sole `.set` sites in `calls/chain_args.rs`); every other flag is
     /// statement-constant during a chain or set identically by the shared AST

@@ -96,7 +96,7 @@ pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
     // Activate arg-doc sharing for the outermost chain only (nested chains observe it
     // already active and reuse the map), so the flat and expanded group builds across
     // every `conditional_group` candidate share one recursive arg build instead of
-    // rebuilding — the member-chain rebuild fix (see grimoire TODO_REBUILD_BLOWUP).
+    // rebuilding — the member-chain rebuild fix.
     let was_active = printer.enter_chain_arg_share();
     let result = build_chain_doc_impl(groups, printer);
     printer.exit_chain_arg_share(was_active);
