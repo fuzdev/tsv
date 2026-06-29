@@ -90,7 +90,9 @@ impl<'arena> ParsedExpr<'arena> {
     }
 
     /// Create a ParsedExpr from an already-arena-boxed expression with explicit
-    /// bounds (for parenthesized expressions that reuse the inner's allocation).
+    /// paren bounds. Unlike `from_expr`/`with_end`, the caller supplies the
+    /// `&'arena Expression` — the inner's own allocation reused (parenthesized
+    /// expression) or a freshly built wrapper node (JSDoc cast).
     fn with_bounds(
         expr: &'arena Expression<'arena>,
         actual_start: usize,
