@@ -27,11 +27,15 @@ pub enum Expression<'arena> {
     MemberExpression(MemberExpression<'arena>),
     ConditionalExpression(ConditionalExpression<'arena>),
     // Inline by value: the layout favors traversal locality over node size, so
-    // fat variants are kept inline rather than arena-boxed (boxing added a
-    // pointer-chase on hot format-read paths).
+    // format-hot variants are kept inline rather than arena-boxed (boxing added a
+    // pointer-chase on hot format-read paths). The exception is the rare-and-fattest
+    // variants, arena-boxed to shrink the enum (which every `parse_*` returns by
+    // value up the recursion) without touching the hot format-read path: a class
+    // expression is rare in real code and never on a format hot loop, so the bump
+    // `&'arena` deref it costs is cheaper than the per-`parse_*` copy it saves.
     ArrowFunctionExpression(ArrowFunctionExpression<'arena>),
     FunctionExpression(FunctionExpression<'arena>),
-    ClassExpression(ClassExpression<'arena>),
+    ClassExpression(&'arena ClassExpression<'arena>),
     SpreadElement(SpreadElement<'arena>),
     TemplateLiteral(TemplateLiteral<'arena>),
     TaggedTemplateExpression(TaggedTemplateExpression<'arena>),
