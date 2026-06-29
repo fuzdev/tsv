@@ -29,9 +29,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     // so storing a fully-decoded copy would be redundant and, for identity escapes, wrong.
     // The arena copy is needed because `current_identifier()` borrows a buffer that
     // `advance()` overwrites, and dispatch happens after the name token is consumed.
-    let name_ident = parser
-        .current_identifier()
-        .unwrap_or_else(|| parser.current_value());
+    let name_ident = parser.current_identifier();
     let name = parser.alloc_str_in(name_ident);
     let mut end = (parser.base_offset() + parser.current_end) as u32; // Capture end of name token
     parser.advance()?;
@@ -166,9 +164,7 @@ fn parse_pseudo_args<'arena>(
                 return Err(parser.error_msg("::part() requires identifier arguments"));
             }
 
-            let ident_str = parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value());
+            let ident_str = parser.current_identifier();
             let ident = parser.alloc_str_in(ident_str);
             idents.push(ident);
             parser.advance()?;
@@ -313,9 +309,7 @@ fn parse_pseudo_args<'arena>(
                     anb_end = parser.current_end;
                     parser.advance()?;
                 } else if parser.check(TokenKind::Identifier) && depth == 0 {
-                    let ident = parser
-                        .current_identifier()
-                        .unwrap_or_else(|| parser.current_value());
+                    let ident = parser.current_identifier();
                     if ident == "of" {
                         // Found "of" keyword - An+B part ends here
                         found_of = true;

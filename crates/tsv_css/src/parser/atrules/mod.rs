@@ -31,9 +31,7 @@ fn is_keyframes_atrule(name: &str) -> bool {
 /// Check if current token is a CSS boolean operator keyword (and, or, not)
 pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
     if let TokenKind::Identifier = &parser.current_kind {
-        let identifier = parser
-            .current_identifier()
-            .unwrap_or_else(|| parser.current_value());
+        let identifier = parser.current_identifier();
         matches!(identifier, "and" | "or" | "not")
     } else {
         false
@@ -58,9 +56,7 @@ pub(crate) fn parse_atrule<'arena>(
     }
 
     // Internal AST: use decoded value (spec-compliant)
-    let name_ident = parser
-        .current_identifier()
-        .unwrap_or_else(|| parser.current_value());
+    let name_ident = parser.current_identifier();
     let name = parser.alloc_str_in(name_ident);
     parser.advance()?;
 

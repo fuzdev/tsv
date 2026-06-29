@@ -6,9 +6,14 @@
 // at a time (streaming, single-token lookahead, no token vector).
 // Svelte's CSS parser uses inline parsing (no separate tokenization step) with read_value().
 //
-// TODO: Benchmark both approaches on large stylesheets (10k+ lines) to determine if inline
-// parsing offers significant performance benefits. Current recommendation: keep separate lexer
-// for better debuggability and maintainability until proven performance issue exists.
+// We keep the separate lexer: it's the more readable/debuggable factoring, and current
+// profiling doesn't favor inlining it. On the files profiled so far the token cursor is a
+// small share (~2.5%) and the CSS-parse hotspot is the value parser's repeated structural
+// re-scan (`ValueParser::parse` and the `contains_*` walks), so the inline single-pass
+// approach has nothing to win against right now — and the per-identifier decode allocation is
+// already lazy (see `read_identifier`). This is a snapshot, not a closed door: if the
+// value-parser re-scan is collapsed (the bigger lever), the cursor's relative share rises and
+// a byte-cursor / inline tokenization may become worth re-measuring.
 //
 // Pros of separate lexer:
 //   - Easier to debug (can inspect token stream)
@@ -34,9 +39,34 @@ use strings::read_string;
 pub use token::{Token, TokenKind};
 use tsv_lang::ParseError;
 
+/// Construct a boxed lexer error. The lexer returns `Result<_, Box<ParseError>>`
+/// (see `From<Box<ParseError>>` in `tsv_lang`): boxing keeps the hot `next_token`
+/// Ok path pointer-sized. `#[cold]` / `#[inline(never)]` outlines the error
+/// construction so it never bloats the inlined token-scan fast path. Shared by the
+/// scanner submodules (each reaches it via `super::lex_err`).
+#[cold]
+#[inline(never)]
+#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
+fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
+    Box::new(ParseError::InvalidSyntax {
+        message: message.into(),
+        position,
+        context: None,
+    })
+}
+
 pub struct Lexer<'a> {
     source: &'a str,
     pos: usize,
+    /// Out-of-band decoded value for the **last token produced**, set only when an
+    /// identifier actually contained an escape sequence (the no-escape common case
+    /// leaves it `None`, so the token's text is recovered as a verbatim source
+    /// slice). `advance`/`new` drain it with `take_decoded` right after lexing;
+    /// `peek` leaves it parked here for the matching `advance`-from-cache to claim,
+    /// so a peeked escaped identifier keeps its decode. `Box<String>` keeps the slot
+    /// pointer-sized. Mirrors `tsv_ts`'s lexer.
+    #[allow(clippy::box_collection)]
+    decoded: Option<Box<String>>,
 }
 
 impl<'a> Lexer<'a> {
@@ -49,7 +79,19 @@ impl<'a> Lexer<'a> {
         } else {
             0
         };
-        Self { source, pos }
+        Self {
+            source,
+            pos,
+            decoded: None,
+        }
+    }
+
+    /// Take the decoded value of the most recently produced token, if it required
+    /// escape processing (only escaped identifiers do). Leaves the slot `None`.
+    #[allow(clippy::box_collection)]
+    #[inline]
+    pub fn take_decoded(&mut self) -> Option<Box<String>> {
+        self.decoded.take()
     }
 
     #[inline]
@@ -73,28 +115,41 @@ impl<'a> Lexer<'a> {
         }
         Token {
             kind: TokenKind::Whitespace,
-            start,
-            end: self.pos,
-            decoded: None,
+            start: start as u32,
+            end: self.pos as u32,
         }
     }
 
-    pub fn next_token(&mut self) -> Result<Token, ParseError> {
+    /// Lex an identifier, stashing any decoded escape value out-of-band in
+    /// `self.decoded`. Thin wrapper over the free `identifiers::read_identifier`
+    /// so both dispatch arms (`$`-prefixed and plain) share the handoff.
+    fn read_identifier(&mut self) -> Result<Token, Box<ParseError>> {
+        let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
+        self.decoded = decoded;
+        Ok(token)
+    }
+
+    pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
+        // Start each token with a clean decoded slot. Callers drain the prior
+        // token's decode (`advance`/`new` at once, `peek` via its matching
+        // `advance`-from-cache), so this is normally already `None` — cheap
+        // insurance that a stale decode can never leak onto a later token. Only an
+        // escaped identifier below sets it again.
+        self.decoded = None;
+
         if self.pos >= self.source.len() {
             return Ok(Token {
                 kind: TokenKind::Eof,
-                start: self.pos,
-                end: self.pos,
-                decoded: None,
+                start: self.pos as u32,
+                end: self.pos as u32,
             });
         }
 
         let Some(ch) = self.current_char() else {
             return Ok(Token {
                 kind: TokenKind::Eof,
-                start: self.pos,
-                end: self.pos,
-                decoded: None,
+                start: self.pos as u32,
+                end: self.pos as u32,
             });
         };
 
@@ -105,9 +160,8 @@ impl<'a> Lexer<'a> {
                 self.pos += ch.len_utf8();
                 Ok(Token {
                     kind: $kind,
-                    start,
-                    end: self.pos,
-                    decoded: None,
+                    start: start as u32,
+                    end: self.pos as u32,
                 })
             }};
         }
@@ -177,9 +231,7 @@ impl<'a> Lexer<'a> {
             // `$`-prefixed identifier (SCSS variable / property name like `$foo`).
             // Svelte's parseCss treats it as a single identifier. A bare `$` (e.g.
             // the `$=` attribute selector) falls through to the Dollar token below.
-            '$' if self.peek_char(1).is_some_and(is_identifier_start) => {
-                read_identifier(self.source, &mut self.pos)
-            }
+            '$' if self.peek_char(1).is_some_and(is_identifier_start) => self.read_identifier(),
             '$' => single_char_token!(TokenKind::Dollar),
             '!' => single_char_token!(TokenKind::Bang),
             '|' => {
@@ -190,9 +242,8 @@ impl<'a> Lexer<'a> {
                     self.pos += 1; // skip second |
                     Ok(Token {
                         kind: TokenKind::ColumnCombinator,
-                        start,
-                        end: self.pos,
-                        decoded: None,
+                        start: start as u32,
+                        end: self.pos as u32,
                     })
                 } else {
                     single_char_token!(TokenKind::Pipe)
@@ -200,14 +251,13 @@ impl<'a> Lexer<'a> {
             }
 
             // Identifiers (including those with unicode escapes)
-            _ if is_identifier_start(ch) => read_identifier(self.source, &mut self.pos),
+            _ if is_identifier_start(ch) => self.read_identifier(),
 
             // Unknown character
-            _ => Err(ParseError::InvalidSyntax {
-                message: format!("Unexpected character in CSS: '{ch}'"),
-                position: self.pos,
-                context: None,
-            }),
+            _ => Err(lex_err(
+                format!("Unexpected character in CSS: '{ch}'"),
+                self.pos,
+            )),
         }
     }
 }
