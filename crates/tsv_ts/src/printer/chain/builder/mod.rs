@@ -93,6 +93,17 @@ fn call_has_breaking_single_arg<P: ChainPrinter>(
 /// - Longer chains: conditionalGroup([oneLine, expanded])
 /// - 3+ calls with complex args: force expanded (no width-based decision)
 pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocId {
+    // Activate arg-doc sharing for the outermost chain only (nested chains observe it
+    // already active and reuse the map), so the flat and expanded group builds across
+    // every `conditional_group` candidate share one recursive arg build instead of
+    // rebuilding — the member-chain rebuild fix (see grimoire TODO_REBUILD_BLOWUP).
+    let was_active = printer.enter_chain_arg_share();
+    let result = build_chain_doc_impl(groups, printer);
+    printer.exit_chain_arg_share(was_active);
+    result
+}
+
+fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocId {
     let d = printer.arena();
     if groups.is_empty() {
         return d.empty();

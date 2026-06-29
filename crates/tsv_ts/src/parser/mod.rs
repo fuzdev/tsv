@@ -786,7 +786,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// identifier, a destructuring pattern (`[`/`{`), a rest element (`...`),
     /// `this`, or a contextual keyword usable as a binding name (e.g. another
     /// modifier like `readonly`). Used to disambiguate a contextual modifier
-    /// keyword (`override`) from a parameter that happens to be named the same.
+    /// keyword (`override`, `readonly`) from a parameter that happens to be
+    /// named the same.
     pub(super) fn peek_starts_parameter_binding(&mut self) -> bool {
         match self.peek_kind() {
             TokenKind::Identifier

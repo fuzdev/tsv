@@ -7,12 +7,14 @@
 //! 1. Prettier requires multiple format passes to reach stable output (idempotency bug)
 //! 2. Our printer produces correct output in a single pass
 //!
-//! See: tests/fixtures/svelte/elements/prettier_bug_space_after_block/README.md
+//! See: tests/fixtures/svelte/elements/space_after_block_prettier_divergence/README.md
 
-// Every sidecar (prettier) check lives in ONE `#[tokio::test]`
-// (`sidecar_prettier_checks` below) — the persistent Deno sidecar pool is shared
-// process-wide, and two concurrent tokio runtimes hammering it race (flaky output).
-// Each check is a plain `async fn` the single test awaits in sequence.
+// Every sidecar (prettier) check is grouped into ONE `#[tokio::test]`
+// (`sidecar_prettier_checks` below) for a single sequential pass over the shared,
+// process-wide Deno sidecar pool. This is organizational, not a correctness
+// requirement: the pool's actor tasks live on a dedicated process-lifetime runtime
+// (see `deno::actor::sidecar_runtime`), so it stays safe across any number of
+// separate test runtimes. Each check is a plain `async fn` the single test awaits.
 
 async fn check_space_after_block_idempotency_bug() {
     // Prettier preserves leading space after block element on first pass,
@@ -183,12 +185,16 @@ fn comment_drop_exact_output_and_idempotent() {
     }
 }
 
-/// The single sidecar-using test (see the note above `check_space_after_block_…`):
-/// every prettier oracle check runs here, sequentially, in one tokio runtime.
-/// Cross-checks that prettier (with tsv's options) produces the same output as tsv
-/// for every typescript comment case (drop + separator-normalization) — confirming
-/// each comment is real content tsv must match — plus the Svelte space-after-block
-/// idempotency-bug probe (mirrors `deno::tests::test_deno_tools`).
+/// The single sidecar-using test (see the note above
+/// `check_space_after_block_…`): every prettier oracle check runs here,
+/// sequentially — the Svelte space-after-block idempotency-bug probe plus the
+/// oracle cross-check that prettier (with tsv's options) produces the same output
+/// as tsv for every typescript comment case (drop + separator-normalization),
+/// confirming each comment is real content tsv must match (mirrors
+/// `deno::tests::test_deno_tools`). Grouping them in one test is an organizational
+/// choice for a single sequential sidecar pass — the shared sidecar pool is itself
+/// safe to use from any number of separate `#[tokio::test]`s, because its actor
+/// tasks live on a dedicated process-lifetime runtime, not on the per-test one.
 #[tokio::test]
 async fn sidecar_prettier_checks() {
     check_space_after_block_idempotency_bug().await;
