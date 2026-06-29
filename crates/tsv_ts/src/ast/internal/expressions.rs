@@ -27,8 +27,12 @@ pub enum Expression<'arena> {
     MemberExpression(MemberExpression<'arena>),
     ConditionalExpression(ConditionalExpression<'arena>),
     // Inline by value: the layout favors traversal locality over node size, so
-    // fat variants are kept inline rather than arena-boxed (boxing added a
-    // pointer-chase on hot format-read paths).
+    // fat variants are kept inline rather than arena-boxed (boxing them shrinks the
+    // enum but adds a pointer-chase on the hot format-read paths that costs more than
+    // the density win). The fat enum is not a parse-return cost either: the parser
+    // threads expressions up the recursive descent by reference (its transient
+    // `ParsedExpr` holds an `&'arena Expression`), so the recursion moves pointers,
+    // not whole nodes — a fat inline variant is not a reason to box it.
     ArrowFunctionExpression(ArrowFunctionExpression<'arena>),
     FunctionExpression(FunctionExpression<'arena>),
     ClassExpression(ClassExpression<'arena>),
