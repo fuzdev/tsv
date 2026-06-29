@@ -10,7 +10,6 @@
 //! - `doc` - document builder primitives for prettier-compatible formatting
 //! - `escapes` - escape sequence utilities for printers
 //! - `printing` - shared printing utilities for printers
-//! - `parser` - shared parser utilities
 //! - `interner` - string interner utilities for printers
 //! - `json` - sizing heuristic for public-AST JSON output buffers
 
@@ -22,7 +21,6 @@ mod escapes;
 mod interner;
 mod location;
 mod output;
-mod parser;
 pub mod printing;
 mod sizing;
 pub mod source_scan;
@@ -39,6 +37,5 @@ pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
 pub use location::{ByteToCharMap, LocationTracker, Position, SourceLocation};
 pub use output::{OutputBuffer, write_indent};
-pub use parser::PeekData;
 pub use sizing::{estimated_ast_arena_capacity, estimated_json_capacity};
 pub use span::Span;

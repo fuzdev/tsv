@@ -568,7 +568,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             // svg|rect, *|div. Peek for the `|` before allocating — only the rare
             // namespaced form copies the prefix into the arena; a bare type selector
             // recovers its text verbatim from `span` at print time.
-            if matches!(parser.peek()?, TokenKind::Pipe) {
+            if matches!(parser.peek_kind()?, TokenKind::Pipe) {
                 // Namespace prefix: identifier|element
                 let namespace = Some(parser.alloc_str_in(parser.current_identifier()));
                 parser.advance()?; // consume the namespace identifier
@@ -748,7 +748,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             }
         }
         _ => Err(parser.error_msg_at(
-            &format!("Unexpected token in selector: {:?}", parser.current_kind),
+            &format!("Unexpected token in selector: {}", parser.current_kind),
             start,
         )),
     }
