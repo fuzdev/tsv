@@ -216,8 +216,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (start, end) = self.current_pos();
         self.advance()?;
 
-        // Check for definite assignment assertion: `let x!: Type`
-        let definite = self.eat(TokenKind::Bang);
+        // Check for definite assignment assertion: `let x!: Type`. The `!` must not
+        // be preceded by a line terminator (TS `BindingIdentifier [no LineTerminator
+        // here] !`): a newline before it makes it not a definite-assignment assertion,
+        // leaving `!` a stray token (acorn-typescript's `hasPrecedingLineBreak` guard).
+        // Same rule as the arrow `=>` / conditional `extends` / predicate `is`.
+        let definite = !self.had_line_terminator && self.eat(TokenKind::Bang);
 
         let type_annotation = self.parse_optional_type_annotation()?;
 

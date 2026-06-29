@@ -395,8 +395,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         });
         if let Some(param_symbol) = param_symbol {
-            // Type predicate: `identifier is Type` or `asserts identifier is Type`
-            if self.peek_is_contextual_keyword("is") {
+            // Type predicate: `identifier is Type` or `asserts identifier is Type`.
+            // The `is` must not be preceded by a line terminator (TS
+            // `parameterName [no LineTerminator here] is Type`): a newline before it
+            // makes it not a predicate, leaving `is` a stray token (acorn-typescript's
+            // `hasPrecedingLineBreak` guard). Same rule as the arrow `=>` / conditional
+            // `extends`.
+            if self.peek_is_contextual_keyword("is") && !self.peek_preceded_by_line_terminator() {
                 let (id_start, id_end) = self.current_pos();
                 self.advance()?;
 
@@ -788,10 +793,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.in_ambient_context = true;
         }
 
-        // Parse statements until '}'
+        // Parse module items until '}'. A namespace/module body is a module-item
+        // context, so `import`/`export` declarations are valid here (unlike an
+        // ordinary block).
         let mut body = self.bvec();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
-            let stmt = self.parse_statement()?;
+            let stmt = self.parse_module_item()?;
             body.push(stmt);
         }
 

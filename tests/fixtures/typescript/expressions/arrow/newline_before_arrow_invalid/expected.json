@@ -1,0 +1,775 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 524,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `ArrowFunction : ArrowParameters [no LineTerminator here] => ConciseBody`",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (ecma262). A line terminator between the parameters (or return type) and",
+			"start": 98,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `=>` is a syntax error; the `input_invalid_*` files cover the rejections.",
+			"start": 175,
+			"end": 251,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " These valid baselines keep the `=>` on the signature line.",
+			"start": 253,
+			"end": 314,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a same-line block comment carries no line terminator, so it stays valid",
+			"start": 406,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 496,
+			"end": 503,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 15
+				},
+				"end": {
+					"line": 11,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 523,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 514,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 316,
+					"end": 339,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 322,
+							"end": 338,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 322,
+								"end": 323,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 326,
+								"end": 338,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 23
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 327,
+										"end": 328,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 12
+											},
+											"end": {
+												"line": 6,
+												"column": 13
+											}
+										},
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 333,
+									"end": 338,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 18
+										},
+										"end": {
+											"line": 6,
+											"column": 23
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 333,
+										"end": 334,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 18
+											},
+											"end": {
+												"line": 6,
+												"column": 19
+											}
+										},
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 337,
+										"end": 338,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 22
+											},
+											"end": {
+												"line": 6,
+												"column": 23
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `ArrowFunction : ArrowParameters [no LineTerminator here] => ConciseBody`",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " (ecma262). A line terminator between the parameters (or return type) and",
+							"start": 98,
+							"end": 173
+						},
+						{
+							"type": "Line",
+							"value": " `=>` is a syntax error; the `input_invalid_*` files cover the rejections.",
+							"start": 175,
+							"end": 251
+						},
+						{
+							"type": "Line",
+							"value": " These valid baselines keep the `=>` on the signature line.",
+							"start": 253,
+							"end": 314
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 341,
+					"end": 372,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 347,
+							"end": 371,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 347,
+								"end": 348,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 351,
+								"end": 371,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 31
+									}
+								},
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 354,
+									"end": 362,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 14
+										},
+										"end": {
+											"line": 7,
+											"column": 22
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 356,
+										"end": 362,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 16
+											},
+											"end": {
+												"line": 7,
+												"column": 22
+											}
+										}
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 352,
+										"end": 353,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 12
+											},
+											"end": {
+												"line": 7,
+												"column": 13
+											}
+										},
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 366,
+									"end": 371,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 26
+										},
+										"end": {
+											"line": 7,
+											"column": 31
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 366,
+										"end": 367,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 26
+											},
+											"end": {
+												"line": 7,
+												"column": 27
+											}
+										},
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 370,
+										"end": 371,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 30
+											},
+											"end": {
+												"line": 7,
+												"column": 31
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 374,
+					"end": 403,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 380,
+							"end": 402,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 380,
+								"end": 381,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "j"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 384,
+								"end": 402,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 29
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 391,
+										"end": 392,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 18
+											},
+											"end": {
+												"line": 8,
+												"column": 19
+											}
+										},
+										"name": "a"
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 397,
+									"end": 402,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 24
+										},
+										"end": {
+											"line": 8,
+											"column": 29
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 397,
+										"end": 398,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 24
+											},
+											"end": {
+												"line": 8,
+												"column": 25
+											}
+										},
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 401,
+										"end": 402,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 28
+											},
+											"end": {
+												"line": 8,
+												"column": 29
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 482,
+					"end": 513,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 488,
+							"end": 512,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 488,
+								"end": 489,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "k"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 492,
+								"end": 512,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 31
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 493,
+										"end": 494,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 12
+											},
+											"end": {
+												"line": 11,
+												"column": 13
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 496,
+												"end": 503
+											}
+										]
+									}
+								],
+								"body": {
+									"type": "BinaryExpression",
+									"start": 507,
+									"end": 512,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 26
+										},
+										"end": {
+											"line": 11,
+											"column": 31
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 507,
+										"end": 508,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 26
+											},
+											"end": {
+												"line": 11,
+												"column": 27
+											}
+										},
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 511,
+										"end": 512,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 30
+											},
+											"end": {
+												"line": 11,
+												"column": 31
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a same-line block comment carries no line terminator, so it stays valid",
+							"start": 406,
+							"end": 480
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

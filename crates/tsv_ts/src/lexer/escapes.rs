@@ -98,7 +98,16 @@ pub fn decode_string_escapes(s: &str) -> Result<String, ParseError> {
                                         context: None,
                                     });
                                 }
-                                None => break,
+                                // End of input before the closing `}` — a `\u{…`
+                                // escape must be terminated (matches acorn).
+                                None => {
+                                    return Err(ParseError::InvalidSyntax {
+                                        message: "Unterminated unicode codepoint escape"
+                                            .to_string(),
+                                        position: 0,
+                                        context: None,
+                                    });
+                                }
                             }
                         }
 

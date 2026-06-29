@@ -145,12 +145,13 @@ Future features (unknown order):
 - module lexer (easy, probably soon)
 - minifier
 - LSP
-- later
-  - linter (type aware, initially focused on declarative data plugins for extensibility, maybe plugins via wasm)
-  - Svelte compiler (exact mirror)
-  - bundler
-  - typechecker isn't off the table
-  - more? see the issues and discussions, suggestions welcome
+- later:
+  - TypeScript 7 integration (the Go impl), unlocking:
+    - svelte-check replacement
+    - linter - type aware, initially focused on serializable data-only plugins for extensibility
+  - Svelte compiler (exact mirror, maybe out of scope, see [rsvelte](https://github.com/baseballyama/rsvelte))
+  - bundling is probably out of scope 
+  - more? discussion welcome
 
 ## Docs
 
