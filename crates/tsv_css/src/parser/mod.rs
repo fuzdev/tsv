@@ -106,7 +106,13 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             self.current_kind = peek.kind;
             self.current_start = peek.start;
             self.current_end = peek.end;
-            self.current_decoded = None; // Peek cache doesn't store decoded (not needed yet)
+            // `peek()` lexed this token but left any decoded escape value parked on
+            // the lexer (it never drains), and nothing re-lexes between the peek and
+            // this consume — so claim it now. Without this, a peeked-then-consumed
+            // escaped identifier would silently lose its decode and fall back to the
+            // verbatim slice. Near-free: `take_decoded` is `None` for the common
+            // no-escape token.
+            self.current_decoded = self.lexer.take_decoded().map(|b| *b);
         } else {
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
@@ -218,6 +224,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     }
 
     /// Get the current token's value from source (for most tokens)
+    #[inline]
     pub(crate) fn current_value(&self) -> &str {
         &self.source[self.current_start..self.current_end]
     }
@@ -229,6 +236,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// `current_decoded` `None` to avoid an allocation). Only meaningful when the
     /// current token is an `Identifier`; for other tokens it returns the raw token
     /// slice, so callers gate on the kind first (as they already did).
+    #[inline]
     pub(crate) fn current_identifier(&self) -> &str {
         self.current_decoded
             .as_deref()

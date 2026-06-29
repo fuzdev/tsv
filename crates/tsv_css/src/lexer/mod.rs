@@ -6,9 +6,14 @@
 // at a time (streaming, single-token lookahead, no token vector).
 // Svelte's CSS parser uses inline parsing (no separate tokenization step) with read_value().
 //
-// TODO: Benchmark both approaches on large stylesheets (10k+ lines) to determine if inline
-// parsing offers significant performance benefits. Current recommendation: keep separate lexer
-// for better debuggability and maintainability until proven performance issue exists.
+// We keep the separate lexer: it's the more readable/debuggable factoring, and current
+// profiling doesn't favor inlining it. On the files profiled so far the token cursor is a
+// small share (~2.5%) and the CSS-parse hotspot is the value parser's repeated structural
+// re-scan (`ValueParser::parse` and the `contains_*` walks), so the inline single-pass
+// approach has nothing to win against right now — and the per-identifier decode allocation is
+// already lazy (see `read_identifier`). This is a snapshot, not a closed door: if the
+// value-parser re-scan is collapsed (the bigger lever), the cursor's relative share rises and
+// a byte-cursor / inline tokenization may become worth re-measuring.
 //
 // Pros of separate lexer:
 //   - Easier to debug (can inspect token stream)
@@ -56,8 +61,10 @@ pub struct Lexer<'a> {
     /// Out-of-band decoded value for the **last token produced**, set only when an
     /// identifier actually contained an escape sequence (the no-escape common case
     /// leaves it `None`, so the token's text is recovered as a verbatim source
-    /// slice). The parser drains it with `take_decoded` right after each token.
-    /// `Box<String>` keeps the slot pointer-sized. Mirrors `tsv_ts`'s lexer.
+    /// slice). `advance`/`new` drain it with `take_decoded` right after lexing;
+    /// `peek` leaves it parked here for the matching `advance`-from-cache to claim,
+    /// so a peeked escaped identifier keeps its decode. `Box<String>` keeps the slot
+    /// pointer-sized. Mirrors `tsv_ts`'s lexer.
     #[allow(clippy::box_collection)]
     decoded: Option<Box<String>>,
 }
@@ -123,9 +130,11 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
-        // Clear any decoded value carried from the previous token (the parser has
-        // already drained it via `take_decoded`); only an escaped identifier below
-        // sets it again.
+        // Start each token with a clean decoded slot. Callers drain the prior
+        // token's decode (`advance`/`new` at once, `peek` via its matching
+        // `advance`-from-cache), so this is normally already `None` — cheap
+        // insurance that a stale decode can never leak onto a later token. Only an
+        // escaped identifier below sets it again.
         self.decoded = None;
 
         if self.pos >= self.source.len() {
