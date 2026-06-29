@@ -208,7 +208,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Extract token data immediately to avoid keeping token alive
         let (mut kind, mut start, mut end, mut decoded) = {
             let token = lexer.next_token()?;
-            (token.kind, token.start, token.end, token.decoded)
+            (token.kind, token.start as usize, token.end as usize, lexer.take_decoded().map(|b| *b))
         };
 
         // Collect leading comment tokens
@@ -219,13 +219,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } = &kind
         {
             let (comment, _) =
-                comment_from_token(source, start, end, *content_start, *is_block, base_offset);
+                comment_from_token(source, start, end, *content_start as usize, *is_block, base_offset);
             comments.push(comment);
             let token = lexer.next_token()?;
             kind = token.kind;
-            start = token.start;
-            end = token.end;
-            decoded = token.decoded;
+            start = token.start as usize;
+            end = token.end as usize;
+            decoded = lexer.take_decoded().map(|b| *b);
         }
 
         Ok(Self {
@@ -280,9 +280,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             let token = self.lexer.next_token()?;
             self.current_kind = token.kind;
-            self.current_start = token.start;
-            self.current_end = token.end;
-            self.current_decoded = token.decoded;
+            self.current_start = token.start as usize;
+            self.current_end = token.end as usize;
+            self.current_decoded = self.lexer.take_decoded().map(|b| *b);
             self.had_line_terminator = self.lexer.had_line_terminator();
         }
 
@@ -306,7 +306,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.source,
                 self.current_start,
                 self.current_end,
-                *content_start,
+                *content_start as usize,
                 *is_block,
                 self.base_offset,
             );
@@ -356,9 +356,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn update_current(&mut self, token: crate::lexer::Token) {
         self.current_kind = token.kind;
-        self.current_start = token.start;
-        self.current_end = token.end;
-        self.current_decoded = token.decoded;
+        self.current_start = token.start as usize;
+        self.current_end = token.end as usize;
+        // `decoded` rides out-of-band on the lexer; the caller lexed `token` from
+        // `self.lexer` immediately before this call, so drain it here.
+        self.current_decoded = self.lexer.take_decoded().map(|b| *b);
     }
 
     #[inline]
@@ -728,9 +730,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // terminator counts as one for ASI purposes.
                             let (comment, has_line_terminator) = comment_from_token(
                                 self.source,
-                                token.start,
-                                token.end,
-                                *content_start,
+                                token.start as usize,
+                                token.end as usize,
+                                *content_start as usize,
                                 *is_block,
                                 self.base_offset,
                             );
@@ -742,14 +744,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         }
                         self.peek_cache = Some(PeekData::with_decoded(
                             token.kind,
-                            token.start,
-                            token.end,
-                            token.decoded,
+                            token.start as usize,
+                            token.end as usize,
+                            self.lexer.take_decoded().map(|b| *b),
                         ));
                     }
                     Err(err) => {
-                        // Store error to be returned on next advance()
-                        self.lexer_error = Some(err);
+                        // Store error to be returned on next advance() (unbox: the
+                        // lexer returns Box<ParseError>, `lexer_error` is ParseError).
+                        self.lexer_error = Some(*err);
                     }
                 }
                 break;
@@ -1040,9 +1043,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 let token = self.lexer.seek_and_next_token(new_start)?;
                 self.current_kind = token.kind;
-                self.current_start = token.start;
-                self.current_end = token.end;
-                self.current_decoded = token.decoded;
+                self.current_start = token.start as usize;
+                self.current_end = token.end as usize;
+                self.current_decoded = self.lexer.take_decoded().map(|b| *b);
                 // Clear peek cache since token changed
                 self.peek_cache = None;
                 Ok(())

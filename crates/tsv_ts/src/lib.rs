@@ -502,3 +502,41 @@ pub use ast::internal::{
     Expression, ObjectPatternProperty, ObjectProperty, Program, Statement, TSTypeAnnotation,
     TSTypeParameterDeclaration, VariableDeclaration,
 };
+
+/// Drive the raw lexer over `source` and return a deterministic, line-per-token
+/// dump (`<kind> <start>..<end> [decoded=…]`, terminated by `Eof` or `ERROR …`).
+///
+/// The differential gate for the lexer rewrite (TODO_LEXER_REWRITE.md §B.0): two
+/// lexer implementations are token-identical iff this string matches for every
+/// corpus file. It exercises the **context-free** `next_token` dispatch only —
+/// the parser-driven `read_regex_literal` / `continue_template_from_brace` paths
+/// aren't reached by a raw `next_token` loop (a `/` lexes as division, a `}` as a
+/// brace), so those stay gated by the AST/format byte-identity suites. Behind the
+/// `debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
+#[cfg(feature = "debug_lex")]
+pub fn debug_token_stream(source: &str) -> String {
+    use crate::lexer::{Lexer, TokenKind};
+    use std::fmt::Write as _;
+
+    let mut lexer = Lexer::new(source);
+    let mut out = String::new();
+    loop {
+        match lexer.next_token() {
+            Ok(token) => {
+                let _ = write!(out, "{:?} {}..{}", token.kind, token.start, token.end);
+                if let Some(decoded) = lexer.take_decoded() {
+                    let _ = write!(out, " decoded={:?}", &*decoded);
+                }
+                out.push('\n');
+                if matches!(token.kind, TokenKind::Eof) {
+                    break;
+                }
+            }
+            Err(err) => {
+                let _ = writeln!(out, "ERROR {err:?}");
+                break;
+            }
+        }
+    }
+    out
+}

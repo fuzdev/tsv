@@ -328,7 +328,7 @@ pub enum TokenKind {
     /// content start here keeps the lexer the single owner of delimiter widths.
     Comment {
         is_block: bool,
-        content_start: usize,
+        content_start: u32,
     },
     // Template literal tokens
     // NoSubstitutionTemplate: `content` (no ${} interpolation)
@@ -445,15 +445,27 @@ impl fmt::Display for TokenKind {
 //
 // This follows the "single source of truth" principle from docs/architecture.md:
 // "Raw strings are NEVER duplicated in the AST" - applies to tokens too (pre-AST).
+// A 16-byte POD: small enough to return from `next_token` in registers (SysV ABI
+// returns ≤16-byte integer aggregates in `rax:rdx` — no `Copy` needed) and store
+// straight into the parser's `current_*` fields, with no heap-owning field to
+// move. The rare decoded string (escapes only) lives out-of-band on the lexer
+// (`Lexer::decoded` / `take_decoded`), so the per-token value carried on the hot
+// pump is just classification + span. Left non-`Copy` (like the original) so
+// `TokenKind` can stay non-`Copy` and avoid a `trivially_copy_pass_by_ref` cascade
+// on the many `&TokenKind` params; moving an 8-byte `TokenKind` field is just as cheap.
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
-    pub start: usize,
-    pub end: usize,
-    /// Decoded value (for strings with escape sequences)
-    /// None for non-string tokens or strings without escapes
-    pub decoded: Option<String>,
+    /// Byte offsets into the lexer's source. `u32` (not `usize`) keeps `Token`
+    /// 16 bytes; source length is capped < 4 GB upstream (`ParseError::FileTooLarge`).
+    pub start: u32,
+    pub end: u32,
 }
+
+// Guards the hot-path invariant: `Token` is a 16-byte `Copy` POD (returns in
+// registers, no heap-owning field). Anything that re-bloats it — re-adding a
+// `String`/`Box` field, widening `start`/`end` to `usize` — fails the build here.
+const _: () = assert!(size_of::<Token>() == 16);
 
 /// Perfect hash map for O(1) keyword lookup
 static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {

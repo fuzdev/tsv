@@ -7,6 +7,21 @@ use super::token::{Token, TokenKind, keyword_kind};
 use std::str::Chars;
 use tsv_lang::ParseError;
 
+/// Construct a boxed lexer error. The lexer returns `Result<_, Box<ParseError>>`
+/// (see `From<Box<ParseError>>` in `tsv_lang`): boxing keeps the hot `next_token`
+/// Ok path pointer-sized. `#[cold]`/`#[inline(never)]` outlines the error
+/// construction so it never bloats the inlined token-scan fast path.
+#[cold]
+#[inline(never)]
+#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
+fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
+    Box::new(ParseError::InvalidSyntax {
+        message: message.into(),
+        position,
+        context: None,
+    })
+}
+
 /// Try to decode a unicode escape sequence at the given position.
 /// Returns Some((decoded_char, bytes_consumed)) if valid, None otherwise.
 ///
@@ -68,6 +83,20 @@ pub struct Lexer<'a> {
     /// the current token. Used for Automatic Semicolon Insertion (ASI).
     /// Reset at start of skip_whitespace(), set when line terminators are found.
     had_line_terminator: bool,
+    /// Out-of-band decoded value for the token just produced — `Some` only on the
+    /// rare escape path (strings/templates with escapes, escaped identifiers). Kept
+    /// off `Token` so the hot per-token value stays a 16-byte POD. Cleared at the top
+    /// of every token-producing entry point (`next_token`,
+    /// `continue_template_from_brace`, `read_regex_literal`) so it reflects only the
+    /// current token; the parser drains it with `take_decoded()` after each lex.
+    ///
+    /// `Box<String>` (8-byte thin pointer), not a bare `String` (24 bytes): this field
+    /// is cleared and `take`-n on *every* token, so its width is per-token memory
+    /// traffic on the hot pump — keeping it pointer-sized is what makes moving `decoded`
+    /// off `Token` a net win rather than a wash. The box only allocates on the rare
+    /// escape path.
+    #[allow(clippy::box_collection)]
+    decoded: Option<Box<String>>,
 }
 
 /// Returns true if `c` is an ECMAScript **WhiteSpace** code point (ES spec
@@ -116,7 +145,19 @@ impl<'a> Lexer<'a> {
             current,
             template_depth: 0,
             had_line_terminator: false,
+            decoded: None,
         }
+    }
+
+    /// Take the decoded value produced for the most recently lexed token (escape
+    /// paths only); `None` for the common escape-free token. The parser calls this
+    /// right after each lex to populate its `current_decoded` slot.
+    // `Box<String>` mirrors the `decoded` field: pointer-sized so the per-token
+    // `take` stays cheap (see the field doc); the box is rare-path-only.
+    #[allow(clippy::box_collection)]
+    #[inline]
+    pub fn take_decoded(&mut self) -> Option<Box<String>> {
+        self.decoded.take()
     }
 
     /// Returns true if a line terminator was encountered while skipping to the current token.
@@ -127,7 +168,7 @@ impl<'a> Lexer<'a> {
 
     /// Seek to a specific position and re-lex from there.
     /// Used when splitting compound tokens like `>=` into `>` + `=`.
-    pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, ParseError> {
+    pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, Box<ParseError>> {
         self.set_position(position);
         self.next_token()
     }
@@ -162,9 +203,8 @@ impl<'a> Lexer<'a> {
     fn make_token(&self, kind: TokenKind, start: usize) -> Token {
         Token {
             kind,
-            start,
-            end: self.position,
-            decoded: None,
+            start: start as u32,
+            end: self.position as u32,
         }
     }
 
@@ -181,7 +221,7 @@ impl<'a> Lexer<'a> {
     /// Escape-free identifiers (the overwhelmingly common case) take a byte-level
     /// ASCII fast path and never allocate: `decoded` materializes lazily on the
     /// first escape, recovering the literal prefix from the source slice.
-    fn scan_identifier_with_escapes(&mut self, first_char: char) -> Result<Token, ParseError> {
+    fn scan_identifier_with_escapes(&mut self, first_char: char) -> Result<Token, Box<ParseError>> {
         let start = self.position;
         // None until an actual escape is decoded; `decoded.is_some()` ⇔ has-escapes.
         let mut decoded: Option<String> = None;
@@ -191,13 +231,10 @@ impl<'a> Lexer<'a> {
             // First char is a unicode escape
             if let Some((ch, len)) = try_decode_unicode_escape(self.source, self.position) {
                 if !is_id_start(ch) {
-                    return Err(ParseError::InvalidSyntax {
-                        message: format!(
-                            "Invalid identifier start character from unicode escape: '{ch}'"
-                        ),
-                        position: start,
-                        context: None,
-                    });
+                    return Err(lex_err(
+                        format!("Invalid identifier start character from unicode escape: '{ch}'"),
+                        start,
+                    ));
                 }
                 decoded = Some(String::from(ch));
                 // Advance by the escape sequence length
@@ -205,11 +242,7 @@ impl<'a> Lexer<'a> {
                     self.advance();
                 }
             } else {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Invalid unicode escape in identifier".to_string(),
-                    position: start,
-                    context: None,
-                });
+                return Err(lex_err("Invalid unicode escape in identifier", start));
             }
         } else {
             self.advance();
@@ -280,11 +313,11 @@ impl<'a> Lexer<'a> {
             TokenKind::Identifier
         };
 
+        self.decoded = decoded.map(Box::new);
         Ok(Token {
             kind,
-            start,
-            end: self.position,
-            decoded,
+            start: start as u32,
+            end: self.position as u32,
         })
     }
 
@@ -388,7 +421,10 @@ impl<'a> Lexer<'a> {
     // - More number formats: floats (1.5), hex (0x10), binary (0b10), octal (0o10)
     // - Template literals: `hello ${world}`
     // - Regular expressions: /pattern/flags
-    pub fn next_token(&mut self) -> Result<Token, ParseError> {
+    pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
+        // Clear any decoded value left from the previous token so `take_decoded`
+        // reflects only the token produced by this call (set by the escape paths below).
+        self.decoded = None;
         self.skip_whitespace();
 
         let start = self.position;
@@ -396,9 +432,8 @@ impl<'a> Lexer<'a> {
         match self.current {
             None => Ok(Token {
                 kind: TokenKind::Eof,
-                start,
-                end: start,
-                decoded: None,
+                start: start as u32,
+                end: start as u32,
             }),
             Some(';') => {
                 self.advance();
@@ -459,11 +494,10 @@ impl<'a> Lexer<'a> {
                         Some('0'..='7') => {
                             // Legacy octal (0777) - reject in strict mode (ES modules)
                             // ES modules are always strict, so this is always an error
-                            return Err(ParseError::InvalidSyntax {
-                                message: "Octal literals are not allowed in strict mode. Use the syntax '0o' instead.".to_string(),
-                                position: start,
-                                context: None,
-                            });
+                            return Err(lex_err(
+                                "Octal literals are not allowed in strict mode. Use the syntax '0o' instead.",
+                                start,
+                            ));
                         }
                         _ => {
                             // Regular number or float starting with 0 (e.g., 0.5, 08, 09)
@@ -496,11 +530,7 @@ impl<'a> Lexer<'a> {
                     return self.scan_identifier_with_escapes('\\');
                 }
                 // Not a valid identifier start - fall through to error at end of match
-                Err(ParseError::InvalidSyntax {
-                    message: "Unexpected character: '\\'".to_string(),
-                    position: start,
-                    context: None,
-                })
+                Err(lex_err("Unexpected character: '\\'", start))
             }
             Some(quote @ '\'' | quote @ '"') => {
                 // String literal - single or double quoted
@@ -519,17 +549,17 @@ impl<'a> Lexer<'a> {
 
                         // Decode escape sequences if present
                         let decoded = if has_escapes {
-                            Some(escapes::decode_string_escapes(content)?)
+                            Some(escapes::decode_string_escapes(content).map_err(Box::new)?)
                         } else {
                             // No escapes - use content as-is
                             None
                         };
 
+                        self.decoded = decoded.map(Box::new);
                         return Ok(Token {
                             kind: TokenKind::String,
-                            start,
-                            end: self.position,
-                            decoded,
+                            start: start as u32,
+                            end: self.position as u32,
                         });
                     } else if ch == '\\' {
                         has_escapes = true;
@@ -544,11 +574,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 // Unterminated string
-                Err(ParseError::InvalidSyntax {
-                    message: "Unterminated string literal".to_string(),
-                    position: start,
-                    context: None,
-                })
+                Err(lex_err("Unterminated string literal", start))
             }
             Some(',') => {
                 self.advance();
@@ -845,11 +871,7 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 Ok(self.make_token(TokenKind::Hash, start))
             }
-            Some(ch) => Err(ParseError::InvalidSyntax {
-                message: format!("Unexpected character: '{ch}'"),
-                position: start,
-                context: None,
-            }),
+            Some(ch) => Err(lex_err(format!("Unexpected character: '{ch}'"), start)),
         }
     }
 
@@ -878,7 +900,7 @@ impl<'a> Lexer<'a> {
     /// - TemplateHead: Start of template with `${` interpolation
     /// - TemplateMiddle: Middle section between interpolations (}...${)
     /// - TemplateTail: End section after last interpolation (}...`)
-    fn read_template_content(&mut self, start: usize) -> Result<Token, ParseError> {
+    fn read_template_content(&mut self, start: usize) -> Result<Token, Box<ParseError>> {
         self.advance(); // consume opening ` or }
 
         let content_start = self.position;
@@ -900,13 +922,12 @@ impl<'a> Lexer<'a> {
                     };
 
                     let content = &self.source[content_start..content_end];
-                    let decoded = Self::decode_template_segment(content, has_escapes);
+                    self.decoded = Self::decode_template_segment(content, has_escapes).map(Box::new);
 
                     return Ok(Token {
                         kind,
-                        start,
-                        end: self.position,
-                        decoded,
+                        start: start as u32,
+                        end: self.position as u32,
                     });
                 }
                 Some('$') => {
@@ -928,13 +949,12 @@ impl<'a> Lexer<'a> {
                         };
 
                         let content = &self.source[content_start..content_end];
-                        let decoded = Self::decode_template_segment(content, has_escapes);
+                        self.decoded = Self::decode_template_segment(content, has_escapes).map(Box::new);
 
                         return Ok(Token {
                             kind,
-                            start,
-                            end: self.position,
-                            decoded,
+                            start: start as u32,
+                            end: self.position as u32,
                         });
                     }
                     // Regular $ character
@@ -952,11 +972,7 @@ impl<'a> Lexer<'a> {
                     self.advance();
                 }
                 None => {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Unterminated template literal".to_string(),
-                        position: start,
-                        context: None,
-                    });
+                    return Err(lex_err("Unterminated template literal", start));
                 }
             }
         }
@@ -975,7 +991,10 @@ impl<'a> Lexer<'a> {
     /// plus the position of the closing `/` (the pattern/flags boundary), letting
     /// the parser slice `[slash_start+1, close]` and `[close+1, end]` without the
     /// caller ever materializing the strings (`token.decoded` is `None`).
-    pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<(Token, usize), ParseError> {
+    pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<(Token, usize), Box<ParseError>> {
+        // A regex token never carries a decoded value; clear any left from the
+        // previous token so the parser's `take_decoded()` after this lex sees `None`.
+        self.decoded = None;
         // Sync to just after the opening /
         self.set_position(slash_start + 1);
 
@@ -988,19 +1007,11 @@ impl<'a> Lexer<'a> {
         loop {
             match self.current {
                 None => {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Unterminated regular expression literal".to_string(),
-                        position: slash_start,
-                        context: None,
-                    });
+                    return Err(lex_err("Unterminated regular expression literal", slash_start));
                 }
                 Some('\n' | '\r' | '\u{2028}' | '\u{2029}') => {
                     // Line terminators not allowed in regex
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Unterminated regular expression literal".to_string(),
-                        position: slash_start,
-                        context: None,
-                    });
+                    return Err(lex_err("Unterminated regular expression literal", slash_start));
                 }
                 Some(_) if escaped => {
                     // Escaped character - consume and continue
@@ -1034,13 +1045,10 @@ impl<'a> Lexer<'a> {
 
         // Check for empty pattern (would be a comment)
         if pattern.is_empty() {
-            return Err(ParseError::InvalidSyntax {
-                message:
-                    "Regular expression literal cannot be empty (use /(?:)/ for empty pattern)"
-                        .to_string(),
-                position: slash_start,
-                context: None,
-            });
+            return Err(lex_err(
+                "Regular expression literal cannot be empty (use /(?:)/ for empty pattern)",
+                slash_start,
+            ));
         }
 
         self.advance(); // Consume closing /
@@ -1062,9 +1070,8 @@ impl<'a> Lexer<'a> {
         Ok((
             Token {
                 kind: TokenKind::RegexLiteral,
-                start: slash_start,
-                end: self.position,
-                decoded: None,
+                start: slash_start as u32,
+                end: self.position as u32,
             },
             pattern_end,
         ))
@@ -1077,13 +1084,15 @@ impl<'a> Lexer<'a> {
     ///
     /// `brace_end` is the position just after the `}` where template content starts.
     /// The lexer will sync to this position and read the rest of the template.
-    pub fn continue_template_from_brace(&mut self, brace_end: usize) -> Result<Token, ParseError> {
+    pub fn continue_template_from_brace(&mut self, brace_end: usize) -> Result<Token, Box<ParseError>> {
+        // Standalone token-producing entry point — clear the out-of-band decoded slot
+        // so `take_decoded()` reflects only the segment produced here (set below on escapes).
+        self.decoded = None;
         if self.template_depth == 0 {
-            return Err(ParseError::InvalidSyntax {
-                message: "continue_template called outside template context".to_string(),
-                position: self.position,
-                context: None,
-            });
+            return Err(lex_err(
+                "continue_template called outside template context",
+                self.position,
+            ));
         }
         self.template_depth -= 1;
 
@@ -1103,13 +1112,12 @@ impl<'a> Lexer<'a> {
                     self.advance(); // consume closing `
 
                     let content = &self.source[content_start..content_end];
-                    let decoded = Self::decode_template_segment(content, has_escapes);
+                    self.decoded = Self::decode_template_segment(content, has_escapes).map(Box::new);
 
                     return Ok(Token {
                         kind: TokenKind::TemplateTail,
-                        start: brace_start,
-                        end: self.position,
-                        decoded,
+                        start: brace_start as u32,
+                        end: self.position as u32,
                     });
                 }
                 Some('$') => {
@@ -1123,13 +1131,12 @@ impl<'a> Lexer<'a> {
                         self.template_depth += 1;
 
                         let content = &self.source[content_start..content_end];
-                        let decoded = Self::decode_template_segment(content, has_escapes);
+                        self.decoded = Self::decode_template_segment(content, has_escapes).map(Box::new);
 
                         return Ok(Token {
                             kind: TokenKind::TemplateMiddle,
-                            start: brace_start,
-                            end: self.position,
-                            decoded,
+                            start: brace_start as u32,
+                            end: self.position as u32,
                         });
                     }
                     // Regular $ character
@@ -1147,11 +1154,7 @@ impl<'a> Lexer<'a> {
                     self.advance();
                 }
                 None => {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Unterminated template literal".to_string(),
-                        position: brace_start,
-                        context: None,
-                    });
+                    return Err(lex_err("Unterminated template literal", brace_start));
                 }
             }
         }
@@ -1161,7 +1164,7 @@ impl<'a> Lexer<'a> {
     /// Only valid at the start of the file (position 0).
     /// Reads until end of line or end of file.
     /// Returns as a Comment token with is_block: false.
-    fn read_hashbang_comment(&mut self, start: usize) -> Result<Token, ParseError> {
+    fn read_hashbang_comment(&mut self, start: usize) -> Result<Token, Box<ParseError>> {
         // Skip #!
         self.advance(); // #
         self.advance(); // !
@@ -1187,11 +1190,10 @@ impl<'a> Lexer<'a> {
         Ok(Token {
             kind: TokenKind::Comment {
                 is_block: false,
-                content_start: start,
+                content_start: start as u32,
             },
-            start,
-            end: self.position,
-            decoded: None,
+            start: start as u32,
+            end: self.position as u32,
         })
     }
 }

@@ -8,7 +8,7 @@ use tsv_lang::ParseError;
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
 /// block comments happens in the conversion layer (matching Svelte's behavior).
-pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
+pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, Box<ParseError>> {
     let start = *pos;
 
     // Skip //
@@ -37,11 +37,10 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
     Ok(Token {
         kind: TokenKind::Comment {
             is_block: false,
-            content_start: start + 2,
+            content_start: (start + 2) as u32,
         },
-        start,
-        end: *pos,
-        decoded: None,
+        start: start as u32,
+        end: *pos as u32,
     })
 }
 
@@ -52,7 +51,7 @@ pub(crate) fn read_line_comment(source: &str, pos: &mut usize) -> Result<Token, 
 ///
 /// NOTE: Content is preserved exactly as written. Indentation stripping for multi-line
 /// comments happens in the conversion layer (matching Svelte's behavior).
-pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
+pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token, Box<ParseError>> {
     let start = *pos;
 
     // Skip /*
@@ -65,11 +64,11 @@ pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token,
         let current_char = source[*pos..].chars().next();
         match current_char {
             None => {
-                return Err(ParseError::InvalidSyntax {
+                return Err(Box::new(ParseError::InvalidSyntax {
                     message: "Unterminated block comment".to_string(),
                     position: start,
                     context: None,
-                });
+                }));
             }
             Some('*') => {
                 // Check for closing */
@@ -90,10 +89,9 @@ pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token,
     Ok(Token {
         kind: TokenKind::Comment {
             is_block: true,
-            content_start: start + 2,
+            content_start: (start + 2) as u32,
         },
-        start,
-        end: *pos,
-        decoded: None,
+        start: start as u32,
+        end: *pos as u32,
     })
 }

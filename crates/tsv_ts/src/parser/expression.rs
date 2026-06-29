@@ -1210,7 +1210,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 );
                 let lexer_start = self.current_start;
                 let (regex_token, pattern_end) = self.lexer.read_regex_literal(lexer_start)?;
-                let lexer_end = regex_token.end;
+                let lexer_end = regex_token.end as usize;
 
                 // Calculate span with base_offset for the AST
                 let span_start = lexer_start + self.base_offset;
