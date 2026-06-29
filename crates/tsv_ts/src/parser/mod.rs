@@ -167,8 +167,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Allocate a decoded string (escapes processed — not a verbatim source
     /// slice) in the arena. One copy into the arena. (No-escape string literals
-    /// are a verbatim source slice and should eventually use a `Span`/`Verbatim`
-    /// form for zero copy — tracked follow-up, see TODO_BUMPALO_ARENA.md.)
+    /// are a verbatim source slice and could instead carry a `Span`, avoiding
+    /// even this one copy.)
     #[inline]
     fn alloc_str_in(&self, s: &str) -> &'arena str {
         self.arena.alloc_str(s)

@@ -4,9 +4,9 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 /// Differential lexer harness — snapshot the raw token stream over a corpus and
-/// diff it against a golden (the linchpin for the lexer rewrite, TODO_LEXER_REWRITE.md
-/// §B.0). Capture a golden from the current lexer (`--write`), then after a lexer
-/// change re-run (`--check`) to prove token-stream identity: same `(kind, start, end,
+/// diff it against a golden. Capture a golden from the current lexer (`--write`),
+/// then after a lexer change re-run (`--check`) to prove token-stream identity:
+/// same `(kind, start, end,
 /// decoded)` for every token of every file. Stronger than format byte-identity — it
 /// catches token-level divergence the formatter might absorb. Pure Rust, no Deno.
 ///

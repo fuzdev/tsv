@@ -906,6 +906,37 @@ mod tests {
         }
     }
 
+    /// The production keyword encoder (`read_word_le`, a single 8-byte load + mask,
+    /// or a byte-assembly near EOF) must produce the same little-endian `u64` as the
+    /// compile-time `kw_encode` the SWAR constants are built from. `swar_matches_phf`
+    /// feeds `kw_encode`, so without this a divergence in `read_word_le` — the byte
+    /// order the lexer actually runs — would pass the unit suite and only surface in
+    /// the integration gates. Covers both the in-bounds fast path (padded source) and
+    /// the near-EOF assembly path (the keyword as the final bytes).
+    #[test]
+    fn read_word_le_matches_kw_encode() {
+        for (&kw, _) in KEYWORDS.entries() {
+            if kw.len() > 8 {
+                continue; // out of SWAR scope; routed to phf, never read_word_le
+            }
+            // Fast path: ≥ 8 bytes in bounds (trailing pad guarantees start + 8 <= len).
+            let mut padded = kw.as_bytes().to_vec();
+            padded.extend_from_slice(b"________");
+            assert_eq!(
+                read_word_le(&padded, 0, kw.len()),
+                kw_encode(kw),
+                "fast-path read_word_le disagrees with kw_encode for `{kw}`"
+            );
+            // Near-EOF path: the keyword is the trailing bytes (start + 8 > len for
+            // len < 8; the three len-8 keywords still exercise the fast branch here).
+            assert_eq!(
+                read_word_le(kw.as_bytes(), 0, kw.len()),
+                kw_encode(kw),
+                "EOF-path read_word_le disagrees with kw_encode for `{kw}`"
+            );
+        }
+    }
+
     /// SWAR must reject non-keywords (including ones that share a keyword's length
     /// and first letter) so it never promotes an identifier to a keyword.
     #[test]

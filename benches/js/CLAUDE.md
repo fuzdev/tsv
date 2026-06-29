@@ -15,8 +15,8 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 The bench runs under **Deno, Node, and Bun** from one shared codebase.
 The motivation: a single-runtime bench can silently fold a runtime-specific effect
 into an engine number — the concrete case being the Deno-FFI fast-call memory
-sensitivity that mismeasured the native path (see §Known Issues + the lore
-`TODO_NODE_BENCHMARKS.md`). A per-runtime delta on the same row is the detector.
+sensitivity that mismeasured the native path (see §Known Issues). A per-runtime
+delta on the same row is the detector.
 
 **Design (well-factored, not forked):**
 

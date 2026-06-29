@@ -1113,8 +1113,7 @@ impl<'a> Printer<'a> {
     ///
     /// Both happen inside the single `build_block_node_doc_with_gt` build — the block is
     /// built **once**, with the `>` threaded in, so a nested chain of dangles stays linear
-    /// (the earlier two-build probe-then-rebuild was O(2^depth); see grimoire
-    /// TODO_REBUILD_BLOWUP).
+    /// (an earlier two-build probe-then-rebuild was O(2^depth) in nesting).
     ///
     /// Applies to all five block heads (`{#if}` / `{#each}` / `{#key}` / `{#await}` /
     /// `{#snippet}`). A control-flow block with any preceding sibling routes its block
@@ -1144,9 +1143,8 @@ impl<'a> Printer<'a> {
         // Build the block exactly once with the `>` threaded in: the expanding path folds
         // it into the inline-vs-multiline `conditional_group` (hug inline, dangle when the
         // block expands); the non-expanding tails dangle it via `dangle_gt` when they break.
-        // (The earlier form built the block twice — a throwaway no-`gt` probe to test
-        // `will_break`, then a rebuild — which made nested dangles O(2^depth); see
-        // grimoire TODO_REBUILD_BLOWUP.)
+        // (An earlier form built the block twice — a throwaway no-`gt` probe to test
+        // `will_break`, then a rebuild — which made nested dangles O(2^depth).)
         let block_doc = self.build_block_node_doc_with_gt(block, gt)?;
         Some((element_doc, block_doc))
     }

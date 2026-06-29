@@ -10,7 +10,7 @@ default = ["convert"]
 # build; on for every other consumer.
 convert = ["dep:serde", "dep:serde_json"]
 # Debug-only: exposes `debug_token_stream` for the differential lexer harness
-# (`tsv_debug lex_diff`, TODO_LEXER_REWRITE.md §B.0). Off in production builds.
+# (`tsv_debug lex_diff`). Off in production builds.
 debug_lex = []
 
 [dependencies]

@@ -506,9 +506,9 @@ pub use ast::internal::{
 /// Drive the raw lexer over `source` and return a deterministic, line-per-token
 /// dump (`<kind> <start>..<end> [decoded=…]`, terminated by `Eof` or `ERROR …`).
 ///
-/// The differential gate for the lexer rewrite (TODO_LEXER_REWRITE.md §B.0): two
-/// lexer implementations are token-identical iff this string matches for every
-/// corpus file. It exercises the **context-free** `next_token` dispatch only —
+/// The differential gate for lexer changes: two lexer implementations are
+/// token-identical iff this string matches for every corpus file. It exercises
+/// the **context-free** `next_token` dispatch only —
 /// the parser-driven `read_regex_literal` / `continue_template_from_brace` paths
 /// aren't reached by a raw `next_token` loop (a `/` lexes as division, a `}` as a
 /// brace), so those stay gated by the AST/format byte-identity suites. Behind the
