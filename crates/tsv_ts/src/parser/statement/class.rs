@@ -152,18 +152,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_expected_after("'class'", "decorator"));
         }
 
-        // Build the class node, mutate it (attach decorators + extend the span to
-        // cover them), then arena-box it — `ClassExpression` is boxed into the
-        // `Expression` enum, so a shared `&'arena` ref can't be mutated in place.
-        let mut class = self.parse_class_expression_node()?;
-        class.decorators = if decorators.is_empty() {
-            None
-        } else {
-            Some(decorators.into_bump_slice())
-        };
-        // Extend the span to cover the leading decorators.
-        class.span = Span::new(start as u32, class.span.end);
-        Ok(Expression::ClassExpression(self.alloc(class)))
+        let mut expr = self.parse_class_expression()?;
+        if let Expression::ClassExpression(class) = &mut expr {
+            class.decorators = if decorators.is_empty() {
+                None
+            } else {
+                Some(decorators.into_bump_slice())
+            };
+            // Extend the span to cover the leading decorators.
+            class.span = Span::new(start as u32, class.span.end);
+        }
+        Ok(expr)
     }
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
@@ -239,14 +238,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - They appear in expression position
     /// - No `declare` field
     pub fn parse_class_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
-        let class = self.parse_class_expression_node()?;
-        Ok(Expression::ClassExpression(self.alloc(class)))
-    }
-
-    /// Parse a class expression into a raw `ClassExpression` node (not yet wrapped
-    /// in `Expression`). The decorated-class path mutates the node before boxing it,
-    /// which the shared `&'arena` ref in `Expression::ClassExpression` can't support.
-    fn parse_class_expression_node(&mut self) -> Result<ClassExpression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
         // Consume 'class' keyword
@@ -296,7 +287,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.parse_class_body(false)?;
         let end = body.span.end;
 
-        Ok(ClassExpression {
+        Ok(Expression::ClassExpression(ClassExpression {
             decorators: None,
             id,
             super_class,
@@ -306,7 +297,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             r#abstract: false,
             type_parameters,
             span: Span::new(start as u32, end),
-        })
+        }))
     }
 
     /// Inner function that returns the ClassDeclaration directly
