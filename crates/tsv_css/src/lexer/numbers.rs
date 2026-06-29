@@ -1,3 +1,4 @@
+use super::lex_err;
 use super::token::{Token, TokenKind};
 use crate::number::{continues_unit, exponent_len};
 use tsv_lang::ParseError;
@@ -6,7 +7,7 @@ use tsv_lang::ParseError;
 /// Numbers: 42, 1.5, .5, -42, +1.5
 /// Percentages: 50%, -100%
 /// Dimensions: 16px, 1.5em, -2.5rem
-pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
+pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, Box<ParseError>> {
     let start = *pos;
 
     // Read optional sign
@@ -81,20 +82,15 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
     let num_str = &source[start..num_end];
     num_str
         .parse::<f64>()
-        .map_err(|_| ParseError::InvalidSyntax {
-            message: format!("Invalid number: {num_str}"),
-            position: start,
-            context: None,
-        })?;
+        .map_err(|_| lex_err(format!("Invalid number: {num_str}"), start))?;
 
     // Check for percentage
     if source[*pos..].starts_with('%') {
         *pos += 1;
         return Ok(Token {
             kind: TokenKind::Percentage,
-            start,
-            end: *pos,
-            decoded: None,
+            start: start as u32,
+            end: *pos as u32,
         });
     }
 
@@ -119,9 +115,8 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
                 kind: TokenKind::Dimension {
                     unit_len: unit_len as u8,
                 },
-                start,
-                end: *pos,
-                decoded: None,
+                start: start as u32,
+                end: *pos as u32,
             });
         }
 
@@ -132,8 +127,7 @@ pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseE
     // Just a number
     Ok(Token {
         kind: TokenKind::Number,
-        start,
-        end: *pos,
-        decoded: None,
+        start: start as u32,
+        end: *pos as u32,
     })
 }

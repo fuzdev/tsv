@@ -1,3 +1,4 @@
+use super::lex_err;
 use super::token::{Token, TokenKind};
 use tsv_lang::ParseError;
 
@@ -7,7 +8,11 @@ use tsv_lang::ParseError;
 ///
 /// **Architecture**: Lexer preserves raw content → Parser decodes → Conversion applies Svelte quirks
 /// This matches TypeScript's approach and keeps the lexer simple and consistent.
-pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<Token, ParseError> {
+pub(crate) fn read_string(
+    source: &str,
+    pos: &mut usize,
+    quote: char,
+) -> Result<Token, Box<ParseError>> {
     let start = *pos;
     *pos += 1; // skip opening quote
 
@@ -16,20 +21,18 @@ pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<
         let current_char = source[*pos..].chars().next();
         match current_char {
             None => {
-                return Err(ParseError::InvalidSyntax {
-                    message: format!("Unterminated string starting with {quote}"),
-                    position: start,
-                    context: None,
-                });
+                return Err(lex_err(
+                    format!("Unterminated string starting with {quote}"),
+                    start,
+                ));
             }
             Some(ch) if ch == quote => {
                 *pos += 1; // skip closing quote
 
                 return Ok(Token {
                     kind: TokenKind::String { quote },
-                    start,
-                    end: *pos,
-                    decoded: None,
+                    start: start as u32,
+                    end: *pos as u32,
                 });
             }
             Some('\\') => {
@@ -38,11 +41,7 @@ pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<
                 if let Some(next_ch) = source[*pos..].chars().next() {
                     *pos += next_ch.len_utf8();
                 } else {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Unexpected end of string after backslash".to_string(),
-                        position: *pos,
-                        context: None,
-                    });
+                    return Err(lex_err("Unexpected end of string after backslash", *pos));
                 }
             }
             Some(ch) => {

@@ -39,10 +39,7 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, P
             // permits any token sequence with balanced `()` / `[]` / `{}` — including
             // a top-level `{...}` block. Without this short-circuit, `--foo: { ... }`
             // would misclassify as a type-selector + pseudo-class.
-            if parser
-                .current_identifier()
-                .is_some_and(|s| s.starts_with("--"))
-            {
+            if parser.current_identifier().starts_with("--") {
                 return Ok(false);
             }
             // Peek past whitespace and comments to find the significant next token
@@ -195,9 +192,7 @@ pub(crate) fn parse_declaration<'arena>(
     }
     // Internal AST: use decoded value (spec-compliant)
     // Svelte quirk (raw value) will be applied in conversion layer
-    let property_ident = parser
-        .current_identifier()
-        .ok_or_else(|| parser.error_expected_at("identifier", start))?;
+    let property_ident = parser.current_identifier();
     let property = parser.alloc_str_in(property_ident);
     parser.advance()?;
 
@@ -249,10 +244,7 @@ pub(crate) fn parse_declaration<'arena>(
         // Convert token to string representation for value
         let value_str = match &parser.current_kind {
             // Internal AST: use decoded value (spec-compliant)
-            TokenKind::Identifier => parser
-                .current_identifier()
-                .unwrap_or_else(|| parser.current_value())
-                .to_string(),
+            TokenKind::Identifier => parser.current_identifier().to_string(),
             TokenKind::String { quote } => {
                 let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
                 format!("{quote}{content}{quote}")

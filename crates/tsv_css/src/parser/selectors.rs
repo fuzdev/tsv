@@ -570,13 +570,7 @@ pub(crate) fn parse_simple_selector<'arena>(
             // recovers its text verbatim from `span` at print time.
             if matches!(parser.peek()?, TokenKind::Pipe) {
                 // Namespace prefix: identifier|element
-                let namespace = Some(
-                    parser.alloc_str_in(
-                        parser
-                            .current_identifier()
-                            .ok_or_else(|| parser.error_expected("identifier"))?,
-                    ),
-                );
+                let namespace = Some(parser.alloc_str_in(parser.current_identifier()));
                 parser.advance()?; // consume the namespace identifier
                 parser.advance()?; // consume the pipe
 
@@ -595,12 +589,8 @@ pub(crate) fn parse_simple_selector<'arena>(
                     },
                 })
             } else {
-                // No namespace, just a regular type selector. Validate the identifier
-                // (matches the prior path); its text is recovered from `span` at print
-                // time, so nothing is copied into the arena.
-                parser
-                    .current_identifier()
-                    .ok_or_else(|| parser.error_expected("identifier"))?;
+                // No namespace, just a regular type selector; its text is recovered
+                // from `span` at print time, so nothing is copied into the arena.
                 parser.advance()?;
                 let end = parser.base_offset() + parser.current_start();
                 Ok(SimpleSelector::Type {
@@ -618,11 +608,8 @@ pub(crate) fn parse_simple_selector<'arena>(
             if !parser.check(TokenKind::Identifier) {
                 return Err(parser.error_expected_after("class name", "."));
             }
-            // Validate an identifier follows; its text is recovered from `span` at
-            // print time, so nothing is copied into the arena.
-            parser
-                .current_identifier()
-                .ok_or_else(|| parser.error_expected("identifier"))?;
+            // The class name's text is recovered from `span` at print time, so
+            // nothing is copied into the arena.
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Class {
@@ -638,11 +625,8 @@ pub(crate) fn parse_simple_selector<'arena>(
             if !parser.check(TokenKind::Identifier) {
                 return Err(parser.error_expected_after("ID name", "#"));
             }
-            // Validate an identifier follows; its text is recovered from `span` at
-            // print time, so nothing is copied into the arena.
-            parser
-                .current_identifier()
-                .ok_or_else(|| parser.error_expected("identifier"))?;
+            // The ID name's text is recovered from `span` at print time, so nothing
+            // is copied into the arena.
             let end = parser.base_offset() + parser.current_end;
             parser.advance()?;
             Ok(SimpleSelector::Id {
@@ -668,11 +652,8 @@ pub(crate) fn parse_simple_selector<'arena>(
                     );
                 }
 
-                // Validate an element identifier follows; its text is recovered from
-                // `span` at print time, so nothing is copied into the arena.
-                parser
-                    .current_identifier()
-                    .ok_or_else(|| parser.error_expected("identifier"))?;
+                // The element name's text is recovered from `span` at print time, so
+                // nothing is copied into the arena.
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
 
@@ -738,11 +719,8 @@ pub(crate) fn parse_simple_selector<'arena>(
 
             // Must be followed by an identifier (element name) or asterisk (universal)
             if parser.check(TokenKind::Identifier) {
-                // Validate an element identifier follows; its text is recovered from
-                // `span` at print time, so nothing is copied into the arena.
-                parser
-                    .current_identifier()
-                    .ok_or_else(|| parser.error_expected("identifier"))?;
+                // The element name's text is recovered from `span` at print time, so
+                // nothing is copied into the arena.
                 let end = parser.base_offset() + parser.current_end;
                 parser.advance()?;
 

@@ -13,7 +13,7 @@ tsv_cli = { path = "../tsv_cli" }
 tsv_lang = { workspace = true, features = ["swallow_check"] }
 tsv_svelte = { workspace = true, features = ["convert"] }
 tsv_ts = { workspace = true, features = ["convert", "debug_lex"] }
-tsv_css = { workspace = true, features = ["convert"] }
+tsv_css = { workspace = true, features = ["convert", "debug_lex"] }
 tsv_html = { workspace = true }
 argh.workspace = true
 serde.workspace = true

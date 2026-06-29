@@ -195,3 +195,47 @@ pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> 
     serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
     String::from_utf8(buf).expect("serde_json emits valid UTF-8")
 }
+
+/// Drive the raw lexer over `source` and return a deterministic, line-per-token
+/// dump (`<kind> <start>..<end> [text=…]`, terminated by `Eof` or `ERROR …`).
+///
+/// The differential gate for lexer changes: two lexer implementations are
+/// token-identical iff this string matches for every corpus file. Behind the
+/// `debug_lex` feature (off in production builds); used by `tsv_debug lex_diff`.
+///
+/// For `Identifier` tokens it prints the **resolved text** — the decoded value
+/// when escapes were present, otherwise the verbatim source slice. That keeps the
+/// golden invariant across the lazy-decode change: a no-escape identifier's
+/// decoded value equals its source slice, so the stream is stable whether the
+/// lexer allocates the decode eagerly or only when an escape is seen, while a
+/// wrong escape decode still shows up as a divergent `text=`.
+#[cfg(feature = "debug_lex")]
+pub fn debug_token_stream(source: &str) -> String {
+    use crate::lexer::{Lexer, TokenKind};
+    use std::fmt::Write as _;
+
+    let mut lexer = Lexer::new(source);
+    let mut out = String::new();
+    loop {
+        match lexer.next_token() {
+            Ok(token) => {
+                let _ = write!(out, "{:?} {}..{}", token.kind, token.start, token.end);
+                if matches!(token.kind, TokenKind::Identifier) {
+                    let slice = &source[token.start as usize..token.end as usize];
+                    let decoded = lexer.take_decoded();
+                    let text = decoded.as_deref().map_or(slice, String::as_str);
+                    let _ = write!(out, " text={text:?}");
+                }
+                out.push('\n');
+                if matches!(token.kind, TokenKind::Eof) {
+                    break;
+                }
+            }
+            Err(err) => {
+                let _ = writeln!(out, "ERROR {err:?}");
+                break;
+            }
+        }
+    }
+    out
+}
