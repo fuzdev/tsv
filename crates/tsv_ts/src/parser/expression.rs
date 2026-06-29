@@ -63,21 +63,27 @@ struct ParsedExpr<'arena> {
     /// Actual start position before any opening parentheses.
     ///
     /// `u32` (not `usize`): source positions fit in `u32` (the parser rejects
-    /// inputs > 4 GB), and at 16 B `ParsedExpr` + a boxed error makes
-    /// `Result<ParsedExpr, Box<ParseError>>` register-returnable (16 B, niche-packed
-    /// via the `&Expression`) instead of sret-returned — the recursion's hot return.
+    /// inputs > 4 GB), and the narrower positions keep `ParsedExpr` minimal (one
+    /// pointer + two `u32`) so a boxed error niche-packs into the `&Expression`'s
+    /// spare space for free, leaving `Result<ParsedExpr, Box<ParseError>>`
+    /// register-returnable instead of sret-returned — the recursion's hot return.
     actual_start: u32,
     /// Actual end position after consuming any closing parentheses
     actual_end: u32,
 }
 
-// `ParsedExpr` is the Pratt recursion's hot return. With the `&Expression` reference
-// (8 B) + two `u32` positions it is 16 B, and a boxed error keeps the fallible return
-// `Result<ParsedExpr, Box<ParseError>>` at 16 B (niche-packed via the `&Expression`),
-// so it returns in registers instead of via an sret stack slot. An unboxed 96 B
-// `ParseError`, or `usize` positions, would push it back over the register threshold.
-const _: () = assert!(size_of::<ParsedExpr<'static>>() == 16);
-const _: () = assert!(size_of::<Result<ParsedExpr<'static>, Box<ParseError>>>() == 16);
+// `ParsedExpr` is the Pratt recursion's hot return: one `&Expression` reference plus two
+// `u32` paren-bound positions (16 B on 64-bit). Boxing the error niche-packs it into the
+// reference's spare space for free — the fallible `Result<ParsedExpr, Box<ParseError>>` is
+// the *same size* as the success value (no error bloat) — so the recursion returns it in
+// registers instead of via an sret stack slot. An unboxed 96 B `ParseError`, or `usize`
+// positions, would push it over the register threshold. The asserts are width-relative (a
+// `&Expression` is one `usize`), so they also hold for the 32-bit `wasm32` build.
+const _: () =
+    assert!(size_of::<ParsedExpr<'static>>() == size_of::<usize>() + 2 * size_of::<u32>());
+const _: () = assert!(
+    size_of::<Result<ParsedExpr<'static>, Box<ParseError>>>() == size_of::<ParsedExpr<'static>>()
+);
 
 impl<'arena> ParsedExpr<'arena> {
     /// Create a ParsedExpr where actual_start/end match the expression's semantic
