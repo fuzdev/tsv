@@ -297,11 +297,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.collect_comments()
     }
 
-    /// Drain consecutive `Comment` tokens starting at the current token into `self.comments`,
-    /// leaving the current token at the first non-comment token. Shared by `advance_inner` and
-    /// the regex relex path (`parse_primary_expression`), both of which land on a fresh token and
-    /// must absorb any comments before the next consumer reads the current token.
+    /// Drain any `Comment` tokens at the current position into `self.comments`, leaving the current
+    /// token at the first non-comment token. Shared by `advance_inner` and the regex relex path
+    /// (`parse_primary_expression`), both of which land on a fresh token and must absorb any
+    /// comments before the next consumer reads the current token.
+    ///
+    /// The common case — the current token is *not* a comment — is a single discriminant check that
+    /// inlines into the hot `advance` pump; the drain loop itself is cold-outlined into
+    /// `drain_comments` so it never bloats the inlined fast path.
+    #[inline]
     pub(super) fn collect_comments(&mut self) -> Result<(), ParseError> {
+        if matches!(self.current.kind, TokenKind::Comment { .. }) {
+            self.drain_comments()
+        } else {
+            Ok(())
+        }
+    }
+
+    /// The cold half of `collect_comments`: the current token is known to be a `Comment` on entry;
+    /// drain it and any consecutive comments. `#[cold]` + `#[inline(never)]` keep it off the hot pump.
+    #[cold]
+    #[inline(never)]
+    fn drain_comments(&mut self) -> Result<(), ParseError> {
         while let TokenKind::Comment {
             is_block,
             content_start,
@@ -1219,10 +1236,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Build line breaks table for O(log n) line boundary lookups
         // Must add base_offset to each position since AST spans use global positions
         let base_offset_u32 = self.base_offset as u32;
-        let line_breaks: Vec<u32> = tsv_lang::printing::build_line_breaks(self.source)
-            .into_iter()
-            .map(|pos| pos + base_offset_u32)
-            .collect();
+        // Standalone (`.ts`/`.svelte.ts`) parses have `base_offset == 0`, so the per-position
+        // shift is an identity — return the table directly instead of cloning it through
+        // `.map(|pos| pos + 0).collect()`. Only embedded `<script>` (base_offset > 0) needs the shift.
+        let line_breaks: Vec<u32> = if base_offset_u32 == 0 {
+            tsv_lang::printing::build_line_breaks(self.source)
+        } else {
+            tsv_lang::printing::build_line_breaks(self.source)
+                .into_iter()
+                .map(|pos| pos + base_offset_u32)
+                .collect()
+        };
 
         Ok(Program {
             body: body.into_bump_slice(),
