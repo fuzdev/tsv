@@ -49,6 +49,9 @@ impl<'a> Printer<'a> {
             }
             Statement::ExportAllDeclaration(decl) => self.build_export_all_declaration_doc(decl),
             Statement::TSExportAssignment(decl) => self.build_export_assignment_doc(decl),
+            Statement::TSNamespaceExportDeclaration(decl) => {
+                self.build_namespace_export_declaration_doc(decl)
+            }
             Statement::ImportDeclaration(decl) => self.build_import_declaration_doc(decl),
             Statement::TSImportEqualsDeclaration(decl) => {
                 self.build_import_equals_declaration_doc(decl)

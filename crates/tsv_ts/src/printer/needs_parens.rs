@@ -110,6 +110,12 @@ pub enum ParenContext {
     /// (incl. `new`, tagged templates, and non-null, which are valid `extends`
     /// operands but still parenthesized for clarity).
     SuperClass,
+
+    /// Left side of an assignment: `<expr> = …` / `<expr> += …`.
+    /// A type-assertion target (`as` / `satisfies` / `<T>`) must be parenthesized —
+    /// `(x as T) = 1` (bare `x as T = 1` is a parse error). Non-null `x!` is valid
+    /// bare, so it isn't wrapped (matches prettier).
+    AssignmentTarget,
 }
 
 /// Whether `expr` is an `in` binary expression — the operator that must be
@@ -344,6 +350,15 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                         | Expression::ObjectExpression(_)
                 )
         }
+
+        // A type-assertion target needs parens to round-trip (`(x as T) = …`);
+        // non-null `x!` is a valid bare assignment target, so it isn't wrapped.
+        ParenContext::AssignmentTarget => matches!(
+            expr,
+            Expression::TSAsExpression(_)
+                | Expression::TSSatisfiesExpression(_)
+                | Expression::TSTypeAssertion(_)
+        ),
     }
 }
 

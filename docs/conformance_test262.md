@@ -96,6 +96,24 @@ pinned by a fixture (fixtures-first per the repo TDD gate):
   module, matching acorn). This makes tsv more spec-correct than acorn-*as-module*,
   which is module-only. See [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis).
 
+A few **TypeScript-specific** constructs round out drop-in parser coverage — acorn
+accepts them and tsv matches. They are off the test262 radar (the suite is pure
+ECMAScript), so they don't move the counts above, but each is pinned by a fixture:
+
+- **`export import X = …`** — the export form of an import-equals re-export
+  (`export import NS = A.B` / `export import NS = require('m')`), entity-name and
+  `require(…)` references alike (`TSImportEqualsDeclaration` with `isExport`).
+- **A type assertion as an assignment target** — `(x as T) = 1`, `(x!) = 1`,
+  `(x satisfies T) = 1`, `(<T>x) = 1`, chained `(x as A as B) = 1`, member inners,
+  compound `(x as T) += 1`, and the destructuring-element forms `[x as T] = y` /
+  `({ a: x as T } = y)`. tsv keeps the assertion node so the formatter reproduces
+  prettier (`(x as T) = 1`), while the public AST drops it from a simple `=` left
+  (`left: Identifier`), matching acorn. An assertion wrapping a *pattern*
+  (`([a, b] as T) = c`), or in a for-in/of head or binding position, stays rejected
+  — also matching acorn.
+- **`export as namespace Foo`** — the TypeScript UMD global export declaration
+  (`TSNamespaceExportDeclaration`), at the top level and inside `declare module`.
+
 `yield` is unaffected by the goal axis — a strict reserved word in both `Script` and
 `Module`. Out of scope (skipped, not graded as failures): **sloppy-mode-only**
 constructs (`with`, the AnnexB `f() = g()` / `for (var a = x in b)` forms, legacy

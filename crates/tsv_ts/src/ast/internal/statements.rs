@@ -10,7 +10,8 @@ use super::{
     ClassDeclaration, ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration,
     Expression, Identifier, ImportDeclaration, TSDeclareFunction, TSEnumDeclaration,
     TSExportAssignment, TSImportEqualsDeclaration, TSInterfaceDeclaration, TSModuleDeclaration,
-    TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration,
+    TSNamespaceExportDeclaration, TSTypeAliasDeclaration, TSTypeAnnotation,
+    TSTypeParameterDeclaration,
 };
 
 /// Statement node type
@@ -33,6 +34,7 @@ pub enum Statement<'arena> {
     ExportDefaultDeclaration(ExportDefaultDeclaration<'arena>),
     ExportAllDeclaration(ExportAllDeclaration<'arena>),
     TSExportAssignment(TSExportAssignment<'arena>),
+    TSNamespaceExportDeclaration(TSNamespaceExportDeclaration<'arena>),
     ImportDeclaration(ImportDeclaration<'arena>),
     TSImportEqualsDeclaration(TSImportEqualsDeclaration<'arena>),
     // Control flow statements
@@ -70,6 +72,7 @@ impl<'arena> Statement<'arena> {
             Statement::ExportDefaultDeclaration(decl) => decl.span,
             Statement::ExportAllDeclaration(decl) => decl.span,
             Statement::TSExportAssignment(decl) => decl.span,
+            Statement::TSNamespaceExportDeclaration(decl) => decl.span,
             Statement::ImportDeclaration(decl) => decl.span,
             Statement::TSImportEqualsDeclaration(decl) => decl.span,
             // Control flow statements

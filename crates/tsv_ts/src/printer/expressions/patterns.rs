@@ -96,7 +96,19 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let rhs_is_assignment = matches!(assign.right, Expression::AssignmentExpression(_));
-        let left_doc = self.build_expression_doc(assign.left);
+        // A type-assertion target (`as` / `satisfies` / `<T>`) must be parenthesized
+        // to round-trip (`(x as T) = …`); non-null `x!` stays bare. The cast is kept
+        // in the internal AST so the formatter reproduces prettier's output, even
+        // though the public AST drops it from a simple `=` left.
+        let left_doc = if self.needs_parens(assign.left, ParenContext::AssignmentTarget) {
+            d.concat(&[
+                d.text("("),
+                self.build_expression_doc(assign.left),
+                d.text(")"),
+            ])
+        } else {
+            self.build_expression_doc(assign.left)
+        };
 
         // Extract inline comments between operator and RHS
         // Uses line-comment-safe spacing: block comments get trailing space,

@@ -83,6 +83,22 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		// Over-rejection fixes: export-import-equals (`TSImportEqualsDeclaration`
+		// with `isExport`), the UMD namespace export (`TSNamespaceExportDeclaration`),
+		// and type-assertion assignment targets — the simple `=` left unwraps to the
+		// inner target (`Identifier`), while `+=` keeps the assertion node.
+		name: 'ts_assertion_targets_and_module_exports',
+		source: [
+			'export import NS = A.B;',
+			'export as namespace Lib;',
+			'(x as T) = 1;',
+			'(y as U) += 2;',
+			'[z as V] = arr;',
+		].join('\n'),
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		// String module specifiers (ES2022 `ModuleExportName : IdentifierName |
 		// StringLiteral`): a string `imported`/`local`/`exported`, and the
 		// `export * as 'str'` namespace name — the `ModuleExportName` union.

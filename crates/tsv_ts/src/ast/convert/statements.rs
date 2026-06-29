@@ -263,6 +263,15 @@ pub(in crate::ast) fn convert_statement<'src>(
                 ),
             })
         }
+        internal::Statement::TSNamespaceExportDeclaration(ns_export) => {
+            public::Statement::TSNamespaceExportDeclaration(public::TSNamespaceExportDeclaration {
+                node_type: "TSNamespaceExportDeclaration",
+                start: ns_export.span.start,
+                end: ns_export.span.end,
+                loc: create_location(ns_export.span, loc, offset),
+                id: convert_identifier(&ns_export.id, source, loc, interner, offset),
+            })
+        }
         internal::Statement::ImportDeclaration(import_decl) => {
             let import_kind = match import_decl.import_kind {
                 internal::ImportKind::Value => {

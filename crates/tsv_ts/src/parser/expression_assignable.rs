@@ -10,6 +10,19 @@ use tsv_lang::ParseError;
 
 use super::Parser;
 
+/// Whether `to_assignable` is converting an **assignment** target or a **binding**
+/// pattern — the one axis that decides whether a type-assertion target is allowed.
+/// Assignment context accepts `(x as T) = …` / `[x as T] = …`; binding context
+/// (for-in/of heads, function params, destructuring bindings, Svelte
+/// `{:then}`/`{:catch}`) rejects it, matching acorn-typescript's `isBinding` split.
+#[derive(Clone, Copy)]
+pub(in crate::parser) enum AssignableContext {
+    /// `… = rhs` — a type-assertion wrapping a *simple* target is itself a valid target.
+    Assignment,
+    /// Binding position — a type-assertion target is rejected.
+    Binding,
+}
+
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Convert an expression to an assignable pattern (cover grammar)
     ///
@@ -23,9 +36,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - SpreadElement → RestElement
     /// - BinaryExpression with = (shorthand default) → AssignmentPattern
     /// - Identifier, MemberExpression → unchanged (valid assignment targets)
+    ///
+    /// In `AssignableContext::Assignment`, a type-assertion-family expression (`as`,
+    /// `satisfies`, non-null `!`, `<T>`) may stand as an assignment target when it
+    /// wraps a *simple* target (`(x as T) = …`, `[x as T] = …`); `Binding` context
+    /// (for-in/of heads and binding patterns) rejects it (matching acorn-typescript's
+    /// `isBinding` split). The assertion node is kept here; the public AST unwraps it
+    /// for `=` at the convert boundary (acorn drops the cast from a simple `=` left).
     pub(super) fn to_assignable(
         &self,
         expr: Expression<'arena>,
+        context: AssignableContext,
     ) -> Result<Expression<'arena>, ParseError> {
         match expr {
             // Identifier is already a valid assignment target
@@ -57,7 +78,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             spread.span.start_usize(),
                         ));
                     }
-                    properties.push(self.object_property_to_pattern(prop.clone())?);
+                    properties.push(self.object_property_to_pattern(prop.clone(), context)?);
                 }
 
                 Ok(Expression::ObjectPattern(ObjectPattern {
@@ -96,7 +117,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     e.span().start_usize(),
                                 ));
                             }
-                            Some(self.to_assignable(e.clone())?)
+                            Some(self.to_assignable(e.clone(), context)?)
                         }
                         None => None,
                     };
@@ -112,13 +133,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Convert SpreadElement to RestElement
             Expression::SpreadElement(spread) => Ok(Expression::RestElement(
-                self.spread_to_rest_element(&spread)?,
+                self.spread_to_rest_element(&spread, context)?,
             )),
 
             // AssignmentExpression in pattern context becomes AssignmentPattern
             // This handles default values like `{a = 1}` which was parsed as shorthand
             Expression::AssignmentExpression(assign) => {
-                let left = self.to_assignable(assign.left.clone())?;
+                let left = self.to_assignable(assign.left.clone(), context)?;
                 Ok(Expression::AssignmentPattern(AssignmentPattern {
                     left: self.alloc(left),
                     right: assign.right,
@@ -131,6 +152,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | Expression::ArrayPattern(_)
             | Expression::AssignmentPattern(_)
             | Expression::RestElement(_) => Ok(expr),
+
+            // A type-assertion-family expression (`as` / `satisfies` / non-null `!` /
+            // `<T>`) is a valid assignment target — in assignment context only — when
+            // it wraps a *simple* target (Identifier/MemberExpression): acorn accepts
+            // `(x as T) = …` / `(x.y! as U) = …` but rejects an assertion wrapping a
+            // destructuring pattern (`([a, b] as T) = …`). The node is kept (the
+            // formatter reproduces prettier's `(x as T) = …`); convert unwraps it for
+            // a simple `=` left.
+            Expression::TSAsExpression(_)
+            | Expression::TSSatisfiesExpression(_)
+            | Expression::TSNonNullExpression(_)
+            | Expression::TSTypeAssertion(_)
+                if matches!(context, AssignableContext::Assignment)
+                    && matches!(
+                        expr.skip_type_assertions(),
+                        Expression::Identifier(_) | Expression::MemberExpression(_)
+                    ) =>
+            {
+                Ok(expr)
+            }
 
             // Invalid assignment target
             _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
@@ -157,8 +198,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn spread_to_rest_element(
         &self,
         spread: &SpreadElement<'arena>,
+        context: AssignableContext,
     ) -> Result<RestElement<'arena>, ParseError> {
-        let argument = self.to_assignable(spread.argument.clone())?;
+        let argument = self.to_assignable(spread.argument.clone(), context)?;
         if matches!(argument, Expression::AssignmentPattern(_)) {
             return Err(self.error_msg_at(
                 "A rest element cannot have a default value",
@@ -176,11 +218,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn object_property_to_pattern(
         &self,
         prop: ObjectProperty<'arena>,
+        context: AssignableContext,
     ) -> Result<ObjectPatternProperty<'arena>, ParseError> {
         match prop {
             ObjectProperty::Property(p) => {
                 // Convert the value to a pattern
-                let value = self.to_assignable(p.value.clone())?;
+                let value = self.to_assignable(p.value.clone(), context)?;
 
                 Ok(ObjectPatternProperty::Property(Property {
                     key: p.key,
@@ -193,7 +236,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }))
             }
             ObjectProperty::SpreadElement(spread) => Ok(ObjectPatternProperty::RestElement(
-                self.spread_to_rest_element(&spread)?,
+                self.spread_to_rest_element(&spread, context)?,
             )),
         }
     }

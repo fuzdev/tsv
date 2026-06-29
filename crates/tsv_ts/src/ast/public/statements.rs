@@ -9,7 +9,7 @@ use super::declarations::{
 };
 use super::modules::{
     ExportAllDeclaration, ExportDefaultDeclaration, ExportNamedDeclaration, ImportDeclaration,
-    TSExportAssignment, TSImportEqualsDeclaration,
+    TSExportAssignment, TSImportEqualsDeclaration, TSNamespaceExportDeclaration,
 };
 use super::types::{TSTypeAliasDeclaration, TSTypeAnnotation, TSTypeParameterDeclaration};
 use super::{Expression, Identifier, SourceLocation, is_false};
@@ -32,6 +32,7 @@ pub enum Statement<'src> {
     ExportDefaultDeclaration(ExportDefaultDeclaration<'src>),
     ExportAllDeclaration(ExportAllDeclaration<'src>),
     TSExportAssignment(TSExportAssignment<'src>),
+    TSNamespaceExportDeclaration(TSNamespaceExportDeclaration<'src>),
     ImportDeclaration(ImportDeclaration<'src>),
     TSImportEqualsDeclaration(TSImportEqualsDeclaration<'src>),
     // Control flow statements

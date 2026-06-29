@@ -86,6 +86,17 @@ pub struct TSExportAssignment<'src> {
     pub expression: Expression<'src>,
 }
 
+/// TypeScript UMD namespace export: `export as namespace Foo;`
+#[derive(Debug, Clone, Serialize)]
+pub struct TSNamespaceExportDeclaration<'src> {
+    #[serde(rename = "type")]
+    pub node_type: &'static str,
+    pub start: u32,
+    pub end: u32,
+    pub loc: SourceLocation,
+    pub id: Identifier<'src>,
+}
+
 /// Export specifier: `export { x }` or `export { x as y }`
 #[derive(Debug, Clone, Serialize)]
 pub struct ExportSpecifier<'src> {

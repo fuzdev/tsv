@@ -119,6 +119,7 @@ export type Statement =
 	| ExportDefaultDeclaration
 	| ExportAllDeclaration
 	| TSExportAssignment
+	| TSNamespaceExportDeclaration
 	| ImportDeclaration
 	| TSImportEqualsDeclaration
 	| IfStatement
@@ -1059,6 +1060,15 @@ export interface TSExportAssignment {
 	end: number;
 	loc: SourceLocation;
 	expression: Expression;
+}
+
+/** `export as namespace Foo;` — TypeScript UMD global export. */
+export interface TSNamespaceExportDeclaration {
+	type: 'TSNamespaceExportDeclaration';
+	start: number;
+	end: number;
+	loc: SourceLocation;
+	id: Identifier;
 }
 
 export interface ExportSpecifier {

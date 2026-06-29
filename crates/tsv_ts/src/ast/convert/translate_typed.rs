@@ -226,6 +226,10 @@ impl Translator<'_> {
                 span!(self, n);
                 self.expression(&mut n.expression);
             }
+            Statement::TSNamespaceExportDeclaration(n) => {
+                span!(self, n);
+                self.identifier(&mut n.id);
+            }
             Statement::ImportDeclaration(n) => {
                 span!(self, n);
                 for spec in &mut n.specifiers {

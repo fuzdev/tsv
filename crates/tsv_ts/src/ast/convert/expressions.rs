@@ -312,19 +312,22 @@ pub(in crate::ast::convert) fn convert_expression_inner<'src>(
             loc: create_location(s.span, loc, offset),
         }),
         internal::Expression::AssignmentExpression(assign) => {
+            // acorn drops a type assertion from a *simple* `=` left
+            // (`(x as T) = 1` → left `Identifier`); compound `op=` and
+            // destructuring elements keep it (only a *direct* assertion left is
+            // peeled — a pattern left is returned unchanged by `skip_type_assertions`).
+            let left = if matches!(assign.operator, internal::AssignmentOperator::Assign) {
+                assign.left.skip_type_assertions()
+            } else {
+                assign.left
+            };
             public::Expression::AssignmentExpression(public::AssignmentExpression {
                 node_type: "AssignmentExpression",
                 start: assign.span.start,
                 end: assign.span.end,
                 loc: create_location(assign.span, loc, offset),
                 operator: assign.operator.as_str(),
-                left: Box::new(convert_expression(
-                    assign.left,
-                    source,
-                    loc,
-                    interner,
-                    offset,
-                )),
+                left: Box::new(convert_expression(left, source, loc, interner, offset)),
                 right: Box::new(convert_expression(
                     assign.right,
                     source,

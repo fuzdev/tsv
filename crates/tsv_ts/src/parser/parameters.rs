@@ -2,6 +2,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use crate::parser::expression_assignable::AssignableContext;
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
@@ -101,7 +102,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             self.parse_object_expression()?
         };
-        self.to_assignable(expr)
+        // Binding context: a type assertion is not a valid binding target
+        // (`let [x as T] = …` / `function f([x as T])` reject, matching acorn).
+        self.to_assignable(expr, AssignableContext::Binding)
     }
 
     /// Parse a destructuring binding (`[a, b]` / `{a, b}`) with an optional
