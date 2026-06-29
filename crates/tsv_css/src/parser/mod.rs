@@ -8,10 +8,10 @@ mod selectors;
 mod value;
 
 use crate::ast::internal::{Comment, CssNode, CssStyleSheet};
-use crate::lexer::{Lexer, TokenKind};
+use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use tsv_lang::{ParseError, PeekData, Span};
+use tsv_lang::{ParseError, Span};
 
 pub(crate) struct CssParser<'a, 'arena> {
     source: &'a str,
@@ -20,7 +20,10 @@ pub(crate) struct CssParser<'a, 'arena> {
     pub(crate) current_start: usize,
     pub(crate) current_end: usize,
     current_decoded: Option<String>, // Decoded value for current token (only set for escaped identifiers)
-    peek_cache: Option<PeekData<TokenKind>>,
+    /// One-token lookahead. Holds the raw lexer token; the decoded value of an
+    /// escaped peeked identifier stays **parked on the lexer** (claimed at consume
+    /// time in `advance`), so this slot carries no `String`.
+    peek: Option<Token>,
     base_offset: usize, // Offset in full source (when parsing embedded CSS)
     pub(crate) comments: Vec<Comment>,
     /// Bump arena that owns every AST node this parser allocates. Supplied by
@@ -47,7 +50,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             current_start: token.start as usize,
             current_end: token.end as usize,
             current_decoded: decoded,
-            peek_cache: None,
+            peek: None,
             base_offset,
             comments: Vec::new(),
             arena,
@@ -102,43 +105,38 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     }
 
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
-        if let Some(peek) = self.peek_cache.take() {
-            self.current_kind = peek.kind;
-            self.current_start = peek.start;
-            self.current_end = peek.end;
-            // `peek()` lexed this token but left any decoded escape value parked on
-            // the lexer (it never drains), and nothing re-lexes between the peek and
-            // this consume — so claim it now. Without this, a peeked-then-consumed
-            // escaped identifier would silently lose its decode and fall back to the
-            // verbatim slice. Near-free: `take_decoded` is `None` for the common
-            // no-escape token.
-            self.current_decoded = self.lexer.take_decoded().map(|b| *b);
-        } else {
-            let token = self.lexer.next_token()?;
-            self.current_kind = token.kind;
-            self.current_start = token.start as usize;
-            self.current_end = token.end as usize;
-            self.current_decoded = self.lexer.take_decoded().map(|b| *b);
-        }
+        // The token comes either from the lookahead slot (lexed during a prior
+        // `peek_kind()`) or fresh from the lexer. In both cases the decoded escape
+        // value of the most-recently-lexed token is parked on the lexer and claimed
+        // below — for the peeked token nothing re-lexes between the peek and this
+        // consume, so it's still parked. Without this claim a peeked-then-consumed
+        // escaped identifier would silently lose its decode and fall back to the
+        // verbatim slice. Near-free: `take_decoded` is `None` for the common
+        // no-escape token.
+        let token = match self.peek.take() {
+            Some(token) => token,
+            None => self.lexer.next_token()?,
+        };
+        self.current_kind = token.kind;
+        self.current_start = token.start as usize;
+        self.current_end = token.end as usize;
+        self.current_decoded = self.lexer.take_decoded().map(|b| *b);
         Ok(())
     }
 
-    /// Peek at the next token without consuming it.
-    /// Result is cached so repeated peeks are efficient.
-    pub(crate) fn peek(&mut self) -> Result<&TokenKind, ParseError> {
-        if self.peek_cache.is_none() {
-            let token = self.lexer.next_token()?;
-            self.peek_cache = Some(PeekData::new(
-                token.kind,
-                token.start as usize,
-                token.end as usize,
-            ));
+    /// Peek at the next token's kind without consuming it. Returns the kind by
+    /// value (`TokenKind` is `Copy`) — like `tsv_ts`'s `peek_kind`, not a borrow of
+    /// `self`. Result is cached so repeated peeks are efficient. (Named `peek_kind`,
+    /// not `peek`, to match `tsv_ts` and avoid shadowing the `peek` field.)
+    pub(crate) fn peek_kind(&mut self) -> Result<TokenKind, ParseError> {
+        if self.peek.is_none() {
+            self.peek = Some(self.lexer.next_token()?);
         }
-        // peek_cache is guaranteed Some after the if block above
-        match &self.peek_cache {
-            Some(data) => Ok(&data.kind),
-            #[allow(clippy::unreachable)] // peek_cache was set Some immediately above
-            None => unreachable!("peek_cache was just populated"),
+        // peek is guaranteed Some after the if block above
+        match &self.peek {
+            Some(token) => Ok(token.kind),
+            #[allow(clippy::unreachable)] // peek was set Some immediately above
+            None => unreachable!("peek was just populated"),
         }
     }
 
@@ -166,7 +164,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
     pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
         if !self.check(kind) {
-            return Err(self.error_expected_found(&format!("{kind:?}")));
+            return Err(self.error_expected_found(&kind.to_string()));
         }
         self.advance()
     }
@@ -175,7 +173,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// Used for nodes whose span should end at the delimiter token.
     pub(crate) fn expect_and_capture(&mut self, kind: TokenKind) -> Result<u32, ParseError> {
         if !self.check(kind) {
-            return Err(self.error_expected_found(&format!("{kind:?}")));
+            return Err(self.error_expected_found(&kind.to_string()));
         }
         let end = (self.base_offset + self.current_end) as u32;
         self.advance()?;

@@ -20,7 +20,8 @@ Each module's visibility (in parens) reflects `pub use`-only modules (private) v
 - `escapes` (`escapes.rs`, private) — Escape sequence handling (quote swapping) — used internally by `printing`
 - `sizing` (`sizing.rs`, private) — `estimated_json_capacity` / `estimated_ast_arena_capacity` — pre-size heuristics for the public-AST JSON serialization buffer and the parse-time bump arena
 - `output` (`output.rs`, private) — `OutputBuffer` — string building with column tracking
-- `parser` (`parser.rs`, private) — `PeekData<K>` — shared lookahead token cache
+
+Each language parser keeps its own single-token lookahead as `peek: Option<Token>` (the lexer's own token POD), with any decoded escape value parked out-of-band — there is no shared lookahead type.
 
 ## Doc Builder
 
@@ -86,9 +87,9 @@ arena_print_doc*()           — render doc tree to formatted string
 ```rust
 // Language parsers use:
 use tsv_lang::{ParseError, Result, Span};
-use tsv_lang::parser::PeekData;           // Lookahead caching
 use tsv_lang::location::LocationTracker;  // For convert_ast()
 use tsv_lang::comment::Comment;           // Collected during parsing
+// Lookahead is each parser's own `peek: Option<Token>` over its lexer's token POD.
 
 // Errors enriched with context:
 parser.parse().map_err(|e| e.with_context(source))
