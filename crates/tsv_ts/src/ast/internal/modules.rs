@@ -98,6 +98,16 @@ pub struct TSExportAssignment<'arena> {
     pub span: Span,
 }
 
+/// TypeScript UMD namespace export: `export as namespace Foo;`
+/// Declares a global (UMD) name a module is also available under; appears in
+/// ambient `.d.ts` files.
+#[derive(Debug, Clone)]
+pub struct TSNamespaceExportDeclaration<'arena> {
+    /// The global namespace name
+    pub id: Identifier<'arena>,
+    pub span: Span,
+}
+
 /// Export specifier: `export { x }` or `export { x as y }` or `export { type x }`
 #[derive(Debug, Clone)]
 pub struct ExportSpecifier<'arena> {

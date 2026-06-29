@@ -57,6 +57,7 @@ pub use modules::{
     ImportDeclaration, ImportDefaultSpecifier, ImportKind, ImportNamedSpecifier,
     ImportNamespaceSpecifier, ImportPhase, ImportSpecifier, ModuleExportName, TSExportAssignment,
     TSExternalModuleReference, TSImportEqualsDeclaration, TSModuleReference,
+    TSNamespaceExportDeclaration,
 };
 
 // Classes

@@ -1340,7 +1340,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &self,
         expr: Expression<'arena>,
     ) -> Result<Expression<'arena>, ParseError> {
-        self.to_assignable(expr)
+        // Svelte `{:then}` / `{:catch}` binding patterns — a binding context, so a
+        // type-assertion target is rejected (same as for-heads / function params).
+        self.to_assignable(expr, expression_assignable::AssignableContext::Binding)
     }
 
     /// Parse a string literal into a Literal node.
