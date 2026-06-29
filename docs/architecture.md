@@ -231,7 +231,6 @@ Language-agnostic primitives shared across all implementations:
 - `comment` — Comment type and lookup utilities (see Comment Handling below)
 - `escapes` — Escape sequence handling
 - `interner` — String interner utilities (`SymbolResolver` trait)
-- `parser` — Shared parser utilities (`PeekData`)
 - `source_scan` — Trivia-aware source scanning: the `skip_trivia` cursor + delimiter/keyword/regex finders (used by AST conversion, printers, and the parsers)
 
 See [crates/tsv_lang/CLAUDE.md](../crates/tsv_lang/CLAUDE.md) for detailed module documentation.
@@ -334,7 +333,7 @@ The `u16` is a cached visual width with two sentinel values (`TEXT_WIDTH_HAS_NEW
 
 ## Parser Architecture
 
-All three parsers are **recursive descent** with **fail-fast error handling** (return `Result`, stop at the first error). Each parser owns a lexer and maintains a single-entry peek cache (`PeekData` from tsv_lang) to avoid re-lexing during lookahead. (Fail-fast is current, not final — spec-style error recovery is a tracked goal; see [Open Concerns](#open-concerns).)
+All three parsers are **recursive descent** with **fail-fast error handling** (return `Result`, stop at the first error). Each parser owns a lexer and maintains a single-entry peek cache (`peek: Option<Token>`, the lexer's own token POD) to avoid re-lexing during lookahead. (Fail-fast is current, not final — spec-style error recovery is a tracked goal; see [Open Concerns](#open-concerns).)
 
 ### TypeScript (`tsv_ts/src/parser/`)
 

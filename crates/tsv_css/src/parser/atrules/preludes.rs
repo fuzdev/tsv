@@ -136,7 +136,7 @@ pub(super) fn parse_condition_query<'arena>(
             // Handle whitespace normalization
             if parser.check(TokenKind::Whitespace) {
                 let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                    || matches!(parser.peek(), Ok(TokenKind::RightParen));
+                    || matches!(parser.peek_kind(), Ok(TokenKind::RightParen));
 
                 parser.advance()?;
 
@@ -589,7 +589,7 @@ fn parse_function_value<'arena>(
             // Skip whitespace after '(' or before ')'
             if parser.check(TokenKind::Whitespace) {
                 let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                    || matches!(parser.peek(), Ok(TokenKind::RightParen));
+                    || matches!(parser.peek_kind(), Ok(TokenKind::RightParen));
 
                 parser.advance()?;
 

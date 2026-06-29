@@ -1,7 +1,7 @@
 // SvelteParser struct and helper methods
 
 use crate::ast::internal::FragmentNode;
-use crate::lexer::{Lexer, TokenKind};
+use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::cell::RefCell;
@@ -9,8 +9,6 @@ use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
 use tsv_lang::{Comment, ParseError, SharedInterner, Span};
 use tsv_ts::Expression;
-
-use super::PeekData;
 
 pub(crate) struct SvelteParser<'a, 'arena> {
     /// Bump arena that owns every AST node this parser allocates — the template
@@ -27,7 +25,10 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     pub(crate) current_kind: TokenKind,
     pub(crate) current_start: usize, // Global position in full source
     pub(crate) current_end: usize,   // Global position in full source
-    pub(crate) peek_cache: Option<PeekData<TokenKind>>,
+    /// One-token lookahead. Holds the raw lexer token (positions are
+    /// **slice-relative** — `base_offset` is added when it's consumed, exactly
+    /// as for a freshly lexed token); cleared whenever the lexer is re-seeked.
+    pub(crate) peek: Option<Token>,
     pub(crate) interner: SharedInterner,
     pub(crate) base_offset: usize, // Offset of lexer's source in full source
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
@@ -40,7 +41,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Extract token data immediately to avoid keeping token alive
         let (kind, start, end) = {
             let token = lexer.next_token()?;
-            (token.kind, token.start, token.end)
+            (token.kind, token.start as usize, token.end as usize)
         };
         let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
         Ok(Self {
@@ -50,7 +51,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             current_kind: kind,
             current_start: start,
             current_end: end,
-            peek_cache: None,
+            peek: None,
             interner,
             base_offset: 0,
             expression_comments: Vec::new(),
@@ -89,16 +90,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
-        if let Some(peek) = self.peek_cache.take() {
-            self.current_kind = peek.kind;
-            self.current_start = peek.start;
-            self.current_end = peek.end;
-        } else {
-            let token = self.lexer.next_token()?;
-            self.current_kind = token.kind;
-            self.current_start = self.base_offset + token.start;
-            self.current_end = self.base_offset + token.end;
-        }
+        let token = match self.peek.take() {
+            Some(token) => token,
+            None => self.lexer.next_token()?,
+        };
+        self.current_kind = token.kind;
+        self.current_start = self.base_offset + token.start as usize;
+        self.current_end = self.base_offset + token.end as usize;
         Ok(())
     }
 
@@ -135,20 +133,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         // Peek at next token
-        if self.peek_cache.is_none() {
-            let token = self.lexer.next_token()?;
-            self.peek_cache = Some(PeekData::new(
-                token.kind,
-                self.base_offset + token.start,
-                self.base_offset + token.end,
-            ));
+        if self.peek.is_none() {
+            self.peek = Some(self.lexer.next_token()?);
         }
 
-        if let Some(peek) = &self.peek_cache
+        if let Some(peek) = &self.peek
             && peek.kind == TokenKind::Identifier
         {
-            // Compare directly without allocating
-            let value = &self.source[peek.start..peek.end];
+            // Compare directly without allocating (peek positions are
+            // slice-relative, so shift by base_offset to index the full source).
+            let value = &self.source
+                [self.base_offset + peek.start as usize..self.base_offset + peek.end as usize];
             return Ok(value == tag_name);
         }
 
@@ -160,16 +155,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Returns true if next token matches kind, false otherwise
     pub(crate) fn is_next_token(&mut self, kind: TokenKind) -> Result<bool, ParseError> {
         // Populate peek cache if not already cached
-        if self.peek_cache.is_none() {
-            let token = self.lexer.next_token()?;
-            self.peek_cache = Some(PeekData::new(
-                token.kind,
-                self.base_offset + token.start,
-                self.base_offset + token.end,
-            ));
+        if self.peek.is_none() {
+            self.peek = Some(self.lexer.next_token()?);
         }
 
-        Ok(self.peek_cache.as_ref().is_some_and(|p| p.kind == kind))
+        Ok(self.peek.as_ref().is_some_and(|p| p.kind == kind))
     }
 
     /// Parse a text node if there's a gap between the last position and current position.
@@ -193,10 +183,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Save the inside_tag state before creating new lexer
         let was_inside_tag = self.lexer.inside_tag;
 
-        // Reset the lexer to start from the new position
-        self.lexer = Lexer::new_at(&self.source[pos..], pos);
+        // Reset the lexer to start from the new position. Positions are reported
+        // relative to the slice; the parser shifts them by base_offset.
+        self.lexer = Lexer::new(&self.source[pos..]);
         self.base_offset = pos;
-        self.peek_cache = None;
+        self.peek = None;
 
         // Restore inside_tag state
         self.lexer.inside_tag = was_inside_tag;
@@ -204,8 +195,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Get the next token at the new position
         let token = self.lexer.next_token()?;
         self.current_kind = token.kind;
-        self.current_start = self.base_offset + token.start;
-        self.current_end = self.base_offset + token.end;
+        self.current_start = self.base_offset + token.start as usize;
+        self.current_end = self.base_offset + token.end as usize;
 
         Ok(())
     }

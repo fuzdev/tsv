@@ -48,19 +48,20 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             // - After '[' or before ']' (attribute selectors) - only for selector list preludes
             // - Before/after '=' (attribute selectors) - only for selector list preludes
             let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                || matches!(parser.peek(), Ok(TokenKind::RightParen))
+                || matches!(parser.peek_kind(), Ok(TokenKind::RightParen))
                 || (is_selector_list_prelude
                     && paren_depth > 0
                     && matches!(prev_token_kind, Some(TokenKind::Colon)))
                 || (is_selector_list_prelude
                     && paren_depth > 0
-                    && matches!(parser.peek(), Ok(TokenKind::Comma)))
+                    && matches!(parser.peek_kind(), Ok(TokenKind::Comma)))
                 || (is_selector_list_prelude
                     && matches!(prev_token_kind, Some(TokenKind::LeftBracket)))
                 || (is_selector_list_prelude
-                    && matches!(parser.peek(), Ok(TokenKind::RightBracket)))
+                    && matches!(parser.peek_kind(), Ok(TokenKind::RightBracket)))
                 || (is_selector_list_prelude && matches!(prev_token_kind, Some(TokenKind::Equals)))
-                || (is_selector_list_prelude && matches!(parser.peek(), Ok(TokenKind::Equals)));
+                || (is_selector_list_prelude
+                    && matches!(parser.peek_kind(), Ok(TokenKind::Equals)));
 
             parser.advance()?;
 
@@ -91,7 +92,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         // verbatim — so trimming uppercase would diverge from prettier.
         if matches!(parser.current_kind, TokenKind::Identifier)
             && parser.current_value().eq_ignore_ascii_case("url")
-            && matches!(parser.peek(), Ok(TokenKind::LeftParen))
+            && matches!(parser.peek_kind(), Ok(TokenKind::LeftParen))
         {
             let is_lowercase_url = parser.current_value() == "url";
             let url_start = parser.current_start;

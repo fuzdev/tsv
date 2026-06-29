@@ -2,6 +2,23 @@ use std::fmt;
 use std::str::Chars;
 use tsv_lang::ParseError;
 
+/// Construct a boxed lexer error. The lexer returns `Result<_, Box<ParseError>>`
+/// (see `From<Box<ParseError>>` in `tsv_lang`): boxing keeps the hot `next_token`
+/// Ok path pointer-sized. `#[cold]` / `#[inline(never)]` outlines the error
+/// construction so it never bloats the inlined token-scan fast path. Mirrors
+/// `tsv_ts` / `tsv_css`'s `lex_err`; used by the unterminated/unexpected sites in
+/// `next_token`.
+#[cold]
+#[inline(never)]
+#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
+fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
+    Box::new(ParseError::InvalidSyntax {
+        message: message.into(),
+        position,
+        context: None,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     LeftAngle,     // <
@@ -41,12 +58,22 @@ impl fmt::Display for TokenKind {
     }
 }
 
+/// A lexed Svelte markup token: a small size-asserted POD with `u32` spans returned
+/// by value from `next_token`, like `tsv_ts::Token` / `tsv_css::Token`. `Clone` (not
+/// `Copy`) mirrors those crates' convention — the parser is the single owner of
+/// `current` / `peek`, consuming via `.take()` / move rather than implicit copies.
+/// There is **no out-of-band decoded value**: markup tokens are pure spans (the
+/// embedded TS/CSS/expression content is lexed by the other crates).
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
-    pub start: usize,
-    pub end: usize,
+    pub start: u32,
+    pub end: u32,
 }
+
+// Compact POD — keeps `next_token`'s by-value return cheap. 12 bytes (not the TS/CSS
+// 16): the fieldless `TokenKind` is 1 byte, whereas theirs carries a `char` payload.
+const _: () = assert!(size_of::<Token>() == 12);
 
 pub struct Lexer<'a> {
     source: &'a str,
@@ -87,15 +114,6 @@ impl<'a> Lexer<'a> {
         self.initial_position
     }
 
-    /// Create a new lexer starting at a given position.
-    /// The source slice starts from the given position, but positions
-    /// are reported relative to the start of the slice (i.e., starting from 0).
-    pub fn new_at(source: &'a str, _start_offset: usize) -> Self {
-        // Note: _start_offset is informational only - the caller handles
-        // adding the base offset to positions. We just lexer the provided slice.
-        Self::new(source)
-    }
-
     #[inline]
     fn advance(&mut self) {
         if let Some(ch) = self.current {
@@ -109,17 +127,17 @@ impl<'a> Lexer<'a> {
     fn make_token(&self, kind: TokenKind, start: usize) -> Token {
         Token {
             kind,
-            start,
-            end: self.position,
+            start: start as u32,
+            end: self.position as u32,
         }
     }
 
-    /// Peek at the next n characters without consuming them
-    fn peek_chars(&self, n: usize) -> &str {
-        let remaining = &self.source[self.position..];
-        // Count n characters (not bytes) to find the correct byte offset
-        let byte_count: usize = remaining.chars().take(n).map(char::len_utf8).sum();
-        &remaining[..byte_count]
+    /// Whether the source from the current position starts with `needle`.
+    /// Used for the ASCII comment delimiters (`<!--` / `-->`); a byte compare is
+    /// exact for ASCII needles and avoids the per-call UTF-8 char counting.
+    #[inline]
+    fn starts_with(&self, needle: &[u8]) -> bool {
+        self.source.as_bytes()[self.position..].starts_with(needle)
     }
 
     fn skip_whitespace(&mut self) {
@@ -146,7 +164,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn next_token(&mut self) -> Result<Token, ParseError> {
+    pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
         // Template mode (outside tags): skip text content, only tokenize special chars
         // Tag mode (inside <...>): tokenize everything including identifiers
         if self.inside_tag {
@@ -160,12 +178,12 @@ impl<'a> Lexer<'a> {
         match self.current {
             None => Ok(Token {
                 kind: TokenKind::Eof,
-                start,
-                end: start,
+                start: start as u32,
+                end: start as u32,
             }),
             Some('<') => {
                 // Check for HTML comment: <!--
-                if self.peek_chars(4) == "<!--" {
+                if self.starts_with(b"<!--") {
                     // Consume "<!--"
                     self.advance(); // <
                     self.advance(); // !
@@ -174,7 +192,7 @@ impl<'a> Lexer<'a> {
 
                     // Scan until "-->"
                     while self.current.is_some() {
-                        if self.peek_chars(3) == "-->" {
+                        if self.starts_with(b"-->") {
                             // Consume "-->"
                             self.advance();
                             self.advance();
@@ -185,11 +203,7 @@ impl<'a> Lexer<'a> {
                     }
 
                     // Unterminated comment
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Unterminated HTML comment".to_string(),
-                        position: start,
-                        context: None,
-                    });
+                    return Err(lex_err("Unterminated HTML comment", start));
                 }
 
                 self.inside_tag = true; // Enter tag mode
@@ -314,11 +328,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 // Unterminated string
-                Err(ParseError::InvalidSyntax {
-                    message: "Unterminated string literal in template".to_string(),
-                    position: start,
-                    context: None,
-                })
+                Err(lex_err("Unterminated string literal in template", start))
             }
             Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' || ch == '-' || ch == '!' => {
                 // Tag names and identifiers
@@ -357,11 +367,10 @@ impl<'a> Lexer<'a> {
                 }
                 Ok(self.make_token(TokenKind::Identifier, start))
             }
-            Some(ch) => Err(ParseError::InvalidSyntax {
-                message: format!("Unexpected character in template: '{ch}'"),
-                position: start,
-                context: None,
-            }),
+            Some(ch) => Err(lex_err(
+                format!("Unexpected character in template: '{ch}'"),
+                start,
+            )),
         }
     }
 }

@@ -82,7 +82,8 @@ pub struct Parser<'a, 'arena> {
     /// Single-token lookahead slot, stored as the 16-byte `Token` POD with its
     /// decoded value out-of-band in `peek_decoded` (mirroring the `current` /
     /// `current_decoded` split). Consuming the peek is then a direct `Token` copy
-    /// into `current` with no `PeekData`/`Option<String>` struct reassembly.
+    /// into `current` with no intermediate lookahead struct / `Option<String>` to
+    /// reassemble.
     peek: Option<Token>,
     peek_decoded: Option<String>,
     interner: SharedInterner,

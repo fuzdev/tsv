@@ -6,7 +6,7 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
-use tsv_lang::{ParseError, PeekData, Span};
+use tsv_lang::{ParseError, Span};
 
 // Module declarations
 mod attribute;
