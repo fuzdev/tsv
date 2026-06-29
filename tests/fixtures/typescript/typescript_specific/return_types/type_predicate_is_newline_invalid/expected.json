@@ -1,0 +1,392 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 348,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `parameterName [no LineTerminator here] is Type`: a line terminator before",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `is` makes it not a type predicate, so `is` is a stray token (acorn-typescript",
+			"start": 99,
+			"end": 180,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `hasPrecedingLineBreak`). The valid baseline keeps `is` on the parameter line.",
+			"start": 182,
+			"end": 263,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 82
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 347,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 265,
+					"end": 337,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 274,
+						"end": 275,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 11
+							}
+						},
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 276,
+							"end": 286,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 12
+								},
+								"end": {
+									"line": 5,
+									"column": 22
+								}
+							},
+							"name": "x",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 277,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 13
+									},
+									"end": {
+										"line": 5,
+										"column": 22
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnknownKeyword",
+									"start": 279,
+									"end": 286,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 15
+										},
+										"end": {
+											"line": 5,
+											"column": 22
+										}
+									}
+								}
+							}
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 287,
+						"end": 300,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 23
+							},
+							"end": {
+								"line": 5,
+								"column": 36
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 289,
+							"end": 300,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 25
+								},
+								"end": {
+									"line": 5,
+									"column": 36
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 289,
+								"end": 290,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 25
+									},
+									"end": {
+										"line": 5,
+										"column": 26
+									}
+								},
+								"name": "x"
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 294,
+								"end": 300,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 30
+									},
+									"end": {
+										"line": 5,
+										"column": 36
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 294,
+									"end": 300,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 30
+										},
+										"end": {
+											"line": 5,
+											"column": 36
+										}
+									}
+								}
+							},
+							"asserts": false
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 301,
+						"end": 337,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 37
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 305,
+								"end": 334,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 31
+									}
+								},
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 312,
+									"end": 333,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 9
+										},
+										"end": {
+											"line": 6,
+											"column": 30
+										}
+									},
+									"left": {
+										"type": "UnaryExpression",
+										"start": 312,
+										"end": 320,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 9
+											},
+											"end": {
+												"line": 6,
+												"column": 17
+											}
+										},
+										"operator": "typeof",
+										"prefix": true,
+										"argument": {
+											"type": "Identifier",
+											"start": 319,
+											"end": 320,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 16
+												},
+												"end": {
+													"line": 6,
+													"column": 17
+												}
+											},
+											"name": "x"
+										}
+									},
+									"operator": "===",
+									"right": {
+										"type": "Literal",
+										"start": 325,
+										"end": 333,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 22
+											},
+											"end": {
+												"line": 6,
+												"column": 30
+											}
+										},
+										"value": "string",
+										"raw": "'string'"
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `parameterName [no LineTerminator here] is Type`: a line terminator before",
+							"start": 20,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " `is` makes it not a type predicate, so `is` is a stray token (acorn-typescript",
+							"start": 99,
+							"end": 180
+						},
+						{
+							"type": "Line",
+							"value": " `hasPrecedingLineBreak`). The valid baseline keeps `is` on the parameter line.",
+							"start": 182,
+							"end": 263
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

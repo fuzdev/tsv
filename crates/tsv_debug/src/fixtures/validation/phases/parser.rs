@@ -286,7 +286,7 @@ pub(in crate::fixtures::validation) async fn validate_parser_external(
 ///
 /// For Svelte files: both our parser and Svelte's parser must fail
 /// For TypeScript and SvelteTs files: both our parser and acorn-typescript must fail
-/// For CSS files: our parser must fail (no canonical source)
+/// For CSS files: both our parser and Svelte's parseCss must fail
 pub(in crate::fixtures::validation) async fn validate_invalid_syntax(
     result: &mut FixtureValidation,
     fixture: &Fixture,

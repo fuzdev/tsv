@@ -13,6 +13,23 @@ use super::expression_lookahead::{
 use super::scan::skip_whitespace_and_comments;
 
 impl<'a, 'arena> Parser<'a, 'arena> {
+    /// Consume the arrow `=>`, enforcing `ArrowFunction`'s `[no LineTerminator here]`
+    /// restriction (ecma262): no line terminator between the arrow parameters (or
+    /// return type) and `=>`. A bare newline, a line comment, or a block comment
+    /// containing or followed by a newline in that gap is a syntax error — acorn
+    /// rejects it (the cover grammar reinterprets the `(…)` as a parenthesized
+    /// expression, leaving `=>` unexpected), and as a drop-in replacement tsv must
+    /// too. The byte-scan arrow predicates skip newlines, so this is the single
+    /// enforcement point, shared by the paren, single-param, generic, and async
+    /// arrow builders. A same-line block comment (`(a) /* c */ =>`) carries no line
+    /// terminator and stays valid.
+    fn expect_arrow(&mut self) -> Result<(), ParseError> {
+        if self.check(&TokenKind::Arrow) && self.had_line_terminator {
+            return Err(self.error_msg("Line terminator not permitted before '=>'"));
+        }
+        self.expect(&TokenKind::Arrow)
+    }
+
     /// Check if current position starts an arrow function
     ///
     /// Scans ahead looking for pattern: `(` ... `)` `=>`
@@ -68,7 +85,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let params = p.parse_parameter_list()?.into_bump_slice();
             // Return type annotation: <T>(): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
-            p.expect(&TokenKind::Arrow)?; // consume '=>'
+            p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
             let body = p.parse_arrow_body()?;
             Ok((params, return_type, body))
         })?;
@@ -127,7 +144,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let params = p.parse_parameter_list()?.into_bump_slice();
             // Return type annotation: (): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
-            p.expect(&TokenKind::Arrow)?; // consume '=>'
+            p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
             let body = p.parse_arrow_body()?;
             Ok((params, return_type, body))
         })?;
@@ -168,7 +185,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )));
         let params = params.into_bump_slice();
 
-        self.expect(&TokenKind::Arrow)?; // consume '=>'
+        self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
 
         // Non-async single-param arrow body is `[~Await]`.
         let body = self.with_in_await(false, Self::parse_arrow_body)?;
@@ -227,7 +244,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for return type annotation or type predicate
         let return_type = self.parse_optional_return_type()?;
 
-        self.expect(&TokenKind::Arrow)?; // consume '=>'
+        self.expect_arrow()?; // consume '=>' (no LineTerminator before it)
 
         // Async arrow body is `[+Await]`.
         let body = self.with_in_await(true, Self::parse_arrow_body)?;

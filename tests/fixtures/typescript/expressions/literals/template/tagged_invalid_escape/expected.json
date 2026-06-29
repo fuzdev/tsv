@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 451,
+	"end": 485,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -45,15 +45,15 @@
 		{
 			"type": "Line",
 			"value": " Valid escapes in a tagged template still cook normally.",
-			"start": 356,
-			"end": 414,
+			"start": 390,
+			"end": 448,
 			"loc": {
 				"start": {
-					"line": 10,
+					"line": 11,
 					"column": 1
 				},
 				"end": {
-					"line": 10,
+					"line": 11,
 					"column": 59
 				}
 			}
@@ -62,19 +62,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 450,
+		"end": 484,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 441,
+			"end": 475,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 12,
+					"line": 13,
 					"column": 9
 				}
 			},
@@ -332,7 +332,7 @@
 				{
 					"type": "VariableDeclaration",
 					"start": 250,
-					"end": 272,
+					"end": 282,
 					"loc": {
 						"start": {
 							"line": 6,
@@ -340,14 +340,14 @@
 						},
 						"end": {
 							"line": 6,
-							"column": 23
+							"column": 33
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
 							"start": 256,
-							"end": 271,
+							"end": 281,
 							"loc": {
 								"start": {
 									"line": 6,
@@ -355,13 +355,13 @@
 								},
 								"end": {
 									"line": 6,
-									"column": 22
+									"column": 32
 								}
 							},
 							"id": {
 								"type": "Identifier",
 								"start": 256,
-								"end": 259,
+								"end": 268,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -369,6 +369,124 @@
 									},
 									"end": {
 										"line": 6,
+										"column": 19
+									}
+								},
+								"name": "unterminated"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 271,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 22
+									},
+									"end": {
+										"line": 6,
+										"column": 32
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 271,
+									"end": 274,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 22
+										},
+										"end": {
+											"line": 6,
+											"column": 25
+										}
+									},
+									"name": "tag"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 274,
+									"end": 281,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 25
+										},
+										"end": {
+											"line": 6,
+											"column": 32
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 275,
+											"end": 280,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 26
+												},
+												"end": {
+													"line": 6,
+													"column": 31
+												}
+											},
+											"value": {
+												"raw": "\\u{41",
+												"cooked": null
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 284,
+					"end": 306,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 290,
+							"end": 305,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 290,
+								"end": 293,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
 										"column": 10
 									}
 								},
@@ -376,29 +494,29 @@
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
-								"start": 262,
-								"end": 271,
+								"start": 296,
+								"end": 305,
 								"loc": {
 									"start": {
-										"line": 6,
+										"line": 7,
 										"column": 13
 									},
 									"end": {
-										"line": 6,
+										"line": 7,
 										"column": 22
 									}
 								},
 								"tag": {
 									"type": "Identifier",
-									"start": 262,
-									"end": 265,
+									"start": 296,
+									"end": 299,
 									"loc": {
 										"start": {
-											"line": 6,
+											"line": 7,
 											"column": 13
 										},
 										"end": {
-											"line": 6,
+											"line": 7,
 											"column": 16
 										}
 									},
@@ -406,15 +524,15 @@
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
-									"start": 265,
-									"end": 271,
+									"start": 299,
+									"end": 305,
 									"loc": {
 										"start": {
-											"line": 6,
+											"line": 7,
 											"column": 16
 										},
 										"end": {
-											"line": 6,
+											"line": 7,
 											"column": 22
 										}
 									},
@@ -422,15 +540,15 @@
 									"quasis": [
 										{
 											"type": "TemplateElement",
-											"start": 266,
-											"end": 270,
+											"start": 300,
+											"end": 304,
 											"loc": {
 												"start": {
-													"line": 6,
+													"line": 7,
 													"column": 17
 												},
 												"end": {
-													"line": 6,
+													"line": 7,
 													"column": 21
 												}
 											},
@@ -449,44 +567,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 274,
-					"end": 316,
+					"start": 308,
+					"end": 350,
 					"loc": {
 						"start": {
-							"line": 7,
+							"line": 8,
 							"column": 1
 						},
 						"end": {
-							"line": 7,
+							"line": 8,
 							"column": 43
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 280,
-							"end": 315,
+							"start": 314,
+							"end": 349,
 							"loc": {
 								"start": {
-									"line": 7,
+									"line": 8,
 									"column": 7
 								},
 								"end": {
-									"line": 7,
+									"line": 8,
 									"column": 42
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 280,
-								"end": 292,
+								"start": 314,
+								"end": 326,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 8,
 										"column": 7
 									},
 									"end": {
-										"line": 7,
+										"line": 8,
 										"column": 19
 									}
 								},
@@ -494,29 +612,29 @@
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
-								"start": 295,
-								"end": 315,
+								"start": 329,
+								"end": 349,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 8,
 										"column": 22
 									},
 									"end": {
-										"line": 7,
+										"line": 8,
 										"column": 42
 									}
 								},
 								"tag": {
 									"type": "Identifier",
-									"start": 295,
-									"end": 298,
+									"start": 329,
+									"end": 332,
 									"loc": {
 										"start": {
-											"line": 7,
+											"line": 8,
 											"column": 22
 										},
 										"end": {
-											"line": 7,
+											"line": 8,
 											"column": 25
 										}
 									},
@@ -524,30 +642,30 @@
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
-									"start": 298,
-									"end": 315,
+									"start": 332,
+									"end": 349,
 									"loc": {
 										"start": {
-											"line": 7,
+											"line": 8,
 											"column": 25
 										},
 										"end": {
-											"line": 7,
+											"line": 8,
 											"column": 42
 										}
 									},
 									"expressions": [
 										{
 											"type": "Identifier",
-											"start": 308,
-											"end": 312,
+											"start": 342,
+											"end": 346,
 											"loc": {
 												"start": {
-													"line": 7,
+													"line": 8,
 													"column": 35
 												},
 												"end": {
-													"line": 7,
+													"line": 8,
 													"column": 39
 												}
 											},
@@ -557,15 +675,15 @@
 									"quasis": [
 										{
 											"type": "TemplateElement",
-											"start": 299,
-											"end": 306,
+											"start": 333,
+											"end": 340,
 											"loc": {
 												"start": {
-													"line": 7,
+													"line": 8,
 													"column": 26
 												},
 												"end": {
-													"line": 7,
+													"line": 8,
 													"column": 33
 												}
 											},
@@ -577,15 +695,15 @@
 										},
 										{
 											"type": "TemplateElement",
-											"start": 313,
-											"end": 314,
+											"start": 347,
+											"end": 348,
 											"loc": {
 												"start": {
-													"line": 7,
+													"line": 8,
 													"column": 40
 												},
 												"end": {
-													"line": 7,
+													"line": 8,
 													"column": 41
 												}
 											},
@@ -604,44 +722,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 318,
-					"end": 353,
+					"start": 352,
+					"end": 387,
 					"loc": {
 						"start": {
-							"line": 8,
+							"line": 9,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
+							"line": 9,
 							"column": 36
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 324,
-							"end": 352,
+							"start": 358,
+							"end": 386,
 							"loc": {
 								"start": {
-									"line": 8,
+									"line": 9,
 									"column": 7
 								},
 								"end": {
-									"line": 8,
+									"line": 9,
 									"column": 35
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 324,
-								"end": 330,
+								"start": 358,
+								"end": 364,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 9,
 										"column": 7
 									},
 									"end": {
-										"line": 8,
+										"line": 9,
 										"column": 13
 									}
 								},
@@ -649,43 +767,43 @@
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
-								"start": 333,
-								"end": 352,
+								"start": 367,
+								"end": 386,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 9,
 										"column": 16
 									},
 									"end": {
-										"line": 8,
+										"line": 9,
 										"column": 35
 									}
 								},
 								"tag": {
 									"type": "MemberExpression",
-									"start": 333,
-									"end": 343,
+									"start": 367,
+									"end": 377,
 									"loc": {
 										"start": {
-											"line": 8,
+											"line": 9,
 											"column": 16
 										},
 										"end": {
-											"line": 8,
+											"line": 9,
 											"column": 26
 										}
 									},
 									"object": {
 										"type": "Identifier",
-										"start": 333,
-										"end": 339,
+										"start": 367,
+										"end": 373,
 										"loc": {
 											"start": {
-												"line": 8,
+												"line": 9,
 												"column": 16
 											},
 											"end": {
-												"line": 8,
+												"line": 9,
 												"column": 22
 											}
 										},
@@ -693,15 +811,15 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 340,
-										"end": 343,
+										"start": 374,
+										"end": 377,
 										"loc": {
 											"start": {
-												"line": 8,
+												"line": 9,
 												"column": 23
 											},
 											"end": {
-												"line": 8,
+												"line": 9,
 												"column": 26
 											}
 										},
@@ -712,15 +830,15 @@
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
-									"start": 343,
-									"end": 352,
+									"start": 377,
+									"end": 386,
 									"loc": {
 										"start": {
-											"line": 8,
+											"line": 9,
 											"column": 26
 										},
 										"end": {
-											"line": 8,
+											"line": 9,
 											"column": 35
 										}
 									},
@@ -728,15 +846,15 @@
 									"quasis": [
 										{
 											"type": "TemplateElement",
-											"start": 344,
-											"end": 351,
+											"start": 378,
+											"end": 385,
 											"loc": {
 												"start": {
-													"line": 8,
+													"line": 9,
 													"column": 27
 												},
 												"end": {
-													"line": 8,
+													"line": 9,
 													"column": 34
 												}
 											},
@@ -755,44 +873,44 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 416,
-					"end": 440,
+					"start": 450,
+					"end": 474,
 					"loc": {
 						"start": {
-							"line": 11,
+							"line": 12,
 							"column": 1
 						},
 						"end": {
-							"line": 11,
+							"line": 12,
 							"column": 25
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 422,
-							"end": 439,
+							"start": 456,
+							"end": 473,
 							"loc": {
 								"start": {
-									"line": 11,
+									"line": 12,
 									"column": 7
 								},
 								"end": {
-									"line": 11,
+									"line": 12,
 									"column": 24
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 422,
-								"end": 427,
+								"start": 456,
+								"end": 461,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 12,
 										"column": 7
 									},
 									"end": {
-										"line": 11,
+										"line": 12,
 										"column": 12
 									}
 								},
@@ -800,29 +918,29 @@
 							},
 							"init": {
 								"type": "TaggedTemplateExpression",
-								"start": 430,
-								"end": 439,
+								"start": 464,
+								"end": 473,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 12,
 										"column": 15
 									},
 									"end": {
-										"line": 11,
+										"line": 12,
 										"column": 24
 									}
 								},
 								"tag": {
 									"type": "Identifier",
-									"start": 430,
-									"end": 433,
+									"start": 464,
+									"end": 467,
 									"loc": {
 										"start": {
-											"line": 11,
+											"line": 12,
 											"column": 15
 										},
 										"end": {
-											"line": 11,
+											"line": 12,
 											"column": 18
 										}
 									},
@@ -830,15 +948,15 @@
 								},
 								"quasi": {
 									"type": "TemplateLiteral",
-									"start": 433,
-									"end": 439,
+									"start": 467,
+									"end": 473,
 									"loc": {
 										"start": {
-											"line": 11,
+											"line": 12,
 											"column": 18
 										},
 										"end": {
-											"line": 11,
+											"line": 12,
 											"column": 24
 										}
 									},
@@ -846,15 +964,15 @@
 									"quasis": [
 										{
 											"type": "TemplateElement",
-											"start": 434,
-											"end": 438,
+											"start": 468,
+											"end": 472,
 											"loc": {
 												"start": {
-													"line": 11,
+													"line": 12,
 													"column": 19
 												},
 												"end": {
-													"line": 11,
+													"line": 12,
 													"column": 23
 												}
 											},
@@ -874,8 +992,8 @@
 						{
 							"type": "Line",
 							"value": " Valid escapes in a tagged template still cook normally.",
-							"start": 356,
-							"end": 414
+							"start": 390,
+							"end": 448
 						}
 					]
 				}

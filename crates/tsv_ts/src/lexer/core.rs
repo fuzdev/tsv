@@ -365,23 +365,52 @@ impl<'a> Lexer<'a> {
         Ok(())
     }
 
-    /// Scan digits matching a predicate, allowing numeric separators (_)
-    fn scan_digits(&mut self, is_valid_digit: impl Fn(char) -> bool) {
+    /// Scan digits matching a predicate, validating numeric separators (`_`).
+    /// Per the ECMAScript lexical grammar a `NumericLiteralSeparator` must sit
+    /// *between two digits*, so a `_` is rejected at the start of the group, at
+    /// the end, when doubled, or adjacent to a prefix/`.`/`e` — the placement
+    /// over-acceptances acorn flags as "Numeric separator is not allowed …".
+    /// Returns whether at least one digit was consumed (callers enforce the
+    /// "≥1 digit after a radix prefix" rule).
+    fn scan_digits(
+        &mut self,
+        is_valid_digit: impl Fn(char) -> bool,
+    ) -> Result<bool, Box<ParseError>> {
         // Digits and `_` are ASCII, so a byte scan suffices: a non-ASCII byte
         // (`b as char` ∈ U+0080..=U+00FF) is never a valid digit, so the predicate
         // breaks the loop just as it would on any other terminator.
+        let mut saw_digit = false;
+        let mut prev_was_digit = false;
         while let Some(b) = self.cur_byte() {
-            if is_valid_digit(b as char) || b == b'_' {
+            if b == b'_' {
+                // A separator is valid only with a digit on each side.
+                let next_is_digit = self
+                    .byte_ahead(1)
+                    .is_some_and(|n| is_valid_digit(n as char));
+                if !prev_was_digit || !next_is_digit {
+                    return Err(lex_err(
+                        "Numeric separator '_' must appear between two digits",
+                        self.position,
+                    ));
+                }
                 self.advance();
+                prev_was_digit = false;
+            } else if is_valid_digit(b as char) {
+                self.advance();
+                saw_digit = true;
+                prev_was_digit = true;
             } else {
                 break;
             }
         }
+        Ok(saw_digit)
     }
 
-    /// Scan a decimal number (integer, float, or scientific notation)
-    /// Handles: 123, 1.5, 1e3, 1.5e-2, 1_000, 1.e1
-    fn scan_decimal_number(&mut self) {
+    /// Scan a decimal number (integer, float, or scientific notation).
+    /// Handles: 123, 1.5, 1e3, 1.5e-2, 1_000, 1.e1. Returns whether the literal
+    /// is integer-form (no fractional part and no exponent) — the only decimal
+    /// shape a BigInt `n` suffix may follow (`1.5n` / `1e3n` are rejected).
+    fn scan_decimal_number(&mut self) -> Result<bool, Box<ParseError>> {
         // `s` starts at the char after a `.`. Returns true when `s` begins a valid
         // exponent (`e`/`E`, optional sign, then a digit) — i.e. `1.e1` is one number.
         fn is_exponent_start(s: &str) -> bool {
@@ -396,8 +425,10 @@ impl<'a> Lexer<'a> {
             c.is_some_and(|c| c.is_ascii_digit())
         }
 
+        let mut is_integer = true;
+
         // Integer part (with optional separators)
-        self.scan_digits(|c| c.is_ascii_digit());
+        self.scan_digits(|c| c.is_ascii_digit())?;
 
         // Decimal point and fractional part
         if self.cur_byte() == Some(b'.') {
@@ -406,30 +437,36 @@ impl<'a> Lexer<'a> {
             let next_char = rest.chars().next();
             if next_char.is_some_and(|c| c.is_ascii_digit()) {
                 // Normal decimal: 3.14
+                is_integer = false;
                 self.advance(); // consume '.'
-                self.scan_digits(|c| c.is_ascii_digit());
+                self.scan_digits(|c| c.is_ascii_digit())?;
             } else if is_exponent_start(rest) {
                 // Trailing-dot exponent: `1.e1` is a single numeric literal (= 1e1).
                 // Consume the '.'; the exponent block below consumes `e1`.
                 // Without this, `1.e1` would lex as `1.` followed by member access `.e1`.
+                is_integer = false;
                 self.advance(); // consume '.'
             } else if next_char.is_none() || !next_char.is_some_and(is_id_start) {
                 // Trailing decimal: 5. or 0. (followed by operator, punctuation, or end)
                 // Don't consume if followed by identifier: 5.toString() is invalid anyway
                 // Do consume for 0..toString() so the number is "0." and second dot is member access
+                is_integer = false;
                 self.advance(); // consume '.'
             }
         }
 
         // Exponent part: e+10, E-3, e10
         if matches!(self.cur_byte(), Some(b'e' | b'E')) {
+            is_integer = false;
             self.advance(); // consume 'e' or 'E'
             // Optional sign
             if matches!(self.cur_byte(), Some(b'+' | b'-')) {
                 self.advance();
             }
-            self.scan_digits(|c| c.is_ascii_digit());
+            self.scan_digits(|c| c.is_ascii_digit())?;
         }
+
+        Ok(is_integer)
     }
 
     /// Scan a numeric literal — decimal, `0x`/`0b`/`0o` radix, float, exponent,
@@ -443,25 +480,35 @@ impl<'a> Lexer<'a> {
         first: u8,
         dst: &mut Token,
     ) -> Result<(), Box<ParseError>> {
+        // Radix literals (`0x`/`0b`/`0o`) are always integer-form, so a BigInt
+        // `n` suffix is always allowed after them; a decimal literal allows `n`
+        // only when it carries no fraction and no exponent.
+        let mut bigint_allowed = true;
         if first == b'0' {
             match self.byte_ahead(1) {
                 Some(b'x' | b'X') => {
                     // Hex: 0xff, 0xFF
                     self.advance(); // consume '0'
                     self.advance(); // consume 'x'
-                    self.scan_digits(|c| c.is_ascii_hexdigit());
+                    if !self.scan_digits(|c| c.is_ascii_hexdigit())? {
+                        return Err(lex_err("Missing hexadecimal digits after '0x'", start));
+                    }
                 }
                 Some(b'b' | b'B') => {
                     // Binary: 0b1010
                     self.advance(); // consume '0'
                     self.advance(); // consume 'b'
-                    self.scan_digits(|c| c == '0' || c == '1');
+                    if !self.scan_digits(|c| c == '0' || c == '1')? {
+                        return Err(lex_err("Missing binary digits after '0b'", start));
+                    }
                 }
                 Some(b'o' | b'O') => {
                     // Octal: 0o77
                     self.advance(); // consume '0'
                     self.advance(); // consume 'o'
-                    self.scan_digits(|c| ('0'..='7').contains(&c));
+                    if !self.scan_digits(|c| ('0'..='7').contains(&c))? {
+                        return Err(lex_err("Missing octal digits after '0o'", start));
+                    }
                 }
                 Some(b'0'..=b'7') => {
                     // Legacy octal (0777) - reject in strict mode (ES modules)
@@ -474,16 +521,19 @@ impl<'a> Lexer<'a> {
                 _ => {
                     // Regular number or float starting with 0 (e.g., 0.5, 08, 09)
                     // Note: 08 and 09 are valid decimal literals (non-octal digits)
-                    self.scan_decimal_number();
+                    bigint_allowed = self.scan_decimal_number()?;
                 }
             }
         } else {
             // Regular decimal number
-            self.scan_decimal_number();
+            bigint_allowed = self.scan_decimal_number()?;
         }
 
-        // Check for BigInt suffix: 123n, 0xffn
-        if self.cur_byte() == Some(b'n') {
+        // BigInt suffix `n` attaches only to an integer-form literal. When `n`
+        // follows a float/exponent we leave it unconsumed so the adjacent
+        // identifier triggers the normal parse-level rejection (as for `5abc`),
+        // matching acorn's "Identifier directly after number".
+        if bigint_allowed && self.cur_byte() == Some(b'n') {
             self.advance();
         }
 
@@ -718,14 +768,14 @@ impl<'a> Lexer<'a> {
                 } else if self.byte_ahead(1).is_some_and(|b| b.is_ascii_digit()) {
                     // Number starting with a decimal point: .5
                     self.advance(); // consume '.'
-                    self.scan_digits(|c| c.is_ascii_digit());
+                    self.scan_digits(|c| c.is_ascii_digit())?;
                     // Check for exponent
                     if matches!(self.cur_byte(), Some(b'e' | b'E')) {
                         self.advance();
                         if matches!(self.cur_byte(), Some(b'+' | b'-')) {
                             self.advance();
                         }
-                        self.scan_digits(|c| c.is_ascii_digit());
+                        self.scan_digits(|c| c.is_ascii_digit())?;
                     }
                     self.make_token(TokenKind::Number, start)
                 } else {

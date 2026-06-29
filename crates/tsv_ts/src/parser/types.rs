@@ -66,8 +66,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         let check_type = self.parse_union_type_inner(respect_asi_bracket)?;
 
-        // Check for conditional type: `T extends U ? V : W`
-        if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
+        // Check for conditional type: `T extends U ? V : W`. The `extends` must not
+        // be preceded by a line terminator (TS `CheckType [no LineTerminator here]
+        // extends ExtendsType`): a newline before it ends the type, leaving `extends`
+        // a stray token (acorn-typescript's `hasPrecedingLineBreak` guard). Same
+        // restricted-production rule as the arrow `=>` (see `expect_arrow`).
+        if self.check(&TokenKind::Keyword(KeywordKind::Extends)) && !self.had_line_terminator {
             self.advance()?; // consume 'extends'
 
             let extends_type = self.parse_union_type()?;
@@ -1039,7 +1043,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse the body of a mapped type (after '{' has been consumed)
     fn parse_mapped_type_body(&mut self, start: usize) -> Result<TSType<'arena>, ParseError> {
         // Parse optional readonly modifier: `readonly`, `+readonly`, `-readonly`
-        let readonly = self.parse_mapped_type_readonly_modifier();
+        let readonly = self.parse_mapped_type_readonly_modifier()?;
 
         // Expect `[`
         self.expect(&TokenKind::BracketOpen)?;
@@ -1087,7 +1091,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BracketClose)?;
 
         // Parse optional modifier: `?`, `+?`, `-?`
-        let optional = self.parse_mapped_type_optional_modifier();
+        let optional = self.parse_mapped_type_optional_modifier()?;
 
         // Expect `:` and parse value type
         self.expect(&TokenKind::Colon)?;
@@ -1115,52 +1119,64 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    /// Parse readonly modifier for mapped type: `readonly`, `+readonly`, `-readonly`
-    fn parse_mapped_type_readonly_modifier(&mut self) -> Option<TSMappedTypeModifier> {
+    /// Parse readonly modifier for mapped type: `readonly`, `+readonly`, `-readonly`.
+    /// A `+`/`-` is a single optional sign that *must* be followed by `readonly`;
+    /// a stray sign (`+[K in T]`, `-+readonly`) is a syntax error, not a silently
+    /// dropped token (matches acorn-typescript).
+    fn parse_mapped_type_readonly_modifier(
+        &mut self,
+    ) -> Result<Option<TSMappedTypeModifier>, ParseError> {
         if self.eat(TokenKind::Minus) {
             // `-readonly`
             if self.eat_contextual_keyword("readonly") {
-                return Some(TSMappedTypeModifier::Minus);
+                return Ok(Some(TSMappedTypeModifier::Minus));
             }
-            // Unexpected - but we consumed `-`
+            return Err(self.error_expected("'readonly' after '-' in mapped type"));
         }
 
         if self.eat(TokenKind::Plus) {
             // `+readonly`
             if self.eat_contextual_keyword("readonly") {
-                return Some(TSMappedTypeModifier::Plus);
+                return Ok(Some(TSMappedTypeModifier::Plus));
             }
+            return Err(self.error_expected("'readonly' after '+' in mapped type"));
         }
 
         if self.eat_contextual_keyword("readonly") {
-            return Some(TSMappedTypeModifier::True);
+            return Ok(Some(TSMappedTypeModifier::True));
         }
 
-        None
+        Ok(None)
     }
 
-    /// Parse optional modifier for mapped type: `?`, `+?`, `-?`
-    fn parse_mapped_type_optional_modifier(&mut self) -> Option<TSMappedTypeModifier> {
+    /// Parse optional modifier for mapped type: `?`, `+?`, `-?`. A `+`/`-` is a
+    /// single optional sign that *must* be followed by `?`; a stray sign
+    /// (`[K in T]+:`) is a syntax error, not a silently dropped token (matches
+    /// acorn-typescript).
+    fn parse_mapped_type_optional_modifier(
+        &mut self,
+    ) -> Result<Option<TSMappedTypeModifier>, ParseError> {
         if self.eat(TokenKind::Minus) {
             // `-?`
             if self.eat(TokenKind::Question) {
-                return Some(TSMappedTypeModifier::Minus);
+                return Ok(Some(TSMappedTypeModifier::Minus));
             }
-            // Unexpected - but we consumed `-`
+            return Err(self.error_expected("'?' after '-' in mapped type"));
         }
 
         if self.eat(TokenKind::Plus) {
             // `+?`
             if self.eat(TokenKind::Question) {
-                return Some(TSMappedTypeModifier::Plus);
+                return Ok(Some(TSMappedTypeModifier::Plus));
             }
+            return Err(self.error_expected("'?' after '+' in mapped type"));
         }
 
         if self.eat(TokenKind::Question) {
-            return Some(TSMappedTypeModifier::True);
+            return Ok(Some(TSMappedTypeModifier::True));
         }
 
-        None
+        Ok(None)
     }
 
     /// Parse tuple type: `[T, U, V]`, `[...T]`, `[label: T]`, `[T?]`, `[first: string, ...rest: T]`

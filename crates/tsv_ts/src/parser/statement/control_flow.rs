@@ -136,11 +136,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let var_decl = self.parse_for_variable_declaration()?;
 
             // Check for 'in' or 'of'
-            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
+            let is_for_in = matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In));
+            let is_for_of = self.current_value() == "of";
+
+            // A for-in/for-of head binds exactly one declarator: the grammar is
+            // `for ( ForDeclaration in/of … )` where `ForDeclaration` is a single
+            // `ForBinding`. Multiple declarators (`for (let a, b of …)`) is a syntax
+            // error — acorn reports an unexpected token at the `in`/`of`.
+            if (is_for_in || is_for_of) && var_decl.declarations.len() != 1 {
+                return Err(self.error_expected_found("a single binding in a for-in/of header"));
+            }
+
+            if is_for_in {
                 self.advance()?;
                 return self.parse_for_in(start, ForInOfLeft::VariableDeclaration(var_decl));
             }
-            if self.current_value() == "of" {
+            if is_for_of {
                 self.advance()?;
                 return self.parse_for_of(
                     start,
@@ -676,7 +687,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::Colon)?;
 
         // Parse the labeled statement
-        let body = self.arena.alloc(self.parse_statement()?);
+        let body_stmt = self.parse_statement()?;
+
+        // `LabelledItem : Statement | FunctionDeclaration`. A lexical declaration
+        // (`let`/`const`), a class declaration, or — in strict/module code, which
+        // tsv always is — a function declaration is not a labelable statement
+        // (acorn reports an unexpected token). A `var` statement and ordinary
+        // statements are fine; TS declarations (`enum`/`interface`/`type`/
+        // `namespace`) acorn-typescript accepts, so they pass through.
+        let label_target_invalid = match &body_stmt {
+            Statement::ClassDeclaration(_) | Statement::FunctionDeclaration(_) => true,
+            Statement::VariableDeclaration(decl) => {
+                !matches!(decl.kind, VariableDeclarationKind::Var)
+            }
+            _ => false,
+        };
+        if label_target_invalid {
+            return Err(self.error_msg_at(
+                "A label can only precede a statement, not a declaration",
+                body_stmt.span().start as usize,
+            ));
+        }
+
+        let body = self.arena.alloc(body_stmt);
         let end = body.span().end;
 
         Ok(Statement::LabeledStatement(LabeledStatement {

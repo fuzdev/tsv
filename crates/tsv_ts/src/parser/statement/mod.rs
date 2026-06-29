@@ -16,6 +16,38 @@ mod type_declarations;
 mod variable;
 
 impl<'a, 'arena> Parser<'a, 'arena> {
+    /// Parse a `ModuleItem`: an import/export declaration or any
+    /// `StatementListItem`. Import/export declarations are valid only here — at the
+    /// module top level (`parse`'s loop) and inside a TS `namespace`/`module` body.
+    /// Every other statement context uses `parse_statement`, which rejects bare
+    /// import/export, so a misplaced one is a syntax error (matching acorn's
+    /// "'import' and 'export' may only appear at the top level"). `import(…)` /
+    /// `import.meta` are expressions and are left to `parse_statement`.
+    pub(crate) fn parse_module_item(&mut self) -> Result<Statement<'arena>, ParseError> {
+        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Export)) {
+            return self.parse_export_declaration();
+        }
+        // `import …` declaration (but not the `import(…)` / `import.meta` expressions).
+        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Import))
+            && !self.import_begins_expression()
+        {
+            return self.parse_import_declaration();
+        }
+        self.parse_statement()
+    }
+
+    /// Whether an `import` keyword at the current position begins an expression —
+    /// the `import(…)` dynamic import or `import.meta` meta-property — rather than
+    /// an import declaration. Callers have already confirmed `current` is `import`.
+    fn import_begins_expression(&mut self) -> bool {
+        matches!(self.peek_kind(), TokenKind::ParenOpen | TokenKind::Dot)
+    }
+
+    /// Error for an `import`/`export` declaration outside a module-item position.
+    fn error_module_item_position(&self) -> ParseError {
+        self.error_msg("'import' and 'export' may only appear at the top level")
+    }
+
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         // Check if this is a variable declaration
         match self.current_kind() {
@@ -40,17 +72,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 KeywordKind::Class => self.parse_class_declaration(),
                 KeywordKind::Enum => self.parse_enum_declaration(false, false),
-                KeywordKind::Export => self.parse_export_declaration(),
+                // `import`/`export` declarations are `ModuleItem`s — reachable only via
+                // `parse_module_item` (the module top level and TS namespace/module
+                // bodies). Reached here they are nested in a block, function body, or
+                // single-statement position, where they are syntax errors. `import(…)`
+                // and `import.meta` are ordinary expressions and stay valid anywhere.
+                KeywordKind::Export => Err(self.error_module_item_position()),
                 KeywordKind::Import => {
-                    // `import(...)` is a dynamic import expression
-                    // `import.meta` is a meta property expression
-                    // `import ...` is an import declaration
-                    if self.peek_kind() == TokenKind::ParenOpen
-                        || self.peek_kind() == TokenKind::Dot
-                    {
+                    if self.import_begins_expression() {
                         self.parse_expression_statement()
                     } else {
-                        self.parse_import_declaration()
+                        Err(self.error_module_item_position())
                     }
                 }
                 KeywordKind::Async => {
