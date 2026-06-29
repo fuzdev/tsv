@@ -3,7 +3,7 @@
 use super::comments;
 use super::escapes;
 use super::ident::{is_id_continue, is_id_start};
-use super::token::{Token, TokenKind, keyword_kind};
+use super::token::{Token, TokenKind, keyword_at};
 use tsv_lang::ParseError;
 
 /// Byte length of the UTF-8 sequence whose lead byte is `lead`. Used to advance
@@ -350,12 +350,13 @@ impl<'a> Lexer<'a> {
         }
 
         // Check if it's a keyword (only if no escapes - escaped keywords are identifiers;
-        // without escapes the source slice IS the name, so no decoded buffer is needed)
+        // without escapes the source slice IS the name, so no decoded buffer is needed).
+        // SWAR recognition over the identifier's raw bytes (no `&str` reslice, no phf
+        // hash on the len-2..=8 path); see `keyword_at`.
         let kind = if decoded.is_none() {
-            if let Some(kw) = keyword_kind(&self.source[start..self.position]) {
-                TokenKind::Keyword(kw)
-            } else {
-                TokenKind::Identifier
+            match keyword_at(self.bytes, start, self.position - start) {
+                Some(kw) => TokenKind::Keyword(kw),
+                None => TokenKind::Identifier,
             }
         } else {
             // Escaped identifiers are never keywords: `\u0063lass` is identifier "class", not keyword

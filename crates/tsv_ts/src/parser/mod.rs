@@ -208,7 +208,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Extract token data immediately to avoid keeping token alive
         let (mut kind, mut start, mut end, mut decoded) = {
             let token = lexer.next_token()?;
-            (token.kind, token.start as usize, token.end as usize, lexer.take_decoded().map(|b| *b))
+            (
+                token.kind,
+                token.start as usize,
+                token.end as usize,
+                lexer.take_decoded().map(|b| *b),
+            )
         };
 
         // Collect leading comment tokens
@@ -218,8 +223,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             content_start,
         } = &kind
         {
-            let (comment, _) =
-                comment_from_token(source, start, end, *content_start as usize, *is_block, base_offset);
+            let (comment, _) = comment_from_token(
+                source,
+                start,
+                end,
+                *content_start as usize,
+                *is_block,
+                base_offset,
+            );
             comments.push(comment);
             let token = lexer.next_token()?;
             kind = token.kind;
