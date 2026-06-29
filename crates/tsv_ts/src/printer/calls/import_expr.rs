@@ -160,29 +160,24 @@ pub(super) fn build_import_expression_doc(
             source_end,
             options_start,
         );
-        inter.route_after_comma_hugging_to_leading(printer, source_end, options_start);
+        inter.route_after_comma_hugging_to_leading(printer);
 
         // Source arg + comma: before-comma blocks trail the source; stranded after-comma
         // blocks and line comments follow the comma.
         let mut head = smallvec![source_doc];
-        inter.emit_trailing_comments_around_comma(&mut head, printer, source_end, options_start);
+        inter.emit_trailing_comments_around_comma(&mut head, printer);
 
         // Blank line in the gap, comment-aware once routed (so a comment's own newlines
         // don't read as a blank line).
         let inter_blank = inter_blank_no_comments
             || (has_inter_comments
-                && inter.has_blank_line_in_gap(
-                    printer.source,
-                    printer.line_breaks,
-                    source_end,
-                    options_start,
-                ));
+                && inter.has_blank_line_in_gap(printer.source, printer.line_breaks));
 
         // Leading comments (own-line + hugged after-comma) lead the options arg; its
         // trailing region follows: same-line block/line comments inline, then own-line
         // comments each on their own line (dangling — import takes no trailing comma).
         let mut tail = DocBuf::new();
-        inter.emit_leading_comments_inline_aware(&mut tail, printer, options_start);
+        inter.emit_leading_comments_inline_aware(&mut tail, printer);
         tail.push(options_doc);
         let trailing = PartitionedComments::new(
             printer.comments,

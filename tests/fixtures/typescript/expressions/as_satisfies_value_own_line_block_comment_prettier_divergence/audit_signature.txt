@@ -1,0 +1,28 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// Own-line block comment after `as`, before the type: kept on its own line,
+	// type on the next line (tsv preserves the author's placement).
+	const a = x /* a */ as A;
+
+	// `satisfies` behaves the same.
+	const b = x /* b */ satisfies B;
+
+	// A blank line after the comment is preserved.
+	const c = x /* c */ as C;
+
+	// A same-line block comment with the type authored on the next line keeps the
+	// type on that line (comment trailing the keyword); preserving the author's break.
+	const d = x /* d */ as D;
+
+	// A same-line block comment with the type glued to it stays fully inline (not a
+	// divergence — both formatters keep it).
+	const e = x as /* e */ E;
+</script>

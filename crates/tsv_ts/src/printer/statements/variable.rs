@@ -256,9 +256,26 @@ impl<'a> Printer<'a> {
                     parts.push(d.hardline());
                     parts.push(d.text(INDENT));
                     if has_block_comment && !has_line_comment {
-                        for comment in comments_in_range(self.comments, comma_pos, curr_start) {
+                        // After-comma block comment(s) leading the next declarator: a
+                        // block inline-adjacent to the declarator hugs it (`/* c */ b`),
+                        // an own-line one keeps its line (with any author blank line
+                        // preserved before the declarator/next comment).
+                        let comments: Vec<_> =
+                            comments_in_range(self.comments, comma_pos, curr_start).collect();
+                        for (ci, comment) in comments.iter().enumerate() {
                             parts.push(self.build_comment_doc(comment));
-                            parts.push(d.text(" "));
+                            if comment.is_block && self.is_same_line(comment.span.end, curr_start) {
+                                parts.push(d.text(" "));
+                            } else {
+                                let next =
+                                    comments.get(ci + 1).map_or(curr_start, |c| c.span.start);
+                                self.push_blank_preserving_hardline(
+                                    &mut parts,
+                                    comment.span.end,
+                                    next,
+                                );
+                                parts.push(d.text(INDENT));
+                            }
                         }
                     }
                 } else {
@@ -341,43 +358,28 @@ impl<'a> Printer<'a> {
                     continue;
                 }
 
-                // When JSDoc cast parens are stripped, 2+ block comments may end up
-                // after `=` even though prettier places the first one before `=`.
-                // Detect and promote the first comment to before `=`.
-                let promoted = has_comments_after_eq
-                    .then(|| self.promote_block_comment_before_eq(equals_pos + 1, init_start))
-                    .flatten();
-                let promoted_before_eq_doc = promoted.map(|(doc, _)| doc);
-                let rhs_comments_start = promoted.map_or(equals_pos + 1, |(_, end)| end);
+                // Comments after `=` all stay after `=`, matching prettier — a JSDoc
+                // cast (`= /** @type {T} */ (expr)`) keeps its parens via the
+                // `JsdocCast` node, so its comment lives inside the init expression and
+                // never reaches this gap.
+                let rhs_comments_start = equals_pos + 1;
 
                 // Helpers for LHS doc handling. Most branches use id_doc as-is;
                 // some rebuild it (break-lhs wrapping type, fluid non-wrapping type).
-                // Comments before `=` are always appended after the LHS.
-                // Promoted comments also go here (between identifier and `=`).
-                // (Only block / promoted comments reach here — a before-`=` *line*
-                // comment took the continuation `continue` path above.)
+                // Comments before `=` are always appended after the LHS. (Only block
+                // comments reach here — a before-`=` *line* comment took the
+                // continuation `continue` path above.)
                 let push_lhs = |parts: &mut DocBuf, lhs_doc: DocId| {
                     parts.push(lhs_doc);
                     if has_comments_before_eq {
                         parts.push(self.build_inline_comments_between_doc(id_end, equals_pos));
                     }
-                    if let Some(doc) = promoted_before_eq_doc {
-                        parts.push(doc);
-                    }
                 };
                 // For fluid layout, LHS + comments must be a single doc (inside the fluid group)
                 let make_fluid_lhs = |lhs_doc: DocId| -> DocId {
-                    let has_any_before_eq =
-                        has_comments_before_eq || promoted_before_eq_doc.is_some();
-                    if has_any_before_eq {
+                    if has_comments_before_eq {
                         let mut lhs_parts: DocBuf = smallvec![lhs_doc];
-                        if has_comments_before_eq {
-                            lhs_parts
-                                .push(self.build_inline_comments_between_doc(id_end, equals_pos));
-                        }
-                        if let Some(doc) = promoted_before_eq_doc {
-                            lhs_parts.push(doc);
-                        }
+                        lhs_parts.push(self.build_inline_comments_between_doc(id_end, equals_pos));
                         d.concat(&lhs_parts)
                     } else {
                         lhs_doc
@@ -619,15 +621,24 @@ impl<'a> Printer<'a> {
                         // Single pass: partition comments into same-line (inline) and
                         // different-line (leading) relative to the `=` sign.
                         let mut leading_comments = DocBuf::new();
-                        for comment in comments_in_range(self.comments, equals_pos + 1, init_start)
-                        {
+                        let after_eq: Vec<_> =
+                            comments_in_range(self.comments, equals_pos + 1, init_start).collect();
+                        for (ci, comment) in after_eq.iter().enumerate() {
                             if self.is_same_line(equals_pos, comment.span.start) {
                                 // Inline comment on same line as =
                                 parts.push(d.text(" "));
                                 parts.push(self.build_comment_doc(comment));
                             } else {
                                 leading_comments.push(self.build_comment_doc(comment));
-                                leading_comments.push(d.hardline());
+                                // Preserve an author blank line before the next comment
+                                // or the value, matching prettier.
+                                let next =
+                                    after_eq.get(ci + 1).map_or(init_start, |c| c.span.start);
+                                self.push_blank_preserving_hardline(
+                                    &mut leading_comments,
+                                    comment.span.end,
+                                    next,
+                                );
                             }
                         }
                         parts.push(d.indent(d.concat(&[

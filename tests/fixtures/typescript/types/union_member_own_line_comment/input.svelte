@@ -27,4 +27,33 @@
 		/* g */
 		| 'y'
 		| 'z';
+
+	// blank line before an own-line member comment is preserved
+	type F =
+		| 'x'
+
+		/* f */
+		| 'y';
+
+	// blank line between two own-line member comments is preserved
+	type G =
+		| 'x'
+		/* g1 */
+
+		/* g2 */
+		| 'y';
+
+	// blank line after a leading comment (before the union) is preserved — inline union
+	type H =
+		/* h */
+
+		'x' | 'y';
+
+	// blank line after a leading comment is preserved — expanded union
+	type I =
+		/* i1 */
+
+		| 'x'
+		/* i2 */
+		| 'y';
 </script>

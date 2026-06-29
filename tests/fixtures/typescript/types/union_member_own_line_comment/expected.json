@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 577,
+	"end": 1035,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -201,24 +201,184 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " blank line before an own-line member comment is preserved",
+			"start": 569,
+			"end": 629,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " f ",
+			"start": 651,
+			"end": 658,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank line between two own-line member comments is preserved",
+			"start": 670,
+			"end": 733,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " g1 ",
+			"start": 754,
+			"end": 762,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 2
+				},
+				"end": {
+					"line": 41,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " g2 ",
+			"start": 766,
+			"end": 774,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 2
+				},
+				"end": {
+					"line": 43,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank line after a leading comment (before the union) is preserved — inline union",
+			"start": 786,
+			"end": 870,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 1
+				},
+				"end": {
+					"line": 46,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " h ",
+			"start": 883,
+			"end": 890,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 2
+				},
+				"end": {
+					"line": 48,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blank line after a leading comment is preserved — expanded union",
+			"start": 907,
+			"end": 974,
+			"loc": {
+				"start": {
+					"line": 52,
+					"column": 1
+				},
+				"end": {
+					"line": 52,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i1 ",
+			"start": 987,
+			"end": 995,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 2
+				},
+				"end": {
+					"line": 54,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i2 ",
+			"start": 1007,
+			"end": 1015,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 2
+				},
+				"end": {
+					"line": 57,
+					"column": 10
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 576,
+		"end": 1034,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 567,
+			"end": 1025,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 30,
+					"line": 59,
 					"column": 9
 				}
 			},
@@ -908,6 +1068,532 @@
 							"value": " own-line comment on a middle member of a 3-member union — expands",
 							"start": 453,
 							"end": 521
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 631,
+					"end": 667,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 8
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 636,
+						"end": 637,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 6
+							},
+							"end": {
+								"line": 32,
+								"column": 7
+							}
+						},
+						"name": "F"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 642,
+						"end": 666,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 2
+							},
+							"end": {
+								"line": 36,
+								"column": 7
+							}
+						},
+						"types": [
+							{
+								"type": "TSLiteralType",
+								"start": 644,
+								"end": 647,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 4
+									},
+									"end": {
+										"line": 33,
+										"column": 7
+									}
+								},
+								"literal": {
+									"type": "Literal",
+									"start": 644,
+									"end": 647,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 4
+										},
+										"end": {
+											"line": 33,
+											"column": 7
+										}
+									},
+									"value": "x",
+									"raw": "'x'"
+								}
+							},
+							{
+								"type": "TSLiteralType",
+								"start": 663,
+								"end": 666,
+								"loc": {
+									"start": {
+										"line": 36,
+										"column": 4
+									},
+									"end": {
+										"line": 36,
+										"column": 7
+									}
+								},
+								"literal": {
+									"type": "Literal",
+									"start": 663,
+									"end": 666,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 4
+										},
+										"end": {
+											"line": 36,
+											"column": 7
+										}
+									},
+									"value": "y",
+									"raw": "'y'"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " f ",
+										"start": 651,
+										"end": 658
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blank line before an own-line member comment is preserved",
+							"start": 569,
+							"end": 629
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 735,
+					"end": 783,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 44,
+							"column": 8
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 740,
+						"end": 741,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 6
+							},
+							"end": {
+								"line": 39,
+								"column": 7
+							}
+						},
+						"name": "G"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 746,
+						"end": 782,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 2
+							},
+							"end": {
+								"line": 44,
+								"column": 7
+							}
+						},
+						"types": [
+							{
+								"type": "TSLiteralType",
+								"start": 748,
+								"end": 751,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 4
+									},
+									"end": {
+										"line": 40,
+										"column": 7
+									}
+								},
+								"literal": {
+									"type": "Literal",
+									"start": 748,
+									"end": 751,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 4
+										},
+										"end": {
+											"line": 40,
+											"column": 7
+										}
+									},
+									"value": "x",
+									"raw": "'x'"
+								}
+							},
+							{
+								"type": "TSLiteralType",
+								"start": 779,
+								"end": 782,
+								"loc": {
+									"start": {
+										"line": 44,
+										"column": 4
+									},
+									"end": {
+										"line": 44,
+										"column": 7
+									}
+								},
+								"literal": {
+									"type": "Literal",
+									"start": 779,
+									"end": 782,
+									"loc": {
+										"start": {
+											"line": 44,
+											"column": 4
+										},
+										"end": {
+											"line": 44,
+											"column": 7
+										}
+									},
+									"value": "y",
+									"raw": "'y'"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " g1 ",
+										"start": 754,
+										"end": 762
+									},
+									{
+										"type": "Block",
+										"value": " g2 ",
+										"start": 766,
+										"end": 774
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blank line between two own-line member comments is preserved",
+							"start": 670,
+							"end": 733
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 872,
+					"end": 904,
+					"loc": {
+						"start": {
+							"line": 47,
+							"column": 1
+						},
+						"end": {
+							"line": 50,
+							"column": 12
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 877,
+						"end": 878,
+						"loc": {
+							"start": {
+								"line": 47,
+								"column": 6
+							},
+							"end": {
+								"line": 47,
+								"column": 7
+							}
+						},
+						"name": "H"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 894,
+						"end": 903,
+						"loc": {
+							"start": {
+								"line": 50,
+								"column": 2
+							},
+							"end": {
+								"line": 50,
+								"column": 11
+							}
+						},
+						"types": [
+							{
+								"type": "TSLiteralType",
+								"start": 894,
+								"end": 897,
+								"loc": {
+									"start": {
+										"line": 50,
+										"column": 2
+									},
+									"end": {
+										"line": 50,
+										"column": 5
+									}
+								},
+								"literal": {
+									"type": "Literal",
+									"start": 894,
+									"end": 897,
+									"loc": {
+										"start": {
+											"line": 50,
+											"column": 2
+										},
+										"end": {
+											"line": 50,
+											"column": 5
+										}
+									},
+									"value": "x",
+									"raw": "'x'"
+								}
+							},
+							{
+								"type": "TSLiteralType",
+								"start": 900,
+								"end": 903,
+								"loc": {
+									"start": {
+										"line": 50,
+										"column": 8
+									},
+									"end": {
+										"line": 50,
+										"column": 11
+									}
+								},
+								"literal": {
+									"type": "Literal",
+									"start": 900,
+									"end": 903,
+									"loc": {
+										"start": {
+											"line": 50,
+											"column": 8
+										},
+										"end": {
+											"line": 50,
+											"column": 11
+										}
+									},
+									"value": "y",
+									"raw": "'y'"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " h ",
+								"start": 883,
+								"end": 890
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blank line after a leading comment (before the union) is preserved — inline union",
+							"start": 786,
+							"end": 870
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 976,
+					"end": 1024,
+					"loc": {
+						"start": {
+							"line": 53,
+							"column": 1
+						},
+						"end": {
+							"line": 58,
+							"column": 8
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 981,
+						"end": 982,
+						"loc": {
+							"start": {
+								"line": 53,
+								"column": 6
+							},
+							"end": {
+								"line": 53,
+								"column": 7
+							}
+						},
+						"name": "I"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 999,
+						"end": 1023,
+						"loc": {
+							"start": {
+								"line": 56,
+								"column": 2
+							},
+							"end": {
+								"line": 58,
+								"column": 7
+							}
+						},
+						"types": [
+							{
+								"type": "TSLiteralType",
+								"start": 1001,
+								"end": 1004,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 4
+									},
+									"end": {
+										"line": 56,
+										"column": 7
+									}
+								},
+								"literal": {
+									"type": "Literal",
+									"start": 1001,
+									"end": 1004,
+									"loc": {
+										"start": {
+											"line": 56,
+											"column": 4
+										},
+										"end": {
+											"line": 56,
+											"column": 7
+										}
+									},
+									"value": "x",
+									"raw": "'x'"
+								}
+							},
+							{
+								"type": "TSLiteralType",
+								"start": 1020,
+								"end": 1023,
+								"loc": {
+									"start": {
+										"line": 58,
+										"column": 4
+									},
+									"end": {
+										"line": 58,
+										"column": 7
+									}
+								},
+								"literal": {
+									"type": "Literal",
+									"start": 1020,
+									"end": 1023,
+									"loc": {
+										"start": {
+											"line": 58,
+											"column": 4
+										},
+										"end": {
+											"line": 58,
+											"column": 7
+										}
+									},
+									"value": "y",
+									"raw": "'y'"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " i2 ",
+										"start": 1007,
+										"end": 1015
+									}
+								]
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " i1 ",
+								"start": 987,
+								"end": 995
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blank line after a leading comment is preserved — expanded union",
+							"start": 907,
+							"end": 974
 						}
 					]
 				}

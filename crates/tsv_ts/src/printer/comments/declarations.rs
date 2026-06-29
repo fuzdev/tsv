@@ -621,14 +621,16 @@ impl<'a> Printer<'a> {
             })
             .unwrap_or_else(|| d.empty());
 
-        // A line comment between the keyword and the first item is kept trailing
-        // the keyword (preserve-in-place; prettier relocates it before the
-        // keyword), with the items pushed onto the next line — mirroring the
-        // as/satisfies + type-param keyword→value handling. The keyword stays
-        // inline; only the items are pushed down (no whole-heritage break).
+        // A line comment — or an own-line block comment (`extends⏎/* c */⏎Item`) —
+        // between the keyword and the first item is kept trailing the keyword
+        // (preserve-in-place; prettier relocates it before the keyword), with the
+        // items pushed onto the next line — mirroring the as/satisfies + type-param
+        // keyword→value handling. The keyword stays inline; only the items are
+        // pushed down (no whole-heritage break). A block glued to the first item
+        // (`extends /* c */ Item`) stays inline.
         if let Some(kw_start) = keyword_start {
             let kw_end = kw_start + keyword.as_str().len() as u32;
-            if self.has_line_comments_between(kw_end, items[0].span.start) {
+            if self.comment_forces_following_own_line(kw_end, items[0].span.start) {
                 let value_doc = d.join(item_docs, ", ");
                 let mut parts = smallvec![d.text(keyword.as_str())];
                 self.append_keyword_value_line_comments(
@@ -763,7 +765,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut value_block: DocBuf = smallvec![d.hardline()];
         let mut on_own_line = false;
-        for comment in comments_in_range(self.comments, keyword_end, value_start) {
+        let comments: Vec<_> = comments_in_range(self.comments, keyword_end, value_start).collect();
+        for (i, comment) in comments.iter().enumerate() {
             let same_line = !on_own_line && self.is_same_line(keyword_end, comment.span.start);
             if same_line {
                 if comment.is_block {
@@ -776,7 +779,9 @@ impl<'a> Printer<'a> {
             } else {
                 on_own_line = true;
                 value_block.push(self.build_comment_doc(comment));
-                value_block.push(d.hardline());
+                // Preserve an author blank line before the next comment / the value.
+                let next = comments.get(i + 1).map_or(value_start, |c| c.span.start);
+                self.push_blank_preserving_hardline(&mut value_block, comment.span.end, next);
             }
         }
         value_block.push(value_doc);

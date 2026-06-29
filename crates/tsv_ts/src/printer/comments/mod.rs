@@ -36,9 +36,9 @@ pub(crate) use declarations::HeritageKeyword;
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};
 
-use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::{Comment, comments_in_range};
 
 /// Spacing style for comments in doc building
 #[derive(Debug, Clone, Copy)]
@@ -73,6 +73,66 @@ pub(crate) enum CommentFilter {
 }
 
 impl<'a> Printer<'a> {
+    /// Whether a comment between two neighbors can't share a line with either — any
+    /// line comment (it runs to EOL), or a block comment isolated from *both* `prev`
+    /// (at the comment's start) and `next` (at its end). The shared "isolated from
+    /// both neighbors" rule behind the function-parameter-list expansion gate
+    /// (`has_own_line_comment_between`) and the intersection-member break gate
+    /// (`intersection_has_isolated_member_comment`): an adjacency on either side keeps
+    /// the comment inline (`a /* c */ b`), matching prettier, which collapses both
+    /// `a,⏎/* c */ b` and `a /* c */,⏎b` back to the inline form.
+    pub(crate) fn comment_isolated_from_neighbors(
+        &self,
+        prev: u32,
+        c: &Comment,
+        next: u32,
+    ) -> bool {
+        !c.is_block
+            || (!self.is_same_line(prev, c.span.start) && !self.is_same_line(c.span.end, next))
+    }
+
+    /// Emit a `hardline` after an own-line comment in a per-line comment list,
+    /// preserving an author blank line as a leading `literalline` when the source
+    /// left one between `comment_end` and `next` (the following own-line comment, or
+    /// the element the comments lead). The blank-preserving counterpart to a bare
+    /// `hardline` separator.
+    pub(crate) fn push_blank_preserving_hardline(
+        &self,
+        parts: &mut DocBuf,
+        comment_end: u32,
+        next: u32,
+    ) {
+        let d = self.d();
+        if self.has_blank_line_between(comment_end, next) {
+            parts.push(d.literalline());
+        }
+        parts.push(d.hardline());
+    }
+
+    /// Emit a run of leading comments before a member/element starting at
+    /// `member_start`: a block comment inline-adjacent to the member hugs it with a
+    /// trailing space (`/* c */ X`); every other comment (own-line block, or line)
+    /// takes its own line via a blank-preserving hardline (toward the next comment, or
+    /// the member). Shared by the member-leading sites whose only difference is the
+    /// member position (interface members, intersection members after `&`).
+    pub(crate) fn emit_member_leading_comments(
+        &self,
+        parts: &mut DocBuf,
+        comments: &[&Comment],
+        member_start: u32,
+    ) {
+        let d = self.d();
+        for (i, comment) in comments.iter().enumerate() {
+            parts.push(self.build_comment_doc(comment));
+            if comment.is_block && self.is_same_line(comment.span.end, member_start) {
+                parts.push(d.text(" "));
+            } else {
+                let next = comments.get(i + 1).map_or(member_start, |c| c.span.start);
+                self.push_blank_preserving_hardline(parts, comment.span.end, next);
+            }
+        }
+    }
+
     /// Build a Doc for inline comments between two positions with specified spacing and filter
     ///
     /// Returns a Doc containing all comments in the range with the specified spacing.
@@ -268,7 +328,11 @@ impl<'a> Printer<'a> {
                 // Line comment, or a block whose value/next comment is on a later
                 // source line: keep them on separate lines (preserve the author's
                 // layout; a line comment must break so it can't absorb the value).
-                parts.push(d.hardline());
+                // An author blank line before the value / next comment is preserved,
+                // matching prettier (it keeps one blank in this "comment before
+                // expression" position everywhere — RHS of `=`/`:`, call args,
+                // `return`/`await`, unary operands, …).
+                self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
             }
         }
         if parts.is_empty() {

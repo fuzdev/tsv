@@ -402,7 +402,7 @@ impl<'a> Printer<'a> {
                     let pc = self.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
                     arg_parts.push(d.hardline());
                     // hugging after-comma + own-line comments lead the next arg (`C`).
-                    pc.emit_leading_comments_inline_aware(&mut arg_parts, self, next_arg_start);
+                    pc.emit_leading_comments_inline_aware(&mut arg_parts, self);
                 } else {
                     // Last argument - check for trailing comments before closing paren
                     let arg_end = arg.span().end;
@@ -420,7 +420,7 @@ impl<'a> Printer<'a> {
                     // and a line comment follows via `line_suffix`), then own-line dangling
                     // comments. No trailing comma (trailingComma: 'none'). Matches the
                     // call/member-chain last-arg paths.
-                    pc.emit_last_arg_comments(&mut arg_parts, self, arg_end, paren_close);
+                    pc.emit_last_arg_comments(&mut arg_parts, self);
                 }
             }
 
@@ -488,10 +488,19 @@ impl<'a> Printer<'a> {
             if !leading_block.is_empty()
                 && let Some(last_doc) = arg_docs.pop()
             {
-                let mut last_parts = vec![last_doc];
+                let mut last_parts = DocBuf::new();
+                last_parts.push(last_doc);
+                let mut prev_end = effective_arg_end;
                 for comment in &leading_block {
-                    last_parts.push(d.hardline());
+                    // Preserve an author blank line before the own-line trailing comment
+                    // (`b⏎⏎/* c */` before `)`), matching prettier and the call path.
+                    self.push_blank_preserving_hardline(
+                        &mut last_parts,
+                        prev_end,
+                        comment.span.start,
+                    );
                     last_parts.push(self.build_comment_doc(comment));
+                    prev_end = comment.span.end;
                 }
                 arg_docs.push(d.concat(&last_parts));
 

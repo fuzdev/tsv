@@ -709,7 +709,7 @@ pub(crate) fn build_args_joined_with_comments(
                     d.line()
                 });
                 // hugging after-comma + own-line comments lead the next arg (`C`).
-                pc.emit_leading_comments_inline_aware(&mut parts, printer, next_arg_start);
+                pc.emit_leading_comments_inline_aware(&mut parts, printer);
             } else {
                 parts.push(no_comment_sep);
             }
@@ -902,18 +902,13 @@ pub(super) fn build_args_with_blank_lines(
             if printer.has_comments_between(arg_end, next_start) {
                 let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_start);
 
-                let next_has_blank = pc.has_blank_line_in_gap(
-                    printer.source,
-                    printer.line_breaks,
-                    arg_end,
-                    next_start,
-                );
+                let next_has_blank = pc.has_blank_line_in_gap(printer.source, printer.line_breaks);
                 if next_has_blank {
                     arg_parts.push(d.literalline());
                 }
                 arg_parts.push(d.hardline());
                 // hugging after-comma + own-line comments lead the next arg (`C`).
-                pc.emit_leading_comments_inline_aware(&mut arg_parts, printer, next_start);
+                pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
             } else {
                 arg_parts.push(d.text(","));
                 // Skip hardline if next arg has blank line

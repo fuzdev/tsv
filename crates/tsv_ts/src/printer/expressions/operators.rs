@@ -119,12 +119,20 @@ impl<'a> Printer<'a> {
             if needs_multiline {
                 // Multiline layout: !(\n  /* c */\n  expr\n) or !(\n  expr // c\n)
                 let mut indent_parts: DocBuf = smallvec![d.hardline()];
-                // Add leading comments — use hardline if the comment and argument
-                // are on different lines, space if they're on the same line.
-                for comment in comments_in_range(self.comments, operator_end, argument_start) {
+                // Add leading comments — use hardline if the comment and the next
+                // comment / argument are on different lines, space if same line. An
+                // author blank line before the argument / next comment is preserved.
+                let leading: Vec<_> =
+                    comments_in_range(self.comments, operator_end, argument_start).collect();
+                for (ci, comment) in leading.iter().enumerate() {
                     indent_parts.push(self.build_comment_doc(comment));
-                    if self.has_newline_between(comment.span.end, argument_start) {
-                        indent_parts.push(d.hardline());
+                    let next = leading.get(ci + 1).map_or(argument_start, |c| c.span.start);
+                    if self.has_newline_between(comment.span.end, next) {
+                        self.push_blank_preserving_hardline(
+                            &mut indent_parts,
+                            comment.span.end,
+                            next,
+                        );
                     } else {
                         indent_parts.push(d.text(" "));
                     }
@@ -708,11 +716,16 @@ impl<'a> Printer<'a> {
             return;
         }
 
-        // Check if any comment is a line comment
-        let has_line_comment = comments.iter().any(|c| !c.is_block);
+        // A comment forces the operand onto its own (broken) line when it's a line
+        // comment OR a block comment with a newline AFTER it (toward the next comment
+        // / the operand) — prettier's `hasLeadingOwnLineComment`. Keying on the newline
+        // *after* (not before) is what makes this idempotent: prettier's own
+        // width-broken output puts an inline-leading block at line start (newline
+        // before, none after — `&&⏎/* c */ b`), which must stay inline, not re-break.
+        let forces_own_line = self.comment_forces_following_own_line(op_end, operand.span.start);
 
-        if !has_line_comment {
-            // Only block comments - place as leading on RHS operand.
+        if !forces_own_line {
+            // Only inline-leading block comments - place as leading on RHS operand.
             // In flat mode: `a || /* comment */ b` (space from line(), comment+trailing space, operand)
             // In break mode: `a ||\n<indent>/* comment */ b` (comment leads continuation line)
             let comments_doc =
@@ -727,8 +740,9 @@ impl<'a> Printer<'a> {
             return;
         }
 
-        // Has line comments - need to preserve line structure
-        // Process each comment individually to maintain proper line breaks
+        // An own-line (or line) comment forces the chain to break. Each comment keeps
+        // its line; authored blank lines are preserved. A trailing comment glued to the
+        // operand (no newline after it) stays inline-leading it.
         let mut pos = op_end;
         for (i, comment) in comments.iter().enumerate() {
             let is_first = i == 0;
@@ -742,15 +756,20 @@ impl<'a> Printer<'a> {
                 // inline, width counted.
                 parts.push(self.build_trailing_comment_doc(comment));
             } else {
-                // Comment on its own line
-                parts.push(d.hardline());
+                // Comment on its own line (preserve an author blank line before it).
+                self.push_blank_preserving_hardline(parts, pos, comment.span.start);
                 parts.push(self.build_comment_doc(comment));
             }
             pos = comment.span.end;
         }
 
-        // Add final hardline before operand (since we have line comments)
-        parts.push(d.hardline());
+        // Operand: on its own line when the last comment has a newline after it
+        // (preserving an author blank line), else glued inline (`/* c */ operand`).
+        if self.has_newline_between(pos, operand.span.start) {
+            self.push_blank_preserving_hardline(parts, pos, operand.span.start);
+        } else {
+            parts.push(d.text(" "));
+        }
         parts.push(operand.doc);
     }
 

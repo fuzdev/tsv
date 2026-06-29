@@ -627,6 +627,52 @@ impl<'a> Printer<'a> {
             || self.has_multiline_block_comments_between(start, end)
     }
 
+    /// Whether a comment in `(start, end)` forces the *following* value onto its own
+    /// line: a line comment (runs to EOL), or a block comment with a newline AFTER it
+    /// — toward the next comment, or `end` for the last (prettier's
+    /// `hasLeadingOwnLineComment`). Keying on the newline *after* the comment (not
+    /// before) keeps the layout idempotent: a block glued to the value (`/* c */ v`,
+    /// even at line start in already-broken output) stays inline, only an authored
+    /// break (`/* c */⏎v`) forces the value down. Shared by the binary/logical operand
+    /// and `as`/`satisfies` cast paths.
+    pub(crate) fn comment_forces_following_own_line(&self, start: u32, end: u32) -> bool {
+        self.any_comment_with_next(start, end, |c, next| {
+            !c.is_block || self.has_newline_between(c.span.end, next)
+        })
+    }
+
+    /// Whether a comment in `(start, end)` is separated from what follows it (the
+    /// next comment, or `end`) by a blank line. Used where a blank line after a
+    /// comment is itself a break trigger — e.g. a ternary branch (`a ? /* c */⏎⏎b`),
+    /// where prettier breaks on the blank even though the own-line comment alone
+    /// does not.
+    pub(crate) fn comment_followed_by_blank(&self, start: u32, end: u32) -> bool {
+        self.any_comment_with_next(start, end, |c, next| {
+            self.has_blank_line_between(c.span.end, next)
+        })
+    }
+
+    /// Scan the comments in `(start, end)` with one-ahead lookahead, returning true
+    /// if `pred(comment, next_start)` holds for any — where `next_start` is the
+    /// following comment's start, or `end` for the last. The shared primitive behind
+    /// the gap predicates above (each keys a per-comment rule on the gap to whatever
+    /// follows it). `peekable` over `comments_in_range`, so no allocation.
+    fn any_comment_with_next(
+        &self,
+        start: u32,
+        end: u32,
+        pred: impl Fn(&internal::Comment, u32) -> bool,
+    ) -> bool {
+        let mut comments = comments_in_range(self.comments, start, end).peekable();
+        while let Some(c) = comments.next() {
+            let next = comments.peek().map_or(end, |n| n.span.start);
+            if pred(c, next) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Whether a single comment occupies its own physical line — a line comment
     /// (always runs to end-of-line), or a block comment with only horizontal
     /// whitespace then a newline before it (`…⏎/* c */…`). The precise "starts a

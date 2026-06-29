@@ -471,11 +471,15 @@ impl<'a> Printer<'a> {
             self.has_line_comments_between(p + 1, first_start)
                 || self.has_own_line_block_comment_after(p, p + 1, first_start)
         });
-        let has_forcing_comments = self.has_line_comments_in_delimited_list(
+        // A blank line the author left between two params also forces multiline (and
+        // is preserved by the separator emission below) — same as regular function
+        // params; prettier keeps the blank in every parameter-list position.
+        let force_multiline = self.has_line_comments_in_delimited_list(
             params,
             internal::Expression::span,
             end_boundary,
         ) || has_leading_gap_forcing
+            || self.has_blank_line_between_params(params)
             || params.last().is_some_and(|last| {
                 self.has_own_line_block_comment_after(
                     last.span().end,
@@ -484,7 +488,7 @@ impl<'a> Printer<'a> {
                 )
             });
 
-        if has_forcing_comments {
+        if force_multiline {
             // Multiline path with hardlines (same as build_function_params_doc_with_line_comments)
             let mut inner_parts = DocBuf::new();
             let open_paren = paren_pos.unwrap_or(0);
@@ -519,6 +523,7 @@ impl<'a> Printer<'a> {
                         &mut inner_parts,
                         param_end,
                         next_start,
+                        true,
                     );
                 } else {
                     let close = close_paren_pos.unwrap_or(param_end);
@@ -662,7 +667,13 @@ impl<'a> Printer<'a> {
                 self.has_line_comments_between(p + 1, first_start)
                     || self.has_own_line_block_comment_after(p, p + 1, first_start)
             });
-            if has_line_comments || has_own_line_block_after_last || has_leading_gap_forcing {
+            // A blank line between two params also forces multiline (preserved by the
+            // hardline path) — same as regular function params; prettier keeps it.
+            if has_line_comments
+                || has_own_line_block_after_last
+                || has_leading_gap_forcing
+                || self.has_blank_line_between_params(params)
+            {
                 return self.build_function_params_doc_with_line_comments(params, paren_pos);
             }
 
@@ -830,6 +841,7 @@ impl<'a> Printer<'a> {
                     &mut inner_parts,
                     param_end,
                     next_start,
+                    true,
                 );
             } else {
                 // Last param: no trailing comma (trailingComma: 'none') + comments before `)`
