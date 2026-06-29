@@ -263,7 +263,11 @@ impl<'a> Lexer<'a> {
     /// Escape-free identifiers (the overwhelmingly common case) take a byte-level
     /// ASCII fast path and never allocate: `decoded` materializes lazily on the
     /// first escape, recovering the literal prefix from the source slice.
-    fn scan_identifier_with_escapes(&mut self, first_char: char) -> Result<Token, Box<ParseError>> {
+    fn scan_identifier_into(
+        &mut self,
+        first_char: char,
+        dst: &mut Token,
+    ) -> Result<(), Box<ParseError>> {
         let start = self.position;
         // None until an actual escape is decoded; `decoded.is_some()` ⇔ has-escapes.
         let mut decoded: Option<String> = None;
@@ -364,11 +368,12 @@ impl<'a> Lexer<'a> {
         };
 
         self.decoded = decoded.map(Box::new);
-        Ok(Token {
+        *dst = Token {
             kind,
             start: start as u32,
             end: self.position as u32,
-        })
+        };
+        Ok(())
     }
 
     /// Scan digits matching a predicate, allowing numeric separators (_)
@@ -486,7 +491,16 @@ impl<'a> Lexer<'a> {
     // - More number formats: floats (1.5), hex (0x10), binary (0b10), octal (0o10)
     // - Template literals: `hello ${world}`
     // - Regular expressions: /pattern/flags
-    pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
+    /// Lex the next token directly into `*dst` — the hot advance path. Writing
+    /// through the caller's slot (`&mut self.current`) instead of returning a
+    /// `Result<Token>` keeps the 16-byte token in registers and elides the sret
+    /// round-trip the by-value return forces (the intermediate `Token` built on
+    /// the lexer frame, returned, and re-scattered). The match yields a `Token`
+    /// value for the common punctuation/number/string paths; the
+    /// identifier/template/hashbang paths and the error paths write `dst` (or
+    /// propagate the error) via an early `return`. [`Lexer::next_token`] is the
+    /// thin by-value wrapper kept for the peek/seek/bootstrap callers.
+    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Box<ParseError>> {
         // Clear any decoded value left from the previous token so `take_decoded`
         // reflects only the token produced by this call (set by the escape paths below).
         self.decoded = None;
@@ -494,19 +508,19 @@ impl<'a> Lexer<'a> {
 
         let start = self.position;
 
-        match self.cur_byte() {
-            None => Ok(Token {
+        *dst = match self.cur_byte() {
+            None => Token {
                 kind: TokenKind::Eof,
                 start: start as u32,
                 end: start as u32,
-            }),
+            },
             Some(b';') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::Semicolon, start))
+                self.make_token(TokenKind::Semicolon, start)
             }
             Some(b':') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::Colon, start))
+                self.make_token(TokenKind::Colon, start)
             }
             Some(b'=') => {
                 self.advance();
@@ -514,22 +528,22 @@ impl<'a> Lexer<'a> {
                     Some(b'>') => {
                         // =>
                         self.advance();
-                        Ok(self.make_token(TokenKind::Arrow, start))
+                        self.make_token(TokenKind::Arrow, start)
                     }
                     Some(b'=') => {
                         self.advance();
                         if self.cur_byte() == Some(b'=') {
                             // ===
                             self.advance();
-                            Ok(self.make_token(TokenKind::EqualsEqualsEquals, start))
+                            self.make_token(TokenKind::EqualsEqualsEquals, start)
                         } else {
                             // ==
-                            Ok(self.make_token(TokenKind::EqualsEquals, start))
+                            self.make_token(TokenKind::EqualsEquals, start)
                         }
                     }
                     _ => {
                         // =
-                        Ok(self.make_token(TokenKind::Equals, start))
+                        self.make_token(TokenKind::Equals, start)
                     }
                 }
             }
@@ -580,22 +594,22 @@ impl<'a> Lexer<'a> {
                     self.advance();
                 }
 
-                Ok(self.make_token(TokenKind::Number, start))
+                self.make_token(TokenKind::Number, start)
             }
             // ECMAScript identifiers: start with ID_Start, _, or $; continue with ID_Continue or $
             // Note: _ is in ID_Continue but not ID_Start, so we check it explicitly for start
             // Identifiers may contain unicode escapes: \u0066oo → foo, b\u0061r → bar
-            Some(b) if is_ascii_id_start(b) => self.scan_identifier_with_escapes(b as char),
+            Some(b) if is_ascii_id_start(b) => return self.scan_identifier_into(b as char, dst),
             // Unicode escape at start of identifier: \u0066oo → foo
             Some(b'\\') => {
                 // Check if this is a valid unicode escape that decodes to an identifier start
                 if let Some((ch, _)) = try_decode_unicode_escape(self.source, self.position)
                     && is_id_start(ch)
                 {
-                    return self.scan_identifier_with_escapes('\\');
+                    return self.scan_identifier_into('\\', dst);
                 }
-                // Not a valid identifier start - fall through to error at end of match
-                Err(lex_err("Unexpected character: '\\'", start))
+                // Not a valid identifier start - error.
+                return Err(lex_err("Unexpected character: '\\'", start));
             }
             Some(quote @ (b'\'' | b'"')) => {
                 // String literal - single or double quoted
@@ -636,11 +650,11 @@ impl<'a> Lexer<'a> {
                         };
 
                         self.decoded = decoded.map(Box::new);
-                        return Ok(Token {
+                        break Token {
                             kind: TokenKind::String,
                             start: start as u32,
                             end: p as u32,
-                        });
+                        };
                     }
                     // bytes[p] == b'\\': escape — skip the backslash and the next
                     // character (decode_string_escapes validates it later). Advance
@@ -655,31 +669,31 @@ impl<'a> Lexer<'a> {
             }
             Some(b',') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::Comma, start))
+                self.make_token(TokenKind::Comma, start)
             }
             Some(b'{') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::BraceOpen, start))
+                self.make_token(TokenKind::BraceOpen, start)
             }
             Some(b'}') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::BraceClose, start))
+                self.make_token(TokenKind::BraceClose, start)
             }
             Some(b'[') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::BracketOpen, start))
+                self.make_token(TokenKind::BracketOpen, start)
             }
             Some(b']') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::BracketClose, start))
+                self.make_token(TokenKind::BracketClose, start)
             }
             Some(b'(') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::ParenOpen, start))
+                self.make_token(TokenKind::ParenOpen, start)
             }
             Some(b')') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::ParenClose, start))
+                self.make_token(TokenKind::ParenClose, start)
             }
             Some(b'.') => {
                 // `.`, `..`, `...` and digits are all ASCII, so peek the next two bytes.
@@ -688,7 +702,7 @@ impl<'a> Lexer<'a> {
                     self.advance(); // consume first .
                     self.advance(); // consume second .
                     self.advance(); // consume third .
-                    Ok(self.make_token(TokenKind::DotDotDot, start))
+                    self.make_token(TokenKind::DotDotDot, start)
                 } else if self.byte_at(1).is_some_and(|b| b.is_ascii_digit()) {
                     // Number starting with a decimal point: .5
                     self.advance(); // consume '.'
@@ -701,35 +715,35 @@ impl<'a> Lexer<'a> {
                         }
                         self.scan_digits(|c| c.is_ascii_digit());
                     }
-                    Ok(self.make_token(TokenKind::Number, start))
+                    self.make_token(TokenKind::Number, start)
                 } else {
                     // Single dot: member access operator
                     self.advance();
-                    Ok(self.make_token(TokenKind::Dot, start))
+                    self.make_token(TokenKind::Dot, start)
                 }
             }
             Some(b'-') => {
                 self.advance();
                 if self.cur_byte() == Some(b'-') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::MinusMinus, start))
+                    self.make_token(TokenKind::MinusMinus, start)
                 } else if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::MinusEquals, start))
+                    self.make_token(TokenKind::MinusEquals, start)
                 } else {
-                    Ok(self.make_token(TokenKind::Minus, start))
+                    self.make_token(TokenKind::Minus, start)
                 }
             }
             Some(b'+') => {
                 self.advance();
                 if self.cur_byte() == Some(b'+') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::PlusPlus, start))
+                    self.make_token(TokenKind::PlusPlus, start)
                 } else if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::PlusEquals, start))
+                    self.make_token(TokenKind::PlusEquals, start)
                 } else {
-                    Ok(self.make_token(TokenKind::Plus, start))
+                    self.make_token(TokenKind::Plus, start)
                 }
             }
             Some(b'/') => {
@@ -742,25 +756,25 @@ impl<'a> Lexer<'a> {
                         let mut pos = self.position;
                         let token = comments::read_line_comment(self.source, &mut pos)?;
                         self.set_position(pos);
-                        Ok(token)
+                        token
                     }
                     Some(b'*') => {
                         // Block comment
                         let mut pos = self.position;
                         let token = comments::read_block_comment(self.source, &mut pos)?;
                         self.set_position(pos);
-                        Ok(token)
+                        token
                     }
                     Some(b'=') => {
                         // Division assignment operator /=
                         self.advance();
                         self.advance();
-                        Ok(self.make_token(TokenKind::SlashEquals, start))
+                        self.make_token(TokenKind::SlashEquals, start)
                     }
                     _ => {
                         // Division operator /
                         self.advance();
-                        Ok(self.make_token(TokenKind::Slash, start))
+                        self.make_token(TokenKind::Slash, start)
                     }
                 }
             }
@@ -770,61 +784,61 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     if self.cur_byte() == Some(b'=') {
                         self.advance();
-                        Ok(self.make_token(TokenKind::StarStarEquals, start))
+                        self.make_token(TokenKind::StarStarEquals, start)
                     } else {
-                        Ok(self.make_token(TokenKind::StarStar, start))
+                        self.make_token(TokenKind::StarStar, start)
                     }
                 } else if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::StarEquals, start))
+                    self.make_token(TokenKind::StarEquals, start)
                 } else {
-                    Ok(self.make_token(TokenKind::Star, start))
+                    self.make_token(TokenKind::Star, start)
                 }
             }
             Some(b'%') => {
                 self.advance();
                 if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::PercentEquals, start))
+                    self.make_token(TokenKind::PercentEquals, start)
                 } else {
-                    Ok(self.make_token(TokenKind::Percent, start))
+                    self.make_token(TokenKind::Percent, start)
                 }
             }
             Some(b'^') => {
                 self.advance();
                 if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::CaretEquals, start))
+                    self.make_token(TokenKind::CaretEquals, start)
                 } else {
-                    Ok(self.make_token(TokenKind::Caret, start))
+                    self.make_token(TokenKind::Caret, start)
                 }
             }
             Some(b'~') => {
                 self.advance();
-                Ok(self.make_token(TokenKind::Tilde, start))
+                self.make_token(TokenKind::Tilde, start)
             }
             Some(b'<') => {
                 self.advance();
                 if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::LessThanEquals, start))
+                    self.make_token(TokenKind::LessThanEquals, start)
                 } else if self.cur_byte() == Some(b'<') {
                     self.advance();
                     if self.cur_byte() == Some(b'=') {
                         self.advance();
-                        Ok(self.make_token(TokenKind::LeftShiftEquals, start))
+                        self.make_token(TokenKind::LeftShiftEquals, start)
                     } else {
-                        Ok(self.make_token(TokenKind::LeftShift, start))
+                        self.make_token(TokenKind::LeftShift, start)
                     }
                 } else {
-                    Ok(self.make_token(TokenKind::LessThan, start))
+                    self.make_token(TokenKind::LessThan, start)
                 }
             }
             Some(b'>') => {
                 self.advance();
                 if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::GreaterThanEquals, start))
+                    self.make_token(TokenKind::GreaterThanEquals, start)
                 } else if self.cur_byte() == Some(b'>') {
                     self.advance();
                     if self.cur_byte() == Some(b'>') {
@@ -832,20 +846,20 @@ impl<'a> Lexer<'a> {
                         self.advance();
                         if self.cur_byte() == Some(b'=') {
                             self.advance();
-                            Ok(self.make_token(TokenKind::UnsignedRightShiftEquals, start))
+                            self.make_token(TokenKind::UnsignedRightShiftEquals, start)
                         } else {
-                            Ok(self.make_token(TokenKind::UnsignedRightShift, start))
+                            self.make_token(TokenKind::UnsignedRightShift, start)
                         }
                     } else if self.cur_byte() == Some(b'=') {
                         // >>=
                         self.advance();
-                        Ok(self.make_token(TokenKind::RightShiftEquals, start))
+                        self.make_token(TokenKind::RightShiftEquals, start)
                     } else {
                         // >>
-                        Ok(self.make_token(TokenKind::RightShift, start))
+                        self.make_token(TokenKind::RightShift, start)
                     }
                 } else {
-                    Ok(self.make_token(TokenKind::GreaterThan, start))
+                    self.make_token(TokenKind::GreaterThan, start)
                 }
             }
             Some(b'!') => {
@@ -854,12 +868,12 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     if self.cur_byte() == Some(b'=') {
                         self.advance();
-                        Ok(self.make_token(TokenKind::BangEqualsEquals, start))
+                        self.make_token(TokenKind::BangEqualsEquals, start)
                     } else {
-                        Ok(self.make_token(TokenKind::BangEquals, start))
+                        self.make_token(TokenKind::BangEquals, start)
                     }
                 } else {
-                    Ok(self.make_token(TokenKind::Bang, start))
+                    self.make_token(TokenKind::Bang, start)
                 }
             }
             Some(b'&') => {
@@ -868,15 +882,15 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     if self.cur_byte() == Some(b'=') {
                         self.advance();
-                        Ok(self.make_token(TokenKind::AmpersandAmpersandEquals, start))
+                        self.make_token(TokenKind::AmpersandAmpersandEquals, start)
                     } else {
-                        Ok(self.make_token(TokenKind::AmpersandAmpersand, start))
+                        self.make_token(TokenKind::AmpersandAmpersand, start)
                     }
                 } else if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::AmpersandEquals, start))
+                    self.make_token(TokenKind::AmpersandEquals, start)
                 } else {
-                    Ok(self.make_token(TokenKind::Ampersand, start))
+                    self.make_token(TokenKind::Ampersand, start)
                 }
             }
             Some(b'|') => {
@@ -885,15 +899,15 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     if self.cur_byte() == Some(b'=') {
                         self.advance();
-                        Ok(self.make_token(TokenKind::PipePipeEquals, start))
+                        self.make_token(TokenKind::PipePipeEquals, start)
                     } else {
-                        Ok(self.make_token(TokenKind::PipePipe, start))
+                        self.make_token(TokenKind::PipePipe, start)
                     }
                 } else if self.cur_byte() == Some(b'=') {
                     self.advance();
-                    Ok(self.make_token(TokenKind::PipeEquals, start))
+                    self.make_token(TokenKind::PipeEquals, start)
                 } else {
-                    Ok(self.make_token(TokenKind::Pipe, start))
+                    self.make_token(TokenKind::Pipe, start)
                 }
             }
             Some(b'?') => {
@@ -902,9 +916,9 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     if self.cur_byte() == Some(b'=') {
                         self.advance();
-                        Ok(self.make_token(TokenKind::QuestionQuestionEquals, start))
+                        self.make_token(TokenKind::QuestionQuestionEquals, start)
                     } else {
-                        Ok(self.make_token(TokenKind::QuestionQuestion, start))
+                        self.make_token(TokenKind::QuestionQuestion, start)
                     }
                 } else if self.cur_byte() == Some(b'.') {
                     // Check for optional chaining `?.`
@@ -913,23 +927,23 @@ impl<'a> Lexer<'a> {
                     let next = self.byte_at(1);
                     if next.is_none_or(|b| !b.is_ascii_digit()) {
                         self.advance();
-                        Ok(self.make_token(TokenKind::QuestionDot, start))
+                        self.make_token(TokenKind::QuestionDot, start)
                     } else {
                         // `?.0` should be `?` followed by `.0` (number)
-                        Ok(self.make_token(TokenKind::Question, start))
+                        self.make_token(TokenKind::Question, start)
                     }
                 } else {
-                    Ok(self.make_token(TokenKind::Question, start))
+                    self.make_token(TokenKind::Question, start)
                 }
             }
             Some(b'`') => {
                 // Template literal starting with backtick
-                self.read_template_content(start)
+                return self.read_template_into(start, dst);
             }
             Some(b'@') => {
                 // @ for decorators
                 self.advance();
-                Ok(self.make_token(TokenKind::At, start))
+                self.make_token(TokenKind::At, start)
             }
             Some(b'#') => {
                 // Check for hashbang at start of file: #!/usr/bin/env node
@@ -937,26 +951,43 @@ impl<'a> Lexer<'a> {
                     let next = self.source.get(1..2);
                     if next == Some("!") {
                         // Hashbang comment - read until end of line
-                        return self.read_hashbang_comment(start);
+                        return self.read_hashbang_into(start, dst);
                     }
                 }
                 // # for private identifiers
                 self.advance();
-                Ok(self.make_token(TokenKind::Hash, start))
+                self.make_token(TokenKind::Hash, start)
             }
             // Non-ASCII lead byte: a Unicode IdentifierStart, otherwise an error.
             // (The ASCII id-start arm above handles `a-z A-Z _ $`; this decodes the
             // char for the Unicode `is_id_start` check — the one token-start decode.)
             Some(b) if b >= 0x80 => match self.cur_char() {
-                Some(ch) if is_id_start(ch) => self.scan_identifier_with_escapes(ch),
-                Some(ch) => Err(lex_err(format!("Unexpected character: '{ch}'"), start)),
-                None => Err(lex_err("Unexpected character", start)),
+                Some(ch) if is_id_start(ch) => return self.scan_identifier_into(ch, dst),
+                Some(ch) => {
+                    return Err(lex_err(format!("Unexpected character: '{ch}'"), start));
+                }
+                None => return Err(lex_err("Unexpected character", start)),
             },
-            Some(b) => Err(lex_err(
-                format!("Unexpected character: '{}'", b as char),
-                start,
-            )),
-        }
+            Some(b) => {
+                return Err(lex_err(
+                    format!("Unexpected character: '{}'", b as char),
+                    start,
+                ));
+            }
+        };
+        Ok(())
+    }
+
+    /// By-value next-token for the peek/seek/bootstrap callers. The hot advance
+    /// path uses [`Lexer::next_token_into`] to write the parser cursor in place.
+    pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
+        let mut tok = Token {
+            kind: TokenKind::Eof,
+            start: 0,
+            end: 0,
+        };
+        self.next_token_into(&mut tok)?;
+        Ok(tok)
     }
 
     /// Decode a template segment's escape sequences for the token's cooked value.
@@ -1034,7 +1065,7 @@ impl<'a> Lexer<'a> {
     /// - TemplateHead: Start of template with `${` interpolation
     /// - TemplateMiddle: Middle section between interpolations (}...${)
     /// - TemplateTail: End section after last interpolation (}...`)
-    fn read_template_content(&mut self, start: usize) -> Result<Token, Box<ParseError>> {
+    fn read_template_into(&mut self, start: usize, dst: &mut Token) -> Result<(), Box<ParseError>> {
         self.advance(); // consume opening ` or }
 
         let content_start = self.position;
@@ -1067,11 +1098,12 @@ impl<'a> Lexer<'a> {
         let content = &self.source[content_start..content_end];
         self.decoded = Self::decode_template_segment(content, has_escapes).map(Box::new);
 
-        Ok(Token {
+        *dst = Token {
             kind,
             start: start as u32,
             end: self.position as u32,
-        })
+        };
+        Ok(())
     }
 
     /// Read a regex literal starting from a `/` or `/=` token.
@@ -1253,7 +1285,7 @@ impl<'a> Lexer<'a> {
     /// Only valid at the start of the file (position 0).
     /// Reads until end of line or end of file.
     /// Returns as a Comment token with is_block: false.
-    fn read_hashbang_comment(&mut self, start: usize) -> Result<Token, Box<ParseError>> {
+    fn read_hashbang_into(&mut self, start: usize, dst: &mut Token) -> Result<(), Box<ParseError>> {
         // Skip #!
         self.advance(); // #
         self.advance(); // !
@@ -1276,13 +1308,14 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Ok(Token {
+        *dst = Token {
             kind: TokenKind::Comment {
                 is_block: false,
                 content_start: start as u32,
             },
             start: start as u32,
             end: self.position as u32,
-        })
+        };
+        Ok(())
     }
 }

@@ -2,13 +2,13 @@
 
 use crate::Goal;
 use crate::ast::internal::*;
-use crate::lexer::{KeywordKind, Lexer, TokenKind};
+use crate::lexer::{KeywordKind, Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::cell::RefCell;
 use std::rc::Rc;
 use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::{ParseError, PeekData, SharedInterner, Span};
+use tsv_lang::{ParseError, SharedInterner, Span};
 
 // Import parsing implementations
 mod expression;
@@ -72,11 +72,19 @@ pub struct Parser<'a, 'arena> {
     arena: &'arena Bump,
     source: &'a str,
     lexer: Lexer<'a>,
-    current_kind: TokenKind,
-    current_start: usize,
-    current_end: usize,
+    /// The current token's classification + span as the lexer's 16-byte POD,
+    /// stored in place so `advance()` overwrites it directly (`self.current =
+    /// self.lexer.next_token()?`) with no intermediate `Token` scattered into
+    /// separate scalar fields. The rare decoded value rides out-of-band in
+    /// `current_decoded` (escape paths only), mirroring the lexer's split.
+    current: Token,
     current_decoded: Option<String>, // Decoded string value (for strings with escapes)
-    peek_cache: Option<PeekData<TokenKind>>,
+    /// Single-token lookahead slot, stored as the 16-byte `Token` POD with its
+    /// decoded value out-of-band in `peek_decoded` (mirroring the `current` /
+    /// `current_decoded` split). Consuming the peek is then a direct `Token` copy
+    /// into `current` with no `PeekData`/`Option<String>` struct reassembly.
+    peek: Option<Token>,
+    peek_decoded: Option<String>,
     interner: SharedInterner,
     base_offset: usize,     // Offset in full source (for embedded expressions)
     comments: Vec<Comment>, // Collected comments during parsing
@@ -105,7 +113,7 @@ pub struct Parser<'a, 'arena> {
     lexer_error: Option<ParseError>,
     /// Whether a line terminator (including before/inside comments drained
     /// during the peek) precedes the cached peek token. Only meaningful while
-    /// `peek_cache` is `Some`; consumed by `advance_inner()`.
+    /// `peek` is `Some`; consumed by `advance_inner()`.
     peek_had_line_terminator: bool,
     /// Whether to allow `in` as a binary operator.
     /// Set to false when parsing for-loop headers to distinguish `for (x in y)` from expressions.
@@ -205,37 +213,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         arena: &'arena Bump,
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
-        // Extract token data immediately to avoid keeping token alive
-        let (mut kind, mut start, mut end, mut decoded) = {
-            let token = lexer.next_token()?;
-            (
-                token.kind,
-                token.start as usize,
-                token.end as usize,
-                lexer.take_decoded().map(|b| *b),
-            )
-        };
+        let mut current = lexer.next_token()?;
+        let mut decoded = lexer.take_decoded().map(|b| *b);
 
         // Collect leading comment tokens
         let mut comments = Vec::new();
         while let TokenKind::Comment {
             is_block,
             content_start,
-        } = &kind
+        } = &current.kind
         {
             let (comment, _) = comment_from_token(
                 source,
-                start,
-                end,
+                current.start as usize,
+                current.end as usize,
                 *content_start as usize,
                 *is_block,
                 base_offset,
             );
             comments.push(comment);
-            let token = lexer.next_token()?;
-            kind = token.kind;
-            start = token.start as usize;
-            end = token.end as usize;
+            current = lexer.next_token()?;
             decoded = lexer.take_decoded().map(|b| *b);
         }
 
@@ -243,11 +240,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             arena,
             source,
             lexer,
-            current_kind: kind,
-            current_start: start,
-            current_end: end,
+            current,
             current_decoded: decoded,
-            peek_cache: None,
+            peek: None,
+            peek_decoded: None,
             interner,
             base_offset,
             comments,
@@ -277,22 +273,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Advance without checking stored error first. Used by try_advance().
     fn advance_inner(&mut self) -> Result<(), ParseError> {
         // Save previous token's end position for ASI span calculation
-        self.prev_end = self.current_end;
+        self.prev_end = self.current.end as usize;
 
         // Get next token (from peek cache or lexer)
-        if let Some(peek) = self.peek_cache.take() {
-            self.current_kind = peek.kind;
-            self.current_start = peek.start;
-            self.current_end = peek.end;
-            self.current_decoded = peek.decoded;
+        if let Some(peek) = self.peek.take() {
+            // Direct 16-byte copy of the cached token POD — no field-by-field
+            // reassembly or `usize`→`u32` conversion.
+            self.current = peek;
+            self.current_decoded = self.peek_decoded.take();
             // Recorded while populating the peek cache — includes line
             // terminators before/inside comments drained during the peek.
             self.had_line_terminator = self.peek_had_line_terminator;
         } else {
-            let token = self.lexer.next_token()?;
-            self.current_kind = token.kind;
-            self.current_start = token.start as usize;
-            self.current_end = token.end as usize;
+            // Write the lexed token straight into the current slot — `next_token_into`
+            // writes through `&mut self.current` (disjoint from `&mut self.lexer`), so
+            // no intermediate `Token` is built/returned/scattered (no sret round-trip).
+            self.lexer.next_token_into(&mut self.current)?;
             self.current_decoded = self.lexer.take_decoded().map(|b| *b);
             self.had_line_terminator = self.lexer.had_line_terminator();
         }
@@ -308,15 +304,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         while let TokenKind::Comment {
             is_block,
             content_start,
-        } = &self.current_kind
+        } = &self.current.kind
         {
             // ECMAScript spec: if a MultiLineComment contains one or more line terminators,
             // then it is replaced by a single line terminator for ASI purposes.
             // So block comments with newlines should set had_line_terminator.
             let (comment, has_line_terminator) = comment_from_token(
                 self.source,
-                self.current_start,
-                self.current_end,
+                self.current.start as usize,
+                self.current.end as usize,
                 *content_start as usize,
                 *is_block,
                 self.base_offset,
@@ -357,7 +353,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     #[inline]
     pub(super) fn current_kind(&self) -> &TokenKind {
-        &self.current_kind
+        &self.current.kind
     }
 
     /// Overwrite the current token's kind/start/end/decoded from a freshly lexed token, without
@@ -365,10 +361,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Used by `collect_comments` and by callers that resync the lexer themselves before reading —
     /// template continuation and the regex relex.
     #[inline]
-    pub(super) fn update_current(&mut self, token: crate::lexer::Token) {
-        self.current_kind = token.kind;
-        self.current_start = token.start as usize;
-        self.current_end = token.end as usize;
+    pub(super) fn update_current(&mut self, token: Token) {
+        self.current = token;
         // `decoded` rides out-of-band on the lexer; the caller lexed `token` from
         // `self.lexer` immediately before this call, so drain it here.
         self.current_decoded = self.lexer.take_decoded().map(|b| *b);
@@ -377,8 +371,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn current_pos(&self) -> (usize, usize) {
         (
-            self.current_start + self.base_offset,
-            self.current_end + self.base_offset,
+            self.current.start as usize + self.base_offset,
+            self.current.end as usize + self.base_offset,
         )
     }
 
@@ -406,12 +400,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Get the raw end position (without base_offset) for lexer operations
     pub(super) fn current_raw_end(&self) -> usize {
-        self.current_end
+        self.current.end as usize
     }
 
     #[inline]
     pub(super) fn current_value(&self) -> &str {
-        &self.source[self.current_start..self.current_end]
+        &self.source[self.current.start as usize..self.current.end as usize]
     }
 
     /// Get the decoded string value for the current token (for strings with escapes)
@@ -629,7 +623,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Create an error: "Expected X, found Y"
     pub(super) fn error_expected_found(&self, what: &str) -> ParseError {
-        let kind = &self.current_kind;
+        let kind = &self.current.kind;
         ParseError::InvalidSyntax {
             message: format!("Expected {what}, found {kind}"),
             position: self.current_pos().0,
@@ -639,7 +633,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Create an error: "Expected X, found Y" at custom position
     pub(super) fn error_expected_found_at(&self, what: &str, position: usize) -> ParseError {
-        let kind = &self.current_kind;
+        let kind = &self.current.kind;
         ParseError::InvalidSyntax {
             message: format!("Expected {what}, found {kind}"),
             position,
@@ -649,7 +643,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Create an error: "Expected X after Y, found Z"
     pub(super) fn error_expected_after(&self, what: &str, after: &str) -> ParseError {
-        let kind = &self.current_kind;
+        let kind = &self.current.kind;
         ParseError::InvalidSyntax {
             message: format!("Expected {what} after '{after}', found {kind}"),
             position: self.current_pos().0,
@@ -672,7 +666,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         separator: &TokenKind,
         terminator: &TokenKind,
     ) -> ParseError {
-        let kind = &self.current_kind;
+        let kind = &self.current.kind;
         ParseError::InvalidSyntax {
             message: format!(
                 "Expected '{separator}' or '{terminator}' after list element, found {kind}"
@@ -683,7 +677,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     pub(super) fn check(&self, kind: &TokenKind) -> bool {
-        &self.current_kind == kind
+        &self.current.kind == kind
     }
 
     /// Check if current token is an assignment operator and return it.
@@ -691,7 +685,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns `Some(operator)` for: `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `**=`,
     /// `<<=`, `>>=`, `>>>=`, `&=`, `|=`, `^=`, `&&=`, `||=`, `??=`
     pub(super) fn try_assignment_operator(&self) -> Option<AssignmentOperator> {
-        match &self.current_kind {
+        match &self.current.kind {
             TokenKind::Equals => Some(AssignmentOperator::Assign),
             TokenKind::PlusEquals => Some(AssignmentOperator::AddAssign),
             TokenKind::MinusEquals => Some(AssignmentOperator::SubtractAssign),
@@ -724,7 +718,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     // draining are recorded in `peek_had_line_terminator` for the
     // advance() that later consumes the cached token.
     pub(super) fn peek_kind(&mut self) -> TokenKind {
-        if self.peek_cache.is_none() && self.lexer_error.is_none() {
+        if self.peek.is_none() && self.lexer_error.is_none() {
             self.peek_had_line_terminator = false;
             loop {
                 match self.lexer.next_token() {
@@ -753,12 +747,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             self.comments.push(comment);
                             continue;
                         }
-                        self.peek_cache = Some(PeekData::with_decoded(
-                            token.kind,
-                            token.start as usize,
-                            token.end as usize,
-                            self.lexer.take_decoded().map(|b| *b),
-                        ));
+                        self.peek = Some(token);
+                        self.peek_decoded = self.lexer.take_decoded().map(|b| *b);
                     }
                     Err(err) => {
                         // Store error to be returned on next advance() (unbox: the
@@ -769,9 +759,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 break;
             }
         }
-        self.peek_cache
+        self.peek
             .as_ref()
-            .map_or(TokenKind::Eof, |p| p.kind.clone())
+            .map_or(TokenKind::Eof, |t| t.kind.clone())
     }
 
     #[expect(dead_code, reason = "Convenience wrapper for peek_kind() == kind")]
@@ -781,9 +771,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Get the value of the peek token as a string slice
     pub(super) fn peek_value(&self) -> &str {
-        self.peek_cache
+        self.peek
             .as_ref()
-            .map_or("", |p| &self.source[p.start..p.end])
+            .map_or("", |t| &self.source[t.start as usize..t.end as usize])
     }
 
     /// Check if peek token is an identifier (used for contextual keyword disambiguation)
@@ -815,7 +805,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Get the start position of the peek token (cache must be populated via peek_kind() first)
     pub(super) fn peek_start(&self) -> usize {
-        self.peek_cache.as_ref().map_or(0, |p| p.start)
+        self.peek.as_ref().map_or(0, |t| t.start as usize)
     }
 
     /// Whether a line terminator separates the current token from the peeked one.
@@ -826,7 +816,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn peek_preceded_by_line_terminator(&mut self) -> bool {
         self.peek_kind(); // populate the cache
         let to = self.peek_start();
-        let from = self.current_end.min(to);
+        let from = (self.current.end as usize).min(to);
         self.source[from..to].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
     }
 
@@ -877,7 +867,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the binding sits one token past the peek horizon.
     pub(super) fn peek_followed_by_same_line_identifier(&mut self) -> bool {
         self.peek_kind(); // populate the cache
-        let after_peek = self.peek_cache.as_ref().map_or(0, |p| p.end);
+        let after_peek = self.peek.as_ref().map_or(0, |t| t.end as usize);
         let bytes = self.source.as_bytes();
         let pos = scan::skip_whitespace_and_comments(bytes, after_peek);
         pos < bytes.len()
@@ -911,7 +901,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// After `.` or `?.`, we expect just an identifier or keyword (not computed/string).
     pub(super) fn current_is_identifier_or_keyword(&self) -> bool {
         matches!(
-            self.current_kind,
+            self.current.kind,
             TokenKind::Identifier | TokenKind::Keyword(_)
         )
     }
@@ -925,7 +915,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Current token must be an identifier or keyword. Call `current_is_identifier_or_keyword()`
     /// to verify before calling this method.
     pub(super) fn current_property_name(&self) -> &str {
-        match &self.current_kind {
+        match &self.current.kind {
             TokenKind::Identifier => self.current_value(),
             TokenKind::Keyword(kw) => kw.as_str(),
             _ => {
@@ -985,7 +975,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             Err(ParseError::UnexpectedToken {
                 expected: kind.to_string(),
-                found: self.current_kind.to_string(),
+                found: self.current.kind.to_string(),
                 position: self.current_pos().0,
                 context: None,
             })
@@ -1013,7 +1003,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     pub(super) fn expect_greater_than_in_type(&mut self) -> Result<(), ParseError> {
-        match self.current_kind {
+        match self.current.kind {
             TokenKind::GreaterThan => {
                 // Normal case: single `>`
                 self.advance()
@@ -1021,19 +1011,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::RightShift => {
                 // `>>` - split into `>` + `>`
                 // Consume first `>` by advancing start position
-                self.current_start += 1;
-                self.current_kind = TokenKind::GreaterThan;
+                self.current.start += 1;
+                self.current.kind = TokenKind::GreaterThan;
                 // Clear peek cache since token boundaries changed
-                self.peek_cache = None;
+                self.peek = None;
+                self.peek_decoded = None;
                 Ok(())
             }
             TokenKind::UnsignedRightShift => {
                 // `>>>` - split into `>` + `>>`
                 // Consume first `>` by advancing start position
-                self.current_start += 1;
-                self.current_kind = TokenKind::RightShift;
+                self.current.start += 1;
+                self.current.kind = TokenKind::RightShift;
                 // Clear peek cache since token boundaries changed
-                self.peek_cache = None;
+                self.peek = None;
+                self.peek_decoded = None;
                 Ok(())
             }
             TokenKind::GreaterThanEquals
@@ -1041,7 +1033,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | TokenKind::UnsignedRightShiftEquals => {
                 // `>=`, `>>=`, `>>>=` - consume `>`, re-lex from next position
                 // The remainder might combine with subsequent chars (e.g., `>=` -> `=>`)
-                let new_start = self.current_start + 1;
+                let new_start = self.current.start as usize + 1;
                 // Drop comments drained by a discarded peek — the seek below
                 // re-lexes that region, and they'd be collected twice.
                 let relex_from = (new_start + self.base_offset) as u32;
@@ -1053,17 +1045,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.comments.pop();
                 }
                 let token = self.lexer.seek_and_next_token(new_start)?;
-                self.current_kind = token.kind;
-                self.current_start = token.start as usize;
-                self.current_end = token.end as usize;
+                self.current = token;
                 self.current_decoded = self.lexer.take_decoded().map(|b| *b);
                 // Clear peek cache since token changed
-                self.peek_cache = None;
+                self.peek = None;
+                self.peek_decoded = None;
                 Ok(())
             }
             _ => Err(ParseError::UnexpectedToken {
                 expected: "'>'".to_string(),
-                found: format!("'{}'", self.current_kind),
+                found: format!("'{}'", self.current.kind),
                 position: self.current_pos().0,
                 context: None,
             }),
@@ -1073,7 +1064,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Check if current token is `>` or can be split to produce `>` (for type contexts)
     pub(super) fn check_greater_than_in_type(&self) -> bool {
         matches!(
-            self.current_kind,
+            self.current.kind,
             TokenKind::GreaterThan
                 | TokenKind::RightShift
                 | TokenKind::UnsignedRightShift
@@ -1129,7 +1120,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// This is the core ASI detection per ECMAScript spec section 12.9.
     pub(super) fn can_insert_semicolon(&self) -> bool {
-        matches!(self.current_kind, TokenKind::Eof | TokenKind::BraceClose)
+        matches!(self.current.kind, TokenKind::Eof | TokenKind::BraceClose)
             || self.had_line_terminator
     }
 
@@ -1215,7 +1206,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.base_offset; // Start at base_offset for embedded contexts
         let mut body = self.bvec();
 
-        while self.current_kind != TokenKind::Eof {
+        while self.current.kind != TokenKind::Eof {
             body.push(self.parse_statement()?);
         }
         self.adapt_directive_prologue(&mut body);
@@ -1285,13 +1276,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let expr = result?;
         // Return the start of the current (unconsumed) token
-        let next_pos = self.current_start + self.base_offset;
+        let next_pos = self.current.start as usize + self.base_offset;
         Ok((expr, next_pos))
     }
 
     /// Check if the current token is a colon.
     pub fn at_colon(&self) -> bool {
-        matches!(self.current_kind, TokenKind::Colon)
+        matches!(self.current.kind, TokenKind::Colon)
     }
 
     /// Parse a type annotation (`: Type`) at the current position.
@@ -1302,7 +1293,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Get the current token's start position (absolute, with base_offset).
     pub fn current_absolute_position(&self) -> usize {
-        self.current_start + self.base_offset
+        self.current.start as usize + self.base_offset
     }
 
     /// Convert an expression to a binding pattern.

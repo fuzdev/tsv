@@ -17,14 +17,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Scans ahead looking for pattern: `(` ... `)` `=>`
     pub(super) fn is_arrow_function_start(&self) -> bool {
-        scan_parens_then_arrow(self.source.as_bytes(), self.current_start)
+        scan_parens_then_arrow(self.source.as_bytes(), self.current.start as usize)
     }
 
     /// Check if current position starts a single-param arrow function: `x =>`
     ///
     /// Scans ahead looking for pattern: `identifier` `=>`
     pub(super) fn is_single_param_arrow_start(&self) -> bool {
-        scan_identifier_then_arrow(self.source.as_bytes(), self.current_start)
+        scan_identifier_then_arrow(self.source.as_bytes(), self.current.start as usize)
     }
 
     /// Check if current position starts a generic arrow function: `<T>() =>`
@@ -32,7 +32,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Scans ahead looking for pattern: `<` ... `>` `(` ... `)` `=>`
     pub(super) fn is_generic_arrow_function_start(&self) -> bool {
         let bytes = self.source.as_bytes();
-        let start = self.current_start;
+        let start = self.current.start as usize;
 
         // Must start with '<'
         if start >= bytes.len() || bytes[start] != b'<' {
