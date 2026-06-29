@@ -3,6 +3,7 @@
 use super::comments;
 use super::escapes;
 use super::ident::{is_id_continue, is_id_start};
+use super::lex_err;
 use super::token::{Token, TokenKind, keyword_at};
 use tsv_lang::ParseError;
 
@@ -30,21 +31,6 @@ const fn is_ascii_id_start(b: u8) -> bool {
 #[inline]
 const fn is_ascii_id_continue(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'$'
-}
-
-/// Construct a boxed lexer error. The lexer returns `Result<_, Box<ParseError>>`
-/// (see `From<Box<ParseError>>` in `tsv_lang`): boxing keeps the hot `next_token`
-/// Ok path pointer-sized. `#[cold]`/`#[inline(never)]` outlines the error
-/// construction so it never bloats the inlined token-scan fast path.
-#[cold]
-#[inline(never)]
-#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
-fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
-    Box::new(ParseError::InvalidSyntax {
-        message: message.into(),
-        position,
-        context: None,
-    })
 }
 
 /// Try to decode a unicode escape sequence at the given position.
@@ -446,6 +432,131 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Scan a numeric literal — decimal, `0x`/`0b`/`0o` radix, float, exponent,
+    /// or `BigInt` suffix — writing the `Number` token into `*dst`. `first` is the
+    /// digit at `start` the dispatch already matched. Mirrors the `_into`
+    /// write-through of the other large scanners so the dispatch arm is one
+    /// `return`. Errors on a legacy octal literal (`0777`), illegal in strict mode.
+    fn scan_number_into(
+        &mut self,
+        start: usize,
+        first: u8,
+        dst: &mut Token,
+    ) -> Result<(), Box<ParseError>> {
+        if first == b'0' {
+            match self.byte_ahead(1) {
+                Some(b'x' | b'X') => {
+                    // Hex: 0xff, 0xFF
+                    self.advance(); // consume '0'
+                    self.advance(); // consume 'x'
+                    self.scan_digits(|c| c.is_ascii_hexdigit());
+                }
+                Some(b'b' | b'B') => {
+                    // Binary: 0b1010
+                    self.advance(); // consume '0'
+                    self.advance(); // consume 'b'
+                    self.scan_digits(|c| c == '0' || c == '1');
+                }
+                Some(b'o' | b'O') => {
+                    // Octal: 0o77
+                    self.advance(); // consume '0'
+                    self.advance(); // consume 'o'
+                    self.scan_digits(|c| ('0'..='7').contains(&c));
+                }
+                Some(b'0'..=b'7') => {
+                    // Legacy octal (0777) - reject in strict mode (ES modules)
+                    // ES modules are always strict, so this is always an error
+                    return Err(lex_err(
+                        "Octal literals are not allowed in strict mode. Use the syntax '0o' instead.",
+                        start,
+                    ));
+                }
+                _ => {
+                    // Regular number or float starting with 0 (e.g., 0.5, 08, 09)
+                    // Note: 08 and 09 are valid decimal literals (non-octal digits)
+                    self.scan_decimal_number();
+                }
+            }
+        } else {
+            // Regular decimal number
+            self.scan_decimal_number();
+        }
+
+        // Check for BigInt suffix: 123n, 0xffn
+        if self.cur_byte() == Some(b'n') {
+            self.advance();
+        }
+
+        *dst = self.make_token(TokenKind::Number, start);
+        Ok(())
+    }
+
+    /// Scan a single- or double-quoted string literal (cursor on the opening
+    /// `quote` byte), writing the `String` token into `*dst` and the decoded value
+    /// out-of-band via `self.decoded` only when it contains escapes. Mirrors the
+    /// `_into` write-through of the other large scanners.
+    ///
+    /// The inner run skips everything that is neither the close quote nor a
+    /// backslash — a 2-byte search the compiler auto-vectorizes. Byte-at-a-time is
+    /// sound: quote and `\` are ASCII (`< 0x80`) and so never appear as a UTF-8
+    /// continuation byte. `has_escapes` gates the (rare) decode pass.
+    fn scan_string_into(
+        &mut self,
+        start: usize,
+        quote: u8,
+        dst: &mut Token,
+    ) -> Result<(), Box<ParseError>> {
+        self.advance(); // consume opening quote
+        let content_start = self.position;
+
+        let bytes = self.bytes;
+        let len = bytes.len();
+        let mut p = content_start;
+        let mut has_escapes = false;
+        loop {
+            while p < len && bytes[p] != quote && bytes[p] != b'\\' {
+                p += 1;
+            }
+            if p >= len {
+                // Unterminated string
+                self.position = p;
+                return Err(lex_err("Unterminated string literal", start));
+            }
+            if bytes[p] == quote {
+                let content_end = p;
+                p += 1; // consume closing quote
+                self.position = p;
+
+                let content = &self.source[content_start..content_end];
+
+                // Decode escape sequences if present
+                let decoded = if has_escapes {
+                    Some(escapes::decode_string_escapes(content).map_err(Box::new)?)
+                } else {
+                    // No escapes - use content as-is
+                    None
+                };
+
+                self.decoded = decoded.map(Box::new);
+                *dst = Token {
+                    kind: TokenKind::String,
+                    start: start as u32,
+                    end: p as u32,
+                };
+                return Ok(());
+            }
+            // bytes[p] == b'\\': escape — skip the backslash and the next
+            // character (decode_string_escapes validates it later). Advance
+            // past a full char so a multibyte escaped char resumes the inner
+            // scan on a char boundary.
+            has_escapes = true;
+            p += 1;
+            if p < len {
+                p += utf8_len(bytes[p]);
+            }
+        }
+    }
+
     fn skip_whitespace(&mut self) {
         self.had_line_terminator = false;
         loop {
@@ -499,10 +610,11 @@ impl<'a> Lexer<'a> {
     /// `Result<Token>` keeps the 16-byte token in registers and elides the sret
     /// round-trip the by-value return forces (the intermediate `Token` built on
     /// the lexer frame, returned, and re-scattered). The match yields a `Token`
-    /// value for the common punctuation/number/string paths; the
-    /// identifier/template/hashbang paths and the error paths write `dst` (or
-    /// propagate the error) via an early `return`. [`Lexer::next_token`] is the
-    /// thin by-value wrapper kept for the peek/seek/bootstrap callers.
+    /// value only for the short punctuation/operator paths; the
+    /// identifier/number/string/template/hashbang scanners and the error paths
+    /// write `dst` (or propagate the error) via an early `return`.
+    /// [`Lexer::next_token`] is the thin by-value wrapper kept for the
+    /// peek/seek/bootstrap callers.
     pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Box<ParseError>> {
         // Clear any decoded value left from the previous token so `take_decoded`
         // reflects only the token produced by this call (set by the escape paths below).
@@ -550,55 +662,7 @@ impl<'a> Lexer<'a> {
                     }
                 }
             }
-            Some(b) if b.is_ascii_digit() => {
-                // Handle different number formats
-                if b == b'0' {
-                    let next = self.byte_ahead(1);
-                    match next {
-                        Some(b'x' | b'X') => {
-                            // Hex: 0xff, 0xFF
-                            self.advance(); // consume '0'
-                            self.advance(); // consume 'x'
-                            self.scan_digits(|c| c.is_ascii_hexdigit());
-                        }
-                        Some(b'b' | b'B') => {
-                            // Binary: 0b1010
-                            self.advance(); // consume '0'
-                            self.advance(); // consume 'b'
-                            self.scan_digits(|c| c == '0' || c == '1');
-                        }
-                        Some(b'o' | b'O') => {
-                            // Octal: 0o77
-                            self.advance(); // consume '0'
-                            self.advance(); // consume 'o'
-                            self.scan_digits(|c| ('0'..='7').contains(&c));
-                        }
-                        Some(b'0'..=b'7') => {
-                            // Legacy octal (0777) - reject in strict mode (ES modules)
-                            // ES modules are always strict, so this is always an error
-                            return Err(lex_err(
-                                "Octal literals are not allowed in strict mode. Use the syntax '0o' instead.",
-                                start,
-                            ));
-                        }
-                        _ => {
-                            // Regular number or float starting with 0 (e.g., 0.5, 08, 09)
-                            // Note: 08 and 09 are valid decimal literals (non-octal digits)
-                            self.scan_decimal_number();
-                        }
-                    }
-                } else {
-                    // Regular decimal number
-                    self.scan_decimal_number();
-                }
-
-                // Check for BigInt suffix: 123n, 0xffn
-                if self.cur_byte() == Some(b'n') {
-                    self.advance();
-                }
-
-                self.make_token(TokenKind::Number, start)
-            }
+            Some(b) if b.is_ascii_digit() => return self.scan_number_into(start, b, dst),
             // ECMAScript identifiers: start with ID_Start, _, or $; continue with ID_Continue or $
             // Note: _ is in ID_Continue but not ID_Start, so we check it explicitly for start
             // Identifiers may contain unicode escapes: \u0066oo → foo, b\u0061r → bar
@@ -614,62 +678,7 @@ impl<'a> Lexer<'a> {
                 // Not a valid identifier start - error.
                 return Err(lex_err("Unexpected character: '\\'", start));
             }
-            Some(quote @ (b'\'' | b'"')) => {
-                // String literal - single or double quoted
-                self.advance(); // consume opening quote
-                let content_start = self.position;
-
-                // Scan the body over raw bytes. The inner run skips everything that
-                // is neither the close quote nor a backslash — a 2-byte search the
-                // compiler auto-vectorizes. Byte-at-a-time is sound: quote and `\`
-                // are ASCII (`< 0x80`) and so never appear as a UTF-8 continuation
-                // byte. `has_escapes` gates the (rare) decode pass.
-                let bytes = self.bytes;
-                let len = bytes.len();
-                let mut p = content_start;
-                let mut has_escapes = false;
-                loop {
-                    while p < len && bytes[p] != quote && bytes[p] != b'\\' {
-                        p += 1;
-                    }
-                    if p >= len {
-                        // Unterminated string
-                        self.position = p;
-                        return Err(lex_err("Unterminated string literal", start));
-                    }
-                    if bytes[p] == quote {
-                        let content_end = p;
-                        p += 1; // consume closing quote
-                        self.position = p;
-
-                        let content = &self.source[content_start..content_end];
-
-                        // Decode escape sequences if present
-                        let decoded = if has_escapes {
-                            Some(escapes::decode_string_escapes(content).map_err(Box::new)?)
-                        } else {
-                            // No escapes - use content as-is
-                            None
-                        };
-
-                        self.decoded = decoded.map(Box::new);
-                        break Token {
-                            kind: TokenKind::String,
-                            start: start as u32,
-                            end: p as u32,
-                        };
-                    }
-                    // bytes[p] == b'\\': escape — skip the backslash and the next
-                    // character (decode_string_escapes validates it later). Advance
-                    // past a full char so a multibyte escaped char resumes the inner
-                    // scan on a char boundary.
-                    has_escapes = true;
-                    p += 1;
-                    if p < len {
-                        p += utf8_len(bytes[p]);
-                    }
-                }
-            }
+            Some(quote @ (b'\'' | b'"')) => return self.scan_string_into(start, quote, dst),
             Some(b',') => {
                 self.advance();
                 self.make_token(TokenKind::Comma, start)

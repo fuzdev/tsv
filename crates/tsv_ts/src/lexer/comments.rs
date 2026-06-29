@@ -1,3 +1,4 @@
+use super::lex_err;
 use super::token::{Token, TokenKind};
 use tsv_lang::ParseError;
 
@@ -69,11 +70,7 @@ pub(crate) fn read_block_comment(source: &str, pos: &mut usize) -> Result<Token,
             p += 1;
         }
         if p >= len {
-            return Err(Box::new(ParseError::InvalidSyntax {
-                message: "Unterminated block comment".to_string(),
-                position: start,
-                context: None,
-            }));
+            return Err(lex_err("Unterminated block comment", start));
         }
         // bytes[p] == b'*'
         if bytes.get(p + 1) == Some(&b'/') {

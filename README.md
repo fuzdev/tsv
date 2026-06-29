@@ -75,11 +75,11 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
   and tsv has its own internal optimal AST
 - `tsv format` discovery is gitignore-aware,
-  honoring `.gitignore` and `.formatignore` (original to tsv)
-  hierarchically (supporting nested files like git, unlike `.prettierignore`)
+  honoring `.gitignore` and `.formatignore` (original to tsv),
+  hierarchically supporting nested files like git and unlike `.prettierignore`,
   plus a compatible `.prettierignore`
   (but relative to repo root if available, not cwd like Prettier's default)
-  ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format that exist today))
+  ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format) that exist today)
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
   JS reaches tsv through the WASM bindings, and native N-API bindings are not yet published
 - architected to output optimal artifacts: runtime speed and compiled
