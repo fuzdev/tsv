@@ -6,8 +6,10 @@
 use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
 use crate::printer::{ParenContext, Printer};
+use smallvec::smallvec;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 
@@ -348,7 +350,7 @@ impl<'a> Printer<'a> {
             tag_doc,
         );
 
-        let mut parts = vec![tag_doc];
+        let mut parts: DocBuf = smallvec![tag_doc];
         if let Some(type_args) = &tagged.type_arguments {
             // Preserve comments between tag and type args: `fn/* c */ <string>`template``
             let tag_end = tagged.tag.span().end;

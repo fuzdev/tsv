@@ -4,7 +4,9 @@
 
 use crate::ast::internal::{self, Statement};
 use crate::printer::Printer;
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char, find_char_skipping_comments};
 
@@ -135,7 +137,7 @@ impl<'a> Printer<'a> {
             ])
         };
 
-        let mut switch_parts = vec![d.text("switch")];
+        let mut switch_parts: DocBuf = smallvec![d.text("switch")];
         if let Some(kc) = keyword_comments {
             switch_parts.push(kc);
         }
@@ -293,7 +295,7 @@ impl<'a> Printer<'a> {
                 } else {
                     // Leading comments exist - indent both comments and block
                     // e.g., `case 'b':\n  // comment\n  {`
-                    let mut stmt_parts = vec![d.hardline()];
+                    let mut stmt_parts: DocBuf = smallvec![d.hardline()];
                     for comment in &leading_comments {
                         stmt_parts.push(self.build_comment_doc(comment));
                         stmt_parts.push(d.hardline());
@@ -303,7 +305,7 @@ impl<'a> Printer<'a> {
                 }
             } else {
                 // Build the indented content for this statement
-                let mut stmt_parts = vec![d.hardline()];
+                let mut stmt_parts: DocBuf = smallvec![d.hardline()];
 
                 // Preserve blank lines between statements within case consequent
                 if prev_stmt_end.is_some() {

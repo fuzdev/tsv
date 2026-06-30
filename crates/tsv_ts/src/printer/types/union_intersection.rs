@@ -15,6 +15,7 @@ use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
 use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::hang_after_operator;
+use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -753,7 +754,7 @@ impl<'a> Printer<'a> {
             for (i, _) in intersection.types.iter().enumerate().skip(1) {
                 let body = self.build_intersection_member_body_doc(intersection, i);
                 let sep = if i == 1 { d.text(" ") } else { d.line() };
-                let mut member = vec![sep];
+                let mut member: DocBuf = smallvec![sep];
                 member.extend(body);
 
                 if i == 1 {
@@ -967,7 +968,7 @@ impl<'a> Printer<'a> {
         // Build the rest as `first & second & third...` inline (the hoisted
         // comment forces a hardline before; we want the intersection itself
         // to remain compact when possible).
-        let mut parts = vec![first_doc];
+        let mut parts: DocBuf = smallvec![first_doc];
         for t in intersection.types.iter().skip(1) {
             parts.push(d.text(" & "));
             parts.push(self.build_type_doc_maybe_parens(t, member_parens));
