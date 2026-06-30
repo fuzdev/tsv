@@ -81,6 +81,32 @@ Deno.test('vs_prettier: loss shared with prettier (e.g. trailing-zero strip) can
 	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
 });
 
+Deno.test('vs_prettier: opposite-direction case canonicalization is safe (CSS unit case)', () => {
+	// tsv lowercases EVERY unit to its spec-canonical serialized form (`5CH`→`5ch`,
+	// `5hZ`→`5hz`); prettier lowercases most but UPCASES the Hz/kHz/Q trio (`5hZ`→`5Hz`)
+	// — the sanctioned `units_serialize_case` divergence. The shared lowercasing (`5CH`
+	// both→`5ch`) gives source a surplus of `H` over ours; prettier keeping `5Hz`
+	// uppercase means it drops fewer `H`, so a naive case-SENSITIVE differential leaves a
+	// fabricated `H`-lost / `h`-added remainder. A case-only swap of a case-insensitive
+	// token is canonicalization, never content loss — folding ASCII case cancels it.
+	const source = 'a: 5CH;\n\tb: 5hZ;\n';
+	const ours = 'a: 5ch;\n\tb: 5hz;\n';
+	const prettier = 'a: 5ch;\n\tb: 5Hz;\n';
+	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
+});
+
+Deno.test('vs_prettier: a genuine letter drop is still flagged despite case-folding', () => {
+	// Case-folding must not mask a real loss: dropping a letter entirely still reduces
+	// the folded count. Here ours drops the `c` from an identifier prettier keeps.
+	const source = 'const abc = 1;\n';
+	const prettier = 'const abc = 1;\n';
+	const ours = 'const ab = 1;\n';
+	const v = check_safety_vs_prettier(source, ours, prettier);
+	assertEquals(v.length, 1);
+	assertEquals(v[0].type, 'content_lost');
+	assertEquals(v[0].total, 1); // the dropped `c`
+});
+
 Deno.test('vs_prettier: prettier-empty output never fabricates a violation', () => {
 	// The prettier Deno sidecar can return '' for a file under load. The check
 	// iterates the chars OURS deviates on and uses prettier only as a subtrahend,

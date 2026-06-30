@@ -5,6 +5,16 @@
  * and punctuation, so semantic characters (letters, digits) should be preserved.
  * If source has more of any semantic character than formatted output, content was lost.
  *
+ * Comparison is ASCII-case-INSENSITIVE. A formatter never recases semantic content
+ * (identifiers and string bytes are preserved exactly); the only thing it recases is a
+ * case-insensitive token — CSS units/keywords/hex, JS numeric `0xFF`/`1E10` — which is
+ * canonicalization, never content loss. Folding ASCII case before counting lets such a
+ * change cancel even when the two formatters canonicalize in OPPOSITE directions (tsv
+ * lowercases every CSS unit to its spec-serialized form while prettier upcases the
+ * `Hz`/`kHz`/`Q` trio — the `units_serialize_case` divergence), which a case-sensitive
+ * count would otherwise report as a fabricated loss/addition. A genuine letter drop still
+ * lowers the folded count, so real loss is unaffected.
+ *
  * Safety violations are BUGS, not intentional divergences.
  *
  * The check is DIFFERENTIAL against prettier (`check_safety_vs_prettier`):
@@ -224,10 +234,13 @@ function find_missing_lines(
 		const trimmed = line.trim();
 		if (!trimmed) continue;
 
-		// Check if line contains any lost characters
+		// Check if line contains any lost characters. The keys are ASCII-case-folded
+		// (count_semantic_chars), so match case-insensitively to find a source line whose
+		// letter appears uppercase.
+		const trimmed_lower = trimmed.toLowerCase();
 		let has_lost_char = false;
 		for (const char of lost_chars.keys()) {
-			if (trimmed.includes(char)) {
+			if (trimmed_lower.includes(char)) {
 				has_lost_char = true;
 				break;
 			}
@@ -258,15 +271,28 @@ function normalize_for_comparison(text: string): string {
 }
 
 /**
- * Count semantic (non-formatting) character frequencies in a string.
+ * Count semantic (non-formatting) character frequencies in a string, folding ASCII
+ * case (see the module doc — a case-only swap is canonicalization, never content loss).
  */
 function count_semantic_chars(text: string): Map<string, number> {
 	const counts = new Map<string, number>();
 
 	for (const char of text) {
 		if (FORMATTING_CHARS.has(char)) continue;
-		counts.set(char, (counts.get(char) ?? 0) + 1);
+		const key = fold_ascii_case(char);
+		counts.set(key, (counts.get(key) ?? 0) + 1);
 	}
 
 	return counts;
+}
+
+/**
+ * Fold an ASCII uppercase letter (A–Z) to lowercase; every other code point
+ * (digits, punctuation, non-ASCII, astral) is returned unchanged. Deliberately
+ * ASCII-only — `String.prototype.toLowerCase` is Unicode-aware and would fold
+ * locale-sensitive forms the CSS/JS case-insensitivity rules don't cover.
+ */
+function fold_ascii_case(char: string): string {
+	const code = char.charCodeAt(0);
+	return code >= 65 && code <= 90 ? String.fromCharCode(code + 32) : char;
 }
