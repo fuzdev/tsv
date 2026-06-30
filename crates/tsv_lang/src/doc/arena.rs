@@ -65,6 +65,22 @@ pub enum DocNode {
     /// Text content to output (static, owned, or symbol)
     Text(DocText),
 
+    /// Multi-line text rendered with per-line context indent.
+    ///
+    /// Holds a body whose lines are `\n`-separated in one owned `String`. The
+    /// first line renders at the current column; every subsequent line is
+    /// preceded by a context-indented hardline (trim trailing whitespace,
+    /// newline, write indentation). Output- and position-identical to
+    /// `concat([text(line0), hardline, text(line1), hardline, …])`, but stores
+    /// the whole body in one allocation instead of one node (and one `String`)
+    /// per line.
+    ///
+    /// Used for indentable (JSDoc / `*`-aligned) multi-line block comments,
+    /// whose continuation lines all use the uniform hardline (context-indent)
+    /// layout. Always contains a newline, so it forces enclosing groups to break
+    /// (`will_break` is true) exactly like the hardlines it replaces.
+    MultilineText(String),
+
     /// Line break - behavior depends on kind and mode
     Line(LineKind),
 
@@ -349,6 +365,17 @@ impl DocArena {
             visual_width(&s, TAB_WIDTH) as u16
         };
         self.alloc(DocNode::Text(DocText::Owned(s, w)))
+    }
+
+    /// Create a multi-line text doc rendered with per-line context indent.
+    ///
+    /// `s`'s lines (split on `\n`) are emitted as: the first at the current
+    /// column, each subsequent one after a context-indented hardline. See
+    /// [`DocNode::MultilineText`]. Use for indentable multi-line block comments;
+    /// the body must already be framed (delimiters + per-line spacing baked in).
+    #[inline]
+    pub fn multiline_text(&self, s: String) -> DocId {
+        self.alloc(DocNode::MultilineText(s))
     }
 
     /// Create an owned-text doc for a *line comment* (`// …` or hashbang) — text
@@ -674,6 +701,8 @@ impl DocArena {
         }
         let result = match &nodes[id.index()] {
             DocNode::Text(_) => false,
+            // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
+            DocNode::MultilineText(_) => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 Self::will_break_memo(*inner, nodes, children, cache)
@@ -718,6 +747,7 @@ impl DocArena {
         match &nodes[id.index()] {
             DocNode::IsolatedGroup { contents, .. } => self.will_break_deep_inner(*contents, nodes),
             DocNode::Text(_) => false,
+            DocNode::MultilineText(_) => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.will_break_deep_inner(*inner, nodes)
@@ -752,6 +782,7 @@ impl DocArena {
     fn has_forced_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
         match &nodes[id.index()] {
             DocNode::Text(_) => false,
+            DocNode::MultilineText(_) => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.has_forced_break_inner(*inner, nodes)
@@ -818,6 +849,7 @@ impl DocArena {
             DocNode::WithContext { doc, .. } => self.can_break_inner(*doc, nodes),
             DocNode::IsolatedGroup { contents, .. } => self.can_break_inner(*contents, nodes),
             DocNode::LineSuffix(inner) => self.can_break_inner(*inner, nodes),
+            DocNode::MultilineText(_) => true,
             DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
         }
@@ -830,6 +862,7 @@ impl DocArena {
         // This pattern avoids RefCell conflicts since alloc() needs borrow_mut().
         enum Info {
             Keep, // Return id unchanged
+            MultilineText(String),
             Line(LineKind),
             Indent(DocId),
             Dedent(DocId),
@@ -854,6 +887,10 @@ impl DocArena {
             let nodes = self.nodes.borrow();
             match &nodes[id.index()] {
                 DocNode::Text(_) | DocNode::LineSuffixBoundary => Info::Keep,
+                // Flatten: drop the internal hardlines (→ empty) and join the
+                // lines with no separator — identical to remove_lines over the
+                // per-line `concat([text, hardline, text, …])` this replaces.
+                DocNode::MultilineText(s) => Info::MultilineText(s.replace('\n', "")),
                 DocNode::Line(kind) => Info::Line(*kind),
                 DocNode::Indent(inner) => Info::Indent(*inner),
                 DocNode::Dedent(inner) => Info::Dedent(*inner),
@@ -888,6 +925,7 @@ impl DocArena {
 
         match info {
             Info::Keep => id,
+            Info::MultilineText(flat) => self.text_owned(flat),
             Info::Line(kind) => match kind {
                 LineKind::Normal => self.text(" "),
                 LineKind::Soft | LineKind::Hard | LineKind::Literal => self.empty(),
