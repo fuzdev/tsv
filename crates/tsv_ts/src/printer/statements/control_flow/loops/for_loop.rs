@@ -25,6 +25,16 @@ struct ForHeaderSpans {
     close_paren: Option<u32>,
 }
 
+/// Mutable cursor state while laying out an empty `for (;;)` header's comments.
+struct EmptyForCursor {
+    /// A `//` line comment was just emitted: it runs to end-of-line, so the next
+    /// item must start on a new line.
+    pending_break: bool,
+    /// The previously emitted item was a block comment, so a separating space is
+    /// owed before a following `;`.
+    prev_block: bool,
+}
+
 impl<'a> Printer<'a> {
     /// Append `)` + comments + non-block body for for-in/for-of statements.
     ///
@@ -169,63 +179,120 @@ impl<'a> Printer<'a> {
         self.build_for_header_doc_impl(stmt, None)
     }
 
-    /// Build doc for empty for (;;) with comments inside
+    /// Build doc for an empty `for (;;)` header that has comments inside the parens.
     ///
-    /// Preserves comments in their original positions (divergence from prettier).
-    /// Format: for (\n\t; // comment\n\t; // comment\n\t// comment\n)
-    fn build_for_empty_with_comments(&self, stmt: &internal::ForStatement<'_>) -> DocId {
+    /// Preserves comments in their authored positions — a divergence from prettier,
+    /// which relocates every comment outside the parens once all three clauses are
+    /// empty (prettier itself keeps them inline when any clause is non-empty, so its
+    /// relocation is internally inconsistent). See the
+    /// `empty_clauses*_comment_prettier_divergence` fixtures.
+    ///
+    /// The header breaks only where a `//` line comment forces a line end: with
+    /// block comments alone the whole header stays on one line (`for (/* a */ ;;)`);
+    /// a line comment drops the rest of the header to the next line, but the `;;`
+    /// stay together when nothing separates them (`for ( // c⏎\t;;⏎)`). `for_open`
+    /// is the already-built `for (` prefix (carrying any `for`→`(` keyword comment).
+    fn build_for_empty_with_comments(
+        &self,
+        stmt: &internal::ForStatement<'_>,
+        for_open: DocId,
+    ) -> DocId {
         let d = self.d();
-        let Some(open_paren) = self.find_open_paren_after(stmt.span.start) else {
-            return d.text("for (;;)");
+        let Some(open) = self.find_open_paren_after(stmt.span.start) else {
+            return d.concat(&[for_open, d.text(";;)")]);
         };
-        let Some(close_paren) = self.matching_close_paren(open_paren) else {
-            return d.text("for (;;)");
+        let Some(close) = self.matching_close_paren(open) else {
+            return d.concat(&[for_open, d.text(";;)")]);
+        };
+        let (Some(s1), Some(s2)) = self.find_for_semicolons(open) else {
+            return d.concat(&[for_open, d.text(";;)")]);
         };
 
-        // Find the two semicolons
-        let (first_semi, second_semi) = self.find_for_semicolons(open_paren);
+        // A `//` line comment anywhere in the header runs to end-of-line, so it
+        // forces the following tokens onto new lines; with only block comments the
+        // header stays inline.
+        let breaking = self.has_line_comments_between(open + 1, close);
 
-        let mut parts: DocBuf = smallvec![d.text("for (")];
-        let mut inner_parts = DocBuf::new();
+        let mut inner = DocBuf::new();
+        let mut cur = EmptyForCursor {
+            pending_break: false,
+            prev_block: false,
+        };
 
-        // First semicolon line: ; // inline comment
-        inner_parts.push(d.hardline());
-        inner_parts.push(d.text(";"));
-        if let (Some(semi1), Some(semi2)) = (first_semi, second_semi) {
-            for comment in comments_in_range(self.comments, semi1 + 1, semi2) {
-                if self.is_same_line(semi1, comment.span.start) {
-                    inner_parts.push(d.text(" "));
-                    inner_parts.push(self.build_comment_doc(comment));
-                }
-            }
+        // Region before the first `;` is anchored on `(` (a leading block comment
+        // hugs it: `for (/* a */`); regions after a `;` space-separate block
+        // comments (`; /* b */`).
+        self.emit_empty_for_comments(&mut inner, &mut cur, open + 1, s1, open, true);
+        self.emit_empty_for_semicolon(&mut inner, &mut cur);
+        self.emit_empty_for_comments(&mut inner, &mut cur, s1 + 1, s2, s1, false);
+        self.emit_empty_for_semicolon(&mut inner, &mut cur);
+        self.emit_empty_for_comments(&mut inner, &mut cur, s2 + 1, close, s2, false);
+
+        // A `//` forces breaks: indent the body and drop `)` to its own line.
+        // Block-only headers stay on the single `for (…)` line.
+        let body = d.concat(&inner);
+        if breaking {
+            d.concat(&[for_open, d.indent(body), d.hardline(), d.text(")")])
+        } else {
+            d.concat(&[for_open, body, d.text(")")])
         }
+    }
 
-        // Second semicolon line: ; // inline comment
-        inner_parts.push(d.hardline());
-        inner_parts.push(d.text(";"));
-
-        // Comments after second semicolon: inline first, then own-line
-        if let Some(semi2) = second_semi {
-            let mut own_line_comments: CommentVec<'_> = smallvec![];
-            for comment in comments_in_range(self.comments, semi2 + 1, close_paren) {
-                if self.is_same_line(semi2, comment.span.start) {
-                    inner_parts.push(d.text(" "));
-                    inner_parts.push(self.build_comment_doc(comment));
+    /// Emit the comments of one empty-`for` header region (`[start, end)`) into
+    /// `inner`, advancing `cur`. `anchor` is the end of the token the region
+    /// follows (used for same-line classification); `hug` is set for the leading
+    /// region so a block comment hugs the `(` with no separating space.
+    fn emit_empty_for_comments(
+        &self,
+        inner: &mut DocBuf,
+        cur: &mut EmptyForCursor,
+        start: u32,
+        end: u32,
+        anchor: u32,
+        hug: bool,
+    ) {
+        let d = self.d();
+        let mut prev = anchor;
+        let mut first = true;
+        for comment in comments_in_range(self.comments, start, end) {
+            if comment.is_block {
+                if cur.pending_break {
+                    inner.push(d.hardline());
+                    cur.pending_break = false;
+                } else if !(first && hug) {
+                    inner.push(d.text(" "));
+                }
+                inner.push(self.build_comment_doc(comment));
+                cur.prev_block = true;
+            } else {
+                // Line comment: breaks the line after itself (`pending_break`).
+                if cur.pending_break || !self.is_same_line(prev, comment.span.start) {
+                    inner.push(d.hardline());
                 } else {
-                    own_line_comments.push(comment);
+                    inner.push(d.text(" "));
                 }
+                inner.push(self.build_comment_doc(comment));
+                cur.pending_break = true;
+                cur.prev_block = false;
             }
-            for comment in own_line_comments {
-                inner_parts.push(d.hardline());
-                inner_parts.push(self.build_comment_doc(comment));
-            }
+            prev = comment.span.end;
+            first = false;
         }
+    }
 
-        parts.push(d.indent(d.concat(&inner_parts)));
-        parts.push(d.hardline());
-        parts.push(d.text(")"));
-
-        d.concat(&parts)
+    /// Emit one `;` of an empty-`for` header into `inner`, advancing `cur`: a
+    /// pending line comment forces it to a new line, a preceding block comment
+    /// owes it a separating space, otherwise it joins the run (`;;`).
+    fn emit_empty_for_semicolon(&self, inner: &mut DocBuf, cur: &mut EmptyForCursor) {
+        let d = self.d();
+        if cur.pending_break {
+            inner.push(d.hardline());
+            cur.pending_break = false;
+        } else if cur.prev_block {
+            inner.push(d.text(" "));
+        }
+        inner.push(d.text(";"));
+        cur.prev_block = false;
     }
 
     fn build_for_header_doc_impl(
@@ -262,9 +329,9 @@ impl<'a> Printer<'a> {
         }
 
         if !has_any && has_comments_inside {
-            // Empty for (;;) with comments - need to preserve them
-            // This is a divergence from prettier (see for_empty_clauses_prettier_divergence)
-            return self.build_for_empty_with_comments(stmt);
+            // Empty for (;;) with comments — preserve them inline where authored
+            // (divergence from prettier; see empty_clauses*_comment_prettier_divergence).
+            return self.build_for_empty_with_comments(stmt, for_open);
         }
 
         // Determine spans for each part
