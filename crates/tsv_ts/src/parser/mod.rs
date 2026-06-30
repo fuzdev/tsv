@@ -421,8 +421,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.current.end as usize
     }
 
+    /// The current token's verbatim source text. Returns `&'a str` (borrowing the
+    /// immutable source), not `&self` — so callers can hold it across `advance()`
+    /// without a borrow-escape `.to_string()`.
     #[inline]
-    pub(super) fn current_value(&self) -> &str {
+    pub(super) fn current_value(&self) -> &'a str {
         &self.source[self.current.start as usize..self.current.end as usize]
     }
 
@@ -933,7 +936,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// # Precondition
     /// Current token must be an identifier or keyword. Call `current_is_identifier_or_keyword()`
     /// to verify before calling this method.
-    pub(super) fn current_property_name(&self) -> &str {
+    pub(super) fn current_property_name(&self) -> &'a str {
         match &self.current.kind {
             TokenKind::Identifier => self.current_value(),
             TokenKind::Keyword(kw) => kw.as_str(),
