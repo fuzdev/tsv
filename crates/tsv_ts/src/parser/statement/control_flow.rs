@@ -201,12 +201,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // valid (non-`invalid`) assignment-target type.
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
             self.advance()?;
-            let left = self.to_assignable(expr, AssignableContext::Binding)?;
+            let left = self.to_assignable(expr, AssignableContext::ForHead)?;
             return self.parse_for_in(start, ForInOfLeft::Pattern(left));
         }
         if self.current_value() == "of" {
             self.advance()?;
-            let left = self.to_assignable(expr, AssignableContext::Binding)?;
+            let left = self.to_assignable(expr, AssignableContext::ForHead)?;
             return self.parse_for_of(start, ForInOfLeft::Pattern(left), is_await);
         }
 

@@ -10,16 +10,25 @@ use tsv_lang::ParseError;
 
 use super::Parser;
 
-/// Whether `to_assignable` is converting an **assignment** target or a **binding**
-/// pattern — the one axis that decides whether a type-assertion target is allowed.
-/// Assignment context accepts `(x as T) = …` / `[x as T] = …`; binding context
-/// (for-in/of heads, function params, destructuring bindings, Svelte
-/// `{:then}`/`{:catch}`) rejects it, matching acorn-typescript's `isBinding` split.
+/// Which assignable position `to_assignable` is converting for — the axis that
+/// decides whether a type-assertion or JSDoc-cast target is allowed. `Assignment`
+/// accepts both (`(x as T) = …`, `/** @type {T} */ (x) = …`); `ForHead` (a
+/// no-declaration for-in/of head) rejects type assertions but accepts a JSDoc cast
+/// over a simple target; `Binding` (function params, destructuring bindings, Svelte
+/// `{:then}`/`{:catch}`) rejects both. Mirrors acorn-typescript's `isBinding` split,
+/// with the for-head carved out as its own case.
 #[derive(Clone, Copy)]
 pub(in crate::parser) enum AssignableContext {
     /// `… = rhs` — a type-assertion wrapping a *simple* target is itself a valid target.
     Assignment,
-    /// Binding position — a type-assertion target is rejected.
+    /// A no-declaration for-in/of head (`for ((x) of …)`) — an
+    /// `AssignmentTargetType`/`LeftHandSideExpression` position. A type-assertion
+    /// target is rejected (acorn: `for ((x as T) of …)` is a syntax error), but a
+    /// JSDoc `/** @type {T} */ (x)` cast is *transparent grouping* (no node in
+    /// acorn's AST), so it is accepted when it wraps a bare Identifier/MemberExpression.
+    ForHead,
+    /// Binding position — a type-assertion *or* a (parenthesized) JSDoc-cast target
+    /// is rejected (even bare parens are illegal: `function f((x))`).
     Binding,
 }
 
@@ -37,12 +46,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - BinaryExpression with = (shorthand default) → AssignmentPattern
     /// - Identifier, MemberExpression → unchanged (valid assignment targets)
     ///
-    /// In `AssignableContext::Assignment`, a type-assertion-family expression (`as`,
-    /// `satisfies`, non-null `!`, `<T>`) may stand as an assignment target when it
-    /// wraps a *simple* target (`(x as T) = …`, `[x as T] = …`); `Binding` context
-    /// (for-in/of heads and binding patterns) rejects it (matching acorn-typescript's
-    /// `isBinding` split). The assertion node is kept here; the public AST unwraps it
-    /// for `=` at the convert boundary (acorn drops the cast from a simple `=` left).
+    /// `AssignableContext` selects which simple-target wrappers are legal.
+    /// `Assignment` accepts a type-assertion-family expression (`as`, `satisfies`,
+    /// non-null `!`, `<T>`) or a JSDoc cast wrapping a *simple* target
+    /// (`(x as T) = …`, `/** @type {T} */ (x) = …`); `ForHead` (a no-declaration
+    /// for-in/of head) rejects type assertions but accepts a JSDoc cast over a simple
+    /// target; `Binding` (function params, destructuring bindings) rejects both —
+    /// matching acorn-typescript's `isBinding` split. The assertion/cast node is kept
+    /// here; the public AST unwraps it at the convert boundary (acorn drops the
+    /// cast/assertion from a simple `=` left).
     pub(super) fn to_assignable(
         &self,
         expr: Expression<'arena>,
@@ -153,13 +165,39 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | Expression::AssignmentPattern(_)
             | Expression::RestElement(_) => Ok(expr),
 
+            // A JSDoc `/** @type {T} */ (expr)` cast is *transparent grouping* — acorn
+            // carries no node for it — so it is a valid target wherever a parenthesized
+            // simple target is: an assignment (`/** @type {T} */ (x.y) += …`) and a
+            // no-declaration for-in/of head (`for (/** @type {T} */ (x) of …)`). True
+            // binding positions reject it (even bare parens are illegal there). The
+            // valid inner is Identifier/MemberExpression — but only an *assignment* may
+            // wrap an assertion inside the cast (`/** @type {T} */ (x as U) = …`); a
+            // for-head must wrap a bare Identifier/MemberExpression (assertions are
+            // illegal there). The node is kept (the formatter preserves the parens);
+            // convert unwraps it unconditionally.
+            Expression::JsdocCast(ref cast)
+                if matches!(
+                    context,
+                    AssignableContext::Assignment | AssignableContext::ForHead
+                ) && matches!(
+                    match context {
+                        AssignableContext::Assignment => cast.inner.skip_type_assertions(),
+                        _ => cast.inner,
+                    },
+                    Expression::Identifier(_) | Expression::MemberExpression(_)
+                ) =>
+            {
+                Ok(expr)
+            }
+
             // A type-assertion-family expression (`as` / `satisfies` / non-null `!` /
-            // `<T>`) is a valid assignment target — in assignment context only — when
-            // it wraps a *simple* target (Identifier/MemberExpression): acorn accepts
+            // `<T>`) is a valid assignment target — in assignment context only — when it
+            // wraps a *simple* target (Identifier/MemberExpression): acorn accepts
             // `(x as T) = …` / `(x.y! as U) = …` but rejects an assertion wrapping a
-            // destructuring pattern (`([a, b] as T) = …`). The node is kept (the
-            // formatter reproduces prettier's `(x as T) = …`); convert unwraps it for
-            // a simple `=` left.
+            // destructuring pattern (`([a, b] as T) = …`), and rejects it in a for-head
+            // (`for ((x as T) of …)`) / binding position (acorn's `isBinding` split). The
+            // node is kept (the formatter reproduces prettier's `(x as T) = …`); convert
+            // unwraps it for a simple `=` left.
             Expression::TSAsExpression(_)
             | Expression::TSSatisfiesExpression(_)
             | Expression::TSNonNullExpression(_)
