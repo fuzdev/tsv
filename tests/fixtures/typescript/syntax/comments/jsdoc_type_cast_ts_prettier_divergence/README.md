@@ -19,11 +19,16 @@ See [conformance_prettier.md §JSDoc / paren semantics](../../../../../../docs/c
 
 ## Contexts tested
 
-- Assignment RHS, reassignment, return, call argument, new-expression args,
-  default parameter values, destructuring defaults — each wrapping a JSDoc cast.
+- Assignment RHS, reassignment, **assignment target** (the cast wraps the place
+  being assigned, including compound `op=` — e.g. `/** @type {A} */ (g.h) += expr`),
+  return, call argument, new-expression args, default parameter values,
+  destructuring defaults — each wrapping a JSDoc cast.
 
 ## Related fixtures
 
+- [cast_target_jsdoc](../../../expressions/assignment/cast_target_jsdoc/) — the same
+  JSDoc-cast assignment target in a **JS** `<script>` (a **match** — prettier-JS
+  preserves), beside the `(x as T)` sibling `cast_target` fixtures
 - [jsdoc_type_cast_svelte](../jsdoc_type_cast_svelte/) — JS `<script>`, the same
   forms as a **match** (prettier-JS preserves)
 - [jsdoc_type_cast_extent](../jsdoc_type_cast_extent/) — `(a.b)` vs `(a).b` cast extent

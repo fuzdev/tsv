@@ -125,6 +125,9 @@ impl<'arena> Expression<'arena> {
             Expression::TSSatisfiesExpression(e) => e.expression.skip_type_assertions(),
             Expression::TSNonNullExpression(e) => e.expression.skip_type_assertions(),
             Expression::TSTypeAssertion(e) => e.expression.skip_type_assertions(),
+            // A JSDoc `/** @type {T} */ (expr)` cast is a type assertion too —
+            // peel it to its inner target like the others.
+            Expression::JsdocCast(e) => e.inner.skip_type_assertions(),
             _ => self,
         }
     }

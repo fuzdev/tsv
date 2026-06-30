@@ -7,6 +7,10 @@ const c = /** @satisfies {A} */ expr;
 let d;
 d = /** @type {A} */ expr;
 
+// assignment target (cast wraps the place being assigned, incl. compound op=)
+/** @type {A} */ g.h = expr;
+/** @type {A} */ g.h += expr;
+
 // return
 function fn1() {
 	return /** @type {A} */ expr;
