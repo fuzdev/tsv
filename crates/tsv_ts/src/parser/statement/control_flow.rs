@@ -527,9 +527,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     })
                 }
                 // Destructuring binding with an optional type annotation:
-                // catch ({message}) / catch ([x, y]) / catch ({message}: ErrorType)
+                // catch ({message}) / catch ([x, y]) / catch ({message}: ErrorType).
+                // A catch binding takes no optional `?` marker.
                 TokenKind::BraceOpen | TokenKind::BracketOpen => {
-                    self.parse_destructured_binding()?
+                    self.parse_destructured_binding(false)?
                 }
                 _ => {
                     return Err(self.error_expected("catch parameter"));

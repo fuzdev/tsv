@@ -85,6 +85,7 @@ pub(in crate::ast) fn convert_object_pattern<'src>(
             .iter()
             .map(|p| convert_object_pattern_property(p, source, loc, interner, offset))
             .collect(),
+        optional: obj.optional,
         type_annotation: obj
             .type_annotation
             .as_ref()
