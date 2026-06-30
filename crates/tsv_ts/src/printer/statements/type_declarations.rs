@@ -1047,6 +1047,19 @@ impl<'a> Printer<'a> {
 
             // `global` is special - it replaces namespace/module keyword
             if decl.global {
+                // A comment in the `declare`→`global` gap (`declare /* c */ global {}`)
+                // stays before `global`, matching prettier — `global` is both keyword
+                // and name here, so there is no later name to relocate it onto (the
+                // non-global branch handles its keyword→name gap below). For a bare
+                // `global {}` the span starts at `global`, so the range is empty.
+                let global_start = match &decl.id {
+                    internal::TSModuleName::Identifier(id) => id.span.start,
+                    internal::TSModuleName::Literal(lit) => lit.span.start,
+                };
+                parts.push(self.build_inline_comments_between_doc_trailing_space(
+                    decl.span.start,
+                    global_start,
+                ));
                 parts.push(d.text("global"));
             } else {
                 // Use the original keyword (namespace or module)

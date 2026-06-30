@@ -217,6 +217,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
+        // `export default interface Foo {}` — detected before the match so the
+        // same-line peek (a `&mut self` borrow) doesn't conflict with the match
+        // scrutinee's `&self` borrow of `current_kind()`. Mirrors the statement-level
+        // interface dispatch: acorn's `parseExportDefaultDeclaration` routes the
+        // `interface` keyword to `tsParseInterfaceDeclaration`, which bails on a line
+        // break before the name (then `interface` is an expression). The `&&`
+        // short-circuits, so the peek runs only when the keyword is actually present.
+        let is_default_interface =
+            self.current_value() == "interface" && self.peek_is_same_line_identifier();
+
         let (declaration, end) = match self.current_kind() {
             TokenKind::Keyword(KeywordKind::Async) => {
                 // export default async function() {}
@@ -279,6 +289,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 class.span = Span::new(abstract_start, class.span.end);
                 let end = class.span.end;
                 (ExportDefaultValue::ClassDeclaration(class), end)
+            }
+            TokenKind::Identifier if is_default_interface => {
+                // export default interface Foo {}
+                let iface_start = self.current_pos().0;
+                let iface = self.parse_interface_declaration_struct(iface_start, false)?;
+                let end = iface.span.end;
+                (ExportDefaultValue::TSInterfaceDeclaration(iface), end)
             }
             _ => {
                 // Expression
