@@ -17,14 +17,11 @@ mod try_jump;
 use smallvec::SmallVec;
 
 use crate::ast::internal::Expression;
-use crate::printer::Printer;
+use crate::printer::{CommentVec, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, comments_in_range};
-
-/// Small vector of comment references, stack-allocated for typical cases.
-type CommentVec<'a> = SmallVec<[&'a Comment; 2]>;
 
 impl<'a> Printer<'a> {
     /// Partition comments between two positions into inline vs own-line.
@@ -325,10 +322,10 @@ impl<'a> Printer<'a> {
         // Classification based on position relative to open paren AND condition:
         // - "inline with open paren" = comment STARTS on same line as open paren
         // - "own line" = comment does NOT start on same line as open paren
-        let leading_comments: Vec<_> = if has_leading {
+        let leading_comments: CommentVec<'_> = if has_leading {
             comments_in_range(self.comments, open_paren_pos + 1, test_start).collect()
         } else {
-            Vec::new()
+            SmallVec::new()
         };
 
         // Check if there are own-line leading comments (not on same line as open paren)

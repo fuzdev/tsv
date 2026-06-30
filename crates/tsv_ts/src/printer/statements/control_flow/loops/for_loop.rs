@@ -4,7 +4,7 @@
 // for-in/for-of left/right printing.
 
 use crate::ast::internal::{self, Expression, Statement};
-use crate::printer::Printer;
+use crate::printer::{CommentVec, Printer};
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -206,7 +206,7 @@ impl<'a> Printer<'a> {
 
         // Comments after second semicolon: inline first, then own-line
         if let Some(semi2) = second_semi {
-            let mut own_line_comments = Vec::new();
+            let mut own_line_comments: CommentVec<'_> = smallvec![];
             for comment in comments_in_range(self.comments, semi2 + 1, close_paren) {
                 if self.is_same_line(semi2, comment.span.start) {
                     inner_parts.push(d.text(" "));
@@ -1109,7 +1109,7 @@ impl<'a> Printer<'a> {
                     // for can't call directly — its `)` is already in the header).
                     let (mut inline_prev, own_line, inline_next) =
                         self.partition_comments_by_line(header_end, body_start);
-                    let mut own_line_lines: Vec<&tsv_lang::Comment> = Vec::new();
+                    let mut own_line_lines: CommentVec<'_> = smallvec![];
                     for comment in own_line.into_iter().chain(inline_next) {
                         if comment.is_block {
                             inline_prev.push(comment);

@@ -3,7 +3,7 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use crate::ast::internal::{self, Statement};
-use crate::printer::Printer;
+use crate::printer::{CommentVec, Printer};
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -63,7 +63,7 @@ impl<'a> Printer<'a> {
             // Handle comments between previous position and this case
             // (includes comments before first case, and between subsequent cases)
             // Skip inline comments that belong to the previous case label (fallthrough cases)
-            let comments: Vec<_> =
+            let comments: CommentVec<'_> =
                 comments_in_range(self.comments, prev_end, case.span.start).collect();
             let mut last_content_end = prev_end;
             for comment in &comments {
@@ -255,12 +255,13 @@ impl<'a> Printer<'a> {
             let stmt_start = stmt.span().start;
 
             // Check for comments between previous position and this statement
-            let comments: Vec<_> = comments_in_range(self.comments, prev_end, stmt_start).collect();
+            let comments: CommentVec<'_> =
+                comments_in_range(self.comments, prev_end, stmt_start).collect();
 
             // Filter out:
             // 1. Trailing same-line comments from the previous statement
             // 2. Inline comments after the case label (already handled above)
-            let leading_comments: Vec<_> = if let Some(prev_stmt) = prev_stmt_end {
+            let leading_comments: CommentVec<'_> = if let Some(prev_stmt) = prev_stmt_end {
                 comments
                     .iter()
                     .filter(|c| !self.is_same_line(prev_stmt, c.span.start))

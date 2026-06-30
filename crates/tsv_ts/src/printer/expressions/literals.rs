@@ -11,7 +11,7 @@
 use crate::ast::internal::{self, LiteralValue};
 use crate::printer::Printer;
 use crate::printer::analysis;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -229,7 +229,7 @@ fn strip_trailing_dot(s: &str) -> String {
 /// Prettier normalizes regex flags to alphabetical order (dgimsvy).
 /// Example: `/pattern/vg` → `/pattern/gv`
 pub fn sort_regex_flags(flags: &str) -> String {
-    let mut chars: Vec<char> = flags.chars().collect();
+    let mut chars: SmallVec<[char; 8]> = flags.chars().collect();
     chars.sort_unstable();
     chars.into_iter().collect()
 }

@@ -1,7 +1,7 @@
 // try/catch/finally, throw, break/continue, and labeled statement printing
 
 use crate::ast::internal::{self, Statement};
-use crate::printer::Printer;
+use crate::printer::{CommentVec, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::SymbolToU32;
@@ -255,7 +255,7 @@ impl<'a> Printer<'a> {
         // inline would let the `//` swallow the `:` + body); an own-line block follows
         // the same rule rather than reflowing inline. A purely **same-line** block
         // stays inline before `:` (`label /* c */: body`), matching prettier.
-        let gap_comments: Vec<_> =
+        let gap_comments: CommentVec<'_> =
             comments_in_range(self.comments, label_end, colon_pos as u32).collect();
         let relocate = gap_comments.iter().any(|c| self.is_own_line_comment(c));
 

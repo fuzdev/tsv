@@ -10,10 +10,8 @@
 // By extracting to a separate module, we avoid code duplication across
 // expressions/ and statements/ modules.
 
-use smallvec::SmallVec;
-
 use crate::ast::internal;
-use crate::printer::Printer;
+use crate::printer::{CommentVec, Printer};
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -71,7 +69,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
-        let comments: Vec<_> = comments_in_range(self.comments, block_start, block_end).collect();
+        let comments: CommentVec<'_> =
+            comments_in_range(self.comments, block_start, block_end).collect();
         let mut comment_parts = DocBuf::new();
         for (i, comment) in comments.iter().enumerate() {
             comment_parts.push(self.build_comment_doc(comment));
@@ -279,8 +278,8 @@ impl<'a> Printer<'a> {
         prev_end: u32,
         stmt_start: u32,
         prev_stmt_end: Option<u32>,
-    ) -> SmallVec<[&internal::Comment; 4]> {
-        let comments: SmallVec<[_; 4]> =
+    ) -> CommentVec<'_> {
+        let comments: CommentVec<'_> =
             comments_in_range(self.comments, prev_end, stmt_start).collect();
         if let Some(prev_stmt) = prev_stmt_end {
             comments

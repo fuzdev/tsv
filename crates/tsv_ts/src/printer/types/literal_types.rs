@@ -9,7 +9,7 @@
 
 use super::Printer;
 use crate::ast::internal::{TSLiteralType, TSType, TemplateLiteralType};
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
@@ -73,7 +73,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // First pass: render each type flat and decide its break at its flat position.
-        let mut interps: Vec<Interpolation> = Vec::with_capacity(template.types.len());
+        let mut interps: SmallVec<[Interpolation; 4]> =
+            SmallVec::with_capacity(template.types.len());
         let mut pos: usize = 1; // Start after backtick
 
         for (i, quasi) in template.quasis.iter().enumerate() {

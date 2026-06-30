@@ -27,6 +27,7 @@ use super::arg_wrapping::{
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
 use super::test_patterns::{callee_chain_string, is_test_call};
 use crate::ast::internal;
+use crate::printer::CommentVec;
 use smallvec::smallvec;
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
@@ -1202,7 +1203,7 @@ fn build_call_with_arg_comments(
                 // line; an author blank line in the gap breaks the run and is
                 // preserved (and forces the call open). A space keeps a block glued
                 // to its arg, so a hug (`/* c */ a`) stays inline.
-                let comments: Vec<_> =
+                let comments: CommentVec<'_> =
                     comments_in_range(printer.comments, paren_open, first_arg_start).collect();
                 // A blank between two comments, or between the last and the arg, expands
                 // the call (the comment interiors are skipped — only the gaps matter).
@@ -1350,7 +1351,7 @@ fn build_call_with_arg_comments(
             // No trailing comma precedes it (trailingComma: 'none').
             if pc.has_trailing_line() {
                 // Build comment docs: " // comment" for each
-                let comment_docs: Vec<_> = pc
+                let comment_docs: DocBuf = pc
                     .trailing_line
                     .iter()
                     .flat_map(|c| [d.text(" "), printer.build_comment_doc(c)])

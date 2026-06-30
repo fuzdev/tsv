@@ -8,7 +8,7 @@
 
 use crate::ast::internal::{self, Expression, LiteralValue};
 use crate::printer::calls::skip_stripped_open_paren;
-use crate::printer::{Printer, has_multiline_content};
+use crate::printer::{CommentVec, Printer, has_multiline_content};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -423,11 +423,11 @@ impl<'a> Printer<'a> {
             }
             e.span().end
         });
-        let mut trailing_own_line_comments = Vec::new();
+        let mut trailing_own_line_comments: CommentVec<'_> = smallvec![];
         // Same-line block comment trailing the LAST element's comma — preserved
         // after the comma (prettier relocates before; see conformance_prettier.md
         // §Comment relocation). Own-line comments are handled below as siblings.
-        let mut trailing_same_line_after_comma = Vec::new();
+        let mut trailing_same_line_after_comma: CommentVec<'_> = smallvec![];
         if let Some(search_start) = last_elem_end {
             let comma_pos = self.find_comma_after(search_start);
             for comment in comments_in_range(self.comments, search_start, arr.span.end - 1) {
@@ -503,7 +503,7 @@ impl<'a> Printer<'a> {
 
         // Own-line block comments after the last element (before closing bracket).
         // These appear after the last element (no trailing comma), each on its own line.
-        let mut trailing_comments = Vec::new();
+        let mut trailing_comments: CommentVec<'_> = smallvec![];
         if let Some(last) = arr.elements.last().and_then(|e| e.as_ref()) {
             let search_start = last.span().end;
             for comment in comments_in_range(self.comments, search_start, arr.span.end - 1) {
@@ -594,7 +594,7 @@ impl<'a> Printer<'a> {
             } else {
                 None
             };
-            let leading_comments: Vec<_> = if let Some(upper) = leading_upper {
+            let leading_comments: CommentVec<'_> = if let Some(upper) = leading_upper {
                 let prev_comma_pos = (i > 0)
                     .then(|| self.find_comma_after(last_real_emit_end))
                     .flatten();
@@ -616,7 +616,7 @@ impl<'a> Printer<'a> {
                     })
                     .collect()
             } else {
-                Vec::new()
+                smallvec![]
             };
 
             // Blank-line check before this element / its leading comments
@@ -672,7 +672,7 @@ impl<'a> Printer<'a> {
             }
 
             // Same-line trailing comments (real elements only).
-            let trailing: Vec<_> = if elem.is_some() {
+            let trailing: CommentVec<'_> = if elem.is_some() {
                 let comma_pos = self.find_comma_after(elem_end);
                 comments_in_range(self.comments, elem_end, next_boundary)
                     .filter(|c| self.is_same_line(elem_end, c.span.start))
@@ -685,7 +685,7 @@ impl<'a> Printer<'a> {
                     })
                     .collect()
             } else {
-                Vec::new()
+                smallvec![]
             };
 
             for comment in trailing.iter().filter(|c| c.is_block) {

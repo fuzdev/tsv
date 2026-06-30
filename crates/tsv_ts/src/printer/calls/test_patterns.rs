@@ -5,6 +5,7 @@
 
 use super::super::Printer;
 use crate::ast::internal;
+use smallvec::SmallVec;
 use string_interner::DefaultSymbol;
 use tsv_lang::SymbolResolver;
 
@@ -74,8 +75,8 @@ pub(super) fn callee_chain_string(
 
 /// Get the member chain parts from an expression
 /// Returns parts reversed, e.g. `["skip", "test"]` for `test.skip`.
-fn get_member_chain_parts(expr: &internal::Expression<'_>) -> Option<Vec<DefaultSymbol>> {
-    let mut parts = Vec::new();
+fn get_member_chain_parts(expr: &internal::Expression<'_>) -> Option<SmallVec<[DefaultSymbol; 8]>> {
+    let mut parts: SmallVec<[DefaultSymbol; 8]> = SmallVec::new();
 
     match expr {
         internal::Expression::Identifier(id) => {

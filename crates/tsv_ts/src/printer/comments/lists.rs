@@ -6,7 +6,7 @@
 // comment splitting, inline-block comment runs, and comma emission in forced-
 // multiline lists.
 
-use super::Printer;
+use super::{CommentVec, Printer};
 use crate::ast::internal;
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
         start: u32,
         end: u32,
         same_line: bool,
-    ) -> Vec<&internal::Comment> {
+    ) -> CommentVec<'_> {
         comments_in_range(self.comments, start, end)
             .filter(|c| c.is_block)
             .filter(|c| same_line == self.is_same_line(start, c.span.start))
@@ -338,9 +338,10 @@ impl<'a> Printer<'a> {
     ///
     /// Used by: class body, interface body, enum body, type literal, namespace body.
     pub(crate) fn build_trailing_body_comments_doc(&self, prev_end: u32, body_end: u32) -> DocBuf {
-        let trailing_comments: Vec<_> = comments_in_range(self.comments, prev_end, body_end)
-            .filter(|c| !self.is_same_line(prev_end, c.span.start))
-            .collect();
+        let trailing_comments: CommentVec<'_> =
+            comments_in_range(self.comments, prev_end, body_end)
+                .filter(|c| !self.is_same_line(prev_end, c.span.start))
+                .collect();
 
         if trailing_comments.is_empty() {
             return DocBuf::new();
@@ -486,9 +487,9 @@ impl<'a> Printer<'a> {
     /// unchanged when `delimiter_pull_pos` is `None` (nothing was pulled).
     pub(in crate::printer) fn first_member_leading_comments<'c>(
         &self,
-        comments: Vec<&'c internal::Comment>,
+        comments: CommentVec<'c>,
         delimiter_pull_pos: Option<u32>,
-    ) -> Vec<&'c internal::Comment> {
+    ) -> CommentVec<'c> {
         match delimiter_pull_pos {
             Some(dpos) => comments
                 .into_iter()
@@ -665,7 +666,7 @@ impl<'a> Printer<'a> {
 
         // Single binary search to find comments
         let first_idx = tsv_lang::find_first_comment_from(self.comments, body_start);
-        let comments: Vec<_> = self.comments[first_idx..]
+        let comments: CommentVec<'_> = self.comments[first_idx..]
             .iter()
             .take_while(|c| c.span.end <= body_end)
             .collect();
