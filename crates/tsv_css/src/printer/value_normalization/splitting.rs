@@ -1,6 +1,8 @@
 // Value splitting and whitespace normalization: top-level splits that respect
 // parens/quotes/comments, plus prettier-style whitespace collapsing.
 
+use crate::whitespace::is_css_whitespace;
+
 /// Normalize CSS whitespace in extracted source text
 ///
 /// Single-pass normalization that:
@@ -35,9 +37,9 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
     // `pending_space` never sets and the final `trim()` is a no-op — the output
     // equals the input. Skip the char scan, the per-char push, and the trim; one
     // bulk copy instead. The overwhelmingly-common `CssValue::Identifier` value
-    // (`red`, `flex`, `1px`) hits this. Non-ASCII bytes bail to the slow path so any
-    // Unicode whitespace (NBSP, U+2028, …) the char loop's `is_whitespace()` would
-    // collapse is still handled there.
+    // (`red`, `flex`, `1px`) hits this. Non-ASCII bytes still bail to the slow path
+    // (conservative), but there they are preserved: CSS whitespace is ASCII-only,
+    // so NBSP/U+2028/… are value content, not separators to collapse.
     if s.bytes().all(is_normalize_noop_byte) {
         return s.to_string();
     }
@@ -113,8 +115,9 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
             }
             pending_space = false;
             result.push(ch);
-            // Skip whitespace after opening paren
-            while chars.peek().is_some_and(|&c| c.is_whitespace()) {
+            // Skip whitespace after opening paren (ASCII only — NBSP and other
+            // Unicode whitespace are value content, not separators).
+            while chars.peek().is_some_and(|&c| is_css_whitespace(c)) {
                 chars.next();
             }
             continue;
@@ -141,8 +144,10 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
             continue;
         }
 
-        // Whitespace - mark pending (collapse consecutive)
-        if ch.is_whitespace() {
+        // Whitespace - mark pending (collapse consecutive). ASCII-only: NBSP and
+        // other Unicode whitespace fall through to the regular-character branch
+        // and are preserved verbatim as value content.
+        if is_css_whitespace(ch) {
             if !result.is_empty() && !result.ends_with('(') {
                 pending_space = true;
             }
@@ -174,16 +179,17 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
 /// non-whitespace byte that is none of the structural bytes the normalizer acts on
 /// (`(` `)` `,` `/` and the two quotes). A string composed only of such bytes
 /// normalizes to itself, enabling the scan-skip fast path. Non-ASCII bytes (≥0x80)
-/// are conservatively treated as "acted on" so that Unicode whitespace (NBSP,
-/// U+2028, …) — which the char loop's `is_whitespace()` collapses — never slips
-/// through the fast path. The ASCII whitespace set (`\t \n \x0B \x0C \r` space)
-/// matches `char::is_whitespace`'s ASCII members.
+/// are conservatively treated as "acted on" so they bail to the slow path — where
+/// they are preserved (CSS whitespace is ASCII-only, so Unicode whitespace is
+/// content). The acted-on ASCII whitespace set (`\t \n \x0C \r` space) is exactly
+/// `char::is_ascii_whitespace` / `is_css_whitespace` — note U+000B (VT) is *not*
+/// CSS whitespace, so it is a no-op byte the normalizer preserves.
 #[inline]
 fn is_normalize_noop_byte(b: u8) -> bool {
     b.is_ascii()
         && !matches!(
             b,
-            b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ' | b'(' | b')' | b',' | b'/' | b'\'' | b'"'
+            b'\t' | b'\n' | 0x0C | b'\r' | b' ' | b'(' | b')' | b',' | b'/' | b'\'' | b'"'
         )
 }
 
@@ -360,9 +366,24 @@ mod tests {
         assert_eq!(normalize_css_whitespace(" red "), "red"); // trim
         assert_eq!(normalize_css_whitespace("a\tb"), "a b"); // tab is whitespace
 
-        // Non-ASCII bails to the slow path (conservative), so Unicode whitespace is
-        // still collapsed exactly as before and non-ws non-ASCII content is preserved.
-        assert_eq!(normalize_css_whitespace("a\u{00A0}b"), "a b"); // NBSP collapses
+        // U+000B (VT) is Unicode whitespace but *not* CSS whitespace, so it is
+        // preserved as value content rather than collapsed to a space. Prettier
+        // agrees (it keeps the VT inside the token), so this is a match, not a
+        // divergence.
+        assert_eq!(normalize_css_whitespace("u\u{000B}v"), "u\u{000B}v"); // VT preserved
+        assert_eq!(
+            normalize_css_whitespace("u\u{000B}\u{000B}v"),
+            "u\u{000B}\u{000B}v"
+        ); // not collapsed
+
+        // Non-ASCII bails to the slow path (conservative), where it is preserved:
+        // CSS whitespace is ASCII-only, so NBSP and other Unicode whitespace are
+        // value content, not separators to collapse.
+        assert_eq!(normalize_css_whitespace("a\u{00A0}b"), "a\u{00A0}b"); // NBSP preserved
+        assert_eq!(
+            normalize_css_whitespace("a\u{00A0}\u{00A0}b"),
+            "a\u{00A0}\u{00A0}b"
+        ); // not collapsed
         assert_eq!(normalize_css_whitespace("émotion"), "émotion"); // non-ws non-ASCII verbatim
     }
 

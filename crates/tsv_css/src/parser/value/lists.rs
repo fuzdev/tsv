@@ -22,49 +22,49 @@ pub enum ValueSeparator {
     None,
 }
 
-/// Classify a CSS value's top-level separators in a single pass.
+/// Classify a CSS value's top-level separators in a single pass over `s`. Comma
+/// detection short-circuits on the first top-level comma (commas win even when
+/// whitespace appears earlier); whitespace is merely recorded while scanning, so
+/// a later comma still takes priority. Block-comment bodies are skipped, so a `,`
+/// or space inside `/* ... */` is not treated as a separator. Callers pass the
+/// already-trimmed value text — leading/trailing whitespace must not classify as
+/// a separator.
 ///
-/// This fuses the former `contains_comma(s)`-then-`contains_space_separator(s)`
-/// pair into one walk over `s`. Behavior is identical: comma detection
-/// short-circuits on the first top-level comma (commas win even when whitespace
-/// appears earlier), and whitespace is merely recorded while scanning so a later
-/// comma still takes priority. Block-comment bodies are skipped so a `,` or space
-/// inside `/* ... */` is not treated as a separator.
+/// Scans raw bytes: every CSS separator — `,`, ASCII whitespace, and the `(` `)`
+/// quote `/*` structure that gates them — is ASCII, so a non-ASCII byte (including
+/// a multibyte char's continuation byte, e.g. the `0xA0` in U+4E20 that a careless
+/// `as char` cast would alias to NBSP) is never a separator and falls through as
+/// content. This reaches the same verdict as the real-`char` splitting in
+/// [`crate::parser::value::cursor::ValueCursor`] (which tests `is_css_whitespace`),
+/// without decoding.
 ///
-/// Callers pass the already-trimmed value text — leading/trailing whitespace must
-/// not classify as a separator.
-///
-/// Note: the [`crate::parser::value::cursor::ValueCursor`] that performs the
-/// actual split is intentionally comment-*blind* (it tracks paren/quote nesting
-/// through comment bodies). This classifier is comment-*aware*. The two only
-/// disagree on values with unbalanced parens/quotes inside comments, and folding
-/// the split into this pass would change that behavior for negligible gain — the
-/// redundant work being removed here is the two full classification scans on
-/// non-separator content (every leaf), not the split itself.
+/// That `ValueCursor` is intentionally comment-*blind* (it tracks paren/quote
+/// nesting through comment bodies) while this classifier is comment-*aware*, so
+/// the two can still disagree on a value with an unbalanced paren/quote inside a
+/// comment. `ValueParser::split_top_level`'s progress guard makes that
+/// disagreement safe — it parses such a range as a single leaf instead of
+/// re-splitting it forever.
 pub fn classify_separators(s: &str) -> ValueSeparator {
     let mut in_parens: u32 = 0;
     let mut in_quote = false;
     let mut in_comment = false;
-    let mut quote_char = '\0';
+    let mut quote_char = 0u8;
     let mut whitespace_seen = false;
     let bytes = s.as_bytes();
 
     let mut i = 0;
     while i < bytes.len() {
-        // Check for comment start (outside quotes)
-        if !in_quote
-            && !in_comment
-            && i + 1 < bytes.len()
-            && bytes[i] == b'/'
-            && bytes[i + 1] == b'*'
-        {
+        let b = bytes[i];
+
+        // Comment start (outside quotes)
+        if !in_quote && !in_comment && b == b'/' && bytes.get(i + 1) == Some(&b'*') {
             in_comment = true;
             i += 2;
             continue;
         }
 
-        // Check for comment end
-        if in_comment && i + 1 < bytes.len() && bytes[i] == b'*' && bytes[i + 1] == b'/' {
+        // Comment end
+        if in_comment && b == b'*' && bytes.get(i + 1) == Some(&b'/') {
             in_comment = false;
             i += 2;
             continue;
@@ -76,21 +76,18 @@ pub fn classify_separators(s: &str) -> ValueSeparator {
             continue;
         }
 
-        let ch = bytes[i] as char;
-        match ch {
-            '\'' | '"' if !in_quote => {
+        match b {
+            b'\'' | b'"' if !in_quote => {
                 in_quote = true;
-                quote_char = ch;
+                quote_char = b;
             }
-            c if in_quote && c == quote_char => {
-                in_quote = false;
-            }
-            '(' if !in_quote => in_parens += 1,
-            ')' if !in_quote => in_parens = in_parens.saturating_sub(1),
-            // Comma wins immediately — matches the original early-out in
-            // `contains_comma`, before whitespace is ever consulted.
-            ',' if in_parens == 0 && !in_quote => return ValueSeparator::Comma,
-            c if in_parens == 0 && !in_quote && c.is_whitespace() => whitespace_seen = true,
+            _ if in_quote && b == quote_char => in_quote = false,
+            b'(' if !in_quote => in_parens += 1,
+            b')' if !in_quote => in_parens = in_parens.saturating_sub(1),
+            // Comma wins immediately, before whitespace is ever consulted.
+            b',' if in_parens == 0 && !in_quote => return ValueSeparator::Comma,
+            // CSS whitespace is ASCII-only; a non-ASCII byte is never a separator.
+            _ if in_parens == 0 && !in_quote && b.is_ascii_whitespace() => whitespace_seen = true,
             _ => {}
         }
         i += 1;
@@ -173,5 +170,18 @@ mod tests {
             classify_separators("/* x */ red"),
             ValueSeparator::Whitespace
         );
+    }
+
+    #[test]
+    fn multibyte_token_is_not_a_separator() {
+        // U+4E20 encodes as `E4 B8 A0`; its `0xA0` continuation byte must not be
+        // mistaken for U+00A0/NBSP whitespace, so a lone non-ASCII token is a
+        // single value, not a separator.
+        assert_eq!(classify_separators("丠"), ValueSeparator::None);
+        // genuine separators around such tokens are still detected
+        assert_eq!(classify_separators("丠 中"), ValueSeparator::Whitespace);
+        assert_eq!(classify_separators("丠, 中"), ValueSeparator::Comma);
+        // the aliasing byte inside parens stays contained
+        assert_eq!(classify_separators("calc(丠)"), ValueSeparator::None);
     }
 }
