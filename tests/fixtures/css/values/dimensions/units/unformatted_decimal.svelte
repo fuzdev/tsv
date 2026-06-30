@@ -8,7 +8,6 @@
 		padding: 72.0pt;
 		border-width: 6.0pc;
 		top: 1.0in;
-		left: 10.0Q;
 		/* Length units - font-relative */
 		font-size: 16.0px;
 		line-height: 1.50em;
@@ -54,9 +53,6 @@
 		/* Time units */
 		transition-duration: 300.0ms;
 		animation-duration: 2.0s;
-		/* Frequency units */
-		pitch: 440.0Hz;
-		pitch: 1.0kHz;
 		/* Resolution units */
 		resolution: 300.0dpi;
 		resolution: 2.0dppx;

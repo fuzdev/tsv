@@ -17,7 +17,7 @@ pub(crate) use splitting::{
 
 use std::borrow::Cow;
 
-use numbers::{is_known_css_unit, normalize_css_number};
+use numbers::{canonical_unit, is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
 
@@ -143,7 +143,9 @@ pub(crate) fn normalize_value_text(input: &str) -> String {
             let unit = &input[unit_start..i];
             if unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit) {
                 out.push_str(&normalize_css_number(num));
-                out.push_str(unit);
+                // `canonical_unit` lowercases a known unit (`PX`→`px`) and leaves the
+                // `n`/empty cases untouched (neither is a known unit).
+                out.push_str(&canonical_unit(unit));
             } else {
                 out.push_str(num);
                 out.push_str(unit);
@@ -166,6 +168,236 @@ fn is_ident_start(ch: char) -> bool {
 /// Can `ch` continue a CSS identifier? (`is_ident_start` plus digits and `-`)
 fn is_ident_continue(ch: char) -> bool {
     is_ident_start(ch) || ch.is_ascii_digit() || ch == '-'
+}
+
+/// Lowercase the **feature name** in an `@media`/`@import` media-query string,
+/// matching prettier — which lowercases the `media-feature` name (`MIN-WIDTH` →
+/// `min-width`) but preserves media types (`SCREEN`), the `and`/`or`/`not`/`only`
+/// keywords, and feature *values* (`(orientation: LANDSCAPE)` keeps `LANDSCAPE`).
+/// Run **after** [`normalize_value_text`] (numbers/units/strings already
+/// canonicalized); this only adjusts identifier case.
+///
+/// Scope: only a **simple** parenthesized feature expression has its name lowercased —
+/// a `(...)` group whose only nested `(`, if any, opens a **function call** in the
+/// value (`(min-width: calc(…))`, `(width: min(…))`). A grouped/complex condition — a
+/// nested `(` that opens a sub-condition (`(not (hover))`, `((a) and (b))`) — is left
+/// verbatim, matching prettier's media-query parser, which treats those as
+/// `media-unknown`. (A function-call `(` is told apart from a sub-condition `(` by
+/// whether it immediately follows an identifier; see `scan_paren_group`.) (One small
+/// divergence:
+/// prettier's parser partially lowercases the *first* feature in `((A) and (B))`; tsv
+/// preserves the whole grouped condition for consistency — see
+/// `media_grouped_feature_case_prettier_divergence`.)
+///
+/// Within a simple expression the feature name is the identifier in **name
+/// position** — before the `:` (plain feature), or anywhere there's no `:` at all
+/// (boolean `(hover)` and range `(width >= 600px)` / `(600px <= width)`, whose values
+/// are numeric). The value after a `:` is preserved. A case-sensitive custom-media
+/// name (`--*`) is preserved (see [`maybe_lowercase_feature_name`]).
+pub(crate) fn lowercase_media_feature_names(query: &str) -> Cow<'_, str> {
+    let bytes = query.as_bytes();
+    // Cheap bail: nothing to lowercase without an uppercase ASCII letter.
+    if !bytes.iter().any(u8::is_ascii_uppercase) {
+        return Cow::Borrowed(query);
+    }
+
+    let mut out = String::with_capacity(query.len());
+    let mut i = 0;
+    while i < query.len() {
+        // Comments/strings copy through verbatim (never lowercase their contents).
+        if let Some(end) = trivia_span_at(query, i) {
+            out.push_str(&query[i..end]);
+            i = end;
+            continue;
+        }
+        match bytes[i] {
+            b'(' => {
+                // A top-level `(` opens a media-feature-expression. A group that
+                // contains a nested *sub-condition* `(` is grouped/complex — copy it
+                // verbatim (prettier's parser treats it as `media-unknown`); a nested
+                // function-call `(` in the value (`calc(`) does not count.
+                let (end, has_nested) = scan_paren_group(query, i);
+                if has_nested {
+                    out.push_str(&query[i..end]);
+                } else {
+                    lowercase_simple_feature_expr(&query[i..end], &mut out);
+                }
+                i = end;
+            }
+            _ => {
+                // Depth-0 content (media types, `and`/`or`/`not`/`only`): verbatim.
+                let ch = query[i..].chars().next().unwrap_or('\0');
+                out.push(ch);
+                i += ch.len_utf8();
+            }
+        }
+    }
+    Cow::Owned(out)
+}
+
+/// Index just past a `/* … */` block comment starting at `start` (or end of input
+/// for an unterminated one).
+fn skip_block_comment(s: &str, start: usize) -> usize {
+    let bytes = s.as_bytes();
+    let mut i = start + 2;
+    while i < s.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
+        i += 1;
+    }
+    (i + 2).min(s.len())
+}
+
+/// Index just past a `'…'`/`"…"` string starting at `start` (backslash-aware; or end
+/// of input for an unterminated one).
+fn skip_string(s: &str, start: usize) -> usize {
+    let bytes = s.as_bytes();
+    let quote = bytes[start];
+    let mut i = start + 1;
+    while i < s.len() {
+        if bytes[i] == b'\\' {
+            i += 2;
+            continue;
+        }
+        if bytes[i] == quote {
+            return i + 1;
+        }
+        i += 1;
+    }
+    s.len()
+}
+
+/// If a `/* … */` comment or a `'…'`/`"…"` string starts at byte `i`, return the index
+/// just past it (so `s[i..end]` is the whole trivia token); otherwise `None`. The
+/// single source of truth for "what is skippable trivia" shared by the media-feature
+/// scanners below — each copies it through or skips it, but they must all agree on its
+/// extent and on what opens it.
+fn trivia_span_at(s: &str, i: usize) -> Option<usize> {
+    let bytes = s.as_bytes();
+    match bytes[i] {
+        b'/' if bytes.get(i + 1) == Some(&b'*') => Some(skip_block_comment(s, i)),
+        b'"' | b'\'' => Some(skip_string(s, i)),
+        _ => None,
+    }
+}
+
+/// Whether `b` is a byte that can end a CSS identifier (a function name, right before
+/// its `(`) — ASCII alphanumeric, `-`, `_`, or any non-ASCII byte (part of a
+/// multi-byte ident char). Used to tell a function-call `(` (`calc(`, `min(`) from the
+/// `(` that opens a grouped sub-condition.
+///
+/// This mirrors the CSS Syntax 3 tokenizer (§"Consume an ident-like token"): an ident
+/// sequence *immediately* followed by `(` is consumed as a `<function-token>`. So a `(`
+/// preceded by an ident byte is a function call; a `(` preceded by whitespace/`(`/a
+/// connector opens a `( <media-condition> )` per the Media Queries 4 grammar.
+fn is_ident_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b >= 0x80
+}
+
+/// Scan a parenthesized group starting at the `(` at `open`. Returns
+/// `(index_just_past_the_matching_close_paren, contains_a_nested_sub_condition)`,
+/// skipping comments/strings. A nested `(` that immediately follows an identifier byte
+/// is a function call in the value (`calc(`) and does **not** set the flag; only a `(`
+/// opening a sub-condition does. For an unbalanced group, returns end-of-input.
+fn scan_paren_group(s: &str, open: usize) -> (usize, bool) {
+    let bytes = s.as_bytes();
+    let mut i = open + 1;
+    let mut depth = 1usize;
+    let mut has_nested = false;
+    while i < s.len() {
+        // A `(`/`)` inside a comment or string doesn't change paren depth.
+        if let Some(end) = trivia_span_at(s, i) {
+            i = end;
+            continue;
+        }
+        match bytes[i] {
+            b'(' => {
+                // A `(` immediately after an identifier byte is a function call inside
+                // a feature value (`calc(`, `min(`, `env(`), not a grouped
+                // sub-condition — it must NOT make the feature opaque, since prettier
+                // still lowercases the feature name (`(MIN-WIDTH: calc(…))` →
+                // `(min-width: calc(…))`). Only a `(` that opens a real sub-condition
+                // (preceded by `(`, whitespace, or a connector keyword) marks the group
+                // as grouped/complex.
+                let is_function_call = i > 0 && is_ident_byte(bytes[i - 1]);
+                if !is_function_call {
+                    has_nested = true;
+                }
+                depth += 1;
+                i += 1;
+            }
+            b')' => {
+                depth -= 1;
+                i += 1;
+                if depth == 0 {
+                    return (i, has_nested);
+                }
+            }
+            _ => i += 1,
+        }
+    }
+    (s.len(), has_nested)
+}
+
+/// Emit a simple media-feature expression `(…)` (no nested parens), lowercasing the
+/// feature name. See [`lowercase_media_feature_names`] for the name-position rule.
+fn lowercase_simple_feature_expr(group: &str, out: &mut String) {
+    let bytes = group.as_bytes();
+    let mut i = 0;
+    let mut seen_colon = false;
+    while i < group.len() {
+        // Comments/strings copy through verbatim (a `:` inside one isn't the
+        // name/value separator).
+        if let Some(end) = trivia_span_at(group, i) {
+            out.push_str(&group[i..end]);
+            i = end;
+            continue;
+        }
+        match bytes[i] {
+            b':' => {
+                seen_colon = true;
+                out.push(':');
+                i += 1;
+            }
+            _ => {
+                let ch = group[i..].chars().next().unwrap_or('\0');
+                // An identifier (incl. a leading `-` for custom media / vendor).
+                if is_ident_start(ch) || ch == '-' {
+                    let start = i;
+                    i += ch.len_utf8();
+                    while let Some(c) = group[i..].chars().next() {
+                        if is_ident_continue(c) {
+                            i += c.len_utf8();
+                        } else {
+                            break;
+                        }
+                    }
+                    let ident = &group[start..i];
+                    // Before the `:` (or no `:` at all — boolean/range, numeric
+                    // values) the identifier is the feature name; after it, a value.
+                    if seen_colon {
+                        out.push_str(ident);
+                    } else {
+                        out.push_str(&maybe_lowercase_feature_name(ident));
+                    }
+                } else {
+                    out.push(ch);
+                    i += ch.len_utf8();
+                }
+            }
+        }
+    }
+}
+
+/// Lowercase a media-feature name unless it's case-sensitive: preserve a custom media
+/// (`--*` / `:--*`), which is case-sensitive per CSS Variables 1. An already-lowercase
+/// name borrows unchanged.
+fn maybe_lowercase_feature_name(name: &str) -> Cow<'_, str> {
+    if name.starts_with("--")
+        || name.starts_with(":--")
+        || !name.bytes().any(|b| b.is_ascii_uppercase())
+    {
+        return Cow::Borrowed(name);
+    }
+    Cow::Owned(name.to_ascii_lowercase())
 }
 
 /// Format a string value semantically
@@ -249,6 +481,51 @@ pub(crate) fn extract_property_name(decl_source: &str) -> Cow<'_, str> {
             Cow::Borrowed(bare)
         }
     }
+}
+
+/// Canonicalize a property name's case: standard CSS property names are ASCII
+/// case-insensitive (CSS Syntax 3), and prettier lowercases them (`COLOR`→`color`,
+/// `Background-Color`→`background-color`, vendor `-WEBKIT-…`→`-webkit-…`). Returns
+/// the input unchanged for the case-sensitive / non-standard / ambiguous forms:
+/// - **custom properties** (`--*`) — case-sensitive per CSS Variables 1;
+/// - **non-standard property starts** — any name not beginning with an ASCII letter
+///   or a vendor-prefix `-`; these aren't CSS property names, so their case is left
+///   untouched;
+/// - names carrying a **comment** (`color /* c */`) or a **`\` escape** — left
+///   verbatim so the lowercasing never touches comment text or an escape's hex
+///   digits (both rare in a property position).
+///
+/// Takes the already-extracted name (see [`extract_property_name`]); only the ASCII
+/// letters of a bare identifier are lowercased.
+pub(crate) fn lowercase_property_name(name: Cow<'_, str>) -> Cow<'_, str> {
+    // Cheapest discriminator first: an all-lowercase name (the overwhelming common
+    // case) has nothing to do, so bail before the substring scans below.
+    if !name.bytes().any(|b| b.is_ascii_uppercase()) {
+        return name;
+    }
+    // A standard property starts with an ASCII letter or a single vendor-prefix `-`
+    // (`--` is a custom property, handled below).
+    let standard_start = name
+        .as_bytes()
+        .first()
+        .is_some_and(|&b| b.is_ascii_alphabetic() || b == b'-');
+    if !standard_start || name.starts_with("--") || name.contains("/*") || name.contains('\\') {
+        return name;
+    }
+    Cow::Owned(name.to_ascii_lowercase())
+}
+
+/// Lowercase an at-rule name (`@MEDIA` → `@media`, `@Font-Face` → `@font-face`),
+/// matching prettier — which lowercases **all** at-rule names, including
+/// vendor-prefixed ones (`@-WEBKIT-KEYFRAMES` → `@-webkit-keyframes`). An escaped
+/// (`\`) name is left verbatim (lowercasing would corrupt an escape's hex digits);
+/// an already-lowercase name borrows unchanged. The `@` is written separately by the
+/// printer, so `name` is just the keyword.
+pub(crate) fn lowercase_at_rule_name(name: &str) -> Cow<'_, str> {
+    if !name.bytes().any(|b| b.is_ascii_uppercase()) || name.contains('\\') {
+        return Cow::Borrowed(name);
+    }
+    Cow::Owned(name.to_ascii_lowercase())
 }
 
 /// Returns true if `name` ends with a CSS hex escape (`\` + 1..=6 hex digits).
@@ -403,5 +680,84 @@ mod tests {
         let got = extract_property_name("  orphan  ");
         assert_eq!(got, "orphan");
         assert!(matches!(got, Cow::Borrowed(_)));
+    }
+
+    #[test]
+    fn test_lowercase_property_name() {
+        let low = |s: &str| lowercase_property_name(Cow::Borrowed(s)).into_owned();
+        // Standard properties + vendor prefixes lowercase.
+        assert_eq!(low("COLOR"), "color");
+        assert_eq!(low("Background-Color"), "background-color");
+        assert_eq!(low("-WEBKIT-Box-Shadow"), "-webkit-box-shadow");
+        // Already-lowercase borrows unchanged (no allocation).
+        assert!(matches!(
+            lowercase_property_name(Cow::Borrowed("color")),
+            Cow::Borrowed("color")
+        ));
+        // Case-sensitive / non-standard names are preserved.
+        assert_eq!(low("--MyVar"), "--MyVar"); // custom property
+        assert_eq!(low("$fontFamily"), "$fontFamily"); // non-letter start → not a CSS property
+        assert_eq!(low("#{$Foo}"), "#{$Foo}"); // non-letter start → preserved
+        assert_eq!(low("COLOR /* C */"), "COLOR /* C */"); // comment-bearing
+        assert_eq!(low("\\43OLOR"), "\\43OLOR"); // escaped
+    }
+
+    #[test]
+    fn test_lowercase_at_rule_name() {
+        let low = |s: &str| lowercase_at_rule_name(s).into_owned();
+        assert_eq!(low("MEDIA"), "media");
+        assert_eq!(low("Font-Face"), "font-face");
+        assert_eq!(low("-WEBKIT-KEYFRAMES"), "-webkit-keyframes");
+        assert_eq!(low("INCLUDE"), "include"); // non-standard directive name, still lowercased
+        // Already-lowercase borrows unchanged (no allocation).
+        assert!(matches!(
+            lowercase_at_rule_name("media"),
+            Cow::Borrowed("media")
+        ));
+        // Escaped names preserved (lowercasing would corrupt the escape's hex digits).
+        assert_eq!(low("\\4D edia"), "\\4D edia");
+    }
+
+    #[test]
+    fn test_lowercase_media_feature_names() {
+        let f = |s: &str| lowercase_media_feature_names(s).into_owned();
+        // Simple feature expressions: name lowercased, value preserved.
+        assert_eq!(f("(MIN-WIDTH: 100px)"), "(min-width: 100px)");
+        assert_eq!(f("(ORIENTATION: LANDSCAPE)"), "(orientation: LANDSCAPE)");
+        assert_eq!(f("(HOVER)"), "(hover)"); // boolean feature
+        assert_eq!(f("(WIDTH >= 600px)"), "(width >= 600px)"); // range, name-first
+        assert_eq!(f("(600px <= WIDTH)"), "(600px <= width)"); // range, value-first
+        // Media type + keyword preserved (only the feature name lowercases).
+        assert_eq!(
+            f("SCREEN and (MIN-WIDTH: 1px)"),
+            "SCREEN and (min-width: 1px)"
+        );
+        // Custom media is case-sensitive → preserved.
+        assert_eq!(f("(--SMALL-VIEWPORT)"), "(--SMALL-VIEWPORT)");
+        // A function-valued feature is still simple — the name lowercases even though
+        // the value carries nested parens (`calc(`/`min(`).
+        assert_eq!(
+            f("(MIN-WIDTH: calc(100px + 1px))"),
+            "(min-width: calc(100px + 1px))"
+        );
+        assert_eq!(f("(WIDTH: min(50%, 100px))"), "(width: min(50%, 100px))");
+        // Grouped/complex condition (nested sub-condition parens) left verbatim — even
+        // when a nested feature itself has a function value.
+        assert_eq!(
+            f("((MIN-WIDTH: 1px) and (MAX-WIDTH: 2px))"),
+            "((MIN-WIDTH: 1px) and (MAX-WIDTH: 2px))"
+        );
+        assert_eq!(
+            f("((MIN-WIDTH: calc(1px)) and (b))"),
+            "((MIN-WIDTH: calc(1px)) and (b))"
+        );
+        assert_eq!(f("(NOT (HOVER))"), "(NOT (HOVER))");
+        // No uppercase → borrows unchanged (no allocation).
+        assert!(matches!(
+            lowercase_media_feature_names("(min-width: 100px)"),
+            Cow::Borrowed(_)
+        ));
+        // A comment in the expression is preserved; the name still lowercases.
+        assert_eq!(f("(MIN-WIDTH: /* c */ 1px)"), "(min-width: /* c */ 1px)");
     }
 }

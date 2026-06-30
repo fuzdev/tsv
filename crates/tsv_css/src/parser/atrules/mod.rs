@@ -20,19 +20,34 @@ use self::raw::parse_raw_prelude_content;
 
 /// Check if an at-rule name is a keyframes rule (including vendor-prefixed versions)
 /// e.g., "keyframes", "-webkit-keyframes", "-moz-keyframes"
-fn is_keyframes_atrule(name: &str) -> bool {
-    name == "keyframes"
-        || name == "-webkit-keyframes"
-        || name == "-moz-keyframes"
-        || name == "-o-keyframes"
-        || name == "-ms-keyframes"
+pub(crate) fn is_keyframes_atrule(name: &str) -> bool {
+    // At-rule names are ASCII case-insensitive (CSS Syntax 3), so `@KEYFRAMES` and
+    // `@-WEBKIT-Keyframes` are keyframes too. Callers pass either the raw name (the
+    // helper folds case) or an already-lowercased dispatch name.
+    name.eq_ignore_ascii_case("keyframes")
+        || name.eq_ignore_ascii_case("-webkit-keyframes")
+        || name.eq_ignore_ascii_case("-moz-keyframes")
+        || name.eq_ignore_ascii_case("-o-keyframes")
+        || name.eq_ignore_ascii_case("-ms-keyframes")
+}
+
+/// Whether `ident` is a CSS boolean-operator keyword (`and`/`or`/`not`).
+///
+/// CSS grammar keywords are ASCII case-insensitive (CSS Syntax 3 §"tokenizing"),
+/// so `AND`/`Or`/`NOT` are the same keyword as `and`/`or`/`not`. This drives
+/// argument/connector *recognition* only; the printer preserves the keyword's
+/// source case (matching prettier — see `connector_raw` and the boolean-operator
+/// case note in `docs/conformance_prettier.md`).
+pub(super) fn is_boolean_operator_keyword(ident: &str) -> bool {
+    ident.eq_ignore_ascii_case("and")
+        || ident.eq_ignore_ascii_case("or")
+        || ident.eq_ignore_ascii_case("not")
 }
 
 /// Check if current token is a CSS boolean operator keyword (and, or, not)
 pub(super) fn is_boolean_operator(parser: &CssParser<'_, '_>) -> bool {
     if let TokenKind::Identifier = &parser.current_kind {
-        let identifier = parser.current_identifier();
-        matches!(identifier, "and" | "or" | "not")
+        is_boolean_operator_keyword(parser.current_identifier())
     } else {
         false
     }
@@ -62,20 +77,33 @@ pub(crate) fn parse_atrule<'arena>(
 
     parser.skip_whitespace()?;
 
+    // At-rule names are ASCII case-insensitive (CSS Syntax 3); dispatch on the
+    // lowercased name so `@MEDIA`/`@Font-Face` route to the right prelude/block
+    // grammar instead of the raw fall-through. The stored `name` keeps its source
+    // case (the public AST matches Svelte, which preserves it — `@SUPPORTS` →
+    // `"name": "SUPPORTS"`); the printer lowercases it for output.
+    let name_lc_owned;
+    let name_lc: &str = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+        name_lc_owned = name.to_ascii_lowercase();
+        &name_lc_owned
+    } else {
+        name
+    };
+
     // Parse prelude based on at-rule type
-    let prelude = if name == "import" {
+    let prelude = if name_lc == "import" {
         // Parse @import prelude structurally (url/string + layer/supports/media)
         let (values, span) = parse_import_prelude(parser)?;
         PreludeValue::Values { values, span }
-    } else if name == "scope" {
+    } else if name_lc == "scope" {
         // Parse @scope prelude as structured selector lists
         let (root, limit, span) = parse_scope_prelude(parser)?;
         PreludeValue::Selectors { root, limit, span }
-    } else if name == "supports" {
+    } else if name_lc == "supports" {
         // Parse @supports prelude as structured conditions (for line-width wrapping)
         let (condition, span) = parse_condition_query(parser)?;
         PreludeValue::Supports { condition, span }
-    } else if name == "container" {
+    } else if name_lc == "container" {
         // Parse @container prelude as structured conditions (for line-width wrapping)
         let (name, condition, span) = parse_container_prelude(parser)?;
         PreludeValue::Container {
@@ -83,7 +111,7 @@ pub(crate) fn parse_atrule<'arena>(
             condition,
             span,
         }
-    } else if name == "media" {
+    } else if name_lc == "media" {
         // Parse @media as raw string to preserve comments
         // Wrapping is handled in the printer by finding and/or boundaries
         // Fully structuring preludes is a deferred design option — see
@@ -99,14 +127,14 @@ pub(crate) fn parse_atrule<'arena>(
         // postcss `parser-postcss.js`), normalizing whitespace to single spaces, so it
         // takes the normalizing path. The public AST stays source-verbatim either way
         // (the printer-facing `content` is what differs); see `convert/mod.rs`.
-        let normalize_whitespace = name == "namespace";
+        let normalize_whitespace = name_lc == "namespace";
         let (content, span) = parse_raw_prelude_content(parser, false, normalize_whitespace)?;
         PreludeValue::Raw { content, span }
     };
 
     // Parse block (if present)
     let (block, end) = if parser.check(TokenKind::LeftBrace) {
-        let block = parse_atrule_block(parser, name, nested_in_rule)?;
+        let block = parse_atrule_block(parser, name_lc, nested_in_rule)?;
         let end = block.span.end;
         (Some(block), end)
     } else if parser.check(TokenKind::Semicolon) {

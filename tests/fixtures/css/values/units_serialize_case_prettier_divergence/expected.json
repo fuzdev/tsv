@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 282,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 273,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 229,
+							"end": 241,
+							"property": "pitch",
+							"value": "440hz"
+						},
+						{
+							"type": "Declaration",
+							"start": 245,
+							"end": 256,
+							"property": "pitch",
+							"value": "1khz"
+						},
+						{
+							"type": "Declaration",
+							"start": 260,
+							"end": 269,
+							"property": "left",
+							"value": "10q"
+						}
+					]
+				},
+				"start": 9,
+				"end": 273
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 274,
+			"styles": "\n\ta {\n\t\t/* Frequency units (hz/khz) and the quarter-millimeter (q) are ASCII\n\t\t   case-insensitive and serialize lowercase per CSS Values 4 §6.1/§6.3 —\n\t\t   canonicalized to lowercase like every other dimension unit. */\n\t\tpitch: 440hz;\n\t\tpitch: 1khz;\n\t\tleft: 10q;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 283,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

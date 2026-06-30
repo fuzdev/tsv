@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 151,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 59,
+				"name": "media",
+				"prelude": "(not (hover))",
+				"block": {
+					"type": "Block",
+					"start": 30,
+					"end": 59,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 34,
+								"end": 35,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 34,
+										"end": 35,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 34,
+														"end": 35
+													}
+												],
+												"start": 34,
+												"end": 35
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 36,
+								"end": 56,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 41,
+										"end": 51,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 34,
+							"end": 56
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 61,
+				"end": 142,
+				"name": "media",
+				"prelude": "(min-width: 100px) and (not (pointer: fine))",
+				"block": {
+					"type": "Block",
+					"start": 113,
+					"end": 142,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 117,
+								"end": 118,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 117,
+										"end": 118,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 117,
+														"end": 118
+													}
+												],
+												"start": 117,
+												"end": 118
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 119,
+								"end": 139,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 124,
+										"end": 134,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 117,
+							"end": 139
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 143,
+			"styles": "\n\t@media (not (hover)) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (min-width: 100px) and (not (pointer: fine)) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 152,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

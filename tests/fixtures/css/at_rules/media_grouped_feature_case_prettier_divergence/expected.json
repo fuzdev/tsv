@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 94,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 85,
+				"name": "media",
+				"prelude": "((MIN-WIDTH: 1px) and (MAX-WIDTH: 2px))",
+				"block": {
+					"type": "Block",
+					"start": 56,
+					"end": 85,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 60,
+								"end": 61,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 60,
+										"end": 61,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 60,
+														"end": 61
+													}
+												],
+												"start": 60,
+												"end": 61
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 62,
+								"end": 82,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 67,
+										"end": 77,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 60,
+							"end": 82
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 86,
+			"styles": "\n\t@media ((MIN-WIDTH: 1px) and (MAX-WIDTH: 2px)) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 95,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
