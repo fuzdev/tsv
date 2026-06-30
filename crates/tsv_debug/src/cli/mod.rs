@@ -3,10 +3,10 @@ pub mod commands;
 use argh::FromArgs;
 use commands::{
     ast_diff::AstDiffCommand, authoring_audit::AuthoringAuditCommand,
-    build_fanout_audit::BuildFanoutAuditCommand, canonical_parse::CanonicalParseCommand,
-    check::CheckCommand, compare::CompareCommand, conformance_audit::ConformanceAuditCommand,
-    fixture_init::FixtureInitCommand, fixtures_audit::FixturesAuditCommand,
-    fixtures_update::FixturesUpdateCommand,
+    buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
+    canonical_parse::CanonicalParseCommand, check::CheckCommand, compare::CompareCommand,
+    conformance_audit::ConformanceAuditCommand, fixture_init::FixtureInitCommand,
+    fixtures_audit::FixturesAuditCommand, fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
@@ -56,6 +56,7 @@ pub struct TopLevel {
 pub enum Subcommand {
     Check(CheckCommand),
     AuthoringAudit(AuthoringAuditCommand),
+    BufferSizes(BufferSizesCommand),
     BuildFanoutAudit(BuildFanoutAuditCommand),
     Compare(CompareCommand),
     ConformanceAudit(ConformanceAuditCommand),
@@ -90,6 +91,7 @@ impl TopLevel {
         match self.nested {
             Subcommand::Check(c) => c.run(),
             Subcommand::AuthoringAudit(c) => c.run(),
+            Subcommand::BufferSizes(c) => c.run(),
             Subcommand::BuildFanoutAudit(c) => c.run(),
             Subcommand::Compare(c) => c.run(),
             Subcommand::ConformanceAudit(c) => c.run(),

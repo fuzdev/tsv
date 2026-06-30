@@ -73,7 +73,7 @@ impl<'a> Printer<'a> {
     pub(super) fn build_type_doc_inner(&self, ts_type: &TSType<'_>, wrap_type_args: bool) -> DocId {
         let d = self.d();
         match ts_type {
-            TSType::Keyword(kw) => d.text_owned(kw.kind.as_str().to_string()),
+            TSType::Keyword(kw) => d.text(kw.kind.as_str()),
             TSType::Literal(lit) => self.build_literal_type_doc(lit),
             TSType::Array(arr) => self.build_array_type_doc(arr),
             TSType::Union(u) => self.build_union_type_doc(u),
