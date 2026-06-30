@@ -20,6 +20,8 @@ tsv_css = { workspace = true }
 tsv_arena = { workspace = true }
 napi = { workspace = true }
 napi-derive = { workspace = true }
+# Experimental perf A/B — see the `mimalloc` feature below.
+mimalloc = { workspace = true, optional = true }
 
 [build-dependencies]
 napi-build = { workspace = true }
@@ -38,6 +40,10 @@ default = ["format", "parse"]
 # Pulls the reusable doc arena (`tsv_arena::with_doc_arena`, which pulls tsv_lang).
 format = ["tsv_arena/format"]
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
+# EXPERIMENTAL: swap in mimalloc as the global allocator (off by default).
+# Build the bench's native addon with it via `cargo build -p tsv_napi --release
+# --features mimalloc`, then re-run `deno task bench:node:run`.
+mimalloc = ["dep:mimalloc"]
 
 # N-API generates unsafe code, exactly like the FFI crate. Cargo replaces the
 # whole [lints] table on override (no partial inherit), so the workspace lints

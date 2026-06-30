@@ -19,6 +19,8 @@ tsv_css = { workspace = true }
 # re-enables it.
 tsv_arena = { workspace = true }
 serde_json.workspace = true
+# Experimental perf A/B — see the `mimalloc` feature below.
+mimalloc = { workspace = true, optional = true }
 
 [features]
 # Default build — both halves: the full libtsv_ffi the bench perf rows load and
@@ -31,6 +33,10 @@ format = ["tsv_arena/format"]
 # tsv_parse_<lang> + tsv_parse_internal_<lang> exports plus the public-AST/JSON
 # convert layer they serialize through.
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
+# EXPERIMENTAL: swap in mimalloc as the global allocator (off by default).
+# Build the bench's native FFI lib with it via `cargo build -p tsv_ffi --release
+# --features mimalloc`, then re-run `deno task bench:deno:run`.
+mimalloc = ["dep:mimalloc"]
 
 # FFI requires unsafe code. Cargo replaces the whole [lints] table on
 # override (no partial inherit), so the workspace lints are re-declared

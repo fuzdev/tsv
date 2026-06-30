@@ -73,6 +73,10 @@ thiserror = "2"
 unicode-ident = "1.0"
 unicode-segmentation = "1.13.3"
 unicode-width = "0.2.2"
+# EXPERIMENTAL (perf A/B only): drop-in global allocator. Off by default —
+# pulled in solely behind each native crate's optional `mimalloc` feature
+# (tsv_debug, tsv_ffi, tsv_napi). Native-only; no WASM build references it.
+mimalloc = "0.1.52"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -17,6 +17,14 @@
 //! `tsv_ffi` / `tsv_wasm`).
 
 use napi_derive::napi;
+
+// EXPERIMENTAL perf A/B (off by default): route every allocation through
+// mimalloc behind the `mimalloc` feature. Set in this cdylib root, it covers the
+// parser/printer allocations the Node/Bun bench native row measures.
+#[cfg(feature = "mimalloc")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 // Per-thread reusable arenas live in the shared `tsv_arena` crate (used by both
 // native bindings — see its module docs for the reuse rationale + soundness).
 use tsv_arena::with_ast_arena;

@@ -24,6 +24,14 @@ thiserror.workspace = true
 similar = "2.7"
 futures-util.workspace = true
 tempfile = "3"
+# Experimental perf A/B — see [features].
+mimalloc = { workspace = true, optional = true }
+
+[features]
+# EXPERIMENTAL: swap in mimalloc as the global allocator (off by default). Used
+# to A/B the `profile` command — `cargo run --release -p tsv_debug --features
+# mimalloc -- profile ...` vs the default build.
+mimalloc = ["dep:mimalloc"]
 
 [lints]
 workspace = true

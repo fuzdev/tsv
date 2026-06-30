@@ -17,6 +17,14 @@
 
 #![allow(unsafe_code)]
 
+// EXPERIMENTAL perf A/B (off by default): route every allocation through
+// mimalloc behind the `mimalloc` feature. Set in this cdylib root, it covers the
+// parser/printer allocations the bench native row measures through the FFI
+// boundary.
+#[cfg(feature = "mimalloc")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use std::panic;
 use std::slice;
 
