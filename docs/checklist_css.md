@@ -31,7 +31,7 @@ Foundation for all CSS parsing. Spec: `css-syntax-3` (REC)
 
 ### Tokenization
 
-- Whitespace tokens
+- Whitespace tokens — ASCII-only (tab/LF/FF/CR/space, css-syntax-3 §4.2); non-ASCII Unicode whitespace (NBSP U+00A0, ideographic space, …) is value content, not a separator, so it is preserved inside a value token rather than collapsed
 - Ident tokens (identifiers) — including unescaped non-ASCII code points (`#♥`, `#💩`; symbols and emoji ≥ U+00A0, matching Svelte's `>= 160` rule)
 - Function tokens (`name(`)
 - At-keyword tokens (`@name`)

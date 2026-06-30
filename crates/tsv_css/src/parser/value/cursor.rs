@@ -4,6 +4,8 @@
 // args) while respecting parenthesis and quote nesting, tracking byte position
 // during parsing.
 
+use crate::whitespace::is_css_whitespace;
+
 /// Position-tracking cursor for parsing CSS values
 ///
 /// Splits a CSS value string into delimiter-separated ranges (lists, function
@@ -81,7 +83,9 @@ impl<'a> ValueCursor<'a> {
     /// new position (first non-whitespace character or EOF).
     pub fn skip_whitespace(&mut self) -> usize {
         while let Some(ch) = self.peek() {
-            if ch.is_whitespace() {
+            // CSS whitespace is ASCII-only; NBSP and other Unicode whitespace are
+            // value content (see `is_css_whitespace`).
+            if is_css_whitespace(ch) {
                 self.pos += ch.len_utf8();
             } else {
                 break;

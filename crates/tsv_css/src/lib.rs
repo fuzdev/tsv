@@ -10,6 +10,7 @@ mod number;
 mod parser;
 mod printer;
 mod url;
+mod whitespace;
 
 // Re-export commonly used types
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet};
