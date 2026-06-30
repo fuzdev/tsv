@@ -333,6 +333,62 @@ Deno.test('inline_content_hug: negative - not svelte', () => {
 	assertEquals(match, null);
 });
 
+// ─── inline_content_block_style ─────────────────────────────────────────────
+
+Deno.test('inline_content_block_style: positive - ours block-style, prettier dangles closing >', () => {
+	// prettier hugs content to the attr line and dangles the closing `>`; ours keeps
+	// both tags intact with the content on its own indented line. Whitespace-only.
+	const prettier = '<code\n\tclass="x">PUBLIC</code\n>';
+	const ours = '<code\n\tclass="x"\n>\n\tPUBLIC\n</code>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: positive - ours dangles the open > to its own line', () => {
+	const prettier = '<span class="x">{content}</span>';
+	const ours = '<span\n\tclass="x"\n>{content}</span\n>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: negative - not svelte', () => {
+	const prettier = '<code\n\tclass="x">PUBLIC</code\n>';
+	const ours = '<code\n\tclass="x"\n>\n\tPUBLIC\n</code>';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: negative - format-ignore verbatim (whitespace-only, no tag dangle)', () => {
+	// tags stay intact and in place; only redundant internal spaces differ. No
+	// dangled delimiter → must NOT be claimed (it is a format-ignore divergence).
+	const prettier = '<div class="a">text</div>';
+	const ours = '<div    class="a"    >text</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: negative - empty-destructure brace spacing (no tag dangle)', () => {
+	const prettier = '{#each items as { }}<div>x</div>{/each}';
+	const ours = '{#each items as {}}<div>x</div>{/each}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: negative - content differs (safety gate blocks a real loss)', () => {
+	// Same block-style/dangle shape, but the text content itself differs — the
+	// whitespace-only gate fails so the detector can never absorb a content change.
+	const prettier = '<code\n\tclass="x">GOODBYE</code\n>';
+	const ours = '<code\n\tclass="x"\n>\n\tHELLO\n</code>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
+
 // ─── single_specifier_import ────────────────────────────────────────────────
 
 Deno.test('single_specifier_import: positive - long import wraps', () => {
@@ -854,6 +910,54 @@ Deno.test('css_selector_divergence: negative - || in TypeScript (logical OR)', (
 	const ours = 'const x = a ||\n\tb;';
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('css_selector_divergence', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('css_selector_divergence: positive - nested pseudo-args re-indent (:is in :where)', () => {
+	// prettier indents the :is() arg list one extra level (`nodes.length > 2`); tsv
+	// keys on a real combinator, so the same list sits one tab shallower. Pure re-indent.
+	const prettier = ':where(\n\t:is(\n\t\t\tp,\n\t\t\tul\n\t\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
+	const ours = ':where(\n\t:is(\n\t\tp,\n\t\tul\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
+	const ctx = make_context(ours, prettier, 'css');
+	const match = run_pattern('css_selector_divergence', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('css_selector_divergence: negative - selector content actually differs (not pure re-indent)', () => {
+	// Same shape, but a selector token changed (`ul` → `ol`): NOT a pure re-indent,
+	// so the pseudo-args clause must not claim it (a real content difference).
+	const prettier = ':where(\n\t:is(\n\t\t\tp,\n\t\t\tul\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
+	const ours = ':where(\n\t:is(\n\t\tp,\n\t\tol\n\t):not(:last-child)\n) {\n\tmargin: 0;\n}';
+	const ctx = make_context(ours, prettier, 'css');
+	const match = run_pattern('css_selector_divergence', ctx);
+	assertEquals(match, null);
+});
+
+// ─── annotation_continuation_indent ─────────────────────────────────────────
+
+Deno.test('annotation_continuation_indent: positive - type after colon line comment indents one level', () => {
+	const prettier = 'const e: // c\nFoo = x;';
+	const ours = 'const e: // c\n\tFoo = x;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('annotation_continuation_indent', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('annotation_continuation_indent: negative - ternary branch (line-leading colon)', () => {
+	// A `:` at the start of its line is a ternary branch, not an annotation target;
+	// requiring a word/closer before the colon excludes it.
+	const prettier = 'const x = cond\n\t? a\n\t: // c\nb;';
+	const ours = 'const x = cond\n\t? a\n\t: // c\n\t\tb;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('annotation_continuation_indent', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('annotation_continuation_indent: negative - pure re-indent with no preceding colon comment', () => {
+	const prettier = 'foo(\n\tbar\n);';
+	const ours = 'foo(\n\t\tbar\n);';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('annotation_continuation_indent', ctx);
 	assertEquals(match, null);
 });
 

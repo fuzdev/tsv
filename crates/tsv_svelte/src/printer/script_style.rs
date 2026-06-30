@@ -7,7 +7,7 @@
 use crate::ast::internal;
 use crate::printer::Printer;
 use tsv_lang::TAB_WIDTH;
-use tsv_lang::doc::{self, arena::DocId};
+use tsv_lang::doc::{self, DocBuf, arena::DocId};
 
 impl<'a> Printer<'a> {
     /// Format a Script tag
@@ -234,7 +234,7 @@ impl<'a> Printer<'a> {
         attributes: &[internal::AttributeNode<'_>],
     ) -> (DocId, bool) {
         let d = self.d();
-        let mut parts = Vec::with_capacity(attributes.len() * 2);
+        let mut parts: DocBuf = DocBuf::with_capacity(attributes.len() * 2);
         let mut has_multiline = false;
         for attr in attributes {
             parts.push(d.line());
