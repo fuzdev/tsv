@@ -86,6 +86,22 @@ fn parse_pseudo_args<'arena>(
 
     let args_start = parser.current_start;
 
+    // CSS pseudo-class/element names are ASCII case-insensitive (Selectors 4
+    // §"Case-Sensitivity"), and Svelte's parser accepts the uppercase forms
+    // (`:NTH-CHILD(2n+1)`, `:IS(…)`, `:GLOBAL(…)`); dispatch on the lowercased name so
+    // they route to the correct argument grammar instead of degenerating onto the
+    // generic path (which can't parse An+B, leaving the whole `name(args)` as an
+    // opaque name). The printed name is recovered from `span` and lowercased there, so
+    // this only affects argument dispatch. The `of` keyword inside `nth-*` stays
+    // case-sensitive (Svelte rejects an uppercase `OF`).
+    let lower_name;
+    let pseudo_name: &str = if pseudo_name.bytes().any(|b| b.is_ascii_uppercase()) {
+        lower_name = pseudo_name.to_ascii_lowercase();
+        &lower_name
+    } else {
+        pseudo_name
+    };
+
     // Parse arguments for ::slotted() pseudo-element
     //
     // Per CSS Scoping Module Level 1: `::slotted( <compound-selector> )`

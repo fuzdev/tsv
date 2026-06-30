@@ -29,6 +29,8 @@
 // tsv's uniform rule is cleaner and needs no node counting — the `+1` comes only
 // from a real combinator. See conformance_prettier.md §CSS: Selectors.
 
+use std::borrow::Cow;
+
 use super::Printer;
 use crate::ast::internal;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -329,6 +331,17 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match simple {
             internal::SimpleSelector::Type { span, .. } => {
+                // Inside `@keyframes`, the `from`/`to` keyframe selectors are
+                // case-insensitive keywords — lowercase them (`FROM`→`from`),
+                // matching prettier. Any other type selector (and all type selectors
+                // outside keyframes) stays verbatim, so only pay the extract+trim on
+                // the keyframes path.
+                if self.in_keyframes {
+                    let text = span.extract(self.source).trim();
+                    if text.eq_ignore_ascii_case("from") || text.eq_ignore_ascii_case("to") {
+                        return d.text_owned(text.to_ascii_lowercase());
+                    }
+                }
                 self.span_leaf_doc(*span, is_last_in_compound)
             }
             internal::SimpleSelector::Universal { namespace, .. } => match namespace {
@@ -493,7 +506,13 @@ impl<'a> Printer<'a> {
     /// - `  n  ` → `n` (trim outer spaces)
     /// - `odd`, `even`, `3` → unchanged
     fn normalize_an_plus_b(value: &str) -> String {
-        let trimmed = value.trim();
+        // Lowercase the `n` variable when it carries a numeric coefficient
+        // (`2N`→`2n`), matching prettier — a bare `N`/`-N` keeps its case (prettier
+        // preserves it), as do the `even`/`odd` keywords (their `n` isn't
+        // digit-preceded). Applied before the early return so `2N` (no operator)
+        // is cased too.
+        let cased = lowercase_an_plus_b_n(value.trim());
+        let trimmed = cased.as_ref();
 
         // Simple cases: keywords and plain numbers (no operators)
         if !trimmed.contains('+') && !trimmed.contains('-') {
@@ -535,5 +554,53 @@ impl<'a> Printer<'a> {
         }
 
         result.trim().to_string()
+    }
+}
+
+/// Lowercase the An+B `n` variable when it carries a numeric coefficient
+/// (`2N`→`2n`), matching prettier. A bare `N`/`-N` keeps its case (prettier
+/// preserves it), and the `even`/`odd` keywords are untouched (their `n` is not
+/// digit-preceded). Borrows when there is nothing to change.
+fn lowercase_an_plus_b_n(s: &str) -> Cow<'_, str> {
+    let bytes = s.as_bytes();
+    let needs = bytes
+        .iter()
+        .enumerate()
+        .any(|(i, &b)| b == b'N' && i > 0 && bytes[i - 1].is_ascii_digit());
+    if !needs {
+        return Cow::Borrowed(s);
+    }
+    let mut out = String::with_capacity(s.len());
+    let mut prev_digit = false;
+    for ch in s.chars() {
+        if ch == 'N' && prev_digit {
+            out.push('n');
+        } else {
+            out.push(ch);
+        }
+        prev_digit = ch.is_ascii_digit();
+    }
+    Cow::Owned(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lowercase_an_plus_b_n;
+
+    #[test]
+    fn test_lowercase_an_plus_b_n() {
+        // Digit-preceded `n` lowercases (matches prettier).
+        assert_eq!(lowercase_an_plus_b_n("2N"), "2n");
+        assert_eq!(lowercase_an_plus_b_n("2N+1"), "2n+1");
+        assert_eq!(lowercase_an_plus_b_n("0N"), "0n");
+        // Bare `N`/`-N` keep their case (prettier preserves them).
+        assert!(matches!(
+            lowercase_an_plus_b_n("N"),
+            std::borrow::Cow::Borrowed("N")
+        ));
+        assert_eq!(lowercase_an_plus_b_n("-N+3"), "-N+3");
+        // `even`/`odd` are untouched (their `n` is not digit-preceded).
+        assert_eq!(lowercase_an_plus_b_n("EVEN"), "EVEN");
+        assert_eq!(lowercase_an_plus_b_n("ODD"), "ODD");
     }
 }

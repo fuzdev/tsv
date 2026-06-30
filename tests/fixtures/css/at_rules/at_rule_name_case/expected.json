@@ -1,0 +1,169 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 143,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 52,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 23,
+					"end": 52,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 27,
+								"end": 28,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 27,
+										"end": 28,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 27,
+														"end": 28
+													}
+												],
+												"start": 27,
+												"end": 28
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 29,
+								"end": 49,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 34,
+										"end": 44,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 27,
+							"end": 49
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 54,
+				"end": 87,
+				"name": "font-face",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 65,
+					"end": 87,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 69,
+							"end": 83,
+							"property": "font-family",
+							"value": "x"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 89,
+				"end": 134,
+				"name": "keyframes",
+				"prelude": "x",
+				"block": {
+					"type": "Block",
+					"start": 102,
+					"end": 134,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 106,
+								"end": 110,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 106,
+										"end": 110,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "from",
+														"start": 106,
+														"end": 110
+													}
+												],
+												"start": 106,
+												"end": 110
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 111,
+								"end": 131,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 116,
+										"end": 126,
+										"property": "opacity",
+										"value": "0"
+									}
+								]
+							},
+							"start": 106,
+							"end": 131
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 135,
+			"styles": "\n\t@media screen {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@font-face {\n\t\tfont-family: x;\n\t}\n\t@keyframes x {\n\t\tfrom {\n\t\t\topacity: 0;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 144,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

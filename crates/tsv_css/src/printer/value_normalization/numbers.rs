@@ -1,5 +1,7 @@
 // Number normalization: canonicalizing numeric value text to prettier's form.
 
+use std::borrow::Cow;
+
 /// Normalize a dimension value from raw source string
 ///
 /// This function matches prettier's exact behavior:
@@ -22,7 +24,8 @@ pub(crate) fn normalize_dimension_from_source(raw: &str) -> String {
     }
 
     let normalized_num = normalize_css_number(num_part);
-    format!("{normalized_num}{unit_part}")
+    let unit = canonical_unit(unit_part);
+    format!("{normalized_num}{unit}")
 }
 
 /// Split a dimension into its numeric part and trailing unit, e.g.
@@ -101,6 +104,28 @@ pub(crate) fn is_known_css_unit(unit: &str) -> bool {
             && CSS_UNITS.contains(unit.to_ascii_lowercase().as_str()))
 }
 
+/// Map a CSS dimension unit to its canonical case: **lowercase**, for every unit.
+/// Units are ASCII case-insensitive (CSS Syntax 3) and serialize as lowercase — CSS
+/// Values 4 §6.2 (`1Q` serializes as `1q`) and §7.3 (`hz` is the canonical
+/// `<frequency>` unit; `1Hz` serializes as `1hz`). This lowercases the frequency units
+/// `Hz`/`kHz` and the quarter-millimeter `Q` along with everything else (`10HZ`→`10hz`,
+/// `10Q`→`10q`), a deliberate divergence from prettier — which upcases those three to
+/// their prose spelling. See `docs/conformance_prettier.md` §"Unit serialization case"
+/// and the `units_serialize_case_prettier_divergence` fixture.
+///
+/// An already-lowercase unit is canonical and borrows unchanged. An **unknown** unit
+/// (not in [`CSS_UNITS`]) is left untouched, matching prettier (`10FOO` stays `10FOO`).
+pub(crate) fn canonical_unit(unit: &str) -> Cow<'_, str> {
+    if !unit.bytes().any(|b| b.is_ascii_uppercase()) {
+        return Cow::Borrowed(unit);
+    }
+    // Mixed/upper input: canonicalize only a known unit (prettier leaves unknown ones).
+    if !is_known_css_unit(unit) {
+        return Cow::Borrowed(unit);
+    }
+    Cow::Owned(unit.to_ascii_lowercase())
+}
+
 /// Normalize decimal number while preserving sign and leading zeros
 ///
 /// Examples:
@@ -147,6 +172,28 @@ fn normalize_decimal_preserving_prefix(num: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_canonical_unit() {
+        // Every known unit lowercases (the spec's serialized form).
+        assert_eq!(canonical_unit("PX"), "px");
+        assert_eq!(canonical_unit("DEG"), "deg");
+        assert_eq!(canonical_unit("Turn"), "turn");
+        assert_eq!(canonical_unit("FR"), "fr");
+        // Already-canonical borrows unchanged.
+        assert!(matches!(canonical_unit("px"), Cow::Borrowed("px")));
+        // `Hz`/`kHz`/`Q` lowercase too (CSS Values 4 §6.2/§7.3 — diverges from
+        // prettier, which upcases them). Already-lowercase forms borrow unchanged.
+        assert_eq!(canonical_unit("HZ"), "hz");
+        assert_eq!(canonical_unit("KHZ"), "khz");
+        assert_eq!(canonical_unit("Q"), "q");
+        assert!(matches!(canonical_unit("hz"), Cow::Borrowed("hz")));
+        assert!(matches!(canonical_unit("khz"), Cow::Borrowed("khz")));
+        assert!(matches!(canonical_unit("q"), Cow::Borrowed("q")));
+        // Unknown units are left untouched (prettier does the same).
+        assert_eq!(canonical_unit("FOO"), "FOO");
+        assert_eq!(canonical_unit(""), "");
+    }
 
     #[test]
     fn test_normalize_css_number_table() {

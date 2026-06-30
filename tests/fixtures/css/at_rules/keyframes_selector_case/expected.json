@@ -1,0 +1,181 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 260,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 153,
+				"end": 251,
+				"name": "keyframes",
+				"prelude": "slide",
+				"block": {
+					"type": "Block",
+					"start": 170,
+					"end": 251,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 174,
+								"end": 178,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 174,
+										"end": 178,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "from",
+														"start": 174,
+														"end": 178
+													}
+												],
+												"start": 174,
+												"end": 178
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 179,
+								"end": 196,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 184,
+										"end": 191,
+										"property": "left",
+										"value": "0"
+									}
+								]
+							},
+							"start": 174,
+							"end": 196
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 199,
+								"end": 202,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 199,
+										"end": 202,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "Percentage",
+														"value": "50%",
+														"start": 199,
+														"end": 202
+													}
+												],
+												"start": 199,
+												"end": 202
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 203,
+								"end": 222,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 208,
+										"end": 217,
+										"property": "left",
+										"value": "50%"
+									}
+								]
+							},
+							"start": 199,
+							"end": 222
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 225,
+								"end": 227,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 225,
+										"end": 227,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "to",
+														"start": 225,
+														"end": 227
+													}
+												],
+												"start": 225,
+												"end": 227
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 228,
+								"end": 248,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 233,
+										"end": 243,
+										"property": "left",
+										"value": "100%"
+									}
+								]
+							},
+							"start": 225,
+							"end": 248
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 252,
+			"styles": "\n\t/* `from`/`to` are case-insensitive keyframe-selector keywords; prettier (and\n\t   tsv) lowercase them. Percentage selectors are unaffected. */\n\t@keyframes slide {\n\t\tfrom {\n\t\t\tleft: 0;\n\t\t}\n\t\t50% {\n\t\t\tleft: 50%;\n\t\t}\n\t\tto {\n\t\t\tleft: 100%;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 261,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

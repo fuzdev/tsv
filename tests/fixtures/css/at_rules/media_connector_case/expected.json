@@ -1,0 +1,156 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 382,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 165,
+				"end": 218,
+				"name": "import",
+				"prelude": "url(reset.css) screen AND (min-width: 100px)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 220,
+				"end": 286,
+				"name": "media",
+				"prelude": "screen AND (min-width: 100px)",
+				"block": {
+					"type": "Block",
+					"start": 257,
+					"end": 286,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 261,
+								"end": 262,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 261,
+										"end": 262,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 261,
+														"end": 262
+													}
+												],
+												"start": 261,
+												"end": 262
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 263,
+								"end": 283,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 268,
+										"end": 278,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 261,
+							"end": 283
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 288,
+				"end": 373,
+				"name": "media",
+				"prelude": "(min-width: 100px) or (min-height: 100px), print",
+				"block": {
+					"type": "Block",
+					"start": 344,
+					"end": 373,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 348,
+								"end": 349,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 348,
+										"end": 349,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 348,
+														"end": 349
+													}
+												],
+												"start": 348,
+												"end": 349
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 350,
+								"end": 370,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 355,
+										"end": 365,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 348,
+							"end": 370
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 374,
+			"styles": "\n\t/* and/or media-query connectors are case-insensitive; tsv preserves the\n\t   author's case (matching prettier), incl. @import preludes and comma lists. */\n\t@import url(reset.css) screen AND (min-width: 100px);\n\t@media screen AND (min-width: 100px) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@media (min-width: 100px) or (min-height: 100px), print {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 383,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

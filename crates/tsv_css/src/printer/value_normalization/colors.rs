@@ -1,5 +1,6 @@
 // Color formatting: semantic color rendering and source-preserving color syntax.
 
+use super::numbers::canonical_unit;
 use crate::ast::internal::{Color, ColorChannel};
 use tsv_lang::Span;
 
@@ -35,9 +36,10 @@ pub(crate) fn format_color_value(color: &Color) -> String {
             lightness,
             alpha,
         } => {
-            // Format hue with optional unit
+            // Format hue with optional unit (canonicalized — `180DEG` → `180deg`)
             let hue_str = if let Some(unit) = hue_unit {
-                format!("{}{}", format_color_channel(hue), unit.as_str())
+                let unit = canonical_unit(unit.as_str());
+                format!("{}{}", format_color_channel(hue), unit)
             } else {
                 format_color_channel(hue)
             };
@@ -129,9 +131,10 @@ pub(crate) fn format_color_from_source(color: &Color, source: &str, span: Span) 
                 lightness,
                 alpha,
             } => {
-                // Format hue with optional unit
+                // Format hue with optional unit (canonicalized — `180DEG` → `180deg`)
                 let hue_str = if let Some(unit) = hue_unit {
-                    format!("{}{}", format_color_channel(hue), unit.as_str())
+                    let unit = canonical_unit(unit.as_str());
+                    format!("{}{}", format_color_channel(hue), unit)
                 } else {
                     format_color_channel(hue)
                 };

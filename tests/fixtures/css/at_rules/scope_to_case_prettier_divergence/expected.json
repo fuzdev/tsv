@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 227,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 161,
+				"end": 218,
+				"name": "scope",
+				"prelude": "(.card) to (.footer)",
+				"block": {
+					"type": "Block",
+					"start": 189,
+					"end": 218,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 193,
+								"end": 194,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 193,
+										"end": 194,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 193,
+														"end": 194
+													}
+												],
+												"start": 193,
+												"end": 194
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 195,
+								"end": 215,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 200,
+										"end": 210,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 193,
+							"end": 215
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 219,
+			"styles": "\n\t/* the `to` scope-limit keyword is a case-insensitive grammar keyword; tsv\n\t   canonicalizes it to lowercase, prettier preserves the author's case. */\n\t@scope (.card) to (.footer) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 228,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

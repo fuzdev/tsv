@@ -18,6 +18,8 @@
 // divergence kept for Svelte), so that one prelude stays imperative. The block body is
 // iterated by the shared `print_css_block_children` (see `mod.rs`).
 
+use std::borrow::Cow;
+
 use super::Printer;
 use super::value_normalization;
 use crate::ast::internal;
@@ -27,12 +29,12 @@ use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 use tsv_lang::source_scan;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
-/// Convert a condition connector to its string representation
-fn connector_str(conn: internal::ConditionConnector) -> &'static str {
-    match conn {
-        internal::ConditionConnector::And => "and",
-        internal::ConditionConnector::Or => "or",
-    }
+/// Whether `atom` is a media-query `and`/`or` connector (ASCII case-insensitive per
+/// CSS Syntax 3, so `AND`/`Or` count too). The connector is the line-wrap break
+/// point in a `@media`/`@import` query; its **case is preserved** in output
+/// (matching prettier — the author's `AND`/`and` is kept), so this is detection-only.
+fn is_media_connector(atom: &str) -> bool {
+    atom.eq_ignore_ascii_case("and") || atom.eq_ignore_ascii_case("or")
 }
 
 /// A `@supports`/`@container` condition prelude. The two differ only in that
@@ -66,14 +68,18 @@ impl<'a> Printer<'a> {
     /// Format a CSS at-rule (@media, @keyframes, @supports, etc.)
     pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule<'_>) {
         self.write("@");
-        self.write(atrule.name);
+        // At-rule names are ASCII case-insensitive; lowercase for output (`@MEDIA`
+        // → `@media`), matching prettier. The stored `name` keeps its source case
+        // (public AST matches Svelte).
+        self.write(&value_normalization::lowercase_at_rule_name(atrule.name));
 
         // Print prelude based on type
         match &atrule.prelude {
             internal::PreludeValue::Values { values, span } if !values.is_empty() => {
                 self.write(" ");
-                // Special handling for @import with media query (last value may need wrapping)
-                let is_import = atrule.name == "import";
+                // Special handling for @import with media query (last value may need
+                // wrapping). At-rule names are case-insensitive (`@IMPORT` too).
+                let is_import = atrule.name.eq_ignore_ascii_case("import");
                 // Track the source position after the previous value so comments in the
                 // gaps (before the first value, between values) can be reconstructed.
                 // Svelte strips these from the prelude string; prettier preserves them
@@ -100,8 +106,18 @@ impl<'a> Printer<'a> {
                         // comment-aware value path below — the fill splits on whitespace
                         // and would shatter `/* … */` comments (the `and`/`or` path keeps
                         // its existing comment handling).
-                        if normalized.contains(" and ")
-                            || normalized.contains(" or ")
+                        // Connector detection is ASCII case-insensitive — `AND`/`Or`
+                        // are valid connectors (CSS Syntax 3) that route to the
+                        // wrapping path (which preserves their source case). Only fold
+                        // case when there's uppercase to fold; the common all-lowercase
+                        // query probes the original directly (no allocation).
+                        let lower = if normalized.bytes().any(|b| b.is_ascii_uppercase()) {
+                            Cow::Owned(normalized.to_ascii_lowercase())
+                        } else {
+                            Cow::Borrowed(normalized.as_str())
+                        };
+                        if lower.contains(" and ")
+                            || lower.contains(" or ")
                             || (normalized.contains(',') && !normalized.contains("/*"))
                         {
                             self.print_import_media_query(&normalized);
@@ -180,7 +196,13 @@ impl<'a> Printer<'a> {
             // through the canonical `print_css_rule`, so it formats identically to a
             // top-level rule (no separate at-rule-block rule path to drift).
             self.indent_level += 1;
+            // Inside an `@keyframes` block, `from`/`to` selectors are case-insensitive
+            // keywords (lowercased by the selector printer); save/restore so a stray
+            // nested context can't leak the flag.
+            let was_in_keyframes = self.in_keyframes;
+            self.in_keyframes = crate::parser::is_keyframes_atrule(atrule.name);
             self.print_css_block_children(block.children, 0);
+            self.in_keyframes = was_in_keyframes;
             self.indent_level -= 1;
 
             // Every child ends with `\n` (declarations/comments inherently,
@@ -222,6 +244,14 @@ impl<'a> Printer<'a> {
         // Normalize numbers + string quotes in the raw prelude (`.5px` → `0.5px`,
         // `"x"` → `'x'`), matching the declaration-value path. Comments preserved.
         let content = value_normalization::normalize_value_text(content);
+        // Lowercase media-feature *names* (`(MIN-WIDTH: …)` → `(min-width: …)`),
+        // matching prettier; media types, `and`/`or`/`not`/`only`, and feature values
+        // are preserved (see `lowercase_media_feature_names`). Keep the already-owned
+        // `content` when nothing changed (the common no-uppercase case borrows).
+        let content = match value_normalization::lowercase_media_feature_names(&content) {
+            Cow::Borrowed(_) => content,
+            Cow::Owned(s) => s,
+        };
 
         let queries: Vec<&str> = value_normalization::split_args_by_comma(&content)
             .into_iter()
@@ -239,6 +269,8 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(","));
                     parts.push(d.line());
                 }
+                // Connector case is preserved (matching prettier), so the query is
+                // emitted verbatim — no atom rewriting in the comma-list branch.
                 parts.push(d.text_owned((*query).to_string()));
             }
             return d.group(d.indent(d.concat(&parts)));
@@ -265,14 +297,12 @@ impl<'a> Printer<'a> {
         let mut segment = String::new();
         let mut has_connector = false;
         for atom in atoms {
-            if matches!(atom, "and" | "or") && !segment.is_empty() {
+            // A `and`/`or` connector (case-insensitive) is the wrap break point;
+            // its case is preserved (emit the original `atom`).
+            if is_media_connector(atom) && !segment.is_empty() {
                 has_connector = true;
-                // Map to the `&'static str` literal `d.text` needs: `atom` borrows
-                // `query`, not `'static`. The `matches!` guard already proved it's one
-                // of these two, so this isn't a redundant rebind.
-                let conn = if atom == "and" { "and" } else { "or" };
                 fill_parts.push(d.text_owned(std::mem::take(&mut segment)));
-                fill_parts.push(d.concat(&[d.text(" "), d.text(conn), d.line()]));
+                fill_parts.push(d.concat(&[d.text(" "), d.text_owned(atom.to_string()), d.line()]));
             } else {
                 if !segment.is_empty() {
                     segment.push(' ');
@@ -424,9 +454,11 @@ impl<'a> Printer<'a> {
                 sep.push(d.text(" "));
                 sep.push(d.text_owned(before));
             }
-            if let Some(conn) = part.connector {
+            // Emit the connector's source case (`AND` stays `AND`), preserved like
+            // prettier. `connector_raw` is `Some` whenever `connector` is.
+            if let Some(conn_raw) = part.connector_raw {
                 sep.push(d.text(" "));
-                sep.push(d.text(connector_str(conn)));
+                sep.push(d.text_owned(conn_raw.to_string()));
             }
             sep.push(d.line());
             fill_parts.push(d.concat(&sep));
@@ -465,12 +497,13 @@ impl<'a> Printer<'a> {
     ///
     /// Returns (comments_before_connector, comments_after_connector); for
     /// `/* a */ and /* b */` → (`/* a */`, `/* b */`). The connector is located
-    /// comment-aware via `find_keyword` (CSS trivia profile), so a `and`/`or` buried
-    /// in a comment (`/* x and y */ and …`) doesn't move the split into the comment —
-    /// which would drop it (a straddling comment is in neither half-range). The parser
-    /// only accepts lowercase `and`/`or`, so a case-sensitive byte match suffices. With
-    /// no connector (or none found) the whole run goes before. Delegates the binning +
-    /// join to the shared `split_comments_at`.
+    /// comment-aware via `find_keyword_ascii_case_insensitive` (CSS trivia profile),
+    /// so a `and`/`or` buried in a comment (`/* x and y */ and …`) doesn't move the
+    /// split into the comment — which would drop it (a straddling comment is in
+    /// neither half-range). The match is ASCII case-insensitive because the parser
+    /// accepts uppercase connectors (`AND`/`Or`), which CSS Syntax 3 makes valid.
+    /// With no connector (or none found) the whole run goes before. Delegates the
+    /// binning + join to the shared `split_comments_at`.
     fn extract_comments_split_by_connector(
         &self,
         start: u32,
@@ -483,7 +516,7 @@ impl<'a> Printer<'a> {
             None => return self.split_comments_at(start, end, None),
         };
 
-        let connector_pos = source_scan::find_keyword(
+        let connector_pos = source_scan::find_keyword_ascii_case_insensitive(
             self.source.as_bytes(),
             start as usize,
             end as usize,
@@ -614,6 +647,7 @@ impl<'a> Printer<'a> {
         let last = atoms.len().saturating_sub(1);
         let mut col = start_col;
         for (ai, &atom) in atoms.iter().enumerate() {
+            // Connector case is preserved (matching prettier); emit `atom` verbatim.
             if ai == 0 {
                 self.write(atom);
                 col += atom.len();

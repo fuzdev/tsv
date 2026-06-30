@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 322,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 313,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 229,
+							"end": 239,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 243,
+							"end": 265,
+							"property": "background-color",
+							"value": "BLUE"
+						},
+						{
+							"type": "Declaration",
+							"start": 269,
+							"end": 293,
+							"property": "-webkit-box-shadow",
+							"value": "none"
+						},
+						{
+							"type": "Declaration",
+							"start": 297,
+							"end": 309,
+							"property": "--MyVar",
+							"value": "1px"
+						}
+					]
+				},
+				"start": 9,
+				"end": 313
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 314,
+			"styles": "\n\ta {\n\t\t/* property names are case-insensitive keywords; prettier (and tsv)\n\t\t   lowercase them, including vendor prefixes. Values, custom-property\n\t\t   names, and SCSS `$` variables are case-sensitive and preserved. */\n\t\tcolor: red;\n\t\tbackground-color: BLUE;\n\t\t-webkit-box-shadow: none;\n\t\t--MyVar: 1px;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 323,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

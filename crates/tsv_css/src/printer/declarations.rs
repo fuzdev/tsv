@@ -176,9 +176,14 @@ impl<'a> Printer<'a> {
     pub(super) fn print_css_declaration(&mut self, decl: &internal::CssDeclaration<'_>) {
         self.write_indent();
 
-        // Extract property name from source to preserve escape sequences
+        // Extract property name from source to preserve escape sequences, then
+        // lowercase it (property names are ASCII case-insensitive; prettier
+        // lowercases — custom properties and escaped/comment-bearing names are
+        // preserved by `lowercase_property_name`).
         let decl_source = decl.span.extract(self.source);
-        let property_normalized = value_normalization::extract_property_name(decl_source);
+        let property_normalized = value_normalization::lowercase_property_name(
+            value_normalization::extract_property_name(decl_source),
+        );
         self.write(&property_normalized);
 
         // Dispatch to appropriate handler based on value type and formatting needs

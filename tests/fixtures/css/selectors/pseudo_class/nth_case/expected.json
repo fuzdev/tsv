@@ -1,0 +1,188 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 201,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 119,
+					"end": 134,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 119,
+							"end": 134,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 119,
+											"end": 120
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 131,
+												"end": 133,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 131,
+														"end": 133,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n",
+																		"start": 131,
+																		"end": 133
+																	}
+																],
+																"start": 131,
+																"end": 133
+															}
+														]
+													}
+												]
+											},
+											"start": 120,
+											"end": 134
+										}
+									],
+									"start": 119,
+									"end": 134
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 135,
+					"end": 153,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 139,
+							"end": 149,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 119,
+				"end": 153
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 155,
+					"end": 172,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 155,
+							"end": 172,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 155,
+											"end": 156
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-of-type",
+											"args": {
+												"type": "SelectorList",
+												"start": 169,
+												"end": 171,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 169,
+														"end": 171,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "3n",
+																		"start": 169,
+																		"end": 171
+																	}
+																],
+																"start": 169,
+																"end": 171
+															}
+														]
+													}
+												]
+											},
+											"start": 156,
+											"end": 172
+										}
+									],
+									"start": 155,
+									"end": 172
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 173,
+					"end": 192,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 177,
+							"end": 188,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 155,
+				"end": 192
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 193,
+			"styles": "\n\t/* the An+B `n` variable lowercases when it carries a numeric coefficient\n\t   (2N→2n), matching prettier. */\n\ta:nth-child(2n) {\n\t\tcolor: red;\n\t}\n\ta:nth-of-type(3n) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 202,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

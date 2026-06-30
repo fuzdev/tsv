@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 401,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 187,
+				"end": 259,
+				"name": "supports",
+				"prelude": "(display: grid) AND (color: red)",
+				"block": {
+					"type": "Block",
+					"start": 230,
+					"end": 259,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 234,
+								"end": 235,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 234,
+										"end": 235,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 234,
+														"end": 235
+													}
+												],
+												"start": 234,
+												"end": 235
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 236,
+								"end": 256,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 241,
+										"end": 251,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 234,
+							"end": 256
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 261,
+				"end": 331,
+				"name": "supports",
+				"prelude": "(display: grid) or (gap: 1rem)",
+				"block": {
+					"type": "Block",
+					"start": 302,
+					"end": 331,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 306,
+								"end": 307,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 306,
+										"end": 307,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 306,
+														"end": 307
+													}
+												],
+												"start": 306,
+												"end": 307
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 308,
+								"end": 328,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 313,
+										"end": 323,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 306,
+							"end": 328
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 333,
+				"end": 392,
+				"name": "supports",
+				"prelude": "NOT (display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 363,
+					"end": 392,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 367,
+								"end": 368,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 367,
+										"end": 368,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 367,
+														"end": 368
+													}
+												],
+												"start": 367,
+												"end": 368
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 369,
+								"end": 389,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 374,
+										"end": 384,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 367,
+							"end": 389
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 393,
+			"styles": "\n\t/* and/or/not are case-insensitive CSS grammar keywords; tsv preserves the\n\t   author's case (matching prettier) — it parses the uppercase forms but\n\t   never rewrites them. */\n\t@supports (display: grid) AND (color: red) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@supports (display: grid) or (gap: 1rem) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@supports NOT (display: grid) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 402,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

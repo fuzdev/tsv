@@ -238,6 +238,17 @@ fn whole_word_at(bytes: &[u8], i: usize, keyword: &[u8]) -> bool {
     before_ok && after_ok
 }
 
+/// Like [`whole_word_at`], but matching `keyword` ASCII-case-insensitively.
+fn whole_word_at_ignore_ascii_case(bytes: &[u8], i: usize, keyword: &[u8]) -> bool {
+    let kw_len = keyword.len();
+    if !bytes[i..i + kw_len].eq_ignore_ascii_case(keyword) {
+        return false;
+    }
+    let before_ok = i == 0 || !is_identifier_byte(bytes[i - 1]);
+    let after_ok = i + kw_len >= bytes.len() || !is_identifier_byte(bytes[i + kw_len]);
+    before_ok && after_ok
+}
+
 /// Whether `b` is an ASCII byte that can appear inside a JS/TS identifier —
 /// alphanumeric, `_`, or `$`. Used for whole-word keyword boundaries.
 #[inline]
@@ -267,6 +278,34 @@ pub fn find_keyword(
             continue;
         }
         if whole_word_at(bytes, i, keyword) {
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Like [`find_keyword`], but matching the keyword **ASCII-case-insensitively**.
+///
+/// CSS grammar keywords (`and`/`or`/`not`/...) are ASCII case-insensitive (CSS
+/// Syntax 3 §"tokenizing"), so a connector buried-comment-aware scan must match
+/// `AND` as well as `and`. JS/TS keywords are case-sensitive — they use
+/// [`find_keyword`]. Pass an already-lowercase `keyword`.
+pub fn find_keyword_ascii_case_insensitive(
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+    keyword: &[u8],
+    profile: TriviaProfile,
+) -> Option<usize> {
+    let kw_len = keyword.len();
+    let mut i = start;
+    while i + kw_len <= end {
+        if let Some(past) = skip_trivia(bytes, i, end, profile) {
+            i = past;
+            continue;
+        }
+        if whole_word_at_ignore_ascii_case(bytes, i, keyword) {
             return Some(i);
         }
         i += 1;
@@ -540,6 +579,30 @@ mod tests {
         assert_eq!(
             find_keyword(src, 0, src.len(), b"class", TriviaProfile::JS),
             Some(8)
+        );
+    }
+
+    #[test]
+    fn find_keyword_ascii_case_insensitive_matches_mixed_case_and_skips_comments() {
+        // Uppercase/mixed-case connector matches (CSS grammar keywords are
+        // ASCII case-insensitive).
+        let src = b"(a: b) AND (c: d)";
+        assert_eq!(
+            find_keyword_ascii_case_insensitive(src, 0, src.len(), b"and", TriviaProfile::CSS),
+            Some(7)
+        );
+        // A connector buried in a comment is skipped; the real (uppercase) one
+        // after it is found — the coupling that makes gap-comment splitting sound.
+        let src = b"(a: b) /* and */ Or (c: d)";
+        assert_eq!(
+            find_keyword_ascii_case_insensitive(src, 0, src.len(), b"or", TriviaProfile::CSS),
+            Some(17)
+        );
+        // Whole-word only: `and` inside `understand` is not a match.
+        let src = b"understand";
+        assert_eq!(
+            find_keyword_ascii_case_insensitive(src, 0, src.len(), b"and", TriviaProfile::CSS),
+            None
         );
     }
 

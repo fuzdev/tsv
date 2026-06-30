@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 371,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 362,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 287,
+							"end": 298,
+							"property": "width",
+							"value": "10px"
+						},
+						{
+							"type": "Declaration",
+							"start": 302,
+							"end": 328,
+							"property": "transform",
+							"value": "rotate(0.5turn)"
+						},
+						{
+							"type": "Declaration",
+							"start": 332,
+							"end": 358,
+							"property": "color",
+							"value": "hsl(180deg 50% 50%)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 362
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 363,
+			"styles": "\n\ta {\n\t\t/* dimension units are ASCII case-insensitive; tsv (and prettier)\n\t\t   canonicalize them to lowercase. (The frequency units hz/khz and the\n\t\t   quarter-millimeter q also lowercase but diverge from prettier — covered by\n\t\t   units_serialize_case_prettier_divergence.) */\n\t\twidth: 10px;\n\t\ttransform: rotate(0.5turn);\n\t\tcolor: hsl(180deg 50% 50%);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 372,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
