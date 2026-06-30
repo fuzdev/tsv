@@ -24,8 +24,7 @@ pub use functions::parse_function_arguments;
 pub use spacing::should_add_space_between;
 pub use strings::parse_string_literal;
 
-// Note: contains_space_separator and contains_comma are used internally by ValueParser
-// but not exported publicly
+// Note: classify_separators is used internally by ValueParser but not exported publicly
 
 /// Parse a CSS value into a structured CssValue
 ///

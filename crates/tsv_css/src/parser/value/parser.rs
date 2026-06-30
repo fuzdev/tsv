@@ -5,6 +5,7 @@
 
 use crate::ast::internal::CssValue;
 use crate::parser::value::cursor::ValueCursor;
+use crate::parser::value::lists::{ValueSeparator, classify_separators};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
@@ -133,57 +134,50 @@ impl<'a> ValueParser<'a> {
             };
         }
 
-        // Check what kind of value we have (use trimmed for detection)
-        if super::lists::contains_comma(trimmed) {
-            self.parse_comma_separated(arena)
-        } else if super::lists::contains_space_separator(trimmed) {
-            self.parse_space_separated(arena)
-        } else {
-            self.parse_single(arena)
+        // Classify the top-level separators in a single pass (commas win over
+        // whitespace), then split accordingly. Detection uses `trimmed` so
+        // leading/trailing whitespace is not mistaken for a separator.
+        match classify_separators(trimmed) {
+            ValueSeparator::Comma => self.parse_comma_separated(arena),
+            ValueSeparator::Whitespace => self.parse_space_separated(arena),
+            ValueSeparator::None => self.parse_single(arena),
         }
     }
 
     /// Parse comma-separated values: "a, b, c"
-    ///
-    /// Uses same-source recursion - all parsed values point to ranges
-    /// in the SAME source string, avoiding position drift.
     fn parse_comma_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
-        let text = self.text();
-        let mut cursor = ValueCursor::new(text);
-        let mut values = BumpVec::new_in(arena);
-
-        loop {
-            cursor.skip_whitespace();
-            if cursor.is_eof() {
-                break;
-            }
-
-            let (value_start, value_end_raw) = cursor.consume_until(|c| c == ',');
-            let value_end = self.trimmed_end(text, value_start, value_end_raw);
-
-            if value_end > value_start {
-                // Non-empty value
-                let sub_parser = self.sub_parser(value_start, value_end);
-                values.push(sub_parser.parse(arena)); // Recursive, but same source!
-            }
-
-            cursor.set_position(value_end_raw);
-            if cursor.peek() == Some(',') {
-                cursor.advance(',');
-            }
-        }
-
         CssValue::CommaSeparated {
-            values: values.into_bump_slice(),
+            values: self.split_top_level(arena, |c| c == ','),
             span: self.absolute_span(),
         }
     }
 
     /// Parse space-separated values: "a b c"
-    ///
-    /// Uses same-source recursion - all parsed values point to ranges
-    /// in the SAME source string, avoiding position drift.
     fn parse_space_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
+        CssValue::List {
+            values: self.split_top_level(arena, char::is_whitespace),
+            span: self.absolute_span(),
+        }
+    }
+
+    /// Split the current range into top-level values at `is_delimiter`, parsing
+    /// each recursively.
+    ///
+    /// Uses same-source recursion — every parsed value points to a range in the
+    /// SAME source string, avoiding position drift. Leading/trailing whitespace
+    /// around each element is trimmed and empty elements are dropped, so both
+    /// the comma form (`a, b, c`) and the whitespace form (`a b c`, where runs
+    /// collapse) fall out of the same loop. The delimiter is consumed after each
+    /// element; for whitespace the next iteration's `skip_whitespace` absorbs the
+    /// rest of the run.
+    fn split_top_level<'arena, F>(
+        &self,
+        arena: &'arena Bump,
+        is_delimiter: F,
+    ) -> &'arena [CssValue<'arena>]
+    where
+        F: Fn(char) -> bool,
+    {
         let text = self.text();
         let mut cursor = ValueCursor::new(text);
         let mut values = BumpVec::new_in(arena);
@@ -194,7 +188,7 @@ impl<'a> ValueParser<'a> {
                 break;
             }
 
-            let (value_start, value_end_raw) = cursor.consume_until(char::is_whitespace);
+            let (value_start, value_end_raw) = cursor.consume_until(&is_delimiter);
             let value_end = self.trimmed_end(text, value_start, value_end_raw);
 
             if value_end > value_start {
@@ -204,13 +198,16 @@ impl<'a> ValueParser<'a> {
             }
 
             cursor.set_position(value_end_raw);
-            // Skip past whitespace delimiter (already handled by next loop's skip_whitespace)
+            // Consume the delimiter that stopped the scan (a comma, or the first
+            // char of a whitespace run); EOF leaves nothing to consume.
+            if let Some(delimiter) = cursor.peek()
+                && is_delimiter(delimiter)
+            {
+                cursor.advance(delimiter);
+            }
         }
 
-        CssValue::List {
-            values: values.into_bump_slice(),
-            span: self.absolute_span(),
-        }
+        values.into_bump_slice()
     }
 
     /// Parse single value (leaf node)
