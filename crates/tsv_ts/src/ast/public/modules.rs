@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-use super::declarations::TSDeclareFunction;
+use super::declarations::{TSDeclareFunction, TSInterfaceDeclaration};
 use super::types::TSEntityName;
 use super::{Expression, Identifier, Literal, SourceLocation, Statement};
 
@@ -52,6 +52,8 @@ pub enum ExportDefaultValue<'src> {
     /// For ambient function declarations (no body)
     TSDeclareFunction(TSDeclareFunction<'src>),
     ClassDeclaration(super::classes::ClassDeclaration<'src>),
+    /// `export default interface Foo {}` (TypeScript)
+    TSInterfaceDeclaration(TSInterfaceDeclaration<'src>),
 }
 
 /// Export all declaration: `export * from "y"` or `export * as ns from "y"`

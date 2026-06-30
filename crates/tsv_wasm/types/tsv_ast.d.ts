@@ -871,6 +871,7 @@ export interface ObjectPattern {
 	end: number;
 	loc: SourceLocation;
 	properties: ObjectPatternProperty[];
+	optional?: boolean;
 	typeAnnotation?: TSTypeAnnotation;
 }
 
@@ -882,6 +883,7 @@ export interface ArrayPattern {
 	end: number;
 	loc: SourceLocation;
 	elements: (Expression | null)[];
+	optional?: boolean;
 	typeAnnotation?: TSTypeAnnotation;
 }
 
@@ -1030,7 +1032,8 @@ export type ExportDefaultValue =
 	| Expression
 	| FunctionDeclaration
 	| TSDeclareFunction
-	| ClassDeclaration;
+	| ClassDeclaration
+	| TSInterfaceDeclaration;
 
 /**
  * A module export name: a bare `Identifier` or a string `Literal`. Per ecma262

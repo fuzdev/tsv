@@ -219,6 +219,27 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Build the doc tail that follows a destructuring-pattern parameter's
+    /// closing `]`/`}`: the optional `?` marker (parameter position only), then a
+    /// `: Type` annotation. Either may be absent — `[]`, `[]?`, `[]: T`, `[]?: T`.
+    /// Shared by every object/array pattern path so the `?` lands between the
+    /// brackets and the type uniformly.
+    fn build_pattern_optional_type_tail(
+        &self,
+        optional: bool,
+        type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        if optional {
+            parts.push(d.text("?"));
+        }
+        if let Some(ta) = type_annotation {
+            parts.push(self.build_type_annotation_doc(ta));
+        }
+        d.concat(&parts)
+    }
+
     /// Build a Doc for an object pattern
     ///
     /// Prettier expands object patterns when:
@@ -302,10 +323,13 @@ impl<'a> Printer<'a> {
                     d.text("}"),
                 ];
 
-                // Include type annotation in the group for width calculation
-                if let Some(type_annotation) = &obj.type_annotation {
-                    group_parts.push(self.build_type_annotation_doc(type_annotation));
-                }
+                // Include `?` + type annotation in the group for width calculation
+                group_parts.push(
+                    self.build_pattern_optional_type_tail(
+                        obj.optional,
+                        obj.type_annotation.as_ref(),
+                    ),
+                );
 
                 d.group(d.concat(&group_parts))
             }
@@ -459,15 +483,21 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Build doc for empty object pattern: `{}` with optional type annotation
+    /// Build doc for empty object pattern: `{}` with optional `?` + type annotation
     fn build_empty_object_pattern_doc(&self, obj: &internal::ObjectPattern<'_>) -> DocId {
         let d = self.d();
-        let body_doc = self.build_empty_braces_inline_with_comments_doc(obj.span);
-        if let Some(type_annotation) = &obj.type_annotation {
-            d.concat(&[body_doc, self.build_type_annotation_doc(type_annotation)])
-        } else {
-            body_doc
-        }
+        // Bound the comment scan to the braces (before any `?`/`: Type`), mirroring
+        // `build_empty_array_pattern_doc`. Scanning the full span would pull a
+        // comment out of the type annotation into the empty `{}` and duplicate it.
+        let body_end = obj
+            .type_annotation
+            .as_ref()
+            .map_or(obj.span.end, |t| t.span.start);
+        let body_doc =
+            self.build_empty_braces_inline_with_comments_doc(Span::new(obj.span.start, body_end));
+        let tail =
+            self.build_pattern_optional_type_tail(obj.optional, obj.type_annotation.as_ref());
+        d.concat(&[body_doc, tail])
     }
 
     /// Build expanded doc for object pattern with hardlines (always multiline)
@@ -566,9 +596,9 @@ impl<'a> Printer<'a> {
             d.text("}"),
         ];
 
-        if let Some(type_annotation) = &obj.type_annotation {
-            result_parts.push(self.build_type_annotation_doc(type_annotation));
-        }
+        result_parts.push(
+            self.build_pattern_optional_type_tail(obj.optional, obj.type_annotation.as_ref()),
+        );
 
         d.concat(&result_parts)
     }
@@ -691,11 +721,9 @@ impl<'a> Printer<'a> {
         let body_doc =
             self.build_empty_brackets_inline_with_comments_doc_range(arr.span.start, body_end);
 
-        if let Some(type_annotation) = &arr.type_annotation {
-            d.concat(&[body_doc, self.build_type_annotation_doc(type_annotation)])
-        } else {
-            body_doc
-        }
+        let tail =
+            self.build_pattern_optional_type_tail(arr.optional, arr.type_annotation.as_ref());
+        d.concat(&[body_doc, tail])
     }
 
     /// Check if array pattern has any line comments
@@ -790,12 +818,9 @@ impl<'a> Printer<'a> {
 
         let group_doc = d.group(d.concat(&group_parts));
 
-        if let Some(type_annotation) = &arr.type_annotation {
-            let type_doc = self.build_type_annotation_doc(type_annotation);
-            d.concat(&[group_doc, type_doc])
-        } else {
-            group_doc
-        }
+        let tail =
+            self.build_pattern_optional_type_tail(arr.optional, arr.type_annotation.as_ref());
+        d.concat(&[group_doc, tail])
     }
 
     /// Build expanded array pattern doc (always multiline)
@@ -898,9 +923,9 @@ impl<'a> Printer<'a> {
             d.text("]"),
         ];
 
-        if let Some(type_annotation) = &arr.type_annotation {
-            result_parts.push(self.build_type_annotation_doc(type_annotation));
-        }
+        result_parts.push(
+            self.build_pattern_optional_type_tail(arr.optional, arr.type_annotation.as_ref()),
+        );
 
         d.concat(&result_parts)
     }

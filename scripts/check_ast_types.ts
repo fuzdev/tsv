@@ -70,6 +70,14 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		// `export default interface` — the TSInterfaceDeclaration member of the
+		// ExportDefaultValue union.
+		name: 'ts_export_default_interface',
+		source: 'export default interface A {\n\ta: string;\n}',
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		// Import attributes: bare `Identifier` key and quoted `Literal` key
 		// (the `key: Identifier | Literal` union), on import + both re-export hosts.
 		name: 'ts_import_attributes',
@@ -108,6 +116,22 @@ const samples: Sample[] = [
 			'export { c as "str c" } from "./c";',
 			'export { "str d" as "str e" } from "./d";',
 			'export * as "str f" from "./f";',
+		].join('\n'),
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
+		// Optional destructuring-pattern parameters (`[]?` / `{}?` / `[a]?: T`):
+		// the `optional: true` flag on ArrayPattern/ObjectPattern, in a signature
+		// member and the function-type path.
+		name: 'ts_optional_pattern_params',
+		source: [
+			'interface I {',
+			'\tm([]?): void;',
+			'\tn({}?): void;',
+			'\to([a]?: number[]): void;',
+			'}',
+			'type F = ([]?) => void;',
 		].join('\n'),
 		parser: 'typescript',
 		type: 'Program',
