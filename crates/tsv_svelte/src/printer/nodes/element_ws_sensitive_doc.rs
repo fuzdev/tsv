@@ -287,7 +287,7 @@ impl<'a> Printer<'a> {
         // The dedicated ws-sensitive if/each builders already hug; this also gates
         // await/key/snippet, which fall through to the normal (dangling) builders.
         let prev_dangle = self.set_block_dangle_allowed(false);
-        let node_docs: Vec<_> = nodes
+        let node_docs: DocBuf = nodes
             .iter()
             .map(|node| self.build_whitespace_sensitive_node_doc(node))
             .collect();

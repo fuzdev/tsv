@@ -190,7 +190,7 @@ impl<'a> Printer<'a> {
             let normalize_class = is_html && self.with_resolved_symbol(attr.name, |s| s == "class");
 
             // Fast path: a single value part (the common `name="x"` / `name={x}`).
-            // Build with a stack array instead of the per-attribute `parts` Vec.
+            // Build with a stack array instead of the per-attribute `parts` buffer.
             if value_parts.len() == 1 {
                 let sym = d.symbol(name_sym);
                 let value_doc = if normalize_class {
