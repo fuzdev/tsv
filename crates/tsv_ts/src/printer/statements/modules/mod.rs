@@ -17,6 +17,7 @@ mod specifier_list;
 pub(super) use super::{Printer, build_entity_name_doc};
 
 use crate::ast::internal;
+use smallvec::SmallVec;
 use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
@@ -389,7 +390,8 @@ impl<'a> Printer<'a> {
 
         // Collect specifiers
         let mut has_default = false;
-        let mut named_specs = Vec::new();
+        // Inline up to 8 named specifiers (covers the common import) before spilling.
+        let mut named_specs: SmallVec<[&internal::ImportNamedSpecifier<'_>; 8]> = SmallVec::new();
         let mut default_sym = 0u32;
         let mut default_spec_start = 0u32;
         let mut default_spec_end = 0u32;

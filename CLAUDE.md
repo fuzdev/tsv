@@ -714,6 +714,16 @@ cargo run -p tsv_debug profile file1.ts file2.svelte  # profile specific files
 # Rust, no Deno; run with --release). See ./docs/performance.md.
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 # Options: --iterations <n> (default: 5), --json (adds per-file data)
+
+# buffer_sizes - AST histograms for tuning the TS printer's SmallVec inline
+# capacities (named_specs, CommentLines) + sizing the future multiline-text doc
+# node. Two metrics: named-import-specifier count per import, and line count per
+# multi-line block comment. Covers .ts/.svelte.ts AND .svelte (the <script>/{expr}
+# feed the same TS-printer buffers). Pure Rust, no Deno. Prints percentiles +
+# spill rate at candidate inline N. For sizing, exclude the prettier/svelte test
+# suites (edge-case skew). See ./docs/performance.md.
+cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
+# Options: --json
 ```
 
 See ./docs/performance.md.
