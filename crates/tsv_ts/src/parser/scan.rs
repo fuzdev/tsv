@@ -3,6 +3,8 @@
 // These are generic helpers for scanning raw bytes, used by both expression
 // parsing (arrow function detection) and type parsing (index signature detection).
 
+use std::borrow::Cow;
+
 /// Skip ASCII whitespace characters in a byte slice, returning new position
 #[inline]
 pub(super) fn skip_whitespace(bytes: &[u8], mut pos: usize) -> usize {
@@ -110,8 +112,14 @@ pub(super) fn skip_identifier(bytes: &[u8], mut pos: usize) -> usize {
 /// Note: Precision loss for large integers (>2^52) matches JS behavior.
 #[allow(clippy::cast_precision_loss)]
 pub(crate) fn parse_number_literal(raw: &str) -> Result<f64, std::num::ParseFloatError> {
-    // Remove numeric separators
-    let clean: String = raw.chars().filter(|&c| c != '_').collect();
+    // Numeric separators (`_`) are uncommon; only allocate to strip them when
+    // they're actually present. The common literal (`42`, `0xff`, `3.14`) carries
+    // no separator and borrows the source slice directly — no per-literal alloc.
+    let clean: Cow<'_, str> = if raw.as_bytes().contains(&b'_') {
+        Cow::Owned(raw.chars().filter(|&c| c != '_').collect())
+    } else {
+        Cow::Borrowed(raw)
+    };
 
     // Strip BigInt suffix
     let clean = clean.strip_suffix('n').unwrap_or(&clean);

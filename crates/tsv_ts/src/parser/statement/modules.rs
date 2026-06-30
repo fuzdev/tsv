@@ -145,8 +145,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             // export type X = T or export interface X { } or export declare function/class
             TokenKind::Identifier => {
-                let value = self.current_value().to_string();
-                match value.as_str() {
+                // `&'a str` (source-bound) — no `.to_string()` needed to hold it
+                // across the `self.advance()` calls in the arms below.
+                let value = self.current_value();
+                match value {
                     "type" => {
                         // Could be:
                         // - export type { Name } from "..." - type-only re-export

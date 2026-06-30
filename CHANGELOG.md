@@ -26,7 +26,7 @@ tsv has no config that changes its formatting style behavior, and none will be a
   relative to the cwd), plus a repo-root `.prettierignore` for drop-in compat
   ([#50](https://github.com/fuzdev/tsv/pull/50))
 - feat: `tsv format --list` prints the in-scope files without formatting
-- feat: support `format-ignore` as an alias to `prettier-ignore`
+- feat: support `format-ignore` as an alias to `prettier-ignore`  
   (along with `format-ignore-start` and `format-ignore-end` for templates)
   ([#41](https://github.com/fuzdev/tsv/pull/41))
 - fix: various conformance fixes to the formatter and parser
@@ -47,7 +47,8 @@ tsv has no config that changes its formatting style behavior, and none will be a
   [#145](https://github.com/fuzdev/tsv/pull/145), [#147](https://github.com/fuzdev/tsv/pull/147),
   [#148](https://github.com/fuzdev/tsv/pull/148), [#151](https://github.com/fuzdev/tsv/pull/151),
   [#156](https://github.com/fuzdev/tsv/pull/156), [#165](https://github.com/fuzdev/tsv/pull/165),
-  [#199](https://github.com/fuzdev/tsv/pull/199), [#200](https://github.com/fuzdev/tsv/pull/200))
+  [#199](https://github.com/fuzdev/tsv/pull/199), [#200](https://github.com/fuzdev/tsv/pull/200),
+  [#205](https://github.com/fuzdev/tsv/pull/205))
 
 ## 0.1.0
 
