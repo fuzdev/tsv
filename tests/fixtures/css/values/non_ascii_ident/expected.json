@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 150,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 141,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 58,
+							"end": 75,
+							"property": "animation-name",
+							"value": "丠"
+						},
+						{
+							"type": "Declaration",
+							"start": 120,
+							"end": 137,
+							"property": "font-family",
+							"value": "丠, 中"
+						}
+					]
+				},
+				"start": 9,
+				"end": 141
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 142,
+			"styles": "\n\ta {\n\t\t/* non-ASCII (CJK) custom-ident value */\n\t\tanimation-name: 丠;\n\t\t/* comma-separated non-ASCII idents */\n\t\tfont-family: 丠, 中;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 151,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

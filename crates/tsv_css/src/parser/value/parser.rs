@@ -6,6 +6,7 @@
 use crate::ast::internal::CssValue;
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
+use crate::whitespace::is_css_whitespace;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
@@ -155,7 +156,7 @@ impl<'a> ValueParser<'a> {
     /// Parse space-separated values: "a b c"
     fn parse_space_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         CssValue::List {
-            values: self.split_top_level(arena, char::is_whitespace),
+            values: self.split_top_level(arena, is_css_whitespace),
             span: self.absolute_span(),
         }
     }
@@ -194,7 +195,18 @@ impl<'a> ValueParser<'a> {
             if value_end > value_start {
                 // Non-empty value
                 let sub_parser = self.sub_parser(value_start, value_end);
-                values.push(sub_parser.parse(arena)); // Recursive, but same source!
+                // Progress guard: the cursor reached EOF without finding a
+                // delimiter (`value_end_raw == text.len()`) and this is the only
+                // element, so the whole range is a single value —
+                // `classify_separators` and the comment-blind cursor disagreed
+                // (an unbalanced paren/quote inside a comment). Re-`parse()`ing
+                // the identical range would re-classify it the same way and
+                // recurse forever, so parse it as a leaf instead.
+                if values.is_empty() && value_end_raw == text.len() {
+                    values.push(sub_parser.parse_single(arena));
+                } else {
+                    values.push(sub_parser.parse(arena)); // Recursive, but same source!
+                }
             }
 
             cursor.set_position(value_end_raw);
@@ -556,6 +568,46 @@ mod tests {
                     assert!(val_span.start > prev_span.end);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_multibyte_non_ascii_value_is_single_leaf() {
+        // U+4E20 encodes a 0xA0 byte that a per-byte `as char` cast would alias
+        // to NBSP, classifying the lone token as a whitespace list and recursing
+        // on the identical range forever. It must parse as a single leaf.
+        let source = "丠";
+        let span = Span {
+            start: 0,
+            end: source.len() as u32,
+        };
+        let parser = ValueParser::new(source, span);
+
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
+        assert!(matches!(value, CssValue::Identifier { .. }));
+    }
+
+    #[test]
+    fn test_comment_unbalanced_paren_terminates() {
+        // `classify_separators` is comment-aware and sees the top-level comma;
+        // the comment-blind cursor sees the `(` inside the comment, opens a paren
+        // it never closes, and can't reach the comma. The progress guard parses
+        // the range as a single value instead of recursing forever.
+        let source = "/* ( */ a, b";
+        let span = Span {
+            start: 0,
+            end: source.len() as u32,
+        };
+        let parser = ValueParser::new(source, span);
+
+        let arena = Bump::new();
+        let value = parser.parse(&arena); // must terminate (no stack overflow)
+        assert!(matches!(value, CssValue::CommaSeparated { .. }));
+        if let CssValue::CommaSeparated { values, .. } = value {
+            // The guard collapsed the unsplittable range to one leaf.
+            assert_eq!(values.len(), 1);
+            assert!(matches!(values[0], CssValue::Identifier { .. }));
         }
     }
 

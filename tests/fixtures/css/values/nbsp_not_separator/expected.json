@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 209,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 200,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 155,
+							"end": 174,
+							"property": "animation-name",
+							"value": "u v"
+						},
+						{
+							"type": "Declaration",
+							"start": 178,
+							"end": 196,
+							"property": "transition",
+							"value": "u v 1s"
+						}
+					]
+				},
+				"start": 9,
+				"end": 200
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 201,
+			"styles": "\n\ta {\n\t\t/* U+00A0 (no-break space) is not CSS whitespace: it stays inside the value\n\t\t   token, while a real ASCII space still splits the list */\n\t\tanimation-name: u v;\n\t\ttransition: u v 1s;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 210,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
