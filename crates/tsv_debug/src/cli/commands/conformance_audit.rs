@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 /// Audit doc/fixture integrity: divergence cataloging, link resolution, README hygiene.
 ///
-/// Runs three checks over one fixture walk, reading each file at most once:
+/// Runs four checks over one fixture walk, reading each file at most once:
 ///
 /// 1. **Orphans** — every `_*_divergence`-suffixed fixture must be linked in the doc
 ///    that sanctions its claim (`_prettier_divergence` → `docs/conformance_prettier.md`,
@@ -18,7 +18,15 @@ use std::path::{Path, PathBuf};
 ///    check only proves *forward* coverage (live fixture → mentioned in doc); this is
 ///    the *reverse* direction — a link to a renamed/demoted/deleted fixture, or a
 ///    back-link with the wrong `../` depth or a stale anchor, is otherwise invisible.
-/// 3. **Stray READMEs** — a non-divergence fixture (matches both Prettier and Svelte)
+/// 3. **Missing back-links** — every `_*_divergence` fixture's README must *contain* a
+///    link that resolves to the doc that sanctions its claim (`_prettier_divergence` →
+///    `docs/conformance_prettier.md`, `_svelte_divergence` → `docs/conformance_svelte.md`,
+///    both for the combined suffix). Checks 1+2 prove the doc catalogs the fixture and
+///    that any link present resolves, but neither requires the back-link to *exist* — a
+///    README that simply omits it passes both. This closes that gap: the README→doc link
+///    is mandatory, not just well-formed-if-present. (A divergence fixture with no README
+///    at all is the fixture validator's `D1` rule, run separately in `fixtures_validate`.)
+/// 4. **Stray READMEs** — a non-divergence fixture (matches both Prettier and Svelte)
 ///    should not carry a README; there is no divergence to sanction, and any conformance
 ///    back-link it holds rots unaudited. A small allowlist (`ALLOWED_NONDIVERGENCE_READMES`)
 ///    holds the deliberate exceptions that document a real parser/spec/contrast fact.
@@ -95,11 +103,13 @@ impl ConformanceAuditCommand {
             .collect();
 
         let dead_links = run_link_audit(&readmes, &mut cache);
+        let missing_backlinks = run_backlink_audit(&readmes, &mut cache);
         let stray_readmes = run_readme_audit(&readmes);
 
         let report = Report {
             orphans,
             dead_links,
+            missing_backlinks,
             stray_readmes,
         };
 
@@ -295,7 +305,63 @@ fn resolve_anchor(md_path: &Path, anchor: &str, cache: &mut DocCache) -> Result<
 }
 
 //
-// Check 3 — stray READMEs (non-divergence fixture carrying a non-allowlisted README)
+// Check 3 — missing back-links (divergence README lacks a link to its sanctioning doc)
+//
+
+struct MissingBacklink {
+    fixture: String,
+    doc_path: &'static str,
+}
+
+/// Every divergence README must link to the doc that sanctions its claim. For each
+/// fixture that *has* a README, check the suffix class against the required doc(s):
+/// a `_prettier_divergence` must link `conformance_prettier.md`, a `_svelte_divergence`
+/// must link `conformance_svelte.md`, and the combined suffix (both predicates true)
+/// must link both. A missing README is out of scope here — that's the validator's `D1`.
+fn run_backlink_audit(
+    readmes: &[(&fixtures::Fixture, PathBuf)],
+    cache: &mut DocCache,
+) -> Vec<MissingBacklink> {
+    let mut missing = Vec::new();
+    for (f, readme_path) in readmes {
+        for (doc_path, in_class) in [
+            (CONFORMANCE_PRETTIER, f.is_prettier_divergence()),
+            (CONFORMANCE_SVELTE, f.is_svelte_divergence()),
+        ] {
+            if in_class && !readme_links_to_doc(readme_path, doc_path, cache) {
+                missing.push(MissingBacklink {
+                    fixture: normalize_fixture_path(&f.relative_path),
+                    doc_path,
+                });
+            }
+        }
+    }
+    missing
+}
+
+/// Does the README at `readme_path` hold a Markdown link whose *path part* resolves
+/// (on disk, canonicalized) to `doc_path`? Anchor validity is the dead-link check's
+/// job — here we only assert the back-link is present and aimed at the right doc, so a
+/// broken link won't match (canonicalize fails → the joined path can't equal the doc's).
+fn readme_links_to_doc(readme_path: &Path, doc_path: &str, cache: &mut DocCache) -> bool {
+    let doc_key = canonical_key(Path::new(doc_path));
+    let links = match cache.get(readme_path) {
+        Some(doc) => doc.links.clone(),
+        None => return false,
+    };
+    let base = readme_path.parent().unwrap_or_else(|| Path::new("."));
+    links.iter().any(|link| {
+        let path_part = link
+            .target
+            .split_once('#')
+            .map_or(link.target.as_str(), |(p, _)| p);
+        // A pure `#anchor` points within the README itself, not at the doc.
+        !path_part.is_empty() && canonical_key(&base.join(path_part)) == doc_key
+    })
+}
+
+//
+// Check 4 — stray READMEs (non-divergence fixture carrying a non-allowlisted README)
 //
 
 fn run_readme_audit(readmes: &[(&fixtures::Fixture, PathBuf)]) -> Vec<String> {
@@ -480,6 +546,7 @@ fn canonical_key(path: &Path) -> PathBuf {
 struct Report {
     orphans: [OrphanAudit; 2],
     dead_links: Vec<DeadLink>,
+    missing_backlinks: Vec<MissingBacklink>,
     stray_readmes: Vec<String>,
 }
 
@@ -487,6 +554,7 @@ impl Report {
     fn is_clean(&self) -> bool {
         self.orphans.iter().all(|a| a.unlinked.is_empty())
             && self.dead_links.is_empty()
+            && self.missing_backlinks.is_empty()
             && self.stray_readmes.is_empty()
     }
 
@@ -523,6 +591,19 @@ impl Report {
             }
         }
 
+        if self.missing_backlinks.is_empty() {
+            println!("✓ every divergence README links to its sanctioning conformance doc");
+        } else {
+            eprintln!(
+                "✗ {} divergence README(s) missing a back-link to their sanctioning doc \
+                 (add `See [conformance_*.md §…](…)`):",
+                self.missing_backlinks.len()
+            );
+            for m in &self.missing_backlinks {
+                eprintln!("  - {} → no link to {}", m.fixture, m.doc_path);
+            }
+        }
+
         if self.stray_readmes.is_empty() {
             println!("✓ no stray READMEs on non-divergence fixtures");
         } else {
@@ -550,6 +631,10 @@ impl Report {
                 "line": d.line,
                 "target": d.target,
                 "reason": d.reason,
+            })).collect::<Vec<_>>(),
+            "missing_backlinks": self.missing_backlinks.iter().map(|m| serde_json::json!({
+                "fixture": m.fixture,
+                "doc": m.doc_path,
             })).collect::<Vec<_>>(),
             "stray_readmes": self.stray_readmes,
         });
@@ -637,6 +722,41 @@ mod tests {
         extract_inline_links("a [x](./one) b [y](../two#anchor) c", 3, &mut out);
         let got: Vec<(usize, &str)> = out.iter().map(|l| (l.line, l.target.as_str())).collect();
         assert_eq!(got, vec![(3, "./one"), (3, "../two#anchor")]);
+    }
+
+    #[test]
+    fn readme_links_to_doc_matches_only_the_sanctioning_doc() {
+        // A divergence README in a deep fixture dir, plus the two conformance docs,
+        // laid out under a tempdir so canonicalization has real paths to resolve.
+        let root =
+            std::env::temp_dir().join(format!("tsv_conf_audit_backlink_{}", std::process::id()));
+        let docs = root.join("docs");
+        let fixture = root.join("tests/fixtures/css/x_prettier_divergence");
+        std::fs::create_dir_all(&docs).unwrap();
+        std::fs::create_dir_all(&fixture).unwrap();
+        std::fs::write(docs.join("conformance_prettier.md"), "# CSS: Layout\n").unwrap();
+        std::fs::write(docs.join("conformance_svelte.md"), "# Svelte\n").unwrap();
+        let readme = fixture.join("README.md");
+        std::fs::write(
+            &readme,
+            "See [conformance_prettier.md §CSS: Layout]\
+             (../../../../docs/conformance_prettier.md#css-layout).\n",
+        )
+        .unwrap();
+
+        let mut cache = DocCache::new();
+        let prettier = docs.join("conformance_prettier.md");
+        let svelte = docs.join("conformance_svelte.md");
+        assert!(
+            readme_links_to_doc(&readme, prettier.to_str().unwrap(), &mut cache),
+            "back-link to conformance_prettier.md resolves"
+        );
+        assert!(
+            !readme_links_to_doc(&readme, svelte.to_str().unwrap(), &mut cache),
+            "no link to conformance_svelte.md"
+        );
+
+        std::fs::remove_dir_all(&root).ok();
     }
 
     #[test]
