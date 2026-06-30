@@ -344,8 +344,8 @@ impl<'a> Lexer<'a> {
 
         // Check if it's a keyword (only if no escapes - escaped keywords are identifiers;
         // without escapes the source slice IS the name, so no decoded buffer is needed).
-        // SWAR recognition over the identifier's raw bytes (no `&str` reslice, no phf
-        // hash on the len-2..=8 path); see `keyword_at`.
+        // SWAR recognition over the identifier's raw bytes (no `&str` reslice, no
+        // hashing — SWAR covers every reserved word length); see `keyword_at`.
         let kind = if decoded.is_none() {
             match keyword_at(self.bytes, start, self.position - start) {
                 Some(kw) => TokenKind::Keyword(kw),

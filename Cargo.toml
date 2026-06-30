@@ -62,7 +62,7 @@ bumpalo = { version = "3.20.3", features = ["collections"] }
 # Async runtime + combinators — dev/debug tooling only (tsv_debug, integration tests)
 tokio = { version = "1" }
 futures-util = "0.3"
-phf = { version = "0.13", features = ["macros"] }
+phf = { version = "0.14", features = ["macros"] }
 serde = { version = "1", features = ["derive"] }
 # float_roundtrip: exact f64 parsing so big literal values (e.g. integral
 # doubles beyond u64) survive the expected.json round-trip byte-faithfully
