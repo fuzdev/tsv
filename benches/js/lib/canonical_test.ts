@@ -1,5 +1,5 @@
 /**
- * Regression test for the canonical (prettier) baseline's `filepath` handling.
+ * Regression test for the canonical (prettier) baseline's `filepath`/parser handling.
  *
  * The corpus comparison's prettier baseline MUST format with a `filepath` hint so
  * prettier applies the same extension-specific heuristics a real on-disk file
@@ -9,6 +9,13 @@
  * emits, which once manufactured ~39 phantom corpus divergences against `.ts`
  * code tsv was formatting correctly. See `canonical.ts` and prettier's
  * `shouldForceTrailingComma` in `src/language-js/print/type-parameters.js`.
+ *
+ * The second axis these tests pin is the `.js` → **babel** vs `.ts` →
+ * **typescript** parser routing: the corpus collapses both into one `typescript`
+ * Language, but real prettier-on-`.js` uses babel (preserves JSDoc `@type` casts)
+ * while prettier-on-`.ts` uses typescript (strips them). tsv preserves casts
+ * uniformly, so without the `.js` routing every `.js` file with a cast read as a
+ * phantom `jsdoc_type_cast_parens` divergence. See `canonical.format_async`.
  */
 
 import { deepStrictEqual as assertEquals, ok as assert } from 'node:assert';
@@ -38,6 +45,39 @@ Deno.test('canonical: an existing `<T,>` is normalized to `<T>` in pure .ts', as
 		// Filepath-aware prettier strips the comma for `.ts`; a missing filepath would keep it.
 		const out = await impl.format_async('const f = <T,>(x: T) => x;\n', 'typescript');
 		assertEquals(out, 'const f = <T>(x: T) => x;\n');
+	} finally {
+		impl.dispose();
+	}
+});
+
+Deno.test('canonical: `.js` path routes through babel and preserves a JSDoc `@type` cast', async () => {
+	const impl = await make_canonical();
+	try {
+		// babel (real prettier-on-`.js`) keeps the cast parens; tsv preserves them too, so
+		// passing the real `.js` path makes the oracle match tsv instead of a phantom divergence.
+		const out = await impl.format_async(
+			'const x = /** @type {string} */ (y);\n',
+			'typescript',
+			'foo.js',
+		);
+		assertEquals(out, 'const x = /** @type {string} */ (y);\n');
+	} finally {
+		impl.dispose();
+	}
+});
+
+Deno.test('canonical: `.ts` path routes through typescript and strips a JSDoc `@type` cast', async () => {
+	const impl = await make_canonical();
+	try {
+		// typescript (real prettier-on-`.ts`) drops the cast parens — the sanctioned
+		// `jsdoc_type_cast_ts_prettier_divergence` direction. Pins that `.ts` still routes here
+		// (not babel) so the routing split is real, not an accidental babel-everywhere.
+		const out = await impl.format_async(
+			'const x = /** @type {string} */ (y);\n',
+			'typescript',
+			'foo.ts',
+		);
+		assertEquals(out, 'const x = /** @type {string} */ y;\n');
 	} finally {
 		impl.dispose();
 	}

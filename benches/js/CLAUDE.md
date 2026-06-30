@@ -266,7 +266,9 @@ deno task test:deno
 
 # The canonical-oracle test (NOT gated — it needs prettier/svelte, so run after
 # `bench:install`): asserts the prettier baseline formats with a filepath, so `.ts`
-# single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`.
+# single-type-param arrows stay `<T>` and `.svelte` ones get `<T,>`, and the `.js` →
+# babel / `.ts` → typescript parser routing (`.js` preserves a JSDoc `@type` cast,
+# `.ts` strips it).
 deno task test:deno:canonical
 
 # Per-pattern corpus coverage with sample diffs (spot-check for overmatching)
@@ -688,13 +690,24 @@ deliberately: edit `package.json` and `sidecar.ts` in lockstep (the
 - prettier — Code formatter
 - prettier-plugin-svelte — Svelte formatting support
 
-`canonical.ts` formats with a `filepath` hint (`file.ts` / `file.svelte` /
-`file.css`) so prettier applies the same extension-specific heuristics a real
-on-disk file gets — matching how `tsv_debug`'s sidecar invokes prettier. This is
-load-bearing, not cosmetic: without it prettier can't tell `.ts` from `.tsx` and
-force-adds the JSX-disambiguating trailing comma to single-type-param arrows
-(`<T,>`) that a real `.ts` run never emits — which once manufactured ~39 phantom
-corpus divergences against `@ryanatkn` code that tsv was formatting correctly.
+`canonical.ts` formats with a `filepath` hint (`file.ts` / `file.js` /
+`file.svelte` / `file.css`) so prettier applies the same extension-specific
+heuristics a real on-disk file gets — matching how `tsv_debug`'s sidecar invokes
+prettier. This is load-bearing, not cosmetic, on two axes:
+
+- **`.ts` vs `.tsx`.** Without a filepath prettier can't tell them apart and
+  force-adds the JSX-disambiguating trailing comma to single-type-param arrows
+  (`<T,>`) that a real `.ts` run never emits — which once manufactured ~39 phantom
+  corpus divergences against `@ryanatkn` code that tsv was formatting correctly.
+- **`.js` vs `.ts` parser.** The corpus collapses `.js` and `.ts` into one
+  `typescript` Language (tsv formats both through its TS path), but real
+  prettier-on-`.js` uses the **babel** parser (preserves JSDoc `@type` casts) where
+  prettier-on-`.ts` uses **typescript** (strips them). `format_async` takes the real
+  source path and routes a `.js` file through `babel` so the oracle matches a real
+  on-disk `.js` run — otherwise every `.js` file carrying a JSDoc cast reads as a
+  phantom `jsdoc_type_cast_parens` divergence against tsv's (correct) uniform
+  preservation. `corpus_compare_format.ts` passes `file.path` for this; the
+  benchmark/smoke callers omit it and fall back to the synthetic `file.<ext>`.
 
 ### Alternative Implementations
 

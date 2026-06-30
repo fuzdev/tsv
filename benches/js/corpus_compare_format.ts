@@ -426,7 +426,9 @@ async function main(): Promise<void> {
 		try {
 			// Format with both
 			const ours = native.format(file.content, lang);
-			const prettier = await canonical.format_async(file.content, lang);
+			// Pass the real path so the oracle routes `.js` → babel (preserves JSDoc casts)
+			// vs `.ts` → typescript — see `canonical.format_async`.
+			const prettier = await canonical.format_async(file.content, lang, file.path);
 
 			// Prettier is the source of truth for the differential safety check
 			// below. An empty format of NON-empty source means prettier (the Deno
