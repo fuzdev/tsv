@@ -4,10 +4,9 @@ use argh::FromArgs;
 use commands::{
     ast_diff::AstDiffCommand, authoring_audit::AuthoringAuditCommand,
     buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
-    canonical_parse::CanonicalParseCommand,
-    check::CheckCommand, compare::CompareCommand, conformance_audit::ConformanceAuditCommand,
-    fixture_init::FixtureInitCommand, fixtures_audit::FixturesAuditCommand,
-    fixtures_update::FixturesUpdateCommand,
+    canonical_parse::CanonicalParseCommand, check::CheckCommand, compare::CompareCommand,
+    conformance_audit::ConformanceAuditCommand, fixture_init::FixtureInitCommand,
+    fixtures_audit::FixturesAuditCommand, fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,

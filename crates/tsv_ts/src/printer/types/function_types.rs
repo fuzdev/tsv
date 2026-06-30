@@ -132,11 +132,7 @@ impl<'a> Printer<'a> {
         if let TSType::Intersection(i) = value_type {
             // Intersections use trailing `&` - first type NOT indented, continuations indented
             let type_doc = self.build_intersection_type_doc(i, false);
-            return d.concat(&[
-                d.text(arrow_sp),
-                comments_doc,
-                d.group(d.indent(type_doc)),
-            ]);
+            return d.concat(&[d.text(arrow_sp), comments_doc, d.group(d.indent(type_doc))]);
         }
         match return_type.type_annotation {
             // TypeReference with complex type args (like Promise<Result<...>>):
