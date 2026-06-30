@@ -32,7 +32,7 @@ The doc builder is the core of the formatting architecture. Language printers bu
 - **`DocArena`** — Contiguous storage for all doc nodes. Heuristic capacity: ~4 nodes per source byte. `reset()` clears the node/child/memo stores while retaining capacity, so a multi-file driver reuses one arena across files (the doc-IR analogue of the binding crates' `Bump::reset()` reuse); the printers borrow `&DocArena` and the caller owns the reusable one (`format_in` on each language crate is the borrowed-arena entry point).
 - **`DocId`** (`u32`) — Lightweight, `Copy` handle into the arena. No cloning, no recursive Drop.
 - **`DocBuf`** (`SmallVec<[DocId; 8]>`) — Shared stack buffer for assembling a node's doc parts before `concat()` / `fill()`. Most nodes have only a handful of parts, so the common case stays off the heap; larger nodes spill. Used by all language printers (the TS chain / binary-operator printers, the Svelte template printer) as the single canonical doc-parts buffer type.
-- **`DocNode`** — Node variants: `Text`, `Line`, `Indent`, `Dedent`, `Group`, `IfBreak`, `Concat`, `Fill`, etc.
+- **`DocNode`** — Node variants: `Text`, `MultilineText` (a `\n`-separated body rendered with per-line context indent — one allocation for an indentable multi-line block comment), `Line`, `Indent`, `Dedent`, `Group`, `IfBreak`, `Concat`, `Fill`, etc.
 - **`DocText`** — Three variants: `Static(&'static str)` (punctuation/keywords), `Owned(String)` (dynamic), `Symbol(u32)` (deferred resolution via interner).
 - **`LineKind`** — `Normal` (space in flat, newline in break), `Soft` (nothing in flat), `Hard` (always newline), `Literal` (newline without indent).
 
@@ -40,7 +40,7 @@ The doc builder is the core of the formatting architecture. Language printers bu
 
 All methods take `&self` (interior mutability via `RefCell`):
 
-- Text — `text()`, `text_owned()`, `empty()`, `symbol()`
+- Text — `text()`, `text_owned()`, `multiline_text()`, `empty()`, `symbol()`
 - Lines — `line()`, `softline()`, `hardline()`, `literalline()`
 - Structure — `group()`, `group_break()`, `indent()`, `dedent()`, `align()`
 - Conditionals — `if_break()`, `indent_if_break()`, `conditional_group()`

@@ -240,6 +240,59 @@ mod arena_tests {
     }
 
     #[test]
+    fn test_arena_multiline_text() {
+        // Renders each `\n` as a hardline: first line in place, the rest broken.
+        let a = DocArena::new();
+        let doc = a.multiline_text("L0\nL1\nL2".to_string());
+        assert_eq!(render_pw_tab(&a, doc, 100), "L0\nL1\nL2");
+
+        // Output-identical to the per-line `concat([text, hardline, …])` it replaces.
+        let a2 = DocArena::new();
+        let concat = a2.concat(&[
+            a2.text("L0"),
+            a2.hardline(),
+            a2.text("L1"),
+            a2.hardline(),
+            a2.text("L2"),
+        ]);
+        assert_eq!(render_pw_tab(&a2, concat, 100), "L0\nL1\nL2");
+    }
+
+    #[test]
+    fn test_arena_multiline_text_context_indent() {
+        // The node's reason for existing: the first line trails the preceding
+        // content in place, every continuation line picks up the enclosing
+        // indent level via its hardline.
+        let a = DocArena::new();
+        let doc = a.concat(&[
+            a.text("parent"),
+            a.indent(a.multiline_text("a\nb\nc".to_string())),
+        ]);
+        assert_eq!(render_pw_tab(&a, doc, 80), "parenta\n\tb\n\tc");
+    }
+
+    #[test]
+    fn test_arena_multiline_text_forces_break() {
+        // Contains hardlines ⇒ `will_break`, so an enclosing group breaks without
+        // a fits check — even at a width where the flat form would fit.
+        let a = DocArena::new();
+        let ml = a.multiline_text("a\nb".to_string());
+        assert!(a.will_break(ml));
+        let doc = a.group(a.concat(&[a.text("x"), a.line(), ml]));
+        // Broke: the `line` is a newline ("x\na\nb"), not a space ("x a\nb").
+        assert_eq!(render_pw_tab(&a, doc, 100), "x\na\nb");
+    }
+
+    #[test]
+    fn test_arena_multiline_text_remove_lines() {
+        // Flattening drops the internal hardlines (→ empty) and joins the lines
+        // with no separator — matches `remove_lines` over the per-line concat.
+        let a = DocArena::new();
+        let flat = a.remove_lines(a.multiline_text("/*a\n b\n c*/".to_string()));
+        assert_eq!(render_default(&a, flat), "/*a b c*/");
+    }
+
+    #[test]
     fn test_arena_fill_all_fit() {
         let a = DocArena::new();
         let doc = a.fill(&[a.text("a"), a.line(), a.text("b"), a.line(), a.text("c")]);

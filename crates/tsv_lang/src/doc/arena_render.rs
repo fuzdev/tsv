@@ -406,6 +406,48 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 render_text(t, output, pos, resolver);
             }
 
+            DocNode::MultilineText(s) => {
+                // Render `[text(line0), hardline, text(line1), hardline, …]` from
+                // one owned string: the first line at the current column, each
+                // subsequent line preceded by the hardline path (flush pending
+                // line suffix, trim, newline, context indent). Byte- and
+                // position-identical to the per-line concat it replaces.
+                let mut lines = s.split('\n');
+                if let Some(first) = lines.next() {
+                    #[cfg(feature = "swallow_check")]
+                    if swallow.enabled() {
+                        // Block-comment text is never a `//` line comment.
+                        swallow.on_text(false, first, output);
+                    }
+                    output.push_str(first);
+                    update_pos_for_text(pos, first);
+                }
+                for line in lines {
+                    // Hardline (breaks in either mode): flush suffix, then break.
+                    flush_line_suffix(
+                        arena,
+                        &mut line_suffix,
+                        output,
+                        pos,
+                        render,
+                        embed,
+                        resolver,
+                    );
+                    trim_trailing_whitespace(output);
+                    output.push('\n');
+                    write_indentation(output, cmd.indent, render, embed);
+                    *pos = line_start_column(cmd.indent, render, embed);
+                    #[cfg(feature = "swallow_check")]
+                    swallow.on_newline(true);
+                    #[cfg(feature = "swallow_check")]
+                    if swallow.enabled() {
+                        swallow.on_text(false, line, output);
+                    }
+                    output.push_str(line);
+                    update_pos_for_text(pos, line);
+                }
+            }
+
             DocNode::Line(kind) => {
                 let kind = *kind;
                 let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
@@ -756,6 +798,28 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
                 render_text(t, output, pos, resolver);
+            }
+
+            DocNode::MultilineText(s) => {
+                // Same per-line render as `render_doc_iterative`'s arm, but with
+                // this sub-renderer's conditional suffix handling (no swallow
+                // check here). See `DocNode::MultilineText`.
+                let mut lines = s.split('\n');
+                if let Some(first) = lines.next() {
+                    output.push_str(first);
+                    update_pos_for_text(pos, first);
+                }
+                for line in lines {
+                    if tracking_suffix {
+                        flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
+                    }
+                    trim_trailing_whitespace(output);
+                    output.push('\n');
+                    write_indentation(output, cmd.indent, render, embed);
+                    *pos = line_start_column(cmd.indent, render, embed);
+                    output.push_str(line);
+                    update_pos_for_text(pos, line);
+                }
             }
 
             DocNode::Line(kind) => {
