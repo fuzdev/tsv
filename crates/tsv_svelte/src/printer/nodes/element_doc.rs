@@ -14,7 +14,7 @@
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{Span, SymbolResolver, SymbolToU32};
@@ -927,7 +927,7 @@ impl<'a> Printer<'a> {
             if !tsv_lang::has_comments_in_range(self.comments, range_start, range_end) {
                 docs.push(separator);
             } else {
-                let comments: Vec<_> =
+                let comments: SmallVec<[&tsv_lang::Comment; 8]> =
                     comments_in_range(self.comments, range_start, range_end).collect();
                 let last_is_own_line = self.push_attr_comment_docs(docs, &comments, range_start);
                 // Separator before the next attribute
@@ -945,7 +945,7 @@ impl<'a> Printer<'a> {
         if let Some(last_attr) = attrs.last() {
             let range_start = last_attr.span().end;
             if tsv_lang::has_comments_in_range(self.comments, range_start, open_tag_end) {
-                let trailing: Vec<_> =
+                let trailing: SmallVec<[&tsv_lang::Comment; 8]> =
                     comments_in_range(self.comments, range_start, open_tag_end).collect();
                 self.push_attr_comment_docs(docs, &trailing, range_start);
             }

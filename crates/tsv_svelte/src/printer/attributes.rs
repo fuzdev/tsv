@@ -11,7 +11,7 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -190,7 +190,7 @@ impl<'a> Printer<'a> {
             let normalize_class = is_html && self.with_resolved_symbol(attr.name, |s| s == "class");
 
             // Fast path: a single value part (the common `name="x"` / `name={x}`).
-            // Build with a stack array instead of the per-attribute `parts` Vec.
+            // Build with a stack array instead of the per-attribute `parts` buffer.
             if value_parts.len() == 1 {
                 let sym = d.symbol(name_sym);
                 let value_doc = if normalize_class {
@@ -787,7 +787,7 @@ impl<'a> Printer<'a> {
 
                 // Comments after the comma: an all-block run leads the next operand
                 // inline; a line comment trails the comma and forces the break.
-                let after: Vec<_> =
+                let after: SmallVec<[&tsv_lang::Comment; 8]> =
                     comments_in_range(self.comments, comma_pos + 1, cur_start).collect();
                 if after.is_empty() {
                     items.push(d.line());
