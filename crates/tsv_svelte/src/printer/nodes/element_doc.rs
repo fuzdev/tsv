@@ -14,7 +14,7 @@
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
-use smallvec::{SmallVec, smallvec};
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{Span, SymbolResolver, SymbolToU32};
@@ -927,9 +927,11 @@ impl<'a> Printer<'a> {
             if !tsv_lang::has_comments_in_range(self.comments, range_start, range_end) {
                 docs.push(separator);
             } else {
-                let comments: SmallVec<[&tsv_lang::Comment; 8]> =
-                    comments_in_range(self.comments, range_start, range_end).collect();
-                let last_is_own_line = self.push_attr_comment_docs(docs, &comments, range_start);
+                let last_is_own_line = self.push_attr_comment_docs(
+                    docs,
+                    comments_in_range(self.comments, range_start, range_end),
+                    range_start,
+                );
                 // Separator before the next attribute
                 if last_is_own_line {
                     docs.push(d.hardline());
@@ -945,9 +947,11 @@ impl<'a> Printer<'a> {
         if let Some(last_attr) = attrs.last() {
             let range_start = last_attr.span().end;
             if tsv_lang::has_comments_in_range(self.comments, range_start, open_tag_end) {
-                let trailing: SmallVec<[&tsv_lang::Comment; 8]> =
-                    comments_in_range(self.comments, range_start, open_tag_end).collect();
-                self.push_attr_comment_docs(docs, &trailing, range_start);
+                self.push_attr_comment_docs(
+                    docs,
+                    comments_in_range(self.comments, range_start, open_tag_end),
+                    range_start,
+                );
             }
         }
     }
@@ -959,10 +963,10 @@ impl<'a> Printer<'a> {
     /// the following attribute must start on a new line — true for any own-line
     /// comment and for any line comment (a `//` runs to end of line, so the next
     /// token can't share it); the caller uses this to pick that separator.
-    pub(super) fn push_attr_comment_docs(
+    pub(super) fn push_attr_comment_docs<'c>(
         &self,
         docs: &mut DocBuf,
-        comments: &[&tsv_lang::Comment],
+        comments: impl IntoIterator<Item = &'c tsv_lang::Comment>,
         range_start: u32,
     ) -> bool {
         let d = self.d();

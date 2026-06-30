@@ -11,7 +11,7 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use smallvec::{SmallVec, smallvec};
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -787,7 +787,7 @@ impl<'a> Printer<'a> {
 
                 // Comments after the comma: an all-block run leads the next operand
                 // inline; a line comment trails the comma and forces the break.
-                let after: SmallVec<[&tsv_lang::Comment; 8]> =
+                let after: Vec<_> =
                     comments_in_range(self.comments, comma_pos + 1, cur_start).collect();
                 if after.is_empty() {
                     items.push(d.line());

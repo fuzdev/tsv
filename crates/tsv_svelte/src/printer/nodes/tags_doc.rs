@@ -5,7 +5,7 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
-use smallvec::{SmallVec, smallvec};
+use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::DocId;
@@ -193,7 +193,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
 
         // Comments within the tag's content (after "{@debug" and before "}").
-        let tag_comments: SmallVec<[&tsv_lang::Comment; 8]> =
+        let tag_comments: Vec<&tsv_lang::Comment> =
             comments_in_range(self.comments, tag.span.start, tag.span.end).collect();
 
         if tag.identifiers.is_empty() && tag_comments.is_empty() {
