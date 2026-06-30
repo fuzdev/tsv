@@ -21,6 +21,9 @@ use super::{Expression, Property, TSTypeAnnotation};
 #[derive(Debug, Clone)]
 pub struct ObjectPattern<'arena> {
     pub properties: &'arena [ObjectPatternProperty<'arena>],
+    /// Optional destructuring-pattern parameter (`{a}?`). Only ever set in a
+    /// parameter position; the `?` extends `span` and precedes `type_annotation`.
+    pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     pub span: Span,
 }
@@ -57,6 +60,9 @@ impl<'arena> ObjectPatternProperty<'arena> {
 pub struct ArrayPattern<'arena> {
     /// Elements are Option to support holes like `[a, , b]`
     pub elements: &'arena [Option<Expression<'arena>>],
+    /// Optional destructuring-pattern parameter (`[a]?`). Only ever set in a
+    /// parameter position; the `?` extends `span` and precedes `type_annotation`.
+    pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     pub span: Span,
 }

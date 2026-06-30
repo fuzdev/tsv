@@ -11,6 +11,7 @@ use string_interner::DefaultSymbol;
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
+use super::expression_lookahead::scan_parens_then_arrow;
 use super::scan::{
     is_identifier_continue, is_identifier_start, skip_identifier, skip_whitespace_and_comments,
 };
@@ -727,13 +728,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse parenthesized type `(T)` or function type `(x: T) => U`
     fn parse_parenthesized_or_function_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+        // Raw `(` offset into `self.source` for the byte scan below (NOT
+        // `current_pos()`, which adds `base_offset` for span coordinates and would
+        // mis-index the embedded `<script>` slice).
+        let paren_offset = self.current.start as usize;
         let start = self.current_pos().0;
         self.expect(&TokenKind::ParenOpen)?;
+
+        // A `[`/`{` after `(` is ambiguous: a tuple/object type in a parenthesized
+        // type (`([number])`, `({a: T})`) vs a destructuring-pattern parameter in
+        // a function type (`([]) => U`, `({a}) => U`). Only an arrow after the
+        // matching `)` resolves it to a function type, so scan ahead for it and
+        // skip the parenthesized-type shortcut. Other `is_definitely_type_start`
+        // tokens stay unambiguous.
+        let pattern_param_function_type =
+            matches!(
+                self.current_kind(),
+                TokenKind::BracketOpen | TokenKind::BraceOpen
+            ) && scan_parens_then_arrow(self.source.as_bytes(), paren_offset);
 
         // Check if this is definitely a parenthesized type (not function params)
         // Tokens that can't be parameter names: keywords (typeof, new, import),
         // type operators (|, &), brackets, literals, etc.
-        if self.is_definitely_type_start() {
+        if !pattern_param_function_type && self.is_definitely_type_start() {
             let inner_type = self.parse_type()?;
             self.expect(&TokenKind::ParenClose)?;
             let end = self.prev_token_end();
@@ -952,13 +969,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(params)
     }
 
-    /// Parse a single function type parameter
+    /// Parse a single function type parameter.
     fn parse_function_type_param(&mut self) -> Result<Expression<'arena>, ParseError> {
+        self.parse_function_type_param_inner(true)
+    }
+
+    /// `allow_pattern` admits a destructuring-pattern parameter (`([a]?) => …`,
+    /// `(new ({a}: T) => …)`). The rest recursion passes `false`: a rest-of-pattern
+    /// (`(...[a]) => …`) in a function type is a separate, still-open parse gap, so
+    /// it keeps rejecting (identifier-only) as before.
+    fn parse_function_type_param_inner(
+        &mut self,
+        allow_pattern: bool,
+    ) -> Result<Expression<'arena>, ParseError> {
         // Check for rest parameter: ...args
         if self.check(&TokenKind::DotDotDot) {
             let (start, _) = self.current_pos();
             self.advance()?;
-            let mut arg = self.parse_function_type_param()?;
+            let mut arg = self.parse_function_type_param_inner(false)?;
             let end = arg.span().end;
             // Move type_annotation from Identifier to RestElement (matching acorn behavior)
             let type_annotation = if let Expression::Identifier(ref mut id) = arg {
@@ -979,6 +1007,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 type_annotation,
                 span: Span::new(start as u32, end),
             }));
+        }
+
+        // Destructuring-pattern parameter: `([a, b]?: T) => …`. Shares the
+        // parameter-list pattern parser (bare pattern, optional `?`, `: Type`),
+        // so `optional`/span handling matches a real signature parameter.
+        if allow_pattern
+            && matches!(
+                self.current_kind(),
+                TokenKind::BracketOpen | TokenKind::BraceOpen
+            )
+        {
+            return self.parse_destructured_binding(true);
         }
 
         let (id_start, id_end) = self.current_pos();

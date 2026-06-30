@@ -112,8 +112,38 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Current token must be `[` or `{`. Shared by parameter lists and
     /// variable declarators; default values are handled by the caller.
-    pub(super) fn parse_destructured_binding(&mut self) -> Result<Expression<'arena>, ParseError> {
+    ///
+    /// `allow_optional` permits a `?` after the pattern (`[a]?` / `{a}?`),
+    /// extending the span and preceding any type annotation. It is set only in
+    /// parameter positions: acorn accepts `[a]?` syntactically in every parameter
+    /// context and rejects it *semantically* outside ambient/type contexts ("A
+    /// binding pattern parameter cannot be optional in an implementation
+    /// signature") — tsv parses it everywhere, deferring that named-semantic
+    /// early-error (a sanctioned `canonical-fails-tsv-ok` divergence, like ambient
+    /// initializers). Declarator/for-loop callers pass `false`, so `const []? = x`
+    /// still rejects in both parsers.
+    pub(super) fn parse_destructured_binding(
+        &mut self,
+        allow_optional: bool,
+    ) -> Result<Expression<'arena>, ParseError> {
         let mut pattern = self.parse_binding_pattern()?;
+
+        // Optional marker `?` (parameter position only), between the pattern and
+        // any type annotation; extends the span to the `?` end (matching acorn).
+        if allow_optional && self.eat(TokenKind::Question) {
+            let q_end = self.prev_token_end() as u32;
+            match &mut pattern {
+                Expression::ArrayPattern(p) => {
+                    p.optional = true;
+                    p.span.end = q_end;
+                }
+                Expression::ObjectPattern(p) => {
+                    p.optional = true;
+                    p.span.end = q_end;
+                }
+                _ => {}
+            }
+        }
 
         // Check for type annotation: [a, b]: Type or {a, b}: Type
         if self.check(&TokenKind::Colon) {
@@ -243,9 +273,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.parse_simple_param()?
                     }
                     TokenKind::BracketOpen | TokenKind::BraceOpen => {
-                        // Destructuring pattern: [a, b] / {a, b}, with optional
-                        // type annotation and default value
-                        let pattern = self.parse_destructured_binding()?;
+                        // Destructuring pattern: [a, b] / {a, b}, with optional `?`
+                        // marker, type annotation and default value
+                        let pattern = self.parse_destructured_binding(true)?;
 
                         // Check for default value
                         if self.eat(TokenKind::Equals) {

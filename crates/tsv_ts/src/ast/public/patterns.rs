@@ -15,6 +15,9 @@ pub struct ObjectPattern<'src> {
     pub end: u32,
     pub loc: SourceLocation,
     pub properties: Vec<ObjectPatternProperty<'src>>,
+    /// Optional destructuring-pattern parameter (`{a}?`); emitted only when true.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub optional: bool,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<TSTypeAnnotation<'src>>,
 }
@@ -36,6 +39,9 @@ pub struct ArrayPattern<'src> {
     pub end: u32,
     pub loc: SourceLocation,
     pub elements: Vec<Option<Expression<'src>>>,
+    /// Optional destructuring-pattern parameter (`[a]?`); emitted only when true.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub optional: bool,
     #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<TSTypeAnnotation<'src>>,
 }

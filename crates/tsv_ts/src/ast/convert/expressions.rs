@@ -354,6 +354,7 @@ pub(in crate::ast::convert) fn convert_expression_inner<'src>(
                             .map(|expr| convert_expression(expr, source, loc, interner, offset))
                     })
                     .collect(),
+                optional: arr.optional,
                 type_annotation: arr
                     .type_annotation
                     .as_ref()

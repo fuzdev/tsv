@@ -95,6 +95,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 Ok(Expression::ObjectPattern(ObjectPattern {
                     properties: properties.into_bump_slice(),
+                    optional: false,
                     type_annotation: None,
                     span: obj.span,
                 }))
@@ -138,6 +139,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 Ok(Expression::ArrayPattern(ArrayPattern {
                     elements: elements.into_bump_slice(),
+                    optional: false,
                     type_annotation: None,
                     span: arr.span,
                 }))

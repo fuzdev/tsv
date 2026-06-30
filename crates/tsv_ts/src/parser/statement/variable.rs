@@ -65,8 +65,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.current_kind(),
             TokenKind::BracketOpen | TokenKind::BraceOpen
         ) {
-            // Destructuring patterns don't support definite assignment
-            (self.parse_destructured_binding()?, false)
+            // Destructuring patterns don't support definite assignment. No
+            // optional `?`: `const []? = x` is invalid (rejected by both parsers).
+            (self.parse_destructured_binding(false)?, false)
         } else {
             return Err(self.error_expected_found("identifier or destructuring pattern"));
         };

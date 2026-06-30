@@ -121,6 +121,22 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		// Optional destructuring-pattern parameters (`[]?` / `{}?` / `[a]?: T`):
+		// the `optional: true` flag on ArrayPattern/ObjectPattern, in a signature
+		// member and the function-type path.
+		name: 'ts_optional_pattern_params',
+		source: [
+			'interface I {',
+			'\tm([]?): void;',
+			'\tn({}?): void;',
+			'\to([a]?: number[]): void;',
+			'}',
+			'type F = ([]?) => void;',
+		].join('\n'),
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		name: 'css_rule_at_media',
 		source: '.foo { color: red; }\n@media (min-width: 600px) {\n\t.bar { padding: 1em 2em; }\n}',
 		parser: 'css',
