@@ -7,6 +7,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
+use string_interner::DefaultSymbol;
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
@@ -1048,12 +1049,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Expect `[`
         self.expect(&TokenKind::BracketOpen)?;
 
-        // Parse type parameter name: `K`
+        // Parse type parameter name: `K` — intern eagerly (the symbol is `Copy`)
+        // so no owned `String` is threaded through to `finish_mapped_type`.
         let param_start = self.current_pos().0;
         let param_name = self
             .current_identifier_or_keyword_name()
-            .ok_or_else(|| self.error_expected("type parameter name in mapped type"))?
-            .to_string();
+            .ok_or_else(|| self.error_expected("type parameter name in mapped type"))?;
+        let param_symbol = self.intern(param_name);
         self.advance()?;
 
         // Expect `in`
@@ -1062,7 +1064,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         self.advance()?; // consume 'in'
 
-        self.finish_mapped_type(start, param_start, param_name, readonly)
+        self.finish_mapped_type(start, param_start, param_symbol, readonly)
     }
 
     /// Shared tail for mapped type parsing after `[K in` has been consumed.
@@ -1071,7 +1073,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         param_start: usize,
-        param_name: String,
+        param_symbol: DefaultSymbol,
         readonly: Option<TSMappedTypeModifier>,
     ) -> Result<TSType<'arena>, ParseError> {
         let arena = self.arena;
@@ -1104,10 +1106,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?;
 
-        let name = self.intern(&param_name);
         Ok(TSType::Mapped(TSMappedType {
             type_parameter: TSMappedTypeParameter {
-                name,
+                name: param_symbol,
                 constraint: self.alloc(constraint),
                 span: Span::new(param_start as u32, param_end),
             },

@@ -32,7 +32,12 @@ struct ClassMemberHeader<'arena> {
     accessor_kind: Option<MethodKind>,
     computed: bool,
     key: Expression<'arena>,
-    method_name: Option<String>,
+    /// Whether the (plain identifier or string-literal) key spells `constructor`
+    /// — the one bit `finish_method_member` derives from the member name to pick
+    /// `MethodKind::Constructor`. Computed/private/numeric keys are never the
+    /// constructor, so they record `false`. The name itself isn't carried: it is
+    /// recoverable from `key`, and nothing else consumes it.
+    name_is_constructor: bool,
     modifier: PropertyModifier,
     type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
 }
@@ -595,59 +600,62 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Parse member name (key)
-        let (computed, key, method_name) = if matches!(self.current_kind(), TokenKind::BracketOpen)
-        {
-            // Computed key: [expr]
-            self.advance()?;
-            let expr = self.parse_expression()?;
-            self.expect(&TokenKind::BracketClose)?;
-            (true, expr, None)
-        } else if matches!(self.current_kind(), TokenKind::Hash) {
-            // Private identifier key: #name
-            let private_id = self.parse_private_identifier()?;
-            (false, Expression::PrivateIdentifier(private_id), None)
-        } else if self.current_is_identifier_or_keyword() {
-            // Identifier or keyword as key - keywords are valid as class member names
-            let name_str = self.current_property_name().to_string();
-            let (key_start, key_end) = self.current_pos();
-            let symbol = self.intern(&name_str);
-            self.advance()?;
-            (
-                false,
-                Expression::Identifier(Identifier::simple(
-                    symbol,
-                    Span::new(key_start as u32, key_end as u32),
-                )),
-                Some(name_str),
-            )
-        } else if matches!(self.current_kind(), TokenKind::String) {
-            // String literal key: `'a-b'() {}`, `'a' = 1;`. A string-keyed
-            // `'constructor'` IS the constructor (kind detection reads the name),
-            // unlike a computed `['constructor']`.
-            let (key_start, key_end) = self.current_pos();
-            let span = Span::new(key_start as u32, key_end as u32);
-            let cooked = self.extract_string_cooked();
-            self.advance()?;
-            // The method-name string (used for `constructor` detection) is the
-            // decoded value resolved from the literal's span.
-            let name = cooked.resolve(span, self.source).to_string();
-            (
-                false,
-                Expression::Literal(Literal {
-                    value: LiteralValue::String(cooked),
-                    span,
-                }),
-                Some(name),
-            )
-        } else if matches!(self.current_kind(), TokenKind::Number) {
-            // Numeric key: `0() {}`, `0xb_b = 1;`, `1n;` — shares the full
-            // numeric decode (radix, separators, bigint)
-            let literal = self.parse_number_or_bigint_literal()?;
-            self.advance()?;
-            (false, Expression::Literal(literal), None)
-        } else {
-            return Err(self.error_expected("class member name"));
-        };
+        let (computed, key, name_is_constructor) =
+            if matches!(self.current_kind(), TokenKind::BracketOpen) {
+                // Computed key: [expr] — never the constructor (`['constructor']` is a
+                // normal computed method, unlike the bare/string `constructor`).
+                self.advance()?;
+                let expr = self.parse_expression()?;
+                self.expect(&TokenKind::BracketClose)?;
+                (true, expr, false)
+            } else if matches!(self.current_kind(), TokenKind::Hash) {
+                // Private identifier key: #name
+                let private_id = self.parse_private_identifier()?;
+                (false, Expression::PrivateIdentifier(private_id), false)
+            } else if self.current_is_identifier_or_keyword() {
+                // Identifier or keyword as key - keywords are valid as class member names.
+                // `current_property_name()` is `&'a str` (source/static), so it interns
+                // and compares without a borrow-escape allocation.
+                let name = self.current_property_name();
+                let name_is_constructor = name == "constructor";
+                let (key_start, key_end) = self.current_pos();
+                let symbol = self.intern(name);
+                self.advance()?;
+                (
+                    false,
+                    Expression::Identifier(Identifier::simple(
+                        symbol,
+                        Span::new(key_start as u32, key_end as u32),
+                    )),
+                    name_is_constructor,
+                )
+            } else if matches!(self.current_kind(), TokenKind::String) {
+                // String literal key: `'a-b'() {}`, `'a' = 1;`. A string-keyed
+                // `'constructor'` IS the constructor (kind detection reads the name),
+                // unlike a computed `['constructor']`. The check goes through the
+                // decoded value, so `'constructor'` is recognized too.
+                let (key_start, key_end) = self.current_pos();
+                let span = Span::new(key_start as u32, key_end as u32);
+                let cooked = self.extract_string_cooked();
+                self.advance()?;
+                let name_is_constructor = cooked.resolve(span, self.source) == "constructor";
+                (
+                    false,
+                    Expression::Literal(Literal {
+                        value: LiteralValue::String(cooked),
+                        span,
+                    }),
+                    name_is_constructor,
+                )
+            } else if matches!(self.current_kind(), TokenKind::Number) {
+                // Numeric key: `0() {}`, `0xb_b = 1;`, `1n;` — shares the full
+                // numeric decode (radix, separators, bigint)
+                let literal = self.parse_number_or_bigint_literal()?;
+                self.advance()?;
+                (false, Expression::Literal(literal), false)
+            } else {
+                return Err(self.error_expected("class member name"));
+            };
 
         // Optional (`?`) / definite (`!`) marker, between the key and any type
         // parameters — methods read `?` as `optional`, properties keep the full modifier.
@@ -671,7 +679,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             accessor_kind,
             computed,
             key,
-            method_name,
+            name_is_constructor,
             modifier,
             type_parameters,
         };
@@ -704,16 +712,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             accessor_kind,
             computed,
             key,
-            method_name,
+            name_is_constructor,
             modifier,
             type_parameters,
             ..
         } = header;
 
         // Method definition - use accessor_kind if set, otherwise check for constructor
-        let kind = accessor_kind.unwrap_or(match method_name.as_deref() {
-            Some("constructor") => MethodKind::Constructor,
-            _ => MethodKind::Method,
+        let kind = accessor_kind.unwrap_or(if name_is_constructor {
+            MethodKind::Constructor
+        } else {
+            MethodKind::Method
         });
 
         // Capture paren position before parsing params (for comment detection)
