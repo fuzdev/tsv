@@ -667,6 +667,107 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok((arguments, paren_end))
     }
 
+    /// Parse the expression part of a decorator (the `expr` in `@expr`), per the
+    /// ES decorators grammar (TC39 Stage 3, which `tsv` supports):
+    ///
+    /// - `@(Expression)` — a parenthesized **full** expression, or
+    /// - `@Ident(.Ident)*` — a `DecoratorMemberExpression`: an identifier
+    ///   reference followed by a `.`-member chain,
+    ///
+    /// each optionally followed by a **single** trailing call `(...)`.
+    ///
+    /// Deliberately narrower than a full `AssignmentExpression`: binary
+    /// operators, computed/optional member access (`[…]`, `?.`), `#private`
+    /// properties, tagged templates, `!`, and `++`/`--` are not part of the
+    /// grammar. Leaving them unconsumed is what lets the construct *after* the
+    /// decorator parse — e.g. the `*` of a decorated generator method
+    /// (`@fn *a() {}`), which a full-expression parse would otherwise swallow as
+    /// multiplication. A full expression must be parenthesized (`@(a + b)`).
+    /// Mirrors `@sveltejs/acorn-typescript`'s `parseDecorator`.
+    pub(in crate::parser) fn parse_decorator_expression(
+        &mut self,
+    ) -> Result<Expression<'arena>, ParseError> {
+        let head_start = self.current_pos().0;
+        let is_parenthesized = *self.current_kind() == TokenKind::ParenOpen;
+
+        // `@(Expression)` rides the full expression grammar inside the parens:
+        // `parse_primary_expression` handles the `(` via `parse_paren_expression`
+        // (sequence, arrow, paren-stripping) exactly as a standalone `(expr)`.
+        // Otherwise the head must be an identifier reference — the same set
+        // `parse_primary_expression` already accepts as an `Identifier` (plain
+        // names plus value-position contextual keywords like `async`/`as`, and
+        // `await` at `Script` goal), never `this`/`super`/a literal/`new`.
+        let mut expr = self.parse_primary_expression()?;
+        if !is_parenthesized {
+            if !matches!(expr.expr, Expression::Identifier(_)) {
+                // `parse_primary_expression` has already consumed the head, so
+                // anchor the error at its start, not the now-current token.
+                return Err(ParseError::InvalidSyntax {
+                    message: "Expected an identifier or '(' as the decorator expression"
+                        .to_string(),
+                    position: head_start,
+                    context: None,
+                });
+            }
+
+            // `DecoratorMemberExpression`: a `.`-member chain. Property names are
+            // liberal (keywords allowed: `@a.class`), but `#private`, computed
+            // `[…]`, and optional `?.` access are not part of the grammar.
+            while *self.current_kind() == TokenKind::Dot {
+                self.advance()?; // consume '.'
+                if !self.current_is_identifier_or_keyword() {
+                    return Err(self.error_expected_after("property name", "."));
+                }
+                let (prop_start, prop_end) = self.current_pos();
+                let name = self.intern(self.current_property_name());
+                self.advance()?;
+                let property = self.arena.alloc(Expression::Identifier(Identifier::simple(
+                    name,
+                    Span::new(prop_start as u32, prop_end as u32),
+                )));
+                let span = Span::new(expr.actual_start, prop_end as u32);
+                expr = ParsedExpr::with_end(
+                    self.arena,
+                    Expression::MemberExpression(MemberExpression {
+                        object: expr.expr,
+                        property,
+                        computed: false,
+                        optional: false,
+                        span,
+                    }),
+                    prop_end,
+                );
+            }
+        }
+
+        // A single optional trailing call (`@foo()`, `@a.b.c()`, `@(expr)()`).
+        // Only one: `parseMaybeDecoratorArguments` runs once, so `@foo()()` and
+        // `@foo().bar` are not decorators — a parenthesized form covers them.
+        if *self.current_kind() == TokenKind::ParenOpen {
+            self.advance()?; // consume '('
+            let (arguments, paren_end) = self.parse_call_arguments()?;
+            let arguments = arguments.into_bump_slice();
+            // The call node starts at the callee's own start (acorn's
+            // `startNodeAtNode(expr)`), not at any stripped wrapping paren.
+            let span = Span::new(expr.expr.span().start, paren_end as u32);
+            expr = ParsedExpr::with_end(
+                self.arena,
+                Expression::CallExpression(CallExpression {
+                    callee: expr.expr,
+                    type_arguments: None,
+                    arguments,
+                    optional: false,
+                    span,
+                }),
+                paren_end,
+            );
+        }
+
+        // Hand back an owned `Expression` (shallow clone — children are arena
+        // refs), matching `parse_assignment_expression`'s by-value boundary.
+        Ok(expr.expr.clone())
+    }
+
     /// Parse postfix expressions: member access (`.`, `[`), call expressions (`()`)
     ///
     /// Handles chained expressions like `obj.prop`, `arr[0]`, `foo()`, `obj.method().prop`

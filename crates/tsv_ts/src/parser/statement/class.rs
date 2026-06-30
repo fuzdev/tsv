@@ -183,12 +183,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(decorators)
     }
 
-    /// Parse a single decorator: `@expression`
-    ///
-    /// The expression can be:
-    /// - Identifier: `@foo`
-    /// - Call expression: `@foo()` or `@foo(arg)`
-    /// - Member expression: `@foo.bar` or `@foo.bar()`
+    /// Parse a single decorator: `@expression`, where the expression follows the
+    /// restricted ES decorators grammar — see `parse_decorator_expression`.
     fn parse_decorator(&mut self) -> Result<Decorator<'arena>, ParseError> {
         let start = self.current_pos().0;
 
@@ -196,9 +192,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         debug_assert!(*self.current_kind() == TokenKind::At);
         self.advance()?;
 
-        // Parse the decorator expression (identifier, member, or call)
-        // We use parse_assignment_expression which handles identifier.member and identifier()
-        let expression = self.parse_assignment_expression()?;
+        // Parse the decorator expression under the restricted ES decorators
+        // grammar (identifier / `.`-member chain / single call, or a
+        // parenthesized full expression) — NOT a full `AssignmentExpression`, so
+        // a trailing `*` or binary operator is left for the following construct
+        // (e.g. a decorated generator method `@fn *a() {}`).
+        let expression = self.parse_decorator_expression()?;
 
         // The decorator span covers a parenthesized expression's closing `)`
         // (`@(expr)`), which the paren-stripped expression span excludes
