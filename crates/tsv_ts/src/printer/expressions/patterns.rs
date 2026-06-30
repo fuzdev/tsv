@@ -10,7 +10,7 @@
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use crate::printer::CommentSpacing;
 use crate::printer::{ParenContext, PatternContext, Printer, object_pattern_should_expand};
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -703,7 +703,7 @@ impl<'a> Printer<'a> {
             .map_or(arr.span.end, |t| t.span.start);
 
         // Flatten elements (skip holes) for checking
-        let non_null_elements: Vec<_> = arr.elements.iter().flatten().collect();
+        let non_null_elements: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
 
         self.collection_formatting_hints(arr.span.start, boundary, &non_null_elements, |elem| {
             elem.span()
@@ -721,7 +721,7 @@ impl<'a> Printer<'a> {
         let span = Span::new(arr.span.start, boundary);
 
         // Collect non-hole element spans for boundary checking
-        let non_null_elements: Vec<_> = arr.elements.iter().flatten().collect();
+        let non_null_elements: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
 
         self.has_own_line_block_comments_in_bracket_list(span, &non_null_elements, |elem| {
             elem.span()
