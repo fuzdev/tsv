@@ -528,6 +528,47 @@ const css_value_ratio: DivergencePattern = {
 
 // ─── CSS-specific patterns ──────────────────────────────────────────────────
 
+const css_unit_serialize_case: DivergencePattern = {
+	id: 'css_unit_serialize_case',
+	description: 'CSS Hz/kHz/Q units serialized lowercase per spec',
+	languages: ['css', 'svelte'],
+	conformance_sections: ['CSS: Values'],
+	fixtures: ['css/values/units_serialize_case_prettier_divergence'],
+	detect(ctx) {
+		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
+
+		// tsv lowercases EVERY unit to its spec-serialized form; prettier upcases the
+		// three units whose canonical serialization is nonetheless lowercase — `5hz`→`5Hz`,
+		// `1khz`→`1kHz`, `10q`→`10Q` (CSS Values 4 §6.2/§7.3). A hunk matches only when a
+		// removed (prettier) line carries one of the upcased forms AND the added (ours) line
+		// is its exact ASCII-case-lowered twin — a pure case swap, so it can never mask a
+		// content change, and the reverse direction (ours upcasing) is not matched.
+		const prettier_unit = /\d(?:Hz|kHz|Q)\b/;
+		const ours_unit = /\d(?:hz|khz|q)\b/;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			if (!is_in_css_context(hunk, ctx)) return false;
+			return hunk.removed_lines.some((removed) => {
+				if (!prettier_unit.test(removed)) return false;
+				const lowered = removed.toLowerCase();
+				return hunk.added_lines.some(
+					(added) => ours_unit.test(added) && added.toLowerCase() === lowered,
+				);
+			});
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'css_unit_serialize_case',
+				confidence: 'certain',
+				hunk_indices,
+				reason: 'CSS Hz/kHz/Q serialized lowercase per spec (CSS Values 4 §6.2/§7.3)',
+			};
+		}
+		return null;
+	},
+};
+
 const css_atrule_spec_spacing: DivergencePattern = {
 	id: 'css_atrule_spec_spacing',
 	description: 'CSS at-rule keyword spacing normalized per spec',
@@ -2012,6 +2053,7 @@ export const PATTERNS: DivergencePattern[] = [
 	css_value_ratio,
 
 	// 2. CSS-specific patterns
+	css_unit_serialize_case,
 	css_atrule_spec_spacing,
 	css_atrule_long_wrap,
 	css_atrule_stable_quirk,

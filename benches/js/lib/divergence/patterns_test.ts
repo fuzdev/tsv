@@ -719,6 +719,43 @@ Deno.test('short_expr_100: negative - not svelte', () => {
 	assertEquals(match, null);
 });
 
+// ─── css_unit_serialize_case ────────────────────────────────────────────────
+
+Deno.test('css_unit_serialize_case: positive - Hz/kHz/Q lowercased in .css', () => {
+	const prettier = 'a {\n\tpitch: 440Hz;\n\tpitch: 1kHz;\n\tleft: 10Q;\n}';
+	const ours = 'a {\n\tpitch: 440hz;\n\tpitch: 1khz;\n\tleft: 10q;\n}';
+	const ctx = make_context(ours, prettier, 'css');
+	const match = run_pattern('css_unit_serialize_case', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('css_unit_serialize_case: positive - inside a Svelte <style> block', () => {
+	const prettier = '<style>\n\ta {\n\t\tpitch: 440Hz;\n\t}\n</style>';
+	const ours = '<style>\n\ta {\n\t\tpitch: 440hz;\n\t}\n</style>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('css_unit_serialize_case', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('css_unit_serialize_case: negative - reverse direction (ours upcases) is NOT matched', () => {
+	// A hypothetical bug where OURS upcases must not be excused — the pattern is
+	// direction-specific (prettier-upcases / ours-lowercases only).
+	const prettier = 'a {\n\tpitch: 440hz;\n}';
+	const ours = 'a {\n\tpitch: 440Hz;\n}';
+	const ctx = make_context(ours, prettier, 'css');
+	const match = run_pattern('css_unit_serialize_case', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('css_unit_serialize_case: negative - unrelated value change', () => {
+	const prettier = 'a {\n\tcolor: red;\n}';
+	const ours = 'a {\n\tcolor: blue;\n}';
+	const ctx = make_context(ours, prettier, 'css');
+	const match = run_pattern('css_unit_serialize_case', ctx);
+	assertEquals(match, null);
+});
+
 // ─── css_atrule_spec_spacing ────────────────────────────────────────────────
 
 Deno.test('css_atrule_spec_spacing: positive - missing space after and(', () => {
