@@ -11,6 +11,7 @@ use super::helpers::type_args_should_wrap_for_return_type;
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::layout::hang_after_operator;
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -362,13 +363,13 @@ impl<'a> Printer<'a> {
                     inner.push(d.hardline());
                     inner.push(self.build_comment_doc(comment));
                 }
-                let mut parts = vec![d.text("(")];
+                let mut parts: DocBuf = smallvec![d.text("(")];
                 parts.push(d.indent(d.concat(&inner)));
                 parts.push(d.hardline());
                 parts.push(d.text(")"));
                 return d.concat(&parts);
             }
-            let mut parts = vec![d.text("(")];
+            let mut parts: DocBuf = smallvec![d.text("(")];
             for comment in comments_in_range(self.comments, paren_pos + 1, close_pos) {
                 parts.push(self.build_comment_doc(comment));
             }
@@ -390,7 +391,7 @@ impl<'a> Printer<'a> {
         return_type_start: u32,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![];
+        let mut parts: DocBuf = smallvec![];
         // Depth-tracked close paren (skips nested parens / comments) — the naive
         // first-`)` scan mis-fires on complex params and pulls real param-trailing
         // comments into this range (duplication).
@@ -531,7 +532,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            let mut parts = vec![d.text("(")];
+            let mut parts: DocBuf = smallvec![d.text("(")];
             parts.push(d.concat(&paren_prefix));
             parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
             parts.push(d.hardline());
@@ -572,7 +573,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let mut parts = vec![d.text("(")];
+        let mut parts: DocBuf = smallvec![d.text("(")];
         parts.push(d.indent(d.concat(&[d.softline(), d.concat(&param_parts)])));
         // No trailing comma on the last param (trailingComma: 'none').
         parts.push(d.softline());
@@ -601,7 +602,7 @@ impl<'a> Printer<'a> {
                 let dots_end = rest.span.start + "...".len() as u32;
                 let arg_start = rest.argument.span().start;
                 let comments_doc = self.build_trailing_comments_break_for_line(dots_end, arg_start);
-                let mut parts = vec![
+                let mut parts: DocBuf = smallvec![
                     d.text("..."),
                     comments_doc,
                     self.build_function_type_param_expression_doc(rest.argument),

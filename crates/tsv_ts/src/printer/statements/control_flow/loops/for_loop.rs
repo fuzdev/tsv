@@ -5,6 +5,7 @@
 
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::Printer;
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -74,7 +75,7 @@ impl<'a> Printer<'a> {
             }
 
             // Remaining comments (own_line + inline_next) go indented before body
-            let mut inner = vec![d.hardline()];
+            let mut inner: DocBuf = smallvec![d.hardline()];
             for comment in own_line.into_iter().chain(inline_next) {
                 inner.push(self.build_comment_doc(comment));
                 if comment.is_block {
@@ -184,7 +185,7 @@ impl<'a> Printer<'a> {
         // Find the two semicolons
         let (first_semi, second_semi) = self.find_for_semicolons(open_paren);
 
-        let mut parts = vec![d.text("for (")];
+        let mut parts: DocBuf = smallvec![d.text("for (")];
         let mut inner_parts = DocBuf::new();
 
         // First semicolon line: ; // inline comment
@@ -904,7 +905,7 @@ impl<'a> Printer<'a> {
             "of" => d.text("of"),
             _ => d.text("of"), // fallback
         };
-        let mut keyword_parts = vec![d.hardline(), keyword_doc];
+        let mut keyword_parts: DocBuf = smallvec![d.hardline(), keyword_doc];
 
         // Comments after keyword, before right — emit all (own-line comments normalize to inline)
         for comment in comments_in_range(self.comments, keyword_end, right_start) {
@@ -1067,7 +1068,8 @@ impl<'a> Printer<'a> {
             // flat/break on its own width (prettier 3.9 collapses `for (i; c; u)` and
             // trails the comment after `)`). Only comments *inside* the parens (handled
             // in `build_for_header_doc_impl`) or overflow expand the header.
-            let mut parts = vec![self.build_for_header_doc_impl(stmt, keyword_comments)];
+            let mut parts: DocBuf =
+                smallvec![self.build_for_header_doc_impl(stmt, keyword_comments)];
 
             // Post-header comments. Non-block bodies use Prettier's `adjustClause`
             // (`indent([line, body])`) wrapped with the header in an outer group, so
@@ -1181,7 +1183,7 @@ impl<'a> Printer<'a> {
         let saved_in_for_init = self.in_for_init.replace(true);
         let result = match init {
             internal::ForInit::VariableDeclaration(decl) => {
-                let mut parts = vec![d.text(decl.kind.as_str()), d.text(" ")];
+                let mut parts: DocBuf = smallvec![d.text(decl.kind.as_str()), d.text(" ")];
                 for (i, declarator) in decl.declarations.iter().enumerate() {
                     if i > 0 {
                         parts.push(d.text(", "));
@@ -1241,7 +1243,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => {
-                let mut parts = vec![d.text(decl.kind.as_str()), d.text(" ")];
+                let mut parts: DocBuf = smallvec![d.text(decl.kind.as_str()), d.text(" ")];
                 if let Some(declarator) = decl.declarations.first() {
                     parts.push(self.build_expression_doc(&declarator.id));
                 }

@@ -25,6 +25,7 @@ use crate::printer::calls::{
     wrap_call_with_will_break_guard,
 };
 use crate::printer::{ParenContext, Printer, has_multiline_content};
+use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -525,7 +526,7 @@ impl<'a> Printer<'a> {
                 // trailing comma, trailingComma: 'none').
                 // No line comments reach this block-only path.
                 let comma_pos = find_comma_pos(self.source, effective_arg_end, new_expr.span.end);
-                let mut last_with_comment = vec![last_doc];
+                let mut last_with_comment: DocBuf = smallvec![last_doc];
                 let mut after_comma = DocBuf::new();
                 for comment in &pc.trailing_block {
                     if comma_pos.is_some_and(|cp| is_comment_after_comma(comment, cp)) {
