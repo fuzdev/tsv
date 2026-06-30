@@ -1,6 +1,5 @@
 // Token types for TypeScript/JS lexer
 
-use phf::phf_map;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -467,76 +466,82 @@ pub struct Token {
 // `String`/`Box` field, widening `start`/`end` to `usize` — fails the build here.
 const _: () = assert!(size_of::<Token>() == 16);
 
-/// Perfect hash map for O(1) keyword lookup
-static KEYWORDS: phf::Map<&'static str, KeywordKind> = phf_map! {
+/// The reserved-word set — the independent oracle the SWAR matcher is validated
+/// against, **test-only**. Production recognition is the per-length compare arms
+/// in [`keyword_swar`] (length ≤ 8) and [`keyword_swar_long`] (length 9/10); there
+/// is no runtime keyword table. The unit tests cross-check those arms — plus
+/// [`KEYWORD_MIN_LEN`]/[`KEYWORD_MAX_LEN`] and [`KEYWORD_FIRST_LETTER_MASK`] —
+/// against this list, so adding a keyword to one without the other fails the suite.
+#[cfg(test)]
+static KEYWORDS: &[(&str, KeywordKind)] = &[
     // Declaration keywords
-    "const" => KeywordKind::Const,
-    "let" => KeywordKind::Let,
-    "var" => KeywordKind::Var,
+    ("const", KeywordKind::Const),
+    ("let", KeywordKind::Let),
+    ("var", KeywordKind::Var),
     // Literal keywords
-    "true" => KeywordKind::True,
-    "false" => KeywordKind::False,
-    "null" => KeywordKind::Null,
-    "undefined" => KeywordKind::Undefined,
+    ("true", KeywordKind::True),
+    ("false", KeywordKind::False),
+    ("null", KeywordKind::Null),
+    ("undefined", KeywordKind::Undefined),
     // Type keywords
-    "number" => KeywordKind::Number,
-    "string" => KeywordKind::String,
-    "boolean" => KeywordKind::Boolean,
-    "any" => KeywordKind::Any,
-    "void" => KeywordKind::Void,
-    "never" => KeywordKind::Never,
-    "unknown" => KeywordKind::Unknown,
-    "object" => KeywordKind::Object,
-    "symbol" => KeywordKind::Symbol,
-    "bigint" => KeywordKind::Bigint,
+    ("number", KeywordKind::Number),
+    ("string", KeywordKind::String),
+    ("boolean", KeywordKind::Boolean),
+    ("any", KeywordKind::Any),
+    ("void", KeywordKind::Void),
+    ("never", KeywordKind::Never),
+    ("unknown", KeywordKind::Unknown),
+    ("object", KeywordKind::Object),
+    ("symbol", KeywordKind::Symbol),
+    ("bigint", KeywordKind::Bigint),
     // Expression keywords
-    "new" => KeywordKind::New,
+    ("new", KeywordKind::New),
     // Binary operator keywords
-    "instanceof" => KeywordKind::Instanceof,
-    "in" => KeywordKind::In,
+    ("instanceof", KeywordKind::Instanceof),
+    ("in", KeywordKind::In),
     // Control flow keywords
-    "return" => KeywordKind::Return,
-    "if" => KeywordKind::If,
-    "else" => KeywordKind::Else,
-    "for" => KeywordKind::For,
-    "while" => KeywordKind::While,
-    "do" => KeywordKind::Do,
-    "switch" => KeywordKind::Switch,
-    "case" => KeywordKind::Case,
-    "default" => KeywordKind::Default,
-    "break" => KeywordKind::Break,
-    "continue" => KeywordKind::Continue,
-    "try" => KeywordKind::Try,
-    "catch" => KeywordKind::Catch,
-    "finally" => KeywordKind::Finally,
-    "throw" => KeywordKind::Throw,
+    ("return", KeywordKind::Return),
+    ("if", KeywordKind::If),
+    ("else", KeywordKind::Else),
+    ("for", KeywordKind::For),
+    ("while", KeywordKind::While),
+    ("do", KeywordKind::Do),
+    ("switch", KeywordKind::Switch),
+    ("case", KeywordKind::Case),
+    ("default", KeywordKind::Default),
+    ("break", KeywordKind::Break),
+    ("continue", KeywordKind::Continue),
+    ("try", KeywordKind::Try),
+    ("catch", KeywordKind::Catch),
+    ("finally", KeywordKind::Finally),
+    ("throw", KeywordKind::Throw),
     // Declaration keywords (continued)
-    "function" => KeywordKind::Function,
-    "class" => KeywordKind::Class,
-    "enum" => KeywordKind::Enum,
+    ("function", KeywordKind::Function),
+    ("class", KeywordKind::Class),
+    ("enum", KeywordKind::Enum),
     // Unary keyword operators
-    "typeof" => KeywordKind::Typeof,
-    "delete" => KeywordKind::Delete,
+    ("typeof", KeywordKind::Typeof),
+    ("delete", KeywordKind::Delete),
     // Async/await keywords
-    "async" => KeywordKind::Async,
-    "await" => KeywordKind::Await,
+    ("async", KeywordKind::Async),
+    ("await", KeywordKind::Await),
     // Class keywords
-    "this" => KeywordKind::This,
-    "super" => KeywordKind::Super,
-    "extends" => KeywordKind::Extends,
+    ("this", KeywordKind::This),
+    ("super", KeywordKind::Super),
+    ("extends", KeywordKind::Extends),
     // Module keywords
-    "export" => KeywordKind::Export,
-    "import" => KeywordKind::Import,
-    "from" => KeywordKind::From,
-    "as" => KeywordKind::As,
-    "satisfies" => KeywordKind::Satisfies,
+    ("export", KeywordKind::Export),
+    ("import", KeywordKind::Import),
+    ("from", KeywordKind::From),
+    ("as", KeywordKind::As),
+    ("satisfies", KeywordKind::Satisfies),
     // Generator keywords
-    "yield" => KeywordKind::Yield,
+    ("yield", KeywordKind::Yield),
     // Debugger
-    "debugger" => KeywordKind::Debugger,
+    ("debugger", KeywordKind::Debugger),
     // TODO: Expand keyword list for:
     // - Type keywords: interface, type, namespace, etc.
-};
+];
 
 /// Shortest reserved word (`as`/`in`/`if`/`do`) is 2 bytes; longest (`instanceof`) is 10.
 const KEYWORD_MIN_LEN: usize = 2;
@@ -567,27 +572,6 @@ const KEYWORD_FIRST_LETTER_MASK: u32 = {
         | bit(b'y')
 };
 
-/// O(1) keyword lookup using a perfect hash function, gated by a cheap reject pre-filter.
-///
-/// Every reserved word is 2–10 bytes long and begins with one of a fixed set of
-/// lowercase-ASCII letters, so an identifier failing either test cannot be a keyword.
-/// The gate skips the phf hash for PascalCase types, `_`/`$`-prefixed names, and any
-/// identifier whose first letter starts no keyword — the overwhelming majority of
-/// identifier tokens. `prefilter_admits_every_keyword` proves it never rejects a real
-/// keyword, so the gate is purely a fast path and changes no behavior.
-#[inline]
-fn keyword_kind(s: &str) -> Option<KeywordKind> {
-    let bytes = s.as_bytes();
-    if !matches!(bytes.len(), KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN) {
-        return None;
-    }
-    let idx = bytes[0].wrapping_sub(b'a');
-    if idx >= 26 || (KEYWORD_FIRST_LETTER_MASK >> idx) & 1 == 0 {
-        return None;
-    }
-    KEYWORDS.get(s).copied()
-}
-
 /// Encode up to 8 ASCII bytes of `s` as a little-endian `u64` — the SWAR key for a
 /// keyword of length ≤ 8. Used only inside `const { … }` so each keyword constant
 /// is materialized at compile time, never re-run at the call site.
@@ -602,18 +586,31 @@ const fn keyword_encode(s: &str) -> u64 {
     w
 }
 
+/// Encode up to 16 ASCII bytes of `s` as a little-endian `u128` — the SWAR key for a
+/// length-9/10 keyword. The `u64` [`keyword_encode`] can't hold 9+ bytes; this is its
+/// wide sibling, used only inside `const { … }` in [`keyword_swar_long`].
+const fn keyword_encode_wide(s: &str) -> u128 {
+    let b = s.as_bytes();
+    let mut w = 0u128;
+    let mut i = 0;
+    while i < b.len() {
+        w |= (b[i] as u128) << (i * 8);
+        i += 1;
+    }
+    w
+}
+
 /// SWAR keyword recognition for identifiers of length **2..=8**: the caller packs
 /// the identifier's bytes into a little-endian `u64` (`word`, masked to `len`
 /// bytes — see `read_keyword_word`) and this matches it against the keyword
-/// constants of that length, retiring the `phf::get_entry` hash on the keyword
-/// path. Returns `None` for non-keywords and for `len` outside 2..=8 — the caller
-/// routes the three length-9/10 keywords (`undefined`/`satisfies`/`instanceof`)
-/// to the `phf` `keyword_kind`.
+/// constants of that length. Returns `None` for non-keywords and for `len` outside
+/// 2..=8 — the caller routes the three length-9/10 keywords
+/// (`undefined`/`satisfies`/`instanceof`) to [`keyword_swar_long`].
 ///
-/// Byte-for-byte equivalent to `keyword_kind` for `len <= 8`; proven over the
-/// whole `KEYWORDS` set in `swar_matches_phf`. Dispatching on `len` first keeps
-/// each per-length compare set tiny, and the `const { … }` encodings are compile-time
-/// constants so this is pure integer comparison.
+/// Recognizes the same length-≤8 reserved words as the `KEYWORDS` oracle, proven in
+/// `swar_matches_keyword_table`. Dispatching on `len` first keeps each per-length
+/// compare set tiny, and the `const { … }` encodings are compile-time constants so
+/// this is pure integer comparison.
 #[inline]
 #[allow(clippy::enum_glob_use)] // 49 arms — the glob keeps the per-length tables readable
 fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
@@ -756,6 +753,37 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
     }
 }
 
+/// SWAR recognition for the three length-9/10 keywords (`undefined`/`satisfies`,
+/// length 9; `instanceof`, length 10). The caller packs the identifier's `len` bytes
+/// little-endian into a `u128` (`read_keyword_word_wide`) and this matches it against
+/// the keyword constants of that length. A `u128` key (vs the `u64` the `len <= 8`
+/// path uses) holds the extra bytes while keeping the hot ≤8 path's compares narrow.
+/// Returns `None` for non-keywords and for `len` outside 9..=10; proven against the
+/// `KEYWORDS` oracle in `swar_matches_keyword_table`.
+#[inline]
+fn keyword_swar_long(word: u128, len: usize) -> Option<KeywordKind> {
+    use KeywordKind::{Instanceof, Satisfies, Undefined};
+    match len {
+        9 => {
+            if word == const { keyword_encode_wide("undefined") } {
+                Some(Undefined)
+            } else if word == const { keyword_encode_wide("satisfies") } {
+                Some(Satisfies)
+            } else {
+                None
+            }
+        }
+        10 => {
+            if word == const { keyword_encode_wide("instanceof") } {
+                Some(Instanceof)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 /// Pack `bytes[start..start+len]` (an identifier, `len` ∈ 2..=8) into a
 /// little-endian `u64` keyword key. Fast path: a single 8-byte load when 8 bytes
 /// are in bounds (the common case — an identifier is rarely in the file's last 8
@@ -791,17 +819,33 @@ fn read_keyword_word(bytes: &[u8], start: usize, len: usize) -> u64 {
     }
 }
 
+/// Pack `bytes[start..start+len]` (an identifier, `len` ∈ 9..=10) into a little-endian
+/// `u128` keyword key — the wide counterpart of [`read_keyword_word`] for the
+/// length-9/10 path. A plain byte loop (no 8-byte fast load): only the three long
+/// keywords reach here, so this path is cold.
+#[inline]
+fn read_keyword_word_wide(bytes: &[u8], start: usize, len: usize) -> u128 {
+    let mut w = 0u128;
+    let mut i = 0;
+    while i < len {
+        w |= (bytes[start + i] as u128) << (i * 8);
+        i += 1;
+    }
+    w
+}
+
 /// Reserved-word lookup for the identifier `bytes[start..start+len]`
-/// (`len = end - start`). The lexer's single keyword entry point: it applies the
-/// same cheap pre-filter as [`keyword_kind`] (length 2..=10 + keyword first-letter,
-/// rejecting PascalCase / `_`/`$`-led / non-keyword-letter names without further
-/// work), then recognizes the 49 keywords of length ≤ 8 via SWAR ([`keyword_swar`],
-/// retiring the `phf` hash) and defers the three length-9/10 keywords
-/// (`undefined`/`satisfies`/`instanceof`) to the `phf` [`keyword_kind`].
+/// (`len = end - start`). The lexer's single keyword entry point: it applies a cheap
+/// pre-filter (length 2..=10 + keyword first-letter, rejecting PascalCase /
+/// `_`/`$`-led / non-keyword-letter names without further work), then recognizes the
+/// keyword entirely via SWAR — the 49 keywords of length ≤ 8 through [`keyword_swar`]
+/// (`u64` key) and the three length-9/10 keywords
+/// (`undefined`/`satisfies`/`instanceof`) through [`keyword_swar_long`] (`u128` key).
+/// No hashing on any path.
 ///
 /// `bytes` is the lexer source and `[start, start+len)` a validated identifier, so
-/// it is in bounds and valid UTF-8 (a non-ASCII identifier simply matches no
-/// ASCII keyword constant and falls through to `None`).
+/// it is in bounds (a non-ASCII identifier simply matches no ASCII keyword constant
+/// and falls through to `None`).
 #[inline]
 pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind> {
     if !matches!(len, KEYWORD_MIN_LEN..=KEYWORD_MAX_LEN) {
@@ -814,10 +858,8 @@ pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind>
     if len <= 8 {
         keyword_swar(read_keyword_word(bytes, start, len), len)
     } else {
-        // The 2 (len 9) + 1 (len 10) keywords: phf over the validated slice.
-        std::str::from_utf8(&bytes[start..start + len])
-            .ok()
-            .and_then(keyword_kind)
+        // The 2 (len 9) + 1 (len 10) keywords: SWAR over a u128.
+        keyword_swar_long(read_keyword_word_wide(bytes, start, len), len)
     }
 }
 
@@ -825,18 +867,18 @@ pub fn keyword_at(bytes: &[u8], start: usize, len: usize) -> Option<KeywordKind>
 mod tests {
     use super::*;
 
-    /// The gate must admit every reserved word — otherwise the lexer would misclassify
-    /// a keyword as an identifier. Also re-derives the length bounds and the first-letter
-    /// mask from `KEYWORDS`, so adding or removing a keyword that shifts either invariant
-    /// fails here instead of silently corrupting tokenization.
+    /// `keyword_at` (pre-filter + SWAR) must recognize every reserved word — otherwise
+    /// the lexer would misclassify a keyword as an identifier. Also re-derives the length
+    /// bounds and the first-letter mask from `KEYWORDS`, so adding or removing a keyword
+    /// that shifts either invariant fails here instead of silently corrupting tokenization.
     #[test]
     fn prefilter_admits_every_keyword() {
         let mut derived_mask = 0u32;
-        for (&kw, &kind) in KEYWORDS.entries() {
+        for &(kw, kind) in KEYWORDS {
             assert_eq!(
-                keyword_kind(kw),
+                keyword_at(kw.as_bytes(), 0, kw.len()),
                 Some(kind),
-                "pre-filter rejected reserved word `{kw}`"
+                "keyword_at failed to recognize reserved word `{kw}`"
             );
             let len = kw.len();
             assert!(
@@ -874,50 +916,72 @@ mod tests {
             "kind",
             "map",
         ] {
-            assert_eq!(keyword_kind(s), None, "`{s}` should not be a keyword");
+            assert_eq!(
+                keyword_at(s.as_bytes(), 0, s.len()),
+                None,
+                "`{s}` should not be a keyword"
+            );
         }
     }
 
-    /// `keyword_swar` must agree with the `phf` `keyword_kind` for every reserved
-    /// word of length ≤ 8 (the SWAR-eligible set) — this proves the hand-written
-    /// per-length compare set has no typo or omission. Lengths 9/10 are out of
-    /// SWAR scope (the caller routes them to `keyword_kind`), so they must return
-    /// `None` from `keyword_swar`.
+    /// The SWAR arms must agree with the `KEYWORDS` oracle for every reserved word —
+    /// this proves the hand-written per-length compare sets have no typo or omission.
+    /// Each word is recognized by exactly one arm: `keyword_swar` (`u64`) for length
+    /// ≤ 8, `keyword_swar_long` (`u128`) for length 9/10. The other arm's `len` gate
+    /// must reject it, so a keyword can never be matched by the wrong-width path.
     #[test]
-    fn swar_matches_phf() {
-        for (&kw, &kind) in KEYWORDS.entries() {
+    fn swar_matches_keyword_table() {
+        for &(kw, kind) in KEYWORDS {
             if kw.len() <= 8 {
                 assert_eq!(
                     keyword_swar(keyword_encode(kw), kw.len()),
                     Some(kind),
-                    "SWAR misclassified reserved word `{kw}`"
+                    "keyword_swar misclassified reserved word `{kw}`"
+                );
+                // Out of the long path's 9..=10 scope: its `len` gate must reject it.
+                assert_eq!(
+                    keyword_swar_long(keyword_encode_wide(kw), kw.len()),
+                    None,
+                    "keyword_swar_long should reject length-{} word `{kw}`",
+                    kw.len()
                 );
             } else {
-                // 9/10-byte keywords are out of SWAR scope (keyword_encode is only valid
-                // for ≤8 bytes); the `len` gate alone must reject them regardless of
-                // the word, so `keyword_at` routes them to the phf `keyword_kind`.
+                assert_eq!(
+                    keyword_swar_long(keyword_encode_wide(kw), kw.len()),
+                    Some(kind),
+                    "keyword_swar_long misclassified reserved word `{kw}`"
+                );
+                // Out of the ≤8 path's scope: `keyword_swar`'s `len` gate must reject it.
                 assert_eq!(
                     keyword_swar(0, kw.len()),
                     None,
-                    "SWAR should defer length-{} word `{kw}` to phf",
+                    "keyword_swar should reject length-{} word `{kw}`",
                     kw.len()
                 );
             }
         }
     }
 
-    /// The production keyword encoder (`read_keyword_word`, a single 8-byte load + mask,
-    /// or a byte-assembly near EOF) must produce the same little-endian `u64` as the
-    /// compile-time `keyword_encode` the SWAR constants are built from. `swar_matches_phf`
-    /// feeds `keyword_encode`, so without this a divergence in `read_keyword_word` — the byte
-    /// order the lexer actually runs — would pass the unit suite and only surface in
-    /// the integration gates. Covers both the in-bounds fast path (padded source) and
-    /// the near-EOF assembly path (the keyword as the final bytes).
+    /// The production keyword encoders (`read_keyword_word`, a single 8-byte load + mask
+    /// or a byte-assembly near EOF, for length ≤ 8; `read_keyword_word_wide` for length
+    /// 9/10) must produce the same little-endian word as the compile-time
+    /// `keyword_encode`/`keyword_encode_wide` the SWAR constants are built from.
+    /// `swar_matches_keyword_table` feeds the compile-time encoders, so without this a
+    /// divergence in the runtime readers — the byte order the lexer actually runs —
+    /// would pass the unit suite and only surface in the integration gates. Covers the
+    /// in-bounds fast path (padded source), the near-EOF assembly path (the keyword as
+    /// the final bytes), and the wide length-9/10 reader.
     #[test]
     fn read_keyword_word_matches_keyword_encode() {
-        for (&kw, _) in KEYWORDS.entries() {
+        for &(kw, _) in KEYWORDS {
             if kw.len() > 8 {
-                continue; // out of SWAR scope; routed to phf, never read_keyword_word
+                // Wide path: read_keyword_word_wide must match the const keyword_encode_wide.
+                assert_eq!(
+                    read_keyword_word_wide(kw.as_bytes(), 0, kw.len()),
+                    keyword_encode_wide(kw),
+                    "read_keyword_word_wide disagrees with keyword_encode_wide for `{kw}`"
+                );
+                continue;
             }
             // Fast path: ≥ 8 bytes in bounds (trailing pad guarantees start + 8 <= len).
             let mut padded = kw.as_bytes().to_vec();
