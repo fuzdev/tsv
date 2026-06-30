@@ -6,9 +6,11 @@
 
 use crate::ast::internal::{EachBlock, FragmentNode};
 use crate::printer::Printer;
+use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_ts::Expression;
@@ -180,7 +182,7 @@ impl<'a> Printer<'a> {
     /// runs to end of line, so the following token drops to the next line to avoid
     /// swallowing it). Empty doc when the range holds no comments.
     fn build_pattern_leading_comments(&self, start: u32, end: u32) -> DocId {
-        let docs: Vec<DocId> = comments_in_range(self.comments, start, end)
+        let docs: DocBuf = comments_in_range(self.comments, start, end)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect();
         self.d().concat(&docs)
@@ -190,7 +192,7 @@ impl<'a> Printer<'a> {
     /// ` /* … */` (inline, leading space); a line comment as ` // …` + `hardline`. Empty
     /// doc when the range holds no comments.
     fn build_pattern_trailing_comments(&self, start: u32, end: u32) -> DocId {
-        let docs: Vec<DocId> = comments_in_range(self.comments, start, end)
+        let docs: DocBuf = comments_in_range(self.comments, start, end)
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
         self.d().concat(&docs)
@@ -343,7 +345,7 @@ impl<'a> Printer<'a> {
         entries: &[(u32, u32, DocId)],
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("{")];
+        let mut parts: DocBuf = smallvec![d.text("{")];
         if entries.is_empty() {
             // Empty pattern stays tight (`{}`), but preserve a dangling comment.
             parts.push(self.build_pattern_leading_comments(span_start + 1, span_end - 1));
@@ -378,7 +380,7 @@ impl<'a> Printer<'a> {
         span_end: u32,
     ) -> DocId {
         let d = self.d();
-        let mut parts = vec![d.text("[")];
+        let mut parts: DocBuf = smallvec![d.text("[")];
         let mut prev_end = span_start + 1; // past `[`
         for (i, elem) in elements.iter().enumerate() {
             if i == 0 {
@@ -526,7 +528,7 @@ impl<'a> Printer<'a> {
         let expr_end = expr.span().end;
 
         // Build docs for leading comments (between span_start and expression start)
-        let leading_docs: Vec<DocId> = comments_in_range(self.comments, span_start, expr_start)
+        let leading_docs: DocBuf = comments_in_range(self.comments, span_start, expr_start)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect();
 
@@ -548,7 +550,7 @@ impl<'a> Printer<'a> {
             tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
 
         // Build docs for trailing comments (between expression end and span_end)
-        let trailing_docs: Vec<DocId> = comments_in_range(self.comments, expr_end, span_end)
+        let trailing_docs: DocBuf = comments_in_range(self.comments, expr_end, span_end)
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
 
@@ -584,7 +586,7 @@ impl<'a> Printer<'a> {
         let expr_end = expr.span().end;
 
         // Build docs for leading comments
-        let leading_docs: Vec<DocId> = comments_in_range(self.comments, span_start, expr_start)
+        let leading_docs: DocBuf = comments_in_range(self.comments, span_start, expr_start)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect();
 
@@ -622,7 +624,7 @@ impl<'a> Printer<'a> {
         };
 
         // Build docs for trailing comments
-        let trailing_docs: Vec<DocId> = comments_in_range(self.comments, expr_end, span_end)
+        let trailing_docs: DocBuf = comments_in_range(self.comments, expr_end, span_end)
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
 
@@ -663,14 +665,15 @@ impl<'a> Printer<'a> {
     /// `build_const_init_doc`).
     pub(super) fn concat_with_surrounding_comments(
         &self,
-        leading_docs: Vec<DocId>,
+        leading_docs: DocBuf,
         expr_doc: DocId,
-        trailing_docs: Vec<DocId>,
+        trailing_docs: DocBuf,
     ) -> DocId {
         if leading_docs.is_empty() && trailing_docs.is_empty() {
             expr_doc
         } else {
-            let mut parts = Vec::with_capacity(leading_docs.len() + 1 + trailing_docs.len());
+            let mut parts: DocBuf =
+                DocBuf::with_capacity(leading_docs.len() + 1 + trailing_docs.len());
             parts.extend(leading_docs);
             parts.push(expr_doc);
             parts.extend(trailing_docs);

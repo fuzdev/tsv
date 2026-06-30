@@ -5,10 +5,11 @@
 
 use crate::ast::internal;
 use crate::printer::Printer;
+use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
-use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_ts::Expression;
 
 // Opening-tag literals whose `.len()` locates the embedded expression past the
@@ -162,7 +163,7 @@ impl<'a> Printer<'a> {
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
 
-        let leading_docs: Vec<DocId> = comments_in_range(self.comments, span_start, expr_start)
+        let leading_docs: DocBuf = comments_in_range(self.comments, span_start, expr_start)
             .map(|c| self.build_leading_js_comment_doc(c))
             .collect();
 
@@ -175,7 +176,7 @@ impl<'a> Printer<'a> {
         let expr_doc =
             tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
 
-        let trailing_docs: Vec<DocId> = comments_in_range(self.comments, expr_end, span_end)
+        let trailing_docs: DocBuf = comments_in_range(self.comments, expr_end, span_end)
             .map(|c| self.build_trailing_js_comment_doc(c))
             .collect();
 
@@ -199,7 +200,7 @@ impl<'a> Printer<'a> {
             return d.text("{@debug}");
         }
 
-        let mut parts: Vec<DocId> = vec![d.text("{@debug ")];
+        let mut parts: DocBuf = smallvec![d.text("{@debug ")];
         // Track position as we emit content, starting after the "{@debug" keyword.
         let mut last_end = tag.span.start + DEBUG_TAG_OPEN.len() as u32;
 

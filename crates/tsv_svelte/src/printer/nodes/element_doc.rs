@@ -14,6 +14,7 @@
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
 use crate::printer::text::TextAnalysis;
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{Span, SymbolResolver, SymbolToU32};
@@ -766,7 +767,7 @@ impl<'a> Printer<'a> {
             element.open_tag_end,
             true,
         );
-        let mut parts = vec![d.text("<"), d.symbol(tag_sym)];
+        let mut parts: DocBuf = smallvec![d.text("<"), d.symbol(tag_sym)];
         parts.extend(space_attrs);
         parts.push(d.text(">"));
 
@@ -842,7 +843,7 @@ impl<'a> Printer<'a> {
                 // Build doc with properly indented content
                 // Each line of formatted content goes on its own line with indent
                 let lines: Vec<&str> = formatted.trim_end().lines().collect();
-                let mut content_lines = Vec::with_capacity(lines.len() * 2);
+                let mut content_lines: DocBuf = DocBuf::with_capacity(lines.len() * 2);
                 for line in lines {
                     content_lines.push(d.hardline());
                     if !line.is_empty() {

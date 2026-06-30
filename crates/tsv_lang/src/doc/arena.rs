@@ -16,6 +16,7 @@ use std::cell::RefCell;
 use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 
+use super::DocBuf;
 use super::types::{
     DocContext, DocText, GroupId, LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TEXT_WIDTH_NOT_COMPUTED,
 };
@@ -842,8 +843,8 @@ impl DocArena {
             IsolatedGroup(DocId),
             IfBreakFlat(DocId),
             IndentIfBreakContents(DocId),
-            Concat(Vec<DocId>),
-            Fill(Vec<DocId>),
+            Concat(DocBuf),
+            Fill(DocBuf),
             WithContext(DocId, DocContext),
             LineSuffix(DocId),
             BreakParent,
@@ -873,11 +874,11 @@ impl DocArena {
                 DocNode::IndentIfBreak { contents, .. } => Info::IndentIfBreakContents(*contents),
                 DocNode::Concat(range) => {
                     let children = self.children.borrow();
-                    Info::Concat(range.resolve(&children).to_vec())
+                    Info::Concat(DocBuf::from_slice(range.resolve(&children)))
                 }
                 DocNode::Fill(range) => {
                     let children = self.children.borrow();
-                    Info::Fill(range.resolve(&children).to_vec())
+                    Info::Fill(DocBuf::from_slice(range.resolve(&children)))
                 }
                 DocNode::WithContext { doc, context } => Info::WithContext(*doc, context.clone()),
                 DocNode::LineSuffix(inner) => Info::LineSuffix(*inner),
@@ -923,9 +924,9 @@ impl DocArena {
                     } else {
                         let kids = {
                             let children = self.children.borrow();
-                            expanded_states.resolve(&children).to_vec()
+                            DocBuf::from_slice(expanded_states.resolve(&children))
                         };
-                        let new_kids: Vec<DocId> =
+                        let new_kids: DocBuf =
                             kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
                         self.alloc_children(&new_kids)
                     };
@@ -944,13 +945,13 @@ impl DocArena {
             Info::IfBreakFlat(flat_doc) => self.remove_lines(flat_doc),
             Info::IndentIfBreakContents(contents) => self.remove_lines(contents),
             Info::Concat(kids) => {
-                let flattened: Vec<DocId> =
+                let flattened: DocBuf =
                     kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
                 self.concat(&flattened)
             }
             Info::Fill(kids) => {
                 // Fill becomes regular concat when flattened
-                let flattened: Vec<DocId> =
+                let flattened: DocBuf =
                     kids.into_iter().map(|kid| self.remove_lines(kid)).collect();
                 self.concat(&flattened)
             }

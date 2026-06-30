@@ -276,7 +276,7 @@ impl<'a> Printer<'a> {
         if raw.contains('\n') {
             // Split at newlines, join with literalline to preserve literal newlines
             // and trigger will_break on the attribute group
-            let line_docs: Vec<DocId> = raw
+            let line_docs: DocBuf = raw
                 .split('\n')
                 .map(|part| d.text_owned(part.to_string()))
                 .collect();
@@ -492,7 +492,7 @@ impl<'a> Printer<'a> {
     //
 
     /// Build Doc parts for modifiers: `|mod1|mod2`
-    fn build_modifiers_doc(&self, modifiers: &[&str]) -> Vec<DocId> {
+    fn build_modifiers_doc(&self, modifiers: &[&str]) -> DocBuf {
         modifiers
             .iter()
             .flat_map(|m| [self.d().text("|"), self.d().text_owned((*m).to_string())])
@@ -533,7 +533,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &Expression<'_>,
         tag_span: Option<Span>,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
 
         // For expressions with internal group structure, keep them hugged with the braces.
@@ -588,19 +588,19 @@ impl<'a> Printer<'a> {
             self.wrap_in_block_structure(expr_content)
         };
 
-        vec![d.text("="), inner]
+        smallvec![d.text("="), inner]
     }
 
     /// Build expression content with leading/trailing comments
     ///
-    /// Returns a Vec<DocId> containing: leading comments + expression doc + trailing comments
+    /// Returns the doc parts: leading comments + expression doc + trailing comments
     fn build_expression_content_with_comments(
         &self,
         expr: &Expression<'_>,
         tag_span: Option<Span>,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         // Collect leading comments
-        let mut leading_comments = Vec::new();
+        let mut leading_comments: DocBuf = DocBuf::new();
         if let Some(span) = tag_span {
             let expr_start = expr.span().start;
             for comment in comments_in_range(self.comments, span.start + 1, expr_start) {
@@ -611,7 +611,7 @@ impl<'a> Printer<'a> {
         let expr_doc = self.build_expression_doc_for_attribute(expr);
 
         // Collect trailing comments
-        let mut trailing_comments = Vec::new();
+        let mut trailing_comments: DocBuf = DocBuf::new();
         if let Some(span) = tag_span {
             let expr_end = expr.span().end;
             for comment in comments_in_range(self.comments, expr_end, span.end - 1) {
@@ -627,7 +627,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Wrap expression content in block structure: `{\n\texpr\n}`
-    fn wrap_in_block_structure(&self, expr_content: Vec<DocId>) -> DocId {
+    fn wrap_in_block_structure(&self, expr_content: DocBuf) -> DocId {
         let d = self.d();
         let content = d.concat(&expr_content);
         let softline = d.softline();
@@ -660,7 +660,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &Expression<'_>,
         tag_span: Option<Span>,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let d = self.d();
         // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
         if let Expression::SequenceExpression(seq) = expr {
@@ -672,7 +672,7 @@ impl<'a> Printer<'a> {
             if let Some(span) = tag_span {
                 let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
                 if tsv_lang::has_comments_in_range(self.comments, span.start + 1, last_end) {
-                    return vec![
+                    return smallvec![
                         d.text("="),
                         self.build_bind_sequence_with_comments_doc(seq, span),
                     ];
@@ -682,7 +682,7 @@ impl<'a> Printer<'a> {
             let len = seq.expressions.len();
 
             // Build items: each expression with trailing comma (except last)
-            let items: Vec<DocId> = seq
+            let items: DocBuf = seq
                 .expressions
                 .iter()
                 .enumerate()
@@ -703,7 +703,10 @@ impl<'a> Printer<'a> {
 
             // Bare block structure (shared with every other bind value): flat
             // `={getter, setter}`, broken `={\n\tgetter,\n\tsetter\n}`.
-            return vec![d.text("="), self.wrap_in_block_structure(vec![items_doc])];
+            return smallvec![
+                d.text("="),
+                self.wrap_in_block_structure(smallvec![items_doc])
+            ];
         }
 
         // For bind: directives, BinaryExpression should use block structure (not hugging).
@@ -742,7 +745,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let bytes = self.source.as_bytes();
-        let mut content: Vec<DocId> = Vec::new();
+        let mut content: DocBuf = DocBuf::new();
 
         // Leading comments between `{` and the first operand. A line or multi-line
         // block comment ends in a hardline, forcing the outer `{ }` to break — but
@@ -764,7 +767,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let mut items: Vec<DocId> = Vec::new();
+        let mut items: DocBuf = DocBuf::new();
         for (i, sub_expr) in seq.expressions.iter().enumerate() {
             if i > 0 {
                 let prev_end = seq.expressions[i - 1].span().end;
@@ -823,9 +826,9 @@ impl<'a> Printer<'a> {
         &self,
         expr: &Expression<'_>,
         tag_span: Option<Span>,
-    ) -> Vec<DocId> {
+    ) -> DocBuf {
         let expr_content = self.build_expression_content_with_comments(expr, tag_span);
-        vec![
+        smallvec![
             self.d().text("="),
             self.wrap_in_block_structure(expr_content),
         ]
