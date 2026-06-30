@@ -418,7 +418,7 @@ impl<'a> Printer<'a> {
         // Build the key parameter docs. The `: keyType` is delegated to the
         // shared annotation printer so a union/intersection key breaks with the
         // leading-`|` / hanging-`&` layout.
-        let param_docs: Vec<_> = idx
+        let param_docs: DocBuf = idx
             .parameters
             .iter()
             .map(|param| {

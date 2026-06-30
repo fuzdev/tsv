@@ -23,7 +23,7 @@ struct ChainOperand {
 /// once per binary expression. The common 2–3 operand chain stays inline
 /// (`ChainOperand` is 12 bytes, `BinaryOperator` 1 byte); longer chains spill.
 type OperandBuf = SmallVec<[ChainOperand; 8]>;
-type OperatorBuf = SmallVec<[BinaryOperator; 8]>;
+pub(super) type OperatorBuf = SmallVec<[BinaryOperator; 8]>;
 
 /// Style for building binary expression chain docs
 #[derive(Clone, Copy)]

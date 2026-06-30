@@ -27,7 +27,8 @@ mod operators;
 mod patterns;
 mod template_literal;
 
-use crate::ast::internal::{BinaryExpression, BinaryOperator, Expression, TSType};
+use self::operators::OperatorBuf;
+use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
 use crate::printer::{ParenContext, PatternContext, Printer, chain};
 use smallvec::smallvec;
@@ -800,7 +801,7 @@ impl<'a> Printer<'a> {
 
         // Collect all operands and operators in the chain
         let mut operands = DocBuf::new();
-        let mut operators = Vec::new();
+        let mut operators = OperatorBuf::new();
         self.collect_binary_operands_for_indent(binary, &mut operands, &mut operators);
 
         if operands.len() <= 1 {
@@ -889,7 +890,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &BinaryExpression<'_>,
         operands: &mut DocBuf,
-        operators: &mut Vec<BinaryOperator>,
+        operators: &mut OperatorBuf,
     ) {
         // Recursively flatten left side if it can be chained with current operator
         if let Expression::BinaryExpression(left_binary) = expr.left {
@@ -930,7 +931,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Collect all operands and operators in the chain
         let mut operands = DocBuf::new();
-        let mut operators = Vec::new();
+        let mut operators = OperatorBuf::new();
         self.collect_binary_operands_for_indent(binary, &mut operands, &mut operators);
 
         if operands.len() <= 1 {

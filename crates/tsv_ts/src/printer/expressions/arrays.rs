@@ -9,7 +9,7 @@
 use crate::ast::internal::{self, Expression, LiteralValue};
 use crate::printer::calls::skip_stripped_open_paren;
 use crate::printer::{Printer, has_multiline_content};
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{comments_in_range, has_multiline_block_comments_in_range};
@@ -261,7 +261,7 @@ impl<'a> Printer<'a> {
     /// Delegates to the generic `has_own_line_block_comments_in_bracket_list` helper,
     /// filtering out holes (elisions) from the element list.
     fn has_own_line_block_comments_in_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
-        let non_null: Vec<_> = arr.elements.iter().flatten().collect();
+        let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
         self.has_own_line_block_comments_in_bracket_list(arr.span, &non_null, |e| e.span())
     }
 
