@@ -8,6 +8,7 @@ use super::{ChainPrinter, SymbolLookup};
 use crate::ast::internal;
 use crate::printer::{CommentSpacing, Printer, comments_in_range};
 use string_interner::DefaultSymbol;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment, Span};
 
@@ -119,7 +120,7 @@ impl<'a> ChainPrinter for Printer<'a> {
             return d.empty();
         }
 
-        let mut parts = Vec::with_capacity(comments.len() * 2);
+        let mut parts = DocBuf::with_capacity(comments.len() * 2);
         for comment in comments {
             // Space before comment (for inline trailing comments: `method() /* c */`)
             parts.push(d.text(" "));
@@ -137,7 +138,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         // Line comments in chains need special handling:
         // Use line_suffix_boundary + line_suffix to keep comment with preceding call
         // The boundary ensures the comment is flushed before the next softline
-        let mut parts = Vec::with_capacity(comments.len() + 1);
+        let mut parts = DocBuf::with_capacity(comments.len() + 1);
         for comment in comments {
             parts.push(self.build_trailing_line_comment_doc(comment));
         }
@@ -153,7 +154,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         }
 
         // Emit each comment on its own line (with hardline after each)
-        let mut parts = Vec::with_capacity(comments.len() * 2);
+        let mut parts = DocBuf::with_capacity(comments.len() * 2);
         for comment in comments {
             parts.push(self.build_comment_doc(comment));
             parts.push(d.hardline());
@@ -169,7 +170,7 @@ impl<'a> ChainPrinter for Printer<'a> {
 
         // Build line_suffix docs WITHOUT a trailing boundary.
         // The comments will stay deferred until the actual end of line.
-        let mut parts = Vec::with_capacity(comments.len());
+        let mut parts = DocBuf::with_capacity(comments.len());
         for comment in comments {
             parts.push(self.build_trailing_line_comment_doc(comment));
         }
@@ -195,7 +196,7 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in block_comments {
             match spacing {
                 CommentSpacing::Leading => {

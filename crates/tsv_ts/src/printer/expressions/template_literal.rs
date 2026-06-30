@@ -27,7 +27,7 @@ impl<'a> Printer<'a> {
         template: &crate::ast::internal::TemplateLiteral<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         parts.push(d.line_suffix_boundary());
         parts.push(d.text("`"));
 
@@ -194,7 +194,7 @@ impl<'a> Printer<'a> {
         if !has_newline {
             return d.text_owned(text.to_string());
         }
-        let mut doc_parts = Vec::new();
+        let mut doc_parts = DocBuf::new();
         for (i, part) in text.split('\n').enumerate() {
             if i > 0 {
                 doc_parts.push(d.literalline());
@@ -257,7 +257,7 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments {
             if is_leading {
                 // Leading comments: comment then separator
@@ -293,7 +293,7 @@ impl<'a> Printer<'a> {
         trailing_comments: &[&crate::ast::internal::Comment],
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Leading comments
         for comment in leading_comments {

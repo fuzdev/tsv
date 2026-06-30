@@ -52,7 +52,7 @@ impl<'a> Printer<'a> {
 
         // Build cases - they handle their own internal indentation
         // Join cases with hardlines, handling comments between cases
-        let mut case_parts = Vec::new();
+        let mut case_parts = DocBuf::new();
         // Start after the open brace to find comments between { and first case
         let brace_start = body_open_brace
             .unwrap_or_else(|| close_paren.map_or_else(|| stmt.discriminant.span().end, |p| p + 1));
@@ -186,7 +186,7 @@ impl<'a> Printer<'a> {
         inline_comment_boundary: u32,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // case X: or default:
         let case_label_end = self.get_case_label_end(case);
