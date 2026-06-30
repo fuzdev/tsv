@@ -144,14 +144,14 @@ Future features (unknown order):
 - type stripper (easy, probably soon)
 - module lexer (easy, probably soon)
 - minifier
-- LSP
 - later:
   - TypeScript 7 integration (the Go impl), unlocking:
     - svelte-check replacement
+    - LSP
     - linter - type aware, initially focused on serializable data-only plugins for extensibility
   - Svelte compiler (exact mirror, maybe out of scope, see [rsvelte](https://github.com/baseballyama/rsvelte))
   - bundling is probably out of scope 
-  - more? discussion welcome
+  - discussion welcome
 
 ## Docs
 
