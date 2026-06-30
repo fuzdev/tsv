@@ -379,6 +379,26 @@ Deno.test('inline_content_block_style: negative - empty-destructure brace spacin
 	assertEquals(match, null);
 });
 
+Deno.test('inline_content_block_style: positive - block body dropped to its own line', () => {
+	// prettier hugs the block body onto the head line; tsv drops it, leaving the
+	// `{#snippet …}` head alone on its own line. Whitespace-only.
+	const prettier = '{#snippet foo()}{#if x}<A />{/if}{/snippet}';
+	const ours = '{#snippet foo()}\n\t{#if x}<A />{/if}\n{/snippet}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: negative - block head not isolated (hugged in ours)', () => {
+	// A `{#if}` head that stays hugged inside an element on ours side is not a
+	// dropped-body signature (no head-alone line, no tag dangle).
+	const prettier = '<div>\n\t{#if c}text{/if}\n</div>';
+	const ours = '<div>{#if c}text{/if}</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
+
 Deno.test('inline_content_block_style: negative - content differs (safety gate blocks a real loss)', () => {
 	// Same block-style/dangle shape, but the text content itself differs — the
 	// whitespace-only gate fails so the detector can never absorb a content change.
@@ -430,6 +450,21 @@ Deno.test('single_specifier_import: negative - long non-import line (no import o
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('single_specifier_import', ctx);
 	assertEquals(match, null);
+});
+
+Deno.test('single_specifier_import: positive - cross-hunk split by a consecutive import', () => {
+	// A following import makes the LCS split the long inline line and ours' broken
+	// `import {` opener into separate hunks; path-keyed matching still claims it.
+	const longSpec = 'describe_identity_parity_cross_tests_with_a_long_enough_name_to_overflow';
+	const prettier =
+		`import { ${longSpec} } from './cross_backend/identity_parity.ts';\n` +
+		`import { create_specs, endpoints } from './spine.ts';`;
+	const ours =
+		`import {\n\t${longSpec}\n} from './cross_backend/identity_parity.ts';\n` +
+		`import { create_specs, endpoints } from './spine.ts';`;
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('single_specifier_import', ctx);
+	assertNotEquals(match, null);
 });
 
 Deno.test('single_specifier_import: negative - long import ours did NOT re-wrap', () => {

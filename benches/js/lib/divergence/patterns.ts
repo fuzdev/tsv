@@ -1108,23 +1108,49 @@ const single_specifier_import: DivergencePattern = {
 		// Imports are tab-indented when inside a Svelte `<script>` block, so allow
 		// leading tabs. The keyword form may carry `type` (`import type { … }`), so
 		// match `import` + any non-brace prefix before the opening `{`.
-		// Ours (broken) opens the specifier braces and ends the line on `{`; the
-		// specifier moves to the next line.
-		const import_open = /^\t*import\b[^{}]*\{\s*$/;
 		// Prettier (inline) keeps the whole single-specifier import on one line:
 		// `import { … } from '…';` — both braces present on the same line.
 		const import_inline = /^\t*import\b[^{}]*\{[^{}]*\}/;
+		// Ours (broken) ends the close line on the module path: `} from '…';`.
+		const import_close = /^\t*\}\s*from\s+['"][^'"]+['"]/;
+		const from_path = (l: string) => l.match(/from\s+(['"][^'"]+['"])/)?.[1] ?? null;
+
+		// The module paths of every single-specifier import prettier kept INLINE past
+		// print width — the divergence target. Keyed on the path (not on hunk
+		// alignment), because consecutive imports make the LCS split the long inline
+		// line and ours' broken close into separate hunks (so the original
+		// same-hunk `opener + long-line` predicate missed real files).
+		const long_inline_paths = new Set<string>();
+		for (const l of ctx.prettier_lines!) {
+			if (import_inline.test(l) && visual_width(l) > 100) {
+				const p = from_path(l);
+				if (p) long_inline_paths.add(p);
+			}
+		}
+		if (long_inline_paths.size === 0) return null;
+
+		// Ours-side re-wrap evidence — a long path only counts if OUR output actually
+		// BROKE it into the multiline form (a `} from '<path>';` close on its own
+		// line). An import ours merely edited in place (same single line, different
+		// path) has no such close, so it is never claimed.
+		const broken_paths = new Set<string>();
+		for (const l of ctx.ours_lines!) {
+			const p = import_close.test(l) ? from_path(l) : null;
+			if (p && long_inline_paths.has(p)) broken_paths.add(p);
+		}
+		if (broken_paths.size === 0) return null;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			// Added lines show multiline import (we break) — the broken opener.
-			const added_has_import = hunk.added_lines.some((l) => import_open.test(l));
-			// Removed lines show the single-line import (prettier keeps inline)
-			// exceeding print width — the ours-side re-wrap evidence is that OUR
-			// output broke this long line into the `import_open` opener above.
-			const removed_has_long_import = hunk.removed_lines.some(
-				(l) => import_inline.test(l) && visual_width(l) > 100,
+			// Prettier side: the long inline import itself.
+			const removed_long = hunk.removed_lines.some(
+				(l) =>
+					import_inline.test(l) && visual_width(l) > 100 && broken_paths.has(from_path(l) ?? ''),
 			);
-			return added_has_import && removed_has_long_import;
+			// Ours side: the broken close `} from '<same path>';`.
+			const added_break = hunk.added_lines.some(
+				(l) => import_close.test(l) && broken_paths.has(from_path(l) ?? ''),
+			);
+			return removed_long || added_break;
 		});
 
 		if (hunk_indices.length > 0) {
@@ -1545,30 +1571,40 @@ const inline_content_block_style: DivergencePattern = {
 		// in any hunk, unlike a width/property heuristic that only inspects one line.
 		if (strip_all_ws(ctx.ours) !== strip_all_ws(ctx.prettier)) return null;
 
-		// FAMILY SIGNATURE — confirm the reflow is a genuinely *dangled* tag delimiter
-		// (the block-style design choice), not some other whitespace-only difference.
-		// The signature on a CHANGED line is either a closing tag whose `>` moved off
-		// (`…</tag` at EOL, no `>`) or a `>` that moved to the start of a line (`>`
-		// alone, or prefixing the hugged content / next tag). These are produced only
-		// by relocating a tag delimiter across a line break. Other whitespace-only
-		// divergences keep every `>` in place and so carry NO such marker — verbatim
+		// FAMILY SIGNATURE — confirm the reflow is the block-style design choice, not
+		// some other whitespace-only difference. Two markers on a CHANGED line, both
+		// produced only by tsv keeping a construct intact and dropping its content to
+		// its own line:
+		//   - a *dangled* tag delimiter: a closing tag whose `>` moved off (`…</tag` at
+		//     EOL, no `>`) or a `>` that moved to the start of a line (`>` alone, or
+		//     prefixing the hugged content / next tag); or
+		//   - a *dropped block body*: a control-flow head (`{#if …}` / `{#each …}` /
+		//     `{#await …}` / `{#key …}` / `{#snippet …}`) sitting ALONE on one of OUR
+		//     lines, where prettier hugged the body onto the head line (the §Svelte:
+		//     Blocks uniform body-drop). Ours-side only, and "alone" — inside `<pre>`
+		//     the body stays hugged so ours never isolates the head, so this does not
+		//     reach the `<pre>` print-width case.
+		// Other whitespace-only divergences carry NEITHER marker — verbatim
 		// `format-ignore`, empty-destructure `{}` vs `{ }`, a moved attribute-list
 		// comment, a `<pre>` print-width attr wrap — and stay unclaimed for their own
 		// detector (broader open-tag / element-alone markers were tried and rejected:
-		// they false-match exactly those forms). tsv keeps `<tag>`/`</tag>` intact and
-		// drops the content to its own indented line; prettier pre-breaks the open tag
-		// and dangles the closing `>`. (A body-drop where prettier instead wraps an
-		// element's attributes — no `>` dangle — is the known uncovered remainder.)
-		const dangle_close = /<\/[A-Za-z][\w-]*[ \t]*$/; // `</tag` at EOL, `>` moved off
-		const dangle_open = /^[ \t]*>/; //                  `>` alone or prefixing a line
-		let has_dangle = false;
+		// they false-match exactly those forms). One body-drop variant stays uncovered:
+		// where prettier instead wraps an element's *attributes* (no `>` dangle and the
+		// head was never hugged), which has no safe marker distinct from those forms.
+		const dangle_close = /<\/[A-Za-z][\w-]*[ \t]*$/; //                  `</tag` at EOL
+		const dangle_open = /^[ \t]*>/; //                                  `>` starts a line
+		const block_head_alone = /^[ \t]*\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
+		let has_signature = false;
 		for (const hunk of ctx.hunks) {
-			if (hunk.removed_lines.concat(hunk.added_lines).some((l) => dangle_close.test(l) || dangle_open.test(l))) {
-				has_dangle = true;
+			if (
+				hunk.removed_lines.concat(hunk.added_lines).some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
+				hunk.added_lines.some((l) => block_head_alone.test(l))
+			) {
+				has_signature = true;
 				break;
 			}
 		}
-		if (!has_dangle) return null;
+		if (!has_signature) return null;
 
 		// The reflow is one content-preserving block-style relocation spanning the
 		// whole diff (the relocated content and the dangled delimiters land in
