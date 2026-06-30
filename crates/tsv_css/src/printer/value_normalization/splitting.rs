@@ -371,13 +371,19 @@ mod tests {
         // agrees (it keeps the VT inside the token), so this is a match, not a
         // divergence.
         assert_eq!(normalize_css_whitespace("u\u{000B}v"), "u\u{000B}v"); // VT preserved
-        assert_eq!(normalize_css_whitespace("u\u{000B}\u{000B}v"), "u\u{000B}\u{000B}v"); // not collapsed
+        assert_eq!(
+            normalize_css_whitespace("u\u{000B}\u{000B}v"),
+            "u\u{000B}\u{000B}v"
+        ); // not collapsed
 
         // Non-ASCII bails to the slow path (conservative), where it is preserved:
         // CSS whitespace is ASCII-only, so NBSP and other Unicode whitespace are
         // value content, not separators to collapse.
         assert_eq!(normalize_css_whitespace("a\u{00A0}b"), "a\u{00A0}b"); // NBSP preserved
-        assert_eq!(normalize_css_whitespace("a\u{00A0}\u{00A0}b"), "a\u{00A0}\u{00A0}b"); // not collapsed
+        assert_eq!(
+            normalize_css_whitespace("a\u{00A0}\u{00A0}b"),
+            "a\u{00A0}\u{00A0}b"
+        ); // not collapsed
         assert_eq!(normalize_css_whitespace("émotion"), "émotion"); // non-ws non-ASCII verbatim
     }
 
