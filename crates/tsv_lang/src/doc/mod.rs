@@ -264,7 +264,10 @@ mod arena_tests {
         // content in place, every continuation line picks up the enclosing
         // indent level via its hardline.
         let a = DocArena::new();
-        let doc = a.concat(&[a.text("parent"), a.indent(a.multiline_text("a\nb\nc".to_string()))]);
+        let doc = a.concat(&[
+            a.text("parent"),
+            a.indent(a.multiline_text("a\nb\nc".to_string())),
+        ]);
         assert_eq!(render_pw_tab(&a, doc, 80), "parenta\n\tb\n\tc");
     }
 
