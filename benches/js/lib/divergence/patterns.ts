@@ -206,6 +206,40 @@ function is_in_css_context(hunk: DiffHunk, ctx: DetectionContext): boolean {
 }
 
 /**
+ * Whether a hunk is a pure re-indent: ours and prettier carry the same lines in the
+ * same order, each differing only by leading whitespace (so no token can be lost),
+ * with at least one line's indentation actually changing. Indentation-only by
+ * construction, so claiming such a hunk can never mask a content change.
+ */
+function is_pure_reindent(hunk: DiffHunk): boolean {
+	const rem = hunk.removed_lines;
+	const add = hunk.added_lines;
+	if (rem.length === 0 || rem.length !== add.length) return false;
+	let any_change = false;
+	for (let i = 0; i < rem.length; i++) {
+		if (rem[i].replace(/^[ \t]*/, '') !== add[i].replace(/^[ \t]*/, '')) return false;
+		if (rem[i] !== add[i]) any_change = true;
+	}
+	return any_change;
+}
+
+/**
+ * Whether a pure-re-indent hunk is CSS *selector* content — at least one line is a
+ * list item (`…,`), a post-pseudo continuation (`):not(…)`), or a pseudo-class
+ * function (`:is(`/`:where(`/`:not(`/`:has(`). This is the §CSS: Selectors indent
+ * divergence (`compound_args_indent` / `nested_where_is`): tsv keys the extra indent
+ * on a real combinator while prettier keys it on a flat `nodes.length > 2` count, so
+ * a nested pseudo's argument list sits one level shallower under tsv.
+ */
+function is_pure_selector_reindent(hunk: DiffHunk): boolean {
+	if (!is_pure_reindent(hunk)) return false;
+	return hunk.removed_lines.some((l) => {
+		const t = l.replace(/^[ \t]*/, '');
+		return /,$/.test(t) || /^\)[:.\w]/.test(t) || /:(?:is|where|not|has|matches|any)\(/.test(t);
+	});
+}
+
+/**
  * Extract comment text content from a line (strip delimiters and whitespace).
  * Returns only the comment token's text, stripping any code that precedes the
  * comment delimiter. Returns `''` when the line has no comment delimiter — the
@@ -330,6 +364,17 @@ function lines_begin_same_element(a: string, b: string): boolean {
 	if (a === b) return true;
 	const [short, long] = a.length <= b.length ? [a, b] : [b, a];
 	return short.length >= 3 && long.startsWith(short);
+}
+
+/**
+ * Strip ALL whitespace from a string. Used as a content-preservation gate: when
+ * `strip_all_ws(ours) === strip_all_ws(prettier)` the entire ours/prettier
+ * difference is whitespace-only, so the divergence is provably a pure-layout
+ * reflow with no content loss — a single non-whitespace difference anywhere
+ * fails the gate and disables the detector (so it can never mask a real loss).
+ */
+function strip_all_ws(s: string): string {
+	return s.replace(/\s+/g, '');
 }
 
 // ─── Pattern Detectors ──────────────────────────────────────────────────────
@@ -763,12 +808,19 @@ const css_selector_divergence: DivergencePattern = {
 	fixtures: [
 		'css/selectors/combinators/column_prettier_divergence',
 		'css/selectors/pseudo_class/nth_child_prettier_divergence',
+		'css/selectors/pseudo_class/compound_args_indent_long_prettier_divergence',
+		'css/selectors/pseudo_class/nested_where_is_long_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			if (!is_in_css_context(hunk, ctx)) return false;
+
+			// Pseudo-args indent: tsv keys the extra indent on a real combinator, not
+			// prettier's `nodes.length > 2` count, so a nested pseudo's argument list
+			// (`:is(…)` inside `:where(…)`) sits one level shallower — a pure re-indent.
+			if (is_pure_selector_reindent(hunk)) return true;
 
 			// Column combinator: || with/without spaces in CSS selectors
 			const removed_has_compact = hunk.removed_lines.some((l) => /\w\|\|\w/.test(l) && /{/.test(l));
@@ -1434,6 +1486,103 @@ const short_expr_100: DivergencePattern = {
 	},
 };
 
+const annotation_continuation_indent: DivergencePattern = {
+	id: 'annotation_continuation_indent',
+	description:
+		'tsv indents a `: Type` annotation continuation one level when a line comment trails the colon; prettier keeps the type flush',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['Uniform Forced-Continuation Indent', 'Comment Position Philosophy'],
+	fixtures: ['typescript/types/comments/annotation_continuation_indent_prettier_divergence'],
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+		const ours_lines = ctx.ours_lines!;
+
+		// A `:` immediately after an annotation target (identifier / `)` / `]` / `}` /
+		// `>`) carrying a trailing line comment — the colon→type continuation that tsv
+		// drops to its own line indented one level (the shared `build_type_annotation_doc`
+		// rule), where prettier keeps the type flush. A line-leading `:` (a ternary
+		// branch) is excluded by requiring a preceding word/closer. The continuation
+		// itself is a pure re-indent (indentation-only), so no content can be lost.
+		const annotation_colon_comment = /[\w)\]}>][ \t]*:[ \t]*\/\//;
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			if (!is_pure_reindent(hunk)) return false;
+			const start = hunk.ours_range?.start;
+			if (start == null || start === 0) return false;
+			return annotation_colon_comment.test(ours_lines[start - 1] ?? '');
+		});
+
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'annotation_continuation_indent',
+			confidence: 'likely',
+			hunk_indices,
+			reason: 'colon→type annotation continuation indents one level after a trailing line comment',
+		};
+	},
+};
+
+const inline_content_block_style: DivergencePattern = {
+	id: 'inline_content_block_style',
+	description:
+		'tsv lays out inline element/block content block-style (tags intact, content on its own line); prettier dangles the tag delimiters / hugs the content',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Inline content block-style', 'Svelte: Blocks'],
+	fixtures: [
+		'svelte/elements/inline_sibling_gt_dangle_prettier_divergence',
+		'svelte/elements/block_body_drop_nested_siblings_prettier_divergence',
+		'svelte/elements/block_multiline_attrs_content_hug_prettier_divergence',
+		'svelte/elements/inline_if_sibling_fill_long_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// SAFETY GATE — the whole ours/prettier difference is whitespace-only, so no
+		// content can be lost: this is provably a pure-layout reflow. A single
+		// non-whitespace difference anywhere (a dropped comment, a normalized quote, a
+		// real content change) fails the gate and disables the detector, so it can
+		// never mask a content loss. This content-preservation proof is also what
+		// makes claiming the whole diff below sound: there is provably nothing hidden
+		// in any hunk, unlike a width/property heuristic that only inspects one line.
+		if (strip_all_ws(ctx.ours) !== strip_all_ws(ctx.prettier)) return null;
+
+		// FAMILY SIGNATURE — confirm the reflow is a genuinely *dangled* tag delimiter
+		// (the block-style design choice), not some other whitespace-only difference.
+		// The signature on a CHANGED line is either a closing tag whose `>` moved off
+		// (`…</tag` at EOL, no `>`) or a `>` that moved to the start of a line (`>`
+		// alone, or prefixing the hugged content / next tag). These are produced only
+		// by relocating a tag delimiter across a line break. Other whitespace-only
+		// divergences keep every `>` in place and so carry NO such marker — verbatim
+		// `format-ignore`, empty-destructure `{}` vs `{ }`, a moved attribute-list
+		// comment, a `<pre>` print-width attr wrap — and stay unclaimed for their own
+		// detector (broader open-tag / element-alone markers were tried and rejected:
+		// they false-match exactly those forms). tsv keeps `<tag>`/`</tag>` intact and
+		// drops the content to its own indented line; prettier pre-breaks the open tag
+		// and dangles the closing `>`. (A body-drop where prettier instead wraps an
+		// element's attributes — no `>` dangle — is the known uncovered remainder.)
+		const dangle_close = /<\/[A-Za-z][\w-]*[ \t]*$/; // `</tag` at EOL, `>` moved off
+		const dangle_open = /^[ \t]*>/; //                  `>` alone or prefixing a line
+		let has_dangle = false;
+		for (const hunk of ctx.hunks) {
+			if (hunk.removed_lines.concat(hunk.added_lines).some((l) => dangle_close.test(l) || dangle_open.test(l))) {
+				has_dangle = true;
+				break;
+			}
+		}
+		if (!has_dangle) return null;
+
+		// The reflow is one content-preserving block-style relocation spanning the
+		// whole diff (the relocated content and the dangled delimiters land in
+		// separate, sometimes non-adjacent hunks), so claim every hunk.
+		return {
+			pattern: 'inline_content_block_style',
+			confidence: 'likely',
+			hunk_indices: ctx.hunks.map((h) => h.index),
+			reason:
+				'inline/block content laid out block-style (tags intact, content on its own line); prettier dangles the tag delimiters',
+		};
+	},
+};
+
 // ─── Broad patterns (run last) ──────────────────────────────────────────────
 
 const css_value_wrap: DivergencePattern = {
@@ -2069,10 +2218,12 @@ export const PATTERNS: DivergencePattern[] = [
 	return_type_generic_union,
 	non_null_paren_base,
 	tabs_only_alignment,
+	annotation_continuation_indent,
 
 	// 4. Svelte-specific patterns
 	menu_block,
 	inline_content_hug,
+	inline_content_block_style,
 	fill_after_inline,
 	block_multiline_attrs_hug,
 	short_expr_100,
