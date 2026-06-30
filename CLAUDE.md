@@ -174,7 +174,7 @@ deno task fixtures:update            # regenerate expected.json + output_prettie
 deno task fixtures:update:parsed     # regenerate expected.json only (run when parser changes)
 deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
-deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves + no stray READMEs on matching fixtures (gated in `deno task check`)
+deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves + each divergence README back-links its sanctioning doc + no stray READMEs on matching fixtures (gated in `deno task check`)
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 ```
@@ -668,11 +668,16 @@ cargo run -p tsv_debug ts_fixture_audit [pattern...]
 #      every fixture README resolves on disk. The reverse direction of (1): a link to a
 #      renamed/demoted/deleted fixture, or a back-link with the wrong ../ depth or stale anchor,
 #      is otherwise invisible (the orphan check only proves live-fixture → mentioned-in-doc).
-#  (3) Stray READMEs - a non-divergence fixture (matches both tools) shouldn't carry a README;
+#  (3) Missing back-links - every divergence fixture's README must *contain* a link resolving to
+#      its sanctioning doc (_prettier_divergence → conformance_prettier.md, _svelte_divergence →
+#      conformance_svelte.md, both for the combined suffix). (1)+(2) prove the doc catalogs the
+#      fixture and that any link present resolves, but neither requires the back-link to exist — a
+#      README omitting it passes both. A missing README entirely is the validator's D1 rule.
+#  (4) Stray READMEs - a non-divergence fixture (matches both tools) shouldn't carry a README;
 #      deliberate exceptions live in the in-code ALLOWED_NONDIVERGENCE_READMES allowlist.
 # Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.
 cargo run -p tsv_debug conformance_audit
-# Also: --json (machine-readable: {orphans, dead_links, stray_readmes})
+# Also: --json (machine-readable: {orphans, dead_links, missing_backlinks, stray_readmes})
 ```
 
 > **Troubleshooting:** See ./docs/fixture_overview.md#quick-decision-tree

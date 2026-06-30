@@ -20,7 +20,8 @@ The non-async generic arrows (first three test cases) parse correctly — only t
 `async` + type parameter combination triggers the bug. **tsv** correctly includes the
 parameters (`expected_ours.json`; `expected_svelte.json` captures Svelte's dropped-param AST).
 
-**Upstream**: acorn-typescript — bug in async arrow parsing when type parameters are present.
+**Upstream**: acorn-typescript — bug in async arrow parsing when type parameters are present. See
+[conformance_svelte.md](../../../../../../docs/conformance_svelte.md) §TypeScript Corrections.
 
 ## 2. Formatter (Prettier) — forced trailing comma
 
