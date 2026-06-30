@@ -635,9 +635,16 @@ pub struct ConditionQuery<'arena> {
 /// `not`-prefixed or function-style like `selector(...)`).
 #[derive(Debug, Clone)]
 pub struct ConditionPart<'arena> {
-    /// The connector before this part (None for first part)
+    /// The connector before this part (None for first part). Normalized to the
+    /// `And`/`Or` enum for logic (comment-split, presence); the original source
+    /// **case** is carried separately in `connector_raw` for output.
     pub connector: Option<ConditionConnector>,
-    /// The condition content (e.g., "(display: grid)" or "not (color: red)")
+    /// The connector's verbatim source text (`and`/`AND`/`Or`/…), emitted by the
+    /// printer so the author's case is preserved (matching prettier). `Some` iff
+    /// `connector` is `Some`.
+    pub connector_raw: Option<&'arena str>,
+    /// The condition content (e.g., "(display: grid)" or "not (color: red)"). A
+    /// leading `not` keeps its source case (preserved like the connectors).
     pub content: &'arena str,
     pub span: Span,
 }

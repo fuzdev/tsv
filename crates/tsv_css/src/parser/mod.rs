@@ -1,6 +1,7 @@
 // CSS parser - parse CSS content from <style> tags
 
 mod atrules;
+pub(crate) use atrules::is_keyframes_atrule;
 mod attributes;
 mod declarations;
 mod pseudo;

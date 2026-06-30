@@ -55,6 +55,10 @@ pub(crate) struct Printer<'a> {
     pub(crate) comments: &'a [Comment],
     /// Precomputed line break positions for O(log n) line boundary lookups
     pub(crate) line_breaks: &'a [u32],
+    /// True while printing the body of an `@keyframes` block, so the `from`/`to`
+    /// keyframe-selector keywords can be lowercased (they're case-insensitive
+    /// keywords there; outside keyframes a `from`/`to` type selector is preserved).
+    pub(crate) in_keyframes: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -90,6 +94,7 @@ impl<'a> Printer<'a> {
             source,
             comments,
             line_breaks,
+            in_keyframes: false,
         }
     }
 

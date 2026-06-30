@@ -1,4 +1,4 @@
-use super::{CssParser, is_boolean_operator};
+use super::{CssParser, is_boolean_operator, is_boolean_operator_keyword};
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::selectors::parse_complex_selector_list;
@@ -25,6 +25,9 @@ pub(super) fn parse_condition_query<'arena>(
     let start = parser.base_offset() + parser.current_start;
     let mut parts = parser.bvec();
     let mut current_connector: Option<ConditionConnector> = None;
+    // The connector's verbatim source text, kept so the printer can preserve the
+    // author's case (`AND` stays `AND`); set in lockstep with `current_connector`.
+    let mut current_connector_raw: Option<&'arena str> = None;
     let mut end_pos = start;
 
     while !parser.check(TokenKind::LeftBrace)
@@ -41,17 +44,25 @@ pub(super) fn parse_condition_query<'arena>(
             parser.skip_whitespace()?;
         }
 
-        // Check for `and`/`or` connector
+        // Check for `and`/`or` connector. CSS grammar keywords are ASCII
+        // case-insensitive (CSS Syntax 3), so `AND`/`Or` connect like `and`; the
+        // enum normalizes for logic but the source case is kept in `connector_raw`
+        // and preserved by the printer (matching prettier).
         if parser.check(TokenKind::Identifier) {
             let ident = parser.current_identifier();
 
-            if ident == "and" || ident == "or" {
+            let connector = if ident.eq_ignore_ascii_case("and") {
+                Some(ConditionConnector::And)
+            } else if ident.eq_ignore_ascii_case("or") {
+                Some(ConditionConnector::Or)
+            } else {
+                None
+            };
+
+            if let Some(conn) = connector {
                 // This is a connector between parts
-                current_connector = Some(if ident == "and" {
-                    ConditionConnector::And
-                } else {
-                    ConditionConnector::Or
-                });
+                current_connector = Some(conn);
+                current_connector_raw = Some(parser.alloc_str_in(parser.current_value()));
                 parser.advance()?;
                 // Register comments after connector (e.g., `and /* comment */ (b)`)
                 parser.skip_whitespace()?;
@@ -70,11 +81,12 @@ pub(super) fn parse_condition_query<'arena>(
         let mut part_content = Vec::new();
         let mut paren_depth: usize = 0;
 
-        // Check for leading `not`
+        // Check for leading `not` (ASCII case-insensitive). Its source case is kept
+        // (pushed verbatim), preserved by the printer like the `and`/`or` connectors.
         if parser.check(TokenKind::Identifier) {
             let ident = parser.current_identifier();
-            if ident == "not" {
-                part_content.push("not".to_string());
+            if ident.eq_ignore_ascii_case("not") {
+                part_content.push(parser.current_value().to_string());
                 parser.advance()?;
                 parser.skip_whitespace()?;
                 // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
@@ -175,7 +187,7 @@ pub(super) fn parse_condition_query<'arena>(
             // Match on the decoded value, not the now-verbatim `part`, so an escaped
             // operator still spaces correctly.
             let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
-                && matches!(parser.current_identifier(), "and" | "or" | "not");
+                && is_boolean_operator_keyword(parser.current_identifier());
 
             // Add space before boolean operators if not preceded by whitespace — but
             // not right after an opening paren (`(not (…))` keeps the paren tight,
@@ -241,6 +253,7 @@ pub(super) fn parse_condition_query<'arena>(
         if !content.is_empty() {
             parts.push(ConditionPart {
                 connector: current_connector.take(),
+                connector_raw: current_connector_raw.take(),
                 content: parser.alloc_str_in(content),
                 span: Span {
                     start: part_start as u32,
@@ -285,7 +298,7 @@ pub(super) fn parse_container_prelude<'arena>(
     // survive (`\@named` stays `\@named`).
     let container_name = if parser.check(TokenKind::Identifier)
         && parser.source.get(parser.current_end..=parser.current_end) != Some("(")
-        && !matches!(parser.current_identifier(), "not" | "and" | "or")
+        && !is_boolean_operator_keyword(parser.current_identifier())
     {
         // Copy into the arena only on the path that stores the name as a node.
         let name = parser.alloc_str_in(parser.current_value());
@@ -347,7 +360,9 @@ pub(super) fn parse_scope_prelude<'arena>(
     parser.skip_whitespace()?;
     let (limit, end_pos) = if parser.check(TokenKind::Identifier) {
         let identifier = parser.current_identifier();
-        if identifier == "to" {
+        // `to` is a case-insensitive grammar keyword; canonicalized to lowercase
+        // at the printer (the `" to ("` literal in `print_css_atrule`).
+        if identifier.eq_ignore_ascii_case("to") {
             parser.advance()?; // consume "to"
             parser.skip_whitespace()?;
 

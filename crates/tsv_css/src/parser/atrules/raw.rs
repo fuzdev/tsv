@@ -161,8 +161,12 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             // Check if we already have a trailing space (from programmatic insertion or whitespace token)
             let has_trailing_space = prelude_parts.last().is_some_and(|s| s == " ");
 
-            // Add space before comments or boolean operators if not already preceded by space
-            if (is_comment || is_bool_op) && !has_trailing_space {
+            // Add space before comments or boolean operators if not already preceded
+            // by space — but not for a boolean operator right after `(`: `(not …)`
+            // stays tight (matching prettier and the structured @supports/@container
+            // path's same `not`-after-`(` suppression).
+            let after_open_paren = last_non_whitespace_kind == Some(TokenKind::LeftParen);
+            if (is_comment || (is_bool_op && !after_open_paren)) && !has_trailing_space {
                 prelude_parts.push(" ".to_string());
             }
 
