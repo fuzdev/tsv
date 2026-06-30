@@ -106,7 +106,10 @@ impl<'a> Printer<'a> {
         leading_space: bool,
     ) -> DocId {
         let d = self.d();
-        let sp = if leading_space { " " } else { "" };
+        // `=>` with the optional leading space, as static text — the leading-space
+        // flag selects among four fixed strings, so no per-call String alloc.
+        let arrow = if leading_space { " =>" } else { "=>" };
+        let arrow_sp = if leading_space { " => " } else { "=> " };
         // Comments between `=>` and the return type (e.g., `() => /* c */ string`)
         // For function types, the annotation span starts at `=` in `=>`
         let arrow_end = return_type.span.start + "=>".len() as u32;
@@ -122,7 +125,7 @@ impl<'a> Printer<'a> {
         if let TSType::Union(u) = value_type {
             let type_doc = self.build_union_type_doc(u);
             return d.concat(&[
-                d.text_owned(format!("{sp}=>")),
+                d.text(arrow),
                 hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
             ]);
         }
@@ -130,7 +133,7 @@ impl<'a> Printer<'a> {
             // Intersections use trailing `&` - first type NOT indented, continuations indented
             let type_doc = self.build_intersection_type_doc(i, false);
             return d.concat(&[
-                d.text_owned(format!("{sp}=> ")),
+                d.text(arrow_sp),
                 comments_doc,
                 d.group(d.indent(type_doc)),
             ]);
@@ -146,10 +149,10 @@ impl<'a> Printer<'a> {
                 // Use build_type_doc_inner with wrap_type_args=true to enable
                 // wrapping inside the type reference's type arguments
                 let type_doc = self.build_type_doc_inner(return_type.type_annotation, true);
-                d.concat(&[d.text_owned(format!("{sp}=> ")), comments_doc, type_doc])
+                d.concat(&[d.text(arrow_sp), comments_doc, type_doc])
             }
             _ => d.concat(&[
-                d.text_owned(format!("{sp}=> ")),
+                d.text(arrow_sp),
                 comments_doc,
                 self.build_type_doc(return_type.type_annotation),
             ]),

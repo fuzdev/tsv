@@ -6,9 +6,15 @@
 
 use super::Printer;
 use crate::ast::internal;
+use smallvec::SmallVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing;
+
+/// Stack buffer for a block comment's split lines — inline up to 16 (covers the
+/// common JSDoc/TSDoc) before spilling, so most multi-line comments split with
+/// no heap allocation.
+type CommentLines<'s> = SmallVec<[&'s str; 16]>;
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a single comment
@@ -61,7 +67,7 @@ impl<'a> Printer<'a> {
     fn build_indentable_block_comment_doc(&self, content: &str) -> DocId {
         let d = self.d();
         // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
-        let lines: Vec<&str> = content.split('\n').collect();
+        let lines: CommentLines<'_> = content.split('\n').collect();
         #[allow(clippy::unreachable)] // content has a newline ⇒ split yields ≥2 lines
         let [first, middle @ .., last] = lines.as_slice() else {
             unreachable!("multi-line comment");
@@ -98,7 +104,7 @@ impl<'a> Printer<'a> {
         let use_context_indent = content.starts_with('*') || stripped.len() != content.len();
 
         // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
-        let lines: Vec<&str> = stripped.split('\n').collect();
+        let lines: CommentLines<'_> = stripped.split('\n').collect();
         #[allow(clippy::unreachable)] // stripped retains the newline ⇒ split yields ≥2 lines
         let [first, middle @ .., last] = lines.as_slice() else {
             unreachable!("multi-line comment");
