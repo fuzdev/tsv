@@ -289,7 +289,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let expr_start = self.current_pos().0;
 
         // Parse prefix expression (primary or unary)
-        let mut left = self.parse_prefix_expression_with_end()?;
+        let mut left = self.parse_prefix_expression()?;
 
         // Parse infix operators and TypeScript type assertions (as/satisfies)
         // Binary operators have higher precedence than as/satisfies, so we check binary first.
@@ -502,7 +502,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse prefix expression returning ParsedExpr with actual end position
-    fn parse_prefix_expression_with_end(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_prefix_expression(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
         let parsed = match self.current_kind() {
             TokenKind::Minus | TokenKind::Plus | TokenKind::Bang | TokenKind::Tilde => {
                 let expr = self.parse_unary_expression()?;
@@ -572,7 +572,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         ParsedExpr::from_expr(self.arena, expr)
                     } else {
                         // `async(2)` — call to function named `async`
-                        self.parse_primary_expression_with_end()?
+                        self.parse_primary_expression()?
                     }
                 } else if matches!(peek, TokenKind::Identifier | TokenKind::LessThan) {
                     // Async arrow function: `async x => ...` or `async <T>() => ...`
@@ -582,7 +582,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     ParsedExpr::from_expr(self.arena, expr)
                 } else {
                     // `async` used as identifier (e.g., `[async]`, `async = 1`)
-                    self.parse_primary_expression_with_end()?
+                    self.parse_primary_expression()?
                 }
             }
             TokenKind::At => {
@@ -620,10 +620,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     ParsedExpr::from_expr(self.arena, expr)
                 } else {
                     // Regular identifier
-                    self.parse_primary_expression_with_end()?
+                    self.parse_primary_expression()?
                 }
             }
-            _ => self.parse_primary_expression_with_end()?,
+            _ => self.parse_primary_expression()?,
         };
 
         // An unparenthesized arrow function is a complete AssignmentExpression —
@@ -1034,7 +1034,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse the primary atom of an `extends` clause (acorn's `parseExprAtom` with
-    /// `canBeArrow = false`). `parse_primary_expression_with_end` covers identifiers,
+    /// `canBeArrow = false`). `parse_primary_expression` covers identifiers,
     /// literals, parens, arrays, objects, templates, `this`/`super`, and regex; the
     /// keyword-led expression atoms (`new`, `class`, `function`, `async function`,
     /// `import`) sit above the primary layer and are dispatched here.
@@ -1071,7 +1071,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.parse_import_or_meta_property()?,
             )),
             _ => {
-                let parsed = self.parse_primary_expression_with_end()?;
+                let parsed = self.parse_primary_expression()?;
                 // Reject a top-level (unparenthesized) arrow: `class C extends (a) => b {}`.
                 // acorn parses the heritage atom with `canBeArrow = false`, so an outer
                 // arrow isn't a valid superclass. A *parenthesized* arrow
@@ -1156,7 +1156,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse primary expression returning ParsedExpr with actual end position
-    fn parse_primary_expression_with_end(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_primary_expression(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
         match self.current_kind() {
             TokenKind::Number => {
                 let literal = self.parse_number_or_bigint_literal()?;
@@ -1253,7 +1253,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::ParenOpen => {
                 // Could be: arrow function `() => ...` or parenthesized expression `(expr)`
-                self.parse_paren_expression_with_end()
+                self.parse_paren_expression()
             }
             TokenKind::DotDotDot => Ok(ParsedExpr::from_expr(self.arena,self.parse_spread_element()?)),
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
@@ -1381,7 +1381,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Grouped expression: `(expr)`
     ///
     /// Uses lookahead to detect arrow functions by scanning for `=>` after `)`.
-    fn parse_paren_expression_with_end(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_paren_expression(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
         // Check if this looks like an arrow function by scanning ahead
         if self.is_arrow_function_start() {
             return Ok(ParsedExpr::from_expr(
@@ -1812,7 +1812,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 _ => {
                     // We use primary + postfix parsing but stop before call expressions
-                    self.parse_primary_expression_with_end()?
+                    self.parse_primary_expression()?
                 }
             }
         };
