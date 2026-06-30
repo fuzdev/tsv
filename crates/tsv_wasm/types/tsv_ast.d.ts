@@ -1030,7 +1030,8 @@ export type ExportDefaultValue =
 	| Expression
 	| FunctionDeclaration
 	| TSDeclareFunction
-	| ClassDeclaration;
+	| ClassDeclaration
+	| TSInterfaceDeclaration;
 
 /**
  * A module export name: a bare `Identifier` or a string `Literal`. Per ecma262

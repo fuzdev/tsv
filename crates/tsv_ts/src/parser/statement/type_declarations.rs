@@ -113,6 +113,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
         declare: bool,
     ) -> Result<Statement<'arena>, ParseError> {
+        Ok(Statement::TSInterfaceDeclaration(
+            self.parse_interface_declaration_struct(start, declare)?,
+        ))
+    }
+
+    /// Parse an interface declaration into its struct, without wrapping in
+    /// `Statement` — reused by `export default interface Foo {}`, where the
+    /// interface is an `ExportDefaultValue` rather than a top-level statement.
+    pub(super) fn parse_interface_declaration_struct(
+        &mut self,
+        start: usize,
+        declare: bool,
+    ) -> Result<TSInterfaceDeclaration<'arena>, ParseError> {
         // Consume 'interface' contextual keyword
         debug_assert!(self.current_value() == "interface");
         self.advance()?;
@@ -144,14 +157,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let body = self.parse_interface_body()?;
         let end = body.span.end;
 
-        Ok(Statement::TSInterfaceDeclaration(TSInterfaceDeclaration {
+        Ok(TSInterfaceDeclaration {
             id,
             type_parameters,
             extends,
             body,
             declare,
             span: Span::new(start as u32, end),
-        }))
+        })
     }
 
     /// Parse interface heritage list: `Foo, Bar<T>`
@@ -262,7 +275,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::Identifier if self.current_value() == "global" => {
                 // declare global { }
-                self.parse_declare_global(start)
+                self.parse_global_declaration(start, true)
             }
             _ => Err(self.error_expected_after(
                 "'function', 'class', 'enum', 'const', 'let', 'var', 'namespace', 'module', 'interface', 'type', or 'global'",
@@ -676,7 +689,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse declare global: `declare global { ... }`
-    fn parse_declare_global(&mut self, start: usize) -> Result<Statement<'arena>, ParseError> {
+    /// Parse a global augmentation: `global { … }`.
+    ///
+    /// `declare` is `true` for `declare global { }` and `false` for a bare
+    /// `global { }` (top-level, or implicitly-ambient inside a `declare module`,
+    /// where acorn omits the `declare` field). `start` is the keyword position
+    /// the span begins at (`declare` for the declared form, `global` for the bare
+    /// form). The body is parsed in ambient context when `declare` is set; a bare
+    /// `global` nested in an already-ambient module keeps that context via
+    /// `parse_module_block`'s save/restore.
+    pub(super) fn parse_global_declaration(
+        &mut self,
+        start: usize,
+        declare: bool,
+    ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'global' keyword
         debug_assert!(self.current_value() == "global");
         let (global_start, global_end) = self.current_pos();
@@ -689,13 +715,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
 
         // Parse body
-        let block = self.parse_module_block(true)?;
+        let block = self.parse_module_block(declare)?;
         let end = module_body_end(&block);
 
         Ok(Statement::TSModuleDeclaration(TSModuleDeclaration {
             id,
             body: Some(block),
-            declare: true,
+            declare,
             kind: TSModuleDeclarationKind::Module, // TypeScript uses module kind for global
             global: true,
             span: Span::new(start as u32, end),

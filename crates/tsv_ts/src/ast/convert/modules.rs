@@ -4,7 +4,7 @@ use super::super::{internal, public};
 use super::types::convert_declare_function;
 use super::{
     Schema, bigint_to_decimal, convert_block_statement, convert_class_declaration,
-    convert_expression, convert_identifier, convert_type_annotation,
+    convert_expression, convert_identifier, convert_interface_declaration, convert_type_annotation,
     convert_type_parameter_declaration, create_location, json_number_from_f64,
 };
 use std::borrow::Cow;
@@ -166,6 +166,11 @@ pub(in crate::ast) fn convert_export_default_value<'src>(
         internal::ExportDefaultValue::ClassDeclaration(class) => {
             public::ExportDefaultValue::ClassDeclaration(convert_class_declaration_local(
                 class, source, loc, interner, offset,
+            ))
+        }
+        internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => {
+            public::ExportDefaultValue::TSInterfaceDeclaration(convert_interface_declaration(
+                iface, source, loc, interner, offset,
             ))
         }
     }

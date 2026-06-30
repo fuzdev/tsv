@@ -151,20 +151,7 @@ impl Translator<'_> {
                 self.type_parameter_declaration_opt(n.type_parameters.as_mut());
                 self.ts_type(&mut n.type_annotation);
             }
-            Statement::TSInterfaceDeclaration(n) => {
-                span!(self, n);
-                self.identifier(&mut n.id);
-                self.type_parameter_declaration_opt(n.type_parameters.as_mut());
-                for h in &mut n.extends {
-                    span!(self, h);
-                    self.entity_name(&mut h.expression);
-                    self.type_parameter_instantiation_opt(h.type_parameters.as_mut());
-                }
-                span!(self, n.body);
-                for m in &mut n.body.body {
-                    self.type_element(m);
-                }
-            }
+            Statement::TSInterfaceDeclaration(n) => self.interface_declaration(n),
             Statement::TSDeclareFunction(n) => self.declare_function(n),
             Statement::TSEnumDeclaration(n) => {
                 span!(self, n);
@@ -212,6 +199,7 @@ impl Translator<'_> {
                     ExportDefaultValue::FunctionDeclaration(f) => self.function_declaration(f),
                     ExportDefaultValue::TSDeclareFunction(f) => self.declare_function(f),
                     ExportDefaultValue::ClassDeclaration(c) => self.class_declaration(c),
+                    ExportDefaultValue::TSInterfaceDeclaration(i) => self.interface_declaration(i),
                 }
             }
             Statement::ExportAllDeclaration(n) => {
@@ -397,6 +385,21 @@ impl Translator<'_> {
             self.expression(p);
         }
         self.type_annotation_opt(n.return_type.as_mut());
+    }
+
+    fn interface_declaration(&self, n: &mut TSInterfaceDeclaration<'_>) {
+        span!(self, n);
+        self.identifier(&mut n.id);
+        self.type_parameter_declaration_opt(n.type_parameters.as_mut());
+        for h in &mut n.extends {
+            span!(self, h);
+            self.entity_name(&mut h.expression);
+            self.type_parameter_instantiation_opt(h.type_parameters.as_mut());
+        }
+        span!(self, n.body);
+        for m in &mut n.body.body {
+            self.type_element(m);
+        }
     }
 
     fn module_declaration(&self, n: &mut TSModuleDeclaration<'_>) {

@@ -70,6 +70,14 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		// `export default interface` — the TSInterfaceDeclaration member of the
+		// ExportDefaultValue union.
+		name: 'ts_export_default_interface',
+		source: 'export default interface A {\n\ta: string;\n}',
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		// Import attributes: bare `Identifier` key and quoted `Literal` key
 		// (the `key: Identifier | Literal` union), on import + both re-export hosts.
 		name: 'ts_import_attributes',

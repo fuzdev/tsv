@@ -218,6 +218,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 {
                     return self.parse_module_declaration(false, false);
                 }
+                // Bare global augmentation: `global { … }` (no `declare`), at the
+                // top level or nested in a `declare module`. Unlike namespace/module,
+                // acorn imposes NO same-line rule — `global` followed by `{` (even
+                // across a line break) is a `TSModuleDeclaration{global:true}`; only
+                // the `{` disambiguates it from `global` as an identifier
+                // (`global.x`, `global = …`). declare is false (acorn omits it).
+                // peek_kind() skips comments.
+                if self.current_value() == "global" && self.peek_kind() == TokenKind::BraceOpen {
+                    let start = self.current_pos().0;
+                    return self.parse_global_declaration(start, false);
+                }
                 // Check for labeled statement: `label: statement`
                 // peek_kind() skips comments: `label /* c */: statement`
                 if self.peek_kind() == TokenKind::Colon {
