@@ -402,7 +402,7 @@ pub(crate) fn build_args_split_last(
     // untyped / comment-free, and `skip_arrow_chain` keeps the expand-last-arg hug
     // states on the default path). Mirrors prettier's `isCallLikeExpression(parent)`
     // reaching `printArrowFunctionSignatures`.
-    let arg_docs: Vec<_> = arguments
+    let arg_docs: DocBuf = arguments
         .iter()
         .map(|arg| {
             if is_curried_arrow_chain(arg) {

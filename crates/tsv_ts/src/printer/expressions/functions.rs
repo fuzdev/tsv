@@ -739,7 +739,7 @@ impl<'a> Printer<'a> {
             return d.group(inner);
         }
 
-        let param_docs: Vec<_> = decl
+        let param_docs: DocBuf = decl
             .params
             .iter()
             .map(|param| self.build_type_parameter_doc(param))
