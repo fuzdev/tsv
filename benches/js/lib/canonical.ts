@@ -4,6 +4,7 @@
  * Uses the same approach as tsv_debug's Deno sidecar for consistency.
  */
 
+import { extname } from 'node:path';
 import {
 	type Language,
 	LANGUAGE_EXTENSIONS,
@@ -121,10 +122,29 @@ export class CanonicalImplementation implements TsvImplementation {
 		return this.#parse_fns[language](source);
 	}
 
-	async format_async(source: string, language: Language): Promise<string> {
+	async format_async(
+		source: string,
+		language: Language,
+		source_path?: string,
+	): Promise<string> {
 		if (!this.#prettier_svelte) throw new Error('Prettier Svelte plugin not initialized');
 
 		const plugins = language === 'svelte' ? [this.#prettier_svelte] : [];
+
+		// Real prettier keys its parser off the file extension. The corpus collapses `.js`
+		// and `.ts` into one `typescript` Language (tsv formats both through its TS path), but
+		// real prettier-on-`.js` uses **babel** (which preserves JSDoc `@type` casts) where
+		// prettier-on-`.ts` uses **typescript** (which strips them). When the caller hands us
+		// the real path, route a `.js` file through `babel` so the oracle matches what a real
+		// on-disk `.js` run produces — otherwise every `.js` file carrying a JSDoc cast reads
+		// as the `jsdoc_type_cast_parens` divergence against tsv's (correct) uniform
+		// preservation. `.ts`/`.svelte`/`.css` keep the synthetic `file.<ext>`.
+		const is_js =
+			language === 'typescript' &&
+			source_path !== undefined &&
+			extname(source_path).toLowerCase() === '.js';
+		const parser = is_js ? 'babel' : LANGUAGE_PRETTIER_PARSERS[language];
+		const ext = is_js ? '.js' : LANGUAGE_EXTENSIONS[language];
 
 		// Pass a filepath so prettier applies extension-specific heuristics, matching how a
 		// real on-disk file is formatted (and how the tsv_debug sidecar invokes prettier). Without
@@ -132,8 +152,8 @@ export class CanonicalImplementation implements TsvImplementation {
 		// trailing comma to single-type-param arrows (`<T,>`) that a real `.ts` run never emits —
 		// see prettier's `shouldForceTrailingComma` in src/language-js/print/type-parameters.js.
 		return await this.#prettier_checked.format(source, {
-			parser: LANGUAGE_PRETTIER_PARSERS[language],
-			filepath: `file${LANGUAGE_EXTENSIONS[language]}`,
+			parser,
+			filepath: `file${ext}`,
 			plugins,
 			...PRETTIER_OPTIONS,
 		});
