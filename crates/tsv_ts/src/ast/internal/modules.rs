@@ -7,7 +7,7 @@ use tsv_lang::Span;
 
 use super::{
     ClassDeclaration, Expression, FunctionDeclaration, Identifier, Literal, Statement,
-    TSDeclareFunction, TSEntityName,
+    TSDeclareFunction, TSEntityName, TSInterfaceDeclaration,
 };
 
 /// Export named declaration: `export const x = 1;`, `export { x }`, `export { x } from "y"`
@@ -70,6 +70,8 @@ pub enum ExportDefaultValue<'arena> {
     /// For ambient function declarations (no body)
     TSDeclareFunction(TSDeclareFunction<'arena>),
     ClassDeclaration(ClassDeclaration<'arena>),
+    /// `export default interface Foo {}` (TypeScript)
+    TSInterfaceDeclaration(TSInterfaceDeclaration<'arena>),
 }
 
 /// Export all declaration: `export * from "y"` or `export * as ns from "y"`

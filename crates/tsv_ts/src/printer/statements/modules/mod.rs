@@ -281,6 +281,9 @@ impl<'a> Printer<'a> {
             internal::ExportDefaultValue::ClassDeclaration(class) => {
                 self.build_class_declaration_doc(class)
             }
+            internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => {
+                self.build_interface_declaration_doc(iface)
+            }
         };
 
         // The `export default`→value gap (a line comment indents the value).
@@ -291,6 +294,7 @@ impl<'a> Printer<'a> {
             internal::ExportDefaultValue::FunctionDeclaration(func) => func.span.start,
             internal::ExportDefaultValue::TSDeclareFunction(func) => func.span.start,
             internal::ExportDefaultValue::ClassDeclaration(class) => class.span.start,
+            internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => iface.span.start,
         };
         // A comment that can't stay inline (a line comment, or a block comment with
         // the value authored on a later line) forces the value onto its own indented

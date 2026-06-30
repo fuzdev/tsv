@@ -372,6 +372,7 @@ ES2015 module syntax with ES2024 additions.
 - Default export (`export default expr`)
 - Default function (`export default function() {}`)
 - Default class (`export default class {}`)
+- Default interface (`export default interface Foo {}`)
 - Re-exports (`export {a} from 'mod'`)
 - String export name (`export {a as 'str'}`, `export {'str'} from 'mod'`) - ES2022
 - Re-export all (`export * from 'mod'`)
@@ -582,6 +583,7 @@ Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 
 
 - `declare module 'mod' {}`
 - `declare global {}`
+- Bare `global {}` (no `declare`, top-level or nested in `declare module`)
 - Interface merging
 
 ### TypeScript-Only Imports/Exports
