@@ -139,11 +139,13 @@ tsv currently supports:
 
 Future features (unknown order):
 
-- CSS error recovery (recover past invalid CSS per the spec instead of
-  failing the parse - doesn't add dialect support)
 - type stripper (easy, probably soon)
 - module lexer (easy, probably soon)
 - minifier
+- JSON support
+- HTML support (assuming Svelte mostly works, but isn't correct e.g. with `{`)
+- CSS error recovery (recover past invalid CSS per the spec instead of
+  failing the parse - doesn't add dialect support)
 - later:
   - TypeScript 7 integration (the Go impl), unlocking:
     - svelte-check replacement
