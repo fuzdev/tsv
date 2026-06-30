@@ -13,6 +13,7 @@ use super::blocks_doc::{EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN};
 use super::helpers::each_expr_comment_end;
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
+use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::{SymbolResolver, SymbolToU32};
 
@@ -373,7 +374,7 @@ impl<'a> Printer<'a> {
 
         let body_doc = self.build_whitespace_sensitive_content_doc(block.consequent.nodes);
 
-        let mut parts = vec![d.text(IF_BLOCK_OPEN), expr_doc, d.text("}"), body_doc];
+        let mut parts: DocBuf = smallvec![d.text(IF_BLOCK_OPEN), expr_doc, d.text("}"), body_doc];
 
         if let Some(alt) = &block.alternate {
             self.build_ws_sensitive_if_alternate(alt, &mut parts);
@@ -384,7 +385,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build if alternate (else/else-if) for whitespace-sensitive context.
-    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment<'_>, parts: &mut Vec<DocId>) {
+    fn build_ws_sensitive_if_alternate(&self, alt: &Fragment<'_>, parts: &mut DocBuf) {
         let d = self.d();
 
         // Check if this can be flattened to {:else if ...}
@@ -425,7 +426,7 @@ impl<'a> Printer<'a> {
             false,
         );
 
-        let mut opening = vec![d.text(EACH_BLOCK_OPEN), expr_doc];
+        let mut opening: DocBuf = smallvec![d.text(EACH_BLOCK_OPEN), expr_doc];
 
         if let Some(context) = &block.context {
             opening.push(d.text(" as "));
@@ -462,7 +463,7 @@ impl<'a> Printer<'a> {
         let body_doc = self.build_whitespace_sensitive_content_doc(block.body.nodes);
 
         let opening_concat = d.concat(&opening);
-        let mut parts = vec![opening_concat, body_doc];
+        let mut parts: DocBuf = smallvec![opening_concat, body_doc];
 
         if let Some(fallback) = &block.fallback {
             let fallback_doc = self.build_whitespace_sensitive_content_doc(fallback.nodes);

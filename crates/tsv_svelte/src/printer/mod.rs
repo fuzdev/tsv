@@ -30,6 +30,7 @@ use crate::ast::internal::{self, FragmentNode};
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::rc::Rc;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
     Comment, EmbedContext, INDENT, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH,
@@ -578,7 +579,7 @@ impl<'a> Printer<'a> {
 
         // Split at `format-ignore` ranges and at interior section comments (both rare); most
         // templates are one segment.
-        let mut out: Vec<DocId> = Vec::new();
+        let mut out: DocBuf = DocBuf::new();
         let mut seg_start = 0;
         let mut i = 0;
         while i < nodes.len() {
