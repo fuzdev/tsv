@@ -9,7 +9,9 @@
 
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use crate::printer::CommentSpacing;
-use crate::printer::{ParenContext, PatternContext, Printer, object_pattern_should_expand};
+use crate::printer::{
+    CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
+};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
@@ -487,15 +489,16 @@ impl<'a> Printer<'a> {
         for (i, prop) in obj.properties.iter().enumerate() {
             // Handle leading comments before this property (with blank line preservation)
             let prop_start = prop.span().start;
-            let leading_comments: Vec<_> = comments_in_range(self.comments, prev_end, prop_start)
-                .filter(|c| {
-                    // The brace-line comment pulled onto the `{` line above is emitted
-                    // as the prefix, not here (only relevant for the first property).
-                    !(i == 0
-                        && brace_pull_pos
-                            .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
-                })
-                .collect();
+            let leading_comments: CommentVec<'_> =
+                comments_in_range(self.comments, prev_end, prop_start)
+                    .filter(|c| {
+                        // The brace-line comment pulled onto the `{` line above is emitted
+                        // as the prefix, not here (only relevant for the first property).
+                        !(i == 0
+                            && brace_pull_pos
+                                .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
+                    })
+                    .collect();
 
             prop_parts.extend(
                 self.build_leading_comments_with_blank_lines(&leading_comments, prop_start),
@@ -821,7 +824,7 @@ impl<'a> Printer<'a> {
             if let Some(e) = elem {
                 // Check for leading comments before this element (with blank line preservation)
                 let elem_start = e.span().start;
-                let leading_comments: Vec<_> =
+                let leading_comments: CommentVec<'_> =
                     comments_in_range(self.comments, prev_end, elem_start)
                         .filter(|c| {
                             // The bracket-line comment pulled onto the `[` line above is

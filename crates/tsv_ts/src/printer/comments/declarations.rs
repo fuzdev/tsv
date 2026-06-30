@@ -6,9 +6,9 @@
 // heritage clauses (`extends` / `implements`).
 
 use super::layout::hang_after_operator;
-use super::{CommentFilter, CommentSpacing, Printer};
+use super::{CommentFilter, CommentSpacing, CommentVec, Printer};
 use crate::ast::internal;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -536,7 +536,7 @@ impl<'a> Printer<'a> {
 
         // Track which items have trailing line comments (between this item and the next).
         // Line comments consume the rest of the line, so the comma must go before them.
-        let has_trailing_line_comment: Vec<bool> = items
+        let has_trailing_line_comment: SmallVec<[bool; 8]> = items
             .windows(2)
             .map(|pair| {
                 self.has_line_comments_between(heritage_item_end(&pair[0]), pair[1].span.start)
@@ -544,7 +544,7 @@ impl<'a> Printer<'a> {
             .collect();
         let has_any_item_line_comments = has_trailing_line_comment.iter().any(|&v| v);
 
-        let item_docs: Vec<_> = items
+        let item_docs: DocBuf = items
             .iter()
             .enumerate()
             .map(|(i, heritage)| {
@@ -565,7 +565,7 @@ impl<'a> Printer<'a> {
                 }
                 if let Some(next) = items.get(i + 1) {
                     let item_end = heritage_item_end(heritage);
-                    let comments: Vec<_> =
+                    let comments: CommentVec<'_> =
                         comments_in_range(self.comments, item_end, next.span.start).collect();
 
                     if has_trailing_line_comment[i] {
@@ -765,7 +765,8 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut value_block: DocBuf = smallvec![d.hardline()];
         let mut on_own_line = false;
-        let comments: Vec<_> = comments_in_range(self.comments, keyword_end, value_start).collect();
+        let comments: CommentVec<'_> =
+            comments_in_range(self.comments, keyword_end, value_start).collect();
         for (i, comment) in comments.iter().enumerate() {
             let same_line = !on_own_line && self.is_same_line(keyword_end, comment.span.start);
             if same_line {

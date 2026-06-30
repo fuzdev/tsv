@@ -4,7 +4,7 @@
 use super::{Printer, build_entity_name_doc, should_hug_union_type};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
-use crate::printer::{CommentFilter, CommentSpacing, HeritageKeyword};
+use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -249,7 +249,7 @@ impl<'a> Printer<'a> {
             // every subsequent comment go on their own line in the indent. Two line
             // comments must not merge onto one line — the second `//` would stop
             // being a delimiter (a boundary loss).
-            let comments: Vec<_> =
+            let comments: CommentVec<'_> =
                 comments_in_range(self.comments, eq_pos + 1, type_start).collect();
             for (idx, comment) in comments.iter().enumerate() {
                 let multiline_block = comment.is_block && self.is_multiline_comment(comment);
@@ -645,9 +645,9 @@ impl<'a> Printer<'a> {
             // Find comments between previous element and this one
             // Filter out trailing same-line comments from the previous member
             // BUT keep multi-line block comments even if they start on the same line
-            let all_comments: Vec<_> =
+            let all_comments: CommentVec<'_> =
                 comments_in_range(self.comments, prev_end, member_start).collect();
-            let leading_comments: Vec<_> = if !is_first {
+            let leading_comments: CommentVec<'_> = if !is_first {
                 all_comments
                     .iter()
                     .filter(|c| {
@@ -850,16 +850,17 @@ impl<'a> Printer<'a> {
                 // Check for comments between previous position and this member.
                 // First member: drop comments pulled onto the `{` line (emitted
                 // as the brace-line prefix above).
-                let comments: Vec<_> = comments_in_range(self.comments, prev_end, member_start)
-                    .filter(|c| {
-                        if is_first {
-                            !delimiter_pull_pos
-                                .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c))
-                        } else {
-                            !self.is_same_line(prev_end, c.span.start)
-                        }
-                    })
-                    .collect();
+                let comments: CommentVec<'_> =
+                    comments_in_range(self.comments, prev_end, member_start)
+                        .filter(|c| {
+                            if is_first {
+                                !delimiter_pull_pos
+                                    .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c))
+                            } else {
+                                !self.is_same_line(prev_end, c.span.start)
+                            }
+                        })
+                        .collect();
 
                 // Check for blank lines
                 if !is_first {

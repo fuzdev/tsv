@@ -12,7 +12,8 @@ use super::helpers::{
     type_needs_parens_in_union_or_intersection, type_never_needs_parens, unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
-use crate::ast::internal::{self, TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
+use crate::ast::internal::{TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
+use crate::printer::CommentVec;
 use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
@@ -353,12 +354,12 @@ impl<'a> Printer<'a> {
             // to trail the previous member (e.g., `a | (// c\n b)` becomes
             // `| a // c\n | b`). We extract them so they can be emitted before
             // the `| ` separator and skipped when building the member's type doc.
-            let relocated_paren_leading: Vec<&internal::Comment> = if i > 0
+            let relocated_paren_leading: CommentVec<'_> = if i > 0
                 && let TSType::Parenthesized(p) = t
             {
                 self.paren_leading_line_comments(p)
             } else {
-                Vec::new()
+                smallvec![]
             };
 
             if i > 0 {
@@ -392,9 +393,10 @@ impl<'a> Printer<'a> {
                     // trail the previous member — see
                     // union_infix_pipe_line_comment_prettier_divergence.
                     let after_pipe = pipe_pos + 1;
-                    let own_line: Vec<_> = comments_in_range(self.comments, after_pipe, type_start)
-                        .filter(|c| !(c.is_block && self.is_same_line(c.span.end, type_start)))
-                        .collect();
+                    let own_line: CommentVec<'_> =
+                        comments_in_range(self.comments, after_pipe, type_start)
+                            .filter(|c| !(c.is_block && self.is_same_line(c.span.end, type_start)))
+                            .collect();
                     // A blank line the author left *before* the first own-line comment
                     // (`A |⏎⏎/* c */⏎B`) and *between* two own-line comments is preserved,
                     // matching prettier — but NOT one after the last comment before the
@@ -856,7 +858,7 @@ impl<'a> Printer<'a> {
                     parts.extend(self.build_trailing_comments_multiline(prev_type_end, amp_pos));
 
                     // Comments after the ampersand - split into trailing (same line as &) and leading (own line)
-                    let comments_after_amp: Vec<_> =
+                    let comments_after_amp: CommentVec<'_> =
                         comments_in_range(self.comments, amp_pos + 1, type_start).collect();
 
                     // Trailing comments on same line as & (come before hardline)
@@ -880,7 +882,7 @@ impl<'a> Printer<'a> {
                     // not on block-vs-line alone). A blank line the author left between
                     // an own-line comment and what follows it (the next own-line comment
                     // or the member) is preserved (`literalline`), matching prettier.
-                    let own_line: Vec<_> = comments_after_amp
+                    let own_line: CommentVec<'_> = comments_after_amp
                         .iter()
                         .copied()
                         .filter(|c| !self.is_same_line(amp_pos, c.span.start))

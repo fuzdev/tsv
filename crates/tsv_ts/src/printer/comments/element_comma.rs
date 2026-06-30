@@ -12,7 +12,7 @@
 // comma inside an earlier comment (`a /* , */ /* x */, b`) is never mistaken for
 // the separator and the following comment is not relocated across it.
 
-use super::Printer;
+use super::{CommentVec, Printer};
 use smallvec::SmallVec;
 use tsv_lang::Comment;
 use tsv_lang::comments_in_range;
@@ -53,7 +53,7 @@ impl<'a> Printer<'a> {
         // normally belongs to the next element as leading — except on the LAST
         // element, where it is preserved after the comma (prettier relocates it
         // before — see conformance_prettier.md §Comment relocation).
-        let all: Vec<_> = comments_in_range(self.comments, elem_end, upper_bound)
+        let all: CommentVec<'_> = comments_in_range(self.comments, elem_end, upper_bound)
             .filter(|c| {
                 self.is_same_line(elem_end, c.span.start)
                     && (!c.is_block

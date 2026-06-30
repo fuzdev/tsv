@@ -35,7 +35,7 @@ tsv has no config that changes its formatting style behavior, and none will be a
 - fix: expressions in Svelte block tags now consistently use TS printing paths,
   fixing oversights prettier-plugin-svelte
 - perf: avoid Token copying in lexer [#191](https://github.com/fuzdev/tsv/pull/191)
-- perf: reduce allocations using `SmallVec` and memoizations
+- perf: reduce heap allocations using `SmallVec` and memoizations
   ([#17](https://github.com/fuzdev/tsv/pull/17), [#19](https://github.com/fuzdev/tsv/pull/19),
   [#20](https://github.com/fuzdev/tsv/pull/20), [#23](https://github.com/fuzdev/tsv/pull/23),
   [#108](https://github.com/fuzdev/tsv/pull/108), [#111](https://github.com/fuzdev/tsv/pull/111),
@@ -50,7 +50,8 @@ tsv has no config that changes its formatting style behavior, and none will be a
   [#199](https://github.com/fuzdev/tsv/pull/199), [#200](https://github.com/fuzdev/tsv/pull/200),
   [#205](https://github.com/fuzdev/tsv/pull/205), [#208](https://github.com/fuzdev/tsv/pull/208),
   [#209](https://github.com/fuzdev/tsv/pull/209), [#210](https://github.com/fuzdev/tsv/pull/210),
-  [#211](https://github.com/fuzdev/tsv/pull/211))
+  [#211](https://github.com/fuzdev/tsv/pull/211), [#212](https://github.com/fuzdev/tsv/pull/212),
+  [#215](https://github.com/fuzdev/tsv/pull/215))
 
 ## 0.1.0
 

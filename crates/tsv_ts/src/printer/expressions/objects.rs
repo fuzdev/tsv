@@ -9,11 +9,11 @@
 
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use crate::printer::CommentSpacing;
-use crate::printer::Printer;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
-use smallvec::smallvec;
+use crate::printer::{CommentVec, Printer};
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::SymbolResolver;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
@@ -42,7 +42,7 @@ impl<'a> Printer<'a> {
         // block comments to be standalone, so skip the per-property span collection
         // (the common comment-free object pays nothing).
         let has_standalone_block_comment = has_comments && {
-            let property_spans: Vec<_> = obj
+            let property_spans: SmallVec<[_; 8]> = obj
                 .properties
                 .iter()
                 .map(internal::ObjectProperty::span)
@@ -106,21 +106,22 @@ impl<'a> Printer<'a> {
                 // Collect leading comments (search starts after comma for non-first properties)
                 // Skip line comments that are on same line as previous property (those are trailing)
                 // Block comments after comma on same line are leading
-                let comments: Vec<_> = comments_in_range(self.comments, search_start, prop_start)
-                    .filter(|c| {
-                        // Brace-line comments pulled onto the `{` line above are emitted
-                        // as the prefix, not here (only relevant for the first property).
-                        if is_first
-                            && let Some(dpos) = brace_pull_pos
-                            && self.comment_on_delimiter_line(dpos, c)
-                        {
-                            return false;
-                        }
-                        is_first ||
+                let comments: CommentVec<'_> =
+                    comments_in_range(self.comments, search_start, prop_start)
+                        .filter(|c| {
+                            // Brace-line comments pulled onto the `{` line above are emitted
+                            // as the prefix, not here (only relevant for the first property).
+                            if is_first
+                                && let Some(dpos) = brace_pull_pos
+                                && self.comment_on_delimiter_line(dpos, c)
+                            {
+                                return false;
+                            }
+                            is_first ||
                         c.is_block || // Block comments after comma are always leading
                         !self.is_same_line( prev_end, c.span.start) // Line comments must be on different line
-                    })
-                    .collect();
+                        })
+                        .collect();
 
                 // For non-first properties, add separator
                 if !is_first {
@@ -224,7 +225,7 @@ impl<'a> Printer<'a> {
 
             // Handle trailing comments before closing brace
             let closing_brace_pos = obj.span.end - 1;
-            let trailing_comments: Vec<_> =
+            let trailing_comments: CommentVec<'_> =
                 comments_in_range(self.comments, prev_end, closing_brace_pos)
                     .filter(|c| !self.is_same_line(prev_end, c.span.start))
                     .collect();
@@ -544,10 +545,10 @@ impl<'a> Printer<'a> {
             }
 
             // Comments between key region and colon (e.g., {key /* comment */: value})
-            let pre_colon_comments: Vec<_> =
+            let pre_colon_comments: CommentVec<'_> =
                 comments_in_range(self.comments, key_region_end, colon_pos).collect();
             // Comments between colon and value (e.g., {key: /* comment */ value})
-            let post_colon_comments: Vec<_> =
+            let post_colon_comments: CommentVec<'_> =
                 comments_in_range(self.comments, colon_pos + 1, value_start).collect();
 
             // Check if value needs parens (e.g., assignment expressions)

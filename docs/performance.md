@@ -26,6 +26,29 @@ Doc building and rendering are **interleaved** per-statement inside `format()` �
 - Doc rendering — `tsv_lang` — `doc::arena_render::arena_print_doc_with_indent_resolved()`
 - Line-break decisions — `tsv_lang` — `doc::arena_fits::arena_fits()`
 
+## Measurement corpora
+
+Comment- and allocation-path work is corpus-sensitive — comment density alone
+varies by an order of magnitude across the trees below — so pick the corpus to
+match what you're measuring, and **run a SmallVec-sizing histogram and the
+heaptrack that validates it on the _same_ corpus.** Gate on the measured
+alloc/wall delta, never a static spill rate: a high spill *rate* over a small
+*population* (comment-collect spills are a fraction of a percent of all
+allocations) is a negligible absolute change.
+
+- **Headline rate / profile** — `~/dev/zzz/src/lib`. Typical app code,
+  comment-sparse; the per-byte baseline the tables here track.
+- **Comment- / alloc-dense stress** — `~/dev/fuz_app/src/lib`. TSDoc-dense
+  library code; the extreme for comment-path and allocation changes (zzz's
+  comment density is a fraction of fuz_app's, so zzz alone under-represents
+  these paths).
+- **Representative real-world** — `~/dev/svelte/packages/svelte/src`,
+  `~/dev/kit/packages/kit/src`, and `~/dev/svelte-docinfo/src`. Large, diverse
+  sources at moderate comment density — the middle ground the two app corpora
+  bracket. svelte and kit are mostly `.js` (which `tsv format` / `profile`
+  skip), so kit's `.svelte` + `.ts` and svelte-docinfo's `.ts` are the
+  formattable slices.
+
 ## Tooling
 
 Four tools, in order of use:
@@ -158,6 +181,24 @@ For those, dump everything and search by source line instead:
 perf annotate --stdio > annotate.txt   # then search for the fn's source lines
 ```
 
+**Telling real work from a code-layout artifact — `perf stat`.** When a logically
+tiny change moves the native wall, count instructions before chasing a function:
+**instruction count is layout-independent** (code placement cannot change how many
+instructions run), so it separates real added work from a frontend/i-cache effect.
+
+```bash
+# Deterministic counts (±0.00% across -r runs); compare two binaries, one workload
+perf stat -r 4 -e instructions,cycles,branches,branch-misses \
+  target/profiling/tsv_debug profile ~/dev/fuz_app/src/lib --iterations 30
+```
+
+A near-flat instruction delta (e.g. ≤0.1%) paired with a larger, run-to-run-*variable*
+cycles delta and a drop in instructions-per-cycle is a code-placement / i-cache
+artifact, not a real cost — added code (a new monomorphization, more inlining)
+shifted hot functions across cache lines. For a printer-only edit, **parse is a
+built-in control**: its code is unchanged, so any instruction movement there is pure
+layout. A real algorithmic change instead shows up as more *instructions*.
+
 For visual flamegraphs (useful for humans, not Claude):
 
 ```bash
@@ -213,7 +254,14 @@ Notes:
   call count. A change that reduces allocations can be wall-neutral, or even
   *regress* format wall-time and peak memory — e.g. relocating hot,
   repeatedly-walked storage, or trading a tight contiguous `Vec` for a sparser
-  arena that hurts cache density. Allocation count is the right gate for the
+  arena that hurts cache density. A subtler regression is not about the data at
+  all: added code (e.g. the inline-vs-heap discriminant a `Vec`→`SmallVec` swap
+  inlines at each site) shifts **code placement** and can nudge hot functions across i-cache
+  lines, raising the native wall while the *instruction* count stays flat — a
+  code-layout artifact, not a real cost (confirm with `perf stat`, §4). It is
+  corpus-dependent and can hit a corpus that barely exercises the changed path
+  *harder* than one that leans on it, and it does not touch the WASM-format wall.
+  Allocation count is the right gate for the
   **WASM-format** wall (dlmalloc memcpys on every heap growth, §6) *only when
   storage stays cache-dense*, and a churn signal for native — never a substitute
   for the format-phase wall A/B itself (`tsv_debug profile` native rate with

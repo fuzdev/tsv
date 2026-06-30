@@ -5,7 +5,7 @@
 
 use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
-use crate::printer::{ParenContext, Printer};
+use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::smallvec;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
@@ -62,9 +62,9 @@ impl<'a> Printer<'a> {
                 };
 
                 // Collect comments in the interpolation region
-                let leading_comments: Vec<_> =
+                let leading_comments: CommentVec<'_> =
                     comments_in_range(self.comments, quasi.span.end, expr.span().start).collect();
-                let trailing_comments: Vec<_> =
+                let trailing_comments: CommentVec<'_> =
                     comments_in_range(self.comments, expr.span().end, next_quasi.span.start)
                         .collect();
 
@@ -372,7 +372,7 @@ impl<'a> Printer<'a> {
             .as_ref()
             .map_or_else(|| tagged.tag.span().end, |ta| ta.span.end);
         let comment_end = tagged.quasi.span.start;
-        let gap_comments: Vec<_> =
+        let gap_comments: CommentVec<'_> =
             comments_in_range(self.comments, comment_start, comment_end).collect();
         if !gap_comments.is_empty() {
             let mut prev_end = comment_start;

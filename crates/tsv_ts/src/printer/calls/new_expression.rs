@@ -24,7 +24,7 @@ use crate::printer::calls::{
     should_force_expansion_for_comments, wrap_call_with_hard_breaks,
     wrap_call_with_will_break_guard,
 };
-use crate::printer::{ParenContext, Printer, has_multiline_content};
+use crate::printer::{CommentVec, ParenContext, Printer, has_multiline_content};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -485,7 +485,8 @@ impl<'a> Printer<'a> {
 
             // Own-line block comments after the last arg (before closing paren).
             // These appear as siblings after the last arg (no trailing comma), forcing expansion.
-            let leading_block: Vec<_> = pc.leading.iter().filter(|c| c.is_block).collect();
+            let leading_block: CommentVec<'_> =
+                pc.leading.iter().filter(|c| c.is_block).copied().collect();
             if !leading_block.is_empty()
                 && let Some(last_doc) = arg_docs.pop()
             {

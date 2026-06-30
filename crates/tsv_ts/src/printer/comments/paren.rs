@@ -6,7 +6,7 @@
 // re-added with the parens when stripping would relocate them, or prepended at a
 // chain base.
 
-use super::{CommentSpacing, Printer};
+use super::{CommentSpacing, CommentVec, Printer};
 use crate::ast::internal;
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
@@ -249,14 +249,14 @@ impl<'a> Printer<'a> {
     pub(crate) fn spread_own_line_block_comments(
         &self,
         expr: &internal::Expression<'_>,
-    ) -> Vec<&tsv_lang::Comment> {
+    ) -> CommentVec<'_> {
         if let internal::Expression::SpreadElement(spread) = expr {
             let arg_end = spread.argument.span().end;
             comments_in_range(self.comments, arg_end, spread.span.end)
                 .filter(|c| c.is_block && self.has_newline_between(arg_end, c.span.start))
                 .collect()
         } else {
-            vec![]
+            smallvec![]
         }
     }
 

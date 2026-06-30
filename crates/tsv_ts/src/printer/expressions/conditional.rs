@@ -3,7 +3,7 @@
 // Handles: a ? b : c, nested ternaries, comments in ternaries
 
 use crate::ast::internal;
-use crate::printer::{Printer, template_literal_has_newlines};
+use crate::printer::{CommentVec, Printer, template_literal_has_newlines};
 use smallvec::smallvec;
 use tsv_lang::INDENT;
 use tsv_lang::comments_in_range;
@@ -449,7 +449,7 @@ impl<'a> Printer<'a> {
         value_start: u32,
     ) -> (bool, bool) {
         let d = self.d();
-        let comments: Vec<_> = op_pos
+        let comments: CommentVec<'_> = op_pos
             .map(|p| comments_in_range(self.comments, p + 1, value_start).collect())
             .unwrap_or_default();
         let mut has_line_comment = false;
