@@ -6,8 +6,10 @@
 use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
 use crate::printer::{ParenContext, Printer};
+use smallvec::smallvec;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 
@@ -25,7 +27,7 @@ impl<'a> Printer<'a> {
         template: &crate::ast::internal::TemplateLiteral<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         parts.push(d.line_suffix_boundary());
         parts.push(d.text("`"));
 
@@ -192,7 +194,7 @@ impl<'a> Printer<'a> {
         if !has_newline {
             return d.text_owned(text.to_string());
         }
-        let mut doc_parts = Vec::new();
+        let mut doc_parts = DocBuf::new();
         for (i, part) in text.split('\n').enumerate() {
             if i > 0 {
                 doc_parts.push(d.literalline());
@@ -255,7 +257,7 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
         for comment in comments {
             if is_leading {
                 // Leading comments: comment then separator
@@ -291,7 +293,7 @@ impl<'a> Printer<'a> {
         trailing_comments: &[&crate::ast::internal::Comment],
     ) -> DocId {
         let d = self.d();
-        let mut parts = Vec::new();
+        let mut parts = DocBuf::new();
 
         // Leading comments
         for comment in leading_comments {
@@ -348,7 +350,7 @@ impl<'a> Printer<'a> {
             tag_doc,
         );
 
-        let mut parts = vec![tag_doc];
+        let mut parts: DocBuf = smallvec![tag_doc];
         if let Some(type_args) = &tagged.type_arguments {
             // Preserve comments between tag and type args: `fn/* c */ <string>`template``
             let tag_end = tagged.tag.span().end;

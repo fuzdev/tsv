@@ -9,6 +9,8 @@
 
 use super::Printer;
 use crate::ast::internal::{TSLiteralType, TSType, TemplateLiteralType};
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
@@ -120,7 +122,7 @@ impl<'a> Printer<'a> {
         // indent() positions content relative to the template's current indent level
         // (e.g. after an `=` break in a type alias): content gets +1, the closing `}`
         // stays at the current level.
-        let mut parts = vec![d.text("`")];
+        let mut parts: DocBuf = smallvec![d.text("`")];
         let mut interp_iter = interps.into_iter();
 
         for quasi in template.quasis {

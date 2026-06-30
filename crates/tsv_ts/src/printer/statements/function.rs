@@ -3,6 +3,7 @@
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -79,7 +80,7 @@ impl<'a> Printer<'a> {
             params_doc
         };
 
-        let mut sig_parts = vec![params_doc];
+        let mut sig_parts: DocBuf = smallvec![params_doc];
         if let Some(rt_doc) = return_type_doc {
             // Preserve a comment between `)` and the return type `:` in place.
             if let Some(rt) = return_type {

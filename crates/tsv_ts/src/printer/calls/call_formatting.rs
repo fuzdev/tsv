@@ -27,6 +27,7 @@ use super::arg_wrapping::{
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
 use super::test_patterns::{callee_chain_string, is_test_call};
 use crate::ast::internal;
+use smallvec::smallvec;
 use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -128,7 +129,7 @@ pub(super) fn build_call_doc_with_wrapping(
             unreachable!("is_test_call requires arguments");
         };
         let paren_close = call.span.end;
-        let mut parts = vec![
+        let mut parts: DocBuf = smallvec![
             flat_callee,
             d.text("("),
             d.join(
@@ -482,7 +483,7 @@ fn try_single_arg_comment_paths(
 
         // Build comment + arg, including any trailing comments after the arg
         // Note: build_rhs_comments_opt already adds trailing space after each comment
-        let mut parts = vec![inline_comments, arg_doc];
+        let mut parts: DocBuf = smallvec![inline_comments, arg_doc];
         if let Some(trailing) = printer.build_inline_comments_between_doc_opt(arg_end, paren_close)
         {
             parts.push(trailing);

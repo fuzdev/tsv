@@ -5,6 +5,7 @@
 // between decorators and the decorated member.
 
 use crate::ast::internal;
+use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::{CommentPosition, classify_comment, comments_in_range, doc::arena::DocId};
 
@@ -221,7 +222,7 @@ impl<'a> Printer<'a> {
         // Own-line block comments produce extra items in the join list.
         let needs_break = has_line_comment || items.len() > decorators.len();
         let joined = d.join_doc(items, d.line());
-        let mut group_parts = vec![joined, trailing];
+        let mut group_parts: DocBuf = smallvec![joined, trailing];
         if needs_break {
             group_parts.push(d.break_parent());
         }

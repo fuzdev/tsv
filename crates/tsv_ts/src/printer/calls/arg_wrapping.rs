@@ -15,6 +15,7 @@ use super::arg_comments::{
 };
 use super::arg_predicates::{is_block_function, is_short_second_arg_for_expand_first};
 use crate::ast::internal;
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -797,7 +798,7 @@ pub(super) fn build_empty_args_doc(
     paren_close: u32,
 ) -> DocId {
     let d = printer.d();
-    let mut parts = vec![callee];
+    let mut parts: DocBuf = smallvec![callee];
     if let Some(paren_pos) = printer.find_char_outside_comments(after_type_args, paren_close, b'(')
     {
         let pre_paren_comments = printer.build_comments_between_filtered_opt(
@@ -848,7 +849,7 @@ pub(super) fn try_hug_multiline_template_arg(
     }
     let d = printer.d();
     let arg_doc = printer.build_expression_doc(&args[0]);
-    let mut parts = vec![callee, d.text("("), arg_doc, d.text(")")];
+    let mut parts: DocBuf = smallvec![callee, d.text("("), arg_doc, d.text(")")];
     if let Some(suffix) =
         printer.build_trailing_comments_line_suffix(args[0].span().end, paren_close)
     {

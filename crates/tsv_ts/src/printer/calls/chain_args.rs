@@ -24,6 +24,7 @@ use super::arg_wrapping::{
     wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
@@ -1173,7 +1174,7 @@ fn build_chain_args_multi(
 
         // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
         if d.will_break(second_arg_doc) {
-            let mut all_parts = vec![first_arg_doc];
+            let mut all_parts: DocBuf = smallvec![first_arg_doc];
             if let Some(t) = inter_trailing {
                 all_parts.push(t);
             }

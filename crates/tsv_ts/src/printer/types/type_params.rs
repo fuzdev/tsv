@@ -7,6 +7,7 @@
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::fluid_after_operator;
+use smallvec::smallvec;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::GroupId;
@@ -579,7 +580,7 @@ impl<'a> Printer<'a> {
                 let leading =
                     self.build_leading_comments_multiline(inst.span.start + 1, param_start);
                 if !leading.is_empty() {
-                    let mut parts = vec![d.text("<")];
+                    let mut parts: DocBuf = smallvec![d.text("<")];
                     parts.extend(leading);
                     parts.push(self.build_type_doc(param));
                     parts.push(d.text(">"));

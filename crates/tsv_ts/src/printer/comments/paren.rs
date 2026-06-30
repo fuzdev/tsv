@@ -8,6 +8,7 @@
 
 use super::{CommentSpacing, Printer};
 use crate::ast::internal;
+use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -359,7 +360,7 @@ impl<'a> Printer<'a> {
             .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
 
         if has_multiline {
-            let mut indent_parts = vec![d.hardline()];
+            let mut indent_parts: DocBuf = smallvec![d.hardline()];
             indent_parts.push(inner);
             // Break before a comment that starts on a new line relative to the
             // previous item (the body or the prior comment); otherwise trail it
@@ -385,7 +386,7 @@ impl<'a> Printer<'a> {
                 d.text(")"),
             ])
         } else {
-            let mut parts = vec![d.text("(")];
+            let mut parts: DocBuf = smallvec![d.text("(")];
             parts.push(inner);
             for comment in comments_in_range(self.comments, expr_end, boundary_end) {
                 parts.push(d.text(" "));
