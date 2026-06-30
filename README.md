@@ -9,6 +9,7 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
 
+Compared to Oxc and Biome, the emphasis is on performance over extensibility, with Svelte as the only JS framework.
 For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
 This is an early release, and reports and feedback are appreciated -
@@ -102,19 +103,16 @@ central `Language` trait, registry, or enum dispatch ("closed scope, open conven
 That means no dynamic dispatch, and WASM builds tree-shake at the link level:
 the parse build excludes the printers, and the format build excludes the JSON-AST conversion layer.
 Languages tree-shake the same way - a build binding only TypeScript would exclude
-Svelte and CSS entirely - though the published packages include all three.
+Svelte and CSS entirely - though currently the published packages include all three.
 Future LSP/incremental features will be later feature-gated layers that don't bloat
 these artifacts - see [docs/architecture.md](docs/architecture.md)
 
-tsv's goal is to be an optimal toolchain for Svelte and TypeScript,
-and avoiding bloat is a key characteristic.
-The trade is depth over breadth: tsv has a closed language set with an expanding
-tool set, instead of checklisting more frameworks and languages.
-Consumers can use tsv's Rust crates to build custom tools independently.
+tsv's goal is to be an optimal toolchain for TypeScript and Svelte.
+Consumers can use tsv's crates ([not yet published](https://github.com/fuzdev/tsv/issues/140) to crates.io)
+to build custom tools independently.
 Hard non-goals:
 
-- no markup for other frameworks - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+friends);
-  Svelte is the only component language (it's in the name `tsv`)
+- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+friends)
 - standard CSS and Svelte extensions only - no SCSS, CSS Modules, LESS, etc
 - no JS plugins - won't embed or integrate a JS runtime,
   instead linter extensibility will be data-driven like with pattern-based rules;
