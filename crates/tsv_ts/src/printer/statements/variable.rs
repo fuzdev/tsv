@@ -4,7 +4,7 @@ use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
-    CommentFilter, CommentSpacing, ParenContext, analysis, class_expr_has_decorators,
+    CommentFilter, CommentSpacing, CommentVec, ParenContext, analysis, class_expr_has_decorators,
     conditional_should_break_after_op, is_call_on_member_chain, is_curried_arrow_chain,
     is_curried_arrow_with_return_type, is_literal_member_chain, is_module_path_fluid_call,
     is_multiline_string_literal, is_poorly_breakable_chain, is_pure_property_chain,
@@ -209,7 +209,7 @@ impl<'a> Printer<'a> {
                         // Line comment(s) between declarators: comma must go before
                         // the first line comment, block comments go before the comma.
                         // e.g. `a = 1 /* c1 */,\n// c2\nb = 2` or `a = 1, // c1\n// c2\nb = 2`
-                        let comments: Vec<_> =
+                        let comments: CommentVec<'_> =
                             comments_in_range(self.comments, prev_end, curr_start).collect();
                         let first_line_idx = comments.iter().position(|c| !c.is_block).unwrap_or(0);
 
@@ -260,7 +260,7 @@ impl<'a> Printer<'a> {
                         // block inline-adjacent to the declarator hugs it (`/* c */ b`),
                         // an own-line one keeps its line (with any author blank line
                         // preserved before the declarator/next comment).
-                        let comments: Vec<_> =
+                        let comments: CommentVec<'_> =
                             comments_in_range(self.comments, comma_pos, curr_start).collect();
                         for (ci, comment) in comments.iter().enumerate() {
                             parts.push(self.build_comment_doc(comment));
@@ -621,7 +621,7 @@ impl<'a> Printer<'a> {
                         // Single pass: partition comments into same-line (inline) and
                         // different-line (leading) relative to the `=` sign.
                         let mut leading_comments = DocBuf::new();
-                        let after_eq: Vec<_> =
+                        let after_eq: CommentVec<'_> =
                             comments_in_range(self.comments, equals_pos + 1, init_start).collect();
                         for (ci, comment) in after_eq.iter().enumerate() {
                             if self.is_same_line(equals_pos, comment.span.start) {

@@ -18,6 +18,7 @@ use super::{CommentSpacing, Printer};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
+use crate::printer::CommentVec;
 use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
@@ -384,10 +385,10 @@ impl<'a> Printer<'a> {
             TSType::Parenthesized(p) => Some(p),
             _ => None,
         };
-        let true_paren_leading_line_comments: Vec<&internal::Comment> = true_paren
+        let true_paren_leading_line_comments: CommentVec<'_> = true_paren
             .map(|p| self.paren_leading_line_comments(p))
             .unwrap_or_default();
-        let false_paren_leading_line_comments: Vec<&internal::Comment> = false_paren
+        let false_paren_leading_line_comments: CommentVec<'_> = false_paren
             .map(|p| self.paren_leading_line_comments(p))
             .unwrap_or_default();
 
@@ -559,9 +560,9 @@ impl<'a> Printer<'a> {
             b'[',
         )
         .map_or(param_name_start, |p| p as u32);
-        let leading_comments: Vec<_> =
+        let leading_comments: CommentVec<'_> =
             comments_in_range(self.comments, content_start, bracket_pos).collect();
-        let bracket_inner_comments: Vec<_> =
+        let bracket_inner_comments: CommentVec<'_> =
             comments_in_range(self.comments, bracket_pos + 1, param_name_start).collect();
 
         // Leading comments (before `[`): the node-adjacent (LAST) comment stays
@@ -686,7 +687,7 @@ impl<'a> Printer<'a> {
 
             // Comments between `]` (or `?`/`+?`/`-?`) and value type
             // Start from bracket_close to avoid double-counting pre-bracket comments
-            let comments_before_value: Vec<_> =
+            let comments_before_value: CommentVec<'_> =
                 comments_in_range(self.comments, bracket_close, type_start).collect();
 
             body_parts.push(d.text(":"));

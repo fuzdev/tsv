@@ -2,7 +2,7 @@
 
 use super::Printer;
 use crate::ast::internal;
-use crate::printer::CommentSpacing;
+use crate::printer::{CommentSpacing, CommentVec};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -258,9 +258,9 @@ impl<'a> Printer<'a> {
 
             // Check for comments between previous position and this member
             // Filter out trailing same-line comments from the previous member
-            let all_comments: Vec<_> =
+            let all_comments: CommentVec<'_> =
                 comments_in_range(self.comments, prev_end, member_start).collect();
-            let comments: Vec<_> = if !is_first {
+            let comments: CommentVec<'_> = if !is_first {
                 all_comments
                     .iter()
                     .filter(|c| !self.is_same_line(prev_end, c.span.start))

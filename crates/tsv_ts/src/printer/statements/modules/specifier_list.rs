@@ -6,6 +6,7 @@
 use super::header_comments::is_only_whitespace_and_comments;
 use super::{MODULE_KW_LEN, MODULE_TYPE_KW_LEN, Printer};
 use crate::ast::internal;
+use crate::printer::CommentVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -458,9 +459,12 @@ impl<'a> Printer<'a> {
             let is_last = i == items.len() - 1;
 
             let search_start = self.leading_comment_search_start(prev_end, is_first);
-            let comments: Vec<_> = comments_in_range(self.comments, search_start, item_start)
-                .filter(|c| is_first || c.is_block || !self.is_same_line(prev_end, c.span.start))
-                .collect();
+            let comments: CommentVec<'_> =
+                comments_in_range(self.comments, search_start, item_start)
+                    .filter(|c| {
+                        is_first || c.is_block || !self.is_same_line(prev_end, c.span.start)
+                    })
+                    .collect();
             // First item: drop comments pulled onto the `{` line (emitted as the
             // brace-line prefix by the caller). No-op when `delimiter_pull_pos`
             // is `None` (the import-attribute `with {…}` caller).

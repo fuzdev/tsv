@@ -6,7 +6,7 @@
 
 use crate::ast::internal::{self, BinaryOperator, Expression};
 use crate::printer::comments::CommentSpacing;
-use crate::printer::{ParenContext, Printer};
+use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
@@ -122,7 +122,7 @@ impl<'a> Printer<'a> {
                 // Add leading comments — use hardline if the comment and the next
                 // comment / argument are on different lines, space if same line. An
                 // author blank line before the argument / next comment is preserved.
-                let leading: Vec<_> =
+                let leading: CommentVec<'_> =
                     comments_in_range(self.comments, operator_end, argument_start).collect();
                 for (ci, comment) in leading.iter().enumerate() {
                     indent_parts.push(self.build_comment_doc(comment));
@@ -759,7 +759,7 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         // Collect all comments in the range between operator and next operand
-        let comments: Vec<_> =
+        let comments: CommentVec<'_> =
             comments_in_range(self.comments, op_end, operand.span.start).collect();
 
         if comments.is_empty() {
@@ -1234,7 +1234,8 @@ impl<'a> Printer<'a> {
     /// same own-line/inline treatment — so the float is idempotent.
     fn append_floated_leading_comments(&self, parts: &mut DocBuf, start: u32, operand_start: u32) {
         let d = self.d();
-        let comments: Vec<_> = comments_in_range(self.comments, start, operand_start).collect();
+        let comments: CommentVec<'_> =
+            comments_in_range(self.comments, start, operand_start).collect();
         for (i, comment) in comments.iter().enumerate() {
             parts.push(self.build_comment_doc(comment));
             let next = comments.get(i + 1).map_or(operand_start, |c| c.span.start);

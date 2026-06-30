@@ -14,8 +14,8 @@ use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{CommentFilter, CommentSpacing};
 use crate::printer::{
-    ParenContext, Printer, has_newline_before_position, is_multiline_template_expression,
-    unwrap_parenthesized,
+    CommentVec, ParenContext, Printer, has_newline_before_position,
+    is_multiline_template_expression, unwrap_parenthesized,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -963,7 +963,8 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = DocBuf::new();
 
         // Print leading comments
-        let comments: Vec<_> = comments_in_range(self.comments, sig_end, body_start).collect();
+        let comments: CommentVec<'_> =
+            comments_in_range(self.comments, sig_end, body_start).collect();
         for (i, comment) in comments.iter().enumerate() {
             parts.push(self.build_comment_doc(comment));
 
@@ -1351,7 +1352,7 @@ impl<'a> Printer<'a> {
             };
 
             // Collect same-line comments
-            let same_line_comments: Vec<_> =
+            let same_line_comments: CommentVec<'_> =
                 comments_in_range(self.comments, param.span().end, search_end)
                     .filter(|c| self.is_same_line(param.span().end, c.span.start))
                     .collect();
@@ -1376,9 +1377,10 @@ impl<'a> Printer<'a> {
             // The last param has no trailing comma, so an after-comma block is deferred to
             // last_after_comma_docs (emitted after the loop, past where the comma was).
             if is_last {
-                let after: Vec<_> = same_line_comments
+                let after: CommentVec<'_> = same_line_comments
                     .iter()
                     .filter(|c| c.is_block && comma_pos.is_some_and(|pos| c.span.start > pos))
+                    .copied()
                     .collect();
                 for comment in after {
                     last_after_comma_docs.push(d.text(" "));
@@ -1495,7 +1497,7 @@ impl<'a> Printer<'a> {
         prev_comma_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let comments: Vec<_> = comments_in_range(self.comments, start, end)
+        let comments: CommentVec<'_> = comments_in_range(self.comments, start, end)
             .filter(|c| {
                 let Some(comma) = prev_comma_pos else {
                     return true; // First param - keep all comments

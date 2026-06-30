@@ -6,13 +6,14 @@
 // - Grouped (`Standard`) vs no-group (`NoGroup`) modes so a parent (function
 //   type / type-argument list) can control breaking
 
+use super::super::CommentVec;
 use super::super::comments_in_range;
 use super::Printer;
 use super::helpers::{immediate_union_paren, unwrap_parenthesized};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -42,9 +43,9 @@ impl<'a> Printer<'a> {
         delimiter_pull_pos: Option<u32>,
     ) -> DocBuf {
         let d = self.d();
-        let all_comments: Vec<_> =
+        let all_comments: CommentVec<'_> =
             comments_in_range(self.comments, prev_end, member_start).collect();
-        let leading_comments: Vec<_> = if !is_first {
+        let leading_comments: CommentVec<'_> = if !is_first {
             all_comments
                 .iter()
                 .filter(|c| !self.is_same_line(prev_end, c.span.start))
@@ -389,7 +390,7 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: Vec<_> =
+                let trailing: CommentVec<'_> =
                     comments_in_range(self.comments, member_content_end, upper_bound)
                         .filter(|c| self.is_same_line(member_content_end, c.span.start))
                         .collect();
@@ -413,7 +414,7 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: Vec<_> =
+                let trailing: CommentVec<'_> =
                     comments_in_range(self.comments, member_content_end, upper_bound).collect();
 
                 if is_last {
@@ -473,7 +474,8 @@ impl<'a> Printer<'a> {
             // Lazy: the per-member span collection only runs when the cheaper checks
             // above didn't already force multiline.
             || {
-                let member_spans: Vec<_> = obj.members.iter().map(TSTypeElement::span).collect();
+                let member_spans: SmallVec<[_; 8]> =
+                    obj.members.iter().map(TSTypeElement::span).collect();
                 self.has_standalone_block_comment(obj.span.start, obj.span.end, &member_spans)
             }
     }
@@ -598,7 +600,7 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: Vec<_> =
+                let trailing: CommentVec<'_> =
                     comments_in_range(self.comments, member_content_end, upper_bound)
                         .filter(|c| self.is_same_line(member_content_end, c.span.start))
                         .collect();
@@ -648,7 +650,7 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: Vec<_> =
+                let trailing: CommentVec<'_> =
                     comments_in_range(self.comments, member_content_end, upper_bound).collect();
 
                 if is_last {
@@ -716,15 +718,15 @@ impl<'a> Printer<'a> {
                 if !has_leading && !has_trailing {
                     return inner;
                 }
-                let leading: Vec<_> = if has_leading {
+                let leading: CommentVec<'_> = if has_leading {
                     comments_in_range(self.comments, p.span.start + 1, inner_start).collect()
                 } else {
-                    Vec::new()
+                    smallvec![]
                 };
-                let trailing: Vec<_> = if has_trailing {
+                let trailing: CommentVec<'_> = if has_trailing {
                     comments_in_range(self.comments, inner_end, p.span.end - 1).collect()
                 } else {
-                    Vec::new()
+                    smallvec![]
                 };
                 // A line comment forces the type-argument list to break. Emit
                 // `break_parent` FIRST so it sits behind the inner type's group in the

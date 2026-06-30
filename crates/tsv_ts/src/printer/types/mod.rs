@@ -35,6 +35,7 @@ pub use helpers::{should_hug_union_type, unwrap_parenthesized};
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
+use crate::printer::CommentVec;
 use crate::printer::calls::PartitionedComments;
 use crate::printer::layout::hang_after_operator;
 use helpers::type_needs_parens_for_indexed_access_object;
@@ -450,7 +451,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn paren_leading_line_comments(
         &self,
         p: &TSParenthesizedType<'_>,
-    ) -> Vec<&tsv_lang::Comment> {
+    ) -> CommentVec<'_> {
         comments_in_range(
             self.comments,
             p.span.start + 1,

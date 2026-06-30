@@ -36,9 +36,16 @@ pub(crate) use declarations::HeritageKeyword;
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};
 
+use smallvec::SmallVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{Comment, comments_in_range};
+
+/// Small stack-allocated vector of comment references. Inline capacity 4 keeps
+/// the common comment gaps off the heap: 0–2 comments are the bulk, and a short
+/// stacked `//` block (3–4 lines, common in documented code) still fits inline.
+/// A larger run spills to a single heap alloc — exactly what a `Vec` would do.
+pub(crate) type CommentVec<'a> = SmallVec<[&'a Comment; 4]>;
 
 /// Spacing style for comments in doc building
 #[derive(Debug, Clone, Copy)]
