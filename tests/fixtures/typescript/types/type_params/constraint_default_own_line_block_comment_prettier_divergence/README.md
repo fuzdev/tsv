@@ -20,7 +20,8 @@ Block comments inline losslessly, so neither formatter wraps or expands the `<�
 they differ only on which side of `extends`/`=` the comment lands for the own-line
 authoring. Per [Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy),
 tsv keeps the comment where the author wrote it relative to the bound type. Only a
-**line** comment or a **multiline** block comment still expands the `<…>` and hangs
-the bound type on its own line. Covers the `extends` constraint and the `=` default.
+**line** comment or an **own-line multiline** block comment still expands the `<…>`
+and hangs the bound type on its own line (a glued multiline block collapses inline
+and keeps `<…>` collapsed). Covers the `extends` constraint and the `=` default.
 
 See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

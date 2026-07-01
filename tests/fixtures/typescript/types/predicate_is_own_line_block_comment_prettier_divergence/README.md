@@ -22,7 +22,7 @@ which side of `is` the comment lands for the own-line authoring. Per
 tsv keeps the comment where the author wrote it relative to the predicate type
 (after `is`) rather than floating it onto the parameter. Only a **line** comment
 ([predicate_is_line_comment](../predicate_is_line_comment_prettier_divergence/) —
-prettier floats it to the body `{`) or a **multiline** block comment still hangs the
-predicate type on its own line.
+prettier floats it to the body `{`) or an **own-line multiline** block comment still
+hangs the predicate type on its own line (a glued multiline block collapses inline).
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

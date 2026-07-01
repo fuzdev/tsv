@@ -17,7 +17,10 @@ Block comments inline losslessly, so the collapse never drops information; the
 prefix operators are an *in-place-collapse* gap (prettier keeps the comment after
 the operator rather than relocating it). Only a **line** comment (which can't
 inline — [type_operator_keyword_line_comment](../type_operator_keyword_line_comment_prettier_divergence/))
-or a **multiline** block comment still hangs the operand on its own line. Covers
-`keyof`, `typeof` (a `TypeQuery` node), and `readonly`.
+or an **own-line multiline** block comment
+([type_operator_keyword_own_line_multiline_block_comment](../type_operator_keyword_own_line_multiline_block_comment_prettier_divergence/))
+still hangs the operand on its own line — a **glued** multiline block collapses
+inline ([keyword_value_glued_multiline_block_comment](../keyword_value_glued_multiline_block_comment/)).
+Covers `keyof`, `typeof` (a `TypeQuery` node), and `readonly`.
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

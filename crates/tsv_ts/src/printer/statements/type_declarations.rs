@@ -9,7 +9,7 @@ use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Comment, Span, SymbolToU32, comments_in_range};
+use tsv_lang::{Span, SymbolToU32, comments_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -52,11 +52,6 @@ fn type_has_internal_breaking(ts_type: &TSType<'_>) -> bool {
 }
 
 impl<'a> Printer<'a> {
-    /// Check if a comment spans multiple lines (block comment with newlines)
-    fn is_multiline_comment(&self, comment: &Comment) -> bool {
-        comment.is_block && !self.is_same_line(comment.span.start, comment.span.end)
-    }
-
     /// Build a doc for type alias declaration with proper line breaking
     ///
     /// For union types that don't fit on one line:
@@ -192,13 +187,14 @@ impl<'a> Printer<'a> {
     /// `=` (true for the inline `... =` form, false when the caller has already
     /// emitted a hardline, e.g. after an own-line pre-`=` comment).
     /// A prefix type operator (`keyof` / `typeof`) whose keyword→operand gap holds
-    /// a comment that forces the operand onto its own line — a **line** comment or a
-    /// **multiline** block comment. Such a value hangs the operand, so the type-alias
-    /// RHS keeps the operator on the `=` line (the operand hangs via the operator's
-    /// own layout) instead of breaking after `=` — consistent with the conditional /
-    /// internal-breaking arms. A **single-line** block comment (own-line, trailing, or
-    /// glued) collapses inline, so this returns false and the comment-free `=` layout
-    /// applies; a long *comment-free* operator still breaks after `=` (the
+    /// a comment that forces the operand onto its own line — a **line** comment or an
+    /// **own-line multiline** block comment. Such a value hangs the operand, so the
+    /// type-alias RHS keeps the operator on the `=` line (the operand hangs via the
+    /// operator's own layout) instead of breaking after `=` — consistent with the
+    /// conditional / internal-breaking arms. A **single-line** block comment (any
+    /// position) or a **glued** multiline block comment collapses inline, so this
+    /// returns false; the comment-free `=` layout then keeps the (short) value on the
+    /// `=` line, and a long *comment-free* operator still breaks after `=` (the
     /// hanging-indent arm). Mirrors the printer-side gate
     /// (`comments_force_own_line_between`) so the two stay in lockstep.
     fn type_operator_comment_forces_operand_own_line(&self, ty: &TSType<'_>) -> bool {
@@ -254,7 +250,7 @@ impl<'a> Printer<'a> {
             let comments: CommentVec<'_> =
                 comments_in_range(self.comments, eq_pos + 1, type_start).collect();
             for (idx, comment) in comments.iter().enumerate() {
-                let multiline_block = comment.is_block && self.is_multiline_comment(comment);
+                let multiline_block = comment.multiline;
                 let authored_on_eq_line = self.is_same_line(eq_pos, comment.span.start);
                 if idx == 0 && !multiline_block && authored_on_eq_line {
                     inline_parts.push(d.text(" "));
@@ -345,18 +341,39 @@ impl<'a> Printer<'a> {
                 let type_doc = self.build_type_doc(value_type);
                 parts.push(d.text(" "));
                 parts.push(type_doc);
-            } else if self.type_operator_comment_forces_operand_own_line(value_type) {
-                // keyof/typeof with a comment after the operator that forces the
-                // operand down: keep the operator on the `=` line; its operand hangs
-                // on the next line (consistent with the conditional / internal-breaking
-                // arms).
-                let type_doc = self.build_type_doc(value_type);
-                parts.push(d.text(" "));
-                parts.push(type_doc);
             } else {
-                // Other types: break after `=` with a hanging indent when too long
+                // Remaining types break after `=` with a hanging indent when too
+                // long — unless a comment keeps the value on the `=` line, in which
+                // case hug it there (like the internal-breaking / conditional arms):
+                //
+                //   - a prefix type operator (`keyof`/`typeof`) whose comment forces
+                //     the operand onto its own line — the operator stays on `=`, its
+                //     operand hangs via the operator's own layout; or
+                //   - any value that `will_break` only from a *glued* comment (a
+                //     multiline block whose operand stays inline — `keyof /* … */ B`,
+                //     `A[/* … */ K]`): `hang_after_operator` would break on that
+                //     spurious `will_break`, but prettier keeps it on the `=` line.
+                //     The comment must not force an own-line break — a line comment
+                //     or an own-line block hangs the operand for real and still
+                //     breaks after `=` (e.g. indexed_access_line_comment).
+                //
+                // A comment-free value that doesn't `will_break` hangs (long case).
                 let type_doc = self.build_type_doc(value_type);
-                parts.push(hang_after_operator(d, type_doc));
+                let value_span = value_type.span();
+                let hug = self.type_operator_comment_forces_operand_own_line(value_type)
+                    || (d.will_break(type_doc)
+                        && tsv_lang::has_comments_in_range(
+                            self.comments,
+                            value_span.start,
+                            value_span.end,
+                        )
+                        && !self.comments_force_own_line_between(value_span.start, value_span.end));
+                if hug {
+                    parts.push(d.text(" "));
+                    parts.push(type_doc);
+                } else {
+                    parts.push(hang_after_operator(d, type_doc));
+                }
             }
         }
 
@@ -658,7 +675,7 @@ impl<'a> Printer<'a> {
                             return true;
                         }
                         // Also keep multi-line block comments (they're always leading, never trailing)
-                        if self.is_multiline_comment(c) {
+                        if c.multiline {
                             return true;
                         }
                         // An inline comment that hugs this member on its line leads it
@@ -715,7 +732,7 @@ impl<'a> Printer<'a> {
             for comment in comments_in_range(self.comments, member.span().end, upper_bound) {
                 if self.is_same_line(member.span().end, comment.span.start) {
                     // Skip multi-line block comments (they're leading comments for next element)
-                    if self.is_multiline_comment(comment) {
+                    if comment.multiline {
                         continue;
                     }
                     // An inline comment that hugs the next member on its line leads that

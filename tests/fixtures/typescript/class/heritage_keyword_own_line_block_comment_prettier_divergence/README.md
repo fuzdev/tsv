@@ -29,7 +29,7 @@ stable form" cases — see the conformance-doc note for the others.) Per
 tsv keeps the comment where the author wrote it relative to the heritage type. Only a
 **line** comment
 ([extends_keyword_line_comment](../extends_keyword_line_comment_prettier_divergence/))
-or a **multiline** block comment still hangs the heritage type on its own line.
+or an **own-line multiline** block comment still hangs the heritage type on its own line (a glued multiline block collapses inline).
 Covers class `extends`, class `implements`, and interface `extends`.
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

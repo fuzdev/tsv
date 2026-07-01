@@ -18,6 +18,6 @@ whether the comment stays inside the brackets (tsv, in place) or moves out befor
 form — it is the reason to diverge, not merely the position preference. Per [Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy),
 tsv keeps the comment where the author wrote it relative to the index. Only a **line**
 comment ([indexed_access_line_comment](../indexed_access_line_comment_prettier_divergence/))
-or a **multiline** block comment still hangs the index on its own line.
+or an **own-line multiline** block comment still hangs the index on its own line (a glued multiline block collapses inline).
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

@@ -22,7 +22,8 @@ which side of `extends` the comment lands for the own-line authoring. Per
 tsv keeps the comment where the author wrote it relative to the extends-type. Only a
 **line** comment
 ([check_extends_line_comment](../check_extends_line_comment_prettier_divergence/) —
-prettier relocates it to trail the extends-type) or a **multiline** block comment
-still hangs the extends-type on its own line and forces the conditional to break.
+prettier relocates it to trail the extends-type) or an **own-line multiline** block
+comment still hangs the extends-type on its own line and forces the conditional to
+break (a glued multiline block collapses inline).
 
 See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

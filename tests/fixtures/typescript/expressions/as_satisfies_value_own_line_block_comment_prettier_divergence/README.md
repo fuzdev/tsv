@@ -21,7 +21,8 @@ which side of `as`/`satisfies` the comment lands for the own-line authoring. Per
 tsv keeps the comment where the author wrote it relative to the cast type. Only a
 **line** comment
 ([as_satisfies_value_line_comment](../as_satisfies_value_line_comment_prettier_divergence/) —
-prettier floats it past the statement `;`) or a **multiline** block comment still
-hangs the cast type on its own line.
+prettier floats it past the statement `;`) or an **own-line multiline** block
+comment still hangs the cast type on its own line (a glued multiline block
+collapses inline).
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

@@ -17,7 +17,7 @@ Block comments inline losslessly, so the collapse never drops information; `infe
 like the prefix type operators, is an *in-place-collapse* gap (prettier keeps the
 comment after `infer` rather than relocating it). Only a **line** comment (which
 can't inline — [keyword_line_comment](../keyword_line_comment_prettier_divergence/))
-or a **multiline** block comment still hangs the inferred name on its own line.
+or an **own-line multiline** block comment still hangs the inferred name on its own line (a glued multiline block collapses inline).
 Covers the bare inferred name and the `extends`-constrained form.
 
 See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
