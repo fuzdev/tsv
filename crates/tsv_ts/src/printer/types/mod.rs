@@ -133,6 +133,21 @@ impl<'a> Printer<'a> {
                         b'i',
                     )
                     .map(|i_pos| (i_pos + "is".len()) as u32);
+                    // Block comment(s) in the parameter→`is` gap (`x /* c */ is T`,
+                    // also `asserts x /* c */ is T` and `this /* c */ is T`) are
+                    // preserved inline before `is`, matching prettier. A line comment
+                    // can't occur here — a newline before `is` is a parse error — so
+                    // only the block form reaches this gap; emitting nothing (the
+                    // previous behavior) was silent content loss. See
+                    // predicate_param_is_block_comment.
+                    if let Some(is_end) = is_end {
+                        let is_start = is_end - "is".len() as u32;
+                        parts.push(self.build_comments_between(
+                            param_end,
+                            is_start,
+                            CommentSpacing::Leading,
+                        ));
+                    }
                     // A line comment or multiline block after `is` hangs the predicate
                     // type on the next line; a single-line block comment (own-line,
                     // trailing, or glued) collapses inline (the else branch). Prettier

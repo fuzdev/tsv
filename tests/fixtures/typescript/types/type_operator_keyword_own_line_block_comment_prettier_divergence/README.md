@@ -9,7 +9,9 @@ on its own line. The own-line authoring (`type A = keyof⏎/* a */⏎B`,
 - **tsv** collapses the operand break in one pass: `type A = keyof /* a */ B;`.
 - **Prettier** reaches the same inline form but is **non-idempotent** — its first
   pass pulls the comment onto the operator line yet leaves the operand on the next
-  line (`keyof /* a */⏎B`), collapsing fully only on a second pass.
+  line (`keyof /* a */⏎B`), collapsing fully only on a second pass. That unstable
+  first pass is pinned by `prettier_intermediate_own_line.svelte` (the validator
+  confirms it reconverges to `input`).
 
 Block comments inline losslessly, so the collapse never drops information; the
 prefix operators are an *in-place-collapse* gap (prettier keeps the comment after

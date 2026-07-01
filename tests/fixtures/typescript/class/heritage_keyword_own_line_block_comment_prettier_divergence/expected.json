@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 357,
+	"end": 457,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " to this. Prettier relocates the comment before the keyword.",
+			"value": " to this. Prettier keeps it on its own line before the keyword (it relocates the",
 			"start": 185,
-			"end": 247,
+			"end": 267,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -54,22 +54,38 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 63
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment across the keyword but, unlike the other gaps, does not inline it).",
+			"start": 269,
+			"end": 347,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 79
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " a ",
-			"start": 265,
-			"end": 272,
+			"start": 365,
+			"end": 372,
 			"loc": {
 				"start": {
-					"line": 5,
+					"line": 6,
 					"column": 17
 				},
 				"end": {
-					"line": 5,
+					"line": 6,
 					"column": 24
 				}
 			}
@@ -77,15 +93,15 @@
 		{
 			"type": "Block",
 			"value": " b ",
-			"start": 299,
-			"end": 306,
+			"start": 399,
+			"end": 406,
 			"loc": {
 				"start": {
-					"line": 7,
+					"line": 8,
 					"column": 20
 				},
 				"end": {
-					"line": 7,
+					"line": 8,
 					"column": 27
 				}
 			}
@@ -93,15 +109,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 334,
-			"end": 341,
+			"start": 434,
+			"end": 441,
 			"loc": {
 				"start": {
-					"line": 9,
+					"line": 10,
 					"column": 21
 				},
 				"end": {
-					"line": 9,
+					"line": 10,
 					"column": 28
 				}
 			}
@@ -110,48 +126,48 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 356,
+		"end": 456,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 347,
+			"end": 447,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 10,
+					"line": 11,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "ClassDeclaration",
-					"start": 249,
-					"end": 277,
+					"start": 349,
+					"end": 377,
 					"loc": {
 						"start": {
-							"line": 5,
+							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 5,
+							"line": 6,
 							"column": 29
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 255,
-						"end": 256,
+						"start": 355,
+						"end": 356,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 6,
 								"column": 7
 							},
 							"end": {
-								"line": 5,
+								"line": 6,
 								"column": 8
 							}
 						},
@@ -159,15 +175,15 @@
 					},
 					"superClass": {
 						"type": "Identifier",
-						"start": 273,
-						"end": 274,
+						"start": 373,
+						"end": 374,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 6,
 								"column": 25
 							},
 							"end": {
-								"line": 5,
+								"line": 6,
 								"column": 26
 							}
 						},
@@ -176,22 +192,22 @@
 							{
 								"type": "Block",
 								"value": " a ",
-								"start": 265,
-								"end": 272
+								"start": 365,
+								"end": 372
 							}
 						]
 					},
 					"body": {
 						"type": "ClassBody",
-						"start": 275,
-						"end": 277,
+						"start": 375,
+						"end": 377,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 6,
 								"column": 27
 							},
 							"end": {
-								"line": 5,
+								"line": 6,
 								"column": 29
 							}
 						},
@@ -212,37 +228,43 @@
 						},
 						{
 							"type": "Line",
-							"value": " to this. Prettier relocates the comment before the keyword.",
+							"value": " to this. Prettier keeps it on its own line before the keyword (it relocates the",
 							"start": 185,
-							"end": 247
+							"end": 267
+						},
+						{
+							"type": "Line",
+							"value": " comment across the keyword but, unlike the other gaps, does not inline it).",
+							"start": 269,
+							"end": 347
 						}
 					]
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 280,
-					"end": 311,
+					"start": 380,
+					"end": 411,
 					"loc": {
 						"start": {
-							"line": 7,
+							"line": 8,
 							"column": 1
 						},
 						"end": {
-							"line": 7,
+							"line": 8,
 							"column": 32
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 286,
-						"end": 287,
+						"start": 386,
+						"end": 387,
 						"loc": {
 							"start": {
-								"line": 7,
+								"line": 8,
 								"column": 7
 							},
 							"end": {
-								"line": 7,
+								"line": 8,
 								"column": 8
 							}
 						},
@@ -252,29 +274,29 @@
 					"implements": [
 						{
 							"type": "TSExpressionWithTypeArguments",
-							"start": 307,
-							"end": 308,
+							"start": 407,
+							"end": 408,
 							"loc": {
 								"start": {
-									"line": 7,
+									"line": 8,
 									"column": 28
 								},
 								"end": {
-									"line": 7,
+									"line": 8,
 									"column": 29
 								}
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 307,
-								"end": 308,
+								"start": 407,
+								"end": 408,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 8,
 										"column": 28
 									},
 									"end": {
-										"line": 7,
+										"line": 8,
 										"column": 29
 									}
 								},
@@ -284,23 +306,23 @@
 								{
 									"type": "Block",
 									"value": " b ",
-									"start": 299,
-									"end": 306
+									"start": 399,
+									"end": 406
 								}
 							]
 						}
 					],
 					"body": {
 						"type": "ClassBody",
-						"start": 309,
-						"end": 311,
+						"start": 409,
+						"end": 411,
 						"loc": {
 							"start": {
-								"line": 7,
+								"line": 8,
 								"column": 30
 							},
 							"end": {
-								"line": 7,
+								"line": 8,
 								"column": 32
 							}
 						},
@@ -309,29 +331,29 @@
 				},
 				{
 					"type": "TSInterfaceDeclaration",
-					"start": 314,
-					"end": 346,
+					"start": 414,
+					"end": 446,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 9,
+							"line": 10,
 							"column": 33
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 324,
-						"end": 325,
+						"start": 424,
+						"end": 425,
 						"loc": {
 							"start": {
-								"line": 9,
+								"line": 10,
 								"column": 11
 							},
 							"end": {
-								"line": 9,
+								"line": 10,
 								"column": 12
 							}
 						},
@@ -340,29 +362,29 @@
 					"extends": [
 						{
 							"type": "TSExpressionWithTypeArguments",
-							"start": 342,
-							"end": 343,
+							"start": 442,
+							"end": 443,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 10,
 									"column": 29
 								},
 								"end": {
-									"line": 9,
+									"line": 10,
 									"column": 30
 								}
 							},
 							"expression": {
 								"type": "Identifier",
-								"start": 342,
-								"end": 343,
+								"start": 442,
+								"end": 443,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 10,
 										"column": 29
 									},
 									"end": {
-										"line": 9,
+										"line": 10,
 										"column": 30
 									}
 								},
@@ -372,23 +394,23 @@
 								{
 									"type": "Block",
 									"value": " c ",
-									"start": 334,
-									"end": 341
+									"start": 434,
+									"end": 441
 								}
 							]
 						}
 					],
 					"body": {
 						"type": "TSInterfaceBody",
-						"start": 344,
-						"end": 346,
+						"start": 444,
+						"end": 446,
 						"loc": {
 							"start": {
-								"line": 9,
+								"line": 10,
 								"column": 31
 							},
 							"end": {
-								"line": 9,
+								"line": 10,
 								"column": 33
 							}
 						},

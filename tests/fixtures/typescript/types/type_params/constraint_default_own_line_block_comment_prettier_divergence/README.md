@@ -7,9 +7,14 @@ on its own line. The own-line authoring (`<T extends⏎/* a */⏎U>`,
 `unformatted_ours_own_line.svelte`) is what tsv normalizes here.
 
 - **tsv** collapses to `type H<T extends /* a */ U> = T` — the comment stays after the
-  keyword, `<…>` inline.
+  keyword, `<…>` inline, in one pass.
 - **Prettier** collapses *and relocates* the comment before the keyword
-  (`<T /* a */ extends U>`).
+  (`<T /* a */ extends U>`), but reaches that form **non-idempotently**: its first
+  pass leaves the comment after the keyword and hangs the bound type
+  (`<T extends /* a */⏎U>`), and only its second pass moves the comment across. The
+  two-pass chain is pinned here by `prettier_intermediate_to_variant_own_line.svelte`
+  (the unstable first pass) and `variant_own_line.svelte` (the relocated fixed point,
+  dual-stable in both formatters).
 
 Block comments inline losslessly, so neither formatter wraps or expands the `<…>`;
 they differ only on which side of `extends`/`=` the comment lands for the own-line

@@ -7,9 +7,14 @@ glued, trailing `extends`, or on its own line. The own-line authoring
 here.
 
 - **tsv** collapses to `type A = X extends /* a */ Y ? T : F` — the comment stays
-  after `extends`, the conditional inline.
+  after `extends`, the conditional inline, in one pass.
 - **Prettier** collapses *and relocates* the comment before `extends`
-  (`X /* a */ extends Y ? T : F`).
+  (`X /* a */ extends Y ? T : F`), but reaches that form **non-idempotently**: its
+  first pass leaves the comment after `extends` and hangs the check type
+  (`X extends /* a */⏎Y`), and only its second pass moves the comment across. The
+  two-pass chain is pinned here by `prettier_intermediate_to_variant_own_line.svelte`
+  (the unstable first pass) and `variant_own_line.svelte` (the relocated fixed point,
+  dual-stable in both formatters).
 
 Block comments inline losslessly, so neither formatter wraps; they differ only on
 which side of `extends` the comment lands for the own-line authoring. Per

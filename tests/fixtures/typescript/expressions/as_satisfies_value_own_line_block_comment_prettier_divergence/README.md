@@ -6,9 +6,14 @@ on its own line. The own-line authoring (`x as⏎/* a */⏎A`,
 `unformatted_ours_own_line.svelte`) is what tsv normalizes here.
 
 - **tsv** collapses to `const a = x as /* a */ A` — the comment stays after the
-  keyword, on the cast type.
+  keyword, on the cast type, in one pass.
 - **Prettier** collapses *and relocates* the comment before the keyword
-  (`x /* a */ as A`).
+  (`x /* a */ as A`), but reaches that form **non-idempotently**: its first pass
+  leaves the comment after the keyword and hangs the type (`x as /* a */⏎A`), and
+  only its second pass moves the comment across (`x /* a */ as A`). The two-pass
+  chain is pinned here by `prettier_intermediate_to_variant_own_line.svelte` (the
+  unstable first pass) and `variant_own_line.svelte` (the relocated fixed point,
+  dual-stable in both formatters).
 
 Block comments inline losslessly, so neither formatter wraps; they differ only on
 which side of `as`/`satisfies` the comment lands for the own-line authoring. Per
