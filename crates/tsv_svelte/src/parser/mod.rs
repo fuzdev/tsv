@@ -303,18 +303,44 @@ pub(crate) fn subslice_offset(outer: &str, inner: &str) -> usize {
     (inner.as_ptr() as usize) - (outer.as_ptr() as usize)
 }
 
-/// Find the closing tag of a raw-text element (`<script>` / `<style>`) at or after
-/// `from`, matching Svelte's `/<\/tag\s*>/` (`tag` is the bare lowercase name, e.g.
-/// `b"script"`). Returns the byte offset of the `<`, or `None` if no close exists.
+/// Find the closing tag of a raw-text `<script>` / `<style>` at or after `from` — the
+/// byte offset of the `<` in `</tag…>`, or `None` if none exists. `tag` is the bare
+/// lowercase name (e.g. `b"script"`), matched as a full token: the byte after it must
+/// be whitespace or `>`, so `</scripts>` never matches.
 ///
-/// A raw byte scan — like Svelte's `read_until(regex_closing_script_tag)` it finds
-/// the first textual `</tag\s*>` regardless of string/comment context, so a literal
-/// `"</script>"` in the body closes the block for both parsers (the shared,
-/// documented raw-text limitation). The `\s*` before `>` is why `</script  >` and
-/// `</style\n>` parse — an earlier exact-`</tag>` byte match rejected any whitespace
-/// there. The name must be a full token (`</scripts>` does not match) since the byte
-/// after `tag` must be whitespace or `>`.
+/// A raw byte scan — like Svelte's `read_until(regex_closing_script_tag)` it matches the
+/// first *textual* `</tag…>` regardless of string/comment context, so a literal
+/// `"</script>"` in the body closes the block for both parsers (the shared, documented
+/// raw-text limitation).
+///
+/// Two variants mirror Svelte's own two code paths — **do not collapse them:**
+///
+/// - `find_raw_text_close` tolerates whitespace before `>` (`/<\/tag\s*>/`), for the
+///   **top-level** component `<script>` / `<style>` Svelte reads via `read_script` /
+///   `read_style` — so `</script  >` and `</style\n>` parse.
+/// - `find_exact_tag_close` requires an exact `</tag>`, for a **nested** `<script>` /
+///   `<style>` in markup, which Svelte reads through its generic element parser: it
+///   rejects `</script  >` there, and tsv matches that (verified parity). Migrating it
+///   to the whitespace-tolerant scan would introduce a divergence.
 pub(crate) fn find_raw_text_close(bytes: &[u8], from: usize, tag: &[u8]) -> Option<usize> {
+    find_tag_close(bytes, from, tag, true)
+}
+
+/// Exact-`</tag>` sibling of `find_raw_text_close` (no whitespace before `>`); see there
+/// for the whitespace-tolerant-vs-exact split and why both exist.
+pub(crate) fn find_exact_tag_close(bytes: &[u8], from: usize, tag: &[u8]) -> Option<usize> {
+    find_tag_close(bytes, from, tag, false)
+}
+
+/// Shared core of `find_raw_text_close` / `find_exact_tag_close`; `allow_ws_before_gt`
+/// selects the whitespace-tolerant (`\s*>`) vs exact (`>`) close. Callers pick a named
+/// wrapper so the boolean never reaches a call site.
+fn find_tag_close(
+    bytes: &[u8],
+    from: usize,
+    tag: &[u8],
+    allow_ws_before_gt: bool,
+) -> Option<usize> {
     let mut i = from;
     while i < bytes.len() {
         if bytes[i] == b'<'
@@ -322,8 +348,10 @@ pub(crate) fn find_raw_text_close(bytes: &[u8], from: usize, tag: &[u8]) -> Opti
             && bytes.get(i + 2..).is_some_and(|rest| rest.starts_with(tag))
         {
             let mut j = i + 2 + tag.len();
-            while bytes.get(j).is_some_and(u8::is_ascii_whitespace) {
-                j += 1;
+            if allow_ws_before_gt {
+                while bytes.get(j).is_some_and(u8::is_ascii_whitespace) {
+                    j += 1;
+                }
             }
             if bytes.get(j) == Some(&b'>') {
                 return Some(i);

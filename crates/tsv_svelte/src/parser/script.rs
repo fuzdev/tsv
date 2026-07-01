@@ -55,28 +55,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             self.arena,
         )?;
 
-        // Reposition the lexer to the closing `</script>` tag (resumes at `<`).
+        // Reposition the lexer to the closing `</script>` tag (resumes at `<`) and
+        // consume it; `find_raw_text_close` already guaranteed it exists.
         self.advance_to_position(content_end)?;
-
-        // Verify it's the closing tag: </script>
-        if !self.check(TokenKind::LeftAngle) {
-            return Err(self.error_expected_found("'</script>'"));
-        }
-        self.advance()?; // consume <
-
-        if !self.check(TokenKind::Slash) {
-            return Err(self.error_expected_found("'/'"));
-        }
-        self.advance()?; // consume /
-
-        if !self.check(TokenKind::Identifier) || self.current_value() != "script" {
-            return Err(self.error_expected_found("'script'"));
-        }
-        self.advance()?; // consume script
-
-        // Save end position before consuming >
-        let end = self.current_end;
-        self.expect(TokenKind::RightAngle)?; // consume >
+        let end = self.parse_closing_tag("script")?;
 
         // Detect script context from attributes
         // Module scripts can be specified as:
@@ -90,7 +72,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             context,
             span: Span {
                 start: start as u32,
-                end: end as u32,
+                end,
             },
         })
     }

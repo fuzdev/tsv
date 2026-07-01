@@ -37,28 +37,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let content_end = find_raw_text_close(self.source.as_bytes(), content_start, b"style")
             .ok_or_else(|| self.error_msg_at("Unterminated style tag", start))?;
 
-        // Reposition the lexer to the closing `</style>` tag (resumes at `<`).
+        // Reposition the lexer to the closing `</style>` tag (resumes at `<`) and
+        // consume it; `find_raw_text_close` already guaranteed it exists.
         self.advance_to_position(content_end)?;
-
-        // Verify it's the closing tag: </style>
-        if !self.check(TokenKind::LeftAngle) {
-            return Err(self.error_expected_found("'</style>'"));
-        }
-        self.advance()?; // consume <
-
-        if !self.check(TokenKind::Slash) {
-            return Err(self.error_expected_found("'/'"));
-        }
-        self.advance()?; // consume /
-
-        if !self.check(TokenKind::Identifier) || self.current_value() != "style" {
-            return Err(self.error_expected_found("'style'"));
-        }
-        self.advance()?; // consume style
-
-        // Save end position before consuming >
-        let end = self.current_end;
-        self.expect(TokenKind::RightAngle)?; // consume >
+        let end = self.parse_closing_tag("style")?;
 
         // Parse CSS content (shares the document's bump arena)
         let css_content = &self.source[content_start..content_end];
@@ -67,7 +49,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(Style {
             span: Span {
                 start: start as u32,
-                end: end as u32,
+                end,
             },
             content_span: Span {
                 start: content_start as u32,
