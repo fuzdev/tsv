@@ -49,6 +49,28 @@ pub fn translate_byte_to_char_offsets_typed(
     t.program(program);
 }
 
+/// Translate all byte-based positions in a single typed `Expression` subtree
+/// to UTF-16 code-unit positions, in place.
+///
+/// The expression-level sibling of `translate_byte_to_char_offsets_typed`, for
+/// hosts that embed typed `Expression`s inside their own public AST —
+/// `tsv_svelte`'s typed walk calls this for every template expression field
+/// (`{expr}` tags, block tests, snippet parameters, …). Spans are in host-file
+/// coordinates, so `map`/`tracker` must be built from the host document.
+///
+/// For ASCII-only sources this is a no-op (byte == UTF-16 offset).
+pub fn translate_expression_byte_to_char_offsets_typed(
+    expression: &mut Expression<'_>,
+    map: &ByteToCharMap,
+    tracker: &LocationTracker,
+) {
+    if !map.has_multibyte() {
+        return;
+    }
+    let t = Translator { map, tracker };
+    t.expression(expression);
+}
+
 struct Translator<'a> {
     map: &'a ByteToCharMap,
     tracker: &'a LocationTracker,

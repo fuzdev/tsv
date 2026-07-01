@@ -13,14 +13,15 @@
 //!   to_string. The shipped path instead runs convert → typed translate
 //!   (multibyte only) → direct to_string — both pipelines are timed.
 //! - **svelte**: convert → to_value → attach (template expression comments,
-//!   mutates the `Value`) → translate → to_string; the shipped fast path
-//!   (direct serialization) applies only when the source is eligible,
-//!   others take the `Value` path
+//!   mutates the `Value`) → translate → to_string for the `Value` path; the
+//!   shipped path runs convert → typed translate (multibyte only) → direct
+//!   to_string, and applies whenever no comments fall outside `<script>`
+//!   (template-comment files take the `Value` path — the attach pass is
+//!   still `Value`-based)
 //! - **css**: same shape as typescript — convert (typed public AST) →
 //!   to_value → translate → to_string for the `Value` path; the shipped path
 //!   runs convert → typed translate (multibyte only) → direct to_string. CSS
-//!   has no `loc`/columns and no `attach` pass, so the typed walk handles
-//!   multibyte directly (like typescript, unlike svelte)
+//!   has no `loc`/columns and no `attach` pass
 //!
 //! Per-language fast-path eligibility is documented in
 //! `docs/architecture.md` §Closed Scope, Open Convention.
@@ -28,12 +29,12 @@
 //! The direct path must be byte-identical to the `Value` path (serde_json is
 //! built with `preserve_order`, keeping struct-field key order; the typed
 //! translation walk must match the `Value` walk). The command checks this per
-//! file and reports mismatches — for typescript and css on **every** file
-//! including multibyte (the typed walk runs before `direct` is captured); for
-//! svelte on ASCII files only, where a mismatch means the attach pass moved
-//! comments into the tree (`convert_ast_json_string` gates on this and falls
-//! back to the `Value` path). The shipped function is identity-checked against
-//! the `Value` path on **every** file, eligible or not.
+//! file and reports mismatches on **every** file including multibyte (each
+//! language's typed walk runs before `direct` is captured); for svelte a
+//! mismatch means the attach pass moved template comments into the tree
+//! (`convert_ast_json_string` gates on this and falls back to the `Value`
+//! path). The shipped function is identity-checked against the `Value` path
+//! on **every** file, eligible or not.
 //!
 //! **Sub-step timings exclude drop costs** — each intermediate (public tree,
 //! `Value`, strings) outlives its timed region. Recursively freeing a large
@@ -118,8 +119,7 @@ impl JsonProfileCommand {
 }
 
 /// Per-file medians for each sub-step (µs). Steps not applicable to a
-/// language stay 0 (`attach` for ts/css; `typed_translate` for svelte, which
-/// has no typed direct path).
+/// language stay 0 (`attach` for ts/css).
 struct FileResult {
     path: PathBuf,
     size: usize,
@@ -137,10 +137,10 @@ struct FileResult {
     value_us: f64,
     shipped_us: f64,
     /// Whether the direct path's output is byte-identical to the `Value`
-    /// path's. `None` when not comparable (svelte multibyte sources, which
-    /// fall back to the `Value` path and have no typed translation walk).
-    /// Comparable on every typescript and css file — their typed walks
-    /// translate multibyte trees before `direct` is captured.
+    /// path's. Comparable on every file — each language's typed walk
+    /// translates multibyte trees before `direct` is captured. For svelte a
+    /// `false` means the attach pass moved template comments into the tree
+    /// (those files the shipped gate routes to the `Value` fallback).
     direct_match: Option<bool>,
     /// Whether `convert_ast_json_string` (the shipped FFI path) is
     /// byte-identical to the `Value` path. Comparable on every file.
@@ -345,8 +345,11 @@ fn profile_whole_calls<I>(
 }
 
 /// One Svelte iteration. Sub-steps mirror `tsv_svelte::convert_ast_json`,
-/// which has an extra `Value`-mutating pass: template expression comment
-/// attachment between to_value and translate.
+/// which has an extra `Value`-mutating pass (template expression comment
+/// attachment between to_value and translate); `typed_translate` + `direct`
+/// mirror the shipped typed pipeline (`convert_ast_json_string`'s direct
+/// path). The typed walk mutates the public tree in place, so it runs only
+/// after `to_value` has captured the untranslated tree.
 #[allow(clippy::expect_used)] // mirrors convert_ast_json's own expect on Serialize
 fn profile_svelte_once(
     source: &str,
@@ -360,7 +363,7 @@ fn profile_svelte_once(
     steps.parse.push(t.elapsed());
 
     let t = Instant::now();
-    let public_ast = tsv_svelte::ast::convert::convert_root(&ast, source);
+    let mut public_ast = tsv_svelte::ast::convert::convert_root(&ast, source);
     steps.convert.push(t.elapsed());
 
     let t = Instant::now();
@@ -388,21 +391,35 @@ fn profile_svelte_once(
     let wire = serde_json::to_string(&value).expect("Value serialization cannot fail");
     steps.to_string.push(t.elapsed());
 
+    // Mirror the shipped direct path: map build inside the timed region (see
+    // profile_ts_once's rationale), tracker built only when multibyte —
+    // exactly as `convert_ast_json_string` does.
+    let t = Instant::now();
+    let typed_map = ByteToCharMap::new(source);
+    if typed_map.has_multibyte() {
+        let typed_tracker = LocationTracker::new(source);
+        tsv_svelte::ast::convert::translate_byte_to_char_offsets_typed(
+            &mut public_ast,
+            &typed_map,
+            &typed_tracker,
+        );
+    }
+    steps.typed_translate.push(t.elapsed());
+
     let t = Instant::now();
     let direct = serde_json::to_string(&public_ast).expect("AST types derive Serialize correctly");
     steps.direct.push(t.elapsed());
 
     let first = meta.is_none();
     if first {
-        let multibyte = map.has_multibyte();
         *meta = Some(IterMeta {
-            multibyte,
+            multibyte: map.has_multibyte(),
             wire_bytes: wire.len(),
-            direct_match: if multibyte {
-                None
-            } else {
-                Some(wire == direct)
-            },
+            // Comparable on every file (the typed walk translated multibyte
+            // trees above); a mismatch means the attach pass moved template
+            // comments into the tree — those files the shipped gate routes to
+            // the `Value` fallback.
+            direct_match: Some(wire == direct),
             shipped_match: None, // filled in by profile_whole_calls
         });
     }
@@ -520,10 +537,10 @@ struct LangAggregate {
 impl LangAggregate {
     /// Does this language run a `Value`-mutating pass between `convert` and
     /// `to_string` (svelte's comment `attach`)? TS and CSS don't — their typed
-    /// direct path handles every file (incl. multibyte), so `direct == value`
-    /// is comparable on all files and the typed-pipeline sub-step sum is an
-    /// honest stand-in for the shipped call. Svelte does, and falls back to the
-    /// `Value` path per multibyte file, so its sub-step sum would understate it.
+    /// direct path handles every file, so the typed-pipeline sub-step sum is
+    /// an honest stand-in for the shipped call. Svelte does: files with
+    /// template-expression comments fall back to the `Value` path, so its
+    /// sub-step sum would understate the shipped call on those.
     fn has_value_mutating_pass(&self) -> bool {
         self.attach_us > 0.0
     }
@@ -617,14 +634,15 @@ fn print_report(
             "  direct to_string {:>10}  (to_string(&public_ast), skips Value)",
             format_duration(a.direct_us)
         );
+        eprintln!(
+            "  typed translate  {:>10}  (map build + typed walk; walk is multibyte-only)",
+            format_duration(a.typed_translate_us)
+        );
         // The shipped typed pipeline as a sub-step sum (drops excluded) is an
-        // honest stand-in only without a Value-mutating pass (svelte's `attach`).
-        // TS and CSS have none; the typed walk early-returns on ASCII files.
+        // honest stand-in only without a Value-mutating pass (svelte's `attach`):
+        // svelte's template-comment files take the Value fallback, so its
+        // sub-step sum would understate the shipped call on those.
         if !a.has_value_mutating_pass() {
-            eprintln!(
-                "  typed translate  {:>10}  (map build + typed walk; walk is multibyte-only)",
-                format_duration(a.typed_translate_us)
-            );
             let typed_pipeline = a.convert_us + a.typed_translate_us + a.direct_us;
             eprintln!(
                 "  typed pipeline   {:>10}  = convert + typed translate + direct → {:.2}x of materialization",
@@ -653,11 +671,11 @@ fn print_report(
         eprintln!(
             "  direct == value on {}/{comparable} comparable files{}",
             a.direct_match,
-            // Svelte's typed direct path matches the Value path only on ASCII
-            // files (it falls back to the Value path per multibyte file); TS/CSS
-            // typed walks handle multibyte too.
+            // A svelte mismatch is the attach pass moving template comments
+            // into the tree — those files the shipped gate routes to the
+            // Value fallback, so a mismatch here is expected, not a bug.
             if a.has_value_mutating_pass() {
-                " (ASCII only)"
+                " (mismatch = template-comment files, shipped falls back)"
             } else {
                 ""
             },

@@ -938,7 +938,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     value: LiteralValue::String(cooked),
                     ..
                 },
-            ) => cooked.resolve(lit.span, self.source).to_string(),
+            ) => self.resolve_cooked(cooked, lit.span).to_string(),
             // Attribute keys are only identifiers or string literals.
             ImportAttributeKey::Literal(_) => String::new(),
         }
