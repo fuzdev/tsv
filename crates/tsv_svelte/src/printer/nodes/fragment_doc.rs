@@ -141,11 +141,8 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if docs.is_empty() {
-            self.d().empty()
-        } else {
-            self.d().concat(&docs)
-        }
+        // `concat` short-circuits the empty case to `empty()`.
+        self.d().concat(&docs)
     }
 
     /// Find the inclusive-exclusive index range of `nodes` after trimming boundary nodes for
@@ -376,11 +373,8 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if child_docs.is_empty() {
-            d.empty()
-        } else {
-            d.concat(&child_docs)
-        }
+        // `concat` short-circuits the empty case to `empty()`.
+        d.concat(&child_docs)
     }
 
     /// Check if a node is an expression-like tag (ExpressionTag, HtmlTag, RenderTag).

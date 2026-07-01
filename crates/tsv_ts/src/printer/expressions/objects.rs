@@ -588,11 +588,8 @@ impl<'a> Printer<'a> {
                         lhs_parts.push(d.text(" "));
                         lhs_parts.push(self.build_comment_doc(comment));
                     }
-                    let lhs_doc = if lhs_parts.len() == 1 {
-                        key_doc
-                    } else {
-                        d.concat(&lhs_parts)
-                    };
+                    // `concat` short-circuits the no-pre-colon-comment case to `key_doc`.
+                    let lhs_doc = d.concat(&lhs_parts);
 
                     // Build RHS: comments (with proper separators) + value
                     let comments_doc = self

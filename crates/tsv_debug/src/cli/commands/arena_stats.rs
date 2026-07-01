@@ -41,6 +41,11 @@ pub struct ArenaStatsCommand {
     #[argh(switch)]
     reuse: bool,
 
+    /// print the path + parse error for every file that failed to parse (the files
+    /// the corpus walk silently skips), then the normal report
+    #[argh(switch)]
+    list_errors: bool,
+
     /// file paths, directories, or glob patterns
     #[argh(positional)]
     paths: Vec<String>,
@@ -96,13 +101,26 @@ struct Stats {
     group_total: u64,
     group_of_group: u64,
     /// Sibling pre-size heuristics (same capacity-only audit as nodes/children):
-    /// the output `String` (`estimated_output_capacity` = `nodes.len()/4`, a stale
-    /// coupling to the old 4-nodes/byte) and the parse-side AST bump
-    /// (`estimated_ast_arena_capacity` = `source_len`).
+    /// the output `String` (`estimated_output_capacity`) and the parse-side AST
+    /// bump (`estimated_ast_arena_capacity`). `output_estimated` sums the former;
+    /// `bump_allocated` sums bumpalo's `allocated_bytes()` for the *production
+    /// pre-sized* bump (so it reads how over/under the current hint runs, NOT the
+    /// AST's demand).
     output_bytes: u64,
     output_capacity: u64,
     output_estimated: u64,
     bump_allocated: u64,
+    /// Per-file calibration distributions for the two sibling pre-sizes.
+    /// `output_per_node` = output bytes / node count — the multiplier
+    /// `estimated_output_capacity` (= `k * nodes.len()`) must clear at its chosen
+    /// percentile so the dense tail doesn't realloc. `bump_demand` = an
+    /// *un-pre-sized* `Bump::new()`'s `allocated_bytes()` / source len — the AST's
+    /// actual byte demand (≤2× inflated by bumpalo chunk doubling), the signal
+    /// `estimated_ast_arena_capacity` must clear (the `bump_allocated` aggregate
+    /// above is pre-size-dominated, so it can't calibrate itself). Sorted before
+    /// reporting.
+    output_per_node: Vec<f64>,
+    bump_demand: Vec<f64>,
 }
 
 impl ArenaStatsCommand {
@@ -118,8 +136,11 @@ impl ArenaStatsCommand {
 
         for path in &files {
             let parser = ParserType::from_extension(&path.to_string_lossy());
-            if collect_file(path, parser, &mut stats).is_err() {
+            if let Err(e) = collect_file(path, parser, &mut stats) {
                 parse_errors += 1;
+                if self.list_errors {
+                    eprintln!("parse-fail  {}  [{parser:?}]  {e}", path.display());
+                }
             }
         }
 
@@ -130,6 +151,8 @@ impl ArenaStatsCommand {
 
         stats.node_density.sort_by(f64::total_cmp);
         stats.children_density.sort_by(f64::total_cmp);
+        stats.output_per_node.sort_by(f64::total_cmp);
+        stats.bump_demand.sort_by(f64::total_cmp);
 
         if self.json {
             print_json(&stats, parse_errors);
@@ -218,25 +241,40 @@ fn run_reuse(files: &[std::path::PathBuf]) -> Result<(), CliError> {
     Ok(())
 }
 
+/// Parse `source` into an un-pre-sized bump and return its `allocated_bytes()` —
+/// bumpalo's grow-to-fit total, a proxy for the AST's true byte demand (inflated
+/// ≤2× by chunk doubling off the default first chunk). Only used to calibrate
+/// `estimated_ast_arena_capacity`; the AST is dropped with the bump. Returns 0 if
+/// the parse fails (the caller's first parse already succeeded, so it won't here).
+fn measure_bump_demand(source: &str, parser: ParserType) -> u64 {
+    let bump = bumpalo::Bump::new();
+    let ok = match parser {
+        ParserType::TypeScript => tsv_ts::parse(source, &bump).is_ok(),
+        ParserType::Svelte => tsv_svelte::parse(source, &bump).is_ok(),
+        ParserType::Css => tsv_css::parse(source, &bump).is_ok(),
+    };
+    if ok { bump.allocated_bytes() as u64 } else { 0 }
+}
+
 /// Format one file into a fresh arena and fold its node population into `stats`.
-/// Parse failures return `Err(())` (counted by the caller), never abort the walk.
+/// Parse failures return `Err(msg)` (counted/listed by the caller), never abort the walk.
 #[allow(clippy::cast_precision_loss)]
-fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<(), ()> {
-    let source = std::fs::read_to_string(path).map_err(|_| ())?;
+fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<(), String> {
+    let source = std::fs::read_to_string(path).map_err(|e| format!("read: {e}"))?;
     let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let arena = DocArena::for_source(&source);
 
     let output = match parser {
         ParserType::TypeScript => {
-            let ast = tsv_ts::parse(&source, &bump).map_err(|_| ())?;
+            let ast = tsv_ts::parse(&source, &bump).map_err(|e| format!("{e}"))?;
             tsv_ts::format_in(&ast, &source, &arena)
         }
         ParserType::Svelte => {
-            let ast = tsv_svelte::parse(&source, &bump).map_err(|_| ())?;
+            let ast = tsv_svelte::parse(&source, &bump).map_err(|e| format!("{e}"))?;
             tsv_svelte::format_in(&ast, &source, &arena)
         }
         ParserType::Css => {
-            let ast = tsv_css::parse(&source, &bump).map_err(|_| ())?;
+            let ast = tsv_css::parse(&source, &bump).map_err(|e| format!("{e}"))?;
             tsv_css::format_in(&ast, &source, &arena)
         }
     };
@@ -246,6 +284,12 @@ fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<()
     // exactly the reservation render used.
     stats.output_estimated += arena.estimated_output_capacity() as u64;
     stats.bump_allocated += bump.allocated_bytes() as u64;
+    // Demand signal for `estimated_ast_arena_capacity` calibration: re-parse into
+    // an UN-pre-sized bump so `allocated_bytes()` tracks bumpalo's own grow-to-fit
+    // (≤2× the true demand via chunk doubling), not the production pre-size the
+    // `bump` above carries. Second parse; the AST is discarded. Parse already
+    // succeeded above, so this cannot fail.
+    let demand = measure_bump_demand(&source, parser);
 
     let nodes = arena.borrow_nodes();
     let children = arena.borrow_children();
@@ -258,6 +302,10 @@ fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<()
     stats.children_capacity += children.capacity() as u64;
     stats.node_density.push(nodes.len() as f64 / len);
     stats.children_density.push(children.len() as f64 / len);
+    stats
+        .output_per_node
+        .push(output.len() as f64 / nodes.len().max(1) as f64);
+    stats.bump_demand.push(demand as f64 / len);
     let children_slice = children.as_slice();
     for n in nodes.iter() {
         *stats.node_hist.entry(classify_node(n)).or_default() += 1;
@@ -385,7 +433,7 @@ fn print_report(s: &Stats, parse_errors: usize) {
     );
     density_line("per-file children/byte", &s.children_density);
     eprintln!(
-        "  output:   {:>9} B  ({:.2}×source, {:.2}×nodes)  reserved {} (est_output=nodes/4)  → fill {:.1}%",
+        "  output:   {:>9} B  ({:.2}×source, {:.2}×nodes)  reserved {} (est_output=nodes*2)  → fill {:.1}%",
         s.output_bytes,
         s.output_bytes as f64 / s.bytes.max(1) as f64,
         s.output_bytes as f64 / s.nodes.max(1) as f64,
@@ -398,11 +446,13 @@ fn print_report(s: &Stats, parse_errors: usize) {
         s.output_bytes,
         s.output_bytes as f64 / s.output_estimated.max(1) as f64,
     );
+    density_line("per-file output/node  ", &s.output_per_node);
     eprintln!(
-        "  ast_bump: {:>9} B allocated  ({:.2}×source; heuristic estimated_ast_arena_capacity = 1×source)",
+        "  ast_bump: {:>9} B allocated  ({:.2}×source; production pre-size, NOT demand)",
         s.bump_allocated,
         s.bump_allocated as f64 / s.bytes.max(1) as f64,
     );
+    density_line("per-file bump demand/B", &s.bump_demand);
     eprintln!();
 
     eprintln!("  DocNode variants (share of all nodes):");
@@ -486,7 +536,7 @@ fn print_json(s: &Stats, parse_errors: usize) {
         s.group_of_group,
     );
     println!(
-        "{{\"files\":{},\"bytes\":{},\"nodes\":{},\"capacity\":{},\"children\":{},\"children_capacity\":{},\"output_bytes\":{},\"output_capacity\":{},\"output_estimated\":{},\"bump_allocated\":{},\"node_density\":{},\"children_density\":{},\"parse_errors\":{parse_errors},\"node_variants\":{},\"text_variants\":{},\"degeneracy\":{}}}",
+        "{{\"files\":{},\"bytes\":{},\"nodes\":{},\"capacity\":{},\"children\":{},\"children_capacity\":{},\"output_bytes\":{},\"output_capacity\":{},\"output_estimated\":{},\"bump_allocated\":{},\"node_density\":{},\"children_density\":{},\"output_per_node\":{},\"bump_demand\":{},\"parse_errors\":{parse_errors},\"node_variants\":{},\"text_variants\":{},\"degeneracy\":{}}}",
         s.files,
         s.bytes,
         s.nodes,
@@ -499,6 +549,8 @@ fn print_json(s: &Stats, parse_errors: usize) {
         s.bump_allocated,
         density_json(&s.node_density),
         density_json(&s.children_density),
+        density_json(&s.output_per_node),
+        density_json(&s.bump_demand),
         hist_json(NODE_KINDS, &s.node_hist),
         hist_json(TEXT_KINDS, &s.text_hist),
         degeneracy,

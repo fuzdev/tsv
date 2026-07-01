@@ -739,7 +739,9 @@ cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
 # arena, as the CLI/FFI/WASM batch drivers use). Covers .ts/.svelte.ts/.svelte/.css.
 # Pure Rust, no Deno. See ./docs/performance.md.
 cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib ~/dev/fuz_css/src/lib
-# Options: --json, --reuse (reset()-reuse high-water)
+# Options: --json, --reuse (reset()-reuse high-water), --list-errors (print the
+#   path + parse error for every file the walk skips — the fast first pass for
+#   finding tsv parse over-rejections; canonical-accepted ones are real gaps)
 
 # lex_diff - differential lexer harness: snapshot the raw token stream over a
 # corpus and diff it against a golden to prove token-stream identity (kind, start,

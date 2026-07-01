@@ -11,7 +11,7 @@ use string_interner::DefaultSymbol;
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
-use super::expression_lookahead::scan_parens_then_arrow;
+use super::expression_lookahead::{paren_pattern_then_type_operator, scan_parens_then_arrow};
 use super::scan::{
     is_identifier_continue, is_identifier_start, skip_identifier, skip_whitespace_and_comments,
 };
@@ -741,11 +741,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // matching `)` resolves it to a function type, so scan ahead for it and
         // skip the parenthesized-type shortcut. Other `is_definitely_type_start`
         // tokens stay unambiguous.
-        let pattern_param_function_type =
-            matches!(
-                self.current_kind(),
-                TokenKind::BracketOpen | TokenKind::BraceOpen
-            ) && scan_parens_then_arrow(self.source.as_bytes(), paren_offset);
+        //
+        // But `scan_parens_then_arrow` counts only parens, so inside an enclosing
+        // arrow's return type it mistakes that arrow's `=>` for this paren's own —
+        // misreading a parenthesized union/intersection type `({ b: B } | C)` /
+        // `([B] | C)` (in `(): A & ({ b: B } | C) => x`) as a param list. Rule it
+        // back out: a leading `{…}`/`[…]` directly followed by `|`/`&` is a
+        // union/intersection type, never a destructuring parameter.
+        let source_bytes = self.source.as_bytes();
+        let pattern_param_function_type = matches!(
+            self.current_kind(),
+            TokenKind::BracketOpen | TokenKind::BraceOpen
+        ) && scan_parens_then_arrow(source_bytes, paren_offset)
+            && !paren_pattern_then_type_operator(source_bytes, paren_offset);
 
         // Check if this is definitely a parenthesized type (not function params)
         // Tokens that can't be parameter names: keywords (typeof, new, import),
