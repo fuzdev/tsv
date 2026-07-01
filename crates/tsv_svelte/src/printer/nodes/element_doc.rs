@@ -774,7 +774,7 @@ impl<'a> Printer<'a> {
         // Raw content from fragment text nodes
         for node in element.fragment.nodes {
             if let FragmentNode::Text(text) = node {
-                parts.push(d.text_owned(text.raw(self.source).to_string()));
+                parts.push(d.source_span(text.raw_span, self.source));
             }
         }
 
@@ -1005,13 +1005,13 @@ impl<'a> Printer<'a> {
         if comment.is_block {
             d.concat(&[
                 d.text("/*"),
-                d.text_owned(comment.content(self.source).to_string()),
+                d.source_span(comment.content_span, self.source),
                 d.text("*/"),
             ])
         } else {
             d.concat(&[
                 d.text("//"),
-                d.text_owned(comment.content(self.source).to_string()),
+                d.source_span(comment.content_span, self.source),
             ])
         }
     }

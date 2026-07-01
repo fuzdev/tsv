@@ -7,6 +7,7 @@ use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
 use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -38,7 +39,7 @@ impl<'a> Printer<'a> {
             // (matches Prettier's replaceEndOfLine(node.value.raw) for TemplateElement).
             // Using literalline makes will_break() propagate correctly through
             // containing groups, so chains/calls break when they contain multiline templates.
-            parts.push(self.replace_end_of_line(quasi.raw(self.source), quasi.has_newline));
+            parts.push(self.replace_end_of_line(quasi.raw_span, quasi.has_newline));
 
             // Interpolation
             if i < template.expressions.len() {
@@ -189,19 +190,27 @@ impl<'a> Printer<'a> {
     /// Equivalent to Prettier's `replaceEndOfLine(text)` for TemplateElement nodes.
     /// `has_newline` is the caller's precomputed `text.contains('\n')` (the quasi's
     /// `has_newline` flag), so the common no-newline fast path skips re-scanning.
-    fn replace_end_of_line(&self, text: &str, has_newline: bool) -> DocId {
+    fn replace_end_of_line(&self, raw_span: Span, has_newline: bool) -> DocId {
         let d = self.d();
         if !has_newline {
-            return d.text_owned(text.to_string());
+            // Verbatim template chunk — emit the source slice, no allocation.
+            return d.source_span(raw_span, self.source);
         }
+        // Split on '\n' into literalline-separated parts. Each part is a subslice
+        // of the verbatim source slice, so track a running byte offset from
+        // `raw_span.start` and emit each as its own (allocation-free) span.
+        let text = raw_span.extract(self.source);
         let mut doc_parts = DocBuf::new();
+        let mut offset = raw_span.start;
         for (i, part) in text.split('\n').enumerate() {
             if i > 0 {
                 doc_parts.push(d.literalline());
             }
+            let part_len = part.len() as u32;
             if !part.is_empty() {
-                doc_parts.push(d.text_owned(part.to_string()));
+                doc_parts.push(d.source_span(Span::new(offset, offset + part_len), self.source));
             }
+            offset += part_len + 1; // +1 for the consumed '\n'
         }
         d.concat(&doc_parts)
     }

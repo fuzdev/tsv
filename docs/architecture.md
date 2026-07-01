@@ -293,7 +293,7 @@ Doc nodes are allocated in a contiguous `DocArena`. Each node is referenced by a
 
 ```rust
 pub enum DocNode {
-    Text(DocText),                              // Static, owned, or symbol
+    Text(DocText),                              // Static, owned, source-span, or symbol
     Line(LineKind),                             // Normal, soft, hard, literal
     Indent(DocId),                              // Increase indent
     Dedent(DocId),                              // Decrease indent
@@ -319,17 +319,18 @@ pub enum DocNode {
 
 **Look-Ahead** — When checking if a group fits, examine what follows. `(longExpr)!.method()` needs to consider the suffix when deciding whether to break.
 
-### DocText: Static, Owned, Symbol
+### DocText: Static, Owned, SourceSpan, Symbol
 
 ```rust
 pub enum DocText {
     Static(&'static str, u16),  // Punctuation, keywords — no allocation
     Owned(String, u16),         // Built text — copied once at doc-build time
+    SourceSpan(Span, u16),      // Verbatim source slice — resolved at print time, no allocation
     Symbol(u32),                // Interned identifier — resolved at print time
 }
 ```
 
-The `u16` is a cached visual width with two sentinel values (`TEXT_WIDTH_HAS_NEWLINE`, `TEXT_WIDTH_NOT_COMPUTED`). Caching is selective: only non-ASCII, newline-free `Owned` strings precompute their width — those need grapheme segmentation, which costs far more than the ASCII path, and `fits()` may measure the same text repeatedly. ASCII text (all `Static`, most `Owned`) stays uncached: `visual_width()`'s ASCII fast path makes re-measuring cheaper than eagerly measuring text that may never reach a `fits()` check. `Symbol` defers both resolution and width to print time, so identifiers allocate nothing during doc building.
+The `u16` is a cached visual width with two sentinel values (`TEXT_WIDTH_HAS_NEWLINE`, `TEXT_WIDTH_NOT_COMPUTED`). Caching is selective: only non-ASCII, newline-free `Owned`/`SourceSpan` text precomputes its width — those need grapheme segmentation, which costs far more than the ASCII path, and `fits()` may measure the same text repeatedly. ASCII text (all `Static`, most `Owned`) stays uncached: `visual_width()`'s ASCII fast path makes re-measuring cheaper than eagerly measuring text that may never reach a `fits()` check. `Symbol` defers both resolution and width to print time, so identifiers allocate nothing during doc building. `SourceSpan` is the same deferral keyed on a span instead of an interner id: it stores a `Span` into the document `source` and resolves to the verbatim slice at print time (via a source-aware `TextResolver`), so unmodified text — comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), Svelte markup text — emits with **no `String` allocation** and **no lifetime on `DocArena`** (the lifetime-free alternative to borrowing `&'src str` into the doc tree, which would forfeit the cross-file arena `reset()` reuse).
 
 ## Parser Architecture
 
@@ -636,7 +637,7 @@ tsv runs on the system allocator — no `#[global_allocator]`, no alternative-al
 
 **Svelte template nodes — contiguous storage.** Fragment children are an `&'arena [FragmentNode]` slice of enum values rather than boxed nodes, keeping siblings contiguous in arena memory for the printer's traversal loops.
 
-**Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists), referenced by `u32` `DocId`s — no per-node heap allocation, no recursive `Drop`. The single-shot `format()` path pre-sizes one arena from source length (~4 nodes per source byte; `DocArena::with_source_size_hint`) and drops it after rendering; multi-file drivers (the CLI dir-walk worker, the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — clearing the node/child/memo stores while retaining capacity, the doc-IR analogue of the per-call AST `Bump::reset()` reuse — and the printers borrow `&DocArena` so the caller owns the reusable one (`format_in` is the borrowed-arena entry point). Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: `DocText::Symbol` stores an interner ID resolved at print time (see [DocText](#doctext-static-owned-symbol)), so the only per-node string allocations are `Owned` text a printer actually constructs.
+**Doc building — the doc arena.** All doc nodes live in a contiguous `DocArena` (two flat `Vec`s: nodes and child lists), referenced by `u32` `DocId`s — no per-node heap allocation, no recursive `Drop`. The single-shot `format()` path pre-sizes one arena from source length (~4 nodes per source byte; `DocArena::with_source_size_hint`) and drops it after rendering; multi-file drivers (the CLI dir-walk worker, the FFI/NAPI/WASM bindings) instead reuse one arena across calls via `DocArena::reset()` — clearing the node/child/memo stores while retaining capacity, the doc-IR analogue of the per-call AST `Bump::reset()` reuse — and the printers borrow `&DocArena` so the caller owns the reusable one (`format_in` is the borrowed-arena entry point). Embedded languages build doc nodes into the host file's arena rather than nesting their own. Identifier text never enters the doc tree: `DocText::Symbol` stores an interner ID resolved at print time (see [DocText](#doctext-static-owned-sourcespan-symbol)), and verbatim source text (comments, template chunks, Svelte markup text) enters as a `DocText::SourceSpan` span resolved at print time too — so the only per-node string allocations are `Owned` text a printer actually constructs.
 
 **Rendering — pre-sized output, stack-allocated scratch.** The output `String` is pre-allocated from arena node count (`DocArena::estimated_output_capacity`, clamped against pathological initial sizes), and `OutputBuffer` pre-allocates from source length for the Svelte printer's direct writes. The `fits()` lookahead and the render loop's own work-list both run on `SmallVec` stacks — the render command stack and its pending line-suffix buffer stay inline for the common small sub-render (the renderers run once per CSS declaration/value and per Svelte template expression, so each would otherwise allocate a fresh `Vec` from empty) — the per-render group-mode map is a fixed inline array keyed by the closed `GroupId` enum (no per-render `HashMap` allocation), and comment-classification buckets are `SmallVec`s sized for the common 0-2 comments case.
 

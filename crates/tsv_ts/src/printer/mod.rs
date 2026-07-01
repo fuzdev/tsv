@@ -300,13 +300,19 @@ impl<'a> Printer<'a> {
         let current_col = self.current_column() + context_offset;
         let output = {
             let interner = self.interner.borrow();
+            // Source-aware resolver so `DocText::SourceSpan` nodes (verbatim
+            // comment/literal slices) resolve without a `DocArena` lifetime.
+            let resolver = doc::SourceTextResolver {
+                inner: &*interner,
+                source: self.source,
+            };
             doc::arena_print_doc_with_indent_resolved(
                 self.arena,
                 d,
                 &self.embed,
                 current_col,
                 self.indent_level,
-                &*interner,
+                &resolver,
             )
         };
         self.write(&output);
@@ -315,7 +321,11 @@ impl<'a> Printer<'a> {
     /// Render an arena DocId to a flat string with effectively infinite width.
     pub(crate) fn render_arena_doc_flat(&self, d: DocId) -> String {
         let interner = self.interner.borrow();
-        doc::arena_print_doc_flat_resolved(self.arena, d, &self.embed, &*interner)
+        let resolver = doc::SourceTextResolver {
+            inner: &*interner,
+            source: self.source,
+        };
+        doc::arena_print_doc_flat_resolved(self.arena, d, &self.embed, &resolver)
     }
 
     /// Get the formatted output

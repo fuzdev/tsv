@@ -150,7 +150,7 @@ const ALLOW: &[Allow] = &[
     ),
     (
         "tsv_css/src/printer/value_normalization/numbers.rs",
-        "let (mantissa, exponent) = match num.find(['e', 'E']) {",
+        "let Some(e_idx) = num.find(['e', 'E']) else {",
         "number-literal",
     ),
     (

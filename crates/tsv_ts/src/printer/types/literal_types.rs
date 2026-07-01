@@ -127,7 +127,9 @@ impl<'a> Printer<'a> {
         let mut interp_iter = interps.into_iter();
 
         for quasi in template.quasis {
-            parts.push(d.text_owned(quasi.raw(self.source).to_string()));
+            // Template raw text is a verbatim source slice (`raw_span`) — emit it
+            // without allocating.
+            parts.push(d.source_span(quasi.raw_span, self.source));
             if let Some(Interpolation {
                 type_doc,
                 comments_doc,

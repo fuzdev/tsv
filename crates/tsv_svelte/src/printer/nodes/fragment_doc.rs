@@ -414,8 +414,7 @@ impl<'a> Printer<'a> {
         {
             return None;
         }
-        let raw = node.span().extract(self.source);
-        Some(self.d().text_owned(raw.to_string()))
+        Some(self.d().source_span(node.span(), self.source))
     }
 
     /// Handle a text child node - matches prettier-plugin-svelte's handleTextChild.
@@ -1412,7 +1411,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         d.concat(&[
             d.text("<!--"),
-            d.text_owned(comment.content(self.source).to_string()),
+            d.source_span(comment.content_span, self.source),
             d.text("-->"),
         ])
     }

@@ -13,6 +13,7 @@
 
 use std::cell::RefCell;
 
+use crate::Span;
 use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 
@@ -389,6 +390,43 @@ impl DocArena {
     #[inline]
     pub fn line_comment_text_owned(&self, s: String) -> DocId {
         let id = self.text_owned(s);
+        #[cfg(feature = "swallow_check")]
+        if super::swallow::swallow_check_enabled() {
+            // Recorded in alloc order → sorted ascending (see field doc).
+            self.line_comment_ids.borrow_mut().push(id.0);
+        }
+        id
+    }
+
+    /// Create a text doc from a verbatim source slice, resolved at render time
+    /// against `source` (no `String` allocation). The doc renders byte-identically
+    /// to `text_owned(span.extract(source).to_string())` — use it wherever a
+    /// printer emits an unmodified source slice (comments, template chunks,
+    /// already-canonical literals). `source` is read only to precompute width
+    /// (same policy as [`Self::text_owned`]: skip ASCII, flag newline, else
+    /// measure once) and is **not** retained — the span lives in the lifetime-less
+    /// arena and is re-resolved at render via a [`super::SourceTextResolver`].
+    #[inline]
+    pub fn source_span(&self, span: Span, source: &str) -> DocId {
+        let slice = span.extract(source);
+        let w = if slice.is_ascii() {
+            TEXT_WIDTH_NOT_COMPUTED // ASCII is cheap, don't bother
+        } else if slice.contains('\n') {
+            TEXT_WIDTH_HAS_NEWLINE
+        } else {
+            visual_width(slice, TAB_WIDTH) as u16
+        };
+        self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
+    }
+
+    /// Verbatim-source-slice form of [`Self::line_comment_text_owned`]: emits a
+    /// [`DocText::SourceSpan`] (no allocation) and, under the `swallow_check`
+    /// feature while enabled, records the node so the renderer can flag content
+    /// emitted on the same physical line after a `//`/hashbang comment. Without
+    /// the feature it is exactly [`Self::source_span`].
+    #[inline]
+    pub fn line_comment_source_span(&self, span: Span, source: &str) -> DocId {
+        let id = self.source_span(span, source);
         #[cfg(feature = "swallow_check")]
         if super::swallow::swallow_check_enabled() {
             // Recorded in alloc order → sorted ascending (see field doc).

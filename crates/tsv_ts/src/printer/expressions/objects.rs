@@ -9,11 +9,11 @@
 
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use crate::printer::CommentSpacing;
-use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, Printer};
 use smallvec::{SmallVec, smallvec};
+use tsv_lang::Span;
 use tsv_lang::SymbolResolver;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
@@ -746,9 +746,14 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         if self.string_key_unquotes(lit, content) {
-            d.text_owned(content.to_string())
+            // Unquoted: the key is a bare identifier equal to the literal's inner
+            // source slice (`string_key_unquotes` requires a valid identifier, so
+            // there are no escapes) — emit that inner span verbatim, no allocation.
+            let inner = Span::new(lit.span.start + 1, lit.span.end - 1);
+            debug_assert_eq!(inner.extract(self.source), content);
+            d.source_span(inner, self.source)
         } else {
-            d.text_owned(format_string_literal_from_ast(lit, self.source))
+            self.build_string_literal_doc(lit)
         }
     }
 

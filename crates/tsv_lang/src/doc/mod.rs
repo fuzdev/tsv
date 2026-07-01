@@ -30,7 +30,7 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use types::{DocContext, DocText, GroupId, LineKind, Mode, TextResolver};
+pub use types::{DocContext, DocText, GroupId, LineKind, Mode, SourceTextResolver, TextResolver};
 
 /// Stack buffer for assembling a node's doc parts before handing them to
 /// `DocArena::concat` / `fill`. Language printers build one such `Vec<DocId>` per
