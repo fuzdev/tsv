@@ -6,7 +6,50 @@
 use crate::ast::internal::ElementKind;
 use serde::Serialize;
 use tsv_css::ast::public::StyleSheet;
-use tsv_ts::ast::public::Expression;
+use tsv_ts::ast::public::{Expression, Program};
+
+/// A template expression position: typed, or a `serde_json::Value` island
+/// carrying attached comments.
+///
+/// Conversion always produces `Typed`. The island-scoped comment-attachment
+/// pass (`ast/convert/attach_typed.rs`) swaps an expression to `Attached`
+/// only when a template comment falls in its container's window — the
+/// expression subtree is serialized to a `Value` so `leadingComments` /
+/// `trailingComments` can be injected without adding comment fields to the
+/// typed `tsv_ts` public AST (a deliberate design decision — see
+/// `ast/convert/special.rs` on `Script.content`). `#[serde(untagged)]` keeps
+/// both arms wire-identical to a plain expression.
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub enum ExpressionIsland<'src> {
+    Typed(Expression<'src>),
+    Attached(serde_json::Value),
+}
+
+impl<'src> From<Expression<'src>> for ExpressionIsland<'src> {
+    fn from(expression: Expression<'src>) -> Self {
+        ExpressionIsland::Typed(expression)
+    }
+}
+
+/// A `<script>` `Program`: typed, or a `serde_json::Value` island carrying
+/// injected comments / non-TS quirks.
+///
+/// Conversion produces `Typed` when nothing will be injected — no script
+/// comments, no preceding HTML comment, and `lang="ts"` (a plain script may
+/// need `"options": null` injected on ImportExpressions) — skipping the
+/// per-script JSON roundtrip on the direct-serialization path. Otherwise the
+/// `Attached` arm holds the JSON-roundtripped `Program` with
+/// `leadingComments`/`trailingComments` injected, keeping the typed `tsv_ts`
+/// public AST free of comment fields (see the architecture note in
+/// `ast/convert/special.rs`). `#[serde(untagged)]` keeps both arms
+/// wire-identical.
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub enum ProgramIsland<'src> {
+    Typed(Program<'src>),
+    Attached(serde_json::Value),
+}
 
 /// Svelte name location - tracks the precise span of a node's name
 ///
@@ -127,7 +170,7 @@ pub struct SpecialElement<'src> {
     pub tag: Option<serde_json::Value>,
     /// Component expression for `<svelte:component this={Component}>`
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expression: Option<Expression<'src>>,
+    pub expression: Option<ExpressionIsland<'src>>,
 }
 
 /// Svelte Options - component configuration
@@ -164,15 +207,14 @@ pub struct SvelteOptions<'src> {
 
 /// Svelte Attribute - element attribute
 #[derive(Debug, Clone, Serialize)]
-pub struct Attribute {
+pub struct Attribute<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
     pub name: String,
     pub name_loc: NameLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<serde_json::Value>,
+    pub value: AttributeValueField<'src>,
 }
 
 /// Svelte AttachTag - element attachment (Svelte 5.29+)
@@ -182,7 +224,7 @@ pub struct AttachTag<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
+    pub expression: ExpressionIsland<'src>,
 }
 
 /// Svelte SpreadAttribute - spread object as attributes (`{...obj}`)
@@ -192,7 +234,7 @@ pub struct SpreadAttribute<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
+    pub expression: ExpressionIsland<'src>,
 }
 
 //
@@ -208,7 +250,7 @@ pub struct OnDirective<'src> {
     pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
-    pub expression: Option<Expression<'src>>,
+    pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
 }
 
@@ -246,7 +288,7 @@ pub struct ClassDirective {
 
 /// StyleDirective - inline style (`style:color={value}`)
 #[derive(Debug, Clone, Serialize)]
-pub struct StyleDirective {
+pub struct StyleDirective<'src> {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
@@ -254,7 +296,7 @@ pub struct StyleDirective {
     pub name: String,
     pub name_loc: NameLocation,
     pub modifiers: Vec<String>,
-    pub value: serde_json::Value, // true | ExpressionTag | [Text | ExpressionTag]
+    pub value: AttributeValueField<'src>,
 }
 
 /// UseDirective - action (`use:action={params}`)
@@ -266,7 +308,7 @@ pub struct UseDirective<'src> {
     pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
-    pub expression: Option<Expression<'src>>,
+    pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
 }
 
@@ -279,7 +321,7 @@ pub struct TransitionDirective<'src> {
     pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
-    pub expression: Option<Expression<'src>>,
+    pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
     pub intro: bool,
     pub outro: bool,
@@ -294,7 +336,7 @@ pub struct AnimateDirective<'src> {
     pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
-    pub expression: Option<Expression<'src>>,
+    pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
 }
 
@@ -307,7 +349,7 @@ pub struct LetDirective<'src> {
     pub node_type: &'static str,
     pub name: String,
     pub name_loc: NameLocation,
-    pub expression: Option<Expression<'src>>,
+    pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
 }
 
@@ -317,17 +359,34 @@ pub struct LetDirective<'src> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum AttributeNode<'src> {
-    Attribute(Attribute),
+    Attribute(Attribute<'src>),
     SpreadAttribute(SpreadAttribute<'src>),
     AttachTag(AttachTag<'src>),
     OnDirective(OnDirective<'src>),
     BindDirective(BindDirective),
     ClassDirective(ClassDirective),
-    StyleDirective(StyleDirective),
+    StyleDirective(StyleDirective<'src>),
     UseDirective(UseDirective<'src>),
     TransitionDirective(TransitionDirective<'src>),
     AnimateDirective(AnimateDirective<'src>),
     LetDirective(LetDirective<'src>),
+}
+
+/// An attribute or style-directive value, in Svelte's three wire shapes:
+/// `true` (boolean shorthand), a bare `{expr}` (plain object), or a
+/// quoted/text sequence (array of parts). `#[serde(untagged)]` serializes
+/// each arm as its bare shape.
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub enum AttributeValueField<'src> {
+    /// Boolean attribute (`disabled`) or valueless style directive —
+    /// always `true`.
+    True(bool),
+    /// Single bare expression (`value={expr}`).
+    Single(AttributeValue<'src>),
+    /// Text content, quoted expressions, or mixed sequences
+    /// (`class="a {b}"`) — always an array, even with one part.
+    Sequence(Vec<AttributeValue<'src>>),
 }
 
 /// Svelte Attribute value part
@@ -370,7 +429,7 @@ pub struct ExpressionTag<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
+    pub expression: ExpressionIsland<'src>,
 }
 
 /// Svelte Script block
@@ -380,8 +439,8 @@ pub struct Script<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub context: String,            // "default" or "module"
-    pub content: serde_json::Value, // Program with leadingComments/trailingComments injected
+    pub context: String, // "default" or "module"
+    pub content: ProgramIsland<'src>,
     pub attributes: Vec<AttributeNode<'src>>,
 }
 
@@ -393,7 +452,7 @@ pub struct IfBlock<'src> {
     pub elseif: bool,
     pub start: u32,
     pub end: u32,
-    pub test: Expression<'src>,
+    pub test: ExpressionIsland<'src>,
     pub consequent: Fragment<'src>,
     pub alternate: Option<Fragment<'src>>,
 }
@@ -405,7 +464,7 @@ pub struct EachBlock<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
+    pub expression: ExpressionIsland<'src>,
     pub body: Fragment<'src>,
     /// None when no `as` clause: {#each expr} or {#each expr, index}.
     /// Uses `serde_json::Value` because Svelte's `read_pattern()` produces a column +1 quirk
@@ -414,7 +473,7 @@ pub struct EachBlock<'src> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub index: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub key: Option<Expression<'src>>,
+    pub key: Option<ExpressionIsland<'src>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fallback: Option<Fragment<'src>>,
 }
@@ -426,7 +485,7 @@ pub struct AwaitBlock<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
+    pub expression: ExpressionIsland<'src>,
     /// Uses `serde_json::Value` — see `EachBlock::context` for why.
     pub value: Option<serde_json::Value>,
     /// Uses `serde_json::Value` — see `EachBlock::context` for why.
@@ -445,7 +504,7 @@ pub struct KeyBlock<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
+    pub expression: ExpressionIsland<'src>,
     pub fragment: Fragment<'src>,
 }
 
@@ -456,8 +515,8 @@ pub struct SnippetBlock<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
-    pub parameters: Vec<Expression<'src>>,
+    pub expression: ExpressionIsland<'src>,
+    pub parameters: Vec<ExpressionIsland<'src>>,
     pub body: Fragment<'src>,
     /// Generic type parameters (e.g., `T` in `{#snippet fn<T>(a: T)}`)
     #[serde(rename = "typeParams", skip_serializing_if = "Option::is_none")]
@@ -471,7 +530,7 @@ pub struct HtmlTag<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
+    pub expression: ExpressionIsland<'src>,
 }
 
 /// Svelte ConstTag - local constant declaration
@@ -506,7 +565,7 @@ pub struct DebugTag<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub identifiers: Vec<Expression<'src>>,
+    pub identifiers: Vec<ExpressionIsland<'src>>,
 }
 
 /// Svelte RenderTag - snippet rendering
@@ -516,5 +575,5 @@ pub struct RenderTag<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub expression: Expression<'src>,
+    pub expression: ExpressionIsland<'src>,
 }

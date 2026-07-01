@@ -105,18 +105,18 @@ the `--json` output as `*_us_per_kb` / `*_us_per_file` fields.
 
 Splits the FFI parse path (`parse` + `convert_ast_json_string`) into the
 `Value` pipeline's per-language sub-steps (convert / to_value / attach /
-translate / to_string), times the direct typed pipeline (typed offset
-translation + `serde_json::to_string(&public_ast)`, skipping the
-intermediate `Value`; per-language eligibility:
+translate / to_string), times the direct typed pipeline (Svelte's
+island-scoped comment attach + typed offset translation +
+`serde_json::to_string(&public_ast)`, skipping the intermediate `Value`;
+the per-language pipeline shapes:
 [architecture.md §Closed Scope, Open Convention](./architecture.md#closed-scope-open-convention)),
 and times the `Value` pipeline and the shipped `convert_ast_json_string` as
 whole calls. The shipped function's
 output is byte-identity-checked against the `Value` pipeline's on every
-file; the direct path is identity-checked on every file too (multibyte
-included — each language's typed walk runs before `direct` is captured; a
-Svelte mismatch means the file carries template-expression comments, which
-the shipped gate routes to the `Value` fallback). Pure Rust, no
-external dependencies.
+file; the direct path is identity-checked on every file too (multibyte and
+template-comment files included — each language's typed walks run before
+`direct` is captured, so any mismatch is a typed-vs-`Value` parity bug).
+Pure Rust, no external dependencies.
 
 ```bash
 # Profile a directory (aggregate report per language)
@@ -127,11 +127,9 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib --json
 ```
 
 Output shows, per language: parse vs materialization, the sub-step shares,
-the shipped typed pipeline's sub-step sum for TypeScript/CSS ("typed
-pipeline" = convert + typed translate + direct; omitted for Svelte, whose
-template-comment files take the `Value` fallback so the sum would
-understate the shipped call), and the whole-call "value baseline" vs
-"shipped" pair, plus both identity-check counts.
+the shipped typed pipeline's sub-step sum ("typed pipeline" = convert +
+typed attach (Svelte only) + typed translate + direct), and the whole-call
+"value baseline" vs "shipped" pair, plus both identity-check counts.
 
 **Sub-step timings exclude drop costs** — each intermediate outlives its
 timed region, and recursively freeing a large tree/`Value` is a

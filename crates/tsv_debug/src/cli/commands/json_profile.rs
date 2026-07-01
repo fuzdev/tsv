@@ -14,27 +14,26 @@
 //!   (multibyte only) → direct to_string — both pipelines are timed.
 //! - **svelte**: convert → to_value → attach (template expression comments,
 //!   mutates the `Value`) → translate → to_string for the `Value` path; the
-//!   shipped path runs convert → typed translate (multibyte only) → direct
-//!   to_string, and applies whenever no comments fall outside `<script>`
-//!   (template-comment files take the `Value` path — the attach pass is
-//!   still `Value`-based)
+//!   shipped path runs convert → typed attach (island-scoped, converts only
+//!   comment-bearing template expressions to `Value` islands; a no-op
+//!   without template comments) → typed translate (multibyte only) → direct
+//!   to_string, on every file
 //! - **css**: same shape as typescript — convert (typed public AST) →
 //!   to_value → translate → to_string for the `Value` path; the shipped path
 //!   runs convert → typed translate (multibyte only) → direct to_string. CSS
 //!   has no `loc`/columns and no `attach` pass
 //!
-//! Per-language fast-path eligibility is documented in
+//! Per-language pipeline shapes are documented in
 //! `docs/architecture.md` §Closed Scope, Open Convention.
 //!
 //! The direct path must be byte-identical to the `Value` path (serde_json is
 //! built with `preserve_order`, keeping struct-field key order; the typed
-//! translation walk must match the `Value` walk). The command checks this per
-//! file and reports mismatches on **every** file including multibyte (each
-//! language's typed walk runs before `direct` is captured); for svelte a
-//! mismatch means the attach pass moved template comments into the tree
-//! (`convert_ast_json_string` gates on this and falls back to the `Value`
-//! path). The shipped function is identity-checked against the `Value` path
-//! on **every** file, eligible or not.
+//! attach and translation walks must match their `Value` counterparts). The
+//! command checks this per file and reports mismatches on **every** file
+//! including multibyte and template-comment ones (each language's typed
+//! walks run before `direct` is captured) — any mismatch is a parity bug.
+//! The shipped function is identity-checked against the `Value` path on
+//! **every** file too.
 //!
 //! **Sub-step timings exclude drop costs** — each intermediate (public tree,
 //! `Value`, strings) outlives its timed region. Recursively freeing a large
@@ -132,15 +131,15 @@ struct FileResult {
     attach_us: f64,
     translate_us: f64,
     to_string_us: f64,
+    typed_attach_us: f64,
     typed_translate_us: f64,
     direct_us: f64,
     value_us: f64,
     shipped_us: f64,
     /// Whether the direct path's output is byte-identical to the `Value`
-    /// path's. Comparable on every file — each language's typed walk
-    /// translates multibyte trees before `direct` is captured. For svelte a
-    /// `false` means the attach pass moved template comments into the tree
-    /// (those files the shipped gate routes to the `Value` fallback).
+    /// path's. Comparable on every file — each language's typed walks
+    /// (svelte's island-scoped attach, the multibyte translation) run before
+    /// `direct` is captured, so a `false` is a parity bug.
     direct_match: Option<bool>,
     /// Whether `convert_ast_json_string` (the shipped FFI path) is
     /// byte-identical to the `Value` path. Comparable on every file.
@@ -163,6 +162,7 @@ struct StepDurations {
     attach: Vec<Duration>,
     translate: Vec<Duration>,
     to_string: Vec<Duration>,
+    typed_attach: Vec<Duration>,
     typed_translate: Vec<Duration>,
     direct: Vec<Duration>,
     value: Vec<Duration>,
@@ -209,6 +209,7 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
         attach_us: median(steps.attach),
         translate_us: median(steps.translate),
         to_string_us: median(steps.to_string),
+        typed_attach_us: median(steps.typed_attach),
         typed_translate_us: median(steps.typed_translate),
         direct_us: median(steps.direct),
         value_us: median(steps.value),
@@ -346,10 +347,10 @@ fn profile_whole_calls<I>(
 
 /// One Svelte iteration. Sub-steps mirror `tsv_svelte::convert_ast_json`,
 /// which has an extra `Value`-mutating pass (template expression comment
-/// attachment between to_value and translate); `typed_translate` + `direct`
-/// mirror the shipped typed pipeline (`convert_ast_json_string`'s direct
-/// path). The typed walk mutates the public tree in place, so it runs only
-/// after `to_value` has captured the untranslated tree.
+/// attachment between to_value and translate); `typed_attach` +
+/// `typed_translate` + `direct` mirror the shipped typed pipeline
+/// (`convert_ast_json_string`). The typed walks mutate the public tree in
+/// place, so they run only after `to_value` has captured the untouched tree.
 #[allow(clippy::expect_used)] // mirrors convert_ast_json's own expect on Serialize
 fn profile_svelte_once(
     source: &str,
@@ -362,8 +363,13 @@ fn profile_svelte_once(
     let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
     steps.parse.push(t.elapsed());
 
+    // The tracker is built in the convert timed region and shared with both
+    // translate steps below — mirroring `convert_ast_json` /
+    // `convert_ast_json_string`, which each build it once per call.
     let t = Instant::now();
-    let mut public_ast = tsv_svelte::ast::convert::convert_root(&ast, source);
+    let tracker = LocationTracker::new(source);
+    let mut public_ast =
+        tsv_svelte::ast::convert::convert_root_with_tracker(&ast, source, &tracker);
     steps.convert.push(t.elapsed());
 
     let t = Instant::now();
@@ -383,7 +389,6 @@ fn profile_svelte_once(
 
     let t = Instant::now();
     let map = ByteToCharMap::new(source);
-    let tracker = LocationTracker::new(source);
     tsv_ts::ast::convert::translate_byte_to_char_offsets(&mut value, &map, &tracker);
     steps.translate.push(t.elapsed());
 
@@ -391,17 +396,28 @@ fn profile_svelte_once(
     let wire = serde_json::to_string(&value).expect("Value serialization cannot fail");
     steps.to_string.push(t.elapsed());
 
-    // Mirror the shipped direct path: map build inside the timed region (see
-    // profile_ts_once's rationale), tracker built only when multibyte —
-    // exactly as `convert_ast_json_string` does.
+    // Mirror the shipped direct path: the island-scoped attach (script-span
+    // computation included, as `convert_ast_json_string` pays it per call)...
+    let t = Instant::now();
+    let typed_script_spans = tsv_svelte::script_content_spans(&ast);
+    tsv_svelte::ast::convert::attach_template_expression_comments_typed(
+        &mut public_ast,
+        &ast.comments,
+        &typed_script_spans,
+        source,
+    );
+    steps.typed_attach.push(t.elapsed());
+
+    // ...then map build inside the timed region (see profile_ts_once's
+    // rationale), reusing the convert step's tracker — exactly as
+    // `convert_ast_json_string` does.
     let t = Instant::now();
     let typed_map = ByteToCharMap::new(source);
     if typed_map.has_multibyte() {
-        let typed_tracker = LocationTracker::new(source);
         tsv_svelte::ast::convert::translate_byte_to_char_offsets_typed(
             &mut public_ast,
             &typed_map,
-            &typed_tracker,
+            &tracker,
         );
     }
     steps.typed_translate.push(t.elapsed());
@@ -415,10 +431,8 @@ fn profile_svelte_once(
         *meta = Some(IterMeta {
             multibyte: map.has_multibyte(),
             wire_bytes: wire.len(),
-            // Comparable on every file (the typed walk translated multibyte
-            // trees above); a mismatch means the attach pass moved template
-            // comments into the tree — those files the shipped gate routes to
-            // the `Value` fallback.
+            // Comparable on every file (the typed attach + translate walks ran
+            // above); a mismatch is a typed-vs-Value parity bug.
             direct_match: Some(wire == direct),
             shipped_match: None, // filled in by profile_whole_calls
         });
@@ -523,6 +537,7 @@ struct LangAggregate {
     attach_us: f64,
     translate_us: f64,
     to_string_us: f64,
+    typed_attach_us: f64,
     typed_translate_us: f64,
     direct_us: f64,
     value_us: f64,
@@ -535,14 +550,17 @@ struct LangAggregate {
 }
 
 impl LangAggregate {
-    /// Does this language run a `Value`-mutating pass between `convert` and
-    /// `to_string` (svelte's comment `attach`)? TS and CSS don't — their typed
-    /// direct path handles every file, so the typed-pipeline sub-step sum is
-    /// an honest stand-in for the shipped call. Svelte does: files with
-    /// template-expression comments fall back to the `Value` path, so its
-    /// sub-step sum would understate the shipped call on those.
-    fn has_value_mutating_pass(&self) -> bool {
+    /// Does this language have comment-attachment passes (svelte)? TS and CSS
+    /// don't — their pipelines skip the `attach` / `typed attach` rows.
+    fn has_attach_pass(&self) -> bool {
         self.attach_us > 0.0
+    }
+
+    /// The shipped typed pipeline as a sub-step sum (drops excluded) —
+    /// convert + typed attach (svelte only, 0 elsewhere) + typed translate +
+    /// direct to_string.
+    fn typed_pipeline_us(&self) -> f64 {
+        self.convert_us + self.typed_attach_us + self.typed_translate_us + self.direct_us
     }
 }
 
@@ -569,6 +587,7 @@ fn aggregate(results: &[FileResult]) -> Vec<(ParserType, LangAggregate)> {
         agg.attach_us += r.attach_us;
         agg.translate_us += r.translate_us;
         agg.to_string_us += r.to_string_us;
+        agg.typed_attach_us += r.typed_attach_us;
         agg.typed_translate_us += r.typed_translate_us;
         agg.direct_us += r.direct_us;
         agg.value_us += r.value_us;
@@ -625,7 +644,7 @@ fn print_report(
         };
         step("convert", a.convert_us);
         step("to_value", a.to_value_us);
-        if a.has_value_mutating_pass() {
+        if a.has_attach_pass() {
             step("attach", a.attach_us);
         }
         step("translate", a.translate_us);
@@ -634,26 +653,30 @@ fn print_report(
             "  direct to_string {:>10}  (to_string(&public_ast), skips Value)",
             format_duration(a.direct_us)
         );
+        if a.has_attach_pass() {
+            eprintln!(
+                "  typed attach     {:>10}  (island-scoped template-comment attach)",
+                format_duration(a.typed_attach_us)
+            );
+        }
         eprintln!(
             "  typed translate  {:>10}  (map build + typed walk; walk is multibyte-only)",
             format_duration(a.typed_translate_us)
         );
-        // The shipped typed pipeline as a sub-step sum (drops excluded) is an
-        // honest stand-in only without a Value-mutating pass (svelte's `attach`):
-        // svelte's template-comment files take the Value fallback, so its
-        // sub-step sum would understate the shipped call on those.
-        if !a.has_value_mutating_pass() {
-            let typed_pipeline = a.convert_us + a.typed_translate_us + a.direct_us;
-            eprintln!(
-                "  typed pipeline   {:>10}  = convert + typed translate + direct → {:.2}x of materialization",
-                format_duration(typed_pipeline),
-                if a.materialize_us > 0.0 {
-                    typed_pipeline / a.materialize_us
-                } else {
-                    0.0
-                },
-            );
-        }
+        eprintln!(
+            "  typed pipeline   {:>10}  = convert{} + typed translate + direct → {:.2}x of materialization",
+            format_duration(a.typed_pipeline_us()),
+            if a.has_attach_pass() {
+                " + typed attach"
+            } else {
+                ""
+            },
+            if a.materialize_us > 0.0 {
+                a.typed_pipeline_us() / a.materialize_us
+            } else {
+                0.0
+            },
+        );
         eprintln!(
             "  value baseline   {:>10}  = to_string(convert_ast_json) whole call, incl. drops",
             format_duration(a.value_us),
@@ -668,17 +691,11 @@ fn print_report(
             },
         );
         let comparable = a.direct_match + a.direct_mismatch;
+        // Any mismatch is a typed-vs-Value parity bug — the typed pipeline
+        // (attach + translate) handles every file, template comments included.
         eprintln!(
-            "  direct == value on {}/{comparable} comparable files{}",
+            "  direct == value on {}/{comparable} comparable files",
             a.direct_match,
-            // A svelte mismatch is the attach pass moving template comments
-            // into the tree — those files the shipped gate routes to the
-            // Value fallback, so a mismatch here is expected, not a bug.
-            if a.has_value_mutating_pass() {
-                " (mismatch = template-comment files, shipped falls back)"
-            } else {
-                ""
-            },
         );
         let shipped_comparable = a.shipped_match + a.shipped_mismatch;
         eprintln!(
@@ -710,7 +727,7 @@ fn print_json(
     let languages: serde_json::Map<String, serde_json::Value> = aggregates
         .iter()
         .map(|(parser_type, a)| {
-            let mut lang = serde_json::json!({
+            let lang = serde_json::json!({
                 "files": a.files,
                 "size_bytes": a.size,
                 "wire_bytes": a.wire_bytes,
@@ -721,23 +738,18 @@ fn print_json(
                 "attach_us": a.attach_us,
                 "translate_us": a.translate_us,
                 "to_string_us": a.to_string_us,
+                "typed_attach_us": a.typed_attach_us,
                 "typed_translate_us": a.typed_translate_us,
                 "direct_us": a.direct_us,
                 "value_us": a.value_us,
                 "shipped_us": a.shipped_us,
                 "materialize_us": a.materialize_us,
+                "typed_pipeline_us": a.typed_pipeline_us(),
                 "direct_match": a.direct_match,
                 "direct_mismatch": a.direct_mismatch,
                 "shipped_match": a.shipped_match,
                 "shipped_mismatch": a.shipped_mismatch,
             });
-            // The typed pipeline sub-step sum is honest for TS and CSS (no
-            // `attach` pass); the shipped svelte path falls back per multibyte
-            // file, so its sum would understate the real cost.
-            if !a.has_value_mutating_pass() {
-                lang["typed_pipeline_us"] =
-                    serde_json::Value::from(a.convert_us + a.typed_translate_us + a.direct_us);
-            }
             (lang_label(*parser_type).to_string(), lang)
         })
         .collect();
@@ -757,6 +769,7 @@ fn print_json(
                 "attach_us": r.attach_us,
                 "translate_us": r.translate_us,
                 "to_string_us": r.to_string_us,
+                "typed_attach_us": r.typed_attach_us,
                 "typed_translate_us": r.typed_translate_us,
                 "direct_us": r.direct_us,
                 "value_us": r.value_us,

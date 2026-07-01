@@ -854,8 +854,8 @@ Implementation: `lib/binary_sizes.ts`
 - **Parse benchmark overhead**: JSON materialization, not parsing, dominates
   the `-json` rows (see `results/report.<runtime>.md` for the current per-language
   ratios). Use `tsv-internal` for raw parse speed. Both the native and WASM rows go through
-  `convert_ast_json_string`, which skips the intermediate `serde_json::Value`
-  when eligible (per-language eligibility:
+  `convert_ast_json_string`, which serializes the typed public AST directly,
+  skipping the intermediate `serde_json::Value` (per-language pipeline shapes:
   [docs/architecture.md §Closed Scope, Open Convention](../../docs/architecture.md#closed-scope-open-convention)).
   They differ only at the boundary: native crosses via FFI copy +
   `JSON.parse` in JS; WASM decodes the string across the boundary and runs
