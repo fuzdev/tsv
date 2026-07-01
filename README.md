@@ -116,14 +116,14 @@ Hard non-goals:
 
 - no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends)
 - standard CSS and Svelte extensions only - no SCSS, CSS Modules, LESS, etc
-- no JS plugins - won't embed or integrate a JS runtime,
-  instead linter extensibility will be data-driven like with pattern-based rules;
-  possibly JS bridging and/or WASM plugins if the tradeoffs work for tsv's goals
 - no style config settings, so on-disk state and caller params
   never change the output for a given input
 - no strict Prettier conformance -
   see the [conformance doc](https://github.com/fuzdev/tsv/blob/main/docs/conformance_prettier.md)
   and [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
+
+Currently tsv does not support or plan for JS plugins or JS runtime integration.
+JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals.
 
 tsv is derived from:
 
