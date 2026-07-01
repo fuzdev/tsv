@@ -1,0 +1,840 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 477,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A function type is not grammatically allowed as a bare union/intersection",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " constituent or type-operator operand — it must be parenthesized there",
+			"start": 98,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (the unparenthesized forms are rejected; see input_invalid_*).",
+			"start": 172,
+			"end": 237,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Redundant parens around a type-operator operand are stripped",
+			"start": 327,
+			"end": 390,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (`readonly ([a])[]` normalizes to this).",
+			"start": 392,
+			"end": 435,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 44
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 476,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 467,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 239,
+					"end": 263,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 25
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 244,
+						"end": 246,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 8
+							}
+						},
+						"name": "A1"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 249,
+						"end": 262,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 11
+							},
+							"end": {
+								"line": 5,
+								"column": 24
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 249,
+								"end": 250,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 249,
+									"end": 250,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 11
+										},
+										"end": {
+											"line": 5,
+											"column": 12
+										}
+									},
+									"name": "B"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 253,
+								"end": 262,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 15
+									},
+									"end": {
+										"line": 5,
+										"column": 24
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSFunctionType",
+									"start": 254,
+									"end": 261,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 16
+										},
+										"end": {
+											"line": 5,
+											"column": 23
+										}
+									},
+									"parameters": [],
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 257,
+										"end": 261,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 19
+											},
+											"end": {
+												"line": 5,
+												"column": 23
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 260,
+											"end": 261,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 22
+												},
+												"end": {
+													"line": 5,
+													"column": 23
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 260,
+												"end": 261,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 22
+													},
+													"end": {
+														"line": 5,
+														"column": 23
+													}
+												},
+												"name": "C"
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A function type is not grammatically allowed as a bare union/intersection",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " constituent or type-operator operand — it must be parenthesized there",
+							"start": 98,
+							"end": 170
+						},
+						{
+							"type": "Line",
+							"value": " (the unparenthesized forms are rejected; see input_invalid_*).",
+							"start": 172,
+							"end": 237
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 265,
+					"end": 296,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 270,
+						"end": 272,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 8
+							}
+						},
+						"name": "A2"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 275,
+						"end": 295,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 11
+							},
+							"end": {
+								"line": 6,
+								"column": 31
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 275,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 275,
+									"end": 276,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 11
+										},
+										"end": {
+											"line": 6,
+											"column": 12
+										}
+									},
+									"name": "B"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 279,
+								"end": 291,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 15
+									},
+									"end": {
+										"line": 6,
+										"column": 27
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSFunctionType",
+									"start": 280,
+									"end": 290,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 16
+										},
+										"end": {
+											"line": 6,
+											"column": 26
+										}
+									},
+									"parameters": [
+										{
+											"type": "ArrayPattern",
+											"start": 281,
+											"end": 284,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 17
+												},
+												"end": {
+													"line": 6,
+													"column": 20
+												}
+											},
+											"elements": [
+												{
+													"type": "Identifier",
+													"start": 282,
+													"end": 283,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 18
+														},
+														"end": {
+															"line": 6,
+															"column": 19
+														}
+													},
+													"name": "a"
+												}
+											]
+										}
+									],
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 286,
+										"end": 290,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 22
+											},
+											"end": {
+												"line": 6,
+												"column": 26
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 289,
+											"end": 290,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 25
+												},
+												"end": {
+													"line": 6,
+													"column": 26
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 289,
+												"end": 290,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 25
+													},
+													"end": {
+														"line": 6,
+														"column": 26
+													}
+												},
+												"name": "C"
+											}
+										}
+									}
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 294,
+								"end": 295,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 30
+									},
+									"end": {
+										"line": 6,
+										"column": 31
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 294,
+									"end": 295,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 30
+										},
+										"end": {
+											"line": 6,
+											"column": 31
+										}
+									},
+									"name": "D"
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 298,
+					"end": 324,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 27
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 303,
+						"end": 305,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 8
+							}
+						},
+						"name": "A3"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 308,
+						"end": 323,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 11
+							},
+							"end": {
+								"line": 7,
+								"column": 26
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSParenthesizedType",
+							"start": 314,
+							"end": 323,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 17
+								},
+								"end": {
+									"line": 7,
+									"column": 26
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSFunctionType",
+								"start": 315,
+								"end": 322,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 18
+									},
+									"end": {
+										"line": 7,
+										"column": 25
+									}
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 318,
+									"end": 322,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 21
+										},
+										"end": {
+											"line": 7,
+											"column": 25
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 321,
+										"end": 322,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 24
+											},
+											"end": {
+												"line": 7,
+												"column": 25
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 321,
+											"end": 322,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 24
+												},
+												"end": {
+													"line": 7,
+													"column": 25
+												}
+											},
+											"name": "C"
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 437,
+					"end": 466,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 30
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 442,
+						"end": 444,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 6
+							},
+							"end": {
+								"line": 11,
+								"column": 8
+							}
+						},
+						"name": "A4"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 447,
+						"end": 465,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 11
+							},
+							"end": {
+								"line": 11,
+								"column": 29
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 447,
+								"end": 448,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 447,
+									"end": 448,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 11
+										},
+										"end": {
+											"line": 11,
+											"column": 12
+										}
+									},
+									"name": "B"
+								}
+							},
+							{
+								"type": "TSTypeOperator",
+								"start": 451,
+								"end": 465,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 15
+									},
+									"end": {
+										"line": 11,
+										"column": 29
+									}
+								},
+								"operator": "readonly",
+								"typeAnnotation": {
+									"type": "TSArrayType",
+									"start": 460,
+									"end": 465,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 24
+										},
+										"end": {
+											"line": 11,
+											"column": 29
+										}
+									},
+									"elementType": {
+										"type": "TSTupleType",
+										"start": 460,
+										"end": 463,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 24
+											},
+											"end": {
+												"line": 11,
+												"column": 27
+											}
+										},
+										"elementTypes": [
+											{
+												"type": "TSTypeReference",
+												"start": 461,
+												"end": 462,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 25
+													},
+													"end": {
+														"line": 11,
+														"column": 26
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 461,
+													"end": 462,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 25
+														},
+														"end": {
+															"line": 11,
+															"column": 26
+														}
+													},
+													"name": "a"
+												}
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Redundant parens around a type-operator operand are stripped",
+							"start": 327,
+							"end": 390
+						},
+						{
+							"type": "Line",
+							"value": " (`readonly ([a])[]` normalizes to this).",
+							"start": 392,
+							"end": 435
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
