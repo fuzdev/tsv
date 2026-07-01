@@ -5,6 +5,7 @@ use crate::lexer::TokenKind;
 use std::rc::Rc;
 use tsv_lang::{InfallibleResolve, ParseError, SharedInterner, Span};
 
+use super::find_raw_text_close;
 use super::parser_impl::SvelteParser;
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -34,31 +35,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Don't advance() here because the Svelte lexer can't tokenize script content
         let content_start = self.current_end;
 
-        // TODO(future): This is a simple pattern matching approach that doesn't handle:
+        // TODO(future): `find_raw_text_close` is a raw scan that doesn't handle:
         // - Nested <script> in string literals or comments: `const a = "</script>";`
         // - Template strings with </script>: `const a = \`</script>\`;`
         // For proper implementation, could use TypeScript lexer to tokenize and track
-        // string/comment contexts.
-        let closing_pattern = b"</script>";
-        let source_bytes = self.source.as_bytes();
-        let mut content_end = content_start;
-        let mut found_close = false;
-
-        // Scan for closing tag pattern
-        for i in content_start..source_bytes.len() {
-            // Check if we found the pattern
-            if i + closing_pattern.len() <= source_bytes.len()
-                && &source_bytes[i..i + closing_pattern.len()] == closing_pattern
-            {
-                content_end = i;
-                found_close = true;
-                break;
-            }
-        }
-
-        if !found_close {
-            return Err(self.error_msg_at("Unterminated script tag", start));
-        }
+        // string/comment contexts. (Svelte's own `read_until` scan has the same gap.)
+        let content_end = find_raw_text_close(self.source.as_bytes(), content_start, b"script")
+            .ok_or_else(|| self.error_msg_at("Unterminated script tag", start))?;
 
         // Extract script content
         let content = &self.source[content_start..content_end];
@@ -72,28 +55,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             self.arena,
         )?;
 
-        // Reposition the lexer to the closing `</script>` tag (resumes at `<`).
+        // Reposition the lexer to the closing `</script>` tag (resumes at `<`) and
+        // consume it; `find_raw_text_close` already guaranteed it exists.
         self.advance_to_position(content_end)?;
-
-        // Verify it's the closing tag: </script>
-        if !self.check(TokenKind::LeftAngle) {
-            return Err(self.error_expected_found("'</script>'"));
-        }
-        self.advance()?; // consume <
-
-        if !self.check(TokenKind::Slash) {
-            return Err(self.error_expected_found("'/'"));
-        }
-        self.advance()?; // consume /
-
-        if !self.check(TokenKind::Identifier) || self.current_value() != "script" {
-            return Err(self.error_expected_found("'script'"));
-        }
-        self.advance()?; // consume script
-
-        // Save end position before consuming >
-        let end = self.current_end;
-        self.expect(TokenKind::RightAngle)?; // consume >
+        let end = self.parse_closing_tag("script")?;
 
         // Detect script context from attributes
         // Module scripts can be specified as:
@@ -107,7 +72,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             context,
             span: Span {
                 start: start as u32,
-                end: end as u32,
+                end,
             },
         })
     }
