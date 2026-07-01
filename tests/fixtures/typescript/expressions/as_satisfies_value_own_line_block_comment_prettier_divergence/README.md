@@ -1,42 +1,22 @@
 # as_satisfies_value_own_line_block_comment_prettier_divergence
 
-A block comment in an `as`/`satisfies` cast's keyword→type gap, with the cast
-type authored on a **later line** than the comment. tsv keeps the type on its
-own line and the comment where the author wrote it; Prettier relocates the
-comment.
+A single-line block comment in an `as`/`satisfies` cast keyword→type gap collapses to
+the inline form (`x as /* a */ A`) — whether authored glued, trailing the keyword, or
+on its own line. The own-line authoring (`x as⏎/* a */⏎A`,
+`unformatted_ours_own_line.svelte`) is what tsv normalizes here.
 
-**Own-line** comment (`x as⏎/* c */⏎A`) — tsv keeps it on its own line, type on
-the next line:
+- **tsv** collapses to `const a = x as /* a */ A` — the comment stays after the
+  keyword, on the cast type.
+- **Prettier** collapses *and relocates* the comment before the keyword
+  (`x /* a */ as A`).
 
-```
-const a = x as
-	/* a */
-	A;
-```
+Block comments inline losslessly, so neither formatter wraps; they differ only on
+which side of `as`/`satisfies` the comment lands for the own-line authoring. Per
+[Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy),
+tsv keeps the comment where the author wrote it relative to the cast type. Only a
+**line** comment
+([as_satisfies_value_line_comment](../as_satisfies_value_line_comment_prettier_divergence/) —
+prettier floats it past the statement `;`) or a **multiline** block comment still
+hangs the cast type on its own line.
 
-Prettier pulls it up onto the keyword line (`x as /* c */⏎A`).
-
-**Same-line** comment, type on the next line (`x as /* c */⏎A`) — tsv keeps the
-comment trailing the keyword and the type on its own line:
-
-```
-const d = x as /* d */
-	D;
-```
-
-Prettier moves the comment *before* the keyword and collapses the type back up
-(`x /* d */ as D`).
-
-Per Comment Position Philosophy: the user put the type on its own line, so tsv
-preserves that break and keeps the comment associated with the cast where it was
-written. An author blank line after an own-line comment is preserved. Both forms
-are idempotent in their respective formatters.
-
-A block comment with the type **glued to it** (`x as /* e */ E`, all on one
-line) stays fully inline in both formatters and is **not** a divergence (case
-`e`); the **line**-comment case floats out separately
-([as_satisfies_value_line_comment](../as_satisfies_value_line_comment_prettier_divergence/)).
-Emitting an own-line/same-line-break comment inline (the previous behavior)
-reflowed the author's break and glued the type onto the comment's line.
-
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

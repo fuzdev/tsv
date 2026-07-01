@@ -6,14 +6,17 @@ use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::has_comments_in_range;
 
 impl<'a> Printer<'a> {
     /// Build doc for a type used as a type argument.
     ///
     /// For single type arg contexts, uses normal doc (allows object types to break).
     /// For multiple type arg contexts, uses hugging (objects don't break independently).
-    fn build_type_arg_doc(&self, param: &TSType<'_>, is_multi_arg: bool) -> DocId {
+    pub(in crate::printer) fn build_type_arg_doc(
+        &self,
+        param: &TSType<'_>,
+        is_multi_arg: bool,
+    ) -> DocId {
         if is_multi_arg {
             self.build_type_doc_for_type_arg(param)
         } else {
@@ -216,81 +219,8 @@ impl<'a> Printer<'a> {
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
-        let d = self.d();
-
-        // Single-arg with only a leading line comment: hug `<` and `>`
-        // (`Array<// leading\n  a>`) instead of full multiline.
-        if args.params.len() == 1 {
-            let param = &args.params[0];
-            let param_start = param.span().start;
-            let param_end = param.span().end;
-            let before_close = args.span.end - 1;
-            let has_trailing = has_comments_in_range(self.comments, param_end, before_close);
-            if !has_trailing {
-                let leading =
-                    self.build_leading_comments_multiline(args.span.start + 1, param_start);
-                if !leading.is_empty() {
-                    let mut parts: DocBuf = smallvec![d.text("<")];
-                    parts.extend(leading);
-                    parts.push(self.build_type_arg_doc(param, false));
-                    parts.push(d.text(">"));
-                    return d.concat(&parts);
-                }
-            }
-        }
-
-        // A comment trailing the opening `<` on its own line is kept on the `<`
-        // line (divergence from prettier, which relocates it to its own line as
-        // the first argument's leading comment). Multi-argument path only — the
-        // single-argument leading-comment case hugs `<`/`>` above and matches
-        // prettier. See conformance_prettier.md §Comment relocation
-        // (Type-argument `<`).
-        let first_param_start = args.params[0].span().start;
-        let (angle_line_prefix, delimiter_pull_pos) =
-            self.delimiter_line_comment_prefix(args.span.start, first_param_start);
-
-        let mut inner_parts = DocBuf::new();
-        let mut prev_end = args.span.start + 1; // After the opening `<`
-
-        for (i, param) in args.params.iter().enumerate() {
-            let param_start = param.span().start;
-            let param_end = param.span().end;
-            let is_last = i == args.params.len() - 1;
-
-            // Leading comments (after previous comma or `<`). For the first arg,
-            // drop comments pulled onto the `<` line (emitted as the angle-line
-            // prefix below).
-            let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline_opt(
-                prev_end,
-                param_start,
-                skip_delim,
-            ));
-
-            inner_parts.push(self.build_type_arg_doc(param, args.params.len() > 1));
-
-            if !is_last {
-                let next_start = args.params[i + 1].span().start;
-                prev_end = self.emit_multiline_comma_with_comments(
-                    &mut inner_parts,
-                    param_end,
-                    next_start,
-                    false,
-                );
-            } else {
-                // Last param: trailing comments before `>`
-                let before_close = args.span.end - 1;
-                inner_parts.extend(self.build_trailing_comments_multiline(param_end, before_close));
-                prev_end = before_close;
-            }
-        }
-
-        d.concat(&[
-            d.text("<"),
-            d.concat(&angle_line_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
-            d.hardline(),
-            d.text(">"),
-        ])
+        // Type-position type arguments render each argument with `build_type_arg_doc`;
+        // the layout is shared with call/`new`-expression arguments.
+        self.build_angle_list_with_line_comments(args, true)
     }
 }

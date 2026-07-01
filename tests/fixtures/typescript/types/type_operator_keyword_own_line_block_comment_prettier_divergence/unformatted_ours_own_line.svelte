@@ -3,11 +3,17 @@
 	// inline; the own-line authoring (unformatted_ours_own_line) collapses to this.
 
 	// keyof
-	type A = keyof /* a */ B;
+	type A = keyof
+		/* a */
+		B;
 
 	// typeof (a TypeQuery node)
-	type B = typeof /* b */ x;
+	type B = typeof
+		/* b */
+		x;
 
 	// readonly
-	type C = readonly /* c */ string[];
+	type C = readonly
+		/* c */
+		string[];
 </script>

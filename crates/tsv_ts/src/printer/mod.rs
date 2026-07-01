@@ -621,7 +621,16 @@ impl<'a> Printer<'a> {
     /// Whether comments in the range cannot share the surrounding operator's
     /// line — a line comment (runs to end-of-line) or a multiline block comment
     /// forces the adjacent value onto its own line. Single-line block comments
-    /// stay inline and do not force a break.
+    /// stay inline and do not force a break — even when the author wrote them on
+    /// their own line (`kw⏎/* c */⏎v`), they collapse to `kw /* c */ v`.
+    ///
+    /// This is the gate for the keyword→value gaps that *collapse* a single-line
+    /// block (as/satisfies, heritage/conditional `extends`, keyof/typeof/readonly,
+    /// infer, type-param constraint/default, predicate `is`, indexed access) —
+    /// prettier reaches the same inline value there. Contrast
+    /// [`Self::comment_forces_following_own_line`], which respects an authored
+    /// own-line block break; use that only at the two carve-out sites where
+    /// prettier *keeps* the break (binary/logical operands, `export default`).
     pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
         self.has_line_comments_between(start, end)
             || self.has_multiline_block_comments_between(start, end)
@@ -633,8 +642,13 @@ impl<'a> Printer<'a> {
     /// `hasLeadingOwnLineComment`). Keying on the newline *after* the comment (not
     /// before) keeps the layout idempotent: a block glued to the value (`/* c */ v`,
     /// even at line start in already-broken output) stays inline, only an authored
-    /// break (`/* c */⏎v`) forces the value down. Shared by the binary/logical operand
-    /// and `as`/`satisfies` cast paths.
+    /// break (`/* c */⏎v`) forces the value down. Used only at the two carve-out
+    /// sites where prettier *keeps* the operand break — binary/logical operands
+    /// (`operators.rs`) and `export default` (`modules/mod.rs`) — so hanging is the
+    /// smaller (indent-only) divergence than collapsing. Contrast
+    /// [`Self::comments_force_own_line_between`], which collapses an authored
+    /// own-line single-line block inline; that is the gate for every other
+    /// keyword→value gap.
     pub(crate) fn comment_forces_following_own_line(&self, start: u32, end: u32) -> bool {
         self.any_comment_with_next(start, end, |c, next| {
             !c.is_block || self.has_newline_between(c.span.end, next)

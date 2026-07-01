@@ -1,33 +1,21 @@
 # predicate_is_own_line_block_comment_prettier_divergence
 
-An **own-line block** comment after a type predicate's `is`, before the predicate
-type (`function f(x): x is⏎/* c */⏎T`).
+A single-line block comment in a type predicate's `is`→predicate-type gap collapses
+to the inline form (`x is /* a */ T`) — whether authored glued, trailing `is`, or on
+its own line. The own-line authoring (`x is⏎/* a */⏎T`,
+`unformatted_ours_own_line.svelte`) is what tsv normalizes here.
 
-**tsv** keeps the comment on its own line after `is` and hangs the predicate type
-on the next line:
+- **tsv** collapses to `function f(x): x is /* a */ T` — the comment stays after `is`,
+  on the predicate type.
+- **Prettier** collapses *and relocates* the comment before `is` (`x /* a */ is T`).
 
-```
-function f(x): x is
-	/* c */
-	T {
-```
-
-**Prettier** pulls the comment up onto the `is` line, then on a second pass
-relocates it *before* `is` and collapses (`x /* c */ is T`) — non-idempotent, so
-`audit_signature.txt` pins the chain.
-
-A **same-line** block comment trailing `is` with the type below (`x is /* c */⏎T`,
-no preceding newline) likewise keeps the comment trailing `is` and the type
-hanging; prettier relocates it before `is` and collapses. A block comment **glued**
-to the type (`x is /* c */ T`) stays inline in both formatters and is not a
-divergence.
-
-This is the own-line-block sibling of the
-[line-comment form](../predicate_is_line_comment_prettier_divergence/) (there
-prettier floats the comment to the body `{`); both share the keyword→value hang
-(`append_keyword_value_line_comments`). Per Comment Position Philosophy, tsv keeps
-the comment associated with the predicate where the author wrote it. A same-line
-block comment glued to the type (`x is /* c */ T`) stays inline in both formatters
-and is not a divergence.
+Block comments inline losslessly, so neither formatter wraps; they differ only on
+which side of `is` the comment lands for the own-line authoring. Per
+[Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy),
+tsv keeps the comment where the author wrote it relative to the predicate type
+(after `is`) rather than floating it onto the parameter. Only a **line** comment
+([predicate_is_line_comment](../predicate_is_line_comment_prettier_divergence/) —
+prettier floats it to the body `{`) or a **multiline** block comment still hangs the
+predicate type on its own line.
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).

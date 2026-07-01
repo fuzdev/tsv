@@ -133,14 +133,13 @@ impl<'a> Printer<'a> {
                         b'i',
                     )
                     .map(|i_pos| (i_pos + "is".len()) as u32);
-                    // A comment after `is` that can't share its line — a line comment,
-                    // or a block comment with the predicate type on a later line —
-                    // stays trailing `is`, predicate type on the next line
-                    // (preserve-in-place; prettier collapses + relocates the comment
-                    // before/after `is`). See predicate_is_line_comment /
-                    // predicate_is_own_line_block_comment.
+                    // A line comment or multiline block after `is` hangs the predicate
+                    // type on the next line; a single-line block comment (own-line,
+                    // trailing, or glued) collapses inline (the else branch). Prettier
+                    // relocates the collapsed comment before `is`. See
+                    // predicate_is_line_comment / predicate_is_own_line_block_comment.
                     if let Some(is_end) = is_end
-                        && self.comment_forces_following_own_line(is_end, type_start)
+                        && self.comments_force_own_line_between(is_end, type_start)
                     {
                         let value_doc = self.build_type_doc(type_ann);
                         parts.push(d.text(" is"));
@@ -202,14 +201,14 @@ impl<'a> Printer<'a> {
                 // Comments between keyword and operand type
                 let keyword_end = o.span.start + o.operator.as_str().len() as u32;
                 let operand_start = o.type_annotation.span().start;
-                // A comment that can't share the operator's line — a line comment, or
-                // a block comment with the operand authored on a later line — keeps the
-                // comment with the operator and hangs the operand on the next line,
-                // indented one level (the shared keyword→value layout). The own-line
-                // block case preserves the author's break, diverging from prettier
-                // (which pulls the comment onto the keyword line); see
-                // type_operator_keyword_line_comment / type_operator_keyword_own_line_block_comment.
-                if self.comment_forces_following_own_line(keyword_end, operand_start) {
+                // A line comment or multiline block keeps the comment with the operator
+                // and hangs the operand on the next line, indented one level (the shared
+                // keyword→value layout). A single-line block comment (own-line, trailing,
+                // or glued) collapses inline (`keyof /* c */ B`) — matching prettier's
+                // fixed point, since the prefix operators are an in-place-collapse gap,
+                // not a relocation. See type_operator_keyword_line_comment /
+                // type_operator_keyword_own_line_block_comment.
+                if self.comments_force_own_line_between(keyword_end, operand_start) {
                     let operand_doc = self.build_type_doc(o.type_annotation);
                     let value_doc = if needs_parens {
                         d.parens(operand_doc)
@@ -254,12 +253,12 @@ impl<'a> Printer<'a> {
                 // Comments between `typeof` and the expression
                 let typeof_end = q.span.start + "typeof".len() as u32;
                 let expr_start = q.expr_name.span().start;
-                // A comment that can't share `typeof`'s line — a line comment, or a
-                // block comment with the expression authored on a later line — keeps
-                // the comment with `typeof` and hangs the expression on the next line
-                // (the shared keyword→value layout; own-line block preserves the
-                // author's break, diverging from prettier).
-                if self.comment_forces_following_own_line(typeof_end, expr_start) {
+                // A line comment or multiline block keeps the comment with `typeof` and
+                // hangs the expression on the next line (the shared keyword→value
+                // layout). A single-line block comment (own-line, trailing, or glued)
+                // collapses inline (`typeof /* c */ x`) like the other prefix operators
+                // (in-place-collapse, not relocation).
+                if self.comments_force_own_line_between(typeof_end, expr_start) {
                     let mut value_parts: DocBuf =
                         smallvec![self.build_type_query_expr_name_doc(&q.expr_name)];
                     if let Some(type_args) = &q.type_arguments {
@@ -318,8 +317,22 @@ impl<'a> Printer<'a> {
                 // keeps a `[`/`]` glyph inside a comment from being read as the bracket).
                 let object_comments = bracket_open
                     .map(|bp| self.build_leading_comments_break_for_line(bracket_area_start, bp));
+                // A line comment (or multiline block) in the `[`→index gap breaks the
+                // index onto its own line so a `//` can't swallow it
+                // (indexed_access_line_comment). A single-line block comment (own-line,
+                // trailing, or glued) collapses the index inline (`A[/* c */ K]`);
+                // prettier relocates the comment out before `[` (`A /* c */[K]`) — see
+                // indexed_access_own_line_block_comment.
                 let index_comments = bracket_open.map(|bp| {
-                    self.build_trailing_comments_break_for_line(bp + 1, index_type_start)
+                    if self.comments_force_own_line_between(bp + 1, index_type_start) {
+                        self.build_trailing_comments_break_for_line(bp + 1, index_type_start)
+                    } else {
+                        self.build_comments_between(
+                            bp + 1,
+                            index_type_start,
+                            CommentSpacing::Trailing,
+                        )
+                    }
                 });
                 let index_doc = self.build_type_doc(i.index_type);
                 let mut parts: DocBuf = if needs_parens {
@@ -417,18 +430,31 @@ impl<'a> Printer<'a> {
                 // Comments between `infer` and the type parameter name
                 let infer_end = i.span.start + "infer".len() as u32;
                 let name_start = i.type_parameter.name.span.start;
-                // Break a line comment so it can't swallow the inferred type name.
-                let comments_doc =
-                    self.build_trailing_comments_break_for_line(infer_end, name_start);
                 // Delegate the name + optional `extends C` constraint to the shared
                 // type-parameter doc builder — prettier's `printInferType` is
                 // `["infer ", print("typeParameter")]`, so an infer constraint lays
                 // out identically to a `<T extends C>` declaration constraint.
-                d.concat(&[
-                    d.text("infer "),
-                    comments_doc,
-                    self.build_type_parameter_doc(&i.type_parameter),
-                ])
+                let type_param_doc = self.build_type_parameter_doc(&i.type_parameter);
+                // A line comment or multiline block keeps the comment with `infer` and
+                // hangs the name on the next line, indented one level (the shared
+                // keyword→value layout). A single-line block comment (own-line, trailing,
+                // or glued) collapses inline (`infer /* c */ R`) — matching prettier's
+                // fixed point, an in-place-collapse gap. See infer/keyword_line_comment /
+                // infer/keyword_own_line_block_comment.
+                if self.comments_force_own_line_between(infer_end, name_start) {
+                    let mut parts: DocBuf = smallvec![d.text("infer")];
+                    self.append_keyword_value_line_comments(
+                        &mut parts,
+                        infer_end,
+                        name_start,
+                        type_param_doc,
+                    );
+                    return d.concat(&parts);
+                }
+                // A block comment glued to the name stays inline (`infer /* c */ R`).
+                let comments_doc =
+                    self.build_trailing_comments_break_for_line(infer_end, name_start);
+                d.concat(&[d.text("infer "), comments_doc, type_param_doc])
             }
             TSType::ThisType(_) => d.text("this"),
         }

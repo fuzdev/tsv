@@ -192,22 +192,24 @@ impl<'a> Printer<'a> {
     /// `=` (true for the inline `... =` form, false when the caller has already
     /// emitted a hardline, e.g. after an own-line pre-`=` comment).
     /// A prefix type operator (`keyof` / `typeof`) whose keyword→operand gap holds
-    /// a comment that forces the operand onto its own line (a line comment, or a
-    /// block comment with the operand on a later line). Such a value carries a
-    /// comment-forced hardline, so the type-alias RHS keeps the operator on the `=`
-    /// line (the operand hangs on the next line via the operator's own layout)
-    /// instead of breaking after `=` — consistent with the conditional /
-    /// internal-breaking arms. A long *comment-free* operator still breaks after `=`
-    /// (the hanging-indent arm).
+    /// a comment that forces the operand onto its own line — a **line** comment or a
+    /// **multiline** block comment. Such a value hangs the operand, so the type-alias
+    /// RHS keeps the operator on the `=` line (the operand hangs via the operator's
+    /// own layout) instead of breaking after `=` — consistent with the conditional /
+    /// internal-breaking arms. A **single-line** block comment (own-line, trailing, or
+    /// glued) collapses inline, so this returns false and the comment-free `=` layout
+    /// applies; a long *comment-free* operator still breaks after `=` (the
+    /// hanging-indent arm). Mirrors the printer-side gate
+    /// (`comments_force_own_line_between`) so the two stay in lockstep.
     fn type_operator_comment_forces_operand_own_line(&self, ty: &TSType<'_>) -> bool {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
-                self.comment_forces_following_own_line(kw_end, o.type_annotation.span().start)
+                self.comments_force_own_line_between(kw_end, o.type_annotation.span().start)
             }
             TSType::TypeQuery(q) => {
                 let kw_end = q.span.start + "typeof".len() as u32;
-                self.comment_forces_following_own_line(kw_end, q.expr_name.span().start)
+                self.comments_force_own_line_between(kw_end, q.expr_name.span().start)
             }
             _ => false,
         }
