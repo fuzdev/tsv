@@ -46,6 +46,11 @@ impl<'a> Printer<'a> {
             // union, intersection, and simple types — see conformance_prettier.md
             // §Uniform forced-continuation indent. (Prettier indents only the union
             // here and leaves intersection/simple flush, so this diverges for those.)
+            //
+            // A *block* comment in this gap is handled by the else branch below, NOT
+            // here: a newline-broken block compacts to the inline value-side position
+            // (`a: /* c */ X`) rather than hanging — a deliberate, cataloged choice
+            // (annotation_leading_block_prettier_divergence).
             let type_doc = self.build_type_doc(annotation.type_annotation);
             d.concat(&[
                 d.text(":"),

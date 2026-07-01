@@ -621,16 +621,15 @@ impl<'a> Printer<'a> {
             })
             .unwrap_or_else(|| d.empty());
 
-        // A line comment — or an own-line block comment (`extends⏎/* c */⏎Item`) —
-        // between the keyword and the first item is kept trailing the keyword
-        // (preserve-in-place; prettier relocates it before the keyword), with the
-        // items pushed onto the next line — mirroring the as/satisfies + type-param
-        // keyword→value handling. The keyword stays inline; only the items are
-        // pushed down (no whole-heritage break). A block glued to the first item
-        // (`extends /* c */ Item`) stays inline.
+        // A line comment or multiline block between the keyword and the first item
+        // hangs the items on the next line — mirroring the as/satisfies + type-param
+        // keyword→value handling. The keyword stays inline; only the items are pushed
+        // down (no whole-heritage break). A single-line block comment (own-line,
+        // trailing, or glued) collapses inline (the fall-through below); prettier
+        // relocates the collapsed comment before the keyword.
         if let Some(kw_start) = keyword_start {
             let kw_end = kw_start + keyword.as_str().len() as u32;
-            if self.comment_forces_following_own_line(kw_end, items[0].span.start) {
+            if self.comments_force_own_line_between(kw_end, items[0].span.start) {
                 let value_doc = d.join(item_docs, ", ");
                 let mut parts = smallvec![d.text(keyword.as_str())];
                 self.append_keyword_value_line_comments(

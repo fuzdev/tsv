@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 527,
+	"end": 309,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,7 +12,7 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Own-line block comment after a type predicate's `is`, predicate type on the",
+			"value": " A single-line block comment after a type predicate's `is` collapses inline;",
 			"start": 20,
 			"end": 98,
 			"loc": {
@@ -28,9 +28,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " next line hanging indented one level.",
+			"value": " the own-line authoring (unformatted_ours_own_line) collapses to this. Prettier",
 			"start": 100,
-			"end": 140,
+			"end": 181,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,102 +38,38 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 41
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " instead relocates the comment before `is` (`x /* a */ is T`).",
+			"start": 183,
+			"end": 247,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 65
 				}
 			}
 		},
 		{
 			"type": "Block",
 			"value": " a ",
-			"start": 164,
-			"end": 171,
+			"start": 269,
+			"end": 276,
 			"loc": {
 				"start": {
 					"line": 5,
-					"column": 2
+					"column": 21
 				},
 				"end": {
 					"line": 5,
-					"column": 9
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " A same-line block comment trailing `is` (no preceding newline) with the",
-			"start": 198,
-			"end": 272,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 1
-				},
-				"end": {
-					"line": 10,
-					"column": 75
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " predicate type on the next line stays trailing `is`, type hanging.",
-			"start": 274,
-			"end": 343,
-			"loc": {
-				"start": {
-					"line": 11,
-					"column": 1
-				},
-				"end": {
-					"line": 11,
-					"column": 70
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " b ",
-			"start": 365,
-			"end": 372,
-			"loc": {
-				"start": {
-					"line": 12,
-					"column": 21
-				},
-				"end": {
-					"line": 12,
-					"column": 28
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " A same-line block comment glued to the type stays fully inline.",
-			"start": 399,
-			"end": 465,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 1
-				},
-				"end": {
-					"line": 17,
-					"column": 67
-				}
-			}
-		},
-		{
-			"type": "Block",
-			"value": " c ",
-			"start": 487,
-			"end": 494,
-			"loc": {
-				"start": {
-					"line": 18,
-					"column": 21
-				},
-				"end": {
-					"line": 18,
 					"column": 28
 				}
 			}
@@ -142,48 +78,48 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 526,
+		"end": 308,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 517,
+			"end": 299,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 21,
+					"line": 8,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "FunctionDeclaration",
-					"start": 142,
-					"end": 195,
+					"start": 249,
+					"end": 298,
 					"loc": {
 						"start": {
-							"line": 4,
+							"line": 5,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
+							"line": 7,
 							"column": 2
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 151,
-						"end": 152,
+						"start": 258,
+						"end": 259,
 						"loc": {
 							"start": {
-								"line": 4,
+								"line": 5,
 								"column": 10
 							},
 							"end": {
-								"line": 4,
+								"line": 5,
 								"column": 11
 							}
 						},
@@ -195,15 +131,15 @@
 					"params": [
 						{
 							"type": "Identifier",
-							"start": 153,
-							"end": 154,
+							"start": 260,
+							"end": 261,
 							"loc": {
 								"start": {
-									"line": 4,
+									"line": 5,
 									"column": 12
 								},
 								"end": {
-									"line": 4,
+									"line": 5,
 									"column": 13
 								}
 							},
@@ -212,43 +148,43 @@
 					],
 					"returnType": {
 						"type": "TSTypeAnnotation",
-						"start": 155,
-						"end": 175,
+						"start": 262,
+						"end": 278,
 						"loc": {
 							"start": {
-								"line": 4,
+								"line": 5,
 								"column": 14
 							},
 							"end": {
-								"line": 6,
-								"column": 3
+								"line": 5,
+								"column": 30
 							}
 						},
 						"typeAnnotation": {
 							"type": "TSTypePredicate",
-							"start": 157,
-							"end": 175,
+							"start": 264,
+							"end": 278,
 							"loc": {
 								"start": {
-									"line": 4,
+									"line": 5,
 									"column": 16
 								},
 								"end": {
-									"line": 6,
-									"column": 3
+									"line": 5,
+									"column": 30
 								}
 							},
 							"parameterName": {
 								"type": "Identifier",
-								"start": 157,
-								"end": 158,
+								"start": 264,
+								"end": 265,
 								"loc": {
 									"start": {
-										"line": 4,
+										"line": 5,
 										"column": 16
 									},
 									"end": {
-										"line": 4,
+										"line": 5,
 										"column": 17
 									}
 								},
@@ -256,44 +192,44 @@
 							},
 							"typeAnnotation": {
 								"type": "TSTypeAnnotation",
-								"start": 174,
-								"end": 175,
+								"start": 277,
+								"end": 278,
 								"loc": {
 									"start": {
-										"line": 6,
-										"column": 2
+										"line": 5,
+										"column": 29
 									},
 									"end": {
-										"line": 6,
-										"column": 3
+										"line": 5,
+										"column": 30
 									}
 								},
 								"typeAnnotation": {
 									"type": "TSTypeReference",
-									"start": 174,
-									"end": 175,
+									"start": 277,
+									"end": 278,
 									"loc": {
 										"start": {
-											"line": 6,
-											"column": 2
+											"line": 5,
+											"column": 29
 										},
 										"end": {
-											"line": 6,
-											"column": 3
+											"line": 5,
+											"column": 30
 										}
 									},
 									"typeName": {
 										"type": "Identifier",
-										"start": 174,
-										"end": 175,
+										"start": 277,
+										"end": 278,
 										"loc": {
 											"start": {
-												"line": 6,
-												"column": 2
+												"line": 5,
+												"column": 29
 											},
 											"end": {
-												"line": 6,
-												"column": 3
+												"line": 5,
+												"column": 30
 											}
 										},
 										"name": "T"
@@ -303,8 +239,8 @@
 									{
 										"type": "Block",
 										"value": " a ",
-										"start": 164,
-										"end": 171
+										"start": 269,
+										"end": 276
 									}
 								]
 							},
@@ -313,44 +249,44 @@
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 176,
-						"end": 195,
+						"start": 279,
+						"end": 298,
 						"loc": {
 							"start": {
-								"line": 6,
-								"column": 4
+								"line": 5,
+								"column": 31
 							},
 							"end": {
-								"line": 8,
+								"line": 7,
 								"column": 2
 							}
 						},
 						"body": [
 							{
 								"type": "ReturnStatement",
-								"start": 180,
-								"end": 192,
+								"start": 283,
+								"end": 295,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 6,
 										"column": 2
 									},
 									"end": {
-										"line": 7,
+										"line": 6,
 										"column": 14
 									}
 								},
 								"argument": {
 									"type": "Literal",
-									"start": 187,
-									"end": 191,
+									"start": 290,
+									"end": 294,
 									"loc": {
 										"start": {
-											"line": 7,
+											"line": 6,
 											"column": 9
 										},
 										"end": {
-											"line": 7,
+											"line": 6,
 											"column": 13
 										}
 									},
@@ -363,441 +299,21 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Own-line block comment after a type predicate's `is`, predicate type on the",
+							"value": " A single-line block comment after a type predicate's `is` collapses inline;",
 							"start": 20,
 							"end": 98
 						},
 						{
 							"type": "Line",
-							"value": " next line hanging indented one level.",
+							"value": " the own-line authoring (unformatted_ours_own_line) collapses to this. Prettier",
 							"start": 100,
-							"end": 140
-						}
-					]
-				},
-				{
-					"type": "FunctionDeclaration",
-					"start": 345,
-					"end": 396,
-					"loc": {
-						"start": {
-							"line": 12,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 2
-						}
-					},
-					"id": {
-						"type": "Identifier",
-						"start": 354,
-						"end": 355,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 10
-							},
-							"end": {
-								"line": 12,
-								"column": 11
-							}
-						},
-						"name": "g"
-					},
-					"expression": false,
-					"generator": false,
-					"async": false,
-					"params": [
-						{
-							"type": "Identifier",
-							"start": 356,
-							"end": 357,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 12
-								},
-								"end": {
-									"line": 12,
-									"column": 13
-								}
-							},
-							"name": "x"
-						}
-					],
-					"returnType": {
-						"type": "TSTypeAnnotation",
-						"start": 358,
-						"end": 376,
-						"loc": {
-							"start": {
-								"line": 12,
-								"column": 14
-							},
-							"end": {
-								"line": 13,
-								"column": 3
-							}
-						},
-						"typeAnnotation": {
-							"type": "TSTypePredicate",
-							"start": 360,
-							"end": 376,
-							"loc": {
-								"start": {
-									"line": 12,
-									"column": 16
-								},
-								"end": {
-									"line": 13,
-									"column": 3
-								}
-							},
-							"parameterName": {
-								"type": "Identifier",
-								"start": 360,
-								"end": 361,
-								"loc": {
-									"start": {
-										"line": 12,
-										"column": 16
-									},
-									"end": {
-										"line": 12,
-										"column": 17
-									}
-								},
-								"name": "x"
-							},
-							"typeAnnotation": {
-								"type": "TSTypeAnnotation",
-								"start": 375,
-								"end": 376,
-								"loc": {
-									"start": {
-										"line": 13,
-										"column": 2
-									},
-									"end": {
-										"line": 13,
-										"column": 3
-									}
-								},
-								"typeAnnotation": {
-									"type": "TSTypeReference",
-									"start": 375,
-									"end": 376,
-									"loc": {
-										"start": {
-											"line": 13,
-											"column": 2
-										},
-										"end": {
-											"line": 13,
-											"column": 3
-										}
-									},
-									"typeName": {
-										"type": "Identifier",
-										"start": 375,
-										"end": 376,
-										"loc": {
-											"start": {
-												"line": 13,
-												"column": 2
-											},
-											"end": {
-												"line": 13,
-												"column": 3
-											}
-										},
-										"name": "U"
-									}
-								},
-								"leadingComments": [
-									{
-										"type": "Block",
-										"value": " b ",
-										"start": 365,
-										"end": 372
-									}
-								]
-							},
-							"asserts": false
-						}
-					},
-					"body": {
-						"type": "BlockStatement",
-						"start": 377,
-						"end": 396,
-						"loc": {
-							"start": {
-								"line": 13,
-								"column": 4
-							},
-							"end": {
-								"line": 15,
-								"column": 2
-							}
-						},
-						"body": [
-							{
-								"type": "ReturnStatement",
-								"start": 381,
-								"end": 393,
-								"loc": {
-									"start": {
-										"line": 14,
-										"column": 2
-									},
-									"end": {
-										"line": 14,
-										"column": 14
-									}
-								},
-								"argument": {
-									"type": "Literal",
-									"start": 388,
-									"end": 392,
-									"loc": {
-										"start": {
-											"line": 14,
-											"column": 9
-										},
-										"end": {
-											"line": 14,
-											"column": 13
-										}
-									},
-									"value": true,
-									"raw": "true"
-								}
-							}
-						]
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " A same-line block comment trailing `is` (no preceding newline) with the",
-							"start": 198,
-							"end": 272
+							"end": 181
 						},
 						{
 							"type": "Line",
-							"value": " predicate type on the next line stays trailing `is`, type hanging.",
-							"start": 274,
-							"end": 343
-						}
-					]
-				},
-				{
-					"type": "FunctionDeclaration",
-					"start": 467,
-					"end": 516,
-					"loc": {
-						"start": {
-							"line": 18,
-							"column": 1
-						},
-						"end": {
-							"line": 20,
-							"column": 2
-						}
-					},
-					"id": {
-						"type": "Identifier",
-						"start": 476,
-						"end": 477,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 10
-							},
-							"end": {
-								"line": 18,
-								"column": 11
-							}
-						},
-						"name": "h"
-					},
-					"expression": false,
-					"generator": false,
-					"async": false,
-					"params": [
-						{
-							"type": "Identifier",
-							"start": 478,
-							"end": 479,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 12
-								},
-								"end": {
-									"line": 18,
-									"column": 13
-								}
-							},
-							"name": "x"
-						}
-					],
-					"returnType": {
-						"type": "TSTypeAnnotation",
-						"start": 480,
-						"end": 496,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 14
-							},
-							"end": {
-								"line": 18,
-								"column": 30
-							}
-						},
-						"typeAnnotation": {
-							"type": "TSTypePredicate",
-							"start": 482,
-							"end": 496,
-							"loc": {
-								"start": {
-									"line": 18,
-									"column": 16
-								},
-								"end": {
-									"line": 18,
-									"column": 30
-								}
-							},
-							"parameterName": {
-								"type": "Identifier",
-								"start": 482,
-								"end": 483,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 16
-									},
-									"end": {
-										"line": 18,
-										"column": 17
-									}
-								},
-								"name": "x"
-							},
-							"typeAnnotation": {
-								"type": "TSTypeAnnotation",
-								"start": 495,
-								"end": 496,
-								"loc": {
-									"start": {
-										"line": 18,
-										"column": 29
-									},
-									"end": {
-										"line": 18,
-										"column": 30
-									}
-								},
-								"typeAnnotation": {
-									"type": "TSTypeReference",
-									"start": 495,
-									"end": 496,
-									"loc": {
-										"start": {
-											"line": 18,
-											"column": 29
-										},
-										"end": {
-											"line": 18,
-											"column": 30
-										}
-									},
-									"typeName": {
-										"type": "Identifier",
-										"start": 495,
-										"end": 496,
-										"loc": {
-											"start": {
-												"line": 18,
-												"column": 29
-											},
-											"end": {
-												"line": 18,
-												"column": 30
-											}
-										},
-										"name": "V"
-									}
-								},
-								"leadingComments": [
-									{
-										"type": "Block",
-										"value": " c ",
-										"start": 487,
-										"end": 494
-									}
-								]
-							},
-							"asserts": false
-						}
-					},
-					"body": {
-						"type": "BlockStatement",
-						"start": 497,
-						"end": 516,
-						"loc": {
-							"start": {
-								"line": 18,
-								"column": 31
-							},
-							"end": {
-								"line": 20,
-								"column": 2
-							}
-						},
-						"body": [
-							{
-								"type": "ReturnStatement",
-								"start": 501,
-								"end": 513,
-								"loc": {
-									"start": {
-										"line": 19,
-										"column": 2
-									},
-									"end": {
-										"line": 19,
-										"column": 14
-									}
-								},
-								"argument": {
-									"type": "Literal",
-									"start": 508,
-									"end": 512,
-									"loc": {
-										"start": {
-											"line": 19,
-											"column": 9
-										},
-										"end": {
-											"line": 19,
-											"column": 13
-										}
-									},
-									"value": true,
-									"raw": "true"
-								}
-							}
-						]
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " A same-line block comment glued to the type stays fully inline.",
-							"start": 399,
-							"end": 465
+							"value": " instead relocates the comment before `is` (`x /* a */ is T`).",
+							"start": 183,
+							"end": 247
 						}
 					]
 				}

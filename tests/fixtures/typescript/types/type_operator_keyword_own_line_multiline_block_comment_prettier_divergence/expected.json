@@ -1,0 +1,484 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 590,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line multiline block comment in a prefix type operator's keyword->operand",
+			"start": 20,
+			"end": 103,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " gap hangs the operand on its own line, the comment kept where the author wrote it.",
+			"start": 105,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " tsv diverges from prettier, which pulls the comment up onto the operator line and",
+			"start": 192,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leaves the operand flush. A GLUED multiline block collapses inline instead — see",
+			"start": 278,
+			"end": 361,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keyword_value_glued_multiline_block_comment. Covers keyof, typeof, readonly.",
+			"start": 363,
+			"end": 442,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " line1\nline2 ",
+			"start": 461,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " line1\nline2 ",
+			"start": 506,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " line1\nline2 ",
+			"start": 553,
+			"end": 572,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 589,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 580,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 444,
+					"end": 485,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 449,
+						"end": 450,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"name": "K"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 453,
+						"end": 484,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 10
+							},
+							"end": {
+								"line": 10,
+								"column": 3
+							}
+						},
+						"operator": "keyof",
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 483,
+							"end": 484,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 483,
+								"end": 484,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " line1\nline2 ",
+									"start": 461,
+									"end": 480
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line multiline block comment in a prefix type operator's keyword->operand",
+							"start": 20,
+							"end": 103
+						},
+						{
+							"type": "Line",
+							"value": " gap hangs the operand on its own line, the comment kept where the author wrote it.",
+							"start": 105,
+							"end": 190
+						},
+						{
+							"type": "Line",
+							"value": " tsv diverges from prettier, which pulls the comment up onto the operator line and",
+							"start": 192,
+							"end": 276
+						},
+						{
+							"type": "Line",
+							"value": " leaves the operand flush. A GLUED multiline block collapses inline instead — see",
+							"start": 278,
+							"end": 361
+						},
+						{
+							"type": "Line",
+							"value": " keyword_value_glued_multiline_block_comment. Covers keyof, typeof, readonly.",
+							"start": 363,
+							"end": 442
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 488,
+					"end": 530,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 493,
+						"end": 494,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "Q"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeQuery",
+						"start": 497,
+						"end": 529,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 10
+							},
+							"end": {
+								"line": 15,
+								"column": 3
+							}
+						},
+						"exprName": {
+							"type": "Identifier",
+							"start": 528,
+							"end": 529,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 3
+								}
+							},
+							"name": "x",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " line1\nline2 ",
+									"start": 506,
+									"end": 525
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 533,
+					"end": 579,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 538,
+						"end": 539,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 6
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"name": "R"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeOperator",
+						"start": 542,
+						"end": 578,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 10
+							},
+							"end": {
+								"line": 20,
+								"column": 5
+							}
+						},
+						"operator": "readonly",
+						"typeAnnotation": {
+							"type": "TSArrayType",
+							"start": 575,
+							"end": 578,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 2
+								},
+								"end": {
+									"line": 20,
+									"column": 5
+								}
+							},
+							"elementType": {
+								"type": "TSTypeReference",
+								"start": 575,
+								"end": 576,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 575,
+									"end": 576,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 3
+										}
+									},
+									"name": "A"
+								}
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " line1\nline2 ",
+									"start": 553,
+									"end": 572
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

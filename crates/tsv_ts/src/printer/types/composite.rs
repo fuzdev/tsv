@@ -77,6 +77,10 @@ impl<'a> Printer<'a> {
             || question_pos.is_some_and(|q| {
                 tsv_lang::has_comments_in_range(self.comments, extends_type_end, q)
             })
+            // A single-line block comment in the `?`→branch gap (own-line or trailing)
+            // collapses inline (`? /* c */ B`) — the branch loop pulls the comment to
+            // trail `?`, so an own-line block can't be kept distinct idempotently;
+            // matches prettier's fixed point. Only a line/multiline comment breaks.
             || extends_paren_has_leading_line_comment
             || true_paren_has_leading_line_comment;
         let colon_end = colon_pos.map_or(true_type_end, |c| c + 1);
@@ -290,11 +294,14 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let extends_type_start = c.extends_type.span().start;
 
-        // A line comment after `extends` stays trailing it, with the extends-type
-        // on the next line (preserve-in-place; prettier relocates the comment to
-        // trail the extends-type). The conditional then breaks (forced multiline
-        // by the comment's hardline).
-        if self.has_line_comments_between(extends_kw_end, extends_type_start) {
+        // A comment that can't share the `extends` line — a line comment or a
+        // multiline block — stays with `extends`, the extends-type hanging on the next
+        // line indented one level (the shared keyword→value layout), forcing the
+        // conditional to break. A single-line block comment (own-line, trailing, or
+        // glued) collapses inline (`extends /* c */ Y`, the fall-through below);
+        // prettier relocates the collapsed comment before `extends`. See
+        // check_extends_line_comment / extends_own_line_block_comment.
+        if self.comments_force_own_line_between(extends_kw_end, extends_type_start) {
             let value_doc = self.build_type_doc_maybe_parens(
                 c.extends_type,
                 type_needs_parens_for_conditional_extends,
@@ -454,7 +461,9 @@ impl<'a> Printer<'a> {
         q_parts.push(d.hardline());
         q_parts.push(d.text("?"));
 
-        // Comments AFTER the `?` token — emit between `?` and the true branch.
+        // Comments AFTER the `?` token — emit between `?` and the true branch. A line
+        // comment or a multiline block drops the branch onto its own (indented) line;
+        // a single-line block stays inline on the `?` arm (in-place collapse).
         let mut needs_indent_before_true = false;
         for comment in comments_in_range(self.comments, after_q_start, true_type_start) {
             q_parts.push(d.text(" "));

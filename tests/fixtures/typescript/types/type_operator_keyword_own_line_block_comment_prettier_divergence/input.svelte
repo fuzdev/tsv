@@ -1,32 +1,13 @@
 <script lang="ts">
-	// Own-line block comment after a prefix type operator, before the operand:
-	// kept on its own line with the operand hanging indented one level (the shared
-	// keyword→value layout).
-	type A = keyof
-		/* a */
-		B;
+	// A single-line block comment between a prefix type operator and its operand is
+	// inline; the own-line authoring (unformatted_ours_own_line) collapses to this.
 
-	// typeof (a TypeQuery node) hangs the same way.
-	type B = typeof
-		/* b */
-		x;
+	// keyof
+	type A = keyof /* a */ B;
 
-	// readonly (a TypeOperator, like keyof) hangs the same way.
-	type C = readonly
-		/* c */
-		string[];
+	// typeof (a TypeQuery node)
+	type B = typeof /* b */ x;
 
-	// A blank line after the comment is preserved.
-	type D = keyof
-		/* d */
-
-		B;
-
-	// A same-line block comment with the operand authored on the next line keeps
-	// the comment trailing the operator and the operand hanging.
-	type E = keyof /* e */
-		B;
-
-	// A same-line block comment glued to the operand stays fully inline.
-	type F = keyof /* f */ B;
+	// readonly
+	type C = readonly /* c */ string[];
 </script>

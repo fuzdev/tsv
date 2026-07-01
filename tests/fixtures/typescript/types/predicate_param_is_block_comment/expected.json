@@ -1,0 +1,860 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 514,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment in a type predicate's parameter->`is` gap is preserved inline",
+			"start": 20,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (`x /* a */ is T`), matching prettier. Covers a plain predicate, an `asserts`",
+			"start": 102,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " predicate, and a `this` predicate. A line comment can't occur here (a newline",
+			"start": 184,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before `is` is a parse error), so only the block form reaches this gap.",
+			"start": 266,
+			"end": 340,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 359,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 18
+				},
+				"end": {
+					"line": 6,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 419,
+			"end": 426,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 26
+				},
+				"end": {
+					"line": 10,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 466,
+			"end": 473,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 12
+				},
+				"end": {
+					"line": 15,
+					"column": 19
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 513,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 504,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 342,
+					"end": 391,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 351,
+						"end": 352,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 11
+							}
+						},
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 353,
+							"end": 354,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 12
+								},
+								"end": {
+									"line": 6,
+									"column": 13
+								}
+							},
+							"name": "x"
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 355,
+						"end": 371,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 14
+							},
+							"end": {
+								"line": 6,
+								"column": 30
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 357,
+							"end": 371,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 16
+								},
+								"end": {
+									"line": 6,
+									"column": 30
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 357,
+								"end": 358,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 16
+									},
+									"end": {
+										"line": 6,
+										"column": 17
+									}
+								},
+								"name": "x",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " a ",
+										"start": 359,
+										"end": 366
+									}
+								]
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 370,
+								"end": 371,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 29
+									},
+									"end": {
+										"line": 6,
+										"column": 30
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 370,
+									"end": 371,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 29
+										},
+										"end": {
+											"line": 6,
+											"column": 30
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 370,
+										"end": 371,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 29
+											},
+											"end": {
+												"line": 6,
+												"column": 30
+											}
+										},
+										"name": "T"
+									}
+								}
+							},
+							"asserts": false
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 372,
+						"end": 391,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 31
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 376,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 14
+									}
+								},
+								"argument": {
+									"type": "Literal",
+									"start": 383,
+									"end": 387,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 9
+										},
+										"end": {
+											"line": 7,
+											"column": 13
+										}
+									},
+									"value": true,
+									"raw": "true"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment in a type predicate's parameter->`is` gap is preserved inline",
+							"start": 20,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " (`x /* a */ is T`), matching prettier. Covers a plain predicate, an `asserts`",
+							"start": 102,
+							"end": 182
+						},
+						{
+							"type": "Line",
+							"value": " predicate, and a `this` predicate. A line comment can't occur here (a newline",
+							"start": 184,
+							"end": 264
+						},
+						{
+							"type": "Line",
+							"value": " before `is` is a parse error), so only the block form reaches this gap.",
+							"start": 266,
+							"end": 340
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 394,
+					"end": 441,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 403,
+						"end": 404,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 10,
+								"column": 11
+							}
+						},
+						"name": "g"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 405,
+							"end": 406,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 12
+								},
+								"end": {
+									"line": 10,
+									"column": 13
+								}
+							},
+							"name": "x"
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 407,
+						"end": 431,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 14
+							},
+							"end": {
+								"line": 10,
+								"column": 38
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypePredicate",
+							"start": 409,
+							"end": 431,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 16
+								},
+								"end": {
+									"line": 10,
+									"column": 38
+								}
+							},
+							"parameterName": {
+								"type": "Identifier",
+								"start": 417,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 24
+									},
+									"end": {
+										"line": 10,
+										"column": 25
+									}
+								},
+								"name": "x",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " b ",
+										"start": 419,
+										"end": 426
+									}
+								]
+							},
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 430,
+								"end": 431,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 37
+									},
+									"end": {
+										"line": 10,
+										"column": 38
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 430,
+									"end": 431,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 37
+										},
+										"end": {
+											"line": 10,
+											"column": 38
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 430,
+										"end": 431,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 37
+											},
+											"end": {
+												"line": 10,
+												"column": 38
+											}
+										},
+										"name": "T"
+									}
+								}
+							},
+							"asserts": true
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 432,
+						"end": 441,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 39
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 436,
+								"end": 438,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 436,
+									"end": 437,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"name": "x"
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 444,
+					"end": 503,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 450,
+						"end": 451,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 7
+							},
+							"end": {
+								"line": 14,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 452,
+						"end": 503,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 9
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 456,
+								"end": 500,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 456,
+									"end": 457,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"name": "m"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 457,
+									"end": 500,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 17,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"returnType": {
+										"type": "TSTypeAnnotation",
+										"start": 459,
+										"end": 478,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 5
+											},
+											"end": {
+												"line": 15,
+												"column": 24
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypePredicate",
+											"start": 461,
+											"end": 478,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 7
+												},
+												"end": {
+													"line": 15,
+													"column": 24
+												}
+											},
+											"parameterName": {
+												"type": "TSThisType",
+												"start": 461,
+												"end": 465,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 7
+													},
+													"end": {
+														"line": 15,
+														"column": 11
+													}
+												},
+												"trailingComments": [
+													{
+														"type": "Block",
+														"value": " c ",
+														"start": 466,
+														"end": 473
+													}
+												]
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 477,
+												"end": 478,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 23
+													},
+													"end": {
+														"line": 15,
+														"column": 24
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 477,
+													"end": 478,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 23
+														},
+														"end": {
+															"line": 15,
+															"column": 24
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 477,
+														"end": 478,
+														"loc": {
+															"start": {
+																"line": 15,
+																"column": 23
+															},
+															"end": {
+																"line": 15,
+																"column": 24
+															}
+														},
+														"name": "T"
+													}
+												}
+											},
+											"asserts": false
+										}
+									},
+									"body": {
+										"type": "BlockStatement",
+										"start": 479,
+										"end": 500,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 25
+											},
+											"end": {
+												"line": 17,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 484,
+												"end": 496,
+												"loc": {
+													"start": {
+														"line": 16,
+														"column": 3
+													},
+													"end": {
+														"line": 16,
+														"column": 15
+													}
+												},
+												"argument": {
+													"type": "Literal",
+													"start": 491,
+													"end": 495,
+													"loc": {
+														"start": {
+															"line": 16,
+															"column": 10
+														},
+														"end": {
+															"line": 16,
+															"column": 14
+														}
+													},
+													"value": true,
+													"raw": "true"
+												}
+											}
+										]
+									}
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

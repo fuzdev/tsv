@@ -128,15 +128,14 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         let d = self.d();
         let super_class = super_class?;
-        // A line comment — or an own-line block comment (`extends⏎/* c */⏎B`) —
-        // after `extends`, before the super class, is kept trailing the keyword
-        // (preserve-in-place; prettier relocates it before `extends`) with the
-        // super class pushed onto the next line — the shared as/satisfies +
-        // type-param keyword→value mechanism. A block glued to the type
-        // (`extends /* c */ B`) stays inline.
+        // A line comment or multiline block after `extends`, before the super class,
+        // hangs the super class on the next line — the shared as/satisfies + type-param
+        // keyword→value mechanism. A single-line block comment (own-line, trailing, or
+        // glued) collapses inline (`extends /* c */ B`, the fall-through below);
+        // prettier relocates the collapsed comment before `extends`.
         if let Some(kw_start) = extends_keyword_start {
             let kw_end = kw_start + "extends".len() as u32;
-            if self.comment_forces_following_own_line(kw_end, super_class.span().start) {
+            if self.comments_force_own_line_between(kw_end, super_class.span().start) {
                 let mut value_parts: DocBuf = smallvec![self.build_super_class_doc(super_class)];
                 if let Some(type_args) = super_type_parameters {
                     let gap_start = super_class.span().end;
