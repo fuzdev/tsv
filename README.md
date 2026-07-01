@@ -157,16 +157,16 @@ Future features (unknown order):
 
 ## Docs
 
-- **[CLAUDE.md](CLAUDE.md)** - development guide (commands, structure, conventions)
-- **[docs/architecture.md](docs/architecture.md)** - the major design decisions
-- **[docs/directives.md](docs/directives.md)** - `format-ignore` / `prettier-ignore` formatting directives
-- **[docs/cli.md](docs/cli.md)** - commands and design
-- **[docs/conformance_prettier.md](docs/conformance_prettier.md)** - where formatting diverges from Prettier (and why)
-- **[docs/conformance_svelte.md](docs/conformance_svelte.md)** - where the parser diverges from Svelte (and why)
-- **[docs/conformance_test262.md](docs/conformance_test262.md)** - ECMAScript parser conformance
-- **[docs/fixture_overview.md](docs/fixture_overview.md)** - fixture system design
-- **[docs/fixture_workflow.md](docs/fixture_workflow.md)** - step-by-step fixture creation
-- **[docs/fixture_naming.md](docs/fixture_naming.md)** - fixture naming conventions and patterns
+- [CLAUDE.md](CLAUDE.md) - development guide (commands, structure, conventions)
+- [docs/architecture.md](docs/architecture.md) - the major design decisions
+- [docs/directives.md](docs/directives.md) - `format-ignore` / `prettier-ignore` formatting directives
+- [docs/cli.md](docs/cli.md) - commands and design
+- [docs/conformance_prettier.md](docs/conformance_prettier.md) - where formatting diverges from Prettier (and why)
+- [docs/conformance_svelte.md](docs/conformance_svelte.md) - where the parser diverges from Svelte (and why)
+- [docs/conformance_test262.md](docs/conformance_test262.md) - ECMAScript parser conformance
+- [docs/fixture_overview.md](docs/fixture_overview.md) - fixture system design
+- [docs/fixture_workflow.md](docs/fixture_workflow.md) - step-by-step fixture creation
+- [docs/fixture_naming.md](docs/fixture_naming.md) - fixture naming conventions and patterns
 
 ## Developing
 
@@ -228,7 +228,7 @@ Each language crate exports a consistent API:
 - `format(ast, source) -> String`
 - `convert_ast(ast, source) -> PublicAST` (default-on `convert` cargo feature; turn off for parse+format-only builds)
 
-See [CLAUDE.md](CLAUDE.md) for detailed structure and full command reference.
+For more details see [CLAUDE.md](CLAUDE.md).
 
 ## Credits
 
