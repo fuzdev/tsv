@@ -146,11 +146,8 @@ pub(super) fn build_member_only_chain_doc<'a, P: ChainPrinter>(
         .take(first_doc_end)
         .map(|n| print_node(n, printer))
         .collect();
-    let first_doc = if first_doc_nodes.is_empty() {
-        d.empty()
-    } else {
-        d.concat(&first_doc_nodes)
-    };
+    // `concat` short-circuits the empty case to `empty()`.
+    let first_doc = d.concat(&first_doc_nodes);
 
     // If no remaining nodes after first_doc, just return it
     if first_doc_end >= all_nodes.len() {

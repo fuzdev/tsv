@@ -453,11 +453,8 @@ impl<'a> Printer<'a> {
         }
         let mut parts = smallvec![with_leading];
         self.append_trailing_paren_comments(&mut parts, rightmost_end, binary.span.end);
-        if parts.len() == 1 {
-            with_leading
-        } else {
-            self.d().concat(&parts)
-        }
+        // `concat` short-circuits the no-trailing-comment case (`[with_leading]`).
+        self.d().concat(&parts)
     }
 
     /// Check if the binary continuation should be wrapped in its own group.

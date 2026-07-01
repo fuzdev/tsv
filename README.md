@@ -9,7 +9,10 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
 
-Compared to Oxc and Biome, the emphasis is on performance over extensibility, with Svelte as the only JS framework.
+Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
+with Svelte as the only JS framework. 
+The extensibility story is currently limited to using its Rust crates as libraries;
+bridging to JS and/or WASM plugins is an open question.
 For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
 This is an early release, and reports and feedback are appreciated -
@@ -79,8 +82,9 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
   plus a compatible `.prettierignore`
   (but relative to repo root if available, not cwd like Prettier's default)
   (also, all 3 files use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
-- Rust-only implementation that never embeds or calls a JS runtime, for performance;
-  JS reaches tsv through the WASM bindings, and native N-API bindings are not yet published
+- Rust-only implementation that currently does not call or embed a JS runtime
+  (open for discussion, needs research into the tradeoffs);
+  JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
 - architected to output optimal artifacts: runtime speed and compiled
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
@@ -97,8 +101,8 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
 
 Each language is a self-contained Rust crate exposing the same
 `parse`/`format`/`convert_ast` functions over its own concrete types - there's no
-central `Language` trait, registry, or enum dispatch ("closed scope, open convention").
-That means no dynamic dispatch, and WASM builds tree-shake at the link level:
+central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention").
+That means the builds tree-shake at the link level:
 the parse build excludes the printers, and the format build excludes the JSON-AST conversion layer.
 Languages tree-shake the same way - a build binding only TypeScript would exclude
 Svelte and CSS entirely - though currently the published packages include all three.
@@ -110,11 +114,11 @@ Consumers can use tsv's crates ([not yet published](https://github.com/fuzdev/ts
 to build custom tools independently.
 Hard non-goals:
 
-- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+friends)
+- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends)
 - standard CSS and Svelte extensions only - no SCSS, CSS Modules, LESS, etc
 - no JS plugins - won't embed or integrate a JS runtime,
   instead linter extensibility will be data-driven like with pattern-based rules;
-  possibly WASM plugins if the weight is deemed worth it
+  possibly JS bridging and/or WASM plugins if the tradeoffs work for tsv's goals
 - no style config settings, so on-disk state and caller params
   never change the output for a given input
 - no strict Prettier conformance -
@@ -153,16 +157,16 @@ Future features (unknown order):
 
 ## Docs
 
-- **[CLAUDE.md](CLAUDE.md)** - development guide (commands, structure, conventions)
-- **[docs/architecture.md](docs/architecture.md)** - the major design decisions
-- **[docs/directives.md](docs/directives.md)** - `format-ignore` / `prettier-ignore` formatting directives
-- **[docs/cli.md](docs/cli.md)** - commands and design
-- **[docs/conformance_prettier.md](docs/conformance_prettier.md)** - where formatting diverges from Prettier (and why)
-- **[docs/conformance_svelte.md](docs/conformance_svelte.md)** - where the parser diverges from Svelte (and why)
-- **[docs/conformance_test262.md](docs/conformance_test262.md)** - ECMAScript parser conformance
-- **[docs/fixture_overview.md](docs/fixture_overview.md)** - fixture system design
-- **[docs/fixture_workflow.md](docs/fixture_workflow.md)** - step-by-step fixture creation
-- **[docs/fixture_naming.md](docs/fixture_naming.md)** - fixture naming conventions and patterns
+- [CLAUDE.md](CLAUDE.md) - development guide (commands, structure, conventions)
+- [docs/architecture.md](docs/architecture.md) - the major design decisions
+- [docs/directives.md](docs/directives.md) - `format-ignore` / `prettier-ignore` formatting directives
+- [docs/cli.md](docs/cli.md) - commands and design
+- [docs/conformance_prettier.md](docs/conformance_prettier.md) - where formatting diverges from Prettier (and why)
+- [docs/conformance_svelte.md](docs/conformance_svelte.md) - where the parser diverges from Svelte (and why)
+- [docs/conformance_test262.md](docs/conformance_test262.md) - ECMAScript parser conformance
+- [docs/fixture_overview.md](docs/fixture_overview.md) - fixture system design
+- [docs/fixture_workflow.md](docs/fixture_workflow.md) - step-by-step fixture creation
+- [docs/fixture_naming.md](docs/fixture_naming.md) - fixture naming conventions and patterns
 
 ## Developing
 
@@ -224,7 +228,7 @@ Each language crate exports a consistent API:
 - `format(ast, source) -> String`
 - `convert_ast(ast, source) -> PublicAST` (default-on `convert` cargo feature; turn off for parse+format-only builds)
 
-See [CLAUDE.md](CLAUDE.md) for detailed structure and full command reference.
+For more details see [CLAUDE.md](CLAUDE.md).
 
 ## Credits
 

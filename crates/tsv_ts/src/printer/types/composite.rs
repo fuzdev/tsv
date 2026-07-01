@@ -522,11 +522,8 @@ impl<'a> Printer<'a> {
         let comments_before_extends =
             self.build_comments_between(check_type_end, extends_kw_start, CommentSpacing::Leading);
 
-        let trailing_on_extends_doc = if trailing_on_extends_parts.is_empty() {
-            d.empty()
-        } else {
-            d.concat(&trailing_on_extends_parts)
-        };
+        // `concat` short-circuits the no-trailing-comment case to `empty()`.
+        let trailing_on_extends_doc = d.concat(&trailing_on_extends_parts);
 
         d.concat(&[
             self.build_conditional_check_doc(c.check_type),

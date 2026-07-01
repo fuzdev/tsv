@@ -244,11 +244,8 @@ impl<'a> Printer<'a> {
                 parts.push(d.hardline());
             }
         }
-        if parts.is_empty() {
-            d.empty()
-        } else {
-            d.concat(&parts)
-        }
+        // `concat` short-circuits the no-comments-in-range case to `empty()`.
+        d.concat(&parts)
     }
 
     /// Leading-spacing counterpart of `build_trailing_comments_break_for_line`: a
@@ -267,11 +264,8 @@ impl<'a> Printer<'a> {
                 parts.push(d.hardline());
             }
         }
-        if parts.is_empty() {
-            d.empty()
-        } else {
-            d.concat(&parts)
-        }
+        // `concat` short-circuits the no-comments-in-range case to `empty()`.
+        d.concat(&parts)
     }
 
     /// Build a Doc for inline comments, returning None if no comments.

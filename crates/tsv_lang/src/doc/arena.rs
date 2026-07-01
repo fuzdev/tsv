@@ -591,9 +591,25 @@ impl DocArena {
     }
 
     /// Concatenate multiple docs into a sequence.
+    ///
+    /// Short-circuits the degenerate cases so no `Concat` node is allocated for
+    /// them: an empty slice returns `empty()` (a `Concat` with no children emits
+    /// nothing, exactly like `empty()`), and a single element returns that
+    /// element's `DocId` directly — `concat([x])` renders exactly as `x`, since
+    /// every consumer of `Concat` only resolves and iterates its child range, so
+    /// wrapping one child changes no output, `fits()` result, or break decision.
+    /// These two shapes are ~7% of all doc nodes on real corpora (single-child
+    /// alone ~6%), so collapsing them at this chokepoint cuts build allocation,
+    /// arena memory, and the render/`fits`/memo traversal that scans every node.
     pub fn concat(&self, docs: &[DocId]) -> DocId {
-        let range = self.alloc_children(docs);
-        self.alloc(DocNode::Concat(range))
+        match docs {
+            [] => self.empty(),
+            [single] => *single,
+            _ => {
+                let range = self.alloc_children(docs);
+                self.alloc(DocNode::Concat(range))
+            }
+        }
     }
 
     /// Create a fill doc for greedy line packing.
@@ -642,11 +658,8 @@ impl DocArena {
             }
             parts.push(doc);
         }
-        if parts.is_empty() {
-            self.empty()
-        } else {
-            self.concat(&parts)
-        }
+        // `concat` short-circuits empty → `empty()` and single → the element.
+        self.concat(&parts)
     }
 
     /// Build a doc from items with a Doc separator between them.
@@ -662,11 +675,8 @@ impl DocArena {
             }
             parts.push(doc);
         }
-        if parts.is_empty() {
-            self.empty()
-        } else {
-            self.concat(&parts)
-        }
+        // `concat` short-circuits empty → `empty()` and single → the element.
+        self.concat(&parts)
     }
 
     /// Wrap a doc with open and close delimiters.
@@ -1096,18 +1106,28 @@ impl DocArena {
 
     /// Estimate output buffer capacity (bytes) for the rendered string.
     ///
-    /// Doc trees average ~4 nodes per source byte (see [`with_source_size_hint`]),
-    /// and Prettier-conforming output is within ±10% of source. So output bytes
-    /// ≈ `nodes.len() / 4`. Used to pre-size the render `String` buffer and avoid
-    /// the geometric `realloc` chain that starts from a small default capacity.
+    /// Called on the fully-built arena, so `nodes.len()` is the final node count.
+    /// Measured across the representative corpus (`tsv_debug arena_stats`, 11.3 K
+    /// files) the rendered output is **~1.9 bytes per doc node** (aggregate
+    /// 1.888×nodes = 1.00×source), so `nodes.len() * 2` reserves the output with a
+    /// few-percent headroom — big files (which dominate the `realloc` memcpy cost)
+    /// carry the aggregate ratio and so fit in one reservation, while only small,
+    /// high-ratio files pay an (amortized, cheap) realloc. This pre-sizes the
+    /// render `String` and avoids the geometric `realloc`+memcpy chain a small
+    /// default capacity pays (~2–3 grows per format); output writes are ~8% of the
+    /// format profile, so eliminating those memcpys is a native + WASM wall lever.
     ///
-    /// Floor: 256 bytes (matches the old hardcoded default for tiny inputs).
-    /// Ceiling: 1 MB (guards against accidental huge initial allocations).
+    /// The prior `nodes.len() / 4` was calibrated to the old 4-nodes/byte pre-size
+    /// (then `nodes/4 ≈ source ≈ output`) and under-provisioned the real output
+    /// ~3.8× → every format reallocated 2–3 times.
     ///
-    /// [`with_source_size_hint`]: Self::with_source_size_hint
+    /// Floor: 256 bytes (tiny inputs). Ceiling: 1 GiB — a pure sanity backstop
+    /// that no real format approaches (the estimate tracks the actual node count),
+    /// raised from the old 1 MiB which capped any file whose output exceeded 1 MB
+    /// and re-introduced reallocs on large files.
     #[inline]
     pub fn estimated_output_capacity(&self) -> usize {
-        (self.nodes.borrow().len() / 4).clamp(256, 1 << 20)
+        (self.nodes.borrow().len() * 2).clamp(256, 1 << 30)
     }
 }
 
