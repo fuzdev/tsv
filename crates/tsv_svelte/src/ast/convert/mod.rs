@@ -17,6 +17,7 @@ mod directives;
 mod fragments;
 mod special;
 mod tags;
+mod translate_typed;
 
 // Imported into the module root so sibling modules can reach them via `super::`
 use attributes::{convert_attribute_node, convert_attribute_value};
@@ -33,6 +34,7 @@ use special::{convert_script, convert_style};
 pub use comment_attachment::{
     attach_template_expression_comments, has_template_expression_comments,
 };
+pub use translate_typed::translate_byte_to_char_offsets_typed;
 
 /// Convert an internal `Span` to a public `NameLocation`
 ///

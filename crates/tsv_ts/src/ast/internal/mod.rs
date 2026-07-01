@@ -161,6 +161,10 @@ impl<'arena> StringCooked<'arena> {
     /// quoted token); `source` is the host document. `Verbatim` slices the inner
     /// text (zero-copy); `Decoded` returns the arena bytes. Both share `'s`
     /// (`'arena: 's` via `&'s self`).
+    ///
+    /// Inside the parser use `Parser::resolve_cooked` instead — there
+    /// `self.source` is the local (embedded) slice, not the host document,
+    /// so the host-coordinate span must shift back by `base_offset` first.
     #[inline]
     pub fn resolve<'s>(&'s self, span: Span, source: &'s str) -> &'s str {
         match self {

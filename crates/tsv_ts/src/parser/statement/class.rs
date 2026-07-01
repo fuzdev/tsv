@@ -637,7 +637,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let span = Span::new(key_start as u32, key_end as u32);
                 let cooked = self.extract_string_cooked();
                 self.advance()?;
-                let name_is_constructor = cooked.resolve(span, self.source) == "constructor";
+                let name_is_constructor = self.resolve_cooked(&cooked, span) == "constructor";
                 (
                     false,
                     Expression::Literal(Literal {

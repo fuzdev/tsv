@@ -29,6 +29,36 @@ pub fn translate_byte_to_char_offsets_typed(
     t.stylesheet(root);
 }
 
+/// Byte→char offset translation over the typed Svelte-embedded `StyleSheet`
+/// envelope, in place — the `<style>`-element sibling of
+/// `translate_byte_to_char_offsets_typed` (which covers the standalone
+/// `StyleSheetFile` root). Called by `tsv_svelte`'s typed walk; spans are in
+/// host-file coordinates, so `map` must be built from the host document.
+///
+/// Covers the envelope's **typed** positions only: `start`/`end`, the CSS
+/// `children`, and `content.start`/`content.end`. The `serde_json::Value`
+/// islands (`attributes` — Svelte attribute JSON — and `content.comment`)
+/// carry positions this crate can't interpret (Svelte/TS shapes); the caller
+/// owns translating those.
+///
+/// For ASCII-only sources this is a no-op (byte == char offset).
+pub fn translate_style_sheet_byte_to_char_offsets_typed(
+    sheet: &mut public::StyleSheet<'_>,
+    map: &tsv_lang::ByteToCharMap,
+) {
+    if !map.has_multibyte() {
+        return;
+    }
+    let t = Translator { map };
+    t.pos(&mut sheet.start);
+    t.pos(&mut sheet.end);
+    for c in &mut sheet.children {
+        t.node(c);
+    }
+    t.pos(&mut sheet.content.start);
+    t.pos(&mut sheet.content.end);
+}
+
 struct Translator<'a> {
     map: &'a tsv_lang::ByteToCharMap,
 }

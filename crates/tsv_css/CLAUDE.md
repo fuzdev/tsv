@@ -24,6 +24,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 
 - `parse_embedded(source, base_offset, arena: &'arena Bump) -> Result<CssStyleSheet<'arena>>` — same parser, but span positions are shifted by `base_offset` so they index into the parent Svelte file; `arena` is the host document's `Bump`, so the embedded CSS AST shares it
 - `format_embedded(&stylesheet, source, EmbedContext)` — formats with `EmbedContext::base_indent_offset` so wrapped lines respect outer Svelte indentation
+- `ast::convert::translate_style_sheet_byte_to_char_offsets_typed` — byte→char offset translation over the typed `StyleSheet` envelope (the `<style>`-element counterpart of the standalone typed walk), called by `tsv_svelte`'s typed walk; covers the envelope's typed positions only — the caller owns its `serde_json::Value` islands (`attributes`, `content.comment`)
 
 The two `StyleSheet` / `StyleContent` types (re-exported only with `convert`) are the public-AST envelopes `tsv_svelte` uses when embedding CSS in a `<style>` element's JSON. Distinct from `CssStyleSheet` (the internal AST root) and `CssNode` (the top-level statement enum).
 

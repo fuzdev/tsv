@@ -39,7 +39,9 @@ mod statements;
 mod translate_typed;
 mod types;
 
-pub use translate_typed::translate_byte_to_char_offsets_typed;
+pub use translate_typed::{
+    translate_byte_to_char_offsets_typed, translate_expression_byte_to_char_offsets_typed,
+};
 
 // Re-export conversion functions (pub(in crate::ast) for internal use)
 pub(in crate::ast) use control_flow::*;
@@ -78,8 +80,12 @@ pub fn translate_byte_to_char_offsets(
 /// Computes the expected byte-based column from the byte offset, then the char-based column,
 /// and preserves the delta between the existing column value and the expected byte column.
 /// This ensures adjustments like `adjust_read_pattern_columns` (+1) survive translation.
+///
+/// `pub` so the delta-preserving column math exists once: the typed walks —
+/// `translate_typed` here and `tsv_svelte`'s (which translates `name_loc`
+/// positions) — must match the `Value` walk exactly.
 #[allow(clippy::cast_sign_loss)]
-fn translate_column(
+pub fn translate_column(
     byte_offset: u32,
     existing_column: u64,
     map: &ByteToCharMap,

@@ -421,6 +421,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.current.end as usize
     }
 
+    /// Resolve a `StringCooked` during parse. Stored spans are in **host**
+    /// coordinates (`base_offset` added), but `self.source` is the local
+    /// (possibly embedded) slice — so the span shifts back before slicing.
+    /// Resolving a host span directly against `self.source` reads the wrong
+    /// bytes under Svelte embedding, or panics past the slice end.
+    pub(super) fn resolve_cooked<'s>(
+        &'s self,
+        cooked: &'s StringCooked<'arena>,
+        span: Span,
+    ) -> &'s str {
+        let local = Span::new(
+            span.start - self.base_offset as u32,
+            span.end - self.base_offset as u32,
+        );
+        cooked.resolve(local, self.source)
+    }
+
     /// The current token's verbatim source text. Returns `&'a str` (borrowing the
     /// immutable source), not `&self` — so callers can hold it across `advance()`
     /// without a borrow-escape `.to_string()`.

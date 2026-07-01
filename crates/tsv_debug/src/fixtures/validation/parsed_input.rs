@@ -99,6 +99,15 @@ const TYPED_WALK_SYNTH_PREFIX: &str = "// 中文😀\n";
 /// without changing the AST shape.
 const CSS_TYPED_WALK_SYNTH_PREFIX: &str = "/* 中文😀 */\n";
 
+/// Svelte counterpart of `TYPED_WALK_SYNTH_PREFIX` — a multibyte HTML comment
+/// (a `//` line comment isn't valid Svelte markup). It parses as an inert
+/// leading `Comment` fragment node, shifting every downstream byte offset;
+/// when the fixture opens with `<script>`/`<style>` it additionally becomes
+/// that tag's preceding HTML comment (injected `leadingComments`), which is
+/// fine — the probe compares the two paths on the same content, not against
+/// `expected.json`.
+const SVELTE_TYPED_WALK_SYNTH_PREFIX: &str = "<!-- 中文😀 -->\n";
+
 /// How a typed-walk parity probe failed.
 #[derive(Debug)]
 pub(super) enum TypedWalkParityFailure {
@@ -119,24 +128,25 @@ pub(super) struct TypedWalkParity {
     pub failures: Vec<(String, TypedWalkParityFailure)>,
 }
 
-/// Probe `tsv_ts`'s typed offset-translation walk for parity with the `Value`
+/// Probe the typed offset-translation walks for parity with the `Value`
 /// walk, beyond what the fixture's own content exercises.
 ///
-/// The typed walk (`translate_byte_to_char_offsets_typed`) enumerates struct
-/// fields manually, so a position-bearing field missing from it stays green on
-/// every ASCII fixture (translation is a no-op on both paths) and on every
-/// multibyte `.svelte` fixture (Svelte's gate routes those to the `Value`
-/// fallback). These probes close that hole:
+/// The typed walks (`translate_byte_to_char_offsets_typed` in tsv_ts, tsv_css,
+/// and tsv_svelte) enumerate struct fields manually, so a position-bearing
+/// field missing from one stays green on every ASCII fixture (translation is a
+/// no-op on both paths). These probes close that hole:
 ///
 /// - `.ts` / `.svelte.ts` inputs get a synthesized multibyte variant (a
 ///   prepended multibyte comment shifts all downstream offsets). Inputs with
 ///   byte-0 features (hashbang, BOM) are skipped — prepending would change
 ///   their semantics.
-/// - `.svelte` inputs have their `<script>` contents extracted and run
-///   through `tsv_ts`'s two paths as standalone TS — as-is when already
-///   multibyte, plus a synthesized multibyte variant — so every AST shape in
-///   the corpus gets typed-walk coverage, not just the few standalone-TS
-///   fixtures.
+/// - `.svelte` inputs get a synthesized multibyte variant of the whole file
+///   (a prepended multibyte HTML comment), exercising `tsv_svelte`'s typed
+///   walk — the Svelte nodes, `name_loc` positions, embedded expression/CSS
+///   subtrees, and `Value` islands. Their `<script>` contents are also
+///   extracted and run through `tsv_ts`'s two paths as standalone TS — as-is
+///   when already multibyte, plus a synthesized multibyte variant — so every
+///   embedded-TS AST shape gets `tsv_ts` typed-walk coverage too.
 ///
 /// Each probe asserts `convert_ast_json_string` is byte-identical to
 /// `serde_json::to_string(&convert_ast_json(..))`. Probes are independent of
@@ -205,6 +215,18 @@ pub(super) fn typed_walk_parity_probes(
             });
             probe!(@record $description, result);
         }};
+        (tsv_svelte, $content:expr, $description:expr) => {{
+            let content: &str = $content;
+            let arena = bumpalo::Bump::new();
+            let result = tsv_svelte::parse(content, &arena).map(|ast| {
+                (
+                    tsv_svelte::convert_ast_json_string(&ast, content),
+                    serde_json::to_string(&tsv_svelte::convert_ast_json(&ast, content))
+                        .expect("Value serialization cannot fail"),
+                )
+            });
+            probe!(@record $description, result);
+        }};
     }
 
     match parsed {
@@ -221,15 +243,24 @@ pub(super) fn typed_walk_parity_probes(
             probe!(tsv_ts @ goal, &synthesized, "synthesized multibyte input");
         }
         ParsedInput::Svelte(root) => {
+            // Whole-file synthesized multibyte variant: exercises
+            // tsv_svelte's own typed walk on the fixture's full AST shape
+            // (multibyte comment-free .svelte files take the direct path).
+            // Byte-0 BOM can't take a prepended comment.
+            if !content.starts_with('\u{feff}') {
+                let synthesized = format!("{SVELTE_TYPED_WALK_SYNTH_PREFIX}{content}");
+                probe!(tsv_svelte, &synthesized, "synthesized multibyte input");
+            }
             for (i, (start, end)) in tsv_svelte::script_content_spans(root)
                 .into_iter()
                 .enumerate()
             {
                 let script = &content[start as usize..end as usize];
                 if !script.is_ascii() {
-                    // Multibyte .svelte inputs take the Value fallback in
-                    // tsv_svelte, so this standalone-TS run is the only
-                    // typed-walk coverage their script content gets. Svelte
+                    // A multibyte script embedded in Svelte goes through the
+                    // Svelte typed walk's Value island for `Script.content`;
+                    // this standalone-TS run is the only coverage the same
+                    // content gets on tsv_ts's own typed walk. Svelte
                     // `<script>` is always a module.
                     probe!(tsv_ts @ tsv_ts::Goal::Module, script, &format!("extracted script {i} (as-is)"));
                 }
