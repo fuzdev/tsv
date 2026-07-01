@@ -112,8 +112,10 @@ intermediate `Value`; per-language eligibility:
 and times the `Value` pipeline and the shipped `convert_ast_json_string` as
 whole calls. The shipped function's
 output is byte-identity-checked against the `Value` pipeline's on every
-file; for TypeScript the direct path is identity-checked on every file too
-(multibyte included), for Svelte on ASCII files only. Pure Rust, no
+file; the direct path is identity-checked on every file too (multibyte
+included — each language's typed walk runs before `direct` is captured; a
+Svelte mismatch means the file carries template-expression comments, which
+the shipped gate routes to the `Value` fallback). Pure Rust, no
 external dependencies.
 
 ```bash
@@ -125,9 +127,11 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib --json
 ```
 
 Output shows, per language: parse vs materialization, the sub-step shares,
-the shipped typed pipeline's sub-step sum for TypeScript ("typed pipeline"
-= convert + typed translate + direct), and the whole-call "value baseline"
-vs "shipped" pair, plus both identity-check counts.
+the shipped typed pipeline's sub-step sum for TypeScript/CSS ("typed
+pipeline" = convert + typed translate + direct; omitted for Svelte, whose
+template-comment files take the `Value` fallback so the sum would
+understate the shipped call), and the whole-call "value baseline" vs
+"shipped" pair, plus both identity-check counts.
 
 **Sub-step timings exclude drop costs** — each intermediate outlives its
 timed region, and recursively freeing a large tree/`Value` is a

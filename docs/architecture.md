@@ -132,10 +132,15 @@ pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
 WASM, CLI non-pretty): byte-identical to serializing `convert_ast_json`'s
 `Value`, but when eligible it serializes the typed public AST directly and
 skips the intermediate `Value`. Eligibility is per-language: tsv_ts and
-tsv_css always qualify (ASCII sources serialize as-is; multibyte sources
-get a typed byte→char offset-translation walk first); tsv_svelte requires
-ASCII plus no template-expression comments outside `<script>`, otherwise it
-falls back to the `Value` path inside the same call.
+tsv_css always qualify; tsv_svelte requires no template-expression comments
+outside `<script>` (its comment-attachment pass is still `Value`-based),
+otherwise it falls back to the `Value` path inside the same call. On the
+direct path ASCII sources serialize as-is; multibyte sources get a typed
+byte→char offset-translation walk first (each crate's
+`translate_byte_to_char_offsets_typed` — tsv_svelte's is a hybrid walk that
+delegates embedded `tsv_ts` expressions and the `tsv_css` `<style>`
+envelope to those crates' typed walks, and its `serde_json::Value` islands
+to the `Value` walk).
 
 There is **no central `Language` trait, no plugin registry, no
 language-set enum**. Each language crate (`tsv_ts`, `tsv_css`,

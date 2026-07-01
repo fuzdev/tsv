@@ -86,12 +86,13 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
 
 /// Validate typed-walk parity on synthesized and extracted probes
 ///
-/// The fixture's own content only exercises the typed offset-translation walk
-/// when it's multibyte standalone TS — a handful of files. These probes give
-/// every fixture's AST shapes typed-walk parity coverage: a synthesized
-/// multibyte variant for `.ts`/`.svelte.ts` inputs, and the extracted
-/// `<script>` contents (as-is when multibyte, plus a synthesized variant) for
-/// `.svelte` inputs. See `typed_walk_parity_probes` in parsed_input.rs.
+/// The fixture's own content only exercises the typed offset-translation
+/// walks when it's multibyte — a handful of files. These probes give every
+/// fixture's AST shapes typed-walk parity coverage: a synthesized multibyte
+/// variant for `.ts`/`.svelte.ts`/`.css`/`.svelte` inputs (the `.svelte` one
+/// exercises `tsv_svelte`'s hybrid typed walk), plus the extracted `<script>`
+/// contents (as-is when multibyte, plus a synthesized variant) for `.svelte`
+/// inputs. See `typed_walk_parity_probes` in parsed_input.rs.
 pub(in crate::fixtures::validation) fn validate_typed_walk_parity(
     result: &mut FixtureValidation,
     input: &str,
