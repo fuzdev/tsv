@@ -18,7 +18,7 @@ and [discussions](https://github.com/fuzdev/tsv/discussions).
 
 AI disclosure: this codebase was generated with machine agents and the usual LLM caveats apply.
 The first release took 7 months and ~1800 manual commits.
-It's a high-effort project that emphasizes quality.
+It's a high-effort project that prioritizes quality.
 
 ## Install
 
@@ -44,19 +44,17 @@ import {parse_svelte, type Root} from '@fuzdev/tsv_parse_wasm';
 const ast: Root = parse_svelte('<script>const x = 1;</script>');
 ```
 
-Both halves import the same way from `@fuzdev/tsv_wasm`.
+Both `parse_svelte` and `format_svelte` import the same way from `@fuzdev/tsv_wasm`.
 As with other WASM packages, it works without setup in Node.js/Bun/Deno,
 but browsers must call `await init()`.
-See the package READMEs for the full API and CLI flags:
+See the [website docs](https://tsv.fuz.dev/docs)
+and package READMEs for the full API and CLI flags:
 
 - [crates/tsv_wasm/README_all.md](crates/tsv_wasm/README_all.md)
 - [crates/tsv_wasm/README_format.md](crates/tsv_wasm/README_format.md)
 - [crates/tsv_wasm/README_parse.md](crates/tsv_wasm/README_parse.md)
 
-There are no prebuilt native binaries yet, just WASM.
-For native speed today, build the C FFI library from source
-(`deno task build:ffi`, producing `target/release/libtsv_ffi.so`/`.dylib`/`.dll`) and bind it
-from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
+Native builds will be published with v0.2, for v0.1 only WASM builds are published.
 
 ## Design
 
@@ -80,7 +78,7 @@ from anything that speaks C FFI. Deno's FFI is used in the benchmarks.
   hierarchically supporting nested files like git and unlike `.prettierignore`,
   plus a compatible `.prettierignore`
   (but relative to repo root if available, not cwd like Prettier's default)
-  ([gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format) that exist today)
+  (also, all 3 files use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
 - Rust-only implementation that never embeds or calls a JS runtime, for performance;
   JS reaches tsv through the WASM bindings, and native N-API bindings are not yet published
 - architected to output optimal artifacts: runtime speed and compiled
