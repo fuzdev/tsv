@@ -380,7 +380,7 @@ The list below covers the settings that diverge from Prettier's defaults; everyt
 
 ### Internal Configuration (Rust Library Only)
 
-There is no runtime configuration. Print width / tab width / indent are compile-time `pub const`s in `tsv_lang::config` (`PRINT_WIDTH`, `TAB_WIDTH`, `INDENT`), read directly by the renderer — not threaded through any signature. Quote preference is likewise hardcoded (single quotes) inside `tsv_lang::printing::format_string_literal`. The doc-builder unit tests exercise the layout at smaller widths via the internal `RenderConfig` seam (`doc::render_config`, `pub(crate)`), never at runtime.
+There is no runtime configuration. Print width / tab width / indent are compile-time `pub const`s in `tsv_lang::config` (`PRINT_WIDTH`, `TAB_WIDTH`, `INDENT`), read directly by the renderer — not threaded through any signature. Quote preference is likewise hardcoded (single quotes) in `tsv_lang::printing` — the `optimal_string_quote` tie-break that `format_string_literal` applies. The doc-builder unit tests exercise the layout at smaller widths via the internal `RenderConfig` seam (`doc::render_config`, `pub(crate)`), never at runtime.
 
 One type carries genuine per-input *state* (not configuration), threaded only where it varies:
 
@@ -716,14 +716,39 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 # Options: --iterations <n> (default: 5), --json (adds per-file data)
 
 # buffer_sizes - AST histograms for tuning the TS printer's SmallVec inline
-# capacities (named_specs, CommentLines) + sizing the future multiline-text doc
-# node. Two metrics: named-import-specifier count per import, and line count per
+# capacities (named_specs, CommentLines) + the line-count distribution behind the
+# `MultilineText` doc node. Two metrics: named-import-specifier count per import, and line count per
 # multi-line block comment. Covers .ts/.svelte.ts AND .svelte (the <script>/{expr}
 # feed the same TS-printer buffers). Pure Rust, no Deno. Prints percentiles +
 # spill rate at candidate inline N. For sizing, exclude the prettier/svelte test
 # suites (edge-case skew). See ./docs/performance.md.
 cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
 # Options: --json
+
+# arena_stats - DocArena node-population + memory audit over a corpus: the data
+# behind the doc-IR memory/node-count levers. Formats each file into a fresh arena
+# and walks borrow_nodes(), reporting: nodes/byte (actual vs the 2/byte pre-size)
+# with per-file density percentiles; capacity fill % (nodes/children reserved vs
+# used); the pre-size audit of the output String (estimated_output_capacity) and
+# AST bump (estimated_ast_arena_capacity) — flags under/over-provisioning; the
+# DocNode variant histogram (which node kind dominates the Vec the render/fits/build
+# loops scan); the DocText sub-histogram (Static/Owned/SourceSpan/Symbol); and
+# container degeneracy (empty/single/nested Concat/Fill + group-of-group — the
+# node-count lever, collapsible at build with no output change). --reuse instead
+# measures the reset()-reuse high-water (peak retained capacity across one shared
+# arena, as the CLI/FFI/WASM batch drivers use). Covers .ts/.svelte.ts/.svelte/.css.
+# Pure Rust, no Deno. See ./docs/performance.md.
+cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib ~/dev/fuz_css/src/lib
+# Options: --json, --reuse (reset()-reuse high-water)
+
+# lex_diff - differential lexer harness: snapshot the raw token stream over a
+# corpus and diff it against a golden to prove token-stream identity (kind, start,
+# end, decoded per token) after a lexer change — stronger than format byte-identity.
+# Covers the context-free next_token dispatch for .ts/.mts/.cts/.svelte.ts/.css.
+# Pure Rust, no Deno.
+cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden --write  # capture golden
+cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          # check against it
+# Options: --write (capture instead of check), --verbose (first divergent line per file)
 ```
 
 See ./docs/performance.md.

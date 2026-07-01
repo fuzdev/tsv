@@ -13,6 +13,7 @@
 
 use std::cell::RefCell;
 
+use crate::Span;
 use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 
@@ -64,6 +65,22 @@ impl ChildRange {
 pub enum DocNode {
     /// Text content to output (static, owned, or symbol)
     Text(DocText),
+
+    /// Multi-line text rendered with per-line context indent.
+    ///
+    /// Holds a body whose lines are `\n`-separated in one owned `String`. The
+    /// first line renders at the current column; every subsequent line is
+    /// preceded by a context-indented hardline (trim trailing whitespace,
+    /// newline, write indentation). Output- and position-identical to
+    /// `concat([text(line0), hardline, text(line1), hardline, …])`, but stores
+    /// the whole body in one allocation instead of one node (and one `String`)
+    /// per line.
+    ///
+    /// Used for indentable (JSDoc / `*`-aligned) multi-line block comments,
+    /// whose continuation lines all use the uniform hardline (context-indent)
+    /// layout. Always contains a newline, so it forces enclosing groups to break
+    /// (`will_break` is true) exactly like the hardlines it replaces.
+    MultilineText(String),
 
     /// Line break - behavior depends on kind and mode
     Line(LineKind),
@@ -245,9 +262,18 @@ impl DocArena {
 
     /// Create an arena with pre-allocated capacity based on source size.
     ///
-    /// Heuristic: ~4 nodes per source byte for typical formatted code.
+    /// Heuristic: **~2 doc nodes per source byte**. Measured across the
+    /// representative corpus (`tsv_debug arena_stats`, 11.3 K files) the real
+    /// density is ~0.57 nodes/byte mean with a p99 of ~1.6 and a max of ~3.5; 2/byte
+    /// clears p99 with margin, so only the sub-1% densest files pay an (amortized)
+    /// realloc, while the typical file no longer over-reserves ~7× (the prior
+    /// 4/byte was pinned to the *max* file). `estimated_children = nodes/2` ⇒
+    /// ~1/byte, which clears the children p95 (~0.97). The pre-size only ever sets
+    /// `Vec` capacity — never output — so lowering it is byte-identical; the win is
+    /// the fresh-arena / first-file / WASM reservation, and the multi-file
+    /// `reset()` reuse high-water is bounded by actual usage, so it can only drop.
     pub fn with_source_size_hint(source_len: usize) -> Self {
-        let estimated_nodes = source_len * 4;
+        let estimated_nodes = source_len * 2;
         let estimated_children = estimated_nodes / 2;
         Self {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
@@ -351,6 +377,17 @@ impl DocArena {
         self.alloc(DocNode::Text(DocText::Owned(s, w)))
     }
 
+    /// Create a multi-line text doc rendered with per-line context indent.
+    ///
+    /// `s`'s lines (split on `\n`) are emitted as: the first at the current
+    /// column, each subsequent one after a context-indented hardline. See
+    /// [`DocNode::MultilineText`]. Use for indentable multi-line block comments;
+    /// the body must already be framed (delimiters + per-line spacing baked in).
+    #[inline]
+    pub fn multiline_text(&self, s: String) -> DocId {
+        self.alloc(DocNode::MultilineText(s))
+    }
+
     /// Create an owned-text doc for a *line comment* (`// …` or hashbang) — text
     /// whose content runs to end-of-line.
     ///
@@ -362,6 +399,43 @@ impl DocArena {
     #[inline]
     pub fn line_comment_text_owned(&self, s: String) -> DocId {
         let id = self.text_owned(s);
+        #[cfg(feature = "swallow_check")]
+        if super::swallow::swallow_check_enabled() {
+            // Recorded in alloc order → sorted ascending (see field doc).
+            self.line_comment_ids.borrow_mut().push(id.0);
+        }
+        id
+    }
+
+    /// Create a text doc from a verbatim source slice, resolved at render time
+    /// against `source` (no `String` allocation). The doc renders byte-identically
+    /// to `text_owned(span.extract(source).to_string())` — use it wherever a
+    /// printer emits an unmodified source slice (comments, template chunks,
+    /// already-canonical literals). `source` is read only to precompute width
+    /// (same policy as [`Self::text_owned`]: skip ASCII, flag newline, else
+    /// measure once) and is **not** retained — the span lives in the lifetime-less
+    /// arena and is re-resolved at render via a [`super::SourceTextResolver`].
+    #[inline]
+    pub fn source_span(&self, span: Span, source: &str) -> DocId {
+        let slice = span.extract(source);
+        let w = if slice.is_ascii() {
+            TEXT_WIDTH_NOT_COMPUTED // ASCII is cheap, don't bother
+        } else if slice.contains('\n') {
+            TEXT_WIDTH_HAS_NEWLINE
+        } else {
+            visual_width(slice, TAB_WIDTH) as u16
+        };
+        self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
+    }
+
+    /// Verbatim-source-slice form of [`Self::line_comment_text_owned`]: emits a
+    /// [`DocText::SourceSpan`] (no allocation) and, under the `swallow_check`
+    /// feature while enabled, records the node so the renderer can flag content
+    /// emitted on the same physical line after a `//`/hashbang comment. Without
+    /// the feature it is exactly [`Self::source_span`].
+    #[inline]
+    pub fn line_comment_source_span(&self, span: Span, source: &str) -> DocId {
+        let id = self.source_span(span, source);
         #[cfg(feature = "swallow_check")]
         if super::swallow::swallow_check_enabled() {
             // Recorded in alloc order → sorted ascending (see field doc).
@@ -674,6 +748,8 @@ impl DocArena {
         }
         let result = match &nodes[id.index()] {
             DocNode::Text(_) => false,
+            // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
+            DocNode::MultilineText(_) => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 Self::will_break_memo(*inner, nodes, children, cache)
@@ -718,6 +794,7 @@ impl DocArena {
         match &nodes[id.index()] {
             DocNode::IsolatedGroup { contents, .. } => self.will_break_deep_inner(*contents, nodes),
             DocNode::Text(_) => false,
+            DocNode::MultilineText(_) => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.will_break_deep_inner(*inner, nodes)
@@ -752,6 +829,7 @@ impl DocArena {
     fn has_forced_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
         match &nodes[id.index()] {
             DocNode::Text(_) => false,
+            DocNode::MultilineText(_) => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.has_forced_break_inner(*inner, nodes)
@@ -818,6 +896,7 @@ impl DocArena {
             DocNode::WithContext { doc, .. } => self.can_break_inner(*doc, nodes),
             DocNode::IsolatedGroup { contents, .. } => self.can_break_inner(*contents, nodes),
             DocNode::LineSuffix(inner) => self.can_break_inner(*inner, nodes),
+            DocNode::MultilineText(_) => true,
             DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
         }
@@ -830,6 +909,7 @@ impl DocArena {
         // This pattern avoids RefCell conflicts since alloc() needs borrow_mut().
         enum Info {
             Keep, // Return id unchanged
+            MultilineText(String),
             Line(LineKind),
             Indent(DocId),
             Dedent(DocId),
@@ -854,6 +934,10 @@ impl DocArena {
             let nodes = self.nodes.borrow();
             match &nodes[id.index()] {
                 DocNode::Text(_) | DocNode::LineSuffixBoundary => Info::Keep,
+                // Flatten: drop the internal hardlines (→ empty) and join the
+                // lines with no separator — identical to remove_lines over the
+                // per-line `concat([text, hardline, text, …])` this replaces.
+                DocNode::MultilineText(s) => Info::MultilineText(s.replace('\n', "")),
                 DocNode::Line(kind) => Info::Line(*kind),
                 DocNode::Indent(inner) => Info::Indent(*inner),
                 DocNode::Dedent(inner) => Info::Dedent(*inner),
@@ -888,6 +972,7 @@ impl DocArena {
 
         match info {
             Info::Keep => id,
+            Info::MultilineText(flat) => self.text_owned(flat),
             Info::Line(kind) => match kind {
                 LineKind::Normal => self.text(" "),
                 LineKind::Soft | LineKind::Hard | LineKind::Literal => self.empty(),

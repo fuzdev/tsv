@@ -28,42 +28,33 @@ impl<'a> Printer<'a> {
         if comment.is_block {
             // Block comment: /* content */
             if !comment.multiline {
-                // Single-line block comment
-                d.text_owned(format!("/*{content}*/"))
+                // Single-line block comment — the full span is verbatim `/*…*/`,
+                // so emit it as a source slice (no allocation).
+                d.source_span(comment.span, self.source)
             } else if printing::is_indentable_block_comment(content) {
                 self.build_indentable_block_comment_doc(content)
             } else {
                 self.build_preserved_block_comment_doc(comment)
             }
         } else if comment.span.start == 0 && content.starts_with("#!") {
-            // Hashbang comment: #!/usr/bin/env node (no // prefix)
-            // Content already includes the #! prefix. Like a line comment it runs
-            // to end-of-line, so tag it for the swallow check.
-            d.line_comment_text_owned(content.to_string())
+            // Hashbang comment: #!/usr/bin/env node (no // prefix). The span is
+            // verbatim (content includes the #! prefix). Like a line comment it
+            // runs to end-of-line, so tag it for the swallow check.
+            d.line_comment_source_span(comment.span, self.source)
         } else {
-            // Line comment: // content. Tagged for the swallow check (runs to EOL).
-            d.line_comment_text_owned(format!("//{content}"))
+            // Line comment: // content. The full span is verbatim `//…`. Tagged
+            // for the swallow check (runs to EOL).
+            d.line_comment_source_span(comment.span, self.source)
         }
-    }
-
-    /// Frame a multi-line block comment's continuation docs (`inner`) with the
-    /// `/*<first_line>` opener and the `*/` closer. `first_line` is the content
-    /// of the line right after `/*` (trailing whitespace trimmed).
-    fn frame_block_comment_doc(&self, first_line: &str, inner: DocBuf) -> DocId {
-        let d = self.d();
-        let mut docs = DocBuf::with_capacity(inner.len() + 2);
-        docs.push(d.text_owned(format!("/*{}", first_line.trim_end())));
-        docs.extend(inner);
-        docs.push(d.text("*/"));
-        d.concat(&docs)
     }
 
     /// Build a multi-line *indentable* block comment (JSDoc `/** … */` and
     /// `*`-aligned `/* … */`, where every line begins with `*`).
     ///
     /// Continuation lines are reindented to a single leading space before the
-    /// `*` — the context indent is supplied by the `hardline`, and content after
-    /// the `*` is untouched. Mirrors prettier's `printIndentableBlockComment`.
+    /// `*` — the context indent is supplied by the per-line hardline (here baked
+    /// into a [`DocNode::MultilineText`]), and content after the `*` is
+    /// untouched. Mirrors prettier's `printIndentableBlockComment`.
     fn build_indentable_block_comment_doc(&self, content: &str) -> DocId {
         let d = self.d();
         // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
@@ -73,16 +64,32 @@ impl<'a> Printer<'a> {
             unreachable!("multi-line comment");
         };
 
-        let mut inner = DocBuf::with_capacity((middle.len() + 1) * 2);
+        // Frame the whole comment as one `\n`-separated body — the `/*<first>`
+        // opener, each continuation line reindented to a single leading space,
+        // the `*/` closer — and emit it as a single `MultilineText` node, which
+        // renders each `\n` as a context-indented hardline. Byte- and
+        // position-identical to the former `concat([text, hardline, text, …])`,
+        // but one string allocation instead of one per line.
+        //
+        // Capacity is an exact upper bound, so the push sequence never reallocs:
+        // `content` already holds every line's text and the interior `\n`s;
+        // framing adds `/*` + `*/` (4) and at most one leading space per line
+        // (`lines.len()`), and the per-line trims only ever remove bytes.
+        let mut body = String::with_capacity(content.len() + lines.len() + 4);
+        body.push_str("/*");
+        body.push_str(first.trim_end());
         for line in middle {
-            inner.push(d.hardline());
-            inner.push(d.text_owned(format!(" {}", line.trim())));
+            body.push('\n');
+            body.push(' ');
+            body.push_str(line.trim());
         }
         // The last line (before `*/`) keeps trailing content via `trim_start`.
-        inner.push(d.hardline());
-        inner.push(d.text_owned(format!(" {}", last.trim_start())));
+        body.push('\n');
+        body.push(' ');
+        body.push_str(last.trim_start());
+        body.push_str("*/");
 
-        self.frame_block_comment_doc(first, inner)
+        d.multiline_text(body)
     }
 
     /// Build a multi-line *non-indentable* block comment (at least one line does
@@ -110,27 +117,33 @@ impl<'a> Printer<'a> {
             unreachable!("multi-line comment");
         };
 
-        let mut inner = DocBuf::with_capacity((middle.len() + 1) * 2);
+        // Frame directly: the `/*<first>` opener, each continuation line on its
+        // own line (context-indented `hardline`, or column-0 `literalline` for
+        // blank lines and non-context-indented comments), then the `*/` closer.
+        // Unlike the indentable path this mixes line kinds, so it stays a
+        // per-line `concat` rather than a `MultilineText`.
+        let mut docs = DocBuf::with_capacity((middle.len() + 1) * 2 + 2);
+        docs.push(d.text_owned(format!("/*{}", first.trim_end())));
         for line in middle {
             // Blank lines stay truly empty (column 0); otherwise apply context
             // indent. Trailing whitespace is trimmed (matches prettier).
-            inner.push(if line.is_empty() || !use_context_indent {
+            docs.push(if line.is_empty() || !use_context_indent {
                 d.literalline()
             } else {
                 d.hardline()
             });
-            inner.push(d.text_owned(line.trim_end().to_string()));
+            docs.push(d.text_owned(line.trim_end().to_string()));
         }
         // Closing line gets context indent; its content (the space before `*/`)
         // is preserved verbatim.
-        inner.push(if use_context_indent {
+        docs.push(if use_context_indent {
             d.hardline()
         } else {
             d.literalline()
         });
-        inner.push(d.text_owned((*last).to_string()));
-
-        self.frame_block_comment_doc(first, inner)
+        docs.push(d.text_owned((*last).to_string()));
+        docs.push(d.text("*/"));
+        d.concat(&docs)
     }
 
     /// Build a line_suffix doc for a trailing line comment (space + comment)

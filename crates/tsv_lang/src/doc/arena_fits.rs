@@ -38,6 +38,9 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
                 }
             }
         },
+        // Contains hardlines → no break-free flat width (like a newline-bearing
+        // `Text` or a `Line(Hard)`); force the `arena_fits` walk.
+        DocNode::MultilineText(_) => None,
         DocNode::Line(kind) => match kind {
             LineKind::Hard | LineKind::Literal => None,
             LineKind::Soft => Some(0),
@@ -172,6 +175,17 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                         remaining -= visual_width(s, TAB_WIDTH) as isize;
                     }
                 }
+            }
+
+            DocNode::MultilineText(s) => {
+                // Equivalent to walking `[Text(first_line), Line(Hard), …]`: the
+                // first line's width counts, then the first newline ends the line
+                // (a hardline returns true in either mode). `remaining >= 0`
+                // distinguishes the two loop outcomes: ≥0 → the next pop would be
+                // the hardline → true; <0 → `while remaining >= 0` exits → false.
+                let first = s.split('\n').next().unwrap_or("");
+                remaining -= visual_width(first, TAB_WIDTH) as isize;
+                return remaining >= 0;
             }
 
             DocNode::Line(kind) => match kind {
@@ -336,6 +350,17 @@ pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
                         }
                     }
                 }
+            }
+
+            DocNode::MultilineText(s) => {
+                // Mirrors the `[Text(first_line), Line(Hard)]` walk: the first
+                // line's width counts; then the first newline ends the line.
+                let first = s.split('\n').next().unwrap_or("");
+                remaining_width -= visual_width(first, TAB_WIDTH) as isize;
+                if remaining_width < 0 {
+                    return false;
+                }
+                return true;
             }
 
             DocNode::Line(kind) => match kind {

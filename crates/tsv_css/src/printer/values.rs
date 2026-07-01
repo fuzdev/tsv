@@ -16,6 +16,7 @@
 
 use super::{Printer, value_normalization};
 use crate::ast::internal::{CssValue, StringCooked};
+use std::borrow::Cow;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
@@ -162,11 +163,16 @@ impl<'a> Printer<'a> {
     /// Build a doc for a dimension value (number + unit)
     ///
     /// Normalizes trailing zeros and adds leading zeros, preserving source
-    /// characteristics like leading zeros and signs.
+    /// characteristics like leading zeros and signs. An already-canonical
+    /// dimension (`10px`, `0.5rem`) borrows its source slice, so it emits a
+    /// zero-allocation `source_span`; only a rewritten dimension allocates.
+    /// Mirrors the TS literal path (`normalized_literal_doc`).
     fn build_dimension_doc(&self, span: Span) -> DocId {
         let raw = span.extract(self.source);
-        let normalized = value_normalization::normalize_dimension_from_source(raw);
-        self.d().text_owned(normalized)
+        match value_normalization::normalize_dimension_from_source(raw) {
+            Cow::Borrowed(_) => self.d().source_span(span, self.source),
+            Cow::Owned(s) => self.d().text_owned(s),
+        }
     }
 
     /// Build a doc for a color value
