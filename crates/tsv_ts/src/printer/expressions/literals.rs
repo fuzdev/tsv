@@ -390,12 +390,8 @@ impl<'a> Printer<'a> {
             ));
         }
 
-        // Optimize for common case: single part (just the name)
-        if parts.len() == 1 {
-            parts[0]
-        } else {
-            d.concat(&parts)
-        }
+        // `concat` short-circuits a single part (just the name) to that part.
+        d.concat(&parts)
     }
 
     /// Build a Doc for a regex literal
