@@ -6,6 +6,7 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
+use super::find_exact_tag_close;
 use super::parser_impl::SvelteParser;
 
 /// Check if a tag name is a component (last segment starts with uppercase)
@@ -123,7 +124,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Per Svelte docs: "the <style> tag will be inserted as-is into the DOM"
         if tag_name == "style" || tag_name == "script" {
             let child_nodes = self.parse_raw_text_content(&tag_name, opening_tag_end, start)?;
-            let end = self.parse_closing_tag(&tag_name, start)?;
+            let end = self.parse_closing_tag(&tag_name)?;
             return Ok(ParsedElement::Element(Element {
                 name: tag_symbol,
                 kind,
@@ -144,7 +145,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let child_nodes = self.parse_children(&tag_name, opening_tag_end, start, in_svelte_head)?;
 
         // Parse closing tag: </tag>
-        let end = self.parse_closing_tag(&tag_name, start)?;
+        let end = self.parse_closing_tag(&tag_name)?;
 
         Ok(ParsedElement::Element(Element {
             name: tag_symbol,
@@ -207,7 +208,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let child_nodes = self.parse_children(tag_name, opening_tag_end, start, in_svelte_head)?;
 
         // Parse closing tag
-        let end = self.parse_closing_tag(tag_name, start)?;
+        let end = self.parse_closing_tag(tag_name)?;
 
         Ok(ParsedElement::SpecialElement(SpecialElement {
             kind,
@@ -397,8 +398,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(child_nodes)
     }
 
-    /// Parse closing tag and return end position
-    fn parse_closing_tag(&mut self, expected_name: &str, _start: usize) -> Result<u32, ParseError> {
+    /// Consume a `</name>` closing tag (lexer positioned at `<`) and return the byte
+    /// offset past `>`. Shared by the generic element path and the raw-text
+    /// `<script>` / `<style>` parsers, so all three agree on tag-close tokenization
+    /// (whitespace before `>` skipped by the lexer, mismatch → one error).
+    pub(super) fn parse_closing_tag(&mut self, expected_name: &str) -> Result<u32, ParseError> {
         self.expect(TokenKind::LeftAngle)?;
         self.expect(TokenKind::Slash)?;
 
@@ -429,30 +433,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         content_start: usize,
         element_start: usize,
     ) -> Result<BumpVec<'arena, FragmentNode<'arena>>, ParseError> {
-        // Build the closing tag pattern: </style> or </script>
-        let closing_pattern = format!("</{tag_name}>");
-        let closing_bytes = closing_pattern.as_bytes();
-        let source_bytes = self.source.as_bytes();
-
-        // Scan for the closing tag
-        let mut content_end = content_start;
-        let mut found_close = false;
-
-        for i in content_start..source_bytes.len() {
-            if i + closing_bytes.len() <= source_bytes.len()
-                && source_bytes[i..].starts_with(closing_bytes)
-            {
-                content_end = i;
-                found_close = true;
-                break;
-            }
-        }
-
-        if !found_close {
-            return Err(
-                self.error_msg_at(&format!("Unterminated <{tag_name}> element"), element_start)
-            );
-        }
+        // Nested raw-text uses an EXACT `</tag>` close (no `\s*` before `>`), matching
+        // Svelte's generic element parser — unlike a top-level `<script>`/`<style>`, which
+        // reads via the whitespace-tolerant `find_raw_text_close`. See that function.
+        let content_end =
+            find_exact_tag_close(self.source.as_bytes(), content_start, tag_name.as_bytes())
+                .ok_or_else(|| {
+                    self.error_msg_at(&format!("Unterminated <{tag_name}> element"), element_start)
+                })?;
 
         // Reposition the lexer to the closing tag. We resume at `<`, which lexes to
         // `LeftAngle` in either mode; `inside_tag` is `false` here (after the opening
