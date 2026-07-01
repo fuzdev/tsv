@@ -928,6 +928,16 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
   floor`, and a corpus byte-identity gate that aborts if the builds format
   differently. Omit `--baseline` for an A/A-only run (floor + current-build
   baseline number, no comparison). See the module doc for the full workflow.
+- `diagnostics/wasm_memory_probe.ts` — measure WASM **linear-memory high-water** for `format()` — the
+  memory axis `wasm_format_probe.ts` (wall) can't see, and the gate for doc-IR memory work (arena/output
+  pre-size, the parked `DocNode` shrink). WASM memory only grows, so `memory.buffer.byteLength` after a
+  format is the peak; the deno glue doesn't re-export `memory`, so the probe captures it by monkeypatching
+  `WebAssembly.instantiateStreaming` before importing, and forces a fresh instance per file via a
+  query-string cache-bust. Two modes: **`--cold`** (fresh instance/file → per-file cold-start peak +
+  growth distribution, the pre-size lever gate) and default **steady-state** (one warm instance over the
+  corpus → the reset-reuse high-water). A/B two builds with `--baseline …/tsv_wasm.js` (same
+  copy-aside-and-rebuild workflow as `wasm_format_probe`). Human output → stderr, `--json` → stdout. Run:
+  `deno run --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/wasm_memory_probe.ts --cold`
 - **wasm-opt**: runs with explicit feature flags in `crates/tsv_wasm/Cargo.toml` — Rust 2024's bulk-memory and nontrapping-float-to-int ops are passed by name to wasm-opt v117, giving ~−2% gzipped on the WASM bundle.
 - **oxfmt × Deno timer interaction (workaround in place)**: once `oxfmt.format` runs once,
   Deno's timer wheel processes exactly one further `setTimeout` callback and then stalls all
