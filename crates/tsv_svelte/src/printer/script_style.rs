@@ -48,13 +48,19 @@ impl<'a> Printer<'a> {
         // start_column = tab_width (2) to account for the initial indent we'll add
         // start_indent_level = 1 to account for the Svelte wrapper indent
         let interner = script.content.interner.borrow();
+        // Source-aware resolver: the embedded TS doc carries `DocText::SourceSpan`
+        // leaves (comments etc.) whose spans are absolute into the host source.
+        let resolver = doc::SourceTextResolver {
+            inner: &*interner,
+            source: self.source(),
+        };
         let output = doc::arena_print_doc_with_indent_resolved(
             self.d(),
             script_doc_id,
             &embed,
             TAB_WIDTH, // start column = 1 tab's visual width
             1,         // start indent level = 1 (accounts for Svelte wrapper)
-            &*interner,
+            &resolver,
         );
 
         // Only write content if there is any (skip indent for empty scripts)
@@ -298,13 +304,17 @@ impl<'a> Printer<'a> {
         };
         let output = {
             let interner = self.interner.borrow();
+            let resolver = doc::SourceTextResolver {
+                inner: &*interner,
+                source: self.source(),
+            };
             doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
                 self.arena,
                 group,
                 &embed,
                 col,
                 self.indent_level,
-                &*interner,
+                &resolver,
             )
         };
         self.write(&output);

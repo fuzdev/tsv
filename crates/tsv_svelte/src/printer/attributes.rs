@@ -88,14 +88,14 @@ impl<'a> Printer<'a> {
         if comment.is_block {
             d.concat(&[
                 d.text("/*"),
-                d.text_owned(comment.content(self.source).to_string()),
+                d.source_span(comment.content_span, self.source),
                 d.text("*/ "),
             ])
         } else {
             // Content already includes the space after // (e.g., " comment" from "// comment")
             d.concat(&[
                 d.text("//"),
-                d.text_owned(comment.content(self.source).to_string()),
+                d.source_span(comment.content_span, self.source),
                 d.hardline(),
             ])
         }
@@ -120,14 +120,14 @@ impl<'a> Printer<'a> {
         if comment.is_block {
             d.concat(&[
                 d.text(" /*"),
-                d.text_owned(comment.content(self.source).to_string()),
+                d.source_span(comment.content_span, self.source),
                 d.text("*/"),
             ])
         } else {
             // Content already includes the space after // (e.g., " comment" from "// comment")
             d.concat(&[
                 d.text(" //"),
-                d.text_owned(comment.content(self.source).to_string()),
+                d.source_span(comment.content_span, self.source),
                 d.hardline(),
             ])
         }
@@ -758,7 +758,7 @@ impl<'a> Printer<'a> {
                 // Multi-line block: own line(s), forcing the broken layout. Emitted
                 // without the inline trailing space so the line ends at `*/`.
                 content.push(d.text("/*"));
-                content.push(d.text_owned(comment.content(self.source).to_string()));
+                content.push(d.source_span(comment.content_span, self.source));
                 content.push(d.text("*/"));
                 content.push(d.hardline());
             } else {

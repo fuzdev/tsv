@@ -12,19 +12,21 @@ use crate::ast::internal::{self, LiteralValue};
 use crate::printer::Printer;
 use crate::printer::analysis;
 use smallvec::{SmallVec, smallvec};
+use std::borrow::Cow;
+use tsv_lang::Span;
 use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::printing::format_string_literal;
+use tsv_lang::printing::{format_string_literal, optimal_string_quote};
 
 /// Format a string literal from the AST to its printed form.
 ///
 /// Extracts the raw string from source, strips quotes, and formats it
 /// according to the literal's quote style.
-pub(crate) fn format_string_literal_from_ast(
+pub(crate) fn format_string_literal_from_ast<'s>(
     literal: &internal::Literal<'_>,
-    source: &str,
-) -> String {
+    source: &'s str,
+) -> Cow<'s, str> {
     let raw_literal = literal.span.extract(source);
     // A string literal's source slice always includes both quote delimiters, so
     // `raw_literal.len() >= 2` and stripping one byte from each end is in bounds.
@@ -38,7 +40,15 @@ pub(crate) fn format_string_literal_from_ast(
     // than stored on the literal.
     let quote = literal.string_quote(source) as char;
 
-    format_string_literal(raw_content, quote)
+    // When the optimal quote matches the original, `format_string_literal` would
+    // re-emit the content verbatim between the same quotes — i.e. exactly the
+    // source slice. Borrow it instead of rebuilding (callers map `Borrowed` to an
+    // allocation-free `source_span`).
+    if optimal_string_quote(raw_content) == quote {
+        Cow::Borrowed(raw_literal)
+    } else {
+        Cow::Owned(format_string_literal(raw_content, quote))
+    }
 }
 
 /// Format a directive prologue string (`'use strict'`) for printing.
@@ -77,33 +87,50 @@ pub(crate) fn format_directive(raw: &str) -> String {
 ///
 /// BigInt literals are only lowercased (Prettier's `printBigInt`); the BigInt
 /// grammar has no exponent or fraction, so the rest of the pipeline is inert.
-pub fn normalize_number_literal(raw: &str) -> String {
-    // Prettier short-circuits single-character literals (`0`, `1`).
-    if raw.chars().count() == 1 {
-        return raw.to_string();
+pub fn normalize_number_literal(raw: &str) -> Cow<'_, str> {
+    // Prettier short-circuits single-character literals (`0`, `1`) — a numeric
+    // literal's only single-char form is one ASCII digit, already canonical, so
+    // borrow (`len == 1` is the ASCII-fast equivalent of `chars().count() == 1`).
+    if raw.len() == 1 {
+        return Cow::Borrowed(raw);
     }
 
     // BigInt (`printBigInt`): lowercase only, suffix included (`0xFFn` → `0xffn`).
     if raw.ends_with('n') {
-        return raw.to_ascii_lowercase();
+        return lower_ascii_cow(raw);
     }
 
     print_number(raw)
 }
 
-/// Port of Prettier's `printNumber` regex pipeline (order matters).
-fn print_number(raw: &str) -> String {
-    let lowered = raw.to_ascii_lowercase();
-    let s = strip_exponent_plus_and_zeros(&lowered);
-    let s = strip_zero_exponent(&s);
-    let s = ensure_leading_digit(&s);
-    let s = strip_trailing_fraction_zeros(&s);
-    strip_trailing_dot(&s)
+/// Lowercase `s` only when it holds an uppercase ASCII byte; otherwise borrow it
+/// unchanged. This is the one unconditional allocation in the number pipeline's
+/// common path, so borrowing the already-lowercase case is what lets a canonical
+/// literal flow through to a `Cow::Borrowed` end-to-end.
+fn lower_ascii_cow(s: &str) -> Cow<'_, str> {
+    if s.bytes().any(|b| b.is_ascii_uppercase()) {
+        Cow::Owned(s.to_ascii_lowercase())
+    } else {
+        Cow::Borrowed(s)
+    }
+}
+
+/// Port of Prettier's `printNumber` regex pipeline (order matters). Each stage
+/// threads a `Cow`: a stage that makes no change passes its input straight
+/// through, so a literal already in canonical form returns `Cow::Borrowed` end to
+/// end (no allocation); the first rewriting stage switches it to `Cow::Owned`.
+fn print_number(raw: &str) -> Cow<'_, str> {
+    let s = lower_ascii_cow(raw);
+    let s = strip_exponent_plus_and_zeros(s);
+    let s = strip_zero_exponent(s);
+    let s = ensure_leading_digit(s);
+    let s = strip_trailing_fraction_zeros(s);
+    strip_trailing_dot(s)
 }
 
 /// `/^([+-]?[\d.]+e)(?:\+|(-))?0*(?=\d)/` → `$1$2`
 /// Removes a `+` and any leading zeros from the exponent (keeps a `-`).
-fn strip_exponent_plus_and_zeros(s: &str) -> String {
+fn strip_exponent_plus_and_zeros(s: Cow<'_, str>) -> Cow<'_, str> {
     let bytes = s.as_bytes();
     let mut i = 0;
     // Optional leading sign.
@@ -116,7 +143,7 @@ fn strip_exponent_plus_and_zeros(s: &str) -> String {
         i += 1;
     }
     if i == mantissa_start || i >= bytes.len() || bytes[i] != b'e' {
-        return s.to_string();
+        return s;
     }
     i += 1; // consume 'e'
     let after_e = i; // prefix `[+-]?[\d.]+e` ends here
@@ -135,59 +162,59 @@ fn strip_exponent_plus_and_zeros(s: &str) -> String {
         i += 1;
     }
     if i >= bytes.len() || !bytes[i].is_ascii_digit() {
-        return s.to_string();
+        return s;
     }
     // Rebuild: prefix through 'e', kept sign, then the remaining digits.
-    format!("{}{}{}", &s[..after_e], sign, &s[i..])
+    Cow::Owned(format!("{}{}{}", &s[..after_e], sign, &s[i..]))
 }
 
 /// `/^([+-]?[\d.]+)e[+-]?0+$/` → `$1`  (removes a whole zero exponent: `0.5e0` → `0.5`)
-fn strip_zero_exponent(s: &str) -> String {
+fn strip_zero_exponent(s: Cow<'_, str>) -> Cow<'_, str> {
     let Some(e_idx) = s.find('e') else {
-        return s.to_string();
+        return s;
     };
     let mantissa = &s[..e_idx];
     let exp = &s[e_idx + 1..];
     if mantissa.is_empty() {
-        return s.to_string();
+        return s;
     }
     // mantissa must be `[+-]?[\d.]+`
     let m = mantissa.strip_prefix(['+', '-']).unwrap_or(mantissa);
     if m.is_empty() || !m.bytes().all(|b| b.is_ascii_digit() || b == b'.') {
-        return s.to_string();
+        return s;
     }
     // exp must be `[+-]?0+`
     let e = exp.strip_prefix(['+', '-']).unwrap_or(exp);
     if !e.is_empty() && e.bytes().all(|b| b == b'0') {
-        mantissa.to_string()
+        Cow::Owned(mantissa.to_string())
     } else {
-        s.to_string()
+        s
     }
 }
 
 /// `/^([+-])?\./` → `$10.`  (`.5` → `0.5`, `-.5` → `-0.5`)
-fn ensure_leading_digit(s: &str) -> String {
+fn ensure_leading_digit(s: Cow<'_, str>) -> Cow<'_, str> {
     if let Some(rest) = s.strip_prefix('.') {
-        format!("0.{rest}")
+        Cow::Owned(format!("0.{rest}"))
     } else if let Some(rest) = s.strip_prefix("+.") {
-        format!("+0.{rest}")
+        Cow::Owned(format!("+0.{rest}"))
     } else if let Some(rest) = s.strip_prefix("-.") {
-        format!("-0.{rest}")
+        Cow::Owned(format!("-0.{rest}"))
     } else {
-        s.to_string()
+        s
     }
 }
 
 /// `/(\.\d+?)0+(?=e|$)/` → `$1`  (first match only; `1.00500` → `1.005`, `1.50` → `1.5`)
-fn strip_trailing_fraction_zeros(s: &str) -> String {
+fn strip_trailing_fraction_zeros(s: Cow<'_, str>) -> Cow<'_, str> {
     let Some(dot) = s.find('.') else {
-        return s.to_string();
+        return s;
     };
     let bytes = s.as_bytes();
     // `\.\d+?` — need at least one digit after the dot.
     let mut i = dot + 1;
     if i >= bytes.len() || !bytes[i].is_ascii_digit() {
-        return s.to_string();
+        return s;
     }
     // Non-greedy `\d+?` keeps the first digit, then we look for trailing zeros
     // that run up to `e` or end-of-string.
@@ -199,7 +226,7 @@ fn strip_trailing_fraction_zeros(s: &str) -> String {
     let frac_end = i; // first non-digit after fraction (could be 'e' or len)
     // Boundary must be `e` or end.
     if frac_end != bytes.len() && bytes[frac_end] != b'e' {
-        return s.to_string();
+        return s;
     }
     // Strip trailing zeros from [frac_start, frac_end), keeping at least one digit.
     let mut keep = frac_end;
@@ -207,21 +234,21 @@ fn strip_trailing_fraction_zeros(s: &str) -> String {
         keep -= 1;
     }
     if keep == frac_end {
-        return s.to_string();
+        return s;
     }
-    format!("{}{}", &s[..keep], &s[frac_end..])
+    Cow::Owned(format!("{}{}", &s[..keep], &s[frac_end..]))
 }
 
 /// `/\.(?=e|$)/` → ``  (drop a trailing dot before `e` or end: `1.` → `1`, `1.e1` → `1e1`)
-fn strip_trailing_dot(s: &str) -> String {
+fn strip_trailing_dot(s: Cow<'_, str>) -> Cow<'_, str> {
     let bytes = s.as_bytes();
     if let Some(dot) = s.find('.') {
         let after = dot + 1;
         if after == bytes.len() || bytes[after] == b'e' {
-            return format!("{}{}", &s[..dot], &s[after..]);
+            return Cow::Owned(format!("{}{}", &s[..dot], &s[after..]));
         }
     }
-    s.to_string()
+    s
 }
 
 /// Sort regex flags alphabetically to match Prettier's output format.
@@ -239,22 +266,49 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_literal_doc(&self, literal: &internal::Literal<'_>) -> DocId {
         let d = self.d();
         match &literal.value {
-            LiteralValue::Number(_) => {
-                // Extract raw literal and normalize it
-                let raw = literal.span.extract(self.source);
-                d.text_owned(normalize_number_literal(raw))
+            LiteralValue::Number(_) | LiteralValue::BigInt => {
+                self.build_number_literal_doc(literal)
             }
-            LiteralValue::String(_) => {
-                d.text_owned(format_string_literal_from_ast(literal, self.source))
-            }
-            LiteralValue::BigInt => {
-                // Extract raw literal and normalize it (lowercases hex digits)
-                let raw = literal.span.extract(self.source);
-                d.text_owned(normalize_number_literal(raw))
-            }
+            LiteralValue::String(_) => self.build_string_literal_doc(literal),
             LiteralValue::Boolean(b) => d.text(if *b { "true" } else { "false" }),
             LiteralValue::Null => d.text("null"),
         }
+    }
+
+    /// Build a Doc for a numeric or BigInt literal, borrowing the verbatim source
+    /// slice when `normalize_number_literal` is the identity (the literal is
+    /// already canonical — any plain decimal integer, lowercase hex/radix, or
+    /// canonical float) and allocating only when normalization rewrites it.
+    /// Mirrors [`Self::build_string_literal_doc`].
+    pub(in crate::printer) fn build_number_literal_doc(
+        &self,
+        lit: &internal::Literal<'_>,
+    ) -> DocId {
+        let raw = lit.span.extract(self.source);
+        self.normalized_literal_doc(lit.span, normalize_number_literal(raw))
+    }
+
+    /// Emit a normalized literal value at `span`: a `Cow::Borrowed` means the
+    /// normalizer returned the source verbatim, so emit `span` as a
+    /// zero-allocation `source_span`; a `Cow::Owned` means it rewrote the text, so
+    /// emit that. Shared by the number and string literal builders.
+    fn normalized_literal_doc(&self, span: Span, value: Cow<'_, str>) -> DocId {
+        let d = self.d();
+        match value {
+            Cow::Borrowed(_) => d.source_span(span, self.source),
+            Cow::Owned(s) => d.text_owned(s),
+        }
+    }
+
+    /// Build a Doc for a string literal, borrowing the verbatim source slice when
+    /// the formatter wouldn't change it (no quote swap) and allocating only on the
+    /// quote-swap path. Shared by string literal *values* and quoted object /
+    /// import-attribute *keys*.
+    pub(in crate::printer) fn build_string_literal_doc(
+        &self,
+        lit: &internal::Literal<'_>,
+    ) -> DocId {
+        self.normalized_literal_doc(lit.span, format_string_literal_from_ast(lit, self.source))
     }
 
     /// Build a Doc for a private identifier
