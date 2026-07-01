@@ -11,7 +11,8 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
 with Svelte as the only JS framework. 
-The extensibility story is limited to using its Rust crates as libraries instead of bridging to JS at runtime.
+The extensibility story is currently limited to using its Rust crates as libraries;
+bridging to JS and/or WASM plugins is an open question.
 For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
 This is an early release, and reports and feedback are appreciated -
@@ -81,8 +82,9 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
   plus a compatible `.prettierignore`
   (but relative to repo root if available, not cwd like Prettier's default)
   (also, all 3 files use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
-- Rust-only implementation that never embeds or calls a JS runtime, for performance;
-  JS reaches tsv through the WASM bindings, and native N-API bindings are not yet published
+- Rust-only implementation that currently does not call or embed a JS runtime
+  (open for discussion, needs research into the tradeoffs);
+  JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
 - architected to output optimal artifacts: runtime speed and compiled
   code size are first-class goals for every shipped artifact, and heavier future
   layers (incremental parsing, CST for LSP) will be feature-gated so they
@@ -116,7 +118,7 @@ Hard non-goals:
 - standard CSS and Svelte extensions only - no SCSS, CSS Modules, LESS, etc
 - no JS plugins - won't embed or integrate a JS runtime,
   instead linter extensibility will be data-driven like with pattern-based rules;
-  possibly WASM plugins if the weight is deemed worth it
+  possibly JS bridging and/or WASM plugins if the tradeoffs work for tsv's goals
 - no style config settings, so on-disk state and caller params
   never change the output for a given input
 - no strict Prettier conformance -
