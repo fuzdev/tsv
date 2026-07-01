@@ -352,6 +352,28 @@ deno run --allow-read --allow-env --allow-net --allow-sys \
   benches/js/diagnostics/wasm_format_probe.ts
 ```
 
+### 7. `tsv_debug arena_stats` — doc-arena node population
+
+Formats a corpus into fresh `DocArena`s and walks `borrow_nodes()`, reporting the
+memory shape of the doc IR: **nodes/byte** (actual vs the `with_source_size_hint`
+2/byte pre-size) with **per-file density percentiles** (p50/p90/p95/p99/max — what a
+safe hint must clear), **capacity fill %** (used vs reserved node slots), the **DocNode
+variant histogram** (which node kind dominates the `Vec` the render/`fits`/build
+loops linearly scan), and the **DocText sub-histogram** (`Static` / `Owned` /
+`SourceSpan` / `Symbol` share of `Text`). `--reuse` instead reports the
+**`reset()`-reuse high-water** — the peak retained node/children capacity across one
+shared arena (as the CLI/FFI/WASM batch drivers use), the number that shows a lower
+pre-size hint doesn't grow the batch footprint (it's bounded by actual max-file usage,
+not the hint). The static, load-independent counterpart to the timing/allocation
+tools — "what is the arena made of and how over-reserved is it" rather than "where
+does the time go". Pure Rust, no Deno; covers `.ts` / `.svelte.ts` / `.svelte` / `.css`.
+
+```bash
+cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib ~/dev/fuz_css/src/lib
+cargo run -p tsv_debug arena_stats <paths> --json
+cargo run -p tsv_debug arena_stats <paths> --reuse   # reset()-reuse high-water
+```
+
 ## Measurement Process
 
 ### Before an optimization
