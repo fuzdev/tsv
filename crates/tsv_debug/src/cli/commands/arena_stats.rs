@@ -82,6 +82,27 @@ struct Stats {
     children_density: Vec<f64>,
     node_hist: std::collections::HashMap<&'static str, u64>,
     text_hist: std::collections::HashMap<&'static str, u64>,
+    /// Container-node degeneracy — the node-count lever. `empty` (0 children) and
+    /// `single` (1 child) `Concat`/`Fill` collapse to nothing / their sole child;
+    /// `nested` (a `Concat` whose child list contains another `Concat`) hoists.
+    /// `group_of_group` is a `Group` whose `contents` is directly another `Group`.
+    concat_total: u64,
+    concat_empty: u64,
+    concat_single: u64,
+    concat_nested: u64,
+    fill_total: u64,
+    fill_empty: u64,
+    fill_single: u64,
+    group_total: u64,
+    group_of_group: u64,
+    /// Sibling pre-size heuristics (same capacity-only audit as nodes/children):
+    /// the output `String` (`estimated_output_capacity` = `nodes.len()/4`, a stale
+    /// coupling to the old 4-nodes/byte) and the parse-side AST bump
+    /// (`estimated_ast_arena_capacity` = `source_len`).
+    output_bytes: u64,
+    output_capacity: u64,
+    output_estimated: u64,
+    bump_allocated: u64,
 }
 
 impl ArenaStatsCommand {
@@ -205,20 +226,26 @@ fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<()
     let bump = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
     let arena = DocArena::for_source(&source);
 
-    match parser {
+    let output = match parser {
         ParserType::TypeScript => {
             let ast = tsv_ts::parse(&source, &bump).map_err(|_| ())?;
-            let _ = tsv_ts::format_in(&ast, &source, &arena);
+            tsv_ts::format_in(&ast, &source, &arena)
         }
         ParserType::Svelte => {
             let ast = tsv_svelte::parse(&source, &bump).map_err(|_| ())?;
-            let _ = tsv_svelte::format_in(&ast, &source, &arena);
+            tsv_svelte::format_in(&ast, &source, &arena)
         }
         ParserType::Css => {
             let ast = tsv_css::parse(&source, &bump).map_err(|_| ())?;
-            let _ = tsv_css::format_in(&ast, &source, &arena);
+            tsv_css::format_in(&ast, &source, &arena)
         }
-    }
+    };
+    stats.output_bytes += output.len() as u64;
+    stats.output_capacity += output.capacity() as u64;
+    // `estimated_output_capacity()` reads the now-final `nodes.len()`, so this is
+    // exactly the reservation render used.
+    stats.output_estimated += arena.estimated_output_capacity() as u64;
+    stats.bump_allocated += bump.allocated_bytes() as u64;
 
     let nodes = arena.borrow_nodes();
     let children = arena.borrow_children();
@@ -231,10 +258,41 @@ fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<()
     stats.children_capacity += children.capacity() as u64;
     stats.node_density.push(nodes.len() as f64 / len);
     stats.children_density.push(children.len() as f64 / len);
+    let children_slice = children.as_slice();
     for n in nodes.iter() {
         *stats.node_hist.entry(classify_node(n)).or_default() += 1;
-        if let DocNode::Text(t) = n {
-            *stats.text_hist.entry(classify_text(t)).or_default() += 1;
+        match n {
+            DocNode::Text(t) => *stats.text_hist.entry(classify_text(t)).or_default() += 1,
+            DocNode::Concat(range) => {
+                stats.concat_total += 1;
+                let kids = range.resolve(children_slice);
+                match kids.len() {
+                    0 => stats.concat_empty += 1,
+                    1 => stats.concat_single += 1,
+                    _ => {}
+                }
+                if kids
+                    .iter()
+                    .any(|k| matches!(nodes[k.index()], DocNode::Concat(_)))
+                {
+                    stats.concat_nested += 1;
+                }
+            }
+            DocNode::Fill(range) => {
+                stats.fill_total += 1;
+                match range.resolve(children_slice).len() {
+                    0 => stats.fill_empty += 1,
+                    1 => stats.fill_single += 1,
+                    _ => {}
+                }
+            }
+            DocNode::Group { contents, .. } => {
+                stats.group_total += 1;
+                if matches!(nodes[contents.index()], DocNode::Group { .. }) {
+                    stats.group_of_group += 1;
+                }
+            }
+            _ => {}
         }
     }
     Ok(())
@@ -326,6 +384,25 @@ fn print_report(s: &Stats, parse_errors: usize) {
         s.children_capacity as f64 / s.children.max(1) as f64
     );
     density_line("per-file children/byte", &s.children_density);
+    eprintln!(
+        "  output:   {:>9} B  ({:.2}×source, {:.2}×nodes)  reserved {} (est_output=nodes/4)  → fill {:.1}%",
+        s.output_bytes,
+        s.output_bytes as f64 / s.bytes.max(1) as f64,
+        s.output_bytes as f64 / s.nodes.max(1) as f64,
+        s.output_capacity,
+        pct(s.output_bytes, s.output_capacity),
+    );
+    eprintln!(
+        "            est_output reserved {} vs {} actual → {:.2}× (>1 = UNDER-provisioned, output reallocs)",
+        s.output_estimated,
+        s.output_bytes,
+        s.output_bytes as f64 / s.output_estimated.max(1) as f64,
+    );
+    eprintln!(
+        "  ast_bump: {:>9} B allocated  ({:.2}×source; heuristic estimated_ast_arena_capacity = 1×source)",
+        s.bump_allocated,
+        s.bump_allocated as f64 / s.bytes.max(1) as f64,
+    );
     eprintln!();
 
     eprintln!("  DocNode variants (share of all nodes):");
@@ -345,6 +422,37 @@ fn print_report(s: &Stats, parse_errors: usize) {
             );
         }
     }
+
+    eprintln!("\n  Container degeneracy (node-count lever — collapsible at build):");
+    let collapsible = s.concat_empty + s.concat_single + s.fill_empty + s.fill_single;
+    eprintln!(
+        "    Concat {:>9}:  empty {} ({:.1}%)  single {} ({:.1}%)  nested-concat {} ({:.1}%)",
+        s.concat_total,
+        s.concat_empty,
+        pct(s.concat_empty, s.concat_total),
+        s.concat_single,
+        pct(s.concat_single, s.concat_total),
+        s.concat_nested,
+        pct(s.concat_nested, s.concat_total),
+    );
+    eprintln!(
+        "    Fill   {:>9}:  empty {} ({:.1}%)  single {} ({:.1}%)",
+        s.fill_total,
+        s.fill_empty,
+        pct(s.fill_empty, s.fill_total),
+        s.fill_single,
+        pct(s.fill_single, s.fill_total),
+    );
+    eprintln!(
+        "    Group  {:>9}:  group-of-group {} ({:.1}%)",
+        s.group_total,
+        s.group_of_group,
+        pct(s.group_of_group, s.group_total),
+    );
+    eprintln!(
+        "    → empty+single Concat/Fill = {collapsible} nodes ({:.1}% of all) removable with no output change",
+        pct(collapsible, s.nodes)
+    );
 }
 
 fn print_json(s: &Stats, parse_errors: usize) {
@@ -365,17 +473,34 @@ fn print_json(s: &Stats, parse_errors: usize) {
             sorted.last().copied().unwrap_or(0.0),
         )
     };
+    let degeneracy = format!(
+        "{{\"concat_total\":{},\"concat_empty\":{},\"concat_single\":{},\"concat_nested\":{},\"fill_total\":{},\"fill_empty\":{},\"fill_single\":{},\"group_total\":{},\"group_of_group\":{}}}",
+        s.concat_total,
+        s.concat_empty,
+        s.concat_single,
+        s.concat_nested,
+        s.fill_total,
+        s.fill_empty,
+        s.fill_single,
+        s.group_total,
+        s.group_of_group,
+    );
     println!(
-        "{{\"files\":{},\"bytes\":{},\"nodes\":{},\"capacity\":{},\"children\":{},\"children_capacity\":{},\"node_density\":{},\"children_density\":{},\"parse_errors\":{parse_errors},\"node_variants\":{},\"text_variants\":{}}}",
+        "{{\"files\":{},\"bytes\":{},\"nodes\":{},\"capacity\":{},\"children\":{},\"children_capacity\":{},\"output_bytes\":{},\"output_capacity\":{},\"output_estimated\":{},\"bump_allocated\":{},\"node_density\":{},\"children_density\":{},\"parse_errors\":{parse_errors},\"node_variants\":{},\"text_variants\":{},\"degeneracy\":{}}}",
         s.files,
         s.bytes,
         s.nodes,
         s.capacity,
         s.children,
         s.children_capacity,
+        s.output_bytes,
+        s.output_capacity,
+        s.output_estimated,
+        s.bump_allocated,
         density_json(&s.node_density),
         density_json(&s.children_density),
         hist_json(NODE_KINDS, &s.node_hist),
         hist_json(TEXT_KINDS, &s.text_hist),
+        degeneracy,
     );
 }
