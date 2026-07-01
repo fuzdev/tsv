@@ -1,33 +1,26 @@
 # type_operator_keyword_own_line_block_comment_prettier_divergence
 
-An **own-line block** comment after a prefix type operator
-(`keyof`/`typeof`/`readonly`), before the operand, with the operand authored on a
-later line (`type A = keyof⏎/* c */⏎B`).
+A single-line block comment between a prefix type operator
+(`keyof`/`typeof`/`readonly`) and its operand collapses to the inline form
+(`keyof /* a */ B`) — whether the author wrote it glued, trailing the operator, or
+on its own line. The own-line authoring (`type A = keyof⏎/* a */⏎B`,
+`unformatted_ours_own_line.svelte`) is what tsv normalizes here.
 
-**tsv** keeps the comment where the author wrote it — on its own line after the
-operator, the operator still on the `=` line — and hangs the operand on the next
-(indented) line:
+- **tsv** collapses the operand break in one pass: `type A = keyof /* a */ B;`.
+- **Prettier** reaches the same inline form but is **non-idempotent** — its first
+  pass pulls the comment onto the operator line yet leaves the operand on the next
+  line (`keyof /* a */⏎B`), collapsing fully only on a second pass. That unstable
+  first pass is pinned by `prettier_intermediate_own_line.svelte` (the validator
+  confirms it reconverges to `input`).
 
-```
-type A = keyof
-	/* a */
-	B;
-```
-
-**Prettier** pulls the comment up onto the operator line, operand flush
-(`keyof /* a */⏎B`).
-
-This is the own-line-block sibling of the
-[line-comment form](../type_operator_keyword_line_comment_prettier_divergence/),
-sharing the keyword→value layout (`append_keyword_value_line_comments`) with the
-`as`/`satisfies` cast gap
-([as_satisfies_value_own_line_block_comment](../../expressions/as_satisfies_value_own_line_block_comment_prettier_divergence/));
-tsv preserves the author's operator-associated placement and the uniform one-level
-operand hang. A blank line after the comment is preserved; a same-line comment
-with the operand below (`keyof /* e */⏎B`) likewise keeps the operand hanging
-(prettier collapses it inline). A **same-line** block comment glued to the operand
-(`keyof /* f */ B`) stays inline in both formatters and is *not* a divergence (the
-regular [type_operator_keyword_comment](../type_operator_keyword_comment/)
-fixture). Covers `keyof`, `typeof`, and `readonly`.
+Block comments inline losslessly, so the collapse never drops information; the
+prefix operators are an *in-place-collapse* gap (prettier keeps the comment after
+the operator rather than relocating it). Only a **line** comment (which can't
+inline — [type_operator_keyword_line_comment](../type_operator_keyword_line_comment_prettier_divergence/))
+or an **own-line multiline** block comment
+([type_operator_keyword_own_line_multiline_block_comment](../type_operator_keyword_own_line_multiline_block_comment_prettier_divergence/))
+still hangs the operand on its own line — a **glued** multiline block collapses
+inline ([keyword_value_glued_multiline_block_comment](../keyword_value_glued_multiline_block_comment/)).
+Covers `keyof`, `typeof` (a `TypeQuery` node), and `readonly`.
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
