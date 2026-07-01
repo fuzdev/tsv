@@ -724,6 +724,29 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 # suites (edge-case skew). See ./docs/performance.md.
 cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
 # Options: --json
+
+# arena_stats - DocArena node-population histogram over a corpus: the data behind
+# the doc-IR memory levers (DocNode size shrink, the arena pre-size heuristic).
+# Formats each file into a fresh arena and walks borrow_nodes(), reporting
+# nodes/byte (actual vs the with_source_size_hint 2/byte heuristic) with per-file
+# density percentiles, capacity fill % (used vs reserved slots), the DocNode
+# variant histogram (which node kind dominates the Vec the render/fits/build loops
+# scan), and the DocText sub-histogram (Static/Owned/SourceSpan/Symbol share of
+# Text). --reuse instead measures the reset()-reuse high-water (peak retained
+# capacity across one shared arena, as the CLI/FFI/WASM batch drivers use — the gate
+# that a lower hint doesn't grow the batch footprint). Covers .ts/.svelte.ts/
+# .svelte/.css. Pure Rust, no Deno. See ./docs/performance.md.
+cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib ~/dev/fuz_css/src/lib
+# Options: --json, --reuse (reset()-reuse high-water)
+
+# lex_diff - differential lexer harness: snapshot the raw token stream over a
+# corpus and diff it against a golden to prove token-stream identity (kind, start,
+# end, decoded per token) after a lexer change — stronger than format byte-identity.
+# Covers the context-free next_token dispatch for .ts/.mts/.cts/.svelte.ts/.css.
+# Pure Rust, no Deno.
+cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden --write  # capture golden
+cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          # check against it
+# Options: --write (capture instead of check), --verbose (first divergent line per file)
 ```
 
 See ./docs/performance.md.
