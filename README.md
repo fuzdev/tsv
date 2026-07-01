@@ -99,8 +99,8 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
 
 Each language is a self-contained Rust crate exposing the same
 `parse`/`format`/`convert_ast` functions over its own concrete types - there's no
-central `Language` trait, registry, or enum dispatch ("closed scope, open convention").
-That means no dynamic dispatch, and WASM builds tree-shake at the link level:
+central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention").
+That means the builds tree-shake at the link level:
 the parse build excludes the printers, and the format build excludes the JSON-AST conversion layer.
 Languages tree-shake the same way - a build binding only TypeScript would exclude
 Svelte and CSS entirely - though currently the published packages include all three.
@@ -112,7 +112,7 @@ Consumers can use tsv's crates ([not yet published](https://github.com/fuzdev/ts
 to build custom tools independently.
 Hard non-goals:
 
-- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+friends)
+- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends)
 - standard CSS and Svelte extensions only - no SCSS, CSS Modules, LESS, etc
 - no JS plugins - won't embed or integrate a JS runtime,
   instead linter extensibility will be data-driven like with pattern-based rules;
