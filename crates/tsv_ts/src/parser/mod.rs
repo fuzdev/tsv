@@ -131,6 +131,20 @@ pub struct Parser<'a, 'arena> {
     /// not an await-expression: under `Goal::Script` it is an ordinary
     /// identifier (`await_is_identifier`), under `Goal::Module` it is reserved.
     in_await: bool,
+    /// Whether the type grammar disallows function/constructor types at the
+    /// current position: a union/intersection constituent (after `|`/`&`,
+    /// including the leading-operator forms) or a type-operator operand
+    /// (`keyof`/`unique`/`readonly`). TS (and acorn-typescript) admit
+    /// `FunctionType`/`ConstructorType` only at full-type positions, so at these
+    /// operand positions a `(` is always a parenthesized type — a following `=>`
+    /// belongs to an enclosing construct (e.g. the enclosing arrow function's own
+    /// `=>` in `(): A & (B) => x`) — and `new () => T` / `<T>() => U` are syntax
+    /// errors (`A & () => x` must be written `A & (() => x)`). Set by the
+    /// constituent/operand parses in `types.rs`; cleared at every full-type
+    /// descent (`parse_type`), so nested positions (type arguments, tuple
+    /// members, object-type members, conditional branches, parenthesized inners)
+    /// parse function types greedily again.
+    fn_type_disallowed: bool,
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -260,6 +274,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
             in_await: matches!(goal, Goal::Module),
+            fn_type_disallowed: false, // Top level is a full-type position
         })
     }
 
@@ -584,6 +599,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.in_await = value;
         let result = f(self);
         self.in_await = saved;
+        result
+    }
+
+    /// Run `f` with the function-type-disallowed context set to `value`,
+    /// restoring it afterward (on success and error alike). Mirrors
+    /// `with_in_await`. Set `true` around union/intersection constituent and
+    /// type-operator operand parses; set `false` at full-type entry
+    /// (`parse_type`) so nested positions parse function types greedily again.
+    pub(super) fn with_fn_type_disallowed<T>(
+        &mut self,
+        value: bool,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = self.fn_type_disallowed;
+        self.fn_type_disallowed = value;
+        let result = f(self);
+        self.fn_type_disallowed = saved;
         result
     }
 

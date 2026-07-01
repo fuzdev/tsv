@@ -60,45 +60,51 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.parse_type_inner(true)
     }
 
-    /// Internal type parsing with ASI control
+    /// Internal type parsing with ASI control. This is the full-type entry, where
+    /// function/constructor types are grammatically allowed — clear
+    /// `fn_type_disallowed` so nested full-type positions (type arguments, tuple
+    /// members, object-type members, conditional branches, parenthesized inners)
+    /// parse them greedily even when reached from a constituent/operand parse.
     fn parse_type_inner(
         &mut self,
         respect_asi_bracket: bool,
     ) -> Result<TSType<'arena>, ParseError> {
-        let start = self.current_pos().0;
-        let check_type = self.parse_union_type_inner(respect_asi_bracket)?;
+        self.with_fn_type_disallowed(false, |p| {
+            let start = p.current_pos().0;
+            let check_type = p.parse_union_type_inner(respect_asi_bracket)?;
 
-        // Check for conditional type: `T extends U ? V : W`. The `extends` must not
-        // be preceded by a line terminator (TS `CheckType [no LineTerminator here]
-        // extends ExtendsType`): a newline before it ends the type, leaving `extends`
-        // a stray token (acorn-typescript's `hasPrecedingLineBreak` guard). Same
-        // restricted-production rule as the arrow `=>` (see `expect_arrow`).
-        if self.check(&TokenKind::Keyword(KeywordKind::Extends)) && !self.had_line_terminator {
-            self.advance()?; // consume 'extends'
+            // Check for conditional type: `T extends U ? V : W`. The `extends` must not
+            // be preceded by a line terminator (TS `CheckType [no LineTerminator here]
+            // extends ExtendsType`): a newline before it ends the type, leaving `extends`
+            // a stray token (acorn-typescript's `hasPrecedingLineBreak` guard). Same
+            // restricted-production rule as the arrow `=>` (see `expect_arrow`).
+            if p.check(&TokenKind::Keyword(KeywordKind::Extends)) && !p.had_line_terminator {
+                p.advance()?; // consume 'extends'
 
-            let extends_type = self.parse_union_type()?;
+                let extends_type = p.parse_union_type()?;
 
-            // Expect '?'
-            self.expect(&TokenKind::Question)?;
+                // Expect '?'
+                p.expect(&TokenKind::Question)?;
 
-            let true_type = self.parse_type()?;
+                let true_type = p.parse_type()?;
 
-            // Expect ':'
-            self.expect(&TokenKind::Colon)?;
+                // Expect ':'
+                p.expect(&TokenKind::Colon)?;
 
-            let false_type = self.parse_type()?;
-            let end = false_type.span().end;
+                let false_type = p.parse_type()?;
+                let end = false_type.span().end;
 
-            Ok(TSType::Conditional(TSConditionalType {
-                check_type: self.alloc(check_type),
-                extends_type: self.alloc(extends_type),
-                true_type: self.alloc(true_type),
-                false_type: self.alloc(false_type),
-                span: Span::new(start as u32, end),
-            }))
-        } else {
-            Ok(check_type)
-        }
+                Ok(TSType::Conditional(TSConditionalType {
+                    check_type: p.alloc(check_type),
+                    extends_type: p.alloc(extends_type),
+                    true_type: p.alloc(true_type),
+                    false_type: p.alloc(false_type),
+                    span: Span::new(start as u32, end),
+                }))
+            } else {
+                Ok(check_type)
+            }
+        })
     }
 
     /// Parse union type: `A | B | C` or `| A | B | C`
@@ -119,7 +125,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.advance()?; // consume leading '|'
         }
 
-        let first = self.parse_intersection_type_inner(respect_asi_bracket)?;
+        // A union constituent is not a full-type position: function/constructor
+        // types are disallowed there (`fn_type_disallowed`), so a constituent's
+        // `(` is a parenthesized type. Without a leading `|` the first parse is
+        // still the full-type position itself (a function type here is greedy:
+        // `([a]) => x | B` is a function type returning `x | B`).
+        let first = if has_leading_pipe {
+            self.with_fn_type_disallowed(true, |p| {
+                p.parse_intersection_type_inner(respect_asi_bracket)
+            })?
+        } else {
+            self.parse_intersection_type_inner(respect_asi_bracket)?
+        };
 
         if !has_leading_pipe && !self.check(&TokenKind::Pipe) {
             return Ok(first);
@@ -129,7 +146,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut types = self.bvec();
         types.push(first);
         while self.eat(TokenKind::Pipe) {
-            types.push(self.parse_intersection_type()?);
+            types.push(self.with_fn_type_disallowed(true, Self::parse_intersection_type)?);
         }
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
@@ -157,7 +174,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             self.advance()?; // consume leading '&'
         }
 
-        let first = self.parse_array_type_inner(respect_asi_bracket)?;
+        // An intersection constituent is not a full-type position — see the
+        // union counterpart above. The no-leading-`&` first parse inherits the
+        // caller's position (full-type, or a union constituent's).
+        let first = if has_leading_amp {
+            self.with_fn_type_disallowed(true, |p| p.parse_array_type_inner(respect_asi_bracket))?
+        } else {
+            self.parse_array_type_inner(respect_asi_bracket)?
+        };
 
         if !has_leading_amp && !self.check(&TokenKind::Ampersand) {
             return Ok(first);
@@ -167,7 +191,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut types = self.bvec();
         types.push(first);
         while self.eat(TokenKind::Ampersand) {
-            types.push(self.parse_array_type()?);
+            types.push(self.with_fn_type_disallowed(true, Self::parse_array_type)?);
         }
 
         let end = types.last().map_or_else(|| start as u32, |t| t.span().end);
@@ -381,8 +405,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.advance()?; // consume the operator keyword (keyof, unique, readonly)
 
-        // Parse the type being operated on (including array/indexed access suffixes)
-        let type_annotation = self.parse_array_type()?;
+        // Parse the type being operated on (including array/indexed access suffixes).
+        // A type-operator operand is not a full-type position: function/constructor
+        // types are disallowed (`keyof () => T` must be `keyof (() => T)`), so a
+        // `(` here is a parenthesized type (`keyof ([a])[]` stays valid).
+        let type_annotation = self.with_fn_type_disallowed(true, Self::parse_array_type)?;
         let end = type_annotation.span().end;
 
         Ok(TSType::TypeOperator(TSTypeOperator {
@@ -726,6 +753,52 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
+    /// Whether the just-opened `(` (the `ParenOpen` already consumed; `paren_offset`
+    /// is its raw byte offset into `self.source`, not a span coordinate) begins a
+    /// function type's parameter list rather than a parenthesized type — the two
+    /// cases where a leading token that [`is_definitely_type_start`] would otherwise
+    /// claim as a type is actually an (ambiguous) parameter. Only meaningful at
+    /// full-type positions; at operand positions (`fn_type_disallowed`) the caller
+    /// short-circuits to a parenthesized type before consulting this.
+    ///
+    /// - a **destructuring pattern** `([a]) => …` / `({ a }) => …`: a leading `[`/`{`
+    ///   with a matching `)` then `=>` (`scan_parens_then_arrow`).
+    ///   `paren_pattern_then_type_operator` additionally rules a leading `{…}`/`[…]`
+    ///   directly followed by `|`/`&` back out (a union/intersection type, never a
+    ///   parameter), e.g. `({ b: B } | C)` / `([B] | C)`.
+    /// - a **contextual type keyword** `(number) => …` (every type keyword except the
+    ///   reserved `void`/`null`, which can't be a parameter name): a parameter when an
+    ///   immediate `:`/`?`/`,` follows (none can appear there in a parenthesized type)
+    ///   or, for a bare single parameter, a `)` then `=>`.
+    ///
+    /// This mirrors acorn-typescript's `tsIsUnambiguouslyStartOfFunctionType`
+    /// lookahead, which likewise runs only at full-type positions.
+    ///
+    /// [`is_definitely_type_start`]: Self::is_definitely_type_start
+    fn paren_starts_function_type_params(&mut self, paren_offset: usize) -> bool {
+        let source_bytes = self.source.as_bytes();
+
+        // Destructuring-pattern parameter: `([a]) => U`, `({ a }) => U`.
+        let pattern_param = matches!(
+            self.current_kind(),
+            TokenKind::BracketOpen | TokenKind::BraceOpen
+        ) && scan_parens_then_arrow(source_bytes, paren_offset)
+            && !paren_pattern_then_type_operator(source_bytes, paren_offset);
+
+        // Contextual type keyword as a parameter name: `(number) => U`.
+        let type_keyword_param = matches!(
+            self.current_kind(),
+            TokenKind::Keyword(kw)
+                if kw.is_type_keyword() && !matches!(kw, KeywordKind::Void | KeywordKind::Null)
+        ) && match self.peek_kind() {
+            TokenKind::Colon | TokenKind::Question | TokenKind::Comma => true,
+            TokenKind::ParenClose => scan_parens_then_arrow(source_bytes, paren_offset),
+            _ => false,
+        };
+
+        pattern_param || type_keyword_param
+    }
+
     /// Parse parenthesized type `(T)` or function type `(x: T) => U`
     fn parse_parenthesized_or_function_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         // Raw `(` offset into `self.source` for the byte scan below (NOT
@@ -735,30 +808,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::ParenOpen)?;
 
-        // A `[`/`{` after `(` is ambiguous: a tuple/object type in a parenthesized
-        // type (`([number])`, `({a: T})`) vs a destructuring-pattern parameter in
-        // a function type (`([]) => U`, `({a}) => U`). Only an arrow after the
-        // matching `)` resolves it to a function type, so scan ahead for it and
-        // skip the parenthesized-type shortcut. Other `is_definitely_type_start`
-        // tokens stay unambiguous.
-        //
-        // But `scan_parens_then_arrow` counts only parens, so inside an enclosing
-        // arrow's return type it mistakes that arrow's `=>` for this paren's own —
-        // misreading a parenthesized union/intersection type `({ b: B } | C)` /
-        // `([B] | C)` (in `(): A & ({ b: B } | C) => x`) as a param list. Rule it
-        // back out: a leading `{…}`/`[…]` directly followed by `|`/`&` is a
-        // union/intersection type, never a destructuring parameter.
-        let source_bytes = self.source.as_bytes();
-        let pattern_param_function_type = matches!(
-            self.current_kind(),
-            TokenKind::BracketOpen | TokenKind::BraceOpen
-        ) && scan_parens_then_arrow(source_bytes, paren_offset)
-            && !paren_pattern_then_type_operator(source_bytes, paren_offset);
+        // Whether this `(` opens a function type's parameter list. At an operand
+        // position (`fn_type_disallowed`: a union/intersection constituent or
+        // type-operator operand) the grammar has no function types, so it never
+        // does — a following `=>` belongs to an enclosing construct, e.g. the
+        // enclosing arrow function's own `=>` after its return-type annotation
+        // (`(): A & (B) => x`). At full-type positions the ambiguous pattern /
+        // type-keyword cases consult the lookahead helper.
+        let starts_function_params =
+            !self.fn_type_disallowed && self.paren_starts_function_type_params(paren_offset);
 
-        // Check if this is definitely a parenthesized type (not function params)
-        // Tokens that can't be parameter names: keywords (typeof, new, import),
-        // type operators (|, &), brackets, literals, etc.
-        if !pattern_param_function_type && self.is_definitely_type_start() {
+        // Parenthesized type: any operand-position `(`, or a full-type-position
+        // `(` on a token that definitely starts a type, not a parameter name
+        // (keywords like typeof/new/import, type operators, brackets, literals).
+        // The inner parse is a full-type position again (`parse_type` clears the
+        // flag), so `A & (() => B)` works.
+        if self.fn_type_disallowed || (!starts_function_params && self.is_definitely_type_start()) {
             let inner_type = self.parse_type()?;
             self.expect(&TokenKind::ParenClose)?;
             let end = self.prev_token_end();
@@ -877,6 +942,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse generic function type: `<T>() => U`, `<T, U extends V>(x: T) => U`
     fn parse_generic_function_type(&mut self) -> Result<TSType<'arena>, ParseError> {
+        // Function types are not allowed at operand positions (`A & <T>() => U`
+        // must be `A & (<T>() => U)`) — see `fn_type_disallowed`.
+        if self.fn_type_disallowed {
+            return Err(self.error_expected_found("type"));
+        }
+
         let start = self.current_pos().0;
 
         // Parse type parameters: <T, U extends V, ...>
@@ -905,6 +976,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse constructor type: `new () => T`, `new <T>() => T`, `abstract new () => T`
     fn parse_constructor_type(&mut self, is_abstract: bool) -> Result<TSType<'arena>, ParseError> {
+        // Constructor types are not allowed at operand positions (`A & new () => T`
+        // must be `A & (new () => T)`) — see `fn_type_disallowed`.
+        if self.fn_type_disallowed {
+            return Err(self.error_expected_found("type"));
+        }
+
         let start = self.current_pos().0;
 
         // If abstract, consume 'abstract' keyword
@@ -977,38 +1054,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(params)
     }
 
-    /// Parse a single function type parameter.
+    /// Parse a single function type parameter: an identifier (`x: T`), the `this`
+    /// parameter (`this: T`), a destructuring pattern (`[a]?: T`, `{ a }: T`), or a
+    /// rest element wrapping any of those (`...a: T[]`, `...[a]: T[]`, `...{ a }: T`).
     fn parse_function_type_param(&mut self) -> Result<Expression<'arena>, ParseError> {
-        self.parse_function_type_param_inner(true)
-    }
-
-    /// `allow_pattern` admits a destructuring-pattern parameter (`([a]?) => …`,
-    /// `(new ({a}: T) => …)`). The rest recursion passes `false`: a rest-of-pattern
-    /// (`(...[a]) => …`) in a function type is a separate, still-open parse gap, so
-    /// it keeps rejecting (identifier-only) as before.
-    fn parse_function_type_param_inner(
-        &mut self,
-        allow_pattern: bool,
-    ) -> Result<Expression<'arena>, ParseError> {
-        // Check for rest parameter: ...args
+        // Rest parameter: `...a`, `...[a]`, `...{ a }` (with an optional annotation).
         if self.check(&TokenKind::DotDotDot) {
             let (start, _) = self.current_pos();
             self.advance()?;
-            let mut arg = self.parse_function_type_param_inner(false)?;
+            let mut arg = self.parse_function_type_param()?;
             let end = arg.span().end;
-            // Move type_annotation from Identifier to RestElement (matching acorn behavior)
-            let type_annotation = if let Expression::Identifier(ref mut id) = arg {
-                if let Some(ta) = id.type_annotation().cloned() {
-                    // Shrink identifier span to exclude type annotation, and clear the
-                    // binding extra (a function-type rest param carries no decorators).
+            // Relocate the type annotation from the argument onto the `RestElement`
+            // (acorn's shape) — a rest param's annotation lives on the rest element
+            // whether the argument is an identifier (`...a: T[]`) or a destructuring
+            // pattern (`...[a]: T[]`, `...{ a }: T`). Shrink the argument span to
+            // exclude the annotation (its start is the `:`).
+            let type_annotation = match &mut arg {
+                Expression::Identifier(id) => id.type_annotation().cloned().inspect(|ta| {
+                    // Clear the binding extra — a rest param carries no decorators.
                     id.span = Span::new(id.span.start, ta.span.start);
                     id.extra = None;
-                    Some(ta)
-                } else {
-                    None
-                }
-            } else {
-                None
+                }),
+                Expression::ArrayPattern(p) => p.type_annotation.take().inspect(|ta| {
+                    p.span.end = ta.span.start;
+                }),
+                Expression::ObjectPattern(p) => p.type_annotation.take().inspect(|ta| {
+                    p.span.end = ta.span.start;
+                }),
+                _ => None,
             };
             return Ok(Expression::RestElement(RestElement {
                 argument: self.alloc(arg),
@@ -1017,15 +1090,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }));
         }
 
-        // Destructuring-pattern parameter: `([a, b]?: T) => …`. Shares the
+        // Destructuring-pattern parameter: `[a, b]?: T`, `{ a }: T`. Shares the
         // parameter-list pattern parser (bare pattern, optional `?`, `: Type`),
         // so `optional`/span handling matches a real signature parameter.
-        if allow_pattern
-            && matches!(
-                self.current_kind(),
-                TokenKind::BracketOpen | TokenKind::BraceOpen
-            )
-        {
+        if matches!(
+            self.current_kind(),
+            TokenKind::BracketOpen | TokenKind::BraceOpen
+        ) {
             return self.parse_destructured_binding(true);
         }
 
