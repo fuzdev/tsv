@@ -262,9 +262,18 @@ impl DocArena {
 
     /// Create an arena with pre-allocated capacity based on source size.
     ///
-    /// Heuristic: ~4 nodes per source byte for typical formatted code.
+    /// Heuristic: **~2 doc nodes per source byte**. Measured across the
+    /// representative corpus (`tsv_debug arena_stats`, 11.3 K files) the real
+    /// density is ~0.57 nodes/byte mean with a p99 of ~1.6 and a max of ~3.5; 2/byte
+    /// clears p99 with margin, so only the sub-1% densest files pay an (amortized)
+    /// realloc, while the typical file no longer over-reserves ~7× (the prior
+    /// 4/byte was pinned to the *max* file). `estimated_children = nodes/2` ⇒
+    /// ~1/byte, which clears the children p95 (~0.97). The pre-size only ever sets
+    /// `Vec` capacity — never output — so lowering it is byte-identical; the win is
+    /// the fresh-arena / first-file / WASM reservation, and the multi-file
+    /// `reset()` reuse high-water is bounded by actual usage, so it can only drop.
     pub fn with_source_size_hint(source_len: usize) -> Self {
-        let estimated_nodes = source_len * 4;
+        let estimated_nodes = source_len * 2;
         let estimated_children = estimated_nodes / 2;
         Self {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),

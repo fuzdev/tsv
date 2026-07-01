@@ -1,3 +1,4 @@
+pub mod arena_stats;
 pub mod ast_diff;
 pub mod authoring_audit;
 pub mod buffer_sizes;
