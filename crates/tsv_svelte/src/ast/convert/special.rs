@@ -47,13 +47,11 @@ fn script_has_lang_ts(
 pub(super) fn convert_script<'src>(
     script: &internal::Script<'_>,
     source: &'src str,
+    loc: &LocationTracker,
     interner: &DefaultStringInterner,
     html_leading_comment: Option<&internal::HtmlComment>,
 ) -> public::Script<'src> {
     let context = script.context.as_str();
-
-    // Use full source LocationTracker for absolute line/column numbers everywhere
-    let loc = LocationTracker::new(source);
 
     // Detect whether this is a TypeScript script (lang="ts") or plain script.
     // Plain scripts use Svelte's parser conventions (no importKind/exportKind for "value",
@@ -66,7 +64,7 @@ pub(super) fn convert_script<'src>(
     } else {
         tsv_ts::ast::convert::Schema::SvelteScript
     };
-    let mut program = tsv_ts::ast::convert::convert_program(&script.content, source, &loc, schema);
+    let mut program = tsv_ts::ast::convert::convert_program(&script.content, source, loc, schema);
 
     // Svelte uses the line of the <script> tag itself, not the content start
     // (matters when the opening tag spans multiple lines, e.g., multiline attr values)
@@ -85,14 +83,55 @@ pub(super) fn convert_script<'src>(
         character: None,
     };
 
-    // Attach comments to all nodes (recursively)
-    // Convert program to JSON so we can inject leadingComments/trailingComments
-    //
-    // Architecture note: We use JSON roundtrip instead of adding fields to AST structs
-    // because it keeps the internal TypeScript AST clean (zero Svelte-specific pollution).
-    // The trade-off is we lose type safety on Script.content (now serde_json::Value),
-    // but this is acceptable for the public API layer.
-    let mut program_json = to_json_value(&program);
+    // Fast path: nothing to inject — no script comments (nothing to attach),
+    // no preceding HTML comment, and `lang="ts"` (a plain script may need
+    // `"options": null` injected on its ImportExpressions) — so the JSON
+    // roundtrip would reproduce the typed program unchanged. Keep it typed:
+    // the direct-serialization path then skips this script's `to_value`
+    // entirely (`#[serde(untagged)]` makes the arms wire-identical).
+    let content =
+        if is_lang_ts && script.content.comments.is_empty() && html_leading_comment.is_none() {
+            public::ProgramIsland::Typed(program)
+        } else {
+            public::ProgramIsland::Attached(attached_program_json(
+                &program,
+                script,
+                source,
+                is_lang_ts,
+                html_leading_comment,
+            ))
+        };
+
+    public::Script {
+        node_type: "Script",
+        start: script.span.start,
+        end: script.span.end,
+        context: context.to_string(),
+        content,
+        attributes: script
+            .attributes
+            .iter()
+            .map(|attr| convert_attribute_node(attr, source, loc, interner))
+            .collect(),
+    }
+}
+
+/// JSON-roundtrip a converted script `Program` and inject what the typed tree
+/// can't carry: attached comments, the non-TS `"options": null` quirk, and a
+/// preceding HTML comment.
+///
+/// Architecture note: We use JSON roundtrip instead of adding fields to AST structs
+/// because it keeps the internal TypeScript AST clean (zero Svelte-specific pollution).
+/// The trade-off is we lose type safety on Script.content (the ProgramIsland::Attached
+/// arm is serde_json::Value), but this is acceptable for the public API layer.
+fn attached_program_json(
+    program: &tsv_ts::ast::public::Program<'_>,
+    script: &internal::Script<'_>,
+    source: &str,
+    is_lang_ts: bool,
+    html_leading_comment: Option<&internal::HtmlComment>,
+) -> serde_json::Value {
+    let mut program_json = to_json_value(program);
 
     // Convert comments to JSON and build the queue (sorted by position, already in order).
     // Each comment is emitted once: tsv corrects acorn-typescript's backtrack-reparse comment
@@ -148,19 +187,7 @@ pub(super) fn convert_script<'src>(
         }
     }
 
-    // Return program_json directly (preserves leadingComments/trailingComments)
-    public::Script {
-        node_type: "Script",
-        start: script.span.start,
-        end: script.span.end,
-        context: context.to_string(),
-        content: program_json,
-        attributes: script
-            .attributes
-            .iter()
-            .map(|attr| convert_attribute_node(attr, source, &loc, interner))
-            .collect(),
-    }
+    program_json
 }
 
 /// Convert internal SvelteOptions to public format
@@ -310,12 +337,10 @@ pub(super) fn convert_svelte_options<'src>(
 pub(super) fn convert_style<'src>(
     style: &internal::Style<'_>,
     source: &'src str,
+    loc: &LocationTracker,
     interner: &DefaultStringInterner,
     preceding_comment: Option<&internal::HtmlComment>,
 ) -> tsv_css::StyleSheet<'src> {
-    // Create LocationTracker for the full source (for attributes)
-    let full_loc = LocationTracker::new(source);
-
     // Extract the raw CSS content (borrowed from source — no allocation)
     let styles = style.content_span.extract(source);
 
@@ -336,7 +361,7 @@ pub(super) fn convert_style<'src>(
             .attributes
             .iter()
             .map(|attr| {
-                let public_attr = convert_attribute_node(attr, source, &full_loc, interner);
+                let public_attr = convert_attribute_node(attr, source, loc, interner);
                 to_json_value(&public_attr)
             })
             .collect(),
@@ -388,7 +413,7 @@ pub(super) fn convert_special_element<'src>(
     let expression = elem
         .kind
         .expression()
-        .map(|e| convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0).into());
 
     public::SpecialElement {
         node_type: elem.kind.node_type(),

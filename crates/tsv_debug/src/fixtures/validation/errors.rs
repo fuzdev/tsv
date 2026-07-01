@@ -226,13 +226,13 @@ impl ValidationError {
                 "Run: deno task fixtures:update:parsed <pattern>"
             }
             Self::ParserJsonStringPathDiverges => {
-                "Fix convert_ast_json_string (fast-path eligibility gate or typed offset translation) to stay byte-identical to convert_ast_json"
+                "Fix convert_ast_json_string (typed comment attach or typed offset translation) to stay byte-identical to convert_ast_json"
             }
             Self::ParserTypedWalkParityDiverges(_) => {
-                "Fix translate_byte_to_char_offsets_typed (translate_typed.rs) — a position-bearing field is likely missing from the typed walk's manual field enumeration"
+                "Fix the typed walks — a multibyte probe points at translate_typed.rs (a position-bearing field missing from the manual field enumeration); a template-comment probe points at attach_typed.rs (a comment window or reachability mismatch vs the Value dispatcher)"
             }
             Self::ParserTypedWalkProbeUnparseable(_, _) => {
-                "The probe content must parse as standalone TS; investigate why prepending a multibyte comment or extracting <script> content broke parsing"
+                "The probe content must parse; investigate why prepending a multibyte comment, appending the template-comment expression tag, or extracting <script> content broke parsing"
             }
             Self::ParserError(_) => "Verify input is valid syntax; if valid, fix the parser",
             Self::ParserErrorInDivergence(_) => {

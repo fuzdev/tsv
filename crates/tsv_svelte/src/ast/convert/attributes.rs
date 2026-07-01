@@ -14,7 +14,7 @@ use tsv_ts::ast::convert::convert_expression;
 use super::{
     convert_animate_directive, convert_bind_directive, convert_class_directive,
     convert_expression_tag, convert_let_directive, convert_on_directive, convert_style_directive,
-    convert_transition_directive, convert_use_directive, span_to_name_loc, to_json_value,
+    convert_transition_directive, convert_use_directive, span_to_name_loc,
 };
 
 pub(super) fn convert_attribute_node<'src>(
@@ -74,7 +74,7 @@ fn convert_attach_tag<'src>(
         node_type: "AttachTag",
         start: tag.span.start,
         end: tag.span.end,
-        expression,
+        expression: expression.into(),
     }
 }
 
@@ -90,16 +90,16 @@ fn convert_spread_attribute<'src>(
         node_type: "SpreadAttribute",
         start: spread.span.start,
         end: spread.span.end,
-        expression,
+        expression: expression.into(),
     }
 }
 
-fn convert_attribute(
+fn convert_attribute<'src>(
     attr: &internal::Attribute<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::Attribute {
+) -> public::Attribute<'src> {
     // Extract attribute name from interner
     let name = interner.resolve_infallible(attr.name).to_string();
 
@@ -109,7 +109,7 @@ fn convert_attribute(
     // - Pure expression (single ExpressionTag): serialize as object
     // - Multiple expressions: serialize as array
     let value = match &attr.value {
-        None => Some(serde_json::Value::Bool(true)), // Boolean attribute
+        None => public::AttributeValueField::True(true), // Boolean attribute
         Some(values) => {
             // Check if any value is Text (string content)
             let has_text = values
@@ -135,7 +135,7 @@ fn convert_attribute(
                     .iter()
                     .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
-                Some(to_json_value(&converted))
+                public::AttributeValueField::Sequence(converted)
             } else if values.len() == 1 {
                 // Single bare expression: serialize as object
                 let mut converted = convert_attribute_value(&values[0], source, loc, interner);
@@ -144,22 +144,23 @@ fn convert_attribute(
                 // read_identifier() which includes `character` in loc. Detect shorthand by
                 // checking if the ExpressionTag and its Identifier expression share the same span.
                 if let public::AttributeValue::ExpressionTag(ref mut et) = converted
+                    && let public::ExpressionIsland::Typed(ref mut expression) = et.expression
                     && let internal::AttributeValue::ExpressionTag(ref internal_tag) = values[0]
                     && let tsv_ts::ast::internal::Expression::Identifier(ref id) =
                         internal_tag.expression
                     && internal_tag.span == id.span
                 {
-                    et.expression.inject_loc_character();
+                    expression.inject_loc_character();
                 }
 
-                Some(to_json_value(&converted))
+                public::AttributeValueField::Single(converted)
             } else {
                 // Multiple expressions: serialize as array
                 let converted: Vec<_> = values
                     .iter()
                     .map(|v| convert_attribute_value(v, source, loc, interner))
                     .collect();
-                Some(to_json_value(&converted))
+                public::AttributeValueField::Sequence(converted)
             }
         }
     };

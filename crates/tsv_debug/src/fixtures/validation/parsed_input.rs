@@ -49,8 +49,8 @@ pub(super) struct InputAstPaths {
     /// bytes `expected*.json` files store (matches `fixtures_update_parsed`).
     pub ast_json_tabs: String,
     /// Whether the compact wire path (`convert_ast_json_string` — what
-    /// FFI/WASM/CLI-compact ship, with its own fast-path eligibility gates
-    /// and multibyte offset translation) is byte-identical to the `Value`
+    /// FFI/WASM/CLI-compact ship, with its typed comment attach and multibyte
+    /// offset translation) is byte-identical to the `Value`
     /// path. The expected.json comparisons go through `convert_ast_json`,
     /// so without this check the shipped path would be fixture-blind.
     pub wire_path_matches: bool,
@@ -108,6 +108,16 @@ const CSS_TYPED_WALK_SYNTH_PREFIX: &str = "/* 中文😀 */\n";
 /// `expected.json`.
 const SVELTE_TYPED_WALK_SYNTH_PREFIX: &str = "<!-- 中文😀 -->\n";
 
+/// Appended expression tag that forces the island-scoped template-comment
+/// attach pass (`attach_template_expression_comments_typed`) to run on the
+/// fixture's full AST shape and compares it against the `Value` dispatcher.
+/// The three comments exercise leading attachment, the walk's same-line
+/// trailing attachment, and the DFS's island-root trailing special case (the
+/// second trailing comment survives the walk and lands via the root-node
+/// path); the multibyte content makes the resulting `Attached` island go
+/// through the typed translation walk's `Value`-island delegation too.
+const SVELTE_TEMPLATE_COMMENT_SYNTH_SUFFIX: &str = "\n{/* 中文😀 */ probe /* t1 */ /* 😀 t2 */}";
+
 /// How a typed-walk parity probe failed.
 #[derive(Debug)]
 pub(super) enum TypedWalkParityFailure {
@@ -128,13 +138,15 @@ pub(super) struct TypedWalkParity {
     pub failures: Vec<(String, TypedWalkParityFailure)>,
 }
 
-/// Probe the typed offset-translation walks for parity with the `Value`
-/// walk, beyond what the fixture's own content exercises.
+/// Probe the typed walks for parity with their `Value` counterparts, beyond
+/// what the fixture's own content exercises.
 ///
-/// The typed walks (`translate_byte_to_char_offsets_typed` in tsv_ts, tsv_css,
-/// and tsv_svelte) enumerate struct fields manually, so a position-bearing
-/// field missing from one stays green on every ASCII fixture (translation is a
-/// no-op on both paths). These probes close that hole:
+/// The typed translation walks (`translate_byte_to_char_offsets_typed` in
+/// tsv_ts, tsv_css, and tsv_svelte) enumerate struct fields manually, so a
+/// position-bearing field missing from one stays green on every ASCII fixture
+/// (translation is a no-op on both paths); tsv_svelte's typed attach
+/// dispatcher (`attach_typed.rs`) likewise stays green on every fixture
+/// without template-expression comments. These probes close those holes:
 ///
 /// - `.ts` / `.svelte.ts` inputs get a synthesized multibyte variant (a
 ///   prepended multibyte comment shifts all downstream offsets). Inputs with
@@ -143,10 +155,13 @@ pub(super) struct TypedWalkParity {
 /// - `.svelte` inputs get a synthesized multibyte variant of the whole file
 ///   (a prepended multibyte HTML comment), exercising `tsv_svelte`'s typed
 ///   walk — the Svelte nodes, `name_loc` positions, embedded expression/CSS
-///   subtrees, and `Value` islands. Their `<script>` contents are also
-///   extracted and run through `tsv_ts`'s two paths as standalone TS — as-is
-///   when already multibyte, plus a synthesized multibyte variant — so every
-///   embedded-TS AST shape gets `tsv_ts` typed-walk coverage too.
+///   subtrees, and `Value` islands. They also get a synthesized
+///   template-comment variant (an appended expression tag carrying multibyte
+///   comments), exercising the island-scoped attach pass against the `Value`
+///   dispatcher on every fixture's AST shape. Their `<script>` contents are
+///   also extracted and run through `tsv_ts`'s two paths as standalone TS —
+///   as-is when already multibyte, plus a synthesized multibyte variant — so
+///   every embedded-TS AST shape gets `tsv_ts` typed-walk coverage too.
 ///
 /// Each probe asserts `convert_ast_json_string` is byte-identical to
 /// `serde_json::to_string(&convert_ast_json(..))`. Probes are independent of
@@ -244,13 +259,20 @@ pub(super) fn typed_walk_parity_probes(
         }
         ParsedInput::Svelte(root) => {
             // Whole-file synthesized multibyte variant: exercises
-            // tsv_svelte's own typed walk on the fixture's full AST shape
-            // (multibyte comment-free .svelte files take the direct path).
+            // tsv_svelte's own typed walk on the fixture's full AST shape.
             // Byte-0 BOM can't take a prepended comment.
             if !content.starts_with('\u{feff}') {
                 let synthesized = format!("{SVELTE_TYPED_WALK_SYNTH_PREFIX}{content}");
                 probe!(tsv_svelte, &synthesized, "synthesized multibyte input");
             }
+            // Template-comment variant: appending is byte-0-safe, and a
+            // parsed document always accepts a trailing top-level tag.
+            let synthesized = format!("{content}{SVELTE_TEMPLATE_COMMENT_SYNTH_SUFFIX}");
+            probe!(
+                tsv_svelte,
+                &synthesized,
+                "synthesized template-comment input"
+            );
             for (i, (start, end)) in tsv_svelte::script_content_spans(root)
                 .into_iter()
                 .enumerate()
