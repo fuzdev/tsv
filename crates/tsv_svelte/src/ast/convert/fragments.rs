@@ -142,7 +142,7 @@ pub(super) fn convert_expression_tag<'src>(
         node_type: "ExpressionTag",
         start: tag.span.start,
         end: tag.span.end,
-        expression: ts_expr,
+        expression: ts_expr.into(),
     }
 }
 

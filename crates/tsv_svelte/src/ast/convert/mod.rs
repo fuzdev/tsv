@@ -10,6 +10,7 @@ use tsv_lang::{Comment, LocationTracker, Span};
 use tsv_ts::ast::convert::convert_expression;
 
 // Module declarations
+mod attach_typed;
 mod attributes;
 mod blocks;
 mod comment_attachment;
@@ -31,9 +32,8 @@ use tags::*;
 use fragments::convert_fragment;
 use special::{convert_script, convert_style};
 
-pub use comment_attachment::{
-    attach_template_expression_comments, has_template_expression_comments,
-};
+pub use attach_typed::attach_template_expression_comments_typed;
+pub use comment_attachment::attach_template_expression_comments;
 pub use translate_typed::translate_byte_to_char_offsets_typed;
 
 /// Convert an internal `Span` to a public `NameLocation`
@@ -181,7 +181,19 @@ fn adjust_columns_on_line(value: &mut serde_json::Value, target_line: u64) {
 
 /// Convert Svelte Root AST to public format
 pub fn convert_root<'src>(root: &internal::Root<'_>, source: &'src str) -> public::Root<'src> {
-    let loc = LocationTracker::new(source);
+    convert_root_with_tracker(root, source, &LocationTracker::new(source))
+}
+
+/// `convert_root` with a caller-provided `LocationTracker` for `source`.
+///
+/// The tracker is a full-source line-index scan; callers that also need one
+/// for byte→char translation (`convert_ast_json`, `convert_ast_json_string`)
+/// build it once and share it, instead of paying a second scan.
+pub fn convert_root_with_tracker<'src>(
+    root: &internal::Root<'_>,
+    source: &'src str,
+    loc: &LocationTracker,
+) -> public::Root<'src> {
     let interner = root.interner.borrow();
 
     // Svelte 5.x: Root.start/end always span the entire source (0 to source.len())
@@ -226,16 +238,16 @@ pub fn convert_root<'src>(root: &internal::Root<'_>, source: &'src str) -> publi
         css: root
             .css
             .as_ref()
-            .map(|style| convert_style(style, source, &interner, style_comment)),
+            .map(|style| convert_style(style, source, loc, &interner, style_comment)),
         js: vec![],
         start,
         end,
         node_type: "Root",
-        fragment: convert_fragment(&root.fragment, source, &loc, &interner),
+        fragment: convert_fragment(&root.fragment, source, loc, &interner),
         options: root
             .options
             .as_ref()
-            .map(|opts| convert_svelte_options(opts, source, &loc, &interner)),
+            .map(|opts| convert_svelte_options(opts, source, loc, &interner)),
         comments: {
             // Each comment is emitted once: tsv corrects acorn-typescript's backtrack-reparse
             // comment duplication rather than replicating it (see docs/conformance_svelte.md
@@ -282,10 +294,10 @@ pub fn convert_root<'src>(root: &internal::Root<'_>, source: &'src str) -> publi
         instance: root
             .instance
             .as_ref()
-            .map(|script| convert_script(script, source, &interner, instance_comment)),
+            .map(|script| convert_script(script, source, loc, &interner, instance_comment)),
         module: root
             .module
             .as_ref()
-            .map(|script| convert_script(script, source, &interner, module_comment)),
+            .map(|script| convert_script(script, source, loc, &interner, module_comment)),
     }
 }

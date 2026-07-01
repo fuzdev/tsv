@@ -2,7 +2,7 @@
  * Diagnostic: attribute the WASM-vs-native JSON parse penalty.
  *
  * Native JSON path:  parse -> convert_ast_json_string -> FFI copy -> JSON.parse (JS)
- *                    (direct typed serialization when eligible, else via serde_json::Value)
+ *                    (direct typed serialization, skipping the intermediate serde_json::Value)
  * WASM JSON path:    parse -> convert_ast_json_string -> boundary string decode
  *                    -> engine JSON.parse (called from Rust via js_sys)
  *

@@ -84,7 +84,7 @@ fn parse_to_json(
     goal: tsv_ts::Goal,
 ) -> Result<String, String> {
     // Compact output uses the convert_ast_json_string hot path (skips the
-    // intermediate serde_json::Value when eligible); pretty-printing needs
+    // intermediate serde_json::Value); pretty-printing needs
     // the Value for tab-indented serialization.
     // The arena owns the internal AST; convert produces owned JSON, so nothing
     // borrowed escapes this function. Pre-sized to the source to avoid the

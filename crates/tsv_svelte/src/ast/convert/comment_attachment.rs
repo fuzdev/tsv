@@ -9,6 +9,14 @@
 //   (`attach_template_expression_comments`): finds expression fields in the
 //   Svelte template JSON and runs the same DFS on each, matching Svelte's
 //   `parse_expression_at` → `add_comments`.
+//
+// The `Value` dispatcher here (`walk_and_attach_expressions`) is the oracle
+// path's whole-document walk; `attach_typed.rs` re-expresses the same
+// dispatch over the typed public AST for the shipped direct-serialization
+// path. Both share the per-island machinery (`try_attach_comments_to_node`
+// and the `attach_*` helpers), and the fixture suite's wire-path identity
+// check cross-checks them byte-for-byte — a window or reachability change in
+// one dispatcher must land in the other.
 
 use std::collections::VecDeque;
 
@@ -413,22 +421,12 @@ pub(super) fn comment_to_json(comment: &Comment, source: &str) -> serde_json::Va
 }
 
 /// Whether a comment lies outside every `<script>` content span — i.e., it's a
-/// template expression comment that `attach_template_expression_comments` may
-/// move into the JSON tree.
-fn is_template_comment(comment: &Comment, script_spans: &[(u32, u32)]) -> bool {
+/// template expression comment that the attachment passes may move into the
+/// JSON tree.
+pub(super) fn is_template_comment(comment: &Comment, script_spans: &[(u32, u32)]) -> bool {
     !script_spans
         .iter()
         .any(|&(s, e)| comment.span.start >= s && comment.span.end <= e)
-}
-
-/// Whether any comment falls outside the `<script>` content spans.
-///
-/// When false, `attach_template_expression_comments` is a no-op — used to gate
-/// the direct-serialization fast path in `convert_ast_json_string`.
-pub fn has_template_expression_comments(comments: &[Comment], script_spans: &[(u32, u32)]) -> bool {
-    comments
-        .iter()
-        .any(|c| is_template_comment(c, script_spans))
 }
 
 /// Attach comments to template expressions in a converted Root JSON AST
@@ -463,7 +461,10 @@ pub fn attach_template_expression_comments(
 /// Identifies Svelte node types by their `type` field and processes their expression fields.
 /// Uses the parent Svelte node's span to filter comments (not the expression's own span),
 /// matching Svelte's `parse_expression_at` which filters comments to `start >= index`.
-fn walk_and_attach_expressions(
+///
+/// `attach_typed.rs` mirrors this dispatch over the typed public AST (and
+/// delegates its `Value` islands back here) — keep the two in sync.
+pub(super) fn walk_and_attach_expressions(
     value: &mut serde_json::Value,
     template_comments: &[&Comment],
     source: &str,
@@ -622,25 +623,13 @@ fn walk_and_attach_expressions(
                             );
                         }
                         if let Some(serde_json::Value::Array(params)) = map.get_mut("parameters") {
-                            // Walk the parameters in order, advancing a cursor past each
-                            // param and its trailing comments so windows don't overlap —
-                            // an inter-parameter comment is claimed once (as the preceding
-                            // param's trailing) rather than attached to both adjacent
-                            // params. Matches Svelte's single acorn parse of the list.
-                            let mut cursor = c_start;
-                            for param in params.iter_mut() {
-                                let p_end = node_end(param);
-                                try_attach_comments_to_node(
-                                    param,
-                                    template_comments,
-                                    source,
-                                    cursor,
-                                    range_end,
-                                );
-                                if let Some(e) = p_end {
-                                    cursor = scan_past_trailing_comments(source, e, range_end);
-                                }
-                            }
+                            attach_snippet_parameters(
+                                params,
+                                template_comments,
+                                source,
+                                c_start,
+                                range_end,
+                            );
                         }
                     }
                 }
@@ -653,43 +642,20 @@ fn walk_and_attach_expressions(
                     if let (Some(c_start), Some(c_end)) = (container_start, container_end)
                         && let Some(decl) = map.get_mut("declaration")
                     {
-                        if let Some(obj) = decl.as_object_mut() {
-                            obj.insert(
-                                "end".to_string(),
-                                serde_json::Value::Number((c_end - 1).into()),
-                            );
-                        }
-                        if let Some(declarations) =
-                            decl.get_mut("declarations").and_then(|d| d.as_array_mut())
-                            && let Some(declarator) = declarations.first_mut()
-                            && let Some(init) = declarator.get_mut("init")
-                        {
-                            try_attach_comments_to_node(
-                                init,
-                                template_comments,
-                                source,
-                                c_start,
-                                c_end,
-                            );
-                        }
+                        attach_const_tag_declaration(
+                            decl,
+                            template_comments,
+                            source,
+                            c_start,
+                            c_end,
+                        );
                     }
                 }
-                // `{const id = init}` / `{let …}` are acorn-parsed, so comments attach
-                // across the **whole VariableDeclaration tree** (every declarator and
-                // its id/init) per acorn's recursive attachment — attaching only to the
-                // first init left a comment leading a later declarator
-                // (`{let a = 1, /* c */ b}`) unattached.
                 "DeclarationTag" => {
                     if let (Some(c_start), Some(c_end)) = (container_start, container_end)
                         && let Some(decl) = map.get_mut("declaration")
                     {
-                        if let Some(obj) = decl.as_object_mut() {
-                            obj.insert(
-                                "end".to_string(),
-                                serde_json::Value::Number((c_end - 1).into()),
-                            );
-                        }
-                        try_attach_comments_to_node(
+                        attach_declaration_tag_declaration(
                             decl,
                             template_comments,
                             source,
@@ -860,7 +826,7 @@ fn first_child_start(
 ///
 /// The `container_start` is the Svelte node's start (e.g., ExpressionTag start).
 /// The `container_end` bounds the maximum extent for trailing comment scanning.
-fn try_attach_comments_to_node(
+pub(super) fn try_attach_comments_to_node(
     node_json: &mut serde_json::Value,
     template_comments: &[&Comment],
     source: &str,
@@ -895,6 +861,79 @@ fn try_attach_comments_to_node(
     };
 
     attach_comments_recursively(node_json, &mut ctx);
+}
+
+/// Attach comments to a snippet block's parameter list.
+///
+/// Walks the parameters in order, advancing a cursor past each param and its
+/// trailing comments so windows don't overlap — an inter-parameter comment is
+/// claimed once (as the preceding param's trailing) rather than attached to
+/// both adjacent params. Matches Svelte's single acorn parse of the list.
+pub(super) fn attach_snippet_parameters(
+    params: &mut [serde_json::Value],
+    template_comments: &[&Comment],
+    source: &str,
+    c_start: u32,
+    range_end: u32,
+) {
+    let mut cursor = c_start;
+    for param in params.iter_mut() {
+        let p_end = node_end(param);
+        try_attach_comments_to_node(param, template_comments, source, cursor, range_end);
+        if let Some(e) = p_end {
+            cursor = scan_past_trailing_comments(source, e, range_end);
+        }
+    }
+}
+
+/// Rewrite a `{@const}`/`{const}`/`{let}` VariableDeclaration's `end` to
+/// Svelte's `parser.index - 1` (the byte before the tag's closing `}`) —
+/// unconditionally, whenever the attachment pass runs.
+fn rewrite_declaration_end(decl: &mut serde_json::Value, c_end: u32) {
+    if let Some(obj) = decl.as_object_mut() {
+        obj.insert(
+            "end".to_string(),
+            serde_json::Value::Number((c_end - 1).into()),
+        );
+    }
+}
+
+/// Attach comments to a `{@const id = init}` declaration `Value`.
+///
+/// Svelte hand-builds the VariableDeclaration and runs `add_comments(init)` on
+/// the **init expression directly**, so comments attach to the init's subtree,
+/// not the whole declaration.
+pub(super) fn attach_const_tag_declaration(
+    decl: &mut serde_json::Value,
+    template_comments: &[&Comment],
+    source: &str,
+    c_start: u32,
+    c_end: u32,
+) {
+    rewrite_declaration_end(decl, c_end);
+    if let Some(declarations) = decl.get_mut("declarations").and_then(|d| d.as_array_mut())
+        && let Some(declarator) = declarations.first_mut()
+        && let Some(init) = declarator.get_mut("init")
+    {
+        try_attach_comments_to_node(init, template_comments, source, c_start, c_end);
+    }
+}
+
+/// Attach comments to a `{const id = init}` / `{let …}` declaration `Value`.
+///
+/// These are acorn-parsed, so comments attach across the **whole
+/// VariableDeclaration tree** (every declarator and its id/init) per acorn's
+/// recursive attachment — attaching only to the first init left a comment
+/// leading a later declarator (`{let a = 1, /* c */ b}`) unattached.
+pub(super) fn attach_declaration_tag_declaration(
+    decl: &mut serde_json::Value,
+    template_comments: &[&Comment],
+    source: &str,
+    c_start: u32,
+    c_end: u32,
+) {
+    rewrite_declaration_end(decl, c_end);
+    try_attach_comments_to_node(decl, template_comments, source, c_start, c_end);
 }
 
 /// Scan source after an expression's end to find the effective end of comment collection

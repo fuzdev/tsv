@@ -21,7 +21,7 @@ pub(super) fn convert_on_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0).into());
 
     public::OnDirective {
         start: d.span.start,
@@ -84,15 +84,15 @@ pub(super) fn convert_class_directive(
     }
 }
 
-pub(super) fn convert_style_directive(
+pub(super) fn convert_style_directive<'src>(
     d: &internal::StyleDirective<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::StyleDirective {
+) -> public::StyleDirective<'src> {
     // Convert value based on its type
     let value = match &d.value {
-        internal::StyleDirectiveValue::True => serde_json::Value::Bool(true),
+        internal::StyleDirectiveValue::True => public::AttributeValueField::True(true),
         internal::StyleDirectiveValue::ExpressionTag(tag) => {
             let expr_tag = convert_expression_tag(tag, source, loc, interner);
             // A quoted expression (`style:color="{expr}"`) serializes as an array like
@@ -104,10 +104,11 @@ pub(super) fn convert_style_directive(
                     .and_then(|i| source.as_bytes().get(i)),
                 Some(b'"' | b'\'')
             );
+            let part = public::AttributeValue::ExpressionTag(expr_tag);
             if quoted {
-                to_json_value(&vec![expr_tag])
+                public::AttributeValueField::Sequence(vec![part])
             } else {
-                to_json_value(&expr_tag)
+                public::AttributeValueField::Single(part)
             }
         }
         internal::StyleDirectiveValue::Parts(parts) => {
@@ -115,7 +116,7 @@ pub(super) fn convert_style_directive(
                 .iter()
                 .map(|p| convert_attribute_value(p, source, loc, interner))
                 .collect();
-            to_json_value(&converted)
+            public::AttributeValueField::Sequence(converted)
         }
     };
 
@@ -139,7 +140,7 @@ pub(super) fn convert_use_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0).into());
 
     public::UseDirective {
         start: d.span.start,
@@ -161,7 +162,7 @@ pub(super) fn convert_transition_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0).into());
 
     public::TransitionDirective {
         start: d.span.start,
@@ -185,7 +186,7 @@ pub(super) fn convert_animate_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0).into());
 
     public::AnimateDirective {
         start: d.span.start,
@@ -207,7 +208,7 @@ pub(super) fn convert_let_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0));
+        .map(|e| convert_expression(e, source, loc, interner, 0).into());
 
     public::LetDirective {
         start: d.span.start,

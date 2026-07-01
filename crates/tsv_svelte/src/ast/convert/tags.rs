@@ -26,7 +26,7 @@ pub(super) fn convert_html_tag<'src>(
         node_type: "HtmlTag",
         start: tag.span.start,
         end: tag.span.end,
-        expression,
+        expression: expression.into(),
     }
 }
 
@@ -100,7 +100,7 @@ pub(super) fn convert_debug_tag<'src>(
     let identifiers = tag
         .identifiers
         .iter()
-        .map(|id| convert_expression(id, source, loc, interner, 0))
+        .map(|id| convert_expression(id, source, loc, interner, 0).into())
         .collect();
 
     public::DebugTag {
@@ -123,6 +123,6 @@ pub(super) fn convert_render_tag<'src>(
         node_type: "RenderTag",
         start: tag.span.start,
         end: tag.span.end,
-        expression,
+        expression: expression.into(),
     }
 }

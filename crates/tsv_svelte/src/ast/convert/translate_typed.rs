@@ -1,10 +1,10 @@
 //! Byte→UTF-16 offset translation as a mutating walk over the typed public AST.
 //!
 //! Counterpart to the `Value` walk (`tsv_ts::ast::convert::translate_byte_to_char_offsets`,
-//! which the `Value` fallback path runs over the whole serialized document):
-//! same translation semantics, but applied to the typed tree so
-//! `convert_ast_json_string` can serialize multibyte sources directly — no
-//! intermediate `Value` materialization on the wire hot path.
+//! which the `Value` oracle path — `convert_ast_json` — runs over the whole
+//! serialized document): same translation semantics, but applied to the typed
+//! tree so `convert_ast_json_string` can serialize multibyte sources directly —
+//! no intermediate `Value` materialization on the wire hot path.
 //!
 //! Unlike the `tsv_ts`/`tsv_css` typed walks this is a **hybrid** walk, because
 //! the Svelte public AST embeds three kinds of position-bearing content:
@@ -12,16 +12,18 @@
 //! - **Typed Svelte nodes** — visited field-by-field here. They carry
 //!   `start`/`end` plus (on elements, attributes, directives) a `name_loc`
 //!   whose positions hold a byte `character` and a byte-derived `column`.
-//! - **Embedded typed subtrees** — `tsv_ts::ast::public::Expression` fields
-//!   (template `{expr}` tags, block tests, snippet parameters, …) delegate to
-//!   `tsv_ts`'s expression-level typed walk; the `css` envelope delegates to
-//!   `tsv_css`'s `StyleSheet` typed walk (typed parts only — its `Value`
-//!   islands are handled here, see below).
-//! - **`serde_json::Value` islands** — `Script.content`, `Attribute.value`,
-//!   directive shorthand expressions, block patterns, root `comments`, the
-//!   `<style>` envelope's `attributes`/`content.comment`, … — delegate to the
-//!   `Value` walk itself, the exact function the fallback path applies to
-//!   these same subtrees, so island semantics are identical by construction.
+//! - **Embedded typed subtrees** — `ExpressionIsland` fields (template
+//!   `{expr}` tags, block tests, snippet parameters, …) whose `Typed` arm
+//!   delegates to `tsv_ts`'s expression-level typed walk; the `css` envelope
+//!   delegates to `tsv_css`'s `StyleSheet` typed walk (typed parts only — its
+//!   `Value` islands are handled here, see below).
+//! - **`serde_json::Value` islands** — directive shorthand expressions,
+//!   block patterns, root `comments`, the `<style>` envelope's
+//!   `attributes`/`content.comment`, `ProgramIsland::Attached` script
+//!   contents, and any `ExpressionIsland::Attached` arm (an expression
+//!   carrying attached template comments) — delegate to the `Value` walk
+//!   itself, the exact function the `Value` oracle path applies to these
+//!   same subtrees, so island semantics are identical by construction.
 //!
 //! Parity contract: output must be byte-identical to the `Value` walk. The
 //! `name_loc` rule ported from there: each position's byte offset is its own
@@ -38,7 +40,6 @@
 //! and `corpus:compare:parse --multibyte-only` against Svelte's parser.
 
 use tsv_lang::{ByteToCharMap, LocationTracker};
-use tsv_ts::ast::public::Expression;
 
 use super::super::public::*;
 
@@ -70,18 +71,24 @@ impl Translator<'_> {
     }
 
     /// Translate a `serde_json::Value` island with the `Value` walk — the same
-    /// function the fallback path runs over the whole document.
+    /// function the `Value` oracle path runs over the whole document.
     fn value(&self, v: &mut serde_json::Value) {
         tsv_ts::ast::convert::translate_byte_to_char_offsets(v, self.map, self.tracker);
     }
 
-    /// Translate an embedded typed TS expression subtree.
-    fn expression(&self, e: &mut Expression<'_>) {
-        tsv_ts::ast::convert::translate_expression_byte_to_char_offsets_typed(
-            e,
-            self.map,
-            self.tracker,
-        );
+    /// Translate an expression island: typed arm via `tsv_ts`'s typed
+    /// expression walk, attached arm (comments injected) via the `Value` walk.
+    fn island(&self, i: &mut ExpressionIsland<'_>) {
+        match i {
+            ExpressionIsland::Typed(e) => {
+                tsv_ts::ast::convert::translate_expression_byte_to_char_offsets_typed(
+                    e,
+                    self.map,
+                    self.tracker,
+                );
+            }
+            ExpressionIsland::Attached(v) => self.value(v),
+        }
     }
 
     fn name_loc(&self, n: &mut NameLocation) {
@@ -142,7 +149,16 @@ impl Translator<'_> {
     fn script(&self, n: &mut Script<'_>) {
         self.pos(&mut n.start);
         self.pos(&mut n.end);
-        self.value(&mut n.content);
+        match &mut n.content {
+            ProgramIsland::Typed(program) => {
+                tsv_ts::ast::convert::translate_byte_to_char_offsets_typed(
+                    program,
+                    self.map,
+                    self.tracker,
+                );
+            }
+            ProgramIsland::Attached(value) => self.value(value),
+        }
         for attr in &mut n.attributes {
             self.attribute_node(attr);
         }
@@ -181,7 +197,7 @@ impl Translator<'_> {
             FragmentNode::IfBlock(b) => {
                 self.pos(&mut b.start);
                 self.pos(&mut b.end);
-                self.expression(&mut b.test);
+                self.island(&mut b.test);
                 self.fragment(&mut b.consequent);
                 if let Some(alternate) = &mut b.alternate {
                     self.fragment(alternate);
@@ -190,13 +206,13 @@ impl Translator<'_> {
             FragmentNode::EachBlock(b) => {
                 self.pos(&mut b.start);
                 self.pos(&mut b.end);
-                self.expression(&mut b.expression);
+                self.island(&mut b.expression);
                 self.fragment(&mut b.body);
                 if let Some(context) = &mut b.context {
                     self.value(context);
                 }
                 if let Some(key) = &mut b.key {
-                    self.expression(key);
+                    self.island(key);
                 }
                 if let Some(fallback) = &mut b.fallback {
                     self.fragment(fallback);
@@ -205,7 +221,7 @@ impl Translator<'_> {
             FragmentNode::AwaitBlock(b) => {
                 self.pos(&mut b.start);
                 self.pos(&mut b.end);
-                self.expression(&mut b.expression);
+                self.island(&mut b.expression);
                 if let Some(value) = &mut b.value {
                     self.value(value);
                 }
@@ -225,22 +241,22 @@ impl Translator<'_> {
             FragmentNode::KeyBlock(b) => {
                 self.pos(&mut b.start);
                 self.pos(&mut b.end);
-                self.expression(&mut b.expression);
+                self.island(&mut b.expression);
                 self.fragment(&mut b.fragment);
             }
             FragmentNode::SnippetBlock(b) => {
                 self.pos(&mut b.start);
                 self.pos(&mut b.end);
-                self.expression(&mut b.expression);
+                self.island(&mut b.expression);
                 for param in &mut b.parameters {
-                    self.expression(param);
+                    self.island(param);
                 }
                 self.fragment(&mut b.body);
             }
             FragmentNode::HtmlTag(t) => {
                 self.pos(&mut t.start);
                 self.pos(&mut t.end);
-                self.expression(&mut t.expression);
+                self.island(&mut t.expression);
             }
             FragmentNode::ConstTag(t) => {
                 self.pos(&mut t.start);
@@ -256,13 +272,13 @@ impl Translator<'_> {
                 self.pos(&mut t.start);
                 self.pos(&mut t.end);
                 for identifier in &mut t.identifiers {
-                    self.expression(identifier);
+                    self.island(identifier);
                 }
             }
             FragmentNode::RenderTag(t) => {
                 self.pos(&mut t.start);
                 self.pos(&mut t.end);
-                self.expression(&mut t.expression);
+                self.island(&mut t.expression);
             }
         }
     }
@@ -289,14 +305,36 @@ impl Translator<'_> {
             self.value(tag);
         }
         if let Some(expression) = &mut n.expression {
-            self.expression(expression);
+            self.island(expression);
         }
     }
 
     fn expression_tag(&self, n: &mut ExpressionTag<'_>) {
         self.pos(&mut n.start);
         self.pos(&mut n.end);
-        self.expression(&mut n.expression);
+        self.island(&mut n.expression);
+    }
+
+    fn attribute_value_field(&self, f: &mut AttributeValueField<'_>) {
+        match f {
+            AttributeValueField::True(_) => {}
+            AttributeValueField::Single(part) => self.attribute_value_part(part),
+            AttributeValueField::Sequence(parts) => {
+                for part in parts {
+                    self.attribute_value_part(part);
+                }
+            }
+        }
+    }
+
+    fn attribute_value_part(&self, p: &mut AttributeValue<'_>) {
+        match p {
+            AttributeValue::Text(t) => {
+                self.pos(&mut t.start);
+                self.pos(&mut t.end);
+            }
+            AttributeValue::ExpressionTag(t) => self.expression_tag(t),
+        }
     }
 
     fn attribute_node(&self, n: &mut AttributeNode<'_>) {
@@ -305,26 +343,24 @@ impl Translator<'_> {
                 self.pos(&mut a.start);
                 self.pos(&mut a.end);
                 self.name_loc(&mut a.name_loc);
-                if let Some(value) = &mut a.value {
-                    self.value(value);
-                }
+                self.attribute_value_field(&mut a.value);
             }
             AttributeNode::SpreadAttribute(a) => {
                 self.pos(&mut a.start);
                 self.pos(&mut a.end);
-                self.expression(&mut a.expression);
+                self.island(&mut a.expression);
             }
             AttributeNode::AttachTag(a) => {
                 self.pos(&mut a.start);
                 self.pos(&mut a.end);
-                self.expression(&mut a.expression);
+                self.island(&mut a.expression);
             }
             AttributeNode::OnDirective(d) => {
                 self.pos(&mut d.start);
                 self.pos(&mut d.end);
                 self.name_loc(&mut d.name_loc);
                 if let Some(expression) = &mut d.expression {
-                    self.expression(expression);
+                    self.island(expression);
                 }
             }
             AttributeNode::BindDirective(d) => {
@@ -343,14 +379,14 @@ impl Translator<'_> {
                 self.pos(&mut d.start);
                 self.pos(&mut d.end);
                 self.name_loc(&mut d.name_loc);
-                self.value(&mut d.value);
+                self.attribute_value_field(&mut d.value);
             }
             AttributeNode::UseDirective(d) => {
                 self.pos(&mut d.start);
                 self.pos(&mut d.end);
                 self.name_loc(&mut d.name_loc);
                 if let Some(expression) = &mut d.expression {
-                    self.expression(expression);
+                    self.island(expression);
                 }
             }
             AttributeNode::TransitionDirective(d) => {
@@ -358,7 +394,7 @@ impl Translator<'_> {
                 self.pos(&mut d.end);
                 self.name_loc(&mut d.name_loc);
                 if let Some(expression) = &mut d.expression {
-                    self.expression(expression);
+                    self.island(expression);
                 }
             }
             AttributeNode::AnimateDirective(d) => {
@@ -366,7 +402,7 @@ impl Translator<'_> {
                 self.pos(&mut d.end);
                 self.name_loc(&mut d.name_loc);
                 if let Some(expression) = &mut d.expression {
-                    self.expression(expression);
+                    self.island(expression);
                 }
             }
             AttributeNode::LetDirective(d) => {
@@ -374,7 +410,7 @@ impl Translator<'_> {
                 self.pos(&mut d.end);
                 self.name_loc(&mut d.name_loc);
                 if let Some(expression) = &mut d.expression {
-                    self.expression(expression);
+                    self.island(expression);
                 }
             }
         }

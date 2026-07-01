@@ -27,7 +27,7 @@ pub(super) fn convert_if_block<'src>(
         elseif: block.elseif,
         start: block.span.start,
         end: block.span.end,
-        test: ts_expr,
+        test: ts_expr.into(),
         consequent: convert_fragment(&block.consequent, source, loc, interner),
         alternate: block
             .alternate
@@ -56,11 +56,11 @@ pub(super) fn convert_each_block<'src>(
         node_type: "EachBlock",
         start: block.span.start,
         end: block.span.end,
-        expression,
+        expression: expression.into(),
         body: convert_fragment(&block.body, source, loc, interner),
         context,
         index: block.index.map(str::to_string),
-        key,
+        key: key.map(Into::into),
         fallback: block
             .fallback
             .as_ref()
@@ -90,7 +90,7 @@ pub(super) fn convert_await_block<'src>(
         node_type: "AwaitBlock",
         start: block.span.start,
         end: block.span.end,
-        expression,
+        expression: expression.into(),
         value,
         error,
         pending: block
@@ -120,7 +120,7 @@ pub(super) fn convert_key_block<'src>(
         node_type: "KeyBlock",
         start: block.span.start,
         end: block.span.end,
-        expression,
+        expression: expression.into(),
         fragment: convert_fragment(&block.fragment, source, loc, interner),
     }
 }
@@ -137,14 +137,14 @@ pub(super) fn convert_snippet_block<'src>(
     let parameters = block
         .parameters
         .iter()
-        .map(|p| convert_expression(p, source, loc, interner, 0))
+        .map(|p| convert_expression(p, source, loc, interner, 0).into())
         .collect();
 
     public::SnippetBlock {
         node_type: "SnippetBlock",
         start: block.span.start,
         end: block.span.end,
-        expression,
+        expression: expression.into(),
         parameters,
         body: convert_fragment(&block.body, source, loc, interner),
         type_params: block.type_params_raw.map(str::to_string),
