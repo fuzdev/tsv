@@ -852,7 +852,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `'`, `=`, `<`, `>`, `` ` ``. So `prop={a}{b}` is one value `[{a}, {b}]`,
     /// `src={a}//cdn` is `[{a}, "//cdn"]`, and `href=/path` is `["/path"]`. A bare
     /// `/` (only `/>`) does not terminate, so protocol-relative and root-relative
-    /// URLs read as plain text.
+    /// URLs read as plain text. The `/>` terminator is suppressed at the value
+    /// start, matching Svelte: `href=/>` reads the leading `/` as the value (`/`)
+    /// and lets the `>` close the tag, rather than self-closing on an empty value.
     ///
     /// We scan raw bytes because the lexer's identifier token doesn't span `/`,
     /// `:`, and the like. `Text` chunks decode with attribute-context rules to
@@ -891,9 +893,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         loop {
             // Terminator regex: `/>` or one of whitespace " ' = < > `
+            // (`/>` only past the value start — a leading `/` is value, not close).
             let terminated = match bytes.get(pos).copied() {
                 None => true,
-                Some(b'/') => bytes.get(pos + 1) == Some(&b'>'),
+                Some(b'/') => pos > start && bytes.get(pos + 1) == Some(&b'>'),
                 Some(
                     b' ' | b'\t' | b'\n' | b'\r' | b'\x0C' | b'"' | b'\'' | b'=' | b'<' | b'>'
                     | b'`',

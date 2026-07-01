@@ -599,7 +599,7 @@ benches/js/
 ├── corpus_compare_parse.ts   # Parse/AST comparison vs canonical parsers (Deno-only entry point)
 ├── divergence_audit.ts    # Divergence audit entry point (Deno-only)
 ├── diagnostics/           # ad-hoc diagnostic scripts (not wired into `deno task` — see §Diagnostic scripts)
-│   ├── skip_triage.ts        # parse-gap triage (tsv vs canonical)
+│   ├── skip_triage.ts        # parse-parity gate (tsv vs canonical; allowlisted over-rejections)
 │   ├── test262_compare.ts    # test262 differential (tsv vs oxc-parser, from the Rust manifest)
 │   ├── wasm_json_probe.ts    # WASM-vs-native JSON parse penalty attribution
 │   ├── wasm_format_probe.ts  # WASM format wall-time A/B
@@ -882,10 +882,19 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
 `node_modules` (`nodeModulesDir: manual`); all run from the repo root
 (corpus/artifact paths are CWD-relative).
 
-- `diagnostics/skip_triage.ts` — parse every corpus file with tsv + the canonical parser,
-  bucket into tsv-fails-canonical-ok / canonical-fails-tsv-ok / both-fail.
-  Run:
-  `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/skip_triage.ts`
+- `diagnostics/skip_triage.ts` — parse-**parity** gate. Parses every corpus file with tsv +
+  the canonical parser and buckets by *asymmetry*, not raw error count: `parity` (both reject —
+  the healthy state, an intentional-error fixture; never gates), `sanctioned_over_rejection`
+  (tsv rejects / canonical accepts, but the path is in the reviewed in-file `SANCTIONED`
+  allowlist — tsv is deliberately stricter, or the input is invalid Svelte the canonical parser
+  is merely lenient about), `over_acceptance` (tsv accepts / canonical rejects — a deferred
+  early-error, reported not gated), and `unexpected_over_rejection` (tsv rejects valid input with
+  no sanction — a real drop-in gap). Exits 1 on any `unexpected_over_rejection`, so it asserts
+  parity rather than reporting a bare error total. Takes an optional corpus-directory argument
+  (defaults to the ~/dev repos, where valid source should be all-parity/green); point it at
+  Svelte's own adversarial `tests/` suite to see the residual gap list. Not gated in
+  `deno task check` (needs the FFI + canonical sidecar). Run:
+  `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/skip_triage.ts [corpus-dir]`
 - `diagnostics/test262_compare.ts` — test262 differential conformance, tsv vs oxc-parser. Consumes
   the manifest from `tsv_debug test262 --emit-manifest <file>` (tsv's graded strict subset + each
   test's expected/tsv verdict + `module` flag), runs oxc over the same files at each test's goal

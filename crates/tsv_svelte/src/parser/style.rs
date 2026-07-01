@@ -4,6 +4,7 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
+use super::find_raw_text_close;
 use super::parser_impl::SvelteParser;
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -31,25 +32,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Content starts right after the >
         let content_start = self.current_end;
 
-        // Find closing </style> tag
-        let closing_pattern = b"</style>";
-        let source_bytes = self.source.as_bytes();
-        let mut content_end = content_start;
-        let mut found_close = false;
-
-        for i in content_start..source_bytes.len() {
-            if i + closing_pattern.len() <= source_bytes.len()
-                && &source_bytes[i..i + closing_pattern.len()] == closing_pattern
-            {
-                content_end = i;
-                found_close = true;
-                break;
-            }
-        }
-
-        if !found_close {
-            return Err(self.error_msg_at("Unterminated style tag", start));
-        }
+        // Find closing </style> tag (raw scan, `/<\/style\s*>/`; see
+        // `find_raw_text_close` for the shared string-context limitation).
+        let content_end = find_raw_text_close(self.source.as_bytes(), content_start, b"style")
+            .ok_or_else(|| self.error_msg_at("Unterminated style tag", start))?;
 
         // Reposition the lexer to the closing `</style>` tag (resumes at `<`).
         self.advance_to_position(content_end)?;

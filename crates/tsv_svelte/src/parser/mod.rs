@@ -303,6 +303,37 @@ pub(crate) fn subslice_offset(outer: &str, inner: &str) -> usize {
     (inner.as_ptr() as usize) - (outer.as_ptr() as usize)
 }
 
+/// Find the closing tag of a raw-text element (`<script>` / `<style>`) at or after
+/// `from`, matching Svelte's `/<\/tag\s*>/` (`tag` is the bare lowercase name, e.g.
+/// `b"script"`). Returns the byte offset of the `<`, or `None` if no close exists.
+///
+/// A raw byte scan — like Svelte's `read_until(regex_closing_script_tag)` it finds
+/// the first textual `</tag\s*>` regardless of string/comment context, so a literal
+/// `"</script>"` in the body closes the block for both parsers (the shared,
+/// documented raw-text limitation). The `\s*` before `>` is why `</script  >` and
+/// `</style\n>` parse — an earlier exact-`</tag>` byte match rejected any whitespace
+/// there. The name must be a full token (`</scripts>` does not match) since the byte
+/// after `tag` must be whitespace or `>`.
+pub(crate) fn find_raw_text_close(bytes: &[u8], from: usize, tag: &[u8]) -> Option<usize> {
+    let mut i = from;
+    while i < bytes.len() {
+        if bytes[i] == b'<'
+            && bytes.get(i + 1) == Some(&b'/')
+            && bytes.get(i + 2..).is_some_and(|rest| rest.starts_with(tag))
+        {
+            let mut j = i + 2 + tag.len();
+            while bytes.get(j).is_some_and(u8::is_ascii_whitespace) {
+                j += 1;
+            }
+            if bytes.get(j) == Some(&b'>') {
+                return Some(i);
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
 /// Find the first `target` byte in `bytes[start..end]` that sits at bracket depth 0
 /// (outside `()`/`[]`/`{}`) and outside trivia (comments + strings per `profile`),
 /// returning its byte offset or `None`.
