@@ -78,6 +78,58 @@ pub(super) fn scan_parens_then_arrow(bytes: &[u8], start: usize) -> bool {
     false
 }
 
+/// Whether the parenthesized content at `(` (a `(` immediately followed by a
+/// `{`/`[`) is a parenthesized union/intersection *type* rather than a
+/// destructuring-parameter list — i.e. the leading `{…}`/`[…]` is directly
+/// followed (at the paren's top level) by a `|` or `&`.
+///
+/// This disambiguates `({ b: B } | C) => x` / `([B] | C) => x` (a parenthesized
+/// union type sitting inside an enclosing arrow's return type, whose `=>` the
+/// paren-only [`scan_parens_then_arrow`] mistakes for this paren's own arrow)
+/// from a genuine function-type param list `({ a }) => U` / `([a]: T) => U`. A
+/// destructuring parameter can only be followed by `:`, `?`, `,`, or `)`; a
+/// `|`/`&` right after the pattern is never a valid parameter, so it is
+/// unambiguously a union/intersection type. (A `|`/`&` *inside* the pattern's
+/// own type annotation — `({ a }: T | U) => V` — sits after the `:`, past the
+/// balanced pattern, so it is not matched.)
+///
+/// Assumes `bytes[start] == b'('`. Skips strings/templates/comments (and a real
+/// regex, e.g. a `/}/` default) while matching the balanced leading `{…}`/`[…]`.
+pub(super) fn paren_pattern_then_type_operator(bytes: &[u8], start: usize) -> bool {
+    let end = bytes.len();
+    if start >= end || bytes[start] != b'(' {
+        return false;
+    }
+    let mut pos = skip_whitespace_and_comments(bytes, start + 1);
+    let Some(&open @ (b'{' | b'[')) = bytes.get(pos) else {
+        return false;
+    };
+    let close = if open == b'{' { b'}' } else { b']' };
+    let mut depth = 0usize;
+    while pos < end {
+        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            pos = past;
+            continue;
+        }
+        if bytes[pos] == b'/' && is_regex_start(bytes, pos, start) {
+            pos = skip_regex_literal(bytes, pos, end);
+            continue;
+        }
+        let b = bytes[pos];
+        if b == open {
+            depth += 1;
+        } else if b == close {
+            depth -= 1;
+            if depth == 0 {
+                let next = skip_whitespace_and_comments(bytes, pos + 1);
+                return matches!(bytes.get(next), Some(b'|' | b'&'));
+            }
+        }
+        pos += 1;
+    }
+    false
+}
+
 /// Check if `=>` follows (possibly with type annotation `: type`)
 #[inline]
 fn check_arrow_after_paren(bytes: &[u8], pos: usize) -> bool {
