@@ -9,9 +9,9 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
 
-Compared to Oxc and Biome, tsv is a set of focused tools, not a generic language platform,
+Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
 with Svelte as the only JS framework. 
-The extensibility story is using its Rust crates as libraries instead of bridging to JS at runtime.
+The extensibility story is limited to using its Rust crates as libraries instead of bridging to JS at runtime.
 For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
 This is an early release, and reports and feedback are appreciated -
