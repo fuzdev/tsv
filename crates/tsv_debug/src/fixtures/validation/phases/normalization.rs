@@ -280,6 +280,18 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
                 }
 
                 // N9b: Our output must be idempotent (format the result again)
+                //
+                // NOTE (tightening candidate): this checks ours reaches *a* fixed point
+                // from V, not `ours(V) == V`. A variant_* is documented as dual-stable
+                // (both formatters keep it verbatim), so the tight check would be
+                // `formatted == stable_content`. Tightening currently turns 4 fixtures
+                // red — all the same "Prettier keeps V, ours rewrites V to a third stable
+                // form" shape: `class/heritage_keyword_own_line_block_comment`,
+                // `statements/if/else_line_comment_nonblock`,
+                // `statements/while/line_before_body_comment`,
+                // `statements/do_while/line_before_while_comment`. That recurring category
+                // has no dedicated home yet, so tightening is deferred to a follow-up that
+                // also re-homes those four (a new type, or README-only).
                 match fixtures::format_with_our_formatter_with_goal(
                     &formatted,
                     &fixture.input_file,

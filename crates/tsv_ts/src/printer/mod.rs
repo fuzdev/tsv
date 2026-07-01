@@ -628,13 +628,30 @@ impl<'a> Printer<'a> {
         tsv_lang::has_multiline_block_comments_in_range(self.comments, start, end)
     }
 
-    /// Whether comments in the range cannot share the surrounding operator's
-    /// line — a line comment (runs to end-of-line) or a multiline block comment
-    /// forces the adjacent value onto its own line. Single-line block comments
-    /// stay inline and do not force a break.
+    /// Whether comments in the range force the following value onto its own line.
+    /// Two comment shapes hang the value: a **line** comment (runs to
+    /// end-of-line — inlining would swallow the value), and a **multiline** block
+    /// comment the author wrote on its own line (`kw⏎/* … */⏎v`, i.e. a newline
+    /// after it). Everything else collapses to the inline form (`kw /* c */ v`):
+    /// a single-line block in *any* position (glued, trailing the keyword, or
+    /// own-line), and a **glued** multiline block — one whose operand shares the
+    /// comment's closing line (`kw /* …⏎… */ v`), the way prettier keeps it.
+    ///
+    /// This is the gate for the keyword→value gaps (as/satisfies,
+    /// heritage/conditional `extends`, keyof/typeof/readonly, infer,
+    /// type-param constraint/default, predicate `is`, indexed access) and the
+    /// type-alias `=` layout. Keying the multiline case on the newline *after*
+    /// the comment (not before) keeps it idempotent: a block glued to the value
+    /// stays inline even at line start in already-broken output, and only an
+    /// authored break hangs it. Contrast
+    /// [`Self::comment_forces_following_own_line`], which *also* hangs a
+    /// single-line own-line block — the two differ only in that `c.multiline`
+    /// guard; use that variant only at the two carve-out sites where prettier
+    /// *keeps* that break (binary/logical operands, `export default`).
     pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
-        self.has_line_comments_between(start, end)
-            || self.has_multiline_block_comments_between(start, end)
+        self.any_comment_with_next(start, end, |c, next| {
+            !c.is_block || (c.multiline && self.has_newline_between(c.span.end, next))
+        })
     }
 
     /// Whether a comment in `(start, end)` forces the *following* value onto its own
@@ -643,8 +660,13 @@ impl<'a> Printer<'a> {
     /// `hasLeadingOwnLineComment`). Keying on the newline *after* the comment (not
     /// before) keeps the layout idempotent: a block glued to the value (`/* c */ v`,
     /// even at line start in already-broken output) stays inline, only an authored
-    /// break (`/* c */⏎v`) forces the value down. Shared by the binary/logical operand
-    /// and `as`/`satisfies` cast paths.
+    /// break (`/* c */⏎v`) forces the value down. Used only at the two carve-out
+    /// sites where prettier *keeps* the operand break — binary/logical operands
+    /// (`operators.rs`) and `export default` (`modules/mod.rs`) — so hanging is the
+    /// smaller (indent-only) divergence than collapsing. Contrast
+    /// [`Self::comments_force_own_line_between`], which collapses an authored
+    /// own-line single-line block inline; that is the gate for every other
+    /// keyword→value gap.
     pub(crate) fn comment_forces_following_own_line(&self, start: u32, end: u32) -> bool {
         self.any_comment_with_next(start, end, |c, next| {
             !c.is_block || self.has_newline_between(c.span.end, next)

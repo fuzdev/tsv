@@ -156,10 +156,11 @@ impl<'a> Printer<'a> {
             || decl
                 .params
                 .iter()
-                // A comment forcing a param's constraint/default onto its own line
-                // (`<T extends /* c */⏎U>`) also forces the whole `<…>` to expand, so
-                // the hang renders inside the broken list rather than collapsing.
-                .any(|p| self.comment_forces_following_own_line(p.span.start, p.span.end))
+                // A line comment or multiline block in a param's constraint/default gap
+                // (`<T extends⏎// c⏎U>`) forces the whole `<…>` to expand, so the hang
+                // renders inside the broken list; a single-line block comment collapses
+                // inline and keeps `<…>` collapsed.
+                .any(|p| self.comments_force_own_line_between(p.span.start, p.span.end))
     }
 
     /// Build enriched param docs with surrounding block comments from the declaration.
@@ -389,13 +390,11 @@ impl<'a> Printer<'a> {
             ]));
             return;
         }
-        if self.comment_forces_following_own_line(keyword_end, value_start) {
-            // A comment after the keyword that can't share its line — a line comment,
-            // or a block comment with the value on a later line — forces the value
-            // onto its own line; the shared helper keeps a same-line comment trailing
-            // the keyword (line comment via `line_suffix`, so its width never
-            // force-breaks a preceding constraint union) and each own-line comment on
-            // its own line.
+        if self.comments_force_own_line_between(keyword_end, value_start) {
+            // A line comment or multiline block after the keyword hangs the bound type
+            // on its own line (and expands the `<…>` via the gate at :163). A
+            // single-line block comment (own-line, trailing, or glued) collapses inline
+            // and keeps `<…>` collapsed (the fall-through below).
             let value_doc = self.build_type_doc(value_type);
             self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
             return;
@@ -565,35 +564,62 @@ impl<'a> Printer<'a> {
         &self,
         inst: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
-        let d = self.d();
+        // Call/`new`-expression type arguments render each argument with
+        // `build_type_doc`; the layout is shared with type-position arguments.
+        self.build_angle_list_with_line_comments(inst, false)
+    }
 
-        // Single-arg with only a leading line comment: hug `<` and `>`
-        // (`foo<// c\n A>(x)`) instead of full multiline — matches prettier.
-        if inst.params.len() == 1 {
+    /// Render a type-argument list `<…>` that breaks onto multiple lines because it
+    /// carries comments — the shared body behind the call/`new`-expression
+    /// ([`Self::build_type_parameter_instantiation_doc_with_line_comments`]) and type-position
+    /// ([`Self::build_type_arguments_doc_with_line_comments`]) printers. `type_position`
+    /// selects the per-argument doc builder (`build_type_arg_doc` vs `build_type_doc`).
+    ///
+    /// A single argument with a leading *line* comment hugs `<`/`>` (`foo<// c\n A>`) —
+    /// a deliberate divergence (prettier expands; see
+    /// `type_position_parens_leading_line_comment`). Every other comment-bearing form —
+    /// a single-argument own-line *block* comment, or any multi-argument list — fully
+    /// expands the list, matching prettier. The own-line block must NOT hug, or the
+    /// emitted `</* c */⏎T>` re-collapses on the next pass (non-idempotent). A block
+    /// trailing/glued to the argument never reaches here (it doesn't trip
+    /// `has_own_line_block_comments_in_bracket_list`) and collapses inline.
+    pub(in crate::printer) fn build_angle_list_with_line_comments(
+        &self,
+        inst: &internal::TSTypeParameterInstantiation<'_>,
+        type_position: bool,
+    ) -> DocId {
+        let d = self.d();
+        let is_multi = inst.params.len() > 1;
+
+        // Single-arg leading *line* comment hugs `<`/`>`.
+        if !is_multi {
             let param = &inst.params[0];
             let param_start = param.span().start;
-            let param_end = param.span().end;
+            let has_line = self.has_line_comments_between(inst.span.start + 1, param_start);
             let before_close = inst.span.end - 1;
             let has_trailing =
-                tsv_lang::has_comments_in_range(self.comments, param_end, before_close);
-            if !has_trailing {
+                tsv_lang::has_comments_in_range(self.comments, param.span().end, before_close);
+            if has_line && !has_trailing {
                 let leading =
                     self.build_leading_comments_multiline(inst.span.start + 1, param_start);
                 if !leading.is_empty() {
+                    let param_doc = if type_position {
+                        self.build_type_arg_doc(param, is_multi)
+                    } else {
+                        self.build_type_doc(param)
+                    };
                     let mut parts: DocBuf = smallvec![d.text("<")];
                     parts.extend(leading);
-                    parts.push(self.build_type_doc(param));
+                    parts.push(param_doc);
                     parts.push(d.text(">"));
                     return d.concat(&parts);
                 }
             }
         }
 
-        // A comment trailing the opening `<` on its own line is kept on the `<`
-        // line (divergence from prettier, which relocates it to its own line as
-        // the first argument's leading comment). Multi-argument path only — the
-        // single-argument leading-comment case hugs `<`/`>` above and matches
-        // prettier. See conformance_prettier.md §Comment relocation.
+        // Full multiline expansion (multi-arg, or single-arg own-line block). A
+        // comment trailing `<` on its own line is kept on the `<` line (divergence —
+        // prettier relocates it to lead the first argument).
         let first_param_start = inst.params[0].span().start;
         let (angle_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(inst.span.start, first_param_start);
@@ -616,7 +642,11 @@ impl<'a> Printer<'a> {
                 skip_delim,
             ));
 
-            inner_parts.push(self.build_type_doc(param));
+            inner_parts.push(if type_position {
+                self.build_type_arg_doc(param, is_multi)
+            } else {
+                self.build_type_doc(param)
+            });
 
             if !is_last {
                 let next_start = inst.params[i + 1].span().start;
