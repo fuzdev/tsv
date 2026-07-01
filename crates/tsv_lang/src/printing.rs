@@ -8,6 +8,26 @@ use crate::escapes::swap_quote_escaping;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthChar;
 
+/// Choose the optimal surrounding quote for a string's raw content: the quote
+/// that appears less often inside needs fewer escapes. Ties prefer single
+/// quotes (hardcoded — matches prettier-plugin-svelte; tsv is non-configurable).
+///
+/// Exposed so a caller can cheaply decide whether [`format_string_literal`]
+/// would change the quote (when this returns the original quote, the formatted
+/// output equals the verbatim source literal — no allocation needed).
+#[inline]
+pub fn optimal_string_quote(raw_content: &str) -> char {
+    let single_count = raw_content.matches('\'').count();
+    let double_count = raw_content.matches('"').count();
+    // Double quotes only when they're strictly rarer (fewer escapes); otherwise
+    // single — which also covers the tie, the hardcoded single-quote tie-breaker.
+    if double_count < single_count {
+        '"'
+    } else {
+        '\''
+    }
+}
+
 /// Format a string literal with optimal quote selection
 ///
 /// Takes raw string content (with escape sequences preserved) and formats it
@@ -52,20 +72,8 @@ use unicode_width::UnicodeWidthChar;
 /// assert_eq!(result, r"'\u0041\n'");
 /// ```
 pub fn format_string_literal(raw_content: &str, original_quote: char) -> String {
-    // Count quotes in the raw content (with escapes) to make the best choice
-    let single_count = raw_content.matches('\'').count();
-    let double_count = raw_content.matches('"').count();
-
-    // Choose optimal quote: less frequent quote = less escaping needed
-    let optimal_quote = if double_count < single_count {
-        '"'
-    } else if single_count < double_count {
-        '\''
-    } else {
-        // Tie-breaker: prefer single quotes (hardcoded — matches
-        // prettier-plugin-svelte; tsv is non-configurable, not an option).
-        '\''
-    };
+    // Count quotes in the raw content (with escapes) to make the best choice.
+    let optimal_quote = optimal_string_quote(raw_content);
 
     // Build the quoted literal in a single pre-sized allocation. On the common
     // path (quote unchanged) the content copies in directly; the swap path still
@@ -636,18 +644,29 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
 /// assert!(!is_indentable_block_comment(" single line "));    // single-line
 /// ```
 pub fn is_indentable_block_comment(content: &str) -> bool {
-    let lines: Vec<&str> = content.split('\n').collect();
     // The `*` of the `/*` opener attaches to the first line and the `*` of the
     // `*/` closer attaches to the last line, so the first line always qualifies
     // and an all-whitespace last line qualifies. Every other line must start
     // with `*`. (Pattern fails for single-line content → `false`.)
-    let [_first, middle @ .., last] = lines.as_slice() else {
-        return false;
+    //
+    // Iterated with a one-line lookahead rather than collected into a `Vec` —
+    // this runs on every multi-line block comment, so the former per-comment
+    // `Vec<&str>` allocation was pure churn on comment-dense files.
+    let mut lines = content.split('\n');
+    lines.next(); // first line always qualifies
+    let Some(mut prev) = lines.next() else {
+        return false; // fewer than 2 lines → not a multi-line indentable comment
     };
-    middle.iter().all(|line| line.trim_start().starts_with('*')) && {
-        let last = last.trim_start();
-        last.is_empty() || last.starts_with('*')
+    for line in lines {
+        // `prev` is a middle line (a line follows it): must start with `*`.
+        if !prev.trim_start().starts_with('*') {
+            return false;
+        }
+        prev = line;
     }
+    // `prev` is now the last line: qualifies when empty or `*`-prefixed.
+    let last = prev.trim_start();
+    last.is_empty() || last.starts_with('*')
 }
 
 /// Calculate the visual width of a string, treating tabs as `tab_width` columns.

@@ -14,18 +14,27 @@ use std::borrow::Cow;
 /// * `raw` - The raw dimension string from source (e.g., "01.5px", "+10.0em")
 ///
 /// # Returns
-/// Normalized dimension string matching prettier's output
-pub(crate) fn normalize_dimension_from_source(raw: &str) -> String {
+/// Normalized dimension matching prettier's output. A `Cow::Borrowed` means the
+/// dimension is already canonical — neither the number nor the unit was rewritten,
+/// so the returned slice **is** `raw`; the caller (`build_dimension_doc`) maps that
+/// to an allocation-free `source_span`, mirroring the TS literal path.
+pub(crate) fn normalize_dimension_from_source(raw: &str) -> Cow<'_, str> {
     let (num_part, unit_part) = split_number_and_unit(raw);
 
     // Not a number we recognize (e.g. a bare identifier) — leave untouched.
     if num_part.is_empty() {
-        return raw.to_string();
+        return Cow::Borrowed(raw);
     }
 
     let normalized_num = normalize_css_number(num_part);
     let unit = canonical_unit(unit_part);
-    format!("{normalized_num}{unit}")
+
+    // Both borrowed ⇒ nothing changed, so `num_part + unit_part == raw` (they are
+    // the two halves of the same `split_at`): borrow the whole original slice.
+    match (normalized_num, unit) {
+        (Cow::Borrowed(_), Cow::Borrowed(_)) => Cow::Borrowed(raw),
+        (num, unit) => Cow::Owned(format!("{num}{unit}")),
+    }
 }
 
 /// Split a dimension into its numeric part and trailing unit, e.g.
@@ -40,17 +49,23 @@ fn split_number_and_unit(raw: &str) -> (&str, &str) {
 /// and a trailing dot (`1.50` → `1.5`, `1.` → `1`), preserve sign and leading
 /// integer zeros. Exponent: lowercase `e`, drop a `+` sign, strip leading
 /// zeros (`e+0010` → `e10`), and drop a zero exponent entirely (`5e0` → `5`).
-pub(crate) fn normalize_css_number(num: &str) -> String {
-    let (mantissa, exponent) = match num.find(['e', 'E']) {
-        Some(idx) => (&num[..idx], &num[idx + 1..]),
-        None => (num, ""),
+///
+/// Returns a `Cow`: an already-canonical number borrows the input slice (no
+/// allocation), so a caller with the number's span can emit it verbatim. Any
+/// rewrite yields `Cow::Owned` — including *every* number carrying an `e`/`E`
+/// exponent, since exponents are rare in CSS and always-owning them keeps the
+/// borrow invariant (`Cow::Borrowed` ⟺ output byte-identical to `num`) trivially
+/// sound without a canonical-exponent check.
+pub(crate) fn normalize_css_number(num: &str) -> Cow<'_, str> {
+    let Some(e_idx) = num.find(['e', 'E']) else {
+        // No exponent: the number is exactly its mantissa, so its Cow is the whole
+        // number's Cow (borrows `num` unchanged when already canonical).
+        return normalize_decimal_preserving_prefix(num);
     };
+    let mantissa = &num[..e_idx];
+    let exponent = &num[e_idx + 1..];
 
     let normalized_mantissa = normalize_decimal_preserving_prefix(mantissa);
-
-    if exponent.is_empty() {
-        return normalized_mantissa;
-    }
 
     let (exp_sign, exp_digits) = if let Some(rest) = exponent.strip_prefix('-') {
         ("-", rest)
@@ -62,11 +77,12 @@ pub(crate) fn normalize_css_number(num: &str) -> String {
 
     let trimmed_digits = exp_digits.trim_start_matches('0');
     if trimmed_digits.is_empty() {
-        // Exponent is zero (`5e0`, `5e-00`) — drop it entirely.
-        return normalized_mantissa;
+        // Exponent is zero or absent (`5e0`, `5e-00`, `1e`) — drop it, keeping the
+        // mantissa. The `e`/`E` is removed, so this is always a rewrite → own it.
+        return Cow::Owned(normalized_mantissa.into_owned());
     }
 
-    format!("{normalized_mantissa}e{exp_sign}{trimmed_digits}")
+    Cow::Owned(format!("{normalized_mantissa}e{exp_sign}{trimmed_digits}"))
 }
 
 /// Known CSS units (lowercase), used to gate number normalization in raw
@@ -126,15 +142,19 @@ pub(crate) fn canonical_unit(unit: &str) -> Cow<'_, str> {
     Cow::Owned(unit.to_ascii_lowercase())
 }
 
-/// Normalize decimal number while preserving sign and leading zeros
+/// Normalize a decimal number while preserving sign and leading zeros.
 ///
 /// Examples:
 /// - `01.50` → `01.5` (preserve leading zero, trim trailing)
 /// - `+10.0` → `+10` (preserve sign, trim trailing)
 /// - `-0.0` → `-0` (preserve negative zero)
 /// - `.5` → `0.5` (add leading zero)
-fn normalize_decimal_preserving_prefix(num: &str) -> String {
-    // Extract sign if present
+///
+/// Returns `Cow::Borrowed(num)` when the number is already canonical (no
+/// leading-zero insertion and nothing to trim), so a canonical number allocates
+/// nothing; any rewrite yields `Cow::Owned`.
+fn normalize_decimal_preserving_prefix(num: &str) -> Cow<'_, str> {
+    // Split off a sign; it is re-emitted unchanged (a borrowed sub-slice either way).
     let (sign, rest) = if let Some(stripped) = num.strip_prefix('-') {
         ("-", stripped)
     } else if let Some(stripped) = num.strip_prefix('+') {
@@ -143,30 +163,31 @@ fn normalize_decimal_preserving_prefix(num: &str) -> String {
         ("", num)
     };
 
-    // Add leading zero if starts with decimal point
-    let with_leading = if rest.starts_with('.') {
-        format!("0{rest}")
-    } else {
-        rest.to_string()
-    };
+    // A bare `.5` needs a leading zero (`.5` → `0.5`).
+    let needs_leading_zero = rest.starts_with('.');
 
-    // Remove trailing zeros after decimal point
-    let trimmed = if with_leading.contains('.') {
-        let mut s = with_leading;
-        // Remove trailing zeros
-        while s.ends_with('0') && s.contains('.') {
-            s.pop();
+    // Trailing-zero / trailing-dot trimming applies only to a fractional part.
+    // Popping trailing `0`s can never remove the dot (a dot isn't a `0`), so this
+    // matches the original loop that trimmed only while a `.` was still present.
+    let bytes = rest.as_bytes();
+    let mut trim_to = rest.len();
+    if rest.contains('.') {
+        while trim_to > 0 && bytes[trim_to - 1] == b'0' {
+            trim_to -= 1;
         }
-        // If we removed all digits after decimal, remove the decimal point too
-        if s.ends_with('.') {
-            s.pop();
+        if trim_to > 0 && bytes[trim_to - 1] == b'.' {
+            trim_to -= 1;
         }
-        s
-    } else {
-        with_leading
-    };
+    }
 
-    format!("{sign}{trimmed}")
+    // Identity fast path: no leading zero to insert and nothing trimmed ⇒ the
+    // canonical form equals `num`, so borrow it.
+    if !needs_leading_zero && trim_to == rest.len() {
+        return Cow::Borrowed(num);
+    }
+
+    let leading = if needs_leading_zero { "0" } else { "" };
+    Cow::Owned(format!("{sign}{leading}{}", &rest[..trim_to]))
 }
 
 #[cfg(test)]
@@ -210,5 +231,50 @@ mod tests {
         assert_eq!(normalize_css_number("1.5E-3"), "1.5e-3");
         // A bare trailing `e` (no exponent digits) drops to the mantissa.
         assert_eq!(normalize_css_number("1e"), "1");
+    }
+
+    #[test]
+    fn test_normalize_css_number_borrows_when_canonical() {
+        // An already-canonical number borrows its input slice (zero allocation) —
+        // the invariant `build_dimension_doc` relies on to emit a `source_span`.
+        for canonical in ["0", "5", "123", "10", "0.5", "1.5", "00.5", "-0", "+10"] {
+            assert!(
+                matches!(normalize_css_number(canonical), Cow::Borrowed(_)),
+                "canonical {canonical:?} must borrow"
+            );
+        }
+        // Anything requiring a rewrite (leading `.`, trailing zeros/dot, any
+        // exponent) allocates a fresh `Cow::Owned`.
+        for rewritten in [".5", "5.", "1.50", "-0.0", "5e0", "1e+0010", "1.5E-3", "1e"] {
+            assert!(
+                matches!(normalize_css_number(rewritten), Cow::Owned(_)),
+                "rewritten {rewritten:?} must own"
+            );
+        }
+    }
+
+    #[test]
+    fn test_normalize_dimension_borrows_when_canonical() {
+        // A canonical number + canonical (already-lowercase or absent) unit borrows
+        // the whole `raw` slice, so the caller emits it as a verbatim source span.
+        for canonical in ["10px", "0.5rem", "100", "1.5", "0", "-0", "+10em"] {
+            assert!(
+                matches!(normalize_dimension_from_source(canonical), Cow::Borrowed(_)),
+                "canonical dimension {canonical:?} must borrow"
+            );
+        }
+        // A rewritten number (`.5`→`0.5`) or an uppercase known unit (`PX`→`px`)
+        // forces an owned rebuild.
+        for rewritten in [".5px", "1.50rem", "10PX", "5e0"] {
+            assert!(
+                matches!(normalize_dimension_from_source(rewritten), Cow::Owned(_)),
+                "rewritten dimension {rewritten:?} must own"
+            );
+        }
+        // A bare identifier (no numeric part) is left untouched → borrowed.
+        assert!(matches!(
+            normalize_dimension_from_source("auto"),
+            Cow::Borrowed("auto")
+        ));
     }
 }

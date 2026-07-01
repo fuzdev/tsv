@@ -7,7 +7,7 @@ use super::super::Printer;
 use crate::ast::internal;
 use smallvec::SmallVec;
 use string_interner::DefaultSymbol;
-use tsv_lang::SymbolResolver;
+use tsv_lang::{InfallibleResolve, SymbolResolver};
 
 /// Test function patterns that Prettier keeps on a single line
 /// Includes: Jest, Mocha, Jasmine, Playwright, Vitest patterns
@@ -56,8 +56,10 @@ fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<DefaultSymbol>
 /// identifier or a non-computed, non-optional member chain. Returns `None` for
 /// anything else (computed access, optional chains, or non-identifier callees).
 ///
-/// Shared by `is_test_call` (pattern lookup) and the test-call layout (flat
-/// callee text) so the two stay in lockstep.
+/// Used by the test-call layout for the flat callee text. `is_test_call` matches
+/// the pattern list against the chain parts directly (no allocation) via the
+/// shared [`get_member_chain_parts`], so the two stay in lockstep on which
+/// callees qualify.
 pub(super) fn callee_chain_string(
     expr: &internal::Expression<'_>,
     printer: &Printer<'_>,
@@ -153,11 +155,25 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
         }
     }
 
-    // Check if callee matches a test pattern
-    let Some(callee_str) = callee_chain_string(call.callee, printer) else {
+    // Check if the callee matches a known test pattern. Compare the resolved
+    // member-chain parts against the pattern list directly — one interner borrow,
+    // a stack-only `SmallVec` — instead of building and immediately discarding a
+    // dotted callee `String` on every test-shaped call (the hot waste this path
+    // used to pay). `callee_chain_string` stays for the actual-test-call
+    // flat-layout path, which needs the owned text.
+    let Some(parts) = get_member_chain_parts(call.callee) else {
         return false;
     };
-
-    // Check against known test patterns
-    TEST_CALL_PATTERNS.contains(&callee_str.as_str())
+    let interner = printer.interner().borrow();
+    // Parts come out leaf→root; reverse to root→leaf to match the dotted
+    // patterns (`test.describe.only`). Identifiers never contain `.`, so a
+    // per-segment compare against `pattern.split('.')` is exact.
+    let names: SmallVec<[&str; 8]> = parts
+        .iter()
+        .rev()
+        .map(|&sym| interner.resolve_infallible(sym))
+        .collect();
+    TEST_CALL_PATTERNS
+        .iter()
+        .any(|pattern| pattern.split('.').eq(names.iter().copied()))
 }

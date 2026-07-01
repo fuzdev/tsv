@@ -314,7 +314,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match node {
             // Text: preserve exact whitespace (significant in pre/textarea)
-            FragmentNode::Text(text) => d.text_owned(text.raw(self.source).to_string()),
+            FragmentNode::Text(text) => d.source_span(text.raw_span, self.source),
 
             // Elements: recursively build as whitespace-sensitive. The body-indent level
             // comes from the parent's collective wrap (build_whitespace_sensitive_content_doc),

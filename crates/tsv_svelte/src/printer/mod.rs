@@ -33,7 +33,7 @@ use std::rc::Rc;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
-    Comment, EmbedContext, INDENT, OutputBuffer, SharedInterner, SymbolResolver, TAB_WIDTH,
+    Comment, EmbedContext, INDENT, OutputBuffer, SharedInterner, Span, SymbolResolver, TAB_WIDTH,
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
 };
 use tsv_ts::Expression;
@@ -210,13 +210,20 @@ impl<'a> Printer<'a> {
         let col = self.buffer.current_column(TAB_WIDTH);
         let output = {
             let interner = self.interner.borrow();
+            // Source-aware resolver: the doc tree's verbatim leaves — this
+            // printer's own markup text / comment slices plus any embedded
+            // `tsv_ts` docs — are `DocText::SourceSpan` (host-absolute spans).
+            let resolver = tsv_lang::doc::SourceTextResolver {
+                inner: &*interner,
+                source: self.source,
+            };
             tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
                 self.arena,
                 d,
                 &self.embed,
                 col,
                 self.indent_level,
-                &*interner,
+                &resolver,
             )
         };
         self.write(&output);
@@ -616,12 +623,13 @@ impl<'a> Printer<'a> {
             {
                 // Segment up to and including the start comment (it prints normally).
                 out.push(self.build_nodes_doc_multiline(&nodes[seg_start..=i]));
-                // Verbatim source from just after the start comment through the end comment.
-                let raw_start = nodes[i].span().end as usize;
-                let raw_end = nodes[range_end].span().end as usize;
+                // Verbatim source from just after the start comment through the end
+                // comment — emit the slice as a span, no allocation.
+                let raw_start = nodes[i].span().end;
+                let raw_end = nodes[range_end].span().end;
                 out.push(
                     self.d()
-                        .text_owned(self.source[raw_start..raw_end].to_string()),
+                        .source_span(Span::new(raw_start, raw_end), self.source),
                 );
                 // The whitespace after the end comment is trimmed by the next segment's
                 // boundary, so re-emit it as the separator before that segment.

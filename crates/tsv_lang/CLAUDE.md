@@ -33,14 +33,14 @@ The doc builder is the core of the formatting architecture. Language printers bu
 - **`DocId`** (`u32`) — Lightweight, `Copy` handle into the arena. No cloning, no recursive Drop.
 - **`DocBuf`** (`SmallVec<[DocId; 8]>`) — Shared stack buffer for assembling a node's doc parts before `concat()` / `fill()`. Most nodes have only a handful of parts, so the common case stays off the heap; larger nodes spill. Used by all language printers (the TS chain / binary-operator printers, the Svelte template printer) as the single canonical doc-parts buffer type.
 - **`DocNode`** — Node variants: `Text`, `MultilineText` (a `\n`-separated body rendered with per-line context indent — one allocation for an indentable multi-line block comment), `Line`, `Indent`, `Dedent`, `Group`, `IfBreak`, `Concat`, `Fill`, etc.
-- **`DocText`** — Three variants: `Static(&'static str)` (punctuation/keywords), `Owned(String)` (dynamic), `Symbol(u32)` (deferred resolution via interner).
+- **`DocText`** — Four variants: `Static(&'static str)` (punctuation/keywords), `Owned(String)` (dynamic), `SourceSpan(Span)` (verbatim source slice — resolved against `source` at print time, like `Symbol` but keyed on a span; zero allocation for unmodified text such as comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), and Svelte markup text, with no `DocArena` lifetime), `Symbol(u32)` (deferred resolution via interner).
 - **`LineKind`** — `Normal` (space in flat, newline in break), `Soft` (nothing in flat), `Hard` (always newline), `Literal` (newline without indent).
 
 ### Builder API Categories
 
 All methods take `&self` (interior mutability via `RefCell`):
 
-- Text — `text()`, `text_owned()`, `multiline_text()`, `empty()`, `symbol()`
+- Text — `text()`, `text_owned()`, `multiline_text()`, `source_span()` / `line_comment_source_span()` (verbatim source slice, no allocation), `empty()`, `symbol()`
 - Lines — `line()`, `softline()`, `hardline()`, `literalline()`
 - Structure — `group()`, `group_break()`, `indent()`, `dedent()`, `align()`
 - Conditionals — `if_break()`, `indent_if_break()`, `conditional_group()`
@@ -142,7 +142,7 @@ See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md#comment-handling-detach
 
 String interning deduplicates identifiers across all languages in a file. Symbols flow from parser through doc builder to renderer:
 
-- `TextResolver` — `resolve(id: u32) -> &str` — resolve symbol during rendering
+- `TextResolver` — `resolve(id: u32) -> &str` — resolve symbol during rendering. Also `resolve_source_span(span) -> &str` (defaulted to panic) for `DocText::SourceSpan` nodes; the default-impl interner carries no source, so a printer emitting `SourceSpan` wraps its interner in `doc::SourceTextResolver { inner, source }` and passes that to the resolved render entry points (this is how `source` reaches render without a `DocArena` lifetime). A printer with **no interner** — the CSS printer, which emits source slices directly and never `DocText::Symbol` — instead supplies a bare source-only `TextResolver` (its `resolve` is unreachable, only `resolve_source_span` does work), the same source-awareness without a symbol table.
 - `SymbolResolver` — `resolve_symbol()`, `with_resolved_symbol()` — zero-allocation hot path
 - `InfallibleResolve` — `resolve_infallible()` — panic-free resolution
 - `SymbolToU32` — Convert `DefaultSymbol` to `u32` for doc builder `Symbol` variant
