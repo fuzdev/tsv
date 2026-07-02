@@ -214,11 +214,14 @@ pub enum PseudoClassArgs<'arena> {
     ///
     /// Values: "2n + 1", "odd", "even", "3", "-n+6", etc.
     /// Optional selector list for `:nth-child(An+B of S)` syntax (CSS Selectors Level 4)
-    /// Span covers the argument content (inside the parentheses)
+    /// Span covers the argument content (inside the parentheses); `value_span`
+    /// covers just the trimmed An+B text, so the printer can find the comments
+    /// in the gaps around it (before the An+B, around `of`, after the list)
     Nth {
         value: &'arena str,
         of_selector: Option<SelectorList<'arena>>,
         span: Span,
+        value_span: Span,
     },
 
     /// Selector list for :is(), :not(), :where(), :has()

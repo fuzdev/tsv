@@ -228,6 +228,7 @@ The boolean **connectors** `and`/`or`/`not` are **preserved** (`@supports (a: b)
 
 - Column combinator `||` — ◆parser_compat — [column](../tests/fixtures/css/selectors/combinators/column_prettier_divergence/)
 - :nth-child() An+B — ◆stable_quirk — [nth_child](../tests/fixtures/css/selectors/pseudo_class/nth_child_prettier_divergence/)
+- :nth-child(… of S) `of` spacing — ◆stable_quirk — [nth_child_of](../tests/fixtures/css/selectors/pseudo_class/nth_child_of_svelte_prettier_divergence/): tsv always emits single spaces around `of`; prettier collapses whitespace runs there but never inserts an absent space, so a glued `of.class` stays glued
 - Pseudo-args indent (single compound) — ◆design_choice — [compound_args_indent](../tests/fixtures/css/selectors/pseudo_class/compound_args_indent_long_prettier_divergence/)
 - Nested pseudo-args indent — ◆design_choice — [nested_where_is](../tests/fixtures/css/selectors/pseudo_class/nested_where_is_long_prettier_divergence/)
 
@@ -286,6 +287,7 @@ The boolean **connectors** `and`/`or`/`not` are **preserved** (`@supports (a: b)
 - Selector before `{` (in at-rule) — [selector_before_opening_brace_in_atrule](../tests/fixtures/css/tokens/comments/selector_before_opening_brace_in_atrule_prettier_divergence/)
 - Selector list — [selector_list](../tests/fixtures/css/tokens/comments/selector_list_prettier_divergence/)
 - Selector list (nested `:is()` / before-comma) — [selector_nested_comment](../tests/fixtures/css/tokens/comments/selector_nested_comment_prettier_divergence/)
+- :nth-\*() arg gaps (before the An+B, around `of`, after the `of` list) — [nth_comment](../tests/fixtures/css/selectors/pseudo_class/nth_comment_svelte_prettier_divergence/): gap comments normalize to single-space separation; a comment **inside** the An+B expression text freezes the An+B verbatim (no operator respacing — it would corrupt comment content), matching prettier, which also skips An+B normalization when a comment is present
 
 ### Whitespace: BOM Handling
 
