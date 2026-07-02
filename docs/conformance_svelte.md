@@ -110,11 +110,17 @@ Where the two goals conflict on conformant input, Svelte-parity wins for now.
   accepts some grammar-invalid CSS that tsv rejects — an invalid attribute
   case-flag (`[type=a x]`; Selectors 4 allows only `i`/`s`), a function token as
   an attribute value (`[id=func("foo")]`), a `url` keyword split across whitespace
-  in `@import`. tsv is **grammar-stricter**, but _not_ more spec-correct: the spec
+  in `@import`, and a backslash immediately before a newline outside a string
+  (`color: red\` + newline — an invalid escape per CSS Syntax 3 §4.3.7; Svelte
+  reads the `\` into the value, and prettier never converges on it). tsv is
+  **grammar-stricter**, but _not_ more spec-correct: the spec
   neither keeps these (Svelte's leniency is wrong) nor aborts the file (tsv's
-  hard-fail is wrong) — it drops the bad rule and keeps the rest. All three differ
-  from the spec; recovery is the resolution that subsumes both, and until then
-  these stay documented near-term divergences from Svelte.
+  hard-fail is wrong) — it drops the bad rule and keeps the rest. All of these
+  differ from the spec; recovery is the resolution that subsumes both, and until
+  then these stay documented near-term divergences from Svelte. (A backslash at
+  **end of input**, by contrast, is rejected by both parsers — pinned by the
+  `input_invalid_escape_eof_*` files in
+  [css/tokens/escapes/escape_eof](../tests/fixtures/css/tokens/escapes/escape_eof/input.svelte).)
 
 **Explicit non-goals.** Preprocessor and vendor dialects — SCSS/Sass, LESS, CSS
 Modules, PostCSS plugin syntax, YAML front-matter, and IE hacks (`*zoom`,

@@ -20,6 +20,10 @@ node_modules
 # Drift-check generated file (left on failure for inspection)
 /scripts/.drift_check.gen.ts
 
+# Derived corpus caches (regenerable — e.g. the wpt <style> harvest from
+# benches/js/diagnostics/wpt_css_harvest.ts)
+/benches/js/.cache
+
 # Benchmark results (the per-runtime report.<runtime>.{json,md} siblings and the
 # combined report.{json,md} are committed; timestamped runs + baseline.json are
 # gitignored)

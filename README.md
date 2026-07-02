@@ -252,6 +252,7 @@ Web Standards:
 - [TC39 ECMAScript](https://github.com/tc39/ecma262) - JS language specification
 - [TC39 test262](https://github.com/tc39/test262) - ECMAScript conformance tests
 - [W3C webref](https://github.com/w3c/webref) - Machine-readable web specs
+- [web-platform-tests/wpt](https://github.com/web-platform-tests/wpt/) - Test suites for Web platform specs
 
 Claude Code was instrumental to this project, and tsv wouldn't exist without LLMs.
 Source code of projects similar to tsv was not used by agents
