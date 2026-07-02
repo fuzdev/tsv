@@ -104,7 +104,7 @@ pub(super) fn convert_script<'src>(
         node_type: "Script",
         start: script.span.start,
         end: script.span.end,
-        context,
+        context: script.context.as_str(),
         content,
         attributes: script
             .attributes
