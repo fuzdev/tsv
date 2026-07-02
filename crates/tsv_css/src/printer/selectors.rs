@@ -188,6 +188,18 @@ impl<'a> Printer<'a> {
     /// level. A single compound needs no group/indent — its only break point is a
     /// pseudo's own arg group, which is self-contained.
     fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector<'_>) -> DocId {
+        // A comment at a combinator boundary (between compounds, or glued between two
+        // simple selectors of one compound) takes the interleaving path: the comment is
+        // re-emitted at its authored position with the surrounding gap whitespace
+        // normalized to a single space — the same rule as every other selector-comment
+        // position (`:is()`/`:nth-*()`/`::slotted()` args). Prettier freezes the source
+        // whitespace instead; parseCss rejects these entirely — see conformance_prettier
+        // §CSS: Comments and conformance_svelte §CSS Corrections. A comment *inside* a
+        // simple selector (a pseudo's args) is not a boundary comment and takes the
+        // normal path (its own normalize handling).
+        if self.complex_has_boundary_comment(complex) {
+            return self.build_complex_selector_doc_with_comments(complex);
+        }
         let d = self.d();
         let mut parts = DocBuf::new();
         for (i, rel) in complex.children.iter().enumerate() {
@@ -213,6 +225,142 @@ impl<'a> Printer<'a> {
         } else {
             body
         }
+    }
+
+    /// Whether this complex selector carries a comment at a combinator boundary — any
+    /// comment inside the selector span that falls in a gap rather than inside a simple
+    /// selector's own span. Covered gaps: before the first simple selector (a leading
+    /// combinator, `:has(> /* c */ img)`), between compounds (`div /* c */ p`,
+    /// `a > /* c */ b`), and within one compound (`.a/* c */.b`). A comment inside a
+    /// simple selector's span (a pseudo's `(...)` args) is NOT a boundary comment and is
+    /// left to the normal builder's own normalize path. Drives the verbatim freeze in
+    /// `build_complex_selector_doc`.
+    fn complex_has_boundary_comment(&self, complex: &internal::ComplexSelector<'_>) -> bool {
+        let mut prev_end = complex.span.start;
+        for rel in complex.children {
+            for simple in rel.selectors {
+                let span = simple.span();
+                if has_comments_in_range(self.comments, prev_end, span.start) {
+                    return true;
+                }
+                prev_end = span.end;
+            }
+        }
+        false
+    }
+
+    /// Build a comment-bearing complex selector inline, interleaving each gap comment
+    /// at its combinator boundary with normalized single-space separation. This is the
+    /// selector-comment normalization the rest of the CSS printer applies uniformly
+    /// (`:is()`/`:nth-*()`/`::slotted()` args): tsv collapses the gap whitespace to one
+    /// space while prettier freezes the source layout — see conformance_prettier.md
+    /// §CSS: Comments. A glued compound-internal comment (`.a/* c */.b`) is emitted
+    /// glued (no spaces) so a compound never reads as a descendant `.a .b`. The selector
+    /// renders inline (explicit spaces, no combinator break points), matching the
+    /// comment-bearing selector-list rule that never applies the always-break.
+    fn build_complex_selector_doc_with_comments(
+        &self,
+        complex: &internal::ComplexSelector<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        let mut prev_end = complex.span.start;
+        for (i, rel) in complex.children.iter().enumerate() {
+            let first_start = rel.selectors[0].span().start;
+            if let Some(combinator) = rel.combinator {
+                if i == 0 {
+                    // Leading combinator (`:has(> /* c */ img)`): the symbol, then any
+                    // comment sitting between it and the first compound.
+                    let s = Self::leading_combinator_str(combinator);
+                    if !s.is_empty() {
+                        parts.push(d.text(s));
+                    }
+                    if let Some(cs) = rel.combinator_span {
+                        let after = self.comment_blocks_in_range(cs.end, first_start);
+                        if !after.is_empty() {
+                            parts.push(d.text_owned(after));
+                            parts.push(d.text(" "));
+                        }
+                    }
+                } else {
+                    parts.push(self.combinator_separator_doc_with_comments(
+                        combinator,
+                        rel.combinator_span,
+                        prev_end,
+                        first_start,
+                    ));
+                }
+            }
+            let n = rel.selectors.len();
+            for (j, simple) in rel.selectors.iter().enumerate() {
+                let sspan = simple.span();
+                if j > 0 && has_comments_in_range(self.comments, prev_end, sspan.start) {
+                    // Glued compound-internal trivia: emit the source slice verbatim (no
+                    // space normalization). The run is fully glued (the parser keeps a
+                    // compound together only across glued comments), so normalizing the
+                    // space *between* two comments (`/* c *//* d */`) would insert a
+                    // whitespace token and turn the compound into a descendant on
+                    // re-parse — non-idempotent. The gap holds only comments here.
+                    let gap = Span {
+                        start: prev_end,
+                        end: sspan.start,
+                    };
+                    parts.push(d.text_owned(gap.extract(self.source).to_string()));
+                }
+                parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
+                prev_end = sspan.end;
+            }
+        }
+        d.concat(&parts)
+    }
+
+    /// The inter-compound separator for the comment path: a single leading space, the
+    /// combinator symbol (`>`/`+`/`~`/`||`; none for descendant), and the gap's comments
+    /// placed on their authored side of the symbol, each single-spaced. The
+    /// span-splitting mirrors the non-comment `combinator_separator_doc` but injects the
+    /// normalized comment text.
+    fn combinator_separator_doc_with_comments(
+        &self,
+        combinator: internal::Combinator,
+        combinator_span: Option<Span>,
+        gap_start: u32,
+        gap_end: u32,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        parts.push(d.text(" "));
+        match combinator {
+            internal::Combinator::Descendant => {
+                let gap = self.comment_blocks_in_range(gap_start, gap_end);
+                if !gap.is_empty() {
+                    parts.push(d.text_owned(gap));
+                    parts.push(d.text(" "));
+                }
+            }
+            other => {
+                let (before, after) = match combinator_span {
+                    Some(cs) => (
+                        self.comment_blocks_in_range(gap_start, cs.start),
+                        self.comment_blocks_in_range(cs.end, gap_end),
+                    ),
+                    None => (
+                        self.comment_blocks_in_range(gap_start, gap_end),
+                        String::new(),
+                    ),
+                };
+                if !before.is_empty() {
+                    parts.push(d.text_owned(before));
+                    parts.push(d.text(" "));
+                }
+                parts.push(d.text(other.as_str()));
+                parts.push(d.text(" "));
+                if !after.is_empty() {
+                    parts.push(d.text_owned(after));
+                    parts.push(d.text(" "));
+                }
+            }
+        }
+        d.concat(&parts)
     }
 
     /// The break point between two compounds: a bare `line` for a descendant

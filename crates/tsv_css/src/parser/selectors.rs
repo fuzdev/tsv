@@ -1,6 +1,6 @@
 use super::CssParser;
 use crate::ast::internal::*;
-use crate::lexer::TokenKind;
+use crate::lexer::{Lexer, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{ParseError, Span};
@@ -303,12 +303,13 @@ fn parse_relative_complex_selector<'arena>(
 
     // Parse additional relative selectors with combinators
     loop {
-        // Stop at ), ,, or EOF (used in pseudo-class argument contexts)
+        // Stop at ), ,, or EOF (used in pseudo-class argument contexts). A comment is
+        // handled by parse_combinator (registered as a gap comment when the selector
+        // continues, left for the caller when trailing).
         if parser.check(TokenKind::LeftBrace)
             || parser.check(TokenKind::Comma)
             || parser.check(TokenKind::RightParen)
             || parser.check(TokenKind::Eof)
-            || matches!(&parser.current_kind, TokenKind::Comment)
         {
             break;
         }
@@ -343,14 +344,14 @@ pub(crate) fn parse_complex_selector<'arena>(
 
     // Parse additional relative selectors with combinators
     loop {
-        // Don't skip comments here - let parse_combinator handle them
-        // Comments before {, ,, or EOF will cause parse_combinator to return None
-        // Also check for ) to support selector lists inside pseudo-class arguments
+        // Also check for ) to support selector lists inside pseudo-class arguments.
+        // A comment is NOT a terminator: parse_combinator registers it as a gap comment
+        // when the selector continues (`div /* c */ p`) and returns None (leaving it) on
+        // a trailing comment before `{`/`,`/`)`.
         if parser.check(TokenKind::LeftBrace)
             || parser.check(TokenKind::Comma)
             || parser.check(TokenKind::RightParen)
             || parser.check(TokenKind::Eof)
-            || matches!(&parser.current_kind, TokenKind::Comment)
         {
             break;
         }
@@ -394,7 +395,7 @@ pub(crate) fn parse_explicit_combinator(
     if let Some(comb) = combinator {
         let end = parser.span_pos(parser.current_end);
         parser.advance()?; // consume combinator token
-        parser.skip_whitespace()?;
+        skip_combinator_gap(parser)?;
 
         Ok(Some((
             comb,
@@ -417,9 +418,16 @@ pub(crate) fn parse_combinator(
     let whitespace_start = parser.span_pos(parser.current_start());
     parser.skip_whitespace()?;
 
-    // Don't skip comments - parse_complex_selector checks for them before calling this
-    // If we're here and there's a comment, it means it's terminal (before {, ,, or EOF)
-    // and we should return None to stop parsing selectors
+    // A comment in the combinator gap is inter-token whitespace (css-syntax-3): register
+    // it and continue only when the selector actually continues past it (a selector or
+    // explicit combinator follows). A trailing comment before `{`/`,`/`)` is left
+    // unconsumed for the caller's pre-brace / pseudo-arg handling. `had_gap_comment`
+    // lets a descendant combinator be recognized even when the gap is comment-only.
+    let had_gap_comment =
+        matches!(&parser.current_kind, TokenKind::Comment) && comment_continues_selector(parser)?;
+    if had_gap_comment {
+        parser.skip_whitespace_registering_comments()?;
+    }
 
     let combinator_start = parser.span_pos(parser.current_start());
 
@@ -429,10 +437,12 @@ pub(crate) fn parse_combinator(
         TokenKind::Tilde => Some(Combinator::SubsequentSibling),
         TokenKind::ColumnCombinator => Some(Combinator::Column),
         _ => {
-            // Descendant requires actual whitespace between the selectors — an adjacent
-            // selector token is part of the same compound (handled by the
-            // is_simple_selector_chain loop) and must never fabricate a zero-width combinator
-            if combinator_start > whitespace_start && is_selector_start(parser) {
+            // Descendant requires actual whitespace (or a gap comment) between the
+            // selectors — an adjacent selector token is part of the same compound
+            // (handled by the is_simple_selector_chain loop) and must never fabricate a
+            // zero-width combinator.
+            if (combinator_start > whitespace_start || had_gap_comment) && is_selector_start(parser)
+            {
                 Some(Combinator::Descendant)
             } else {
                 None
@@ -450,7 +460,7 @@ pub(crate) fn parse_combinator(
 
         if comb != Combinator::Descendant {
             parser.advance()?; // consume combinator token
-            parser.skip_whitespace()?;
+            skip_combinator_gap(parser)?;
         }
 
         Some((comb, Span { start, end }))
@@ -461,10 +471,24 @@ pub(crate) fn parse_combinator(
     Ok(result)
 }
 
-/// Check if current token could start a selector
-fn is_selector_start(parser: &CssParser<'_, '_>) -> bool {
+/// Skip whitespace after a just-consumed explicit combinator symbol, registering any
+/// gap comment that follows it (`div > /* c */ p`, `:has(> /* c */ img)`) so the
+/// printer can re-emit it. The leading `skip_whitespace` also covers the no-comment
+/// case. Shared by `parse_combinator` and `parse_explicit_combinator`.
+fn skip_combinator_gap(parser: &mut CssParser<'_, '_>) -> Result<(), ParseError> {
+    parser.skip_whitespace()?;
+    if matches!(&parser.current_kind, TokenKind::Comment) {
+        parser.skip_whitespace_registering_comments()?;
+    }
+    Ok(())
+}
+
+/// Token kinds that can begin a simple selector (`div`, `.c`, `#id`, `*`, `:hover`,
+/// `[attr]`, `&`). Shared by `is_selector_start` (current token) and the comment-gap
+/// lookaheads (a peeked token, by value).
+fn is_selector_start_kind(kind: TokenKind) -> bool {
     matches!(
-        parser.current_kind,
+        kind,
         TokenKind::Identifier
             | TokenKind::Dot
             | TokenKind::Hash
@@ -473,6 +497,51 @@ fn is_selector_start(parser: &CssParser<'_, '_>) -> bool {
             | TokenKind::LeftBracket
             | TokenKind::Ampersand
     )
+}
+
+/// The explicit combinator symbols (`>`, `+`, `~`, `||`). A gap comment followed by
+/// one of these still continues the selector (`i /* c */ > em`).
+fn is_explicit_combinator_kind(kind: TokenKind) -> bool {
+    matches!(
+        kind,
+        TokenKind::GreaterThan | TokenKind::Plus | TokenKind::Tilde | TokenKind::ColumnCombinator
+    )
+}
+
+/// Check if current token could start a selector
+fn is_selector_start(parser: &CssParser<'_, '_>) -> bool {
+    is_selector_start_kind(parser.current_kind)
+}
+
+/// After a compound, decide whether a `Comment` at the current position is an
+/// inter-token gap comment — a selector or explicit combinator follows past it, so the
+/// complex selector continues (`div /* c */ p`, `i /* c */ > em`) — or a trailing
+/// comment before `{`/`,`/`)` that the caller captures (a rule's pre-brace comment, or
+/// a pseudo-arg list's trailing comment). Assumes the current token is a `Comment`; the
+/// lookahead is non-destructive (`peek_past_whitespace` skips comments + whitespace).
+fn comment_continues_selector(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
+    let after = parser.peek_past_whitespace()?;
+    Ok(is_selector_start_kind(after) || is_explicit_combinator_kind(after))
+}
+
+/// Assuming the current token is a `Comment`, scan the directly-glued run of
+/// comments (a temp lexer from the comment's end) and report whether a simple
+/// selector start follows the whole run with **no** intervening whitespace — i.e.
+/// the comment(s) are inter-token trivia *inside one compound* (`.a/* c */.b`,
+/// `.a/* c *//* d */.b`), which must stay a compound (a space would tokenize as a
+/// descendant `.a .b`). A whitespace anywhere in the run, or a non-selector token
+/// after it, ends the compound (the combinator loop then reads the gap). This is
+/// the multi-comment generalization of a single `peek_kind` — one lookahead can't
+/// see past a *second* glued comment. Non-destructive.
+fn compound_continues_across_comments(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
+    let mut lexer = Lexer::new(&parser.source()[parser.current_end..]);
+    loop {
+        match lexer.next_token()?.kind {
+            TokenKind::Comment => continue,
+            TokenKind::Whitespace => return Ok(false),
+            kind => return Ok(is_selector_start_kind(kind)),
+        }
+    }
 }
 
 /// Parse a relative selector: combinator + simple selectors
@@ -492,6 +561,23 @@ fn parse_relative_selector<'arena>(
     loop {
         let simple = parse_simple_selector(parser)?;
         selectors.push(simple);
+
+        // A glued comment run (`.a/* c */.b`, `.a/* c *//* d */.b`) between two simple
+        // selectors is inter-token trivia that keeps them in one compound — with no
+        // surrounding whitespace it is NOT a descendant. Register the whole run and
+        // continue only when a simple-selector start follows it glued; a whitespace
+        // anywhere in the run (`.a/* c */ .b`) ends the compound and the combinator loop
+        // reads it as a descendant.
+        if matches!(&parser.current_kind, TokenKind::Comment) {
+            if compound_continues_across_comments(parser)? {
+                while matches!(&parser.current_kind, TokenKind::Comment) {
+                    parser.register_current_comment();
+                    parser.advance()?;
+                }
+                continue;
+            }
+            break;
+        }
 
         // Check if another simple selector follows (no whitespace, no combinator)
         if !is_simple_selector_chain(parser) {
