@@ -325,22 +325,27 @@ fn convert_pseudo_class_args<'src>(
             // Filter out Invalid selectors (from forgiving parsing)
             convert_selector_list_filtered(selectors, source, scope)
         }
-        internal::PseudoClassArgs::Identifier { value, span } => {
+        internal::PseudoClassArgs::Identifier { value_span, .. } => {
             // SVELTE QUIRK: Identifier arguments (e.g., :dir(ltr), :lang(en-US)) are wrapped
             // in a SelectorList → ComplexSelector → RelativeSelector → TypeSelector structure
             // even though the spec says they should be identifiers, not selectors.
             //
             // This matches Svelte's parser behavior for compatibility.
             //
-            // Spec-compliant internal: Identifier { value: "ltr" }
-            // Svelte's public quirk: TypeSelector wrapping
+            // `value_span` (not the full-parens `span`) is the value's own range, so
+            // both the name text and the wrapping nodes' start/end match Svelte's —
+            // see `parse_pseudo_args`. Emitted verbatim, the raw form the printer
+            // keeps (unlike a real `TypeSelector`, which decodes escapes via
+            // `raw_selector_name`).
+            // TODO: if Svelte decodes CSS escapes in these args, route through
+            // `raw_selector_name` — needs a fixture proving the decode first.
             let type_selector = public::SimpleSelector::Named(public::NamedSelector {
                 node_type: "TypeSelector",
-                name: Cow::Owned((*value).to_string()),
-                start: span.start,
-                end: span.end,
+                name: Cow::Borrowed(value_span.extract(source)),
+                start: value_span.start,
+                end: value_span.end,
             });
-            wrap_single_selector(type_selector, *span, scope)
+            wrap_single_selector(type_selector, *value_span, scope)
         }
         // Slotted/Part args are parsed internally (for the formatter/tooling) but NOT
         // exposed in the public AST — Svelte omits pseudo-element args from its JSON.

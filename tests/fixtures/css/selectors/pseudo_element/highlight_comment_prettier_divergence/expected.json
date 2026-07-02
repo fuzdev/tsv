@@ -1,0 +1,120 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 195,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 50,
+					"end": 77,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 50,
+							"end": 77,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "highlight",
+											"start": 50,
+											"end": 61
+										}
+									],
+									"start": 50,
+									"end": 77
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 78,
+					"end": 96,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 82,
+							"end": 92,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 50,
+				"end": 96
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 139,
+					"end": 166,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 139,
+							"end": 166,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "highlight",
+											"start": 139,
+											"end": 150
+										}
+									],
+									"start": 139,
+									"end": 166
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 167,
+					"end": 186,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 171,
+							"end": 182,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 139,
+				"end": 186
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 187,
+			"styles": "\n\t/* comment before the highlight name */\n\t::highlight(/* c1 */ name1) {\n\t\tcolor: red;\n\t}\n\n\t/* comment after the highlight name */\n\t::highlight(name2 /* c2 */) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 196,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

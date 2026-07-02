@@ -504,8 +504,13 @@ impl<'a> Printer<'a> {
                     self.wrap_args_gap_comments(d.text_owned(idents.join(" ")), *span, *value_span);
                 d.concat(&[d.text("("), inner, d.text(")")])
             }
-            internal::PseudoClassArgs::Identifier { value, .. } => {
-                d.concat(&[d.text("("), d.text_owned(value.to_string()), d.text(")")])
+            internal::PseudoClassArgs::Identifier { span, value_span } => {
+                // The value is emitted verbatim from source (zero-alloc `source_span`,
+                // like `build_dimension_doc`). Interleave leading/trailing comments
+                // outside it (`:dir(/* lead */ ltr /* trail */)`), like `::part()`.
+                let value = d.source_span(*value_span, self.source);
+                let inner = self.wrap_args_gap_comments(value, *span, *value_span);
+                d.concat(&[d.text("("), inner, d.text(")")])
             }
         }
     }
@@ -513,12 +518,11 @@ impl<'a> Printer<'a> {
     /// Interleave the gap comments that sit inside a pseudo's argument parens
     /// (`args_span`) but outside the argument content (`content_span`), returning
     /// `inner` wrapped with them. Assumes `args_span.end` is one byte past the `)` —
-    /// the `Slotted`/`Part`/`SelectorList` convention, where `span` is the full
-    /// `(...)` printer bound — so the trailing gap ends at `args_span.end - 1`, the
-    /// `)` position. `Nth` and `Identifier` can't share this helper: their `span` is
-    /// instead the Svelte-matching public-AST node span (it ends *before* the `)`,
-    /// and convert reads it verbatim — see `convert_pseudo_class_args`), so `Nth`
-    /// interleaves inline and `Identifier` carries no gap comments yet.
+    /// the `Slotted`/`Part`/`Identifier`/`SelectorList` convention, where `span` is
+    /// the full `(...)` printer bound — so the trailing gap ends at `args_span.end - 1`,
+    /// the `)` position. `Nth` can't share this helper: its `span` is instead the
+    /// Svelte-matching public-AST node span (it ends *before* the `)`, and convert
+    /// reads it verbatim — see `convert_pseudo_class_args`), so it interleaves inline.
     fn wrap_args_gap_comments(&self, inner: DocId, args_span: Span, content_span: Span) -> DocId {
         let leading = self.comment_blocks_in_range(args_span.start, content_span.start);
         let trailing =
