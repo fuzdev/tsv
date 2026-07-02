@@ -13,7 +13,9 @@ accepts a comment in every combinator position:
 - explicit combinator, comment after — `a > /* c */ b`
 - explicit combinator, comment before — `i /* c */ > em`
 - compound-internal, glued — `.a/* c */.b` (no whitespace → stays a compound,
-  not a descendant `.a .b`)
+  not a descendant `.a .b`); the glued members can be heterogeneous
+  (`div/* c */.b`, `.a/* c */:hover`) and a run can span three or more members
+  (`.a/* c */.b/* c */#id`, every boundary glued)
 - relative-selector leading combinator in `:has()` — `:has(> /* c */ img)`
 
 ## Svelte Behavior

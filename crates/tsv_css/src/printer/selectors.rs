@@ -290,6 +290,18 @@ impl<'a> Printer<'a> {
                         first_start,
                     ));
                 }
+            } else {
+                // No combinator ⇒ the first compound. `complex_has_boundary_comment`
+                // scans from `complex.span.start`, but nothing here emits a comment
+                // sitting between it and this first simple selector — today the two
+                // positions coincide (the range is empty). Pin that so a future span
+                // change folding leading trivia into `complex.span.start` can't silently
+                // drop the comment — a block-comment content loss `swallow_audit` can't
+                // catch (it only sees `//` line-comment swallows in rendered output).
+                debug_assert!(
+                    !has_comments_in_range(self.comments, complex.span.start, first_start),
+                    "leading gap comment before the first compound has no emission path"
+                );
             }
             let n = rel.selectors.len();
             for (j, simple) in rel.selectors.iter().enumerate() {
