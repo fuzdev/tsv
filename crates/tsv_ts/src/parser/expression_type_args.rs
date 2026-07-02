@@ -2,7 +2,9 @@
 // less-than operator without lexing, by scanning raw source bytes after `<`.
 
 use super::Parser;
-use super::expression_lookahead::{is_function_type_start, scan_for_closing_angle_bracket};
+use super::expression_lookahead::{
+    is_function_type_start, is_generic_function_type_start, scan_for_closing_angle_bracket,
+};
 use super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -53,6 +55,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             // Function type: `<(x: T) => R>` or `<() => R>`
             b'(' => is_function_type_start(bytes, pos),
+
+            // A second `<` — the tail of a `<<` shift token, or a spaced
+            // `< <` — can only open a generic function type
+            // (`f<<T>(v: T) => void>()`); shift chains (`a << b > c`) never
+            // match its `>`-then-`(` shape.
+            b'<' => is_generic_function_type_start(bytes, pos + 1),
 
             // Object/tuple/string/template literal types — but the same tokens start
             // object, array, string, and template *value* literals, so `x < 'b'` and

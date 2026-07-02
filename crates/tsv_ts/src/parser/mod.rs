@@ -953,10 +953,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// token (tsc's `nextTokenIsIdentifierOnSameLine`).
     ///
     /// The shared shape behind the contextual-keyword declaration starters
-    /// (`using`/`type`/`interface`/`namespace`/`module`): a line break before the
+    /// (`type`/`interface`/`namespace`/`module`): a line break before the
     /// name demotes the keyword to a plain identifier and ASI splits the statement.
     pub(super) fn peek_is_same_line_identifier(&mut self) -> bool {
         self.peek_is_identifier() && !self.peek_preceded_by_line_terminator()
+    }
+
+    /// Whether the peeked token is a same-line *binding word* for a `using`
+    /// declaration: any identifier-shaped word — a plain identifier or a
+    /// keyword-lexed contextual name (`async`, `undefined`, …) — except the
+    /// words that continue the *expression* reading of `using` instead:
+    /// the word-shaped binary operators (`using in b`, `using instanceof C`)
+    /// and the cast keywords (`using as T`, `using satisfies T` — acorn reads
+    /// these as casts of the identifier `using`; tsc commits to a declaration
+    /// with a binding named `as`/`satisfies`, but the drop-in oracle wins).
+    /// Reserved words (`function`, `let`, …) pass the gate and are rejected by
+    /// the binding parser, matching acorn's rejection of both readings. The
+    /// one-past-peek sibling is `peek_followed_by_same_line_binding_word`.
+    pub(super) fn peek_is_same_line_binding_word(&mut self) -> bool {
+        matches!(
+            self.peek_kind(),
+            TokenKind::Identifier | TokenKind::Keyword(_)
+        ) && !self.peek_preceded_by_line_terminator()
+            && !matches!(self.peek_value(), "in" | "instanceof" | "as" | "satisfies")
     }
 
     /// Whether the token after a `declare` modifier begins an ambient declaration
@@ -994,7 +1013,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Used for `await using [no LineTerminator here] BindingIdentifier`, where
     /// the binding sits one token past the peek horizon.
-    pub(super) fn peek_followed_by_same_line_identifier(&mut self) -> bool {
+    pub(super) fn peek_followed_by_same_line_binding_word(&mut self) -> bool {
         self.peek_kind(); // populate the cache
         let after_peek = self.peek.as_ref().map_or(0, |t| t.end as usize);
         let bytes = self.source.as_bytes();
@@ -1002,6 +1021,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         pos < bytes.len()
             && scan::is_identifier_start(bytes[pos])
             && !self.source[after_peek..pos].contains(['\n', '\r', '\u{2028}', '\u{2029}'])
+            && {
+                // A word continuing the *expression* reading instead of binding:
+                // `await using in b` / `await using instanceof C` are await
+                // expressions (`in`/`instanceof` are the word-shaped binary
+                // operators), and `await using as T` / `await using satisfies T`
+                // are casts of `await using` (acorn's reading; tsc would commit
+                // to a declaration binding `as`/`satisfies`, but the drop-in
+                // oracle wins). Every other word is a binding attempt — including
+                // contextual keywords that are valid binding names (`async`,
+                // `undefined`, `of`). Mirrors `peek_is_same_line_binding_word`.
+                let end = scan::skip_identifier(bytes, pos);
+                let word = &bytes[pos..end];
+                word != b"in" && word != b"instanceof" && word != b"as" && word != b"satisfies"
+            }
     }
 
     /// Check if peek token could be a property name (identifier, keyword, string, or computed key)
@@ -1139,22 +1172,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::RightShift => {
                 // `>>` - split into `>` + `>`
-                // Consume first `>` by advancing start position
+                // Consume first `>` by advancing start position. The split
+                // only narrows the current token — `current.end` and every
+                // later token boundary are unchanged — so a cached peek (lexed
+                // from `current.end`) stays valid and MUST be kept: clearing
+                // it would desync the cache from the lexer's cursor (the next
+                // fill would silently skip the peeked token).
                 self.current.start += 1;
                 self.current.kind = TokenKind::GreaterThan;
-                // Clear peek cache since token boundaries changed
-                self.peek = None;
-                self.peek_decoded = None;
                 Ok(())
             }
             TokenKind::UnsignedRightShift => {
                 // `>>>` - split into `>` + `>>`
-                // Consume first `>` by advancing start position
+                // Consume first `>` by advancing start position; the cached
+                // peek stays valid (see the `>>` arm).
                 self.current.start += 1;
                 self.current.kind = TokenKind::RightShift;
-                // Clear peek cache since token boundaries changed
-                self.peek = None;
-                self.peek_decoded = None;
                 Ok(())
             }
             TokenKind::GreaterThanEquals
@@ -1183,6 +1216,39 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             _ => Err(ParseError::UnexpectedToken {
                 expected: "'>'".to_string(),
+                found: format!("'{}'", self.current.kind),
+                position: self.current_pos().0,
+                context: None,
+            }),
+        }
+    }
+
+    /// Whether the current token is `<` or the `<<` shift token, whose first
+    /// `<` can open a type-argument list (`f<<T>(v: T) => void>()`) — the
+    /// opening mirror of `check_greater_than_in_type`. `<<=` never splits: the
+    /// `<=` remainder cannot continue a type-argument list (matches acorn).
+    pub(super) fn check_less_than_in_type(&self) -> bool {
+        matches!(
+            self.current.kind,
+            TokenKind::LessThan | TokenKind::LeftShift
+        )
+    }
+
+    /// Expect `<` opening a type-argument list, splitting `<<` into `<` + `<`
+    /// — the opening mirror of `expect_greater_than_in_type`.
+    pub(super) fn expect_less_than_in_type(&mut self) -> Result<(), ParseError> {
+        match self.current.kind {
+            TokenKind::LessThan => self.advance(),
+            TokenKind::LeftShift => {
+                // Consume the first `<` by advancing the token start; the
+                // remainder is the inner `<`. The cached peek stays valid
+                // (see `expect_greater_than_in_type`'s `>>` arm).
+                self.current.start += 1;
+                self.current.kind = TokenKind::LessThan;
+                Ok(())
+            }
+            _ => Err(ParseError::UnexpectedToken {
+                expected: "'<'".to_string(),
                 found: format!("'{}'", self.current.kind),
                 position: self.current_pos().0,
                 context: None,

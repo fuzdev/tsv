@@ -1641,7 +1641,8 @@ export interface TSMappedType {
 	/** Key remapping: `as NewK`. */
 	nameType: TSType | null;
 	optional?: TSMappedTypeModifier;
-	typeAnnotation: TSType | null;
+	/** The value type — omitted entirely when absent (`{ [K in T] }`). */
+	typeAnnotation?: TSType;
 }
 
 export interface TSMappedTypeParameter {
