@@ -154,23 +154,24 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
         flat_cache.resize(nodes.len(), FLAT_WIDTH_UNKNOWN);
     }
     let mut remaining = remaining_width;
+    if remaining < 0 {
+        return false;
+    }
 
     let mut stack: SmallVec<[(DocId, Mode); 16]> = SmallVec::new();
-    stack.push((doc, mode));
-
     let mut rest_idx = rest_commands.len();
 
-    while remaining >= 0 {
-        let Some((current_id, current_mode)) = stack.pop() else {
-            if rest_idx == 0 {
-                return true;
-            }
-            rest_idx -= 1;
-            let cmd = &rest_commands[rest_idx];
-            stack.push((cmd.doc, cmd.mode));
-            continue;
-        };
+    // Tail-continuation dispatch — same shape as the render loops (see
+    // `render_doc_iterative`): single-continuation arms assign the current
+    // `(id, mode)` and `continue` instead of a push+pop round trip through the
+    // stack; width-consuming terminal arms fall through to the `remaining`
+    // check + pop at the bottom, preserving the original between-items check
+    // placement. `WithContext` both consumes width AND forwards, so it keeps
+    // an inline `remaining < 0` check before its continuation (a hardline in
+    // the child must not flip a false verdict to true).
+    let (mut current_id, mut current_mode) = (doc, mode);
 
+    loop {
         // Fast path: a break-free subtree in flat mode contributes a fixed,
         // memoized width — identical to walking it (the walk would only sum the
         // same width with no early return).
@@ -184,129 +185,151 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
             )
         {
             remaining -= w as isize;
-            continue;
-        }
+        } else {
+            match &nodes[current_id.index()] {
+                // Reached only in Break mode (the Flat-mode fast path above already
+                // consulted the memo). A text's flat width is mode-independent, so
+                // the memo applies here too — caching the resolve+measure that
+                // Break-mode visits would otherwise repeat per fits call.
+                DocNode::Text(_) => match flat_width_memo(
+                    current_id,
+                    &nodes,
+                    &children_vec,
+                    flat_cache.as_mut_slice(),
+                    resolver,
+                ) {
+                    Some(w) => remaining -= w as isize,
+                    // Newline-bearing text ends the line — everything so far fit.
+                    None => return true,
+                },
 
-        match &nodes[current_id.index()] {
-            // Reached only in Break mode (the Flat-mode fast path above already
-            // consulted the memo). A text's flat width is mode-independent, so
-            // the memo applies here too — caching the resolve+measure that
-            // Break-mode visits would otherwise repeat per fits call.
-            DocNode::Text(_) => match flat_width_memo(
-                current_id,
-                &nodes,
-                &children_vec,
-                flat_cache.as_mut_slice(),
-                resolver,
-            ) {
-                Some(w) => remaining -= w as isize,
-                // Newline-bearing text ends the line — everything so far fit.
-                None => return true,
-            },
-
-            DocNode::MultilineText(s) => {
-                // Equivalent to walking `[Text(first_line), Line(Hard), …]`: the
-                // first line's width counts, then the first newline ends the line
-                // (a hardline returns true in either mode). `remaining >= 0`
-                // distinguishes the two loop outcomes: ≥0 → the next pop would be
-                // the hardline → true; <0 → `while remaining >= 0` exits → false.
-                let first = s.split('\n').next().unwrap_or("");
-                remaining -= visual_width(first, TAB_WIDTH) as isize;
-                return remaining >= 0;
-            }
-
-            DocNode::Line(kind) => match kind {
-                LineKind::Hard | LineKind::Literal => return true,
-                _ if current_mode == Mode::Break => return true,
-                LineKind::Soft => {}
-                LineKind::Normal => {
-                    remaining -= 1;
+                DocNode::MultilineText(s) => {
+                    // Equivalent to walking `[Text(first_line), Line(Hard), …]`: the
+                    // first line's width counts, then the first newline ends the line
+                    // (a hardline returns true in either mode). `remaining >= 0`
+                    // distinguishes the two loop outcomes: ≥0 → the next item would be
+                    // the hardline → true; <0 → the bottom check would return false.
+                    let first = s.split('\n').next().unwrap_or("");
+                    remaining -= visual_width(first, TAB_WIDTH) as isize;
+                    return remaining >= 0;
                 }
-            },
 
-            DocNode::Group {
-                contents,
-                expanded_states,
-                should_break,
-                ..
-            } => {
-                let mode_for_group = if *should_break {
-                    Mode::Break
-                } else {
-                    current_mode
-                };
-                let doc_to_check = if mode_for_group == Mode::Break {
-                    if !expanded_states.is_empty() {
-                        let kids = expanded_states.resolve(&children_vec);
-                        *kids.last().unwrap_or(contents)
+                DocNode::Line(kind) => match kind {
+                    LineKind::Hard | LineKind::Literal => return true,
+                    _ if current_mode == Mode::Break => return true,
+                    LineKind::Soft => {}
+                    LineKind::Normal => {
+                        remaining -= 1;
+                    }
+                },
+
+                DocNode::Group {
+                    contents,
+                    expanded_states,
+                    should_break,
+                    ..
+                } => {
+                    let mode_for_group = if *should_break {
+                        Mode::Break
+                    } else {
+                        current_mode
+                    };
+                    let doc_to_check = if mode_for_group == Mode::Break {
+                        if !expanded_states.is_empty() {
+                            let kids = expanded_states.resolve(&children_vec);
+                            *kids.last().unwrap_or(contents)
+                        } else {
+                            *contents
+                        }
                     } else {
                         *contents
+                    };
+                    (current_id, current_mode) = (doc_to_check, mode_for_group);
+                    continue;
+                }
+
+                DocNode::IsolatedGroup { contents } => {
+                    current_id = *contents;
+                    continue;
+                }
+
+                DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+                    current_id = *inner;
+                    continue;
+                }
+
+                DocNode::Align { contents, .. } => {
+                    current_id = *contents;
+                    continue;
+                }
+
+                DocNode::IndentIfBreak { contents, .. } => {
+                    current_id = *contents;
+                    continue;
+                }
+
+                DocNode::IfBreak {
+                    break_doc,
+                    flat_doc,
+                    group_id,
+                } => {
+                    // A group-id if_break keys on a group that, during this
+                    // hypothetical fits test, is still unresolved → treat as flat.
+                    // This keeps trailing text (e.g. a block head's `}`) counted in
+                    // the keyed group's own width so it breaks at the right boundary.
+                    let chosen = if group_id.is_none() && current_mode == Mode::Break {
+                        *break_doc
+                    } else {
+                        *flat_doc
+                    };
+                    current_id = chosen;
+                    continue;
+                }
+
+                DocNode::Concat(range) | DocNode::Fill(range) => {
+                    let kids = range.resolve(&children_vec);
+                    if let Some((&first, rest)) = kids.split_first() {
+                        for &child in rest.iter().rev() {
+                            stack.push((child, current_mode));
+                        }
+                        current_id = first;
+                        continue;
                     }
-                } else {
-                    *contents
-                };
-                stack.push((doc_to_check, mode_for_group));
-            }
-
-            DocNode::IsolatedGroup { contents } => {
-                stack.push((*contents, current_mode));
-            }
-
-            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-                stack.push((*inner, current_mode));
-            }
-
-            DocNode::Align { contents, .. } => {
-                stack.push((*contents, current_mode));
-            }
-
-            DocNode::IndentIfBreak { contents, .. } => {
-                stack.push((*contents, current_mode));
-            }
-
-            DocNode::IfBreak {
-                break_doc,
-                flat_doc,
-                group_id,
-            } => {
-                // A group-id if_break keys on a group that, during this
-                // hypothetical fits test, is still unresolved → treat as flat.
-                // This keeps trailing text (e.g. a block head's `}`) counted in
-                // the keyed group's own width so it breaks at the right boundary.
-                let chosen = if group_id.is_none() && current_mode == Mode::Break {
-                    *break_doc
-                } else {
-                    *flat_doc
-                };
-                stack.push((chosen, current_mode));
-            }
-
-            DocNode::Concat(range) => {
-                let kids = range.resolve(&children_vec);
-                for &child in kids.iter().rev() {
-                    stack.push((child, current_mode));
                 }
-            }
 
-            DocNode::Fill(range) => {
-                let kids = range.resolve(&children_vec);
-                for &child in kids.iter().rev() {
-                    stack.push((child, current_mode));
+                DocNode::WithContext { doc, context } => {
+                    remaining -= context.trailing_reserve as isize;
+                    if remaining < 0 {
+                        return false;
+                    }
+                    current_id = *doc;
+                    continue;
                 }
-            }
 
-            DocNode::WithContext { doc, context } => {
-                remaining -= context.trailing_reserve as isize;
-                stack.push((*doc, current_mode));
+                DocNode::LineSuffix(_) => {}
+                DocNode::LineSuffixBoundary => {}
+                DocNode::BreakParent => return false,
             }
-
-            DocNode::LineSuffix(_) => {}
-            DocNode::LineSuffixBoundary => {}
-            DocNode::BreakParent => return false,
         }
-    }
 
-    false
+        // Terminal arm: check the accumulated width, then take the next item —
+        // from the stack, else from the look-ahead rest commands (back to
+        // front), else everything fit.
+        if remaining < 0 {
+            return false;
+        }
+        (current_id, current_mode) = match stack.pop() {
+            Some(next) => next,
+            None => {
+                if rest_idx == 0 {
+                    return true;
+                }
+                rest_idx -= 1;
+                let cmd = &rest_commands[rest_idx];
+                (cmd.doc, cmd.mode)
+            }
+        };
+    }
 }
 
 /// Check if a doc fits in the remaining width (public API without look-ahead).
