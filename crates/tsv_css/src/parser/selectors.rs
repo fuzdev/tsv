@@ -284,51 +284,18 @@ fn parse_relative_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<ComplexSelector<'arena>, ParseError> {
     let start = parser.span_pos(parser.current_start());
-    let mut children = parser.bvec();
 
-    // Check if we start with an EXPLICIT combinator (>, +, ~, ||)
-    // Note: We use parse_explicit_combinator here, NOT parse_combinator,
-    // because selectors without a leading combinator should have combinator: null,
-    // not an implicit Descendant combinator.
-    let first_combinator_info = parse_explicit_combinator(parser)?;
-
-    let first = if let Some((combinator, combinator_span)) = first_combinator_info {
-        // Starts with explicit combinator: :has(> img)
-        parse_relative_selector(parser, Some(combinator), Some(combinator_span))?
-    } else {
-        // No leading combinator: :has(img) - combinator field will be null
-        parse_relative_selector(parser, None, None)?
-    };
-    let mut end = first.span.end;
-    children.push(first);
-
-    // Parse additional relative selectors with combinators
-    loop {
-        // Stop at ), ,, or EOF (used in pseudo-class argument contexts). A comment is
-        // handled by parse_combinator (registered as a gap comment when the selector
-        // continues, left for the caller when trailing).
-        if parser.check(TokenKind::LeftBrace)
-            || parser.check(TokenKind::Comma)
-            || parser.check(TokenKind::RightParen)
-            || parser.check(TokenKind::Eof)
-        {
-            break;
+    // A relative selector MAY begin with an explicit combinator (`:has(> img)`).
+    // parse_explicit_combinator (NOT parse_combinator) returns None for a bare compound,
+    // so its combinator field stays null rather than becoming an implicit Descendant.
+    let first = match parse_explicit_combinator(parser)? {
+        Some((combinator, combinator_span)) => {
+            parse_relative_selector(parser, Some(combinator), Some(combinator_span))?
         }
+        None => parse_relative_selector(parser, None, None)?,
+    };
 
-        // Check for combinator
-        let Some((combinator, combinator_span)) = parse_combinator(parser)? else {
-            break; // No more combinators, we're done
-        };
-
-        let child = parse_relative_selector(parser, Some(combinator), Some(combinator_span))?;
-        end = child.span.end;
-        children.push(child);
-    }
-
-    Ok(ComplexSelector {
-        children: children.into_bump_slice(),
-        span: Span { start, end },
-    })
+    parse_complex_selector_tail(parser, start, first)
 }
 
 /// Parse a complex selector: `div > span + .class`
@@ -336,19 +303,31 @@ pub(crate) fn parse_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<ComplexSelector<'arena>, ParseError> {
     let start = parser.span_pos(parser.current_start());
-    let mut children = parser.bvec();
 
-    // First relative selector has no combinator
+    // A complex selector's first compound never leads with a combinator (unlike a
+    // relative selector), so its combinator field stays null.
     let first = parse_relative_selector(parser, None, None)?;
+
+    parse_complex_selector_tail(parser, start, first)
+}
+
+/// Assemble a `ComplexSelector` from an already-parsed first compound plus the trailing
+/// `combinator + compound` sequence. A complex selector and a relative selector differ
+/// only in that first compound (a relative one may lead with an explicit combinator), so
+/// both share this tail. The loop stops at `{`/`,`/`)`/EOF or when no further combinator
+/// follows; a gap comment is registered inside `parse_combinator` (`div /* c */ p`) and
+/// is never itself a terminator — a trailing comment before a stop token is left
+/// unconsumed for the caller's pre-brace / pseudo-arg handling.
+fn parse_complex_selector_tail<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    start: u32,
+    first: RelativeSelector<'arena>,
+) -> Result<ComplexSelector<'arena>, ParseError> {
     let mut end = first.span.end;
+    let mut children = parser.bvec();
     children.push(first);
 
-    // Parse additional relative selectors with combinators
     loop {
-        // Also check for ) to support selector lists inside pseudo-class arguments.
-        // A comment is NOT a terminator: parse_combinator registers it as a gap comment
-        // when the selector continues (`div /* c */ p`) and returns None (leaving it) on
-        // a trailing comment before `{`/`,`/`)`.
         if parser.check(TokenKind::LeftBrace)
             || parser.check(TokenKind::Comma)
             || parser.check(TokenKind::RightParen)
@@ -357,7 +336,6 @@ pub(crate) fn parse_complex_selector<'arena>(
             break;
         }
 
-        // Check for combinator (this will skip whitespace internally)
         let Some((combinator, combinator_span)) = parse_combinator(parser)? else {
             break; // No more combinators, we're done
         };
@@ -610,17 +588,12 @@ fn parse_relative_selector<'arena>(
 /// appear mid-compound (`&__a`, `div&`, `&&`, `*&`) — a space yields a `Whitespace` token and ends
 /// the chain. Type-not-first compounds (`&div`, `a&b`) are grammar-invalid per Selectors 4 but
 /// parsed for parity with Svelte's `parseCss` (validity is the future diagnostics layer's job).
+///
+/// The continuing-token set is exactly `is_selector_start_kind` — a token that can *begin*
+/// a simple selector is also one that *continues* a glued compound — so this delegates
+/// rather than re-listing the kinds, keeping the two in lockstep.
 fn is_simple_selector_chain(parser: &CssParser<'_, '_>) -> bool {
-    matches!(
-        parser.current_kind,
-        TokenKind::Dot
-            | TokenKind::Hash
-            | TokenKind::Colon
-            | TokenKind::LeftBracket
-            | TokenKind::Identifier
-            | TokenKind::Asterisk
-            | TokenKind::Ampersand
-    )
+    is_selector_start_kind(parser.current_kind)
 }
 
 /// Parse a simple selector: type, class, id, attribute, pseudo-class, pseudo-element

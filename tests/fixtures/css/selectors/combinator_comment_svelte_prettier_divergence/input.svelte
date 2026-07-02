@@ -39,6 +39,21 @@
 		color: orange;
 	}
 
+	/* glued compound, type + class (stays a compound) */
+	div/* c11 */.b {
+		color: pink;
+	}
+
+	/* glued compound, class + pseudo-class (stays a compound) */
+	.a/* c12 */:hover {
+		color: gray;
+	}
+
+	/* glued compound run across three members (each boundary stays glued) */
+	.a/* c13 */.b/* c14 */#id {
+		color: aqua;
+	}
+
 	/* relative-selector leading combinator in :has() */
 	:has(> /* c10 */ img) {
 		color: purple;
