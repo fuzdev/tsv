@@ -18,6 +18,8 @@ use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 
 use super::DocBuf;
+#[cfg(feature = "swallow_check")]
+use super::swallow::swallow_check_enabled;
 use super::types::{
     DocContext, DocText, GroupId, LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TEXT_WIDTH_NOT_COMPUTED,
 };
@@ -416,7 +418,7 @@ impl DocArena {
     pub fn line_comment_text_owned(&self, s: String) -> DocId {
         let id = self.text_owned(s);
         #[cfg(feature = "swallow_check")]
-        if super::swallow::swallow_check_enabled() {
+        if swallow_check_enabled() {
             // Recorded in alloc order → sorted ascending (see field doc).
             self.line_comment_ids.borrow_mut().push(id.0);
         }
@@ -446,7 +448,7 @@ impl DocArena {
     pub fn line_comment_source_span(&self, span: Span, source: &str) -> DocId {
         let id = self.source_span(span, source);
         #[cfg(feature = "swallow_check")]
-        if super::swallow::swallow_check_enabled() {
+        if swallow_check_enabled() {
             // Recorded in alloc order → sorted ascending (see field doc).
             self.line_comment_ids.borrow_mut().push(id.0);
         }
