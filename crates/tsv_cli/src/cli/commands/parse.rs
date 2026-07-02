@@ -58,7 +58,22 @@ impl ParseCommand {
         };
 
         match parse_to_json(input.content(), self.pretty, parser_type, goal) {
-            Ok(json) => println!("{json}"),
+            Ok(json) => {
+                // The wire bytes are UTF-8 by construction; writing them
+                // directly (plus the newline `println!` would add) skips the
+                // O(output) validation a `String` round trip would pay on
+                // ~15×-source-sized JSON.
+                use std::io::Write;
+                let stdout = std::io::stdout();
+                let mut out = stdout.lock();
+                if out
+                    .write_all(&json)
+                    .and_then(|()| out.write_all(b"\n"))
+                    .is_err()
+                {
+                    process::exit(1);
+                }
+            }
             Err(e) => {
                 eprintln!("Parse error: {e}");
                 process::exit(1);
@@ -82,10 +97,11 @@ fn parse_to_json(
     pretty: bool,
     parser_type: ParserType,
     goal: tsv_ts::Goal,
-) -> Result<String, String> {
-    // Compact output uses the convert_ast_json_string hot path (skips the
-    // intermediate serde_json::Value); pretty-printing needs
-    // the Value for tab-indented serialization.
+) -> Result<Vec<u8>, String> {
+    // Compact output uses the convert_ast_json_bytes hot path (skips the
+    // intermediate serde_json::Value and the output UTF-8 validation a String
+    // would require); pretty-printing needs the Value for tab-indented
+    // serialization.
     // The arena owns the internal AST; convert produces owned JSON, so nothing
     // borrowed escapes this function. Pre-sized to the source to avoid the
     // bump's chunk-doubling tail on the parse.
@@ -96,8 +112,9 @@ fn parse_to_json(
             if pretty {
                 to_json_with_tabs(&$lang::convert_ast_json(&ast, source))
                     .map_err(|e| format!("JSON serialization failed: {e}"))?
+                    .into_bytes()
             } else {
-                $lang::convert_ast_json_string(&ast, source)
+                $lang::convert_ast_json_bytes(&ast, source)
             }
         }};
     }

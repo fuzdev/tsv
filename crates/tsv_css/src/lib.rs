@@ -177,7 +177,7 @@ pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_j
     json
 }
 
-/// Like `convert_ast_json`, serialized to a compact JSON string
+/// Like `convert_ast_json`, serialized to compact JSON wire bytes
 ///
 /// Serializes the typed public AST (`convert_stylesheet_file`) directly, skipping
 /// the intermediate `serde_json::Value` (matching `tsv_ts`/`tsv_svelte`). For
@@ -185,16 +185,28 @@ pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_j
 /// the typed offset-translation walk (`translate_byte_to_char_offsets_typed`)
 /// before serialization. Byte-identical to
 /// `serde_json::to_string(&convert_ast_json(...))`; the hot path for the
-/// FFI/WASM parse bindings and the CLI's compact output.
+/// FFI parse binding and the CLI's compact output — the bytes are valid UTF-8
+/// by construction (serde_json only emits UTF-8), and byte-oriented consumers
+/// skip the O(output) validation a `String` requires.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
+pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
     let mut public_ast = ast::convert::convert_stylesheet_file(stylesheet.nodes, source);
     let map = tsv_lang::ByteToCharMap::new(source);
     ast::convert::translate_byte_to_char_offsets_typed(&mut public_ast, &map);
     let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
-    String::from_utf8(buf).expect("serde_json emits valid UTF-8")
+    buf
+}
+
+/// Like `convert_ast_json_bytes`, as a `String` for `&str` boundaries (the
+/// WASM binding's `JSON.parse`, N-API strings): same wire bytes plus one
+/// UTF-8 validation of the output.
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes(stylesheet, source))
+        .expect("serde_json emits valid UTF-8")
 }
 
 /// Drive the raw lexer over `source` and return a deterministic, line-per-token

@@ -209,24 +209,25 @@ pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Valu
     json
 }
 
-/// Convert internal AST to a compact JSON string with character-based positions
+/// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
-/// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but
-/// serializes the typed public AST directly, skipping the intermediate
-/// `serde_json::Value` (`serde_json`'s `preserve_order` keeps struct-field key
-/// order), and fuses the byte→UTF-16 offset translation into the conversion
-/// pass itself: `convert_program` receives the `ByteToCharMap` via
-/// `LocationMapper` and emits final char-space positions directly, so no
-/// post-conversion translation walk runs. For ASCII sources the map is empty
-/// and emission is byte-space passthrough. This is the hot path for the
-/// FFI/WASM parse bindings and the CLI's compact output.
+/// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but emits
+/// the wire JSON directly during a single walk of the internal AST (the writer
+/// in `ast/convert/write/`), never materializing the typed public tree, and
+/// fuses the byte→UTF-16 offset translation into that walk: the writer receives
+/// the `ByteToCharMap` via `LocationMapper` and emits final char-space
+/// positions directly, so no post-conversion translation walk runs. For ASCII
+/// sources the map is empty and emission is byte-space passthrough. This is
+/// the hot path for the FFI parse binding and the CLI's compact output — both
+/// hand the bytes on without ever needing `&str`, so they skip the O(output)
+/// UTF-8 validation `convert_ast_json_string` pays (the output is ~15× the
+/// source).
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
-pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
+pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
     // One fused source scan builds both; ASCII sources take a byte-level
     // line scan and get the identity map.
     let (tracker, map) = tsv_lang::LocationTracker::new_ecmascript_with_map(source);
-    let public_ast = ast::convert::convert_program(
+    ast::convert::write_program_json(
         program,
         source,
         tsv_lang::LocationMapper {
@@ -234,10 +235,20 @@ pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
             map: &map,
         },
         ast::convert::Schema::Acorn,
-    );
-    let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
-    serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
-    String::from_utf8(buf).expect("serde_json emits valid UTF-8")
+    )
+}
+
+/// Convert internal AST to a compact JSON string with character-based positions
+///
+/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the
+/// WASM binding's `JSON.parse`, N-API strings): same wire bytes plus one
+/// UTF-8 validation of the output. Byte-oriented consumers should prefer the
+/// bytes variant.
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes(program, source))
+        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
 /// Parse TypeScript with a shared string interner and base offset
