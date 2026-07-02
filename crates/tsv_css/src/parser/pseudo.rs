@@ -109,6 +109,14 @@ fn parse_pseudo_args<'arena>(
     // Only the `::` pseudo-element form builds these args; a single-colon `:slotted(...)`
     // falls through to the generic selector-list path (matching Svelte's PseudoClassSelector).
     if is_pseudo_element && pseudo_name == "slotted" {
+        // TODO: the skip_whitespace_and_comments calls in this block (and the
+        // ::part(), :dir()-family, and unknown-pseudo blocks below) DROP comments
+        // the printer can never emit (`::slotted(/* c */ div)` → `::slotted(div)`)
+        // — the same content-loss class fixed for nth-* args (register via
+        // skip_whitespace_registering_comments, then interleave the gap ranges in
+        // build_pseudo_args_doc). Each path needs its own fixture and a
+        // parseCss-parity probe first; the unknown-pseudo path is likely
+        // register-only, since its SelectorList printer arm already interleaves.
         parser.skip_whitespace_and_comments()?;
 
         // Parse compound selector (sequence of simple selectors, no combinators)
@@ -170,6 +178,8 @@ fn parse_pseudo_args<'arena>(
     // Only the `::` pseudo-element form builds these args; a single-colon `:part(...)`
     // falls through to the generic selector-list path (matching Svelte's PseudoClassSelector).
     if is_pseudo_element && pseudo_name == "part" {
+        // TODO: comment drop (`::part(/* c */ label)` → `::part(label)`) — see the
+        // ::slotted() TODO above.
         parser.skip_whitespace_and_comments()?;
 
         let mut idents = parser.bvec();
@@ -218,6 +228,8 @@ fn parse_pseudo_args<'arena>(
     //
     // Note: Svelte's parser quirk treats these as selectors in public AST (handled at conversion)
     if matches!(pseudo_name, "dir" | "lang" | "highlight") {
+        // TODO: comment drop (`:dir(/* c */ ltr)` → `:dir(ltr)`) — see the
+        // ::slotted() TODO above.
         parser.skip_whitespace_and_comments()?;
 
         // Parse identifier (or consume tokens until closing paren)
@@ -303,8 +315,11 @@ fn parse_pseudo_args<'arena>(
     let args = match pseudo_name {
         "nth-child" | "nth-of-type" | "nth-last-child" | "nth-last-of-type" | "nth-col"
         | "nth-last-col" => {
-            // Parse An+B part (collect tokens until "of" keyword or closing paren)
-            parser.skip_whitespace_and_comments()?;
+            // Parse An+B part (collect tokens until "of" keyword or closing paren).
+            // Comments in the gaps around the An+B text are registered so the
+            // printer can reconstruct them; comments *inside* the An+B stay part
+            // of its verbatim value text (consumed by the scan loop below).
+            parser.skip_whitespace_registering_comments()?;
             let anb_start = parser.current_start;
 
             // Scan tokens until we hit "of" keyword or closing paren
@@ -316,44 +331,47 @@ fn parse_pseudo_args<'arena>(
                 if parser.check(TokenKind::RightParen) && depth == 0 {
                     // End of nth args
                     break;
-                } else if parser.check(TokenKind::LeftParen) {
+                }
+                if depth == 0
+                    && parser.check(TokenKind::Identifier)
+                    && parser.current_identifier() == "of"
+                {
+                    // Found "of" keyword - An+B part ends here
+                    found_of = true;
+                    parser.advance()?; // consume "of"
+                    break;
+                }
+                if parser.check(TokenKind::LeftParen) {
                     depth += 1;
-                    anb_end = parser.current_end;
-                    parser.advance()?;
                 } else if parser.check(TokenKind::RightParen) {
                     depth -= 1;
-                    anb_end = parser.current_end;
-                    parser.advance()?;
-                } else if parser.check(TokenKind::Identifier) && depth == 0 {
-                    let ident = parser.current_identifier();
-                    if ident == "of" {
-                        // Found "of" keyword - An+B part ends here
-                        found_of = true;
-                        parser.advance()?; // consume "of"
-                        break;
-                    }
-                    // Part of An+B (e.g., "odd", "even", "n")
-                    anb_end = parser.current_end;
-                    parser.advance()?;
-                } else {
-                    // Other tokens (numbers, +, -, whitespace, etc.)
-                    anb_end = parser.current_end;
-                    parser.advance()?;
                 }
+                // Everything else — idents (`odd`, `n`), numbers, `+`/`-`,
+                // whitespace, comments — extends the raw An+B text.
+                anb_end = parser.current_end;
+                parser.advance()?;
             }
 
-            // Extract An+B value
-            let anb_value = parser.alloc_str_in(parser.source()[anb_start..anb_end].trim());
+            // Extract An+B value. The scan extends `anb_end` over whitespace and
+            // comment tokens, so trim to the real text and keep its span — the
+            // printer uses it to locate the gap comments around the An+B.
+            let anb_raw = &parser.source()[anb_start..anb_end];
+            let anb_trimmed_start = anb_start + (anb_raw.len() - anb_raw.trim_start().len());
+            let anb_value = parser.alloc_str_in(anb_raw.trim());
+            let value_span = Span {
+                start: (parser.base_offset() + anb_trimmed_start) as u32,
+                end: (parser.base_offset() + anb_trimmed_start + anb_value.len()) as u32,
+            };
 
             // Parse optional selector list after "of"
             let of_selector = if found_of {
-                parser.skip_whitespace_and_comments()?;
+                parser.skip_whitespace_registering_comments()?;
                 Some(parse_complex_selector_list(parser)?)
             } else {
                 None
             };
 
-            parser.skip_whitespace_and_comments()?;
+            parser.skip_whitespace_registering_comments()?;
             let span_end = (parser.base_offset() + parser.current_start) as u32; // End before closing paren
             let paren_end = parser.expect_and_capture(TokenKind::RightParen)?; // End after closing paren
 
@@ -365,6 +383,7 @@ fn parse_pseudo_args<'arena>(
                         start: (parser.base_offset() + args_start) as u32,
                         end: span_end,
                     },
+                    value_span,
                 }),
                 paren_end,
             )
@@ -376,6 +395,9 @@ fn parse_pseudo_args<'arena>(
             //
             // Approach: Try to parse as selector list first (most common case)
             // If that fails, skip the arguments (for pseudo-classes with non-selector args)
+            //
+            // TODO: comment drop (`:current(/* c */ .a)` → `:current(.a)`) — see the
+            // ::slotted() TODO above; this path is likely register-only.
             parser.skip_whitespace_and_comments()?;
 
             // Try to parse as a selector list (complex selectors, strict parsing)

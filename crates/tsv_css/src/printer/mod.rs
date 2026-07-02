@@ -494,6 +494,13 @@ impl<'a> Printer<'a> {
     /// Join the comments fully within `[start, end)` as space-separated `/*…*/`
     /// blocks (empty string when there are none). The single source-to-string form of
     /// a comment run, shared by the at-rule prelude and selector comment interleaving.
+    ///
+    /// TODO: a MULTILINE block comment emitted through here is non-idempotent under
+    /// Svelte `<style>` embedding — the embed reindent adds a tab to the comment's
+    /// continuation lines each pass (content mutation, never converges; e.g.
+    /// `.a, /* x⏎y */ .b`). Standalone CSS and the between-rules comment path are
+    /// unaffected; the fix likely mirrors whatever keeps between-rules multiline
+    /// comments stable.
     pub(crate) fn comment_blocks_in_range(&self, start: u32, end: u32) -> String {
         let mut out = String::new();
         for comment in comments_in_range(self.comments, start, end) {

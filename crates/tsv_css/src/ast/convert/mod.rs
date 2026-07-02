@@ -304,6 +304,7 @@ fn convert_pseudo_class_args<'src>(
             value,
             of_selector,
             span,
+            value_span: _,
         } => {
             // If there's an "of <selector-list>", include it in the Nth node
             // (CSS Selectors Level 4: :nth-child(An+B of S)).

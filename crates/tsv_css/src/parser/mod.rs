@@ -188,7 +188,15 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Ok(())
     }
 
-    /// Skip whitespace and comments (comments are not included in AST)
+    /// Skip whitespace and comments, **dropping** the comments.
+    ///
+    /// A comment skipped here never reaches `self.comments`, so the printer's
+    /// `comments_in_range` lookups cannot reconstruct it — in any gap the printer
+    /// rebuilds from the AST (rather than emitting verbatim source), that is
+    /// silent content loss. Use `skip_whitespace_registering_comments` in those
+    /// positions; this variant is only safe where the skipped range is re-emitted
+    /// verbatim or comments are recovered by other means (e.g. the declaration
+    /// property→colon gap, reconstructed by the svelte-compat property split).
     pub(crate) fn skip_whitespace_and_comments(&mut self) -> Result<(), ParseError> {
         loop {
             if self.check(TokenKind::Whitespace) || matches!(&self.current_kind, TokenKind::Comment)
