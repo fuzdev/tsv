@@ -290,10 +290,15 @@ pub enum PseudoClassArgs<'arena> {
     /// - ::highlight() - takes custom highlight name
     ///
     /// Note: Svelte's parser treats these as selectors in public AST (quirk applied at conversion)
-    Identifier {
-        value: &'arena str, // Identifier value (without quotes or parentheses)
-        span: Span,
-    },
+    ///
+    /// The value text is not stored — it is a verbatim source slice recovered from
+    /// `value_span`, the same span-only model as `SimpleSelector::{Type, Class, Id}`
+    /// (see the "raw strings never duplicated in AST" invariant). `span` covers the
+    /// argument content (inside the parentheses, closing paren included) so the
+    /// printer can find the gap comments around the value; `value_span` covers just
+    /// the value, giving both the printed text and the Svelte-matching public-AST
+    /// node span — the two-span shape mirrors `Part`.
+    Identifier { span: Span, value_span: Span },
 }
 
 impl PseudoClassArgs<'_> {
