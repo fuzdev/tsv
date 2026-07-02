@@ -7,7 +7,9 @@ use super::super::Printer;
 use crate::ast::internal;
 use smallvec::SmallVec;
 use string_interner::DefaultSymbol;
-use tsv_lang::{InfallibleResolve, SymbolResolver};
+use tsv_lang::doc::DocBuf;
+use tsv_lang::doc::arena::DocId;
+use tsv_lang::{InfallibleResolve, SymbolResolver, SymbolToU32};
 
 /// Test function patterns that Prettier keeps on a single line
 /// Includes: Jest, Mocha, Jasmine, Playwright, Vitest patterns
@@ -52,27 +54,35 @@ fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<DefaultSymbol>
     }
 }
 
-/// Build the dotted callee string (e.g. `test.describe.only`) for a simple
-/// identifier or a non-computed, non-optional member chain. Returns `None` for
-/// anything else (computed access, optional chains, or non-identifier callees).
+/// Build the flat, break-free callee doc (e.g. `test.describe.only`) for the
+/// test-call layout, straight from the interned member-chain parts of a simple
+/// identifier or non-computed, non-optional member chain — no intermediate
+/// `String`. Returns `None` for anything else (computed access, optional chains,
+/// or non-identifier callees), so the caller falls back to the general callee doc.
 ///
-/// Used by the test-call layout for the flat callee text. `is_test_call` matches
-/// the pattern list against the chain parts directly (no allocation) via the
-/// shared [`get_member_chain_parts`], so the two stay in lockstep on which
+/// Emitting `symbol` + `.` doc nodes is byte-identical to the old
+/// resolve-and-`join(".")` `String`: interned identifiers never contain `.`, and
+/// the concatenated text nodes carry no break point, so the flat callee still
+/// never breaks at `.skip` — at zero heap allocation. `is_test_call` matches the
+/// pattern list against the same chain parts directly (also no allocation) via
+/// the shared [`get_member_chain_parts`], so the two stay in lockstep on which
 /// callees qualify.
-pub(super) fn callee_chain_string(
+pub(super) fn build_test_callee_flat_doc(
     expr: &internal::Expression<'_>,
     printer: &Printer<'_>,
-) -> Option<String> {
+) -> Option<DocId> {
     let parts = get_member_chain_parts(expr)?;
-    Some(
-        parts
-            .iter()
-            .rev()
-            .map(|sym| printer.resolve_symbol(*sym))
-            .collect::<Vec<_>>()
-            .join("."),
-    )
+    let d = printer.d();
+    // Parts come out leaf→root; reverse to root→leaf (`test.describe.only`).
+    let mut doc_parts = DocBuf::new();
+    for (i, sym) in parts.iter().rev().enumerate() {
+        if i > 0 {
+            doc_parts.push(d.text("."));
+        }
+        doc_parts.push(d.symbol(sym.to_u32()));
+    }
+    // `concat` short-circuits a single-part callee (`it`) to the bare symbol.
+    Some(d.concat(&doc_parts))
 }
 
 /// Get the member chain parts from an expression

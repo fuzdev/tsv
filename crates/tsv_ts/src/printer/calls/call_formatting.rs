@@ -25,7 +25,7 @@ use super::arg_wrapping::{
     wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
-use super::test_patterns::{callee_chain_string, is_test_call};
+use super::test_patterns::{build_test_callee_flat_doc, is_test_call};
 use crate::ast::internal;
 use crate::printer::CommentVec;
 use smallvec::smallvec;
@@ -116,12 +116,10 @@ pub(super) fn build_call_doc_with_wrapping(
     // Test function calls (it, test, describe, etc.) stay on one line
     // even if they exceed print width
     if is_test_call(call, printer) {
-        // Build callee as flat string (no conditionalGroup)
-        // This prevents breaking at `.skip` etc. even when very long
-        let flat_callee = match callee_chain_string(call.callee, printer) {
-            Some(callee_str) => d.text_owned(callee_str),
-            None => callee,
-        };
+        // Build callee as a flat doc (no conditionalGroup) straight from the
+        // interned chain parts — this prevents breaking at `.skip` etc. even when
+        // very long, without materializing a throwaway callee `String`.
+        let flat_callee = build_test_callee_flat_doc(call.callee, printer).unwrap_or(callee);
 
         // Check for trailing comments on last arg. The empty-args case returned
         // above, so `arguments` is non-empty here and `.last()` is always `Some`.
