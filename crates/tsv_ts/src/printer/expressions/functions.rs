@@ -854,42 +854,6 @@ impl<'a> Printer<'a> {
         })
     }
 
-    /// Get the end position for trailing comments after a parameter
-    /// Compute the boundary for trailing comments after the last parameter: the
-    /// params' close paren `)`.
-    ///
-    /// Comments after `)` are not param-trailing — a comment between `)` and the body
-    /// is handled by `append_body_with_sig_comments`, and a comment between `)` and a
-    /// return type by `build_paren_to_return_type_comments`. Bounding here keeps the
-    /// params scan from consuming (and duplicating, or mis-positioning) either. Falls
-    /// back to `body_start` if the paren can't be located.
-    pub(in crate::printer) fn params_trailing_comments_end(
-        &self,
-        params_start: u32,
-        body_start: u32,
-    ) -> u32 {
-        self.find_closing_paren(params_start, body_start)
-            .map_or(body_start, |after_paren| after_paren - 1)
-    }
-
-    /// End of a function signature — where comments before the body begin. The
-    /// return type's end when present, otherwise just past the params' `)` (falling
-    /// back to `body_start` if the paren can't be located). Shared by the function
-    /// declaration and function expression printers.
-    pub(in crate::printer) fn signature_end(
-        &self,
-        return_type: Option<&internal::TSTypeAnnotation<'_>>,
-        params_start: u32,
-        body_start: u32,
-    ) -> u32 {
-        match return_type {
-            Some(rt) => rt.span.end,
-            None => self
-                .find_closing_paren(params_start, body_start)
-                .unwrap_or(body_start),
-        }
-    }
-
     fn param_trailing_end(
         &self,
         params: &[internal::Expression<'_>],
@@ -1035,12 +999,21 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for just the function expression signature (type params, params, return type).
     /// Body is printed separately via imperative printer to preserve comments.
+    ///
+    /// One depth-tracked scan locates the params' close `)`; every boundary derived
+    /// from it shares that scan (same contract as `build_callable_signature_doc`).
+    /// Returns the doc plus the signature end — where comments before the body
+    /// begin: the return type's end when present, otherwise just past the `)`
+    /// (falling back to the body start if the paren can't be located).
     fn build_function_expression_signature_doc(
         &self,
         func: &internal::FunctionExpression<'_>,
-    ) -> DocId {
+    ) -> (DocId, u32) {
         let d = self.d();
         let mut sig_parts = DocBuf::new();
+
+        let body_start = func.body.span.start;
+        let close_paren_after = self.find_closing_paren(func.params_start, body_start);
 
         // Type parameters (TypeScript generics): <T, U>
         // Use _wrapping version for width-based line breaking
@@ -1062,18 +1035,30 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Function parameters - NOT in their own group, just softlines
-        sig_parts.push(self.build_method_params_doc_ungrouped(func));
+        // Function parameters - NOT in their own group, just softlines.
+        // Params trailing comments are bounded at the close paren; a comment between
+        // `)` and the return type is emitted by the return-type path below.
+        let trailing_comments_end =
+            Some(close_paren_after.map_or(body_start, |after_paren| after_paren - 1));
+        sig_parts.push(self.build_params_doc_with_comments(
+            func.params,
+            Some(func.params_start),
+            trailing_comments_end,
+        ));
 
         // Return type annotation (e.g., `: number`), preserving a comment between
         // `)` and `:` in place. Only wraps for complex type args (unions/intersections).
         if let Some(return_type) = &func.return_type {
-            sig_parts
-                .push(self.build_function_return_type_doc(Some(func.params_start), return_type));
+            sig_parts.push(self.build_function_return_type_doc(close_paren_after, return_type));
         }
 
+        let sig_end = match &func.return_type {
+            Some(rt) => rt.span.end,
+            None => close_paren_after.unwrap_or(body_start),
+        };
+
         // Wrap signature in a group for width-aware breaking
-        d.group(d.concat(&sig_parts))
+        (d.group(d.concat(&sig_parts)), sig_end)
     }
 
     /// Build a Doc for function expression body (type params, params, return type, body).
@@ -1085,14 +1070,8 @@ impl<'a> Printer<'a> {
         func: &internal::FunctionExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        let sig_doc = self.build_function_expression_signature_doc(func);
-
-        // Find signature end for outer comment detection
-        let sig_end = self.signature_end(
-            func.return_type.as_ref(),
-            func.params_start,
-            func.body.span.start,
-        );
+        // sig_end bounds the outer comment detection before the body.
+        let (sig_doc, sig_end) = self.build_function_expression_signature_doc(func);
 
         let mut parts: DocBuf = smallvec![sig_doc];
         self.append_body_with_sig_comments(&mut parts, sig_end, &func.body);
@@ -1163,27 +1142,6 @@ impl<'a> Printer<'a> {
         parts.push(self.build_function_doc_body(func));
 
         d.concat(&parts)
-    }
-
-    /// Build doc for function/method params NOT in their own group
-    ///
-    /// `params_start` is the position of the opening paren (for comment detection).
-    /// `trailing_comments_end` is where trailing comments after the last param end
-    /// (typically return type start or body start).
-    pub(in crate::printer) fn build_method_params_doc_ungrouped(
-        &self,
-        func: &internal::FunctionExpression<'_>,
-    ) -> DocId {
-        let params = &func.params;
-        let params_start = Some(func.params_start);
-
-        // Params trailing comments are bounded at the close paren; a comment between
-        // `)` and the return type is emitted by the signature's return-type path.
-        let trailing_comments_end =
-            Some(self.params_trailing_comments_end(func.params_start, func.body.span.start));
-
-        // Delegate to shared implementation
-        self.build_params_doc_with_comments(params, params_start, trailing_comments_end)
     }
 
     /// Shared implementation for building params doc with comment handling

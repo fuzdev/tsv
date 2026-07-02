@@ -823,6 +823,24 @@ impl<'a> Printer<'a> {
             return self.build_empty_brackets_inline_with_comments_doc(t.span);
         }
 
+        // Zero-comment fast gate (see `build_params_doc_with_comments`): every
+        // comment sub-query below is bounded within the tuple's span, so with no
+        // comment there the expansion checks are provably false and the list is
+        // plain elements joined by `,` + line (renders identically — the skipped
+        // pushes are empty comment docs and the empty after-comma buffer).
+        if !self.has_comments_between(t.span.start, t.span.end) {
+            let mut parts = DocBuf::new();
+            for (i, elem) in t.element_types.iter().enumerate() {
+                if i > 0 {
+                    parts.push(d.text(","));
+                    parts.push(d.line());
+                }
+                parts.push(self.build_type_doc(elem));
+            }
+            let inner = d.concat(&[d.softline(), d.concat(&parts)]);
+            return d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]));
+        }
+
         // Check for comments that force expansion: line comments, multiline block comments,
         // or own-line single-line block comments. Also check for line comments BEFORE the
         // first element (between `[` and first element), e.g., `[// leading\n a, b]`.
