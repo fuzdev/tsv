@@ -175,18 +175,13 @@ const ALLOW: &[Allow] = &[
     ),
     // ── tsv_lang ─────────────────────────────────────────────────────────────
     (
-        "tsv_lang/src/doc/arena_fits.rs",
-        "if let Some(last_newline_pos) = s.rfind('\\n') {",
-        "non-source",
-    ),
-    (
         "tsv_lang/src/doc/arena_render.rs",
         "let trim_start = s.rfind('\\n').map_or(0, |i| i + 1);",
         "non-source",
     ),
     (
         "tsv_lang/src/doc/arena_render.rs",
-        "if let Some(last_nl) = s.rfind('\\n') {",
+        "if let Some(last_newline_pos) = s.rfind('\\n') {",
         "non-source",
     ),
     (

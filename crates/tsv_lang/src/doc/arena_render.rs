@@ -2,15 +2,14 @@
 
 use crate::EmbedContext;
 use crate::config::TAB_WIDTH;
+use crate::printing::visual_width;
 use smallvec::SmallVec;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
-use super::arena_fits::{arena_fits_with_lookahead, update_pos_for_text};
+use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
 use super::render_config::RenderConfig;
-use super::types::{
-    DocContext, GroupId, LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TextResolver, resolve_text,
-};
+use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
 
 /// Inline-backed render work-list. The renderers run many times per file (CSS
 /// per declaration/value, Svelte per template expression), each spinning up a
@@ -79,14 +78,52 @@ fn render_text<R: TextResolver + ?Sized>(
     let s = resolve_text(text, resolver);
     output.push_str(s);
     match text.cached_width() {
-        Some(w) if w == TEXT_WIDTH_HAS_NEWLINE => {
-            // Has newline — compute position from last line
-            if let Some(last_nl) = s.rfind('\n') {
-                *pos = crate::printing::visual_width(&s[last_nl + 1..], TAB_WIDTH);
-            }
+        CachedWidth::Width(w) => *pos += w as usize, // Common path: no visual_width call
+        CachedWidth::HasNewline => update_pos_for_text_unicode(pos, s),
+        CachedWidth::NotComputed => update_pos_for_text(pos, s),
+    }
+}
+
+/// Update position after rendering a text string, accounting for tab expansion.
+///
+/// The overwhelmingly common input here is short ASCII with no newline — every
+/// interned identifier (`Symbol`) and every static punctuation/keyword token
+/// reaches this via `render_text`'s uncached-width arm. For those the previous
+/// shape scanned the bytes three times (`rfind('\n')` + `visual_width`'s own
+/// `is_ascii` + tab count). The fast path below folds the newline reset, tab
+/// expansion, and width accumulation into a single forward byte pass, so no
+/// backward `memchr` scan runs. The first non-ASCII byte hands off to
+/// `update_pos_for_text_unicode` (cold-outlined to keep this fast path lean and
+/// inlinable, mirroring `skip_trivia` / `skip_trivia_scan`). Byte-identical to
+/// the prior implementation by construction.
+#[inline]
+fn update_pos_for_text(pos: &mut usize, s: &str) {
+    let mut col = *pos;
+    for &b in s.as_bytes() {
+        match b {
+            b'\n' => col = 0,
+            b'\t' => col += TAB_WIDTH,
+            0..=0x7f => col += 1,
+            _ => return update_pos_for_text_unicode(pos, s),
         }
-        Some(w) => *pos += w as usize, // Common path: no visual_width call
-        None => update_pos_for_text(pos, s), // Symbol fallback
+    }
+    *pos = col;
+}
+
+/// Position update for text that contains a newline or a non-ASCII byte: the
+/// column restarts after the last newline (if any), measured grapheme-aware.
+/// Re-measures the whole string from scratch (`update_pos_for_text`'s partial
+/// `col` is intentionally dropped) so a combining mark attaching to an ASCII
+/// base char is never split mid-grapheme. Cold-outlined to keep the ASCII fast
+/// path lean and inlinable; `visual_width`'s ASCII-run scanning keeps this
+/// affordable even on multibyte-dense corpora, where it is not rare.
+#[cold]
+#[inline(never)]
+fn update_pos_for_text_unicode(pos: &mut usize, s: &str) {
+    if let Some(last_newline_pos) = s.rfind('\n') {
+        *pos = visual_width(&s[last_newline_pos + 1..], TAB_WIDTH);
+    } else {
+        *pos += visual_width(s, TAB_WIDTH);
     }
 }
 
@@ -433,10 +470,15 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         embed,
                         resolver,
                     );
-                    trim_trailing_whitespace(output);
-                    output.push('\n');
-                    write_indentation(output, cmd.indent, render, embed);
-                    *pos = line_start_column(cmd.indent, render, embed);
+                    render_line_break(
+                        LineKind::Hard,
+                        cmd.mode,
+                        cmd.indent,
+                        output,
+                        pos,
+                        render,
+                        embed,
+                    );
                     #[cfg(feature = "swallow_check")]
                     swallow.on_newline(true);
                     #[cfg(feature = "swallow_check")]
@@ -813,10 +855,15 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     if tracking_suffix {
                         flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
                     }
-                    trim_trailing_whitespace(output);
-                    output.push('\n');
-                    write_indentation(output, cmd.indent, render, embed);
-                    *pos = line_start_column(cmd.indent, render, embed);
+                    render_line_break(
+                        LineKind::Hard,
+                        cmd.mode,
+                        cmd.indent,
+                        output,
+                        pos,
+                        render,
+                        embed,
+                    );
                     output.push_str(line);
                     update_pos_for_text(pos, line);
                 }
