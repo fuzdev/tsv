@@ -19,12 +19,9 @@ Heritage is the odd one out among the relocation gaps: the other gaps
 broken onto its own line — in one pass, stably. Prettier's stable form
 (`class P⏎/* a */⏎extends Q`) is **not** dual-stable: tsv re-collapses it to a
 *third* form (`class P /* a */ extends Q` — comment before the keyword, inline).
-A `variant_*` file is meant to be dual-stable (both formatters keep it verbatim),
-so this three-way case has no dedicated pin type — it is documented by this README
-plus the `unformatted_ours_own_line` variant, and the fixture carries the
-validator's informational "undocumented Prettier output" note by design. (It is
-one of a small recurring family of "Prettier keeps V, tsv rewrites V to a third
-stable form" cases — see the conformance-doc note for the others.) Per
+Those three distinct stable forms (input, Prettier's `V`, and tsv's `ours(V)`) are
+pinned by `divergent_variant_own_line.svelte` — a `divergent_variant_*` form asserting
+`prettier(V) == V` while `ours(V)` settles on a distinct third stable form. Per
 [Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy),
 tsv keeps the comment where the author wrote it relative to the heritage type. Only a
 **line** comment

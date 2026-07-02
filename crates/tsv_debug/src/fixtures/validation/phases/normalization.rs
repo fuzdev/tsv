@@ -25,9 +25,25 @@ fn matching_prettier_variant<'a>(
         .map(|(_, pv_files)| &pv_files[0])
 }
 
-/// N2, N4, N5, N9b, N9c: Validate our formatter's variant handling
-/// (normalization to input, plus variant_* stability), with duplicate
-/// and redundancy checks across the variant kinds
+/// Report a `Duplicate*WithinFixture` error for any content shared by more than one
+/// variant file. `contents` maps file content → the names that produced it (each
+/// variant loop builds one for its kind); `dup_error` is that kind's duplicate variant.
+fn report_duplicate_variants(
+    result: &mut FixtureValidation,
+    contents: &HashMap<String, Vec<String>>,
+    dup_error: fn(Vec<String>) -> ValidationError,
+) {
+    for names in contents.values() {
+        if names.len() > 1 {
+            result.add_error(dup_error(names.clone()));
+        }
+    }
+}
+
+/// N2, N4, N5, N9b, N9c, N11b–d: Validate our formatter's variant handling
+/// (normalization to input, `variant_*` dual-stability, and `divergent_variant_*`
+/// rewrite-to-a-third-form), with duplicate and redundancy checks across the
+/// variant kinds
 pub(in crate::fixtures::validation) fn validate_normalization_ours(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -79,13 +95,11 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
     }
 
     // Check for duplicate prettier_variant files
-    for variants in pv_contents.values() {
-        if variants.len() > 1 {
-            result.add_error(ValidationError::DuplicatePrettierVariantWithinFixture(
-                variants.clone(),
-            ));
-        }
-    }
+    report_duplicate_variants(
+        result,
+        &pv_contents,
+        ValidationError::DuplicatePrettierVariantWithinFixture,
+    );
 
     // Check for prettier_variant files identical to output_prettier (redundant)
     let output_prettier_path = fixture.output_prettier_path();
@@ -153,13 +167,11 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
     }
 
     // Check for duplicate unformatted files
-    for variants in unformatted_contents.values() {
-        if variants.len() > 1 {
-            result.add_error(ValidationError::DuplicateUnformattedWithinFixture(
-                variants.clone(),
-            ));
-        }
-    }
+    report_duplicate_variants(
+        result,
+        &unformatted_contents,
+        ValidationError::DuplicateUnformattedWithinFixture,
+    );
 
     // Check for redundant unformatted files (identical to prettier_variant)
     for (unformatted_content, unformatted_files) in &unformatted_contents {
@@ -221,13 +233,11 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
     }
 
     // Check for duplicate unformatted_ours files (mirrors the unformatted_* guard above)
-    for variants in unformatted_ours_contents.values() {
-        if variants.len() > 1 {
-            result.add_error(ValidationError::DuplicateUnformattedWithinFixture(
-                variants.clone(),
-            ));
-        }
-    }
+    report_duplicate_variants(
+        result,
+        &unformatted_ours_contents,
+        ValidationError::DuplicateUnformattedWithinFixture,
+    );
 
     // Check for redundant unformatted_ours files (identical to prettier_variant): a
     // prettier_variant_* already covers ours → input, so a matching unformatted_ours_*
@@ -279,49 +289,26 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
                     continue;
                 }
 
-                // N9b: Our output must be idempotent (format the result again)
-                //
-                // NOTE (tightening candidate): this checks ours reaches *a* fixed point
-                // from V, not `ours(V) == V`. A variant_* is documented as dual-stable
-                // (both formatters keep it verbatim), so the tight check would be
-                // `formatted == stable_content`. Tightening currently turns 4 fixtures
-                // red — all the same "Prettier keeps V, ours rewrites V to a third stable
-                // form" shape: `class/heritage_keyword_own_line_block_comment`,
-                // `statements/if/else_line_comment_nonblock`,
-                // `statements/while/line_before_body_comment`,
-                // `statements/do_while/line_before_while_comment`. That recurring category
-                // has no dedicated home yet, so tightening is deferred to a follow-up that
-                // also re-homes those four (a new type, or README-only).
-                match fixtures::format_with_our_formatter_with_goal(
-                    &formatted,
-                    &fixture.input_file,
-                    fixture.goal(),
-                ) {
-                    Ok(second_pass) => {
-                        if second_pass != formatted {
-                            result.add_error(
-                                ValidationError::NormalizationVariantOursNotIdempotent(
-                                    stable_name.clone(),
-                                ),
-                            );
-                            result.add_diff(
-                                &format!(
-                                    "variant idempotency: {}/{}",
-                                    fixture.relative_path, stable_name
-                                ),
-                                &formatted,
-                                &second_pass,
-                                &diff::DiffOptions::idempotency(),
-                            );
-                        } else {
-                            variant_ok += 1;
-                        }
-                    }
-                    Err(e) => {
-                        result.add_error(ValidationError::FormatterError(format!(
-                            "{stable_name} (second pass): {e}"
-                        )));
-                    }
+                // N9b: our formatter must KEEP V verbatim — `ours(V) == V`. A
+                // variant_* is dual-stable: both formatters leave it as-is. The
+                // looser "reaches *a* fixed point" check let through the case
+                // where prettier keeps V but ours rewrites it to a *third* stable
+                // form — that is a divergent_variant_* form, not a variant_*.
+                if formatted != stable_content {
+                    result.add_error(ValidationError::NormalizationVariantOursNotStable(
+                        stable_name.clone(),
+                    ));
+                    result.add_diff(
+                        &format!(
+                            "variant not stable: {}/{}",
+                            fixture.relative_path, stable_name
+                        ),
+                        &stable_content,
+                        &formatted,
+                        &diff::DiffOptions::idempotency(),
+                    );
+                } else {
+                    variant_ok += 1;
                 }
             }
             Err(e) => {
@@ -333,16 +320,116 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
     }
 
     // Check for duplicate variant files
-    for variants in variant_contents.values() {
-        if variants.len() > 1 {
-            result.add_error(ValidationError::DuplicateVariantWithinFixture(
-                variants.clone(),
-            ));
-        }
-    }
+    report_duplicate_variants(
+        result,
+        &variant_contents,
+        ValidationError::DuplicateVariantWithinFixture,
+    );
 
     if variant_ok > 0 {
         result.add_success(ValidationSuccess::VariantVariantsOk(variant_ok));
+    }
+
+    // N11b, N11c, N11d: divergent_variant_* validation (our formatter)
+    // A divergent_variant_* form V is prettier-stable (N11a, prettier phase) but our
+    // formatter rewrites it to a *third* stable form:
+    //   N11b: ours(V) != input — else it collapses to input (use prettier_variant_*)
+    //   N11c: ours(V) != V     — else both formatters keep it (use variant_*)
+    //   N11d: ours(ours(V)) == ours(V) — the rewritten third form is itself stable
+    let mut divergent_variant_contents: HashMap<String, Vec<String>> = HashMap::new();
+    let mut divergent_variant_ok = 0;
+
+    for tw_name in &files.divergent_variant {
+        let tw_path = fixture_dir.join(tw_name);
+        let tw_content = match read_file(&tw_path) {
+            Ok(c) => c,
+            Err(e) => {
+                result.add_error(ValidationError::FileReadError(e));
+                continue;
+            }
+        };
+
+        divergent_variant_contents
+            .entry(tw_content.clone())
+            .or_default()
+            .push(tw_name.clone());
+
+        match fixtures::format_with_our_formatter_with_goal(
+            &tw_content,
+            &fixture.input_file,
+            fixture.goal(),
+        ) {
+            Ok(formatted) => {
+                // N11b: ours must NOT normalize to input
+                if formatted == *input {
+                    result.add_error(
+                        ValidationError::NormalizationDivergentVariantOursNormalizesToInput(
+                            tw_name.clone(),
+                        ),
+                    );
+                    continue;
+                }
+
+                // N11c: ours must NOT keep V verbatim (that would be a variant_*)
+                if formatted == tw_content {
+                    result.add_error(
+                        ValidationError::NormalizationDivergentVariantOursDualStable(
+                            tw_name.clone(),
+                        ),
+                    );
+                    continue;
+                }
+
+                // N11d: the rewritten third form must itself be a fixed point
+                match fixtures::format_with_our_formatter_with_goal(
+                    &formatted,
+                    &fixture.input_file,
+                    fixture.goal(),
+                ) {
+                    Ok(second_pass) => {
+                        if second_pass != formatted {
+                            result.add_error(
+                                ValidationError::NormalizationDivergentVariantOursNotStable(
+                                    tw_name.clone(),
+                                ),
+                            );
+                            result.add_diff(
+                                &format!(
+                                    "divergent_variant third-form not stable: {}/{}",
+                                    fixture.relative_path, tw_name
+                                ),
+                                &formatted,
+                                &second_pass,
+                                &diff::DiffOptions::idempotency(),
+                            );
+                        } else {
+                            divergent_variant_ok += 1;
+                        }
+                    }
+                    Err(e) => {
+                        result.add_error(ValidationError::FormatterError(format!(
+                            "{tw_name} (second pass): {e}"
+                        )));
+                    }
+                }
+            }
+            Err(e) => {
+                result.add_error(ValidationError::FormatterError(format!("{tw_name}: {e}")));
+            }
+        }
+    }
+
+    // Check for duplicate divergent_variant files
+    report_duplicate_variants(
+        result,
+        &divergent_variant_contents,
+        ValidationError::DuplicateDivergentVariantWithinFixture,
+    );
+
+    if divergent_variant_ok > 0 {
+        result.add_success(ValidationSuccess::DivergentVariantOursOk(
+            divergent_variant_ok,
+        ));
     }
 
     if total_variants > 0 {
@@ -350,7 +437,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
     }
 }
 
-/// N1, N3, N6, N7, N7b, N8, N9a, N10: Validate prettier normalization behavior
+/// N1, N3, N6, N7, N7b, N8, N9a, N10, N11a: Validate prettier normalization behavior
 ///
 /// Orchestrates the per-rule helpers below. Each rule lives in its own function
 /// so a skip or early return inside one rule can't silently disable the rules
@@ -364,6 +451,7 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
 ) {
     validate_n1_prettier_variants_preserved(result, fixture, files).await;
     validate_n9a_variants_preserved(result, fixture, files).await;
+    validate_n11a_divergent_variant_preserved(result, fixture, files).await;
     validate_n3_unformatted_normalizes(result, fixture, input, files).await;
     let unformatted_ours_outputs =
         validate_n6_unformatted_ours(result, fixture, input, input_ext, files).await;
@@ -396,20 +484,27 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
     );
 }
 
-/// N1: prettier(prettier_variant_*) == prettier_variant_* (prettier preserves its stable variants)
-async fn validate_n1_prettier_variants_preserved(
+/// Shared body for the "prettier preserves this stable-form file verbatim" checks
+/// (N1 `prettier_variant_*`, N9a `variant_*`, N11a `divergent_variant_*`): assert
+/// `prettier(file) == file` for each named file, reporting `not_preserved` on a
+/// mismatch and counting the stable ones into `stable_success`. The three kinds
+/// differ only in their file list, error/success variants, and diff label.
+async fn validate_prettier_preserves(
     result: &mut FixtureValidation,
     fixture: &Fixture,
-    files: &FixtureFiles,
+    file_names: &[String],
+    label: &str,
+    not_preserved: fn(String) -> ValidationError,
+    stable_success: fn(usize) -> ValidationSuccess,
 ) {
     let fixture_dir = &fixture.path;
     let prettier_parser = fixture.input_type().prettier_parser();
 
     let mut stable = 0;
 
-    for pv_name in &files.prettier_variant {
-        let pv_path = fixture_dir.join(pv_name);
-        let pv_content = match read_file(&pv_path) {
+    for name in file_names {
+        let path = fixture_dir.join(name);
+        let content = match read_file(&path) {
             Ok(c) => c,
             Err(e) => {
                 result.add_error(ValidationError::FileReadError(e));
@@ -417,18 +512,13 @@ async fn validate_n1_prettier_variants_preserved(
             }
         };
 
-        match run_prettier(&pv_content, prettier_parser).await {
+        match run_prettier(&content, prettier_parser).await {
             Ok(formatted) => {
-                if formatted != pv_content {
-                    result.add_error(ValidationError::NormalizationPrettierVariantNotPreserved(
-                        pv_name.clone(),
-                    ));
+                if formatted != content {
+                    result.add_error(not_preserved(name.clone()));
                     result.add_diff(
-                        &format!(
-                            "prettier_variant not preserved: {}/{}",
-                            fixture.relative_path, pv_name
-                        ),
-                        &pv_content,
+                        &format!("{label} not preserved: {}/{}", fixture.relative_path, name),
+                        &content,
                         &formatted,
                         &diff::DiffOptions::prettier_behavior(),
                     );
@@ -438,15 +528,32 @@ async fn validate_n1_prettier_variants_preserved(
             }
             Err(e) => {
                 result.add_error(ValidationError::FormatterError(format!(
-                    "Prettier on {pv_name}: {e}"
+                    "Prettier on {name}: {e}"
                 )));
             }
         }
     }
 
     if stable > 0 {
-        result.add_success(ValidationSuccess::PrettierVariantsStable(stable));
+        result.add_success(stable_success(stable));
     }
+}
+
+/// N1: prettier(prettier_variant_*) == prettier_variant_* (prettier preserves its stable variants)
+async fn validate_n1_prettier_variants_preserved(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    files: &FixtureFiles,
+) {
+    validate_prettier_preserves(
+        result,
+        fixture,
+        &files.prettier_variant,
+        "prettier_variant",
+        ValidationError::NormalizationPrettierVariantNotPreserved,
+        ValidationSuccess::PrettierVariantsStable,
+    )
+    .await;
 }
 
 /// N9a: prettier(variant_*) == variant_* (prettier preserves these too)
@@ -455,51 +562,36 @@ async fn validate_n9a_variants_preserved(
     fixture: &Fixture,
     files: &FixtureFiles,
 ) {
-    let fixture_dir = &fixture.path;
-    let prettier_parser = fixture.input_type().prettier_parser();
+    validate_prettier_preserves(
+        result,
+        fixture,
+        &files.variant,
+        "variant",
+        ValidationError::NormalizationVariantNotPreserved,
+        ValidationSuccess::VariantsStable,
+    )
+    .await;
+}
 
-    let mut stable = 0;
-
-    for stable_name in &files.variant {
-        let stable_path = fixture_dir.join(stable_name);
-        let stable_content = match read_file(&stable_path) {
-            Ok(c) => c,
-            Err(e) => {
-                result.add_error(ValidationError::FileReadError(e));
-                continue;
-            }
-        };
-
-        match run_prettier(&stable_content, prettier_parser).await {
-            Ok(formatted) => {
-                if formatted != stable_content {
-                    result.add_error(ValidationError::NormalizationVariantNotPreserved(
-                        stable_name.clone(),
-                    ));
-                    result.add_diff(
-                        &format!(
-                            "variant not preserved: {}/{}",
-                            fixture.relative_path, stable_name
-                        ),
-                        &stable_content,
-                        &formatted,
-                        &diff::DiffOptions::prettier_behavior(),
-                    );
-                } else {
-                    stable += 1;
-                }
-            }
-            Err(e) => {
-                result.add_error(ValidationError::FormatterError(format!(
-                    "Prettier on {stable_name}: {e}"
-                )));
-            }
-        }
-    }
-
-    if stable > 0 {
-        result.add_success(ValidationSuccess::VariantsStable(stable));
-    }
+/// N11a: prettier(divergent_variant_*) == divergent_variant_* (prettier preserves these too)
+///
+/// A divergent_variant_* form is prettier-stable by definition; the ours-side checks
+/// (N11b–d, in `validate_normalization_ours`) verify that our formatter rewrites
+/// it to a distinct third stable form.
+async fn validate_n11a_divergent_variant_preserved(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    files: &FixtureFiles,
+) {
+    validate_prettier_preserves(
+        result,
+        fixture,
+        &files.divergent_variant,
+        "divergent_variant",
+        ValidationError::NormalizationDivergentVariantNotPreserved,
+        ValidationSuccess::DivergentVariantStable,
+    )
+    .await;
 }
 
 /// N3: prettier(unformatted_*) == input
@@ -965,7 +1057,7 @@ async fn validate_n8_unformatted_prettier(
 ///
 /// After N7, check which unformatted_ours_* prettier outputs weren't consumed by
 /// prettier_intermediate_*, then check if those outputs match any known file content
-/// (output_prettier, prettier_variant_*, variant_*).
+/// (output_prettier, prettier_variant_*, variant_*, divergent_variant_*).
 fn validate_n10_cross_path_discovery(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -998,9 +1090,10 @@ fn validate_n10_cross_path_discovery(
     // Also claim suffixes where prettier(unformatted_ours_*) == input (those got N6 errors, not novel)
     // These are already not in unformatted_ours_prettier_outputs (they were flagged as errors)
 
-    // Build known content set from output_prettier, prettier_variant_*, variant_*.
-    // Read failures are tolerated here without an error: F2/N1/N9a own these files
-    // and report unreadable ones loudly, so a silent skip here can't hide a gap.
+    // Build known content set from output_prettier, prettier_variant_*, variant_*,
+    // divergent_variant_*. Read failures are tolerated here without an error: F2/N1/N9a/N11a
+    // own these files and report unreadable ones loudly, so a silent skip here can't
+    // hide a gap.
     let mut known_contents: Vec<String> = Vec::new();
 
     // output_prettier content
@@ -1027,6 +1120,16 @@ fn validate_n10_cross_path_discovery(
         }
     }
 
+    // divergent_variant_* contents — a prettier-stable form our formatter rewrites; it is
+    // a documented target for an unformatted_ours_* whose prettier output lands on
+    // it (e.g. the heritage own-line form), so include it in the known set.
+    for tw_name in &files.divergent_variant {
+        let tw_path = fixture_dir.join(tw_name);
+        if let Ok(content) = read_file(&tw_path) {
+            known_contents.push(content);
+        }
+    }
+
     // Check unclaimed outputs
     let mut pinned = 0;
     for (suffix, prettier_output) in unformatted_ours_prettier_outputs {
@@ -1044,8 +1147,8 @@ fn validate_n10_cross_path_discovery(
         if !is_known {
             let source_file = format!("unformatted_ours_{suffix}{input_ext}");
             // When the fixture documents prettier's stable forms (it has
-            // output_prettier / prettier_variant_* / variant_* files), every
-            // unformatted_ours_* prettier output must match one of them — an
+            // output_prettier / prettier_variant_* / variant_* / divergent_variant_*
+            // files), every unformatted_ours_* prettier output must match one — an
             // unmatched output means prettier drifted or the target is
             // undocumented, so block. Fixtures that document the divergence by
             // README alone (no stable-form files) keep this informational.

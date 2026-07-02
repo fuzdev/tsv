@@ -168,6 +168,8 @@ enum FormatResult {
     MatchesPrettierVariant(String),
     /// Output matches a variant_* file
     MatchesVariant(String),
+    /// Output matches a divergent_variant_* file
+    MatchesDivergentVariant(String),
     /// Output matches a prettier_intermediate_* file
     MatchesPrettierIntermediate(String),
     /// Novel output not matching any known file
@@ -181,6 +183,8 @@ enum Suggestion {
     PrettierVariant(String),
     /// Suggest creating a variant_* file
     Variant(String),
+    /// Suggest creating a divergent_variant_* file
+    DivergentVariant(String),
     /// Suggest creating a prettier_intermediate_* file
     PrettierIntermediate(String),
     /// Suggest creating a prettier_intermediate_to_variant_* file
@@ -264,6 +268,7 @@ fn format_result_label(result: &FormatResult) -> String {
         FormatResult::MatchesOutputPrettier => "output_prettier".to_string(),
         FormatResult::MatchesPrettierVariant(name) => name.clone(),
         FormatResult::MatchesVariant(name) => name.clone(),
+        FormatResult::MatchesDivergentVariant(name) => name.clone(),
         FormatResult::MatchesPrettierIntermediate(name) => name.clone(),
         FormatResult::Novel => "[novel]".to_string(),
     }
@@ -276,6 +281,11 @@ fn format_suggestion(suggestion: &Suggestion) -> String {
         }
         Suggestion::Variant(suffix) => {
             format!("suggest variant_{suffix} (both formatters keep stable)")
+        }
+        Suggestion::DivergentVariant(suffix) => {
+            format!(
+                "suggest divergent_variant_{suffix} (prettier stable, ours rewrites it to a distinct third stable form)"
+            )
         }
         Suggestion::PrettierIntermediate(suffix) => {
             format!(
@@ -327,6 +337,7 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         .prettier_variant
         .iter()
         .chain(&files.variant)
+        .chain(&files.divergent_variant)
         .chain(&files.prettier_intermediate)
         .chain(&files.prettier_intermediate_to_variant)
     {
@@ -346,6 +357,7 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
     files_to_audit.extend(files.unformatted_ours.iter().cloned());
     files_to_audit.extend(files.prettier_variant.iter().cloned());
     files_to_audit.extend(files.variant.iter().cloned());
+    files_to_audit.extend(files.divergent_variant.iter().cloned());
     files_to_audit.extend(files.prettier_intermediate.iter().cloned());
     files_to_audit.extend(files.prettier_intermediate_to_variant.iter().cloned());
 
@@ -440,6 +452,8 @@ fn classify_output(
                 return FormatResult::MatchesOutputPrettier;
             } else if name.starts_with("prettier_variant_") {
                 return FormatResult::MatchesPrettierVariant(name.clone());
+            } else if name.starts_with("divergent_variant_") {
+                return FormatResult::MatchesDivergentVariant(name.clone());
             } else if name.starts_with("variant_") {
                 return FormatResult::MatchesVariant(name.clone());
             } else if name.starts_with("prettier_intermediate_") {
@@ -535,14 +549,18 @@ async fn classify_novel(
         match fixtures::format_with_our_formatter(&novel_output, &fixture.input_file) {
             Ok(ours_of_novel) => {
                 if ours_of_novel == *input_content {
-                    // Our formatter normalizes it to input -> prettier_variant_*
+                    // ours(V) == input -> prettier_variant_*
                     Some(Suggestion::PrettierVariant(suffix.to_string()))
+                } else if ours_of_novel == novel_output {
+                    // ours keeps V verbatim (ours(V) == V) -> dual-stable variant_*
+                    Some(Suggestion::Variant(suffix.to_string()))
                 } else {
-                    // Check if our formatter keeps it stable
+                    // ours rewrites V to a distinct form (!= V, != input). If that third
+                    // form is itself stable it's a divergent_variant_*, else it's a genuine bug.
                     match fixtures::format_with_our_formatter(&ours_of_novel, &fixture.input_file) {
                         Ok(second) if second == ours_of_novel => {
-                            // Our formatter is idempotent on this -> variant_*
-                            Some(Suggestion::Variant(suffix.to_string()))
+                            // ours(ours(V)) == ours(V) -> divergent_variant_*
+                            Some(Suggestion::DivergentVariant(suffix.to_string()))
                         }
                         _ => Some(Suggestion::Investigate(
                             "prettier stable but our formatter not idempotent on novel output"
