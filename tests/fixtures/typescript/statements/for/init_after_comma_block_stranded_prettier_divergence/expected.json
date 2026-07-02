@@ -1,0 +1,289 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 271,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 68,
+			"end": 75,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 52
+				},
+				"end": {
+					"line": 3,
+					"column": 59
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 270,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 10,
+					"end": 260,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 18,
+						"end": 122,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 46
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 22,
+								"end": 66,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 6
+									},
+									"end": {
+										"line": 3,
+										"column": 50
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 22,
+									"end": 62,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 6
+										},
+										"end": {
+											"line": 3,
+											"column": 46
+										}
+									},
+									"name": "firstDeclaratorWithADeliberatelyLongName"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 65,
+									"end": 66,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 49
+										},
+										"end": {
+											"line": 3,
+											"column": 50
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 68,
+										"end": 75
+									}
+								]
+							},
+							{
+								"type": "VariableDeclarator",
+								"start": 79,
+								"end": 122,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 3
+									},
+									"end": {
+										"line": 4,
+										"column": 46
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 79,
+									"end": 118,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 3
+										},
+										"end": {
+											"line": 4,
+											"column": 42
+										}
+									},
+									"name": "secondDeclaratorAlsoWithALongEnoughName"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 121,
+									"end": 122,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 45
+										},
+										"end": {
+											"line": 4,
+											"column": 46
+										}
+									},
+									"value": 2,
+									"raw": "2"
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 126,
+						"end": 208,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 84
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 126,
+							"end": 166,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 42
+								}
+							},
+							"name": "firstDeclaratorWithADeliberatelyLongName"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Identifier",
+							"start": 169,
+							"end": 208,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 45
+								},
+								"end": {
+									"line": 5,
+									"column": 84
+								}
+							},
+							"name": "secondDeclaratorAlsoWithALongEnoughName"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 212,
+						"end": 254,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 44
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 212,
+							"end": 252,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 42
+								}
+							},
+							"name": "firstDeclaratorWithADeliberatelyLongName"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 258,
+						"end": 260,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 3
+							},
+							"end": {
+								"line": 7,
+								"column": 5
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -21,4 +21,21 @@
 		p < 9;
 		p++
 	) {}
+
+	// Trailing block before the comma plus a same-line line comment: both trail the comma.
+	for (
+		let r = 0 /* c5 */, // c6
+			s = 1;
+		r < 9;
+		r++
+	) {}
+
+	// Own-line line comment after the comma sits on its own line below.
+	for (
+		let t = 0,
+			// c7
+			u = 1;
+		t < 9;
+		t++
+	) {}
 </script>

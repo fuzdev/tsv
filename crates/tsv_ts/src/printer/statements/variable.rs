@@ -195,9 +195,7 @@ impl<'a> Printer<'a> {
                 // The declarator-separating comma. A block comment keeps the author's
                 // side of it: before → trails the previous init; after → leads the next
                 // declarator. (Only consulted when `has_block_comment`.)
-                let comma_pos = self
-                    .find_char_outside_comments(prev_end, curr_start, b',')
-                    .unwrap_or(curr_start);
+                let comma_pos = self.comma_between(prev_end, curr_start);
 
                 if should_break {
                     if has_line_comment {
@@ -211,6 +209,7 @@ impl<'a> Printer<'a> {
                         self.push_inter_declarator_line_comment_gap(
                             &mut parts,
                             &comments,
+                            comma_pos,
                             d.text(INDENT),
                         );
                     } else {
@@ -218,12 +217,14 @@ impl<'a> Printer<'a> {
                         // (`a = 1 /* c */,`); after-comma comments lead the next
                         // declarator (below the break). Prettier preserves the side.
                         if has_block_comment {
-                            for comment in comments_in_range(self.comments, prev_end, comma_pos) {
-                                parts.push(d.text(" "));
-                                parts.push(self.build_comment_doc(comment));
-                            }
+                            self.push_before_comma_blocks(&mut parts, prev_end, comma_pos);
                         }
                         parts.push(d.text(","));
+                        // A stranded after-comma block (on the comma's line, but a
+                        // newline before the next declarator) trails the comma —
+                        // preserving the author's placement (prettier relocates it
+                        // before the comma). Emitted before the break below.
+                        self.push_stranded_after_comma_blocks(&mut parts, comma_pos, curr_start);
                     }
                     // Break to new line with indentation for next declarator
                     parts.push(d.hardline());
@@ -232,10 +233,14 @@ impl<'a> Printer<'a> {
                         // After-comma block comment(s) leading the next declarator: a
                         // block inline-adjacent to the declarator hugs it (`/* c */ b`),
                         // an own-line one keeps its line (with any author blank line
-                        // preserved before the declarator/next comment).
+                        // preserved before the declarator/next comment). A stranded
+                        // block already trailed the comma above, so skip it here.
                         let comments: CommentVec<'_> =
                             comments_in_range(self.comments, comma_pos, curr_start).collect();
                         for (ci, comment) in comments.iter().enumerate() {
+                            if self.is_stranded_after_comma_block(comment, comma_pos, curr_start) {
+                                continue;
+                            }
                             parts.push(self.build_comment_doc(comment));
                             if comment.is_block && self.is_same_line(comment.span.end, curr_start) {
                                 parts.push(d.text(" "));
@@ -258,10 +263,7 @@ impl<'a> Printer<'a> {
                     // after-comma comments lead the next declarator.
                     let comma_target = if i == 1 { &mut parts } else { &mut rest_parts };
                     if has_block_comment {
-                        for comment in comments_in_range(self.comments, prev_end, comma_pos) {
-                            comma_target.push(d.text(" "));
-                            comma_target.push(self.build_comment_doc(comment));
-                        }
+                        self.push_before_comma_blocks(comma_target, prev_end, comma_pos);
                     }
                     comma_target.push(d.text(","));
                     // Soft break for declarations without initializers

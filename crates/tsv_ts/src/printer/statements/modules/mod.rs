@@ -23,7 +23,6 @@ use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
 
 /// Byte length of the leading `import`/`export` keyword (both 6 chars). Added to
 /// a declaration's span start to reach the position just past the keyword.
@@ -474,19 +473,11 @@ impl<'a> Printer<'a> {
             if has_default {
                 // Comments between default specifier and comma → emit before comma
                 // Comments between comma and `*` → emit after comma
-                let comma_pos = find_char_skipping_comments(
-                    self.source.as_bytes(),
-                    default_spec_end as usize,
-                    ns_spec.span.start as usize,
-                    b',',
-                )
-                .unwrap_or(default_spec_end as usize);
-                parts.push(
-                    self.build_inline_comments_between_doc(default_spec_end, comma_pos as u32),
-                );
+                let comma_pos = self.comma_between(default_spec_end, ns_spec.span.start);
+                parts.push(self.build_inline_comments_between_doc(default_spec_end, comma_pos));
                 parts.push(d.text(", "));
                 parts.push(self.build_inline_comments_between_doc_trailing_space(
-                    comma_pos as u32 + 1,
+                    comma_pos + 1,
                     ns_spec.span.start,
                 ));
                 parts.push(d.text("*"));
