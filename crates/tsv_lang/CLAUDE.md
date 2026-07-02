@@ -58,8 +58,11 @@ by default, like tsv_ts's `convert`), so production builds compile it out
 entirely — no `DocArena` side-set, no render hook; `line_comment_text_owned`
 collapses to `text_owned`. With the feature, `set_swallow_check(true)` arms it
 and the renderer (via `SwallowTracker`) records every swallow into a thread-local
-sink drained by `take_swallow_reports()`. Output-neutral. `tsv_debug` enables the
-feature to drive `tsv_debug swallow_audit`.
+sink drained by `take_swallow_reports()`. Output-neutral. `tsv_debug` forwards
+the feature as its own opt-in `swallow_check` feature (off by default so its
+profiles measure production-shaped render code) and gates the `swallow_audit`
+command behind it — build with `--features swallow_check` to drive
+`tsv_debug swallow_audit`.
 
 ### Rendering Pipeline
 

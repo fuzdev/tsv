@@ -9,6 +9,8 @@ use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
 use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
 use super::render_config::RenderConfig;
+#[cfg(feature = "swallow_check")]
+use super::swallow::SwallowTracker;
 use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
 
 /// Inline-backed render work-list. The renderers run many times per file (CSS
@@ -17,7 +19,7 @@ use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolve
 /// sub-render fully on the stack (no heap allocation), mirroring the fits path's
 /// `SmallVec<[(DocId, Mode); 16]>`. `N = 8` is the measured knee of the
 /// per-call high-water distribution (≈89% of CSS top-level renders and ≈99.7%
-/// of the high-frequency `render_single_doc_inner` calls stay inline — measured
+/// of the high-frequency single-doc sub-renders stay inline — measured
 /// before the tail-continuation rewrite, which only lowered stack transit, so
 /// the knee holds a fortiori); its 128-byte inline footprint matches the fits
 /// stack and the `DocBuf` convention.
@@ -146,6 +148,17 @@ fn effective_suffix_width(pos: usize, embed: &EmbedContext) -> usize {
     } else {
         0
     }
+}
+
+/// Width remaining on the current line for a group's fits check: the print
+/// width minus the reserved embedding suffix ([`effective_suffix_width`])
+/// minus the current column, saturating at zero before the `isize` cast.
+#[inline]
+fn remaining_width(pos: usize, render: &RenderConfig, embed: &EmbedContext) -> isize {
+    render
+        .print_width
+        .saturating_sub(effective_suffix_width(pos, embed))
+        .saturating_sub(pos) as isize
 }
 
 /// Trim trailing whitespace (spaces and tabs) from the end of the output buffer.
@@ -405,7 +418,158 @@ pub(crate) fn arena_print_doc_with_indent_and_render(
 // Core rendering
 //
 
-/// Command-stack-based rendering implementation with look-ahead.
+/// Renderer-specific behavior threaded through [`render_doc_core`].
+///
+/// The top-level renderer and the single-doc sub-renderer share one loop; the
+/// divergences between them are enumerable and small, so each lives behind a
+/// policy method (or const) that folds away after monomorphization — two
+/// instantiations, the same codegen shape as the hand-duplicated loops this
+/// replaces.
+trait RenderPolicy {
+    /// Whether a conditional group's own `should_break` short-circuits straight
+    /// to its most-expanded state in break mode (Prettier's `if (doc.break)`).
+    /// The single-doc sub-renderer predates that upgrade and runs the fits
+    /// ladder regardless — preserved drift, kept exactly as it was (a
+    /// conditional group with `should_break` inside a fill segment or line
+    /// suffix has not been observed on fixtures/corpora; unify fixtures-first
+    /// if one ever appears).
+    const CONDITIONAL_GROUP_HONORS_SHOULD_BREAK: bool;
+
+    /// Whether `line_suffix` content is deferred to the buffer and flushed at
+    /// line breaks. When `false` (the suffix-flush sub-render), suffix content
+    /// renders inline where it appears, groups pass through in the current
+    /// mode without fits checks, and `WithContext` descends without its fill
+    /// special case (the suffix was already measured where it was queued).
+    fn tracking_suffix(&self) -> bool;
+
+    /// The keyed-group mode map, when this renderer resolves keyed groups
+    /// (top-level only). `None` makes an id-keyed `IfBreak`/`IndentIfBreak`
+    /// read its group as unresolved → flat.
+    fn group_mode_map(&self) -> Option<&GroupModeMap>;
+
+    /// Record a keyed group's chosen mode (no-op without a map).
+    fn record_group_mode(&mut self, id: Option<GroupId>, mode: Mode);
+
+    /// The pending-command lookahead a `WithContext`-wrapped fill sees: the
+    /// real command stack at top level, nothing in the single-doc sub-render.
+    fn with_context_fill_rest<'a>(&self, commands: &'a [ArenaCommand]) -> &'a [ArenaCommand];
+
+    // Opt-in swallow diagnostic hooks (`swallow_check` feature): live only on
+    // the top-level policy — the sub-renders never carried the check. See
+    // `crate::doc::swallow`.
+    #[cfg(feature = "swallow_check")]
+    fn swallow_enabled(&self) -> bool;
+    #[cfg(feature = "swallow_check")]
+    fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str);
+    #[cfg(feature = "swallow_check")]
+    fn swallow_on_newline(&mut self, emitted: bool);
+}
+
+/// Policy for [`render_doc_iterative`]: resolves keyed groups into a
+/// [`GroupModeMap`], always defers line suffixes, honors conditional-group
+/// `should_break`, hands fills the real pending-command lookahead, and (under
+/// the `swallow_check` feature) hosts the line-comment swallow diagnostic.
+struct TopLevelPolicy {
+    group_mode_map: GroupModeMap,
+    #[cfg(feature = "swallow_check")]
+    swallow: SwallowTracker,
+}
+
+impl RenderPolicy for TopLevelPolicy {
+    const CONDITIONAL_GROUP_HONORS_SHOULD_BREAK: bool = true;
+
+    #[inline]
+    fn tracking_suffix(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn group_mode_map(&self) -> Option<&GroupModeMap> {
+        Some(&self.group_mode_map)
+    }
+
+    #[inline]
+    fn record_group_mode(&mut self, id: Option<GroupId>, mode: Mode) {
+        if let Some(group_id) = id {
+            self.group_mode_map.insert(group_id, mode);
+        }
+    }
+
+    #[inline]
+    fn with_context_fill_rest<'a>(&self, commands: &'a [ArenaCommand]) -> &'a [ArenaCommand] {
+        commands
+    }
+
+    #[cfg(feature = "swallow_check")]
+    #[inline]
+    fn swallow_enabled(&self) -> bool {
+        self.swallow.enabled()
+    }
+
+    #[cfg(feature = "swallow_check")]
+    #[inline]
+    fn swallow_on_text(&mut self, is_line_comment: bool, text: &str, output: &str) {
+        self.swallow.on_text(is_line_comment, text, output);
+    }
+
+    #[cfg(feature = "swallow_check")]
+    #[inline]
+    fn swallow_on_newline(&mut self, emitted: bool) {
+        self.swallow.on_newline(emitted);
+    }
+}
+
+/// Policy for [`render_single_doc_inner`] (fill segments and line-suffix
+/// flush): no keyed-group map (keyed groups read as unresolved → flat), suffix
+/// tracking only when the caller supplied a buffer, no conditional-group
+/// `should_break` shortcut (preserved drift — see
+/// [`RenderPolicy::CONDITIONAL_GROUP_HONORS_SHOULD_BREAK`]), and fills see no
+/// pending-command lookahead through `WithContext`.
+struct SingleDocPolicy {
+    tracking_suffix: bool,
+}
+
+impl RenderPolicy for SingleDocPolicy {
+    const CONDITIONAL_GROUP_HONORS_SHOULD_BREAK: bool = false;
+
+    #[inline]
+    fn tracking_suffix(&self) -> bool {
+        self.tracking_suffix
+    }
+
+    #[inline]
+    fn group_mode_map(&self) -> Option<&GroupModeMap> {
+        None
+    }
+
+    #[inline]
+    fn record_group_mode(&mut self, _id: Option<GroupId>, _mode: Mode) {}
+
+    #[inline]
+    fn with_context_fill_rest<'a>(&self, _commands: &'a [ArenaCommand]) -> &'a [ArenaCommand] {
+        &[]
+    }
+
+    #[cfg(feature = "swallow_check")]
+    #[inline]
+    fn swallow_enabled(&self) -> bool {
+        false
+    }
+
+    #[cfg(feature = "swallow_check")]
+    #[inline]
+    fn swallow_on_text(&mut self, _is_line_comment: bool, _text: &str, _output: &str) {}
+
+    #[cfg(feature = "swallow_check")]
+    #[inline]
+    fn swallow_on_newline(&mut self, _emitted: bool) {}
+}
+
+/// Command-stack-based rendering with look-ahead — the top-level renderer
+/// behind every `arena_print_doc*` entry point. Resolves keyed groups, defers
+/// `line_suffix` content (flushed at line breaks and once at the end), and
+/// (under the `swallow_check` feature) hosts the line-comment swallow
+/// diagnostic. The loop itself is [`render_doc_core`].
 #[allow(clippy::too_many_arguments)]
 fn render_doc_iterative<R: TextResolver + ?Sized>(
     arena: &DocArena,
@@ -417,25 +581,77 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     embed: &EmbedContext,
     resolver: Option<&R>,
 ) {
-    // Tail-continuation dispatch: `cmd` is the command being processed; arms
-    // that forward to exactly one child (Indent, Group, Concat's first child,
-    // …) assign `cmd` and `continue` instead of pushing it — the pushed-last
-    // command would be popped right back on the next iteration (LIFO), so this
-    // skips that stack round trip (SmallVec spill checks both ways plus the
-    // reload feeding the dispatch load chain). Traversal order is identical,
-    // and `commands` holds the same pending set at every fits/fill lookahead
-    // (those run before the continuation would have been pushed). Only
-    // terminal arms (Text, Line, Fill, …) fall through to the pop at the
-    // bottom of the loop.
+    // The swallow tracker (opt-in diagnostic) snapshots the process-global
+    // enabled flag once per render and is inert when disabled. Compiled out
+    // entirely without the feature. See `crate::doc::swallow`.
+    let mut policy = TopLevelPolicy {
+        group_mode_map: GroupModeMap::default(),
+        #[cfg(feature = "swallow_check")]
+        swallow: SwallowTracker::new(),
+    };
+    let mut line_suffix: LineSuffixBuf = SmallVec::new();
+
+    render_doc_core(
+        arena,
+        doc,
+        output,
+        pos,
+        start_indent_level,
+        Mode::Break,
+        render,
+        embed,
+        resolver,
+        &mut policy,
+        &mut line_suffix,
+    );
+
+    flush_line_suffix(
+        arena,
+        &mut line_suffix,
+        output,
+        pos,
+        render,
+        embed,
+        resolver,
+    );
+}
+
+/// The shared command-stack render loop with look-ahead — the single
+/// implementation behind [`render_doc_iterative`] and
+/// [`render_single_doc_inner`], parameterized by [`RenderPolicy`]. Pending
+/// `line_suffix` content the loop didn't flush stays in the caller's buffer
+/// (the top-level wrapper flushes it; the single-doc wrapper hands it back).
+///
+/// Tail-continuation dispatch: `cmd` is the command being processed; arms
+/// that forward to exactly one child (Indent, Group, Concat's first child,
+/// …) assign `cmd` and `continue` instead of pushing it — the pushed-last
+/// command would be popped right back on the next iteration (LIFO), so this
+/// skips that stack round trip (SmallVec spill checks both ways plus the
+/// reload feeding the dispatch load chain). Traversal order is identical,
+/// and `commands` holds the same pending set at every fits/fill lookahead
+/// (those run before the continuation would have been pushed). Only
+/// terminal arms (Text, Line, Fill, …) fall through to the pop at the
+/// bottom of the loop.
+#[allow(clippy::too_many_arguments)]
+fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
+    arena: &DocArena,
+    doc: DocId,
+    output: &mut String,
+    pos: &mut usize,
+    indent_level: usize,
+    mode: Mode,
+    render: &RenderConfig,
+    embed: &EmbedContext,
+    resolver: Option<&R>,
+    policy: &mut P,
+    line_suffix: &mut LineSuffixBuf,
+) {
     let mut commands: CmdStack = SmallVec::new();
     let mut cmd = ArenaCommand {
-        indent: start_indent_level,
-        mode: Mode::Break,
+        indent: indent_level,
+        mode,
         doc,
     };
-
-    let mut line_suffix: LineSuffixBuf = SmallVec::new();
-    let mut group_mode_map = GroupModeMap::default();
 
     // Hoist arena borrows out of the loop: the arena is read-only during
     // rendering, so a single immutable borrow held for the whole render
@@ -445,20 +661,13 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     let nodes: &[DocNode] = &nodes_outer;
     let children_vec: &[DocId] = &children_outer;
 
-    // Opt-in diagnostic (`swallow_check` feature): flag a line comment that
-    // swallows the content emitted after it on the same physical line. The
-    // tracker owns the state machine and is inert when the check is disabled.
-    // Compiled out entirely without the feature. See `crate::doc::swallow`.
-    #[cfg(feature = "swallow_check")]
-    let mut swallow = crate::doc::swallow::SwallowTracker::new();
-
     loop {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
                 #[cfg(feature = "swallow_check")]
-                if swallow.enabled() {
+                if policy.swallow_enabled() {
                     let s = resolve_text(t, resolver);
-                    swallow.on_text(arena.is_line_comment(cmd.doc), s, output);
+                    policy.swallow_on_text(arena.is_line_comment(cmd.doc), s, output);
                 }
                 render_text(t, output, pos, resolver);
             }
@@ -472,24 +681,18 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let mut lines = s.split('\n');
                 if let Some(first) = lines.next() {
                     #[cfg(feature = "swallow_check")]
-                    if swallow.enabled() {
+                    if policy.swallow_enabled() {
                         // Block-comment text is never a `//` line comment.
-                        swallow.on_text(false, first, output);
+                        policy.swallow_on_text(false, first, output);
                     }
                     output.push_str(first);
                     update_pos_for_text(pos, first);
                 }
                 for line in lines {
                     // Hardline (breaks in either mode): flush suffix, then break.
-                    flush_line_suffix(
-                        arena,
-                        &mut line_suffix,
-                        output,
-                        pos,
-                        render,
-                        embed,
-                        resolver,
-                    );
+                    if policy.tracking_suffix() {
+                        flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
+                    }
                     render_line_break(
                         LineKind::Hard,
                         cmd.mode,
@@ -500,10 +703,11 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         embed,
                     );
                     #[cfg(feature = "swallow_check")]
-                    swallow.on_newline(true);
-                    #[cfg(feature = "swallow_check")]
-                    if swallow.enabled() {
-                        swallow.on_text(false, line, output);
+                    {
+                        policy.swallow_on_newline(true);
+                        if policy.swallow_enabled() {
+                            policy.swallow_on_text(false, line, output);
+                        }
                     }
                     output.push_str(line);
                     update_pos_for_text(pos, line);
@@ -512,23 +716,17 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 
             DocNode::Line(kind) => {
                 let kind = *kind;
-                let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
-                if cmd.mode == Mode::Break || is_hard {
-                    flush_line_suffix(
-                        arena,
-                        &mut line_suffix,
-                        output,
-                        pos,
-                        render,
-                        embed,
-                        resolver,
-                    );
+                if policy.tracking_suffix() {
+                    let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
+                    if cmd.mode == Mode::Break || is_hard {
+                        flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
+                    }
                 }
                 // A real newline ends the comment's line → clears the pending swallow.
                 let emitted_newline =
                     render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
                 #[cfg(feature = "swallow_check")]
-                swallow.on_newline(emitted_newline);
+                policy.swallow_on_newline(emitted_newline);
                 #[cfg(not(feature = "swallow_check"))]
                 let _ = emitted_newline;
             }
@@ -563,28 +761,32 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let id = *id;
                 let should_break = *should_break;
 
+                if !policy.tracking_suffix() {
+                    // Suffix-flush render: pass through in the current mode,
+                    // no fits checks.
+                    cmd = cmd.with_doc(contents);
+                    continue;
+                }
+
                 let (chosen_mode, chosen_doc) = if !expanded_states.is_empty() {
                     // conditionalGroup: try each state until one fits.
                     // Prettier: only use most expanded when group's OWN should_break is true.
                     // Parent mode being Break does NOT skip the fits check — conditional
                     // groups always try flat first, even inside a MODE_BREAK parent.
-                    if should_break {
+                    if P::CONDITIONAL_GROUP_HONORS_SHOULD_BREAK && should_break {
                         // Prettier: if (doc.break) → use most expanded in break mode
                         let states = expanded_states.resolve(children_vec);
                         (Mode::Break, states.last().copied().unwrap_or(contents))
                     } else {
                         // Fits check regardless of parent mode — matches Prettier
-                        let effective_width = render
-                            .print_width
-                            .saturating_sub(effective_suffix_width(*pos, embed));
-                        let remaining_width = effective_width.saturating_sub(*pos) as isize;
+                        let remaining = remaining_width(*pos, render, embed);
 
                         let contents_fit = arena_fits_with_lookahead(
                             arena,
                             contents,
                             Mode::Flat,
                             &commands,
-                            remaining_width,
+                            remaining,
                             embed,
                             resolver,
                         );
@@ -604,7 +806,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                                     state,
                                     Mode::Flat,
                                     &commands,
-                                    remaining_width,
+                                    remaining,
                                     embed,
                                     resolver,
                                 );
@@ -619,25 +821,19 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 } else if should_break || arena.will_break(contents) {
                     (Mode::Break, contents)
                 } else {
-                    let effective_width = render
-                        .print_width
-                        .saturating_sub(effective_suffix_width(*pos, embed));
-                    let remaining_width = effective_width.saturating_sub(*pos) as isize;
                     let fits = arena_fits_with_lookahead(
                         arena,
                         contents,
                         Mode::Flat,
                         &commands,
-                        remaining_width,
+                        remaining_width(*pos, render, embed),
                         embed,
                         resolver,
                     );
                     (if fits { Mode::Flat } else { Mode::Break }, contents)
                 };
 
-                if let Some(group_id) = id {
-                    group_mode_map.insert(group_id, chosen_mode);
-                }
+                policy.record_group_mode(id, chosen_mode);
                 cmd = cmd.with_mode(chosen_mode, chosen_doc);
                 continue;
             }
@@ -645,16 +841,18 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             DocNode::IsolatedGroup { contents } => {
                 let contents = *contents;
 
-                let effective_width = render
-                    .print_width
-                    .saturating_sub(effective_suffix_width(*pos, embed));
-                let remaining_width = effective_width.saturating_sub(*pos) as isize;
+                if !policy.tracking_suffix() {
+                    // Suffix-flush render: pass through in the current mode.
+                    cmd = cmd.with_doc(contents);
+                    continue;
+                }
+
                 let fits = arena_fits_with_lookahead(
                     arena,
                     contents,
                     Mode::Flat,
                     &commands,
-                    remaining_width,
+                    remaining_width(*pos, render, embed),
                     embed,
                     resolver,
                 );
@@ -668,8 +866,17 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 flat_doc,
                 group_id,
             } => {
+                // Without a group map (the single-doc sub-renders), a keyed
+                // if_break treats its group as unresolved → flat, matching how
+                // IndentIfBreak defaults below.
                 let broke = match group_id {
-                    Some(gid) => group_mode_map.get(*gid).unwrap_or(Mode::Flat) == Mode::Break,
+                    Some(gid) => {
+                        policy
+                            .group_mode_map()
+                            .and_then(|map| map.get(*gid))
+                            .unwrap_or(Mode::Flat)
+                            == Mode::Break
+                    }
                     None => cmd.mode == Mode::Break,
                 };
                 let chosen = if broke { *break_doc } else { *flat_doc };
@@ -689,7 +896,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     contents,
                     group_id,
                     negate,
-                    Some(&group_mode_map),
+                    policy.group_mode_map(),
                     &cmd,
                 );
                 continue;
@@ -725,14 +932,28 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             DocNode::WithContext { doc, context } => {
                 let inner_doc = *doc;
 
-                if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
-                    let context = context.clone();
-                    let parts = fill_range.resolve(children_vec);
-                    render_fill_iterative(
-                        arena, parts, output, pos, cmd.indent, render, embed, &context, &commands,
-                        resolver,
-                    );
+                if policy.tracking_suffix() {
+                    if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
+                        let context = context.clone();
+                        let parts = fill_range.resolve(children_vec);
+                        render_fill_iterative(
+                            arena,
+                            parts,
+                            output,
+                            pos,
+                            cmd.indent,
+                            render,
+                            embed,
+                            &context,
+                            policy.with_context_fill_rest(&commands),
+                            resolver,
+                        );
+                    } else {
+                        cmd = cmd.with_doc(inner_doc);
+                        continue;
+                    }
                 } else {
+                    // Suffix-flush render: descend without the fill special case.
                     cmd = cmd.with_doc(inner_doc);
                     continue;
                 }
@@ -740,19 +961,19 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 
             DocNode::LineSuffix(inner) => {
                 let inner = *inner;
-                line_suffix.push(cmd.with_doc(inner));
+                if policy.tracking_suffix() {
+                    line_suffix.push(cmd.with_doc(inner));
+                } else {
+                    // Suffix-flush render: render suffix content inline.
+                    cmd = cmd.with_doc(inner);
+                    continue;
+                }
             }
 
             DocNode::LineSuffixBoundary => {
-                flush_line_suffix(
-                    arena,
-                    &mut line_suffix,
-                    output,
-                    pos,
-                    render,
-                    embed,
-                    resolver,
-                );
+                if policy.tracking_suffix() {
+                    flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
+                }
             }
 
             DocNode::BreakParent => {
@@ -766,16 +987,6 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             None => break,
         }
     }
-
-    flush_line_suffix(
-        arena,
-        &mut line_suffix,
-        output,
-        pos,
-        render,
-        embed,
-        resolver,
-    );
 }
 
 /// Render a single doc with specified mode (helper for Fill).
@@ -815,7 +1026,18 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
     );
 }
 
-/// Unified single-doc renderer with optional suffix handling.
+/// Unified single-doc renderer with optional suffix handling — the
+/// sub-renderer behind fill segments ([`render_single_doc`]) and line-suffix
+/// flushing (`suffix_buffer: None`, which renders suffix content inline). The
+/// loop itself is [`render_doc_core`]; see [`SingleDocPolicy`] for what this
+/// render does and doesn't do.
+///
+/// This wrapper looks dissolvable (its two callers could construct their own
+/// policy and call [`render_doc_core`] directly), but that shape measured as
+/// an instruction regression on every corpus — giving `render_doc_core`'s
+/// single-doc instantiation two call sites flips its inlining and puts a call
+/// on the hot per-line-break suffix-flush path. Keep the wrapper; re-attempt
+/// only with an instruction-count gate.
 #[allow(clippy::too_many_arguments)]
 fn render_single_doc_inner<R: TextResolver + ?Sized>(
     arena: &DocArena,
@@ -829,307 +1051,25 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     resolver: Option<&R>,
     suffix_buffer: Option<&mut LineSuffixBuf>,
 ) {
-    // Tail-continuation dispatch — same shape as `render_doc_iterative` (see
-    // the comment there): single-continuation arms assign `cmd` and `continue`;
-    // terminal arms fall through to the pop at the bottom of the loop.
-    let mut commands: CmdStack = SmallVec::new();
-    let mut cmd = ArenaCommand {
-        indent: indent_level,
-        mode,
-        doc,
+    let mut policy = SingleDocPolicy {
+        tracking_suffix: suffix_buffer.is_some(),
     };
-
-    let tracking_suffix = suffix_buffer.is_some();
     let mut dummy_suffix: LineSuffixBuf = SmallVec::new();
     let line_suffix = suffix_buffer.unwrap_or(&mut dummy_suffix);
 
-    // Hoist arena borrows out of the loop: the arena is read-only during
-    // rendering, so a single immutable borrow held for the whole render
-    // avoids the per-iteration dynamic borrow-check cost.
-    let nodes_outer = arena.borrow_nodes();
-    let children_outer = arena.borrow_children();
-    let nodes: &[DocNode] = &nodes_outer;
-    let children_vec: &[DocId] = &children_outer;
-
-    loop {
-        match &nodes[cmd.doc.index()] {
-            DocNode::Text(t) => {
-                render_text(t, output, pos, resolver);
-            }
-
-            DocNode::MultilineText(s) => {
-                // Same per-line render as `render_doc_iterative`'s arm, but with
-                // this sub-renderer's conditional suffix handling (no swallow
-                // check here). See `DocNode::MultilineText`.
-                let mut lines = s.split('\n');
-                if let Some(first) = lines.next() {
-                    output.push_str(first);
-                    update_pos_for_text(pos, first);
-                }
-                for line in lines {
-                    if tracking_suffix {
-                        flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
-                    }
-                    render_line_break(
-                        LineKind::Hard,
-                        cmd.mode,
-                        cmd.indent,
-                        output,
-                        pos,
-                        render,
-                        embed,
-                    );
-                    output.push_str(line);
-                    update_pos_for_text(pos, line);
-                }
-            }
-
-            DocNode::Line(kind) => {
-                let kind = *kind;
-                if tracking_suffix {
-                    let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
-                    if cmd.mode == Mode::Break || is_hard {
-                        flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
-                    }
-                }
-                render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
-            }
-
-            DocNode::Indent(inner) => {
-                let inner = *inner;
-                cmd = cmd.indented(inner);
-                continue;
-            }
-
-            DocNode::Dedent(inner) => {
-                let inner = *inner;
-                cmd = cmd.dedented(inner);
-                continue;
-            }
-
-            DocNode::Align { n, contents } => {
-                let n = *n;
-                let contents = *contents;
-                cmd = cmd.with_indent(n, contents);
-                continue;
-            }
-
-            DocNode::Group {
-                contents,
-                expanded_states,
-                id: _,
-                should_break,
-            } => {
-                let contents = *contents;
-                let expanded_states = *expanded_states;
-                let should_break = *should_break;
-
-                if !tracking_suffix {
-                    cmd = cmd.with_doc(contents);
-                } else if !expanded_states.is_empty() {
-                    let effective_width = render
-                        .print_width
-                        .saturating_sub(effective_suffix_width(*pos, embed));
-                    let remaining = effective_width.saturating_sub(*pos) as isize;
-
-                    if arena_fits_with_lookahead(
-                        arena,
-                        contents,
-                        Mode::Flat,
-                        &commands,
-                        remaining,
-                        embed,
-                        resolver,
-                    ) {
-                        cmd = cmd.with_mode(Mode::Flat, contents);
-                    } else {
-                        // Try each earlier state flat, in order; the final state
-                        // is the Break fallback (`states` is non-empty — the
-                        // `!expanded_states.is_empty()` guard above).
-                        let states = expanded_states.resolve(children_vec);
-                        let last = states.len() - 1;
-                        let mut chosen = (Mode::Break, states[last]);
-                        for &state in &states[..last] {
-                            if arena_fits_with_lookahead(
-                                arena,
-                                state,
-                                Mode::Flat,
-                                &commands,
-                                remaining,
-                                embed,
-                                resolver,
-                            ) {
-                                chosen = (Mode::Flat, state);
-                                break;
-                            }
-                        }
-                        cmd = cmd.with_mode(chosen.0, chosen.1);
-                    }
-                } else if should_break || arena.will_break(contents) {
-                    cmd = cmd.with_mode(Mode::Break, contents);
-                } else {
-                    let effective_width = render
-                        .print_width
-                        .saturating_sub(effective_suffix_width(*pos, embed));
-                    let remaining = effective_width.saturating_sub(*pos) as isize;
-                    let chosen_mode = if arena_fits_with_lookahead(
-                        arena,
-                        contents,
-                        Mode::Flat,
-                        &commands,
-                        remaining,
-                        embed,
-                        resolver,
-                    ) {
-                        Mode::Flat
-                    } else {
-                        Mode::Break
-                    };
-                    cmd = cmd.with_mode(chosen_mode, contents);
-                }
-                continue;
-            }
-
-            DocNode::IsolatedGroup { contents } => {
-                let contents = *contents;
-
-                if !tracking_suffix {
-                    cmd = cmd.with_doc(contents);
-                } else {
-                    let effective_width = render
-                        .print_width
-                        .saturating_sub(effective_suffix_width(*pos, embed));
-                    let remaining = effective_width.saturating_sub(*pos) as isize;
-                    let chosen_mode = if arena_fits_with_lookahead(
-                        arena,
-                        contents,
-                        Mode::Flat,
-                        &commands,
-                        remaining,
-                        embed,
-                        resolver,
-                    ) {
-                        Mode::Flat
-                    } else {
-                        Mode::Break
-                    };
-                    cmd = cmd.with_mode(chosen_mode, contents);
-                }
-                continue;
-            }
-
-            DocNode::IfBreak {
-                break_doc,
-                flat_doc,
-                group_id,
-            } => {
-                // No group_mode_map in this sub-renderer; a group-id if_break
-                // treats its keyed group as unresolved (flat), matching how
-                // IndentIfBreak defaults below.
-                let broke = group_id.is_none() && cmd.mode == Mode::Break;
-                let chosen = if broke { *break_doc } else { *flat_doc };
-                cmd = cmd.with_doc(chosen);
-                continue;
-            }
-
-            DocNode::IndentIfBreak {
-                contents,
-                group_id,
-                negate,
-            } => {
-                let contents = *contents;
-                let group_id = *group_id;
-                let negate = *negate;
-                cmd = process_indent_if_break(contents, group_id, negate, None, &cmd);
-                continue;
-            }
-
-            DocNode::Concat(range) => {
-                let kids = range.resolve(children_vec);
-                if let Some((&first, rest)) = kids.split_first() {
-                    for &child in rest.iter().rev() {
-                        commands.push(cmd.with_doc(child));
-                    }
-                    cmd = cmd.with_doc(first);
-                    continue;
-                }
-            }
-
-            DocNode::Fill(range) => {
-                let parts = range.resolve(children_vec);
-                // Pass the remaining commands as look-ahead (like the top-level
-                // `render_doc_iterative` Fill arm), so a fill's final-segment fits check
-                // sees the content that follows it within this sub-render — e.g. the
-                // `</tag` suffix after an inline element's content fill — and wraps the
-                // last word instead of over-shooting the print width.
-                render_fill_iterative(
-                    arena,
-                    parts,
-                    output,
-                    pos,
-                    cmd.indent,
-                    render,
-                    embed,
-                    &DocContext::default(),
-                    &commands,
-                    resolver,
-                );
-            }
-
-            DocNode::WithContext { doc, context } => {
-                let inner_doc = *doc;
-
-                if tracking_suffix {
-                    if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
-                        let context = context.clone();
-                        let parts = fill_range.resolve(children_vec);
-                        render_fill_iterative(
-                            arena,
-                            parts,
-                            output,
-                            pos,
-                            cmd.indent,
-                            render,
-                            embed,
-                            &context,
-                            &[],
-                            resolver,
-                        );
-                    } else {
-                        cmd = cmd.with_doc(inner_doc);
-                        continue;
-                    }
-                } else {
-                    cmd = cmd.with_doc(inner_doc);
-                    continue;
-                }
-            }
-
-            DocNode::LineSuffix(inner) => {
-                let inner = *inner;
-                if tracking_suffix {
-                    line_suffix.push(cmd.with_doc(inner));
-                } else {
-                    cmd = cmd.with_doc(inner);
-                    continue;
-                }
-            }
-
-            DocNode::LineSuffixBoundary => {
-                if tracking_suffix {
-                    flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
-                }
-            }
-
-            DocNode::BreakParent => {}
-        }
-
-        // Terminal arm: take the next pending command off the stack.
-        match commands.pop() {
-            Some(next) => cmd = next,
-            None => break,
-        }
-    }
+    render_doc_core(
+        arena,
+        doc,
+        output,
+        pos,
+        indent_level,
+        mode,
+        render,
+        embed,
+        resolver,
+        &mut policy,
+        line_suffix,
+    );
 }
 
 //

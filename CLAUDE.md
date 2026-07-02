@@ -771,12 +771,15 @@ deno task metrics                          # shorthand
 # any `//` line comment followed by content on the same output line (silent
 # content loss). Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files
 # to audit real code. Exits 1 on any finding.
-cargo run -p tsv_debug swallow_audit                 # audit all fixtures
-cargo run -p tsv_debug swallow_audit ~/dev/zzz/src   # audit a real codebase
+cargo run -p tsv_debug --features swallow_check swallow_audit                 # audit all fixtures
+cargo run -p tsv_debug --features swallow_check swallow_audit ~/dev/zzz/src   # audit a real codebase
 # Also: --json. The check lives in tsv_lang::doc::swallow, behind the
 # `swallow_check` cargo feature (off by default → compiled out of prod
-# wasm/cli/ffi; tsv_debug enables it). Gated in `deno task check` (via the
-# `swallow:audit` task) over tests/fixtures.
+# wasm/cli/ffi AND out of default tsv_debug builds, so `profile`/`perf`
+# sessions measure production-shaped render code). tsv_debug forwards the
+# feature and gates the command behind it — build with
+# `--features swallow_check` (only the `swallow:audit` deno task needs it).
+# Gated in `deno task check` (via the `swallow:audit` task) over tests/fixtures.
 ```
 
 **Build-Fanout Audit (exponential-rebuild regression guard):**

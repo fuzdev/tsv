@@ -8,9 +8,17 @@ description = "Development utilities for tsv (AST debugging, printer comparison)
 name = "tsv_debug"
 path = "src/main.rs"
 
+[features]
+# Opt-in: compiles tsv_lang's render-time swallow check into this binary and
+# enables the `swallow_audit` subcommand (the `swallow:audit` deno task passes
+# it). Off by default so default tsv_debug builds — including `profile` and
+# `perf` sessions — measure production-shaped render code with no
+# instrumentation branch in the render loop.
+swallow_check = ["tsv_lang/swallow_check"]
+
 [dependencies]
 tsv_cli = { path = "../tsv_cli" }
-tsv_lang = { workspace = true, features = ["swallow_check"] }
+tsv_lang = { workspace = true }
 tsv_svelte = { workspace = true, features = ["convert"] }
 tsv_ts = { workspace = true, features = ["convert", "debug_lex"] }
 tsv_css = { workspace = true, features = ["convert", "debug_lex"] }
