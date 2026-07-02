@@ -163,16 +163,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Check for alternate branch
         let alternate = if self.check(TokenKind::BlockContinue) {
-            // Peek at what follows {:
+            // Peek at what follows {:. Match the first two whitespace-delimited
+            // words allocation-free (the old `.take(2).join(" ")` normalized
+            // "else  if" -> "else if" only to compare against these two forms).
             let keyword = self.continuation_keyword_at(self.current_end);
-            // Normalize whitespace: "else  if" -> "else if"
-            let keyword_normalized: String = keyword
-                .split_whitespace()
-                .take(2)
-                .collect::<Vec<_>>()
-                .join(" ");
+            let mut words = keyword.split_whitespace();
+            let first = words.next();
+            let second = words.next();
+            let is_else_if = first == Some("else") && second == Some("if");
+            let is_else = first == Some("else") && second.is_none();
 
-            if keyword_normalized == "else if" {
+            if is_else_if {
                 // {:else if} - parse as nested if block
                 let elseif_start = self.current_start;
                 let elseif_block = self.parse_if_block_inner(elseif_start, true)?;
@@ -181,7 +182,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 Some(Fragment {
                     nodes: nodes.into_bump_slice(),
                 })
-            } else if keyword_normalized == "else" {
+            } else if is_else {
                 // {:else} - parse else branch
                 let else_tag_start = self.current_end;
                 let (_, else_content_start) = self.scan_block_tag_content(else_tag_start)?; // consume "else}"

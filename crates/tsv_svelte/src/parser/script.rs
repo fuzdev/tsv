@@ -99,8 +99,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 | AttributeNode::LetDirective(_) => continue,
             };
 
-            // Resolve attribute name to string
-            let name = interner.borrow().resolve_infallible(attr.name).to_string();
+            // Resolve attribute name (borrow scoped to this iteration — no owned copy)
+            let interner_ref = interner.borrow();
+            let name = interner_ref.resolve_infallible(attr.name);
 
             // Check for boolean module attribute: <script module>
             if name == "module" && attr.value.is_none() {

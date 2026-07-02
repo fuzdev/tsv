@@ -63,7 +63,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let token = lexer.next_token()?;
             (token.kind, token.start as usize, token.end as usize)
         };
-        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
+        // Pre-size the per-document interner from the source length (one up-front
+        // allocation instead of the from-empty doubling reallocs). The Svelte parser
+        // owns the single interner shared with every embedded `<script>`/`{expr}`.
+        let interner = Rc::new(RefCell::new(DefaultStringInterner::with_capacity(
+            tsv_lang::estimated_interner_capacity(source.len()),
+        )));
         Ok(Self {
             arena,
             source,
@@ -128,7 +133,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         (self.current_start, self.current_end)
     }
 
-    pub(crate) fn current_value(&self) -> &str {
+    /// The current token's verbatim source text. Returns `&'a str` (borrowing the
+    /// immutable source), not `&self` — so callers can hold it across `advance()`
+    /// (and other `&mut self` calls) without a borrow-escape `.to_string()`.
+    pub(crate) fn current_value(&self) -> &'a str {
         // current_start/end are global, so use them directly
         &self.source[self.current_start..self.current_end]
     }
