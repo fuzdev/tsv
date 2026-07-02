@@ -1,0 +1,138 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 214,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 81,
+					"end": 101,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 81,
+							"end": 101,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 81,
+											"end": 83
+										},
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 99,
+											"end": 101
+										}
+									],
+									"start": 81,
+									"end": 101
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 102,
+					"end": 120,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 106,
+							"end": 116,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 81,
+				"end": 120
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 163,
+					"end": 185,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 163,
+							"end": 185,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 163,
+											"end": 165
+										},
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 165,
+											"end": 167
+										},
+										{
+											"type": "ClassSelector",
+											"name": "c",
+											"start": 183,
+											"end": 185
+										}
+									],
+									"start": 163,
+									"end": 185
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 186,
+					"end": 205,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 190,
+							"end": 201,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 163,
+				"end": 205
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 206,
+			"styles": "\n\t/* two adjacent glued comments keep the compound (not a descendant) */\n\t.a/* c1 *//* c2 */.b {\n\t\tcolor: red;\n\t}\n\n\t/* a glued comment run mid-compound */\n\t.a.b/* c3 *//* c4 */.c {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 215,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
