@@ -47,6 +47,13 @@ impl<'a> Printer<'a> {
     /// passes them decomposed. When `should_group_function_parameters` is true, params
     /// are wrapped in their own inner group so they can stay flat even when the outer
     /// group breaks due to the return type's hardlines.
+    ///
+    /// One depth-tracked scan locates the params' close `)`; every boundary derived
+    /// from it (the params-trailing bound, the `)`→return-type comment range, the
+    /// signature end) shares that scan. Returns the doc plus the signature end —
+    /// where comments before the body begin: the return type's end when present,
+    /// otherwise just past the `)` (falling back to `body_start` if the paren can't
+    /// be located).
     pub(in crate::printer) fn build_callable_signature_doc(
         &self,
         params: &[internal::Expression<'_>],
@@ -54,13 +61,18 @@ impl<'a> Printer<'a> {
         return_type: Option<&internal::TSTypeAnnotation<'_>>,
         params_start: u32,
         body_start: u32,
-    ) -> DocId {
+    ) -> (DocId, u32) {
         let d = self.d();
 
-        // Params trailing comments are bounded at the close paren; a comment between
-        // `)` and the return type is emitted via build_paren_to_return_type_comments.
+        let close_paren_after = self.find_closing_paren(params_start, body_start);
+
+        // Params trailing comments are bounded at the close paren: a comment after
+        // `)` is not param-trailing — it belongs to the `)`→return-type gap (emitted
+        // via build_close_paren_to_return_type_comments) or the signature→body gap.
+        // Bounding here keeps the params scan from consuming (and duplicating, or
+        // mis-positioning) either.
         let trailing_comments_end =
-            Some(self.params_trailing_comments_end(params_start, body_start));
+            Some(close_paren_after.map_or(body_start, |after_paren| after_paren - 1));
 
         let params_doc =
             self.build_params_doc_with_comments(params, Some(params_start), trailing_comments_end);
@@ -85,13 +97,21 @@ impl<'a> Printer<'a> {
             // Preserve a comment between `)` and the return type `:` in place.
             if let Some(rt) = return_type {
                 sig_parts.push(
-                    self.build_paren_to_return_type_comments(Some(params_start), rt.span.start),
+                    self.build_close_paren_to_return_type_comments(
+                        close_paren_after,
+                        rt.span.start,
+                    ),
                 );
             }
             sig_parts.push(rt_doc);
         }
 
-        d.group(d.concat(&sig_parts))
+        let sig_end = match return_type {
+            Some(rt) => rt.span.end,
+            None => close_paren_after.unwrap_or(body_start),
+        };
+
+        (d.group(d.concat(&sig_parts)), sig_end)
     }
 
     /// Build a Doc for a function declaration
@@ -181,20 +201,16 @@ impl<'a> Printer<'a> {
         }
 
         // Signature (params + return type) in a single group
-        tail.push(self.build_callable_signature_doc(
+        let (sig_doc, sig_end) = self.build_callable_signature_doc(
             decl.params,
             decl.type_parameters.as_ref(),
             decl.return_type.as_ref(),
             decl.params_start,
             decl.body.span.start,
-        ));
+        );
+        tail.push(sig_doc);
 
         // Handle comments between signature and body: function a() /* comment */ {}
-        let sig_end = self.signature_end(
-            decl.return_type.as_ref(),
-            decl.params_start,
-            decl.body.span.start,
-        );
         self.append_body_with_sig_comments(&mut tail, sig_end, &decl.body);
 
         if decl.id.is_some() {
