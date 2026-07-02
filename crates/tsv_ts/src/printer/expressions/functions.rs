@@ -12,7 +12,7 @@ use crate::printer::calls::arg_predicates::arrow_has_trailing_param_comments;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;
-use crate::printer::{CommentFilter, CommentSpacing};
+use crate::printer::{CommentFilter, CommentSpacing, LeadingGlue};
 use crate::printer::{
     CommentVec, ParenContext, Printer, has_newline_before_position,
     is_multiline_template_expression, unwrap_parenthesized,
@@ -926,29 +926,16 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
 
-        // Print leading comments
-        let comments: CommentVec<'_> =
-            comments_in_range(self.comments, sig_end, body_start).collect();
-        for (i, comment) in comments.iter().enumerate() {
-            parts.push(self.build_comment_doc(comment));
-
-            // Determine separator after comment:
-            // - Line comments (// ...) → MUST use hardline (comment extends to EOL)
-            // - Own-line block comments (newline after) → hardline
-            // - Inline block comments → space
-            let is_line_comment = !comment.is_block;
-            let next_start = comments.get(i + 1).map_or(body_start, |c| c.span.start);
-            let is_own_line = comment.is_block && !self.is_same_line(comment.span.end, next_start);
-
-            if is_line_comment || is_own_line {
-                // Preserve an author blank line before the next comment / the body,
-                // matching prettier.
-                self.push_blank_preserving_hardline(&mut parts, comment.span.end, next_start);
-            } else {
-                // Inline block comment → space
-                parts.push(d.text(" "));
-            }
-        }
+        // Print leading comments: a block comment inline-adjacent to the next
+        // comment / the body hugs it with a space; a line comment or own-line
+        // block drops to its own line (a line comment must break so it can't
+        // absorb the body). Same shape as the RHS-of-`=` leading run.
+        self.push_leading_comment_run(
+            &mut parts,
+            comments_in_range(self.comments, sig_end, body_start),
+            body_start,
+            LeadingGlue::Adjacent,
+        );
 
         // Add the body expression
         parts.push(self.build_arrow_body_doc(expr));

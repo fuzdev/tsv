@@ -48,7 +48,9 @@ pub(crate) use analysis::{
     is_multiline_template_expression, is_pure_property_chain, is_string_literal,
     object_pattern_should_expand, template_literal_has_newlines,
 };
-pub(crate) use comments::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword};
+pub(crate) use comments::{
+    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
+};
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
     arrow_chain_has_return_type, class_expr_has_decorators, is_call_on_member_chain,
