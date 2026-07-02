@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 728,
+		"end": 1046,
 		"attributes": [],
 		"children": [
 			{
@@ -524,13 +524,179 @@
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 676,
-					"end": 697,
+					"start": 677,
+					"end": 691,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 676,
-							"end": 697,
+							"start": 677,
+							"end": 691,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 677,
+											"end": 680
+										},
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 689,
+											"end": 691
+										}
+									],
+									"start": 677,
+									"end": 691
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 692,
+					"end": 711,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 696,
+							"end": 707,
+							"property": "color",
+							"value": "pink"
+						}
+					]
+				},
+				"start": 677,
+				"end": 711
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 777,
+					"end": 794,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 777,
+							"end": 794,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 777,
+											"end": 779
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "hover",
+											"args": null,
+											"start": 788,
+											"end": 794
+										}
+									],
+									"start": 777,
+									"end": 794
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 795,
+					"end": 814,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 799,
+							"end": 810,
+							"property": "color",
+							"value": "gray"
+						}
+					]
+				},
+				"start": 777,
+				"end": 814
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 892,
+					"end": 917,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 892,
+							"end": 917,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 892,
+											"end": 894
+										},
+										{
+											"type": "ClassSelector",
+											"name": "b",
+											"start": 903,
+											"end": 905
+										},
+										{
+											"type": "IdSelector",
+											"name": "id",
+											"start": 914,
+											"end": 917
+										}
+									],
+									"start": 892,
+									"end": 917
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 918,
+					"end": 937,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 922,
+							"end": 933,
+							"property": "color",
+							"value": "aqua"
+						}
+					]
+				},
+				"start": 892,
+				"end": 937
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 994,
+					"end": 1015,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 994,
+							"end": 1015,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -541,43 +707,43 @@
 											"name": "has",
 											"args": {
 												"type": "SelectorList",
-												"start": 681,
-												"end": 696,
+												"start": 999,
+												"end": 1014,
 												"children": [
 													{
 														"type": "ComplexSelector",
-														"start": 681,
-														"end": 696,
+														"start": 999,
+														"end": 1014,
 														"children": [
 															{
 																"type": "RelativeSelector",
 																"combinator": {
 																	"type": "Combinator",
 																	"name": ">",
-																	"start": 681,
-																	"end": 682
+																	"start": 999,
+																	"end": 1000
 																},
 																"selectors": [
 																	{
 																		"type": "TypeSelector",
 																		"name": "img",
-																		"start": 693,
-																		"end": 696
+																		"start": 1011,
+																		"end": 1014
 																	}
 																],
-																"start": 681,
-																"end": 696
+																"start": 999,
+																"end": 1014
 															}
 														]
 													}
 												]
 											},
-											"start": 676,
-											"end": 697
+											"start": 994,
+											"end": 1015
 										}
 									],
-									"start": 676,
-									"end": 697
+									"start": 994,
+									"end": 1015
 								}
 							]
 						}
@@ -585,32 +751,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 698,
-					"end": 719,
+					"start": 1016,
+					"end": 1037,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 702,
-							"end": 715,
+							"start": 1020,
+							"end": 1033,
 							"property": "color",
 							"value": "purple"
 						}
 					]
 				},
-				"start": 676,
-				"end": 719
+				"start": 994,
+				"end": 1037
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 720,
-			"styles": "\n\t/* descendant combinator gap */\n\tdiv /* c1 */ p {\n\t\tcolor: red;\n\t}\n\n\t/* child combinator, comment after */\n\ta > /* c2 */ b {\n\t\tcolor: blue;\n\t}\n\n\t/* child combinator, comment before */\n\ti /* c3 */ > em {\n\t\tcolor: green;\n\t}\n\n\t/* next-sibling combinator */\n\th2 + /* c4 */ p {\n\t\tcolor: teal;\n\t}\n\n\t/* subsequent-sibling combinator */\n\th2 ~ /* c5 */ p {\n\t\tcolor: navy;\n\t}\n\n\t/* column combinator */\n\tcol || /* c6 */ td {\n\t\tcolor: maroon;\n\t}\n\n\t/* comment on both sides of the symbol */\n\ta /* c7 */ > /* c8 */ b {\n\t\tcolor: olive;\n\t}\n\n\t/* compound-internal glued (stays a compound) */\n\t.a/* c9 */.b {\n\t\tcolor: orange;\n\t}\n\n\t/* relative-selector leading combinator in :has() */\n\t:has(> /* c10 */ img) {\n\t\tcolor: purple;\n\t}\n",
+			"end": 1038,
+			"styles": "\n\t/* descendant combinator gap */\n\tdiv /* c1 */ p {\n\t\tcolor: red;\n\t}\n\n\t/* child combinator, comment after */\n\ta > /* c2 */ b {\n\t\tcolor: blue;\n\t}\n\n\t/* child combinator, comment before */\n\ti /* c3 */ > em {\n\t\tcolor: green;\n\t}\n\n\t/* next-sibling combinator */\n\th2 + /* c4 */ p {\n\t\tcolor: teal;\n\t}\n\n\t/* subsequent-sibling combinator */\n\th2 ~ /* c5 */ p {\n\t\tcolor: navy;\n\t}\n\n\t/* column combinator */\n\tcol || /* c6 */ td {\n\t\tcolor: maroon;\n\t}\n\n\t/* comment on both sides of the symbol */\n\ta /* c7 */ > /* c8 */ b {\n\t\tcolor: olive;\n\t}\n\n\t/* compound-internal glued (stays a compound) */\n\t.a/* c9 */.b {\n\t\tcolor: orange;\n\t}\n\n\t/* glued compound, type + class (stays a compound) */\n\tdiv/* c11 */.b {\n\t\tcolor: pink;\n\t}\n\n\t/* glued compound, class + pseudo-class (stays a compound) */\n\t.a/* c12 */:hover {\n\t\tcolor: gray;\n\t}\n\n\t/* glued compound run across three members (each boundary stays glued) */\n\t.a/* c13 */.b/* c14 */#id {\n\t\tcolor: aqua;\n\t}\n\n\t/* relative-selector leading combinator in :has() */\n\t:has(> /* c10 */ img) {\n\t\tcolor: purple;\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 729,
+	"end": 1047,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
