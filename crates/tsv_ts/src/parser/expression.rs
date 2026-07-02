@@ -1339,18 +1339,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (regex_token, pattern_end) = self.lexer.read_regex_literal(lexer_start)?;
                 let lexer_end = regex_token.end as usize;
 
-                // Calculate span with base_offset for the AST
-                let span_start = lexer_start + self.base_offset;
-                let span_end = lexer_end + self.base_offset;
-
                 // Pattern and flags are verbatim source slices (escapes preserved),
                 // recovered from spans rather than owned strings. `pattern_end` is the
                 // closing `/` (local): pattern is [slash+1, close), flags are
-                // [close+1, token end). Spans are stored in host coordinates.
+                // [close+1, token end). Spans are stored in host coordinates
+                // (`span_pos` applies the `base_offset` shift).
                 let pattern_span =
-                    Span::new(span_start as u32 + 1, (pattern_end + self.base_offset) as u32);
+                    Span::new(self.span_pos(lexer_start + 1), self.span_pos(pattern_end));
                 let flags_span =
-                    Span::new((pattern_end + 1 + self.base_offset) as u32, span_end as u32);
+                    Span::new(self.span_pos(pattern_end + 1), self.span_pos(lexer_end));
                 // Precompute the pattern's visual width so the "simple call argument"
                 // width check stays source-free; saturate to the field's u16 range.
                 let pattern_width = visual_width(&self.source[lexer_start + 1..pattern_end], TAB_WIDTH)
@@ -1376,9 +1373,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         pattern_span,
                         flags_span,
                         pattern_width,
-                        span: Span::new(span_start as u32, span_end as u32),
+                        span: Span::new(self.span_pos(lexer_start), self.span_pos(lexer_end)),
                     }),
-                    span_end,
+                    lexer_end + self.base_offset,
                 ))
             }
             TokenKind::Hash => {
