@@ -5,6 +5,7 @@
 
 use crate::ast::internal::ElementKind;
 use serde::Serialize;
+use std::borrow::Cow;
 use tsv_css::ast::public::StyleSheet;
 use tsv_ts::ast::public::{Expression, Program};
 
@@ -76,8 +77,10 @@ pub struct NamePosition {
 /// The public AST is Serialize-only — it is an output format (matching Svelte's
 /// JSON), never deserialized back into these types. (`css` also embeds
 /// `tsv_css`'s `StyleSheet`, whose `&'static str` type tags couldn't round-trip
-/// regardless.) The `'src` lifetime ties embedded `tsv_ts` expressions and
-/// `tsv_css` style text back to the source they were converted against.
+/// regardless.) The `'src` lifetime ties embedded `tsv_ts` expressions,
+/// `tsv_css` style text, and Svelte's own borrowed text leaves (`Cow<'src, str>`
+/// names, `Text`/`Comment` content) back to the source they were converted
+/// against.
 #[derive(Debug, Clone, Serialize)]
 pub struct Root<'src> {
     pub css: Option<StyleSheet<'src>>,
@@ -111,8 +114,8 @@ pub enum FragmentNode<'src> {
     RegularElement(Element<'src>),
     SpecialElement(SpecialElement<'src>),
     ExpressionTag(ExpressionTag<'src>),
-    Text(Text),
-    Comment(Comment),
+    Text(Text<'src>),
+    Comment(Comment<'src>),
     IfBlock(IfBlock<'src>),
     EachBlock(EachBlock<'src>),
     AwaitBlock(AwaitBlock<'src>),
@@ -127,12 +130,12 @@ pub enum FragmentNode<'src> {
 
 /// Svelte HTML Comment node: <!-- content -->
 #[derive(Debug, Clone, Serialize)]
-pub struct Comment {
+pub struct Comment<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub data: String,
+    pub data: Cow<'src, str>,
 }
 
 /// Svelte Element - HTML/component tag
@@ -142,7 +145,7 @@ pub struct Element<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     #[serde(skip_serializing)]
     pub kind: ElementKind,
@@ -161,7 +164,8 @@ pub struct SpecialElement<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub name: String,
+    /// Special-element tag names are a closed set (`ElementKind::tag_name`).
+    pub name: &'static str,
     pub name_loc: NameLocation,
     pub attributes: Vec<AttributeNode<'src>>,
     pub fragment: Fragment<'src>,
@@ -196,10 +200,10 @@ pub struct SvelteOptions<'src> {
     pub preserve_whitespace: Option<bool>,
     /// Parsed from `css="injected"` attribute
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub css: Option<String>,
+    pub css: Option<Cow<'src, str>>,
     /// Parsed from `namespace="svg"` attribute
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
+    pub namespace: Option<Cow<'src, str>>,
     /// Parsed from `customElement={{ tag: '...', shadow: '...' }}` attribute
     #[serde(rename = "customElement", skip_serializing_if = "Option::is_none")]
     pub custom_element: Option<serde_json::Value>,
@@ -212,7 +216,7 @@ pub struct Attribute<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub value: AttributeValueField<'src>,
 }
@@ -248,7 +252,7 @@ pub struct OnDirective<'src> {
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
@@ -260,12 +264,12 @@ pub struct OnDirective<'src> {
 /// (`bind:value`) produce Svelte-style field ordering without `loc`, while
 /// explicit directives (`bind:value={a}`) use acorn-style ordering with `loc`.
 #[derive(Debug, Clone, Serialize)]
-pub struct BindDirective {
+pub struct BindDirective<'src> {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub expression: serde_json::Value,
     pub modifiers: Vec<String>,
@@ -275,12 +279,12 @@ pub struct BindDirective {
 ///
 /// See `BindDirective` for why `expression` is `serde_json::Value`.
 #[derive(Debug, Clone, Serialize)]
-pub struct ClassDirective {
+pub struct ClassDirective<'src> {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub expression: serde_json::Value,
     pub modifiers: Vec<String>,
@@ -293,7 +297,7 @@ pub struct StyleDirective<'src> {
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub modifiers: Vec<String>,
     pub value: AttributeValueField<'src>,
@@ -306,7 +310,7 @@ pub struct UseDirective<'src> {
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
@@ -319,7 +323,7 @@ pub struct TransitionDirective<'src> {
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
@@ -334,7 +338,7 @@ pub struct AnimateDirective<'src> {
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
@@ -347,7 +351,7 @@ pub struct LetDirective<'src> {
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub name: String,
+    pub name: Cow<'src, str>,
     pub name_loc: NameLocation,
     pub expression: Option<ExpressionIsland<'src>>,
     pub modifiers: Vec<String>,
@@ -363,8 +367,8 @@ pub enum AttributeNode<'src> {
     SpreadAttribute(SpreadAttribute<'src>),
     AttachTag(AttachTag<'src>),
     OnDirective(OnDirective<'src>),
-    BindDirective(BindDirective),
-    ClassDirective(ClassDirective),
+    BindDirective(BindDirective<'src>),
+    ClassDirective(ClassDirective<'src>),
     StyleDirective(StyleDirective<'src>),
     UseDirective(UseDirective<'src>),
     TransitionDirective(TransitionDirective<'src>),
@@ -393,7 +397,7 @@ pub enum AttributeValueField<'src> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum AttributeValue<'src> {
-    Text(AttributeText),
+    Text(AttributeText<'src>),
     ExpressionTag(ExpressionTag<'src>),
 }
 
@@ -402,24 +406,24 @@ pub enum AttributeValue<'src> {
 /// Svelte's parser serializes attribute-value Text nodes with `start, end` before `type`,
 /// unlike fragment-level Text nodes which use `type, start, end`.
 #[derive(Debug, Clone, Serialize)]
-pub struct AttributeText {
+pub struct AttributeText<'src> {
     pub start: u32,
     pub end: u32,
     #[serde(rename = "type")]
     pub node_type: &'static str,
-    pub raw: String,
-    pub data: String,
+    pub raw: Cow<'src, str>,
+    pub data: Cow<'src, str>,
 }
 
 /// Svelte Text node (fragment context: type, start, end, raw, data)
 #[derive(Debug, Clone, Serialize)]
-pub struct Text {
+pub struct Text<'src> {
     #[serde(rename = "type")]
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub raw: String,
-    pub data: String,
+    pub raw: Cow<'src, str>,
+    pub data: Cow<'src, str>,
 }
 
 /// Svelte ExpressionTag - {expression} in template
@@ -439,7 +443,7 @@ pub struct Script<'src> {
     pub node_type: &'static str,
     pub start: u32,
     pub end: u32,
-    pub context: String, // "default" or "module"
+    pub context: &'static str, // "default" or "module" (`ScriptContext::as_str`)
     pub content: ProgramIsland<'src>,
     pub attributes: Vec<AttributeNode<'src>>,
 }

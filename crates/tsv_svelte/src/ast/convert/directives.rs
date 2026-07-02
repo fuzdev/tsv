@@ -6,11 +6,25 @@
 // still preserve any `|mod` text verbatim, matching Svelte's permissive parser.
 
 use crate::ast::{internal, public};
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{LocationTracker, Span};
 use tsv_ts::ast::convert::convert_expression;
 
 use super::{convert_attribute_value, convert_expression_tag, span_to_name_loc, to_json_value};
+
+/// A directive's name borrows straight from source: `name_span` covers exactly
+/// the name, so no interner round-trip or borrow guard is needed.
+fn directive_name<'src>(name_span: Span, source: &'src str) -> Cow<'src, str> {
+    Cow::Borrowed(name_span.extract(source))
+}
+
+/// Directive modifiers stay owned: the internal AST stores them as arena
+/// strings without spans, so there is no `'src` slice to borrow. They are rare
+/// (only `|modifier` heads), so the allocation doesn't matter.
+fn convert_modifiers(modifiers: &[&str]) -> Vec<String> {
+    modifiers.iter().map(|m| (*m).to_string()).collect()
+}
 
 pub(super) fn convert_on_directive<'src>(
     d: &internal::OnDirective<'_>,
@@ -27,19 +41,19 @@ pub(super) fn convert_on_directive<'src>(
         start: d.span.start,
         end: d.span.end,
         node_type: "OnDirective",
-        name: d.name_span.extract(source).to_string(),
+        name: directive_name(d.name_span, source),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
+        modifiers: convert_modifiers(d.modifiers),
     }
 }
 
-pub(super) fn convert_bind_directive(
+pub(super) fn convert_bind_directive<'src>(
     d: &internal::BindDirective<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::BindDirective {
+) -> public::BindDirective<'src> {
     let expression = convert_directive_expression(
         &d.expression,
         d.expression_tag_span.is_some(),
@@ -52,19 +66,19 @@ pub(super) fn convert_bind_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "BindDirective",
-        name: d.name_span.extract(source).to_string(),
+        name: directive_name(d.name_span, source),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
+        modifiers: convert_modifiers(d.modifiers),
     }
 }
 
-pub(super) fn convert_class_directive(
+pub(super) fn convert_class_directive<'src>(
     d: &internal::ClassDirective<'_>,
-    source: &str,
+    source: &'src str,
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
-) -> public::ClassDirective {
+) -> public::ClassDirective<'src> {
     let expression = convert_directive_expression(
         &d.expression,
         d.expression_tag_span.is_some(),
@@ -77,10 +91,10 @@ pub(super) fn convert_class_directive(
         start: d.span.start,
         end: d.span.end,
         node_type: "ClassDirective",
-        name: d.name_span.extract(source).to_string(),
+        name: directive_name(d.name_span, source),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
+        modifiers: convert_modifiers(d.modifiers),
     }
 }
 
@@ -124,9 +138,9 @@ pub(super) fn convert_style_directive<'src>(
         start: d.span.start,
         end: d.span.end,
         node_type: "StyleDirective",
-        name: d.name_span.extract(source).to_string(),
+        name: directive_name(d.name_span, source),
         name_loc: span_to_name_loc(d.head_span, loc),
-        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
+        modifiers: convert_modifiers(d.modifiers),
         value,
     }
 }
@@ -146,10 +160,10 @@ pub(super) fn convert_use_directive<'src>(
         start: d.span.start,
         end: d.span.end,
         node_type: "UseDirective",
-        name: d.name_span.extract(source).to_string(),
+        name: directive_name(d.name_span, source),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
+        modifiers: convert_modifiers(d.modifiers),
     }
 }
 
@@ -168,10 +182,10 @@ pub(super) fn convert_transition_directive<'src>(
         start: d.span.start,
         end: d.span.end,
         node_type: "TransitionDirective",
-        name: d.name_span.extract(source).to_string(),
+        name: directive_name(d.name_span, source),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
+        modifiers: convert_modifiers(d.modifiers),
         intro: d.direction.has_intro(),
         outro: d.direction.has_outro(),
     }
@@ -192,10 +206,10 @@ pub(super) fn convert_animate_directive<'src>(
         start: d.span.start,
         end: d.span.end,
         node_type: "AnimateDirective",
-        name: d.name_span.extract(source).to_string(),
+        name: directive_name(d.name_span, source),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
+        modifiers: convert_modifiers(d.modifiers),
     }
 }
 
@@ -214,10 +228,10 @@ pub(super) fn convert_let_directive<'src>(
         start: d.span.start,
         end: d.span.end,
         node_type: "LetDirective",
-        name: d.name_span.extract(source).to_string(),
+        name: directive_name(d.name_span, source),
         name_loc: span_to_name_loc(d.head_span, loc),
         expression,
-        modifiers: d.modifiers.iter().map(|m| (*m).to_string()).collect(),
+        modifiers: convert_modifiers(d.modifiers),
     }
 }
 
