@@ -759,7 +759,13 @@ impl<'a> Printer<'a> {
                 body_parts.push(self.build_trailing_comment_doc(comment));
             }
         } else {
-            body_parts.push(d.text(": "));
+            // No value type (`{ [K in T] }`): comments after the `]` (or the
+            // optional modifier) still trail the member the same way — dropping
+            // through without collecting them would lose content.
+            let body_end = m.span.end.saturating_sub(1); // before `}`
+            for comment in comments_in_range(self.comments, bracket_close, body_end) {
+                body_parts.push(self.build_trailing_comment_doc(comment));
+            }
         }
 
         if source_is_multiline {

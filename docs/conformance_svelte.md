@@ -230,6 +230,20 @@ Conversely, acorn-typescript *over-accepts* three or more arguments
 spec-faithful in both directions. **Upstream candidate**: acorn-typescript
 `ImportCall` argument handling.
 
+**Legacy import-assertions `assert` clause (rejected)**: the abandoned Stage-3
+predecessor of import attributes spelled the clause
+`import x from 'm' assert { type: 'json' }`. It never merged into ecma262 —
+the final grammar is `WithClause : with { … }`
+([ecma262 §16.2.2](https://tc39.es/ecma262/#prod-WithClause)) — and engines
+have since removed it. acorn-typescript still accepts it; tsv rejects it
+(`Expected ';'`), parsing only the spec's `with` form. This is deliberate
+spec-over-acorn strictness in the reverse direction of most entries here (tsv
+stricter, not broader). No fixture: the fixture pipeline can't pin a
+tsv-rejects/acorn-accepts input (`input_invalid_*` requires both parsers to
+reject); pinned by `tests/import_phase.rs`
+(`legacy_assert_clause_rejected`) and the parse-parity gate's sanctioned
+list (`benches/js/diagnostics/skip_triage.ts`).
+
 #### Import-phase proposals
 
 The Stage-3 **source-phase imports** and **import defer** proposals add a phase to

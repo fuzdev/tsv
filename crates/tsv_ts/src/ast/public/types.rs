@@ -686,8 +686,8 @@ pub struct TSMappedType<'src> {
     /// Optional modifier: true, "+", "-", or absent
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional: Option<TSMappedTypeModifier>,
-    /// The value type
-    #[serde(rename = "typeAnnotation")]
+    /// The value type — omitted entirely when absent (`{ [K in T] }`), matching acorn
+    #[serde(rename = "typeAnnotation", skip_serializing_if = "Option::is_none")]
     pub type_annotation: Option<Box<TSType<'src>>>,
 }
 
