@@ -1,8 +1,13 @@
 # combinator_comment_svelte_prettier_divergence
 
-Comments are inter-token whitespace per [CSS Syntax 3 §comments](https://www.w3.org/TR/css-syntax-3/#comment-diagram)
-— valid wherever whitespace is, including inside a complex selector at a
-combinator boundary. tsv accepts them in every combinator position:
+Comments are inter-token trivia — removed at tokenization, producing no token,
+not even whitespace: [Consume a token](https://www.w3.org/TR/css-syntax-3/#consume-token)
+begins by [consuming comments](https://www.w3.org/TR/css-syntax-3/#consume-comment),
+which "returns nothing". A comment is therefore valid wherever inter-token
+separation is (including inside a complex selector at a combinator boundary) yet
+never contributes a whitespace token: `.a/* c */.b` tokenizes identically to `.a.b`
+(a compound), while `.a/* c */ .b` yields a whitespace token (a descendant). tsv
+accepts a comment in every combinator position:
 
 - descendant gap — `div /* c */ p`
 - explicit combinator, comment after — `a > /* c */ b`
