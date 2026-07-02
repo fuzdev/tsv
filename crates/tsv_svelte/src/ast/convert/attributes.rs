@@ -7,9 +7,11 @@
 // - Various directives (delegated to directives.rs)
 
 use crate::ast::{internal, public};
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::LocationTracker;
 use tsv_ts::ast::convert::convert_expression;
+use tsv_ts::ast::public::name_cow;
 
 use super::{
     convert_animate_directive, convert_bind_directive, convert_class_directive,
@@ -100,8 +102,8 @@ fn convert_attribute<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::Attribute<'src> {
-    // Extract attribute name from interner
-    let name = interner.resolve_infallible(attr.name).to_string();
+    // Extract attribute name from interner, borrowing from source when possible
+    let name = name_cow(attr.name_span, source, attr.name, interner);
 
     // Convert attribute value following Svelte's JSON format:
     // - Boolean attributes (no value): serialize as `true`
@@ -191,12 +193,15 @@ pub(super) fn convert_attribute_value<'src>(
     }
 }
 
-fn convert_attribute_text(text: &internal::Text, source: &str) -> public::AttributeText {
+fn convert_attribute_text<'src>(
+    text: &internal::Text,
+    source: &'src str,
+) -> public::AttributeText<'src> {
     public::AttributeText {
         start: text.span.start,
         end: text.span.end,
         node_type: "Text",
-        raw: text.raw(source).to_string(),
-        data: text.data(source).into_owned(),
+        raw: Cow::Borrowed(text.raw(source)),
+        data: text.data(source),
     }
 }
