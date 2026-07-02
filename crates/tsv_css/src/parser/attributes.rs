@@ -37,8 +37,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
         // prefix), this is the verbatim name span — the decoded string below is only needed when
         // it's actually a namespace.
         let maybe_namespace_span = Span {
-            start: (parser.base_offset() + parser.current_start) as u32,
-            end: (parser.base_offset() + parser.current_end) as u32,
+            start: parser.span_pos(parser.current_start),
+            end: parser.span_pos(parser.current_end),
         };
         let maybe_namespace = parser.alloc_str_in(parser.current_identifier());
         parser.advance()?;
@@ -161,8 +161,8 @@ pub(crate) fn parse_attribute_selector<'arena>(
     // ast/convert/mod.rs). The `Identifier` check above guarantees a name token, so no decoded
     // copy is stored.
     let name_span = Span {
-        start: (parser.base_offset() + parser.current_start) as u32,
-        end: (parser.base_offset() + parser.current_end) as u32,
+        start: parser.span_pos(parser.current_start),
+        end: parser.span_pos(parser.current_end),
     };
     parser.advance()?;
     parser.skip_whitespace()?;

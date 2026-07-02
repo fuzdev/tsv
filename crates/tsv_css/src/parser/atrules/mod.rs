@@ -60,7 +60,7 @@ pub(crate) fn parse_atrule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested_in_rule: bool,
 ) -> Result<CssAtrule<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.span_pos(parser.current_start);
 
     // Expect @ symbol
     parser.expect(TokenKind::AtSign)?;
@@ -139,16 +139,13 @@ pub(crate) fn parse_atrule<'arena>(
         (Some(block), end)
     } else if parser.check(TokenKind::Semicolon) {
         // Statement at-rule (no block)
-        let end = parser.base_offset() + parser.current_end;
+        let end = parser.span_pos(parser.current_end);
         parser.advance()?;
         return Ok(CssAtrule {
             name,
             prelude,
             block: None,
-            span: Span {
-                start: start as u32,
-                end: end as u32,
-            },
+            span: Span { start, end },
         });
     } else {
         return Err(parser.error_expected_after("'{' or ';'", "at-rule prelude"));
@@ -158,10 +155,7 @@ pub(crate) fn parse_atrule<'arena>(
         name,
         prelude,
         block,
-        span: Span {
-            start: start as u32,
-            end,
-        },
+        span: Span { start, end },
     })
 }
 
@@ -177,7 +171,7 @@ fn parse_atrule_block<'arena>(
     atrule_name: &str,
     nested_in_rule: bool,
 ) -> Result<CssAtruleBlock<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.span_pos(parser.current_start);
 
     // Expect {
     parser.expect(TokenKind::LeftBrace)?;
@@ -273,14 +267,11 @@ fn parse_atrule_block<'arena>(
     if !parser.check(TokenKind::RightBrace) {
         return Err(parser.error_expected("'}'"));
     }
-    let end = parser.base_offset() + parser.current_end;
+    let end = parser.span_pos(parser.current_end);
     parser.advance()?; // consume }
 
     Ok(CssAtruleBlock {
         children: children.into_bump_slice(),
-        span: Span {
-            start: start as u32,
-            end: end as u32,
-        },
+        span: Span { start, end },
     })
 }

@@ -15,7 +15,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     normalize_whitespace: bool,
 ) -> Result<(&'arena str, Span), ParseError> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
-    let prelude_start = parser.base_offset() + parser.current_start;
+    let prelude_start = parser.span_pos(parser.current_start);
     let mut prelude_parts = Vec::new();
     let mut prev_token_kind: Option<TokenKind> = None;
     let mut last_non_whitespace_kind: Option<TokenKind> = None;
@@ -236,10 +236,10 @@ pub(super) fn parse_raw_prelude_content<'arena>(
 
     let joined = prelude_parts.join("");
     let content = parser.alloc_str_in(joined.trim());
-    let prelude_end = parser.base_offset() + parser.current_start;
+    let prelude_end = parser.span_pos(parser.current_start);
     let span = Span {
-        start: prelude_start as u32,
-        end: prelude_end as u32,
+        start: prelude_start,
+        end: prelude_end,
     };
 
     Ok((content, span))

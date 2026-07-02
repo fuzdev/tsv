@@ -77,7 +77,7 @@ pub(super) fn parse_condition_query<'arena>(
         }
 
         // Parse a condition part (may start with `not`, then parenthesized content)
-        let part_start = parser.base_offset() + parser.current_start;
+        let part_start = parser.span_pos(parser.current_start);
         let mut part_content = Vec::new();
         let mut paren_depth: usize = 0;
 
@@ -256,7 +256,7 @@ pub(super) fn parse_condition_query<'arena>(
                 connector_raw: current_connector_raw.take(),
                 content: parser.alloc_str_in(content),
                 span: Span {
-                    start: part_start as u32,
+                    start: part_start,
                     end: end_pos as u32,
                 },
             });
@@ -289,7 +289,7 @@ pub(super) fn parse_condition_query<'arena>(
 pub(super) fn parse_container_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<(Option<&'arena str>, ConditionQuery<'arena>, Span), ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.span_pos(parser.current_start);
 
     // Check for optional container name: an identifier before the first '(' that
     // isn't a `not`/`and`/`or` keyword or a function call (`style(...)`, no space
@@ -316,7 +316,7 @@ pub(super) fn parse_container_prelude<'arena>(
     // so a named `@container foo (…)` covers the name while an unnamed one matches
     // `parse_condition_query` exactly.
     let span = Span {
-        start: start as u32,
+        start,
         end: cond_span.end,
     };
 
@@ -334,7 +334,7 @@ pub(super) fn parse_container_prelude<'arena>(
 pub(super) fn parse_scope_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<(SelectorList<'arena>, Option<SelectorList<'arena>>, Span), ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.span_pos(parser.current_start);
 
     // Expect opening paren
     if !parser.check(TokenKind::LeftParen) {
@@ -352,7 +352,7 @@ pub(super) fn parse_scope_prelude<'arena>(
     if !parser.check(TokenKind::RightParen) {
         return Err(parser.error_expected_after("')'", "@scope root selectors"));
     }
-    let end_after_root_paren = parser.base_offset() + parser.current_end;
+    let end_after_root_paren = parser.span_pos(parser.current_end);
     parser.advance()?; // consume ')'
 
     // Note: Don't skip whitespace yet - we need to check for "to" keyword
@@ -382,7 +382,7 @@ pub(super) fn parse_scope_prelude<'arena>(
             if !parser.check(TokenKind::RightParen) {
                 return Err(parser.error_expected_after("')'", "@scope limit selectors"));
             }
-            let end_after_limit_paren = parser.base_offset() + parser.current_end;
+            let end_after_limit_paren = parser.span_pos(parser.current_end);
             parser.advance()?; // consume ')'
             parser.skip_whitespace()?;
 
@@ -396,8 +396,8 @@ pub(super) fn parse_scope_prelude<'arena>(
 
     // Span covers the entire prelude (up to and including the last ')')
     let span = Span {
-        start: start as u32,
-        end: end_pos as u32,
+        start,
+        end: end_pos,
     };
 
     Ok((root, limit, span))
@@ -416,7 +416,7 @@ pub(super) fn parse_scope_prelude<'arena>(
 pub(super) fn parse_import_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<(&'arena [CssValue<'arena>], Span), ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.span_pos(parser.current_start);
     let mut values = parser.bvec();
 
     // Register a leading comment between `@import` and the url()/string (e.g.
@@ -437,8 +437,8 @@ pub(super) fn parse_import_prelude<'arena>(
     } else if let TokenKind::String { .. } = &parser.current_kind {
         // Bare string — the inner text is recovered verbatim from `span` at print time
         // (span-for-verbatim, zero alloc); the quote char from `source[span.start]`.
-        let value_start = (parser.base_offset() + parser.current_start) as u32;
-        let value_end = (parser.base_offset() + parser.current_end) as u32;
+        let value_start = parser.span_pos(parser.current_start);
+        let value_end = parser.span_pos(parser.current_end);
         values.push(CssValue::String {
             content: StringCooked::Verbatim,
             span: Span {
@@ -471,8 +471,8 @@ pub(super) fn parse_import_prelude<'arena>(
             if ident == "layer" {
                 // Bare "layer" keyword (without function call); text recovered from
                 // `span` at print time (span-for-verbatim).
-                let value_start = (parser.base_offset() + parser.current_start) as u32;
-                let value_end = (parser.base_offset() + parser.current_end) as u32;
+                let value_start = parser.span_pos(parser.current_start);
+                let value_end = parser.span_pos(parser.current_end);
                 values.push(CssValue::Identifier {
                     span: Span {
                         start: value_start,
@@ -484,7 +484,7 @@ pub(super) fn parse_import_prelude<'arena>(
             } else {
                 // Media query - preserve original whitespace from source
                 let media_local_start = parser.current_start;
-                let media_start = (parser.base_offset() + media_local_start) as u32;
+                let media_start = parser.span_pos(media_local_start);
                 let mut media_local_end = parser.current_end;
 
                 while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
@@ -494,7 +494,7 @@ pub(super) fn parse_import_prelude<'arena>(
                     parser.advance()?;
                 }
 
-                let media_end = (parser.base_offset() + media_local_end) as u32;
+                let media_end = parser.span_pos(media_local_end);
 
                 // Media-query text recovered verbatim from `span` at print time.
                 if media_local_end > media_local_start {
@@ -512,22 +512,16 @@ pub(super) fn parse_import_prelude<'arena>(
         }
     }
 
-    let end = values.last().map_or(start as u32, |v| v.span().end);
+    let end = values.last().map_or(start, |v| v.span().end);
 
-    Ok((
-        values.into_bump_slice(),
-        Span {
-            start: start as u32,
-            end,
-        },
-    ))
+    Ok((values.into_bump_slice(), Span { start, end }))
 }
 
 /// Parse a function value (e.g., url(), layer(), supports())
 fn parse_function_value<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<CssValue<'arena>, ParseError> {
-    let value_start = (parser.base_offset() + parser.current_start) as u32;
+    let value_start = parser.span_pos(parser.current_start);
 
     // Get function name (current token should be identifier)
     let name = if parser.check(TokenKind::Identifier) {
@@ -552,8 +546,8 @@ fn parse_function_value<'arena>(
         // url() - parse the URL argument (string or bare URL)
         parser.skip_whitespace()?;
         if let TokenKind::String { .. } = &parser.current_kind {
-            let arg_start = (parser.base_offset() + parser.current_start) as u32;
-            let arg_end = (parser.base_offset() + parser.current_end) as u32;
+            let arg_start = parser.span_pos(parser.current_start);
+            let arg_end = parser.span_pos(parser.current_end);
             // Bare string arg — inner text recovered verbatim from `span` at print
             // time (span-for-verbatim, zero alloc); quote char from `source[span.start]`.
             args.push(CssValue::String {
@@ -577,8 +571,8 @@ fn parse_function_value<'arena>(
         // layer(name) - parse the layer name as identifier
         parser.skip_whitespace()?;
         if parser.check(TokenKind::Identifier) {
-            let arg_start = (parser.base_offset() + parser.current_start) as u32;
-            let arg_end = (parser.base_offset() + parser.current_end) as u32;
+            let arg_start = parser.span_pos(parser.current_start);
+            let arg_end = parser.span_pos(parser.current_end);
             // Identifier text recovered verbatim from `span` at print time.
             args.push(CssValue::Identifier {
                 span: Span {
@@ -594,7 +588,7 @@ fn parse_function_value<'arena>(
         // This ensures `supports(  display:  grid  )` → `supports(display: grid)`
         parser.skip_whitespace()?;
 
-        let condition_start = (parser.base_offset() + parser.current_start) as u32;
+        let condition_start = parser.span_pos(parser.current_start);
         let mut condition_parts = Vec::new();
         let mut prev_token_kind: Option<TokenKind> = None;
         let mut last_non_whitespace_kind: Option<TokenKind> = None;
@@ -645,7 +639,7 @@ fn parse_function_value<'arena>(
             condition_parts.push(part);
 
             let current_kind = parser.current_kind;
-            condition_end = (parser.base_offset() + parser.current_end) as u32;
+            condition_end = parser.span_pos(parser.current_end);
             parser.advance()?;
 
             // Add space after boolean operators or ':'
@@ -697,7 +691,7 @@ fn parse_function_value<'arena>(
         return Err(parser.error_expected("')' to close function"));
     }
 
-    let value_end = (parser.base_offset() + parser.current_end) as u32;
+    let value_end = parser.span_pos(parser.current_end);
     parser.advance()?; // consume ')'
 
     Ok(CssValue::Function {
