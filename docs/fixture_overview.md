@@ -726,7 +726,7 @@ When `output_prettier.*` exists, prettier baseline validation (F3) is skipped �
 For **permanent, intentional** parser differences (spec compliance, Svelte bugs), use `expected_ours.json` + `expected_svelte.json`. Both must exist together; `expected.json` cannot coexist with them. Requires `_svelte_divergence` directory suffix and README.md documenting what differs, why, and spec references.
 
 ```
-nth_child_of_svelte_divergence/
+nth_child_of_svelte_prettier_divergence/
 ├── input.svelte              # li:nth-child(2n of .item) { }
 ├── expected_ours.json        # Our AST (spec-compliant: selector inside Nth node)
 ├── expected_svelte.json      # Svelte's AST (flattens selector as sibling)

@@ -430,14 +430,45 @@ impl<'a> Printer<'a> {
                 self.wrap_pseudo_args(inner)
             }
             internal::PseudoClassArgs::Nth {
-                value, of_selector, ..
+                value,
+                of_selector,
+                span,
+                value_span,
             } => {
-                let normalized = Self::normalize_an_plus_b(value);
+                // A comment inside the An+B text freezes it verbatim: the spacing
+                // normalizer would do string surgery inside the comment content
+                // (`/* a-b */` → `/* a - b */`). Prettier also skips An+B
+                // normalization when a comment is present, so verbatim matches.
+                let normalized = if value.contains("/*") {
+                    (*value).to_string()
+                } else {
+                    Self::normalize_an_plus_b(value)
+                };
+                // Comments in the gaps around the An+B text are not part of
+                // `value`; interleave them like the SelectorList arm above.
+                let leading = self.comment_blocks_in_range(span.start, value_span.start);
                 match of_selector {
-                    None => d.concat(&[d.text("("), d.text_owned(normalized), d.text(")")]),
+                    None => {
+                        let trailing = self.comment_blocks_in_range(value_span.end, span.end);
+                        let inner = self.wrap_inner_with_comments(
+                            d.text_owned(normalized),
+                            &leading,
+                            &trailing,
+                        );
+                        d.concat(&[d.text("("), inner, d.text(")")])
+                    }
                     Some(selectors) => {
-                        let list = self.build_nested_selector_list_doc(selectors);
+                        // The of-gap comments (`of /* c */ .a`) lead the selector list.
+                        let of_gap =
+                            self.comment_blocks_in_range(value_span.end, selectors.span.start);
+                        let list = self.wrap_inner_with_comments(
+                            self.build_nested_selector_list_doc(selectors),
+                            &of_gap,
+                            "",
+                        );
+                        let trailing = self.comment_blocks_in_range(selectors.span.end, span.end);
                         let inner = d.concat(&[d.text_owned(normalized), d.text(" of "), list]);
+                        let inner = self.wrap_inner_with_comments(inner, &leading, &trailing);
                         self.wrap_pseudo_args(inner)
                     }
                 }
