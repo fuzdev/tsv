@@ -66,6 +66,39 @@ const SANCTIONED: { pattern: string; reason: string }[] = [
 		pattern: 'validator/samples/if-block-whitespace',
 		reason: 'whitespace after `{#` (`{ #if}`) — svelte parser lenient, validator rejects',
 	},
+	// Legacy Stage-3 import-assertions `assert { … }` clause — never merged into
+	// ecma262 (the final WithClause grammar is `with`-only) and since removed from
+	// engines; acorn-typescript still accepts it. tsv parses only the spec form.
+	// See docs/conformance_svelte.md §TypeScript Corrections.
+	{
+		pattern: 'tests/format/js/import-assertions/',
+		reason: 'legacy `assert {…}` import attributes — abandoned pre-spec form; tsv is `with`-only per ecma262',
+	},
+	// CSS spec-strictness on the prettier test corpus — Svelte's parseCss is
+	// lenient where tsv follows the CSS grammar. Same class as the svelte/tests
+	// CSS entries above; see docs/conformance_svelte.md §CSS Parser Scope & Error Model.
+	{
+		pattern: 'tests/format/css/attribute/quotes.css',
+		reason: 'function as attr value `[id=func("foo")]` — selectors-4 attr value is <string>|<ident>',
+	},
+	{
+		pattern: 'tests/format/css/attribute/sensitive.css',
+		reason: 'invalid attr case-flag `[type=a x]` — selectors-4 <attr-modifier> is `i`|`s` only',
+	},
+	{
+		pattern: 'tests/format/css/no-semicolon/url.css',
+		reason: '`url` split across a newline in `@import` — css-cascade prelude is url()/string',
+	},
+	{
+		pattern: 'tests/format/css/stylefmt-repo/ie-hacks/',
+		reason: 'IE property/selector hacks — proprietary syntax outside the CSS grammar; tsv is spec-only',
+	},
+	// Not a Svelte component — an HTML conformance file the corpus loader feeds
+	// to the Svelte parser; svelte/compiler happens to tolerate its raw `[`.
+	{
+		pattern: 'tests/format/html/tags/tags.html',
+		reason: '.html file, not Svelte — raw template `[` svelte tolerates; out of tsv scope',
+	},
 ];
 
 function sanction_for(path: string): string | null {

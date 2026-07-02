@@ -46,4 +46,13 @@
 		await using first = new Resource('first');
 		await using second = new Resource('second');
 	}
+
+	// Contextual keywords as binding names — any identifier-shaped word that
+	// is not an expression continuation (`in`/`instanceof`/`as`/`satisfies`)
+	// binds, even when it lexes as a keyword
+	async function keywords() {
+		await using async = getAsyncResource();
+		await using undefined = getAsyncResource();
+		await using of = getAsyncResource();
+	}
 </script>

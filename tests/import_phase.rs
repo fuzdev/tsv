@@ -18,10 +18,12 @@
 //! succeeds with wrong output" assertion would gate the suite on a sidecar call
 //! under load, which is needless fragility for a niche Stage-3 divergence.
 //!
-//! One test also pins a *parser* divergence that the fixture/test262 path can't
-//! reach (the spec-valid input is a `_FIXTURE.js`, never graded): a source-phase
-//! binding whose name lexes as a contextual keyword. See
-//! `static_import_source_keyword_binding_rejected`.
+//! Two tests also pin *parser* divergences the fixture path can't reach: a
+//! source-phase binding whose name lexes as a contextual keyword (the spec-valid
+//! input is a `_FIXTURE.js`, never graded — see
+//! `static_import_source_keyword_binding_rejected`), and the legacy
+//! import-assertions `assert` clause, which tsv deliberately rejects while acorn
+//! accepts (`legacy_assert_clause_rejected`).
 
 /// tsv parses + formats `input` to itself, then re-formats stably (idempotent).
 fn assert_ours_stable(input: &str) {
@@ -124,4 +126,19 @@ fn static_import_source_single_binding_enforced() {
 fn static_import_source_keyword_binding_rejected() {
     assert_ours_rejects("<script lang=\"ts\">\n\timport source from from 'x';\n</script>\n");
     assert_ours_stable("<script lang=\"ts\">\n\timport source source from 'x';\n</script>\n");
+}
+
+/// The abandoned Stage-3 import-assertions `assert { … }` clause never merged
+/// into ecma262 (the final WithClause grammar is `with`-only) and engines have
+/// removed it. acorn-typescript still accepts it; tsv deliberately rejects it,
+/// parsing only the spec's `with` form. See `docs/conformance_svelte.md`
+/// §TypeScript Corrections. The sibling `with` forms stay accepted — boundary
+/// check.
+#[test]
+fn legacy_assert_clause_rejected() {
+    let w = |s: &str| format!("<script lang=\"ts\">\n\t{s}\n</script>\n");
+    assert_ours_rejects(&w("import a from './a.json' assert { type: 'json' };"));
+    assert_ours_rejects(&w("export * from './a.json' assert { type: 'json' };"));
+    assert_ours_rejects(&w("export { a } from './a.json' assert { type: 'json' };"));
+    assert_ours_stable(&w("import a from './a.json' with { type: 'json' };"));
 }

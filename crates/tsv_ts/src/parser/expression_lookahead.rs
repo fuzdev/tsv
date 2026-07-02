@@ -337,12 +337,62 @@ pub(super) fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
 /// or `<T, (x: number) => void>` is actually type arguments (finds matching `>`).
 ///
 /// Returns `true` if a matching `>` is found before hitting an unbalanced
-/// `)`, `]`, `}`, or `;` at depth 0.
+/// `)`, `]`, `}`, or `;` at depth 0, and the close isn't followed by an
+/// expression-starting token (which would make the `>` a comparison instead).
+pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize) -> bool {
+    match matching_angle_close(bytes, pos) {
+        None => false,
+        Some(close) => {
+            // After closing `>` in type args, the next token is `(`
+            // (a call), a template literal (a tagged template), or a
+            // non-expression token (`;`, `,`, `)`, an operator…).
+            // Any other expression-starting token — identifier,
+            // number, string, `[`, `{`, or a prefix operator — means
+            // this `>` is a comparison operator instead — but only
+            // on the same line: across a line break the token starts
+            // a new statement via ASI and the `<…>` is an
+            // instantiation (acorn bails to relational on
+            // `tokenCanStartExpression && !hasPrecedingLineBreak`).
+            let after = skip_whitespace_and_comments(bytes, close + 1);
+            !(after < bytes.len()
+                && starts_expression_after_type_args(bytes, after)
+                && !has_line_terminator_between(bytes, close + 1, after))
+        }
+    }
+}
+
+/// Whether `pos` (the first byte after an inner `<` that directly follows a
+/// type-argument-opening `<`) begins a generic function type's type-parameter
+/// list — the only type that can start with `<`, so the only valid reading of
+/// a `<<` at a type-argument position (`f<<T>(v: T) => void>()`). True iff
+/// the list's matching `>` is followed by a parenthesized parameter list whose
+/// matching `)` is followed by `=>`. The `=>` requirement is what separates
+/// the split from a shift-comparison chain whose right operand is
+/// parenthesized (`a << b > (c)`): an arrow can never be a relational
+/// operand, so real shift code never has `(…) =>` after the would-be close.
+pub(super) fn is_generic_function_type_start(bytes: &[u8], pos: usize) -> bool {
+    let Some(close) = matching_angle_close(bytes, pos) else {
+        return false;
+    };
+    let after = skip_whitespace_and_comments(bytes, close + 1);
+    if after >= bytes.len() || bytes[after] != b'(' {
+        return false;
+    }
+    matching_paren_close(bytes, after + 1).is_some_and(|paren_close| {
+        let after_params = skip_whitespace_and_comments(bytes, paren_close + 1);
+        after_params + 1 < bytes.len()
+            && bytes[after_params] == b'='
+            && bytes[after_params + 1] == b'>'
+    })
+}
+
+/// Find the `>` closing the angle-bracket list opened just before `pos`
+/// (`pos` is the first byte after the `<`), or `None` if an unbalanced `)`,
+/// `]`, `}`, or a top-level `;` intervenes.
 ///
 /// Operator disambiguation: `<=` and `>=` are comparison operators (not angle
-/// brackets), `=>` is an arrow operator (not a closing bracket), and a bare
-/// identifier after `>` indicates comparison rather than type argument close.
-pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bool {
+/// brackets) and `=>` is an arrow operator (not a closing bracket).
+pub(super) fn matching_angle_close(bytes: &[u8], mut pos: usize) -> Option<usize> {
     let mut angle_depth: i32 = 1;
     let mut paren_depth: i32 = 0;
     let mut bracket_depth: i32 = 0;
@@ -374,24 +424,7 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
                 } else {
                     angle_depth -= 1;
                     if angle_depth == 0 {
-                        // After closing `>` in type args, the next token is `(`
-                        // (a call), a template literal (a tagged template), or a
-                        // non-expression token (`;`, `,`, `)`, an operator…).
-                        // Any other expression-starting token — identifier,
-                        // number, string, `[`, `{`, or a prefix operator — means
-                        // this `>` is a comparison operator instead — but only
-                        // on the same line: across a line break the token starts
-                        // a new statement via ASI and the `<…>` is an
-                        // instantiation (acorn bails to relational on
-                        // `tokenCanStartExpression && !hasPrecedingLineBreak`).
-                        let after = skip_whitespace_and_comments(bytes, pos + 1);
-                        if after < bytes.len()
-                            && starts_expression_after_type_args(bytes, after)
-                            && !has_line_terminator_between(bytes, pos + 1, after)
-                        {
-                            return false;
-                        }
-                        return true;
+                        return Some(pos);
                     }
                 }
             }
@@ -399,31 +432,77 @@ pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], mut pos: usize) -> bo
             b')' => {
                 paren_depth -= 1;
                 if paren_depth < 0 {
-                    return false; // Unbalanced - hit call/group end
+                    return None; // Unbalanced - hit call/group end
                 }
             }
             b'[' => bracket_depth += 1,
             b']' => {
                 bracket_depth -= 1;
                 if bracket_depth < 0 {
-                    return false; // Unbalanced - hit array end
+                    return None; // Unbalanced - hit array end
                 }
             }
             b'{' => brace_depth += 1,
             b'}' => {
                 brace_depth -= 1;
                 if brace_depth < 0 {
-                    return false; // Unbalanced - hit block end
+                    return None; // Unbalanced - hit block end
                 }
             }
             // Statement end — but only at the top level. Inside a balanced `{…}` a `;`
             // is an object-type member separator (`<{ a: number; b: string }>`).
-            b';' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => return false,
+            b';' if paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 => return None,
             _ => {}
         }
         pos += 1;
     }
-    false
+    None
+}
+
+/// Find the `)` closing the paren opened just before `pos` (`pos` is the first
+/// byte after the `(`), or `None` if an unbalanced `]`/`}` or end of input
+/// intervenes. Strings, templates, and comments are opaque, like
+/// `matching_angle_close` (and like it, no regex skip — a `)` inside a regex
+/// parameter default could close early, which only fails toward the
+/// shift/comparison reading).
+fn matching_paren_close(bytes: &[u8], mut pos: usize) -> Option<usize> {
+    let mut paren_depth: i32 = 1;
+    let mut bracket_depth: i32 = 0;
+    let mut brace_depth: i32 = 0;
+    let end = bytes.len();
+
+    while pos < end {
+        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            pos = past;
+            continue;
+        }
+        match bytes[pos] {
+            b'(' => paren_depth += 1,
+            b')' => {
+                paren_depth -= 1;
+                if paren_depth == 0 {
+                    return Some(pos);
+                }
+            }
+            b'[' => bracket_depth += 1,
+            b']' => {
+                bracket_depth -= 1;
+                if bracket_depth < 0 {
+                    return None; // Unbalanced - hit array end
+                }
+            }
+            b'{' => brace_depth += 1,
+            b'}' => {
+                brace_depth -= 1;
+                if brace_depth < 0 {
+                    return None; // Unbalanced - hit block end
+                }
+            }
+            _ => {}
+        }
+        pos += 1;
+    }
+    None
 }
 
 /// Whether the token starting at `pos` can begin an expression and therefore

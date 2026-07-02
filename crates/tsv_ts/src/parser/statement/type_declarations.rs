@@ -231,6 +231,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         debug_assert!(self.current_value() == "declare");
         self.advance()?;
 
+        // Everything under `declare` parses in ambient context (acorn/babel
+        // `inAmbientContext`) — notably a single trailing comma after a rest
+        // parameter is tolerated anywhere in the subtree (parameter lists,
+        // function types, interface/type-literal members); see the rest-comma
+        // checks in `parameters.rs`/`types.rs`.
+        self.with_context_flag(
+            |p| &mut p.in_ambient_context,
+            true,
+            |p| p.parse_declare_statement_kind(start),
+        )
+    }
+
+    /// The post-`declare` dispatch, run inside ambient context.
+    fn parse_declare_statement_kind(
+        &mut self,
+        start: usize,
+    ) -> Result<Statement<'arena>, ParseError> {
         match self.current_kind() {
             TokenKind::Keyword(KeywordKind::Function) => self.parse_declare_function(start),
             TokenKind::Keyword(KeywordKind::Class) => self.parse_declare_class(start, false),
@@ -644,9 +661,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
         self.advance()?;
 
-        // Parse module name - can be identifier or string literal (for ambient modules)
-        let id = if matches!(self.current_kind(), TokenKind::String) {
-            // Ambient module with string literal name: `declare module 'name' { }`
+        // Parse module name — an identifier, or (module keyword only) a string
+        // literal: `module 'name' { }` / `declare module 'name';`. acorn rejects
+        // a string name after `namespace`.
+        let id = if kind == TSModuleDeclarationKind::Module
+            && matches!(self.current_kind(), TokenKind::String)
+        {
             let lit = self.parse_string_literal()?;
             TSModuleName::Literal(lit)
         } else if matches!(self.current_kind(), TokenKind::Identifier) {

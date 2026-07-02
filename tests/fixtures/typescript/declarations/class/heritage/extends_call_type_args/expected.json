@@ -1,0 +1,1254 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 688,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Superclass call with explicit type arguments — the type-arg list closing",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before `(` routes to the call, not the bare-superclass split",
+			"start": 97,
+			"end": 160,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A generic-function-type argument — the arrow's `>` is not the list close",
+			"start": 242,
+			"end": 317,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment inside the list is opaque, even one containing `>`",
+			"start": 418,
+			"end": 481,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " > ",
+			"start": 507,
+			"end": 514,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 25
+				},
+				"end": {
+					"line": 12,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Contrast: no call after the list — the bare superclass keeps the type",
+			"start": 527,
+			"end": 599,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " arguments as its own type parameters",
+			"start": 601,
+			"end": 640,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 40
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 687,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 678,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 162,
+					"end": 195,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 34
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 168,
+						"end": 169,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 7
+							},
+							"end": {
+								"line": 4,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": {
+						"type": "CallExpression",
+						"start": 178,
+						"end": 192,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 17
+							},
+							"end": {
+								"line": 4,
+								"column": 31
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 178,
+							"end": 183,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 17
+								},
+								"end": {
+									"line": 4,
+									"column": 22
+								}
+							},
+							"name": "mixin"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 187,
+								"end": 191,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 26
+									},
+									"end": {
+										"line": 4,
+										"column": 30
+									}
+								},
+								"name": "Base"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 183,
+							"end": 186,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 22
+								},
+								"end": {
+									"line": 4,
+									"column": 25
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 184,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 23
+										},
+										"end": {
+											"line": 4,
+											"column": 24
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 184,
+										"end": 185,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 23
+											},
+											"end": {
+												"line": 4,
+												"column": 24
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 193,
+						"end": 195,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 32
+							},
+							"end": {
+								"line": 4,
+								"column": 34
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Superclass call with explicit type arguments — the type-arg list closing",
+							"start": 20,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " before `(` routes to the call, not the bare-superclass split",
+							"start": 97,
+							"end": 160
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 197,
+					"end": 239,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 43
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 203,
+							"end": 238,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 42
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 203,
+								"end": 204,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "B"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 207,
+								"end": 238,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 42
+									}
+								},
+								"id": null,
+								"superClass": {
+									"type": "CallExpression",
+									"start": 221,
+									"end": 235,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 25
+										},
+										"end": {
+											"line": 5,
+											"column": 39
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 221,
+										"end": 226,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 25
+											},
+											"end": {
+												"line": 5,
+												"column": 30
+											}
+										},
+										"name": "mixin"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 230,
+											"end": 234,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 34
+												},
+												"end": {
+													"line": 5,
+													"column": 38
+												}
+											},
+											"name": "Base"
+										}
+									],
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 226,
+										"end": 229,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 30
+											},
+											"end": {
+												"line": 5,
+												"column": 33
+											}
+										},
+										"params": [
+											{
+												"type": "TSTypeReference",
+												"start": 227,
+												"end": 228,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 31
+													},
+													"end": {
+														"line": 5,
+														"column": 32
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 227,
+													"end": 228,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 31
+														},
+														"end": {
+															"line": 5,
+															"column": 32
+														}
+													},
+													"name": "T"
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 236,
+									"end": 238,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 40
+										},
+										"end": {
+											"line": 5,
+											"column": 42
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 319,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 43
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 325,
+						"end": 326,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 7
+							},
+							"end": {
+								"line": 8,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": {
+						"type": "CallExpression",
+						"start": 335,
+						"end": 358,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 17
+							},
+							"end": {
+								"line": 8,
+								"column": 40
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 335,
+							"end": 340,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 17
+								},
+								"end": {
+									"line": 8,
+									"column": 22
+								}
+							},
+							"name": "mixin"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 353,
+								"end": 357,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 35
+									},
+									"end": {
+										"line": 8,
+										"column": 39
+									}
+								},
+								"name": "Base"
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 340,
+							"end": 352,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 22
+								},
+								"end": {
+									"line": 8,
+									"column": 34
+								}
+							},
+							"params": [
+								{
+									"type": "TSFunctionType",
+									"start": 341,
+									"end": 351,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 23
+										},
+										"end": {
+											"line": 8,
+											"column": 33
+										}
+									},
+									"parameters": [],
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 344,
+										"end": 351,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 26
+											},
+											"end": {
+												"line": 8,
+												"column": 33
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSVoidKeyword",
+											"start": 347,
+											"end": 351,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 29
+												},
+												"end": {
+													"line": 8,
+													"column": 33
+												}
+											}
+										}
+									}
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 359,
+						"end": 361,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 41
+							},
+							"end": {
+								"line": 8,
+								"column": 43
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A generic-function-type argument — the arrow's `>` is not the list close",
+							"start": 242,
+							"end": 317
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 363,
+					"end": 415,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 53
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 369,
+							"end": 414,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 52
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 369,
+								"end": 370,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "D"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 373,
+								"end": 414,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 52
+									}
+								},
+								"id": null,
+								"superClass": {
+									"type": "CallExpression",
+									"start": 387,
+									"end": 411,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 25
+										},
+										"end": {
+											"line": 9,
+											"column": 49
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 387,
+										"end": 392,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 25
+											},
+											"end": {
+												"line": 9,
+												"column": 30
+											}
+										},
+										"name": "mixin"
+									},
+									"arguments": [
+										{
+											"type": "Identifier",
+											"start": 406,
+											"end": 410,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 44
+												},
+												"end": {
+													"line": 9,
+													"column": 48
+												}
+											},
+											"name": "Base"
+										}
+									],
+									"typeArguments": {
+										"type": "TSTypeParameterInstantiation",
+										"start": 392,
+										"end": 405,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 30
+											},
+											"end": {
+												"line": 9,
+												"column": 43
+											}
+										},
+										"params": [
+											{
+												"type": "TSFunctionType",
+												"start": 393,
+												"end": 404,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 31
+													},
+													"end": {
+														"line": 9,
+														"column": 42
+													}
+												},
+												"parameters": [
+													{
+														"type": "Identifier",
+														"start": 394,
+														"end": 398,
+														"loc": {
+															"start": {
+																"line": 9,
+																"column": 32
+															},
+															"end": {
+																"line": 9,
+																"column": 36
+															}
+														},
+														"name": "v",
+														"typeAnnotation": {
+															"type": "TSTypeAnnotation",
+															"start": 395,
+															"end": 398,
+															"loc": {
+																"start": {
+																	"line": 9,
+																	"column": 33
+																},
+																"end": {
+																	"line": 9,
+																	"column": 36
+																}
+															},
+															"typeAnnotation": {
+																"type": "TSTypeReference",
+																"start": 397,
+																"end": 398,
+																"loc": {
+																	"start": {
+																		"line": 9,
+																		"column": 35
+																	},
+																	"end": {
+																		"line": 9,
+																		"column": 36
+																	}
+																},
+																"typeName": {
+																	"type": "Identifier",
+																	"start": 397,
+																	"end": 398,
+																	"loc": {
+																		"start": {
+																			"line": 9,
+																			"column": 35
+																		},
+																		"end": {
+																			"line": 9,
+																			"column": 36
+																		}
+																	},
+																	"name": "T"
+																}
+															}
+														}
+													}
+												],
+												"typeAnnotation": {
+													"type": "TSTypeAnnotation",
+													"start": 400,
+													"end": 404,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 38
+														},
+														"end": {
+															"line": 9,
+															"column": 42
+														}
+													},
+													"typeAnnotation": {
+														"type": "TSTypeReference",
+														"start": 403,
+														"end": 404,
+														"loc": {
+															"start": {
+																"line": 9,
+																"column": 41
+															},
+															"end": {
+																"line": 9,
+																"column": 42
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 403,
+															"end": 404,
+															"loc": {
+																"start": {
+																	"line": 9,
+																	"column": 41
+																},
+																"end": {
+																	"line": 9,
+																	"column": 42
+																}
+															},
+															"name": "R"
+														}
+													}
+												}
+											}
+										]
+									}
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 412,
+									"end": 414,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 50
+										},
+										"end": {
+											"line": 9,
+											"column": 52
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 483,
+					"end": 524,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 42
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 489,
+						"end": 490,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 7
+							},
+							"end": {
+								"line": 12,
+								"column": 8
+							}
+						},
+						"name": "E"
+					},
+					"superClass": {
+						"type": "CallExpression",
+						"start": 499,
+						"end": 521,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 17
+							},
+							"end": {
+								"line": 12,
+								"column": 39
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 499,
+							"end": 504,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 17
+								},
+								"end": {
+									"line": 12,
+									"column": 22
+								}
+							},
+							"name": "mixin"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 516,
+								"end": 520,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 34
+									},
+									"end": {
+										"line": 12,
+										"column": 38
+									}
+								},
+								"name": "Base",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " > ",
+										"start": 507,
+										"end": 514
+									}
+								]
+							}
+						],
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 504,
+							"end": 515,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 22
+								},
+								"end": {
+									"line": 12,
+									"column": 33
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeReference",
+									"start": 505,
+									"end": 506,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 23
+										},
+										"end": {
+											"line": 12,
+											"column": 24
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 505,
+										"end": 506,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 23
+											},
+											"end": {
+												"line": 12,
+												"column": 24
+											}
+										},
+										"name": "T"
+									}
+								}
+							]
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 522,
+						"end": 524,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 40
+							},
+							"end": {
+								"line": 12,
+								"column": 42
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment inside the list is opaque, even one containing `>`",
+							"start": 418,
+							"end": 481
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 642,
+					"end": 677,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 36
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 648,
+						"end": 649,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 7
+							},
+							"end": {
+								"line": 16,
+								"column": 8
+							}
+						},
+						"name": "F"
+					},
+					"superClass": {
+						"type": "Identifier",
+						"start": 658,
+						"end": 662,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 17
+							},
+							"end": {
+								"line": 16,
+								"column": 21
+							}
+						},
+						"name": "Base"
+					},
+					"superTypeParameters": {
+						"type": "TSTypeParameterInstantiation",
+						"start": 662,
+						"end": 674,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 21
+							},
+							"end": {
+								"line": 16,
+								"column": 33
+							}
+						},
+						"params": [
+							{
+								"type": "TSFunctionType",
+								"start": 663,
+								"end": 673,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 22
+									},
+									"end": {
+										"line": 16,
+										"column": 32
+									}
+								},
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 666,
+									"end": 673,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 25
+										},
+										"end": {
+											"line": 16,
+											"column": 32
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSVoidKeyword",
+										"start": 669,
+										"end": 673,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 28
+											},
+											"end": {
+												"line": 16,
+												"column": 32
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 675,
+						"end": 677,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 34
+							},
+							"end": {
+								"line": 16,
+								"column": 36
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Contrast: no call after the list — the bare superclass keeps the type",
+							"start": 527,
+							"end": 599
+						},
+						{
+							"type": "Line",
+							"value": " arguments as its own type parameters",
+							"start": 601,
+							"end": 640
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

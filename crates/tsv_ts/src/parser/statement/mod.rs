@@ -108,10 +108,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                     // Check for `await using` declaration (ES2024 Explicit Resource Management);
                     // both gaps carry [no LineTerminator here] — a break before `using` or
-                    // before the binding makes this an `await using` expression statement
+                    // before the binding makes this an `await using` expression statement,
+                    // as does a word-shaped binary operator (`await using in b`)
                     if self.peek_is_same_line_identifier()
                         && self.peek_value() == "using"
-                        && self.peek_followed_by_same_line_identifier()
+                        && self.peek_followed_by_same_line_binding_word()
                     {
                         return self.parse_await_using_declaration();
                     }
@@ -173,10 +174,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
             },
             TokenKind::Identifier => {
-                // Check for contextual keyword 'using' followed by identifier (ES2024
-                // Explicit Resource Management); `using [no LineTerminator here]
-                // BindingIdentifier` — a break makes `using` an identifier statement
-                if self.current_value() == "using" && self.peek_is_same_line_identifier() {
+                // Check for contextual keyword 'using' followed by a binding word
+                // (ES2024 Explicit Resource Management); `using [no LineTerminator
+                // here] BindingIdentifier` — a break makes `using` an identifier
+                // statement, and an expression-continuation word (`in`/`instanceof`/
+                // `as`/`satisfies`) keeps the expression reading
+                if self.current_value() == "using" && self.peek_is_same_line_binding_word() {
                     return self.parse_using_declaration();
                 }
                 // Contextual keyword `type` starts a type alias only when the name is
@@ -212,9 +215,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Contextual keywords `namespace`/`module` start a declaration only
                 // when the name is on the SAME line (tsc
                 // `nextTokenIsIdentifierOrStringLiteralOnSameLine`); a line break
-                // demotes them to identifiers. peek_kind() skips comments.
-                if matches!(self.current_value(), "namespace" | "module")
-                    && self.peek_is_same_line_identifier()
+                // demotes them to identifiers. Only `module` also takes a
+                // string-literal name (`module 'x' {}`); acorn rejects
+                // `namespace 'x'`. peek_kind() skips comments.
+                if (matches!(self.current_value(), "namespace" | "module")
+                    && self.peek_is_same_line_identifier())
+                    || (self.current_value() == "module"
+                        && self.peek_kind() == TokenKind::String
+                        && !self.peek_preceded_by_line_terminator())
                 {
                     return self.parse_module_declaration(false, false);
                 }

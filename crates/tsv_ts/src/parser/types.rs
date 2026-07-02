@@ -693,7 +693,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // A line break before `<` ends the query (acorn's tsParseTypeQuery
         // checks hasPrecedingLineBreak) — `typeof a` ⏎ `<T>(): void` in an
         // interface is two members, not an instantiation.
-        let type_arguments = if self.check(&TokenKind::LessThan) && !self.had_line_terminator {
+        let type_arguments = if self.check_less_than_in_type() && !self.had_line_terminator {
             Some(self.parse_type_arguments()?)
         } else {
             None
@@ -752,7 +752,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(in crate::parser) fn parse_optional_type_arguments(
         &mut self,
     ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
-        if self.check(&TokenKind::LessThan) {
+        if self.check_less_than_in_type() {
             Ok(Some(self.parse_type_arguments()?))
         } else {
             Ok(None)
@@ -764,7 +764,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
     ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
         let start = self.current_pos().0;
-        self.expect(&TokenKind::LessThan)?;
+        self.expect_less_than_in_type()?;
 
         let mut params = self.bvec();
         if !self.check_greater_than_in_type() {
@@ -1070,8 +1070,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             while self.eat(TokenKind::Comma) {
                 saw_comma = true;
                 // A rest parameter must be last: nothing — not even a trailing
-                // comma — may follow it (see `parse_parameter_list`).
+                // comma — may follow it (see `parse_parameter_list`). In an
+                // ambient (`declare`) context acorn tolerates a single trailing
+                // comma; the `)` check below permits exactly that shape.
                 if rest_seen {
+                    if self.in_ambient_context && self.check(&TokenKind::ParenClose) {
+                        break;
+                    }
                     return Err(self.error_msg("A rest parameter must be last in a parameter list"));
                 }
                 // Handle trailing comma
@@ -1247,9 +1252,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse optional modifier: `?`, `+?`, `-?`
         let optional = self.parse_mapped_type_optional_modifier()?;
 
-        // Expect `:` and parse value type
-        self.expect(&TokenKind::Colon)?;
-        let type_annotation = Some(&*arena.alloc(self.parse_type()?));
+        // Parse optional `:` and value type — the annotation may be absent
+        // entirely (`{ [K in T] }`, `{ [K in T]+? }`), matching acorn.
+        let type_annotation = if self.eat(TokenKind::Colon) {
+            Some(&*arena.alloc(self.parse_type()?))
+        } else {
+            None
+        };
 
         // Consume optional separator
         self.eat(TokenKind::Semicolon);
@@ -1746,7 +1755,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
     ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
         let start = self.current_pos().0 as u32;
-        self.expect(&TokenKind::LessThan)?;
+        self.expect_less_than_in_type()?;
 
         let mut params = self.bvec();
         loop {

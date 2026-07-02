@@ -15,8 +15,8 @@ use tsv_lang::printing::visual_width;
 use tsv_lang::{ParseError, Span, TAB_WIDTH};
 
 use super::Parser;
-use super::expression_lookahead::scan_parens_then_arrow;
-use super::scan::parse_number_literal;
+use super::expression_lookahead::{matching_angle_close, scan_parens_then_arrow};
+use super::scan::{parse_number_literal, skip_whitespace_and_comments};
 
 //
 // Binding Power Constants for Pratt Parser
@@ -594,9 +594,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let expr = self.parse_function_expression()?;
                 ParsedExpr::from_expr(self.arena, expr)
             }
-            TokenKind::LessThan => {
-                // Generic arrow function: `<T>() => ...`
-                if self.is_generic_arrow_function_start() {
+            TokenKind::LessThan | TokenKind::LeftShift => {
+                // Generic arrow function: `<T>() => ...` — never begins with a
+                // `<<` shift token (its type-parameter list opens with a single
+                // `<`), so a shift here can only open a type assertion whose
+                // type is a generic function type: `<<T>() => R>x`.
+                if self.current.kind == TokenKind::LessThan
+                    && self.is_generic_arrow_function_start()
+                {
                     let expr = self.parse_generic_arrow_function()?;
                     ParsedExpr::from_expr(self.arena, expr)
                 } else {
@@ -904,7 +909,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 paren_end,
                             );
                         }
-                        TokenKind::LessThan if self.is_type_arguments_start() => {
+                        TokenKind::LessThan | TokenKind::LeftShift
+                            if self.is_type_arguments_start() =>
+                        {
                             // obj?.<T>(args) - optional call with explicit type arguments;
                             // only a call may follow (`a?.<T>` without `(` is a syntax error)
                             let type_args = self.parse_type_parameter_instantiation()?;
@@ -1052,10 +1059,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         op_end,
                     );
                 }
-                TokenKind::LessThan => {
+                TokenKind::LessThan | TokenKind::LeftShift => {
                     // Might be TSInstantiationExpression: f<T>, expr<Type>
+                    // (a `<<` shift token splits when its tail opens a generic
+                    // function type: `f<<T>(v: T) => void>()`).
                     // If it parses as type arguments it's instantiation; otherwise
-                    // let binary expression handle it as comparison.
+                    // let binary expression handle it as comparison/shift.
                     //
                     // In ClassHeritage mode a bare `<T>` (type args NOT followed by a
                     // call) belongs to the class's `super_type_parameters` split, so we
@@ -1156,49 +1165,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Check whether the current `<` opens type arguments immediately followed by a
-    /// call: `<T>(`. Used by the `ClassHeritage` subscript mode to tell a call's type
-    /// arguments (`getMixin<T>(Base)`, consumed) from a bare superclass instantiation
-    /// (`extends Base<T>`, left for the `super_type_parameters` split).
+    /// Check whether the current `<` (or `<<`) opens type arguments immediately
+    /// followed by a call: `<T>(`. Used by the `ClassHeritage` subscript mode to
+    /// tell a call's type arguments (`getMixin<T>(Base)`, consumed) from a bare
+    /// superclass instantiation (`extends Base<T>`, left for the
+    /// `super_type_parameters` split). `matching_angle_close` handles an `=>`
+    /// arrow's `>` (`getMixin<() => void>(Base)`), comments, and strings; for a
+    /// `<<` token, the second `<` re-raises the depth so the scan finds the
+    /// outer close.
     fn is_type_args_followed_by_call(&self) -> bool {
         let bytes = self.source.as_bytes();
-        let mut pos = self.current.start as usize;
+        let start = self.current.start as usize;
 
         // Must start with '<'
-        if pos >= bytes.len() || bytes[pos] != b'<' {
+        if start >= bytes.len() || bytes[start] != b'<' {
             return false;
         }
-        pos += 1;
 
-        // Track nesting to find the matching '>'
-        let mut depth = 1;
-        while pos < bytes.len() && depth > 0 {
-            match bytes[pos] {
-                b'<' => depth += 1,
-                b'>' => depth -= 1,
-                b'\'' | b'"' | b'`' => {
-                    // Skip strings
-                    let quote = bytes[pos];
-                    pos += 1;
-                    while pos < bytes.len() && bytes[pos] != quote {
-                        if bytes[pos] == b'\\' {
-                            pos += 1; // skip escaped char
-                        }
-                        pos += 1;
-                    }
-                }
-                _ => {}
+        match matching_angle_close(bytes, start + 1) {
+            None => false,
+            Some(close) => {
+                let after = skip_whitespace_and_comments(bytes, close + 1);
+                after < bytes.len() && bytes[after] == b'('
             }
-            pos += 1;
         }
-
-        // Skip whitespace after '>'
-        while pos < bytes.len() && matches!(bytes[pos], b' ' | b'\t' | b'\n' | b'\r') {
-            pos += 1;
-        }
-
-        // Check if '(' follows
-        pos < bytes.len() && bytes[pos] == b'('
     }
 
     /// Parse a Number token into a Literal, handling BigInt suffix
@@ -1537,8 +1527,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let arena = self.arena;
         let (start, _) = self.current_pos();
 
-        // Parse <Type>
-        self.expect(&TokenKind::LessThan)?; // consume '<'
+        // Parse <Type> (`<<` splits when the assertion type is a generic
+        // function type: `<<T>() => R>x`)
+        self.expect_less_than_in_type()?; // consume '<'
         let type_annotation = self.parse_type()?;
         self.expect(&TokenKind::GreaterThan)?; // consume '>'
 
@@ -1951,7 +1942,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Parse optional type arguments: new Map<K, V>()
-        let type_arguments = if self.check(&TokenKind::LessThan) && self.is_type_arguments_start() {
+        let type_arguments = if self.check_less_than_in_type() && self.is_type_arguments_start() {
             Some(self.parse_type_parameter_instantiation()?)
         } else {
             None

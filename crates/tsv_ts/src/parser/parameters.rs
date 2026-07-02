@@ -363,12 +363,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // A rest parameter must be the last in the list. Per the grammar
                 // (`FormalParameters : FormalParameterList `,` FunctionRestParameter`)
                 // nothing — not even a trailing comma — may follow it. acorn:
-                // "Comma is not permitted after the rest element".
+                // "Comma is not permitted after the rest element". Exception:
+                // in an ambient (`declare`) context acorn tolerates a single
+                // trailing comma (`declare function f(...a: T[], )`), consumed
+                // here; a following parameter or second comma still rejects
+                // via the `)` expectation below.
                 if is_rest {
                     if self.check(&TokenKind::Comma) {
-                        return Err(
-                            self.error_msg("A rest parameter must be last in a parameter list")
-                        );
+                        if !self.in_ambient_context {
+                            return Err(
+                                self.error_msg("A rest parameter must be last in a parameter list")
+                            );
+                        }
+                        self.advance()?;
                     }
                     break;
                 }
