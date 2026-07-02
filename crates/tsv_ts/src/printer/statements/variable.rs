@@ -603,12 +603,12 @@ impl<'a> Printer<'a> {
                 // Check for a comment after `=` that forces break-after-operator.
                 // Prettier ref: hasLeadingOwnLineComment → break-after-operator in
                 // chooseLayout. A comment forces the break when it's multiline (its own
-                // newlines break the group) or the source put the value on a later line
-                // than the comment (an own-line leading comment); a single-line block
-                // glued to the value (`= /* c */ v`) stays inline.
+                // newlines break the group) or own-line — a newline *precedes* it, so it
+                // starts a fresh line. A single-line block glued to `=` stays inline even
+                // when the value follows on the next line (`= /* c */⏎v` → `= /* c */ v`).
                 let has_own_line_comment_after_eq = has_comments_after_eq
                     && comments_in_range(self.comments, rhs_comments_start, init_start)
-                        .any(|c| c.multiline || !self.is_same_line(c.span.end, init_start));
+                        .any(|c| self.comment_forces_own_line(c));
 
                 // Curried arrows with return type always break after `=`
                 let is_curried_arrow = is_curried_arrow_with_return_type(init);

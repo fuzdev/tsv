@@ -1,0 +1,305 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 199,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Single-line block glued to `=>` with the body on the next line stays inline.",
+			"start": 10,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 107,
+			"end": 114,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 17
+				},
+				"end": {
+					"line": 3,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Own-line comment keeps the break.",
+			"start": 120,
+			"end": 156,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 176,
+			"end": 183,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 198,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 91,
+					"end": 117,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 97,
+							"end": 116,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 97,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 101,
+								"end": 116,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 26
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Identifier",
+									"start": 115,
+									"end": 116,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 25
+										},
+										"end": {
+											"line": 3,
+											"column": 26
+										}
+									},
+									"name": "a",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 107,
+											"end": 114
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single-line block glued to `=>` with the body on the next line stays inline.",
+							"start": 10,
+							"end": 89
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 158,
+					"end": 188,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 164,
+							"end": 187,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 164,
+								"end": 165,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 168,
+								"end": 187,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Identifier",
+									"start": 186,
+									"end": 187,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 3
+										}
+									},
+									"name": "b",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 176,
+											"end": 183
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line comment keeps the break.",
+							"start": 120,
+							"end": 156
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

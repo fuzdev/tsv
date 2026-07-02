@@ -141,13 +141,17 @@ impl<'a> Printer<'a> {
                         .as_ref()
                         .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
                     let arg_start = new_expr.arguments[0].span().start;
-                    let has_leading_comment =
-                        if let Some(leading) = self.build_rhs_comments_opt(paren_open, arg_start) {
-                            arrow_doc = d.concat(&[leading, arrow_doc]);
-                            true
-                        } else {
-                            false
-                        };
+                    // Glued like the regular-call leading-arg paths (prettier shares
+                    // one `printCallArguments` for Call and New): a single-line block
+                    // hugged to `(` stays with the argument across a source newline.
+                    let has_leading_comment = if let Some(leading) =
+                        self.build_rhs_comments_glued_opt(paren_open, arg_start)
+                    {
+                        arrow_doc = d.concat(&[leading, arrow_doc]);
+                        true
+                    } else {
+                        false
+                    };
 
                     // If the arrow has trailing param comments or leading comments,
                     // force wrapped state

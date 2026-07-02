@@ -133,7 +133,10 @@ impl<'a> Printer<'a> {
 
         let rhs_has_line_comment =
             self.has_line_comments_between(effective_rhs_start, rhs_comment_end);
-        let rhs_comments = self.build_rhs_comments_opt(effective_rhs_start, rhs_comment_end);
+        // A single-line block glued to the operator hugs the value even across a
+        // source newline (`x = /* c */⏎v` → `x = /* c */ v`), matching prettier's
+        // assignment layout.
+        let rhs_comments = self.build_rhs_comments_glued_opt(effective_rhs_start, rhs_comment_end);
 
         // For 2-segment chains at top level (a = b = value), use unified assignment layout.
         // Prettier only uses chain formatting for 3+ segments (assignment.js:113-125).

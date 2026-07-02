@@ -1,0 +1,288 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 202,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Single-line block glued to `=` in a for-init with the value on the next line",
+			"start": 10,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " stays inline and does not force the for-header to break.",
+			"start": 91,
+			"end": 150,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 165,
+			"end": 172,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 14
+				},
+				"end": {
+					"line": 4,
+					"column": 21
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 201,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 152,
+					"end": 191,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 40
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 157,
+						"end": 174,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 23
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 161,
+								"end": 174,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 10
+									},
+									"end": {
+										"line": 4,
+										"column": 23
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 161,
+									"end": 162,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 10
+										},
+										"end": {
+											"line": 4,
+											"column": 11
+										}
+									},
+									"name": "i"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 173,
+									"end": 174,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 22
+										},
+										"end": {
+											"line": 4,
+											"column": 23
+										}
+									},
+									"value": 0,
+									"raw": "0",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 165,
+											"end": 172
+										}
+									]
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 176,
+						"end": 182,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 25
+							},
+							"end": {
+								"line": 4,
+								"column": 31
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 176,
+							"end": 177,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 25
+								},
+								"end": {
+									"line": 4,
+									"column": 26
+								}
+							},
+							"name": "i"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 180,
+							"end": 182,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 29
+								},
+								"end": {
+									"line": 4,
+									"column": 31
+								}
+							},
+							"value": 10,
+							"raw": "10"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 184,
+						"end": 187,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 33
+							},
+							"end": {
+								"line": 4,
+								"column": 36
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 184,
+							"end": 185,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 33
+								},
+								"end": {
+									"line": 4,
+									"column": 34
+								}
+							},
+							"name": "i"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 189,
+						"end": 191,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 38
+							},
+							"end": {
+								"line": 4,
+								"column": 40
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single-line block glued to `=` in a for-init with the value on the next line",
+							"start": 10,
+							"end": 89
+						},
+						{
+							"type": "Line",
+							"value": " stays inline and does not force the for-header to break.",
+							"start": 91,
+							"end": 150
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

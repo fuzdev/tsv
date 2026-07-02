@@ -1,0 +1,184 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 134,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Single-line block glued to `...` with the argument on the next line stays inline.",
+			"start": 10,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 110,
+			"end": 117,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 15
+				},
+				"end": {
+					"line": 3,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 133,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 124,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 96,
+					"end": 123,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 102,
+							"end": 122,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 102,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 106,
+								"end": 122,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 27
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 107,
+										"end": 121,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 12
+											},
+											"end": {
+												"line": 3,
+												"column": 26
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 118,
+											"end": 121,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 23
+												},
+												"end": {
+													"line": 3,
+													"column": 26
+												}
+											},
+											"name": "foo",
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 110,
+													"end": 117
+												}
+											]
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single-line block glued to `...` with the argument on the next line stays inline.",
+							"start": 10,
+							"end": 94
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

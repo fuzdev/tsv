@@ -208,11 +208,6 @@ const ALLOW: &[Allow] = &[
         "jsdoc-tag",
     ),
     (
-        "tsv_ts/src/parser/expression.rs",
-        "let Some(open) = self.source[..i - 2].rfind(\"/*\") else {",
-        "comment-marker",
-    ),
-    (
         "tsv_ts/src/printer/expressions/literals.rs",
         "let Some(e_idx) = s.find('e') else {",
         "number-literal",

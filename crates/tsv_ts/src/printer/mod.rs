@@ -717,6 +717,16 @@ impl<'a> Printer<'a> {
         !comment.is_block || has_newline_before_position(self.source, comment.span.start)
     }
 
+    /// Whether a comment must occupy its own line rather than gluing inline to the
+    /// operator that precedes it: a line comment, a multiline block, or an own-line
+    /// block (a newline precedes it). This is exactly the negation of the single-line
+    /// glued block that
+    /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt) hugs across
+    /// a source newline, so the two stay in lockstep.
+    pub(crate) fn comment_forces_own_line(&self, comment: &internal::Comment) -> bool {
+        comment.multiline || self.is_own_line_comment(comment)
+    }
+
     /// Check if a delimited list (tuple, type params, etc.) has line comments
     /// between any elements OR after the last element.
     ///
