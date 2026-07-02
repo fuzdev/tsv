@@ -48,7 +48,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Err(self.error_expected_found("tag name"));
         }
 
-        let tag_name = self.current_value().to_string();
+        // `&'a str` borrows the source, so it survives the `&mut self` calls below.
+        let tag_name = self.current_value();
         let name_span = Span {
             start: self.current_start as u32,
             end: self.current_end as u32,
@@ -56,13 +57,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.advance()?;
 
         // Check if this is a special element
-        if let Some(special_tag) = SpecialElementTag::from_tag_name(&tag_name, in_svelte_head) {
+        if let Some(special_tag) = SpecialElementTag::from_tag_name(tag_name, in_svelte_head) {
             return self.parse_special_element_body(start, name_span, special_tag);
         }
 
         // Regular element or component
-        let tag_symbol = self.intern(&tag_name);
-        let kind = if is_component(&tag_name) {
+        let tag_symbol = self.intern(tag_name);
+        let kind = if is_component(tag_name) {
             ElementKind::Component
         } else {
             ElementKind::Html
@@ -82,7 +83,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn parse_regular_element_body(
         &mut self,
         start: usize,
-        tag_name: String,
+        tag_name: &'a str,
         tag_symbol: string_interner::DefaultSymbol,
         kind: ElementKind,
         name_span: Span,
@@ -105,7 +106,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Void and self-closing elements have no children or closing tag
         // (classification lives in tsv_html, shared with the printer).
-        if tsv_html::is_void_element(&tag_name) || self_closing {
+        if tsv_html::is_void_element(tag_name) || self_closing {
             return Ok(ParsedElement::Element(Element {
                 name: tag_symbol,
                 kind,
@@ -123,8 +124,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Nested <style> and <script> elements have raw text content (not parsed as Svelte template)
         // Per Svelte docs: "the <style> tag will be inserted as-is into the DOM"
         if tag_name == "style" || tag_name == "script" {
-            let child_nodes = self.parse_raw_text_content(&tag_name, opening_tag_end, start)?;
-            let end = self.parse_closing_tag(&tag_name)?;
+            let child_nodes = self.parse_raw_text_content(tag_name, opening_tag_end, start)?;
+            let end = self.parse_closing_tag(tag_name)?;
             return Ok(ParsedElement::Element(Element {
                 name: tag_symbol,
                 kind,
@@ -142,10 +143,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
 
         // Parse children
-        let child_nodes = self.parse_children(&tag_name, opening_tag_end, start, in_svelte_head)?;
+        let child_nodes = self.parse_children(tag_name, opening_tag_end, start, in_svelte_head)?;
 
         // Parse closing tag: </tag>
-        let end = self.parse_closing_tag(&tag_name)?;
+        let end = self.parse_closing_tag(tag_name)?;
 
         Ok(ParsedElement::Element(Element {
             name: tag_symbol,

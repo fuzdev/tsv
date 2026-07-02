@@ -686,7 +686,11 @@ impl DocArena {
     pub fn join_doc(&self, docs: impl IntoIterator<Item = DocId>, separator: DocId) -> DocId {
         let iter = docs.into_iter();
         let (lower, _) = iter.size_hint();
-        let mut parts = Vec::with_capacity(lower.saturating_mul(2).saturating_sub(1));
+        // Shared inline buffer (N=8): the joined parts (2n-1 for n items) stay off the
+        // heap for the common small list, matching the three printers' DocBuf sweep.
+        // Call sites join arg/param/specifier lists (≥1 item), so the buffer is never
+        // the always-empty no-op the SmallVec sweep warns about.
+        let mut parts = DocBuf::with_capacity(lower.saturating_mul(2).saturating_sub(1));
         for (i, doc) in iter.enumerate() {
             if i > 0 {
                 parts.push(separator); // Copy, no clone needed!
