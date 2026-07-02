@@ -10,7 +10,7 @@ use super::types::{CachedWidth, DocText, LineKind, Mode, TextResolver, resolve_t
 
 /// Flat width of a text node, or `None` when the text contains a newline (the
 /// line ends inside it, so it has no single-line width). The one definition of
-/// the cached-or-measure fallback, backing [`flat_width_memo`]'s `Text` arm —
+/// the cached-or-measure fallback, backing [`flat_width_fill`]'s `Text` arm —
 /// its only caller, since the fits walk's `Text` arm reaches it via the memo.
 #[inline]
 fn text_flat_width<R: TextResolver + ?Sized>(t: &DocText, resolver: Option<&R>) -> Option<u32> {
@@ -33,6 +33,11 @@ fn text_flat_width<R: TextResolver + ?Sized>(t: &DocText, resolver: Option<&R>) 
 /// contains a forced break, so `arena_fits` must walk it. Mirrors the flat-mode
 /// arm of the fits loop exactly, so substituting `remaining -= w` for the walk
 /// is byte-identical.
+///
+/// Split into an inline cache probe over an outlined recursive fill: the fits
+/// walk probes an already-warm slot far more often than it fills one, so the
+/// warm path is a load + compare at the call site instead of a full call.
+#[inline]
 fn flat_width_memo<R: TextResolver + ?Sized>(
     id: DocId,
     nodes: &[DocNode],
@@ -41,10 +46,24 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
     resolver: Option<&R>,
 ) -> Option<u32> {
     match cache[id.index()] {
-        FLAT_WIDTH_UNKNOWN => {}
-        FLAT_WIDTH_BREAKS => return None,
-        w => return Some(w),
+        FLAT_WIDTH_UNKNOWN => flat_width_fill(id, nodes, children, cache, resolver),
+        FLAT_WIDTH_BREAKS => None,
+        w => Some(w),
     }
+}
+
+/// The cold half of [`flat_width_memo`]: compute and cache a subtree's flat
+/// width. Runs at most once per node; recursion goes back through the inline
+/// probe so warm children never re-enter here.
+#[cold]
+#[inline(never)]
+fn flat_width_fill<R: TextResolver + ?Sized>(
+    id: DocId,
+    nodes: &[DocNode],
+    children: &[DocId],
+    cache: &mut [u32],
+    resolver: Option<&R>,
+) -> Option<u32> {
     let result: Option<u32> = match &nodes[id.index()] {
         DocNode::Text(t) => text_flat_width(t, resolver),
         // Contains hardlines → no break-free flat width (like a newline-bearing
