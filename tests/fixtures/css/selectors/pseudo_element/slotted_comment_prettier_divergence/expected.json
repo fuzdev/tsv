@@ -1,0 +1,120 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 193,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 53,
+					"end": 76,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 53,
+							"end": 76,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "slotted",
+											"start": 53,
+											"end": 62
+										}
+									],
+									"start": 53,
+									"end": 76
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 77,
+					"end": 95,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 81,
+							"end": 91,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 53,
+				"end": 95
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 141,
+					"end": 164,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 141,
+							"end": 164,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "slotted",
+											"start": 141,
+											"end": 150
+										}
+									],
+									"start": 141,
+									"end": 164
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 165,
+					"end": 184,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 169,
+							"end": 180,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 141,
+				"end": 184
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 185,
+			"styles": "\n\t/* comment before the compound selector */\n\t::slotted(/* c1 */ div) {\n\t\tcolor: red;\n\t}\n\n\t/* comment after the compound selector */\n\t::slotted(div /* c2 */) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 194,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -419,14 +419,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match args {
             internal::PseudoClassArgs::SelectorList { selectors, span } => {
-                let inner = self.build_nested_selector_list_doc(selectors);
                 // Interleave leading/trailing comments that sit inside the parens but
-                // outside the inner list span (`:is(/* lead */ .a /* trail */)`). The
-                // args `span` covers `(content)`; the `)` is its last byte.
-                let leading = self.comment_blocks_in_range(span.start, selectors.span.start);
-                let trailing =
-                    self.comment_blocks_in_range(selectors.span.end, span.end.saturating_sub(1));
-                let inner = self.wrap_inner_with_comments(inner, &leading, &trailing);
+                // outside the inner list span (`:is(/* lead */ .a /* trail */)`).
+                let inner = self.build_nested_selector_list_doc(selectors);
+                let inner = self.wrap_args_gap_comments(inner, *span, selectors.span);
                 self.wrap_pseudo_args(inner)
             }
             internal::PseudoClassArgs::Nth {
@@ -473,22 +469,61 @@ impl<'a> Printer<'a> {
                     }
                 }
             }
-            internal::PseudoClassArgs::Slotted { selectors, .. } => {
+            internal::PseudoClassArgs::Slotted { selectors, span } => {
                 // A compound selector (no combinators) — never breaks.
                 let mut parts = DocBuf::new();
                 let n = selectors.len();
                 for (j, simple) in selectors.iter().enumerate() {
                     parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
                 }
-                d.concat(&[d.text("("), d.concat(&parts), d.text(")")])
+                let compound = d.concat(&parts);
+                // Interleave leading/trailing comments inside the parens but outside
+                // the compound (`::slotted(/* lead */ div /* trail */)`), using the
+                // compound's own bounds. The parser guarantees ≥1 selector, so the
+                // fallback is unreachable in practice.
+                let inner = match (selectors.first(), selectors.last()) {
+                    (Some(first), Some(last)) => {
+                        let content = Span {
+                            start: first.span().start,
+                            end: last.span().end,
+                        };
+                        self.wrap_args_gap_comments(compound, *span, content)
+                    }
+                    _ => compound,
+                };
+                d.concat(&[d.text("("), inner, d.text(")")])
             }
-            internal::PseudoClassArgs::Part { idents, .. } => {
-                d.concat(&[d.text("("), d.text_owned(idents.join(" ")), d.text(")")])
+            internal::PseudoClassArgs::Part {
+                idents,
+                span,
+                value_span,
+            } => {
+                // Interleave leading/trailing comments outside the identifier run
+                // (`::part(/* lead */ label /* trail */)`).
+                let inner =
+                    self.wrap_args_gap_comments(d.text_owned(idents.join(" ")), *span, *value_span);
+                d.concat(&[d.text("("), inner, d.text(")")])
             }
             internal::PseudoClassArgs::Identifier { value, .. } => {
                 d.concat(&[d.text("("), d.text_owned(value.to_string()), d.text(")")])
             }
         }
+    }
+
+    /// Interleave the gap comments that sit inside a pseudo's argument parens
+    /// (`args_span`) but outside the argument content (`content_span`), returning
+    /// `inner` wrapped with them. Assumes `args_span.end` is one byte past the `)` —
+    /// the `Slotted`/`Part`/`SelectorList` convention, where `span` is the full
+    /// `(...)` printer bound — so the trailing gap ends at `args_span.end - 1`, the
+    /// `)` position. `Nth` and `Identifier` can't share this helper: their `span` is
+    /// instead the Svelte-matching public-AST node span (it ends *before* the `)`,
+    /// and convert reads it verbatim — see `convert_pseudo_class_args`), so `Nth`
+    /// interleaves inline and `Identifier` carries no gap comments yet.
+    fn wrap_args_gap_comments(&self, inner: DocId, args_span: Span, content_span: Span) -> DocId {
+        let leading = self.comment_blocks_in_range(args_span.start, content_span.start);
+        let trailing =
+            self.comment_blocks_in_range(content_span.end, args_span.end.saturating_sub(1));
+        self.wrap_inner_with_comments(inner, &leading, &trailing)
     }
 
     /// Prepend a leading comment and append a trailing comment around an inner doc,
