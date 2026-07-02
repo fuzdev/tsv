@@ -1,6 +1,8 @@
 pub mod commands;
 
 use argh::FromArgs;
+#[cfg(feature = "swallow_check")]
+use commands::swallow_audit::SwallowAuditCommand;
 use commands::{
     arena_stats::ArenaStatsCommand, ast_diff::AstDiffCommand,
     authoring_audit::AuthoringAuditCommand, buffer_sizes::BufferSizesCommand,
@@ -13,8 +15,7 @@ use commands::{
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
     json_profile::JsonProfileCommand, lex_diff::LexDiffCommand, line_width::LineWidthCommand,
     metrics::MetricsCommand, profile::ProfileCommand, scan_audit::ScanAuditCommand,
-    swallow_audit::SwallowAuditCommand, test262::Test262Command,
-    ts_fixture_audit::TsFixtureAuditCommand,
+    test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -77,6 +78,10 @@ pub enum Subcommand {
     LexDiff(LexDiffCommand),
     Metrics(MetricsCommand),
     ScanAudit(ScanAuditCommand),
+    // Requires the `swallow_check` feature so default builds keep the
+    // render-time swallow instrumentation compiled out (production-shaped
+    // profiles); the `swallow:audit` deno task passes it.
+    #[cfg(feature = "swallow_check")]
     SwallowAudit(SwallowAuditCommand),
     Test262(Test262Command),
     TsFixtureAudit(TsFixtureAuditCommand),
@@ -113,6 +118,7 @@ impl TopLevel {
             Subcommand::LexDiff(c) => c.run(),
             Subcommand::Metrics(c) => c.run(),
             Subcommand::ScanAudit(c) => c.run(),
+            #[cfg(feature = "swallow_check")]
             Subcommand::SwallowAudit(c) => c.run(),
             Subcommand::Test262(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),

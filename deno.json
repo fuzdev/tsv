@@ -25,7 +25,7 @@
 		"typecheck": "cargo check --workspace",
 		"test": "cargo test --workspace",
 		"lint": "cargo clippy --workspace -- -D warnings",
-		"check": "deno task typecheck && deno task test && deno task test:deno && deno task conformance:audit && deno task swallow:audit && deno task scan:audit && deno task fanout:audit && cargo fmt --check && deno task check:ast-types && deno task lint",
+		"check": "deno task typecheck && deno task test && deno task test:deno && deno task conformance:audit && deno task scan:audit && deno task fanout:audit && deno task swallow:audit && cargo fmt --check && deno task check:ast-types && deno task lint",
 		"check:ast-types": "deno run --allow-read --allow-write=scripts --allow-run=cargo,deno scripts/check_ast_types.ts",
 
 		"fixtures:init": "cargo run -p tsv_debug --quiet fixture_init",
@@ -37,7 +37,7 @@
 		"fixtures:audit": "cargo run -p tsv_debug --quiet fixtures_audit",
 		"fixtures:ts-audit": "cargo run -p tsv_debug --quiet ts_fixture_audit",
 		"conformance:audit": "cargo run -p tsv_debug --quiet conformance_audit",
-		"swallow:audit": "cargo run -p tsv_debug --quiet swallow_audit",
+		"swallow:audit": "cargo test -p tsv_lang --features swallow_check --quiet && cargo run -p tsv_debug --features swallow_check --quiet swallow_audit",
 		"scan:audit": "cargo run -p tsv_debug --quiet scan_audit",
 		"fanout:audit": "cargo run -p tsv_debug --quiet build_fanout_audit",
 		"metrics": "cargo run -p tsv_debug --quiet metrics",
