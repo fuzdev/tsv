@@ -881,10 +881,12 @@ impl<'a> Printer<'a> {
         elem_end: u32,
         end_boundary: u32,
     ) {
-        match self
-            .find_comma_after(elem_end)
-            .filter(|cp| *cp < end_boundary)
-        {
+        // Zero-comment fast gate: with no comment in the window, both splits emit
+        // nothing wherever the comma is — skip the comma scan entirely.
+        if !self.has_comments_between(elem_end, end_boundary) {
+            return;
+        }
+        match self.find_comma_in_range(elem_end, end_boundary) {
             Some(comma_pos) => {
                 self.append_trailing_inline_block_comments(before, elem_end, comma_pos);
                 self.append_trailing_inline_block_comments(after, comma_pos, end_boundary);

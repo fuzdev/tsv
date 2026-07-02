@@ -198,13 +198,15 @@ impl<'a> Printer<'a> {
         let brace_close = self.close_brace_offset(last_spec_end, bound);
 
         // Expanding comments (line comments, or own-line single-line block
-        // comments) force the multiline path.
+        // comments) force the multiline path. One zero-comment window check over
+        // the braces gates all three queries (each is bounded within the braces).
         let brace_span = Span::new(brace_start, brace_close + 1);
-        let has_expanding_comments =
-            self.has_line_comments_in_delimited_list(specifiers, &get_span, brace_close)
+        let has_expanding_comments = self.has_comments_between(brace_start, brace_close + 1)
+            && (self.has_line_comments_in_delimited_list(specifiers, &get_span, brace_close)
                 || self.has_line_comments_between(brace_start + 1, first_start)
-                || self
-                    .has_own_line_block_comments_in_bracket_list(brace_span, specifiers, &get_span);
+                || self.has_own_line_block_comments_in_bracket_list(
+                    brace_span, specifiers, &get_span,
+                ));
 
         let braces_doc = if has_expanding_comments {
             // `Some(first_start)` keeps a same-line `{` comment on the brace line
@@ -340,6 +342,26 @@ impl<'a> Printer<'a> {
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
+
+        // Zero-comment fast gate (see `build_params_doc_with_comments`): every
+        // comment sub-query below — the per-item leading/trailing lookups, the
+        // per-gap `find_list_comma` scans (whose results feed only comment
+        // placement), and the last item's comma split — is bounded within the
+        // braces, so with no comment there the list is plain items joined by
+        // `,` + line. Tree-identical: the skipped singleton `concat`s collapse
+        // to the item doc, and the skipped pushes are empty docs.
+        if !self.has_comments_between(brace_start, brace_close + 1) {
+            let mut inner_parts = DocBuf::new();
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    inner_parts.push(d.text(","));
+                    inner_parts.push(d.line());
+                }
+                inner_parts.push(build_item_doc(item));
+            }
+            return d.concat(&inner_parts);
+        }
+
         let mut inner_parts = DocBuf::new();
         let mut prev_end = brace_start + 1; // After opening `{`
         // Block comment trailing the LAST item after its source comma — preserved past

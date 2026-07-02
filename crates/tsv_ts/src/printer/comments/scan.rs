@@ -22,6 +22,13 @@ impl<'a> Printer<'a> {
         find_char(source, pos as usize, source.len(), b',', TriviaProfile::JS).map(|i| i as u32)
     }
 
+    /// `find_comma_after` bounded to `[pos, end)` — stops scanning at `end`
+    /// instead of running to the next comma anywhere in the rest of the source.
+    pub(crate) fn find_comma_in_range(&self, pos: u32, end: u32) -> Option<u32> {
+        let source = self.source.as_bytes();
+        find_char(source, pos as usize, end as usize, b',', TriviaProfile::JS).map(|i| i as u32)
+    }
+
     /// Find an angle-bracket type assertion's closing `>` in `[start, end)`,
     /// skipping any `>` that sits inside a comment or string (`<T /* > */>x`).
     ///
@@ -44,16 +51,13 @@ impl<'a> Printer<'a> {
 
     /// Find the position of the LAST comma in `[start, end)`, or `None`.
     ///
-    /// Walks forward via `find_comma_after`, so it correctly skips commas
+    /// Walks forward via `find_comma_in_range`, so it correctly skips commas
     /// inside strings and comments. Used to anchor comments emitted past the
     /// last separator in trailing-elision arrays (e.g. `[, , ,/* c */]`).
     pub(crate) fn find_last_comma_before(&self, start: u32, end: u32) -> Option<u32> {
         let mut last = None;
         let mut pos = start;
-        while let Some(c) = self.find_comma_after(pos) {
-            if c >= end {
-                break;
-            }
+        while let Some(c) = self.find_comma_in_range(pos, end) {
             last = Some(c);
             pos = c + 1;
         }
@@ -67,8 +71,7 @@ impl<'a> Printer<'a> {
     /// Callers must pass `prev_end <= upper`.
     pub(crate) fn has_blank_line_after_comma(&self, prev_end: u32, upper: u32) -> bool {
         let check_start = self
-            .find_comma_after(prev_end)
-            .filter(|&c| c < upper)
+            .find_comma_in_range(prev_end, upper)
             .map_or(prev_end, |c| c + 1);
         let check_end = super::calls::skip_stripped_open_paren(self.source, check_start, upper);
         self.has_blank_line_between(check_start, check_end)

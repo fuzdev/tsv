@@ -390,14 +390,25 @@ impl<'a> Printer<'a> {
         paren_pos: Option<u32>,
         return_type_start: u32,
     ) -> DocId {
-        let d = self.d();
-        let mut parts: DocBuf = smallvec![];
         // Depth-tracked close paren (skips nested parens / comments) — the naive
         // first-`)` scan mis-fires on complex params and pulls real param-trailing
         // comments into this range (duplication).
-        if let Some(paren_pos) = paren_pos
-            && let Some(close_after) = self.find_closing_paren(paren_pos, return_type_start)
-        {
+        let close_paren_after =
+            paren_pos.and_then(|p| self.find_closing_paren(p, return_type_start));
+        self.build_close_paren_to_return_type_comments(close_paren_after, return_type_start)
+    }
+
+    /// `build_paren_to_return_type_comments` for callers that already located the
+    /// params' close paren (`close_paren_after` = position just past the `)`) —
+    /// reuses that scan instead of re-running it.
+    pub(in crate::printer) fn build_close_paren_to_return_type_comments(
+        &self,
+        close_paren_after: Option<u32>,
+        return_type_start: u32,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![];
+        if let Some(close_after) = close_paren_after {
             for comment in comments_in_range(self.comments, close_after, return_type_start) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
@@ -426,14 +437,16 @@ impl<'a> Printer<'a> {
     /// Build a function-declaration return type (`: T`) with `)`→`:` comment
     /// handling, using the return-type type variant (wraps unions/intersections so
     /// params break first). Sibling of `build_signature_return_type_doc`, which
-    /// serves type-member signatures and uses the plain type variant.
+    /// serves type-member signatures and uses the plain type variant. The caller
+    /// supplies the already-located close paren (position just past the `)`).
     pub(in crate::printer) fn build_function_return_type_doc(
         &self,
-        paren_pos: Option<u32>,
+        close_paren_after: Option<u32>,
         return_type: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
         let d = self.d();
-        let prefix = self.build_paren_to_return_type_comments(paren_pos, return_type.span.start);
+        let prefix = self
+            .build_close_paren_to_return_type_comments(close_paren_after, return_type.span.start);
         d.concat(&[
             prefix,
             self.build_type_annotation_doc_for_return_type(return_type),
@@ -643,30 +656,44 @@ impl<'a> Printer<'a> {
             // Use last param end as fallback if close paren not found (no trailing check)
             let end_boundary =
                 close_paren_pos.unwrap_or_else(|| params.last().map_or(0, |p| p.span().end));
-            let has_line_comments = self.has_line_comments_in_delimited_list(
-                params,
-                internal::Expression::span,
-                end_boundary,
-            );
-            // Also check for own-line block comments after the last param
-            let has_own_line_block_after_last = params.last().is_some_and(|last| {
-                self.has_own_line_block_comment_after(
-                    last.span().end,
-                    last.span().end,
+
+            // Zero-comment fast gate (see `build_params_doc_with_comments`): every
+            // comment sub-query below is bounded within `[paren, end_boundary]`
+            // (with no located paren, the leading queries anchor at 0, so the
+            // window widens to stay a superset), so when no comment lies there
+            // each is provably empty/false.
+            let window_has_comments = {
+                let window_start = paren_pos.unwrap_or(0);
+                self.has_comments_between(window_start, end_boundary)
+            };
+
+            let has_line_comments = window_has_comments
+                && self.has_line_comments_in_delimited_list(
+                    params,
+                    internal::Expression::span,
                     end_boundary,
-                )
-            });
+                );
+            // Also check for own-line block comments after the last param
+            let has_own_line_block_after_last = window_has_comments
+                && params.last().is_some_and(|last| {
+                    self.has_own_line_block_comment_after(
+                        last.span().end,
+                        last.span().end,
+                        end_boundary,
+                    )
+                });
             // A line comment trailing `(` (`(// c\n p`), or an own-line block comment
             // in the `(`→first-param gap (`(\n/* c */\n p`), forces multiline.
             // `has_line_comments_in_delimited_list` skips this leading gap, and the
             // inline path below emits these with trailing spacing — a line comment
             // swallows the following tokens, a block comment collapses inline. Route
             // to the hardline path so they land on their own line (matches prettier).
-            let has_leading_gap_forcing = paren_pos.is_some_and(|p| {
-                let first_start = params[0].span().start;
-                self.has_line_comments_between(p + 1, first_start)
-                    || self.has_own_line_block_comment_after(p, p + 1, first_start)
-            });
+            let has_leading_gap_forcing = window_has_comments
+                && paren_pos.is_some_and(|p| {
+                    let first_start = params[0].span().start;
+                    self.has_line_comments_between(p + 1, first_start)
+                        || self.has_own_line_block_comment_after(p, p + 1, first_start)
+                });
             // A blank line between two params also forces multiline (preserved by the
             // hardline path) — same as regular function params; prettier keeps it.
             if has_line_comments
@@ -689,10 +716,12 @@ impl<'a> Printer<'a> {
             //   fn: (
             //       options: { repo: LocalRepo; log: Logger },
             //   ) => ReturnType
-            let no_leading_comments = paren_pos
-                .is_none_or(|pos| !self.has_comments_between(pos + 1, params[0].span().start));
-            let no_trailing_comments = close_paren_pos
-                .is_none_or(|cp| !self.has_comments_between(params[0].span().end, cp));
+            let no_leading_comments = !window_has_comments
+                || paren_pos
+                    .is_none_or(|pos| !self.has_comments_between(pos + 1, params[0].span().start));
+            let no_trailing_comments = !window_has_comments
+                || close_paren_pos
+                    .is_none_or(|cp| !self.has_comments_between(params[0].span().end, cp));
             let huggable_param = if params.len() == 1 && no_leading_comments && no_trailing_comments
             {
                 get_type_literal_from_identifier(&params[0])
@@ -728,16 +757,32 @@ impl<'a> Printer<'a> {
                 ));
                 parts.push(self.build_type_literal_doc_for_function_param(type_literal));
 
-                // Handle trailing comments after the param (between type literal and close paren)
+                // Handle trailing comments after the param (between type literal and
+                // close paren); `end_boundary` is that close paren (or the param end
+                // fallback — identical for this single-param path).
                 let param_end = params[0].span().end;
-                let close_paren = paren_pos
-                    .and_then(|p| self.matching_close_paren(p))
-                    .unwrap_or(param_end);
-                for comment in comments_in_range(self.comments, param_end, close_paren) {
+                for comment in comments_in_range(self.comments, param_end, end_boundary) {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
 
+                parts.push(d.text(")"));
+            } else if !window_has_comments {
+                // Zero-comment fast path: plain params joined by `,` + line — no
+                // per-gap comma scans or comment lookups. Renders identically (the
+                // skipped pushes are empty comment docs and the empty after-comma
+                // buffer).
+                let mut param_parts = DocBuf::new();
+                for (i, p) in params.iter().enumerate() {
+                    if i > 0 {
+                        param_parts.push(d.text(","));
+                        param_parts.push(d.line());
+                    }
+                    param_parts.push(self.build_function_type_param_expression_doc(p));
+                }
+                parts.push(d.text("("));
+                parts.push(d.indent(d.concat(&[d.softline(), d.concat(&param_parts)])));
+                parts.push(d.softline());
                 parts.push(d.text(")"));
             } else {
                 let mut param_parts = DocBuf::new();
@@ -772,15 +817,13 @@ impl<'a> Printer<'a> {
                         );
                         prev_end = comma_pos + 1; // After comma
                     } else {
-                        // Last param: trailing comments before `)`
-                        let close_paren = paren_pos
-                            .and_then(|p| self.matching_close_paren(p))
-                            .unwrap_or(param_end);
+                        // Last param: trailing comments before `)` (`end_boundary` is
+                        // the close paren, or the last param end fallback).
                         self.append_last_trailing_block_comments_split(
                             &mut param_parts,
                             &mut last_after_comma,
                             param_end,
-                            close_paren,
+                            end_boundary,
                         );
                     }
                 }

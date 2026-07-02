@@ -701,13 +701,14 @@ impl<'a> Printer<'a> {
 
         // Parameters and return type - shared callable-signature builder (same path
         // as function declarations; MethodDefinition.value is field-identical).
-        parts.push(self.build_callable_signature_doc(
+        let (sig_doc, sig_end) = self.build_callable_signature_doc(
             method.value.params,
             method.value.type_parameters.as_ref(),
             method.value.return_type.as_ref(),
             method.value.params_start,
             method.value.body.span.start,
-        ));
+        );
+        parts.push(sig_doc);
 
         // Overload signatures have empty body (start == end)
         let is_overload_signature = method.value.body.span.start == method.value.body.span.end;
@@ -733,15 +734,6 @@ impl<'a> Printer<'a> {
             parts.push(d.text(";"));
             parts.extend(after);
         } else {
-            let sig_end = if let Some(rt) = &method.value.return_type {
-                rt.span.end
-            } else if let Some(paren) =
-                self.find_closing_paren(method.value.params_start, method.value.body.span.start)
-            {
-                paren
-            } else {
-                method.value.body.span.start
-            };
             self.append_body_with_sig_comments(&mut parts, sig_end, &method.value.body);
         }
 

@@ -8,9 +8,10 @@
 // the object/array destructuring-pattern builders and the object-literal builder
 // so the ordering can't drift between them.
 //
-// The comma is located with `find_comma_after` (comment/string-skipping), so a
-// comma inside an earlier comment (`a /* , */ /* x */, b`) is never mistaken for
-// the separator and the following comment is not relocated across it.
+// The comma is located with `find_comma_in_range` (comment/string-skipping,
+// bounded by the element's upper boundary), so a comma inside an earlier comment
+// (`a /* , */ /* x */, b`) is never mistaken for the separator and the following
+// comment is not relocated across it.
 
 use super::{CommentVec, Printer};
 use smallvec::SmallVec;
@@ -44,10 +45,24 @@ impl<'a> Printer<'a> {
         upper_bound: u32,
         is_last: bool,
     ) -> TrailingComments<'_> {
+        // Zero-comment fast gate: the comma position only classifies comments, so
+        // with no comment in the window there is nothing to collect — skip the
+        // comma scan entirely.
+        if !self.has_comments_between(elem_end, upper_bound) {
+            return TrailingComments {
+                block: SmallVec::new(),
+                block_after: SmallVec::new(),
+                line: SmallVec::new(),
+                end_pos: elem_end,
+            };
+        }
+
         // Find the separator comma in source (if any), skipping commas that sit
         // inside comments or strings so `a /* , */ /* x */, b` is split on the
-        // real comma, not the one in `/* , */`.
-        let comma_pos = self.find_comma_after(elem_end).filter(|c| *c < upper_bound);
+        // real comma, not the one in `/* , */`. The scan is bounded by
+        // `upper_bound` (the old unbounded-then-filter form scanned to the next
+        // comma anywhere in the rest of the source).
+        let comma_pos = self.find_comma_in_range(elem_end, upper_bound);
 
         // Collect same-line trailing comments. A block comment after the comma
         // normally belongs to the next element as leading — except on the LAST
