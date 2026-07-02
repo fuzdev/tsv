@@ -79,6 +79,31 @@ pub(crate) enum CommentFilter {
     BlockOnly,
 }
 
+/// How a leading-comment run decides whether a *block* comment hugs the token
+/// that follows it (a trailing space, `/* c */ X`) rather than dropping to its
+/// own line. The rest of the run is identical across sites — one
+/// `build_comment_doc` per comment, and a blank-preserving `hardline` toward the
+/// next comment (or the terminal) for every comment that doesn't hug — so only
+/// this glue test varies, and [`push_leading_comment_run`](Printer::push_leading_comment_run)
+/// takes it as a mode.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum LeadingGlue {
+    /// A block hugs when it shares a source line with the *next* comment (or the
+    /// terminal, for the last one). The RHS-of-`=`/`:` / keyword-operand form
+    /// ([`build_rhs_comments_opt`](Printer::build_rhs_comments_opt)).
+    Adjacent,
+    /// `Adjacent`, plus a single-line block glued to the operator hugs the value
+    /// across a source newline — prettier's assignment/call pull-up
+    /// ([`build_rhs_comments_glued_opt`](Printer::build_rhs_comments_glued_opt)).
+    AdjacentGlued,
+    /// A block hugs only when it shares a source line with the terminal member.
+    /// The member-leading form (interface / intersection members). Differs from
+    /// `Adjacent` only for a multi-comment run whose interior blocks share a line
+    /// with each other but not with the member (`/* a */ /* b */⏎member`): this
+    /// keeps each on its own line, where `Adjacent` would glue the leading pair.
+    Terminal,
+}
+
 impl<'a> Printer<'a> {
     /// Whether a comment between two neighbors can't share a line with either — any
     /// line comment (it runs to EOL), or a block comment isolated from *both* `prev`
@@ -128,16 +153,12 @@ impl<'a> Printer<'a> {
         comments: &[&Comment],
         member_start: u32,
     ) {
-        let d = self.d();
-        for (i, comment) in comments.iter().enumerate() {
-            parts.push(self.build_comment_doc(comment));
-            if comment.is_block && self.is_same_line(comment.span.end, member_start) {
-                parts.push(d.text(" "));
-            } else {
-                let next = comments.get(i + 1).map_or(member_start, |c| c.span.start);
-                self.push_blank_preserving_hardline(parts, comment.span.end, next);
-            }
-        }
+        self.push_leading_comment_run(
+            parts,
+            comments.iter().copied(),
+            member_start,
+            LeadingGlue::Terminal,
+        );
     }
 
     /// Build a Doc for inline comments between two positions with specified spacing and filter
@@ -337,7 +358,7 @@ impl<'a> Printer<'a> {
     /// Use for any position where a comment appears before an expression (RHS of `=`,
     /// after keywords like `return`/`await`, after operators like `!`/`...`, etc.).
     pub(crate) fn build_rhs_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
-        self.build_rhs_comments_opt_impl(start, end, false)
+        self.build_leading_comment_run_opt(start, end, LeadingGlue::Adjacent)
     }
 
     /// Like `build_rhs_comments_opt`, but a single-line block comment glued to the
@@ -348,46 +369,80 @@ impl<'a> Printer<'a> {
     /// keyword operands, object property values, …) stay on the non-gluing
     /// `build_rhs_comments_opt`.
     pub(crate) fn build_rhs_comments_glued_opt(&self, start: u32, end: u32) -> Option<DocId> {
-        self.build_rhs_comments_opt_impl(start, end, true)
+        self.build_leading_comment_run_opt(start, end, LeadingGlue::AdjacentGlued)
     }
 
-    fn build_rhs_comments_opt_impl(
+    /// Emit a run of leading comments before `terminal_pos` — the value, member,
+    /// or body the comments lead. Each comment is emitted with `build_comment_doc`;
+    /// a *block* comment that hugs the following token (per `glue`) gets a trailing
+    /// space (`/* c */ X`), and every other comment (an own-line block, or any line
+    /// comment) drops to its own line via a blank-preserving `hardline` toward the
+    /// next comment (or `terminal_pos` for the last). Preserving an author blank
+    /// line before the value / next comment matches prettier, which keeps one blank
+    /// in this "comment before expression" position everywhere (RHS of `=`/`:`, call
+    /// args, `return`/`await`, unary operands, …). The single loop behind
+    /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt),
+    /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt),
+    /// [`emit_member_leading_comments`](Self::emit_member_leading_comments), and the
+    /// arrow-body leading run.
+    pub(crate) fn push_leading_comment_run<'c>(
         &self,
-        start: u32,
-        end: u32,
-        glue_inline_block: bool,
-    ) -> Option<DocId> {
+        parts: &mut DocBuf,
+        comments: impl Iterator<Item = &'c Comment>,
+        terminal_pos: u32,
+        glue: LeadingGlue,
+    ) {
         let d = self.d();
-        let mut parts = DocBuf::new();
-        let mut comments = comments_in_range(self.comments, start, end).peekable();
+        let mut comments = comments.peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
             // The next thing after this comment is the following comment, or the
-            // value itself (`end`) for the last one.
-            let next = comments.peek().map_or(end, |c| c.span.start);
-            // A glued (not own-line) single-line block hugs the value with a space
-            // when `glue_inline_block` is set, even across a source newline.
-            let glue_across_newline = glue_inline_block && !self.comment_forces_own_line(comment);
-            if comment.is_block
-                && (self.is_same_line(comment.span.end, next) || glue_across_newline)
-            {
+            // terminal (value/member/body) for the last one.
+            let next = comments.peek().map_or(terminal_pos, |c| c.span.start);
+            let hugs = comment.is_block
+                && match glue {
+                    LeadingGlue::Adjacent => self.is_same_line(comment.span.end, next),
+                    // A glued (not own-line) single-line block hugs across a source
+                    // newline; the same-line-as-next case still hugs as in `Adjacent`.
+                    LeadingGlue::AdjacentGlued => {
+                        self.is_same_line(comment.span.end, next)
+                            || !self.comment_forces_own_line(comment)
+                    }
+                    LeadingGlue::Terminal => self.is_same_line(comment.span.end, terminal_pos),
+                };
+            if hugs {
                 // Value (or next comment) shares the `*/` line — keep it glued.
                 parts.push(d.text(" "));
             } else {
                 // Line comment, or a block whose value/next comment is on a later
                 // source line: keep them on separate lines (preserve the author's
                 // layout; a line comment must break so it can't absorb the value).
-                // An author blank line before the value / next comment is preserved,
-                // matching prettier (it keeps one blank in this "comment before
-                // expression" position everywhere — RHS of `=`/`:`, call args,
-                // `return`/`await`, unary operands, …).
-                self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
+                self.push_blank_preserving_hardline(parts, comment.span.end, next);
             }
         }
+    }
+
+    /// Build a leading-comment run over `[start, end)` into a fresh `DocBuf`,
+    /// returning `None` when the range holds no comments. The `Option`-returning
+    /// form of [`push_leading_comment_run`](Self::push_leading_comment_run) that
+    /// the RHS-comment wrappers use.
+    fn build_leading_comment_run_opt(
+        &self,
+        start: u32,
+        end: u32,
+        glue: LeadingGlue,
+    ) -> Option<DocId> {
+        let mut parts = DocBuf::new();
+        self.push_leading_comment_run(
+            &mut parts,
+            comments_in_range(self.comments, start, end),
+            end,
+            glue,
+        );
         if parts.is_empty() {
             None
         } else {
-            Some(d.concat(&parts))
+            Some(self.d().concat(&parts))
         }
     }
 
