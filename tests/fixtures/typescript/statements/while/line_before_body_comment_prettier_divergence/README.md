@@ -13,9 +13,10 @@ tsv treats the author's vertical spacing as intentional, preserving the blank
 line before the comment. Consistent with tsv's comment-position handling across
 control-flow statements.
 
-`variant_spaces.svelte` is a dual-stable form prettier reaches from the
+`divergent_variant_spaces.svelte` is prettier's stable form reached from the
 extra-whitespace `unformatted_ours_spaces.svelte` (it keeps a blank line *after*
-the comment instead); `unformatted_ours_*` variants normalize back to input under
-tsv only.
+the comment instead). It is a divergent variant: prettier keeps it, but tsv drops
+the blank and settles on a distinct third stable form (neither prettier's nor the
+input). `unformatted_ours_*` variants normalize back to input under tsv only.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

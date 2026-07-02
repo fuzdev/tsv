@@ -7,9 +7,14 @@ A line comment between the `else` keyword and a non-block body expression
 indented with the body. **tsv** keeps the comment trailing `else` on the **same
 line** (the author's placement), with the body indented beneath.
 
-A third form — the comment relocated *before* `else` (`} // c1`, then
-`else expr`) — is also prettier-stable, documented as the dual-stable
-`variant_comment_before_else.svelte`.
+A third placement — the comment relocated *before* `else` (`} // c1`, then
+`else expr`) — is also prettier-stable and dual-stable (both formatters keep it
+verbatim), documented as `variant_comment_before_else.svelte`.
+
+For the non-block-consequent case (`if (a)⏎expr; // c1⏎else`), that same
+comment-before-`else` form is *not* dual-stable: tsv re-collapses `if (a)⏎expr;`
+to `if (a) expr;`, reaching a third stable form distinct from both prettier's and
+the input. That divergent-variant case is pinned by `divergent_variant_nonblock.svelte`.
 
 ## Reason
 

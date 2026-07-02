@@ -125,14 +125,30 @@ pub enum ValidationError {
     // Prettier stable (dual-stable forms)
     #[error("{0} not preserved by prettier")]
     NormalizationVariantNotPreserved(String),
-    #[error("{0} not idempotent with our formatter")]
-    NormalizationVariantOursNotIdempotent(String),
+    #[error("{0} not kept stable by our formatter (variant_* requires ours(V) == V)")]
+    NormalizationVariantOursNotStable(String),
     #[error("{0} normalizes to input with our formatter (should be prettier_variant_* instead)")]
     NormalizationVariantNormalizesToInput(String),
+
+    // Divergent-variant forms (prettier keeps V; ours rewrites V to a third stable form)
+    #[error("{0} not preserved by prettier")]
+    NormalizationDivergentVariantNotPreserved(String),
+    #[error("{0} normalizes to input with our formatter (should be prettier_variant_* instead)")]
+    NormalizationDivergentVariantOursNormalizesToInput(String),
+    #[error(
+        "{0} kept stable by our formatter (both formatters keep it — should be variant_* instead)"
+    )]
+    NormalizationDivergentVariantOursDualStable(String),
+    #[error(
+        "{0}: our formatter's rewrite of this form is not itself stable (ours(ours(V)) != ours(V))"
+    )]
+    NormalizationDivergentVariantOursNotStable(String),
 
     // Duplicates (within fixture) - variant
     #[error("Duplicate variant files: {}", .0.join(", "))]
     DuplicateVariantWithinFixture(Vec<String>),
+    #[error("Duplicate divergent_variant files: {}", .0.join(", "))]
+    DuplicateDivergentVariantWithinFixture(Vec<String>),
 
     // Prettier intermediate (unstable first-pass output)
     #[error(
@@ -176,7 +192,7 @@ pub enum ValidationError {
     // forms (has output_prettier / prettier_variant_* / variant_*) must account
     // for prettier's output of every unformatted_ours_* variant.
     #[error(
-        "prettier output of {0} matches no documented form (output_prettier / prettier_variant_* / variant_*) — prettier may have drifted, or the target is undocumented"
+        "prettier output of {0} matches no documented form (output_prettier / prettier_variant_* / variant_* / divergent_variant_*) — prettier may have drifted, or the target is undocumented"
     )]
     UndocumentedPrettierOutput(String),
 
@@ -328,13 +344,28 @@ impl ValidationError {
             Self::NormalizationVariantNotPreserved(_) => {
                 "Prettier doesn't preserve this file - check if it should be a different variant type"
             }
-            Self::NormalizationVariantOursNotIdempotent(_) => {
-                "Our formatter doesn't preserve this file - if it normalizes to input, use prettier_variant_* instead"
+            Self::NormalizationVariantOursNotStable(_) => {
+                "Our formatter doesn't keep this file verbatim (variant_* must be dual-stable). If ours rewrites it to a third stable form, use divergent_variant_* instead; if ours normalizes it to input, use prettier_variant_*"
             }
             Self::NormalizationVariantNormalizesToInput(_) => {
                 "Our formatter normalizes this to input - rename to prettier_variant_* instead"
             }
-            Self::DuplicateVariantWithinFixture(_) => "Remove duplicate files (identical content)",
+            Self::NormalizationDivergentVariantNotPreserved(_) => {
+                "Prettier doesn't preserve this file - divergent_variant_* requires prettier(V) == V"
+            }
+            Self::NormalizationDivergentVariantOursNormalizesToInput(_) => {
+                "Our formatter normalizes this to input - use prettier_variant_* instead of divergent_variant_*"
+            }
+            Self::NormalizationDivergentVariantOursDualStable(_) => {
+                "Both formatters keep this stable - use variant_* instead of divergent_variant_*"
+            }
+            Self::NormalizationDivergentVariantOursNotStable(_) => {
+                "Our formatter's rewrite of this form must itself be idempotent - investigate why ours(ours(V)) != ours(V)"
+            }
+            Self::DuplicateVariantWithinFixture(_)
+            | Self::DuplicateDivergentVariantWithinFixture(_) => {
+                "Remove duplicate files (identical content)"
+            }
             Self::NormalizationPrettierIntermediateMismatch(_) => {
                 "Update prettier_intermediate_* to match prettier's actual first-pass output"
             }
@@ -366,7 +397,7 @@ impl ValidationError {
                 "Add a variant_* or prettier_variant_* file documenting the convergence target"
             }
             Self::UndocumentedPrettierOutput(_) => {
-                "Document prettier's output: add a variant_* / prettier_variant_* (or prettier_intermediate*_*) sibling matching it, or update the existing one if prettier changed"
+                "Document prettier's output: add a variant_* / prettier_variant_* / divergent_variant_* (or prettier_intermediate*_*) sibling matching it, or update the existing one if prettier changed"
             }
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_) => {
@@ -441,8 +472,12 @@ impl ValidationError {
             | Self::NormalizationUnformattedPrettierMissingTarget(_)
             | Self::NormalizationPrettierIntermediateMismatch(_)
             | Self::NormalizationVariantNotPreserved(_)
-            | Self::NormalizationVariantOursNotIdempotent(_)
+            | Self::NormalizationVariantOursNotStable(_)
             | Self::NormalizationVariantNormalizesToInput(_)
+            | Self::NormalizationDivergentVariantNotPreserved(_)
+            | Self::NormalizationDivergentVariantOursNormalizesToInput(_)
+            | Self::NormalizationDivergentVariantOursDualStable(_)
+            | Self::NormalizationDivergentVariantOursNotStable(_)
             | Self::NormalizationPrettierIntermediateIsStable(_)
             | Self::NormalizationPrettierIntermediateNotConverging(_)
             | Self::NormalizationPrettierIntermediateMissingSource(_)
@@ -457,6 +492,7 @@ impl ValidationError {
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_)
             | Self::DuplicateVariantWithinFixture(_)
+            | Self::DuplicateDivergentVariantWithinFixture(_)
             | Self::RedundantUnformattedMatchesPrettierVariant(_, _)
             | Self::RedundantPrettierVariantMatchesOutputPrettier(_) => "Duplicates",
 
@@ -485,12 +521,14 @@ pub enum ValidationSuccess {
     FormatterMatchesPrettier,
     NormalizationVariantsOk(usize), // number of variants checked
     VariantVariantsOk(usize),       // number of variant_* checked
+    DivergentVariantOursOk(usize),  // number of divergent_variant_* passing the ours-side checks
     NormalizationSkipped,           // skipped due to formatter failure
     InvalidSyntaxVariantsOk(usize), // number of invalid syntax files validated
     // Prettier-side normalization rules: one counter per rule so summaries can
     // distinguish "validated n files" from "had nothing to validate"
     PrettierVariantsStable(usize),                 // N1
     VariantsStable(usize),                         // N9a
+    DivergentVariantStable(usize),                 // N11a
     UnformattedPrettierNormalized(usize),          // N3
     UnformattedOursDivergent(usize),               // N6
     PrettierIntermediatesConverge(usize),          // N7
@@ -525,6 +563,9 @@ impl fmt::Display for ValidationSuccess {
             Self::VariantVariantsOk(n) => {
                 write!(f, "{n} variant_* variants validated")
             }
+            Self::DivergentVariantOursOk(n) => {
+                write!(f, "{n} divergent_variant_* variants validated (ours side)")
+            }
             Self::NormalizationSkipped => write!(f, "SKIPPED (formatter not idempotent)"),
             Self::InvalidSyntaxVariantsOk(n) => {
                 write!(f, "{n} invalid syntax files correctly rejected")
@@ -533,6 +574,9 @@ impl fmt::Display for ValidationSuccess {
                 write!(f, "{n} prettier_variant_* preserved by prettier (N1)")
             }
             Self::VariantsStable(n) => write!(f, "{n} variant_* preserved by prettier (N9a)"),
+            Self::DivergentVariantStable(n) => {
+                write!(f, "{n} divergent_variant_* preserved by prettier (N11a)")
+            }
             Self::UnformattedPrettierNormalized(n) => {
                 write!(f, "{n} unformatted_* normalized to input by prettier (N3)")
             }

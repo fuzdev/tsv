@@ -5,7 +5,7 @@
 > For naming conventions, see ./fixture_naming.md.
 > For divergence catalogs, see ./conformance_prettier.md and ./conformance_svelte.md.
 
-**Terminology**: `prettier_variant_*` = prettier-stable, our formatter normalizes to input. `variant_*` = both formatters keep stable, NOT input.
+**Terminology**: `prettier_variant_*` = prettier-stable, our formatter normalizes to input. `variant_*` = both formatters keep stable, NOT input. `divergent_variant_*` = prettier-stable, our formatter rewrites to a distinct third stable form (NOT input, NOT the form).
 
 ## Quick Start
 
@@ -225,9 +225,13 @@ Does prettier format input.svelte differently?
       │  └─> input.svelte + prettier_variant_*.svelte + unformatted_ours_*.svelte
       │      (+ optional output_prettier.svelte when prettier's primary output differs from all quirks)
       │
-      └─ YES, ours also keeps stable → Dual-stable divergence
-         └─> input.svelte + variant_*.svelte + unformatted_ours_*.svelte
-             (+ optional output_prettier.svelte when prettier's primary output differs from all stables)
+      ├─ YES, ours also keeps stable → Dual-stable divergence
+      │  └─> input.svelte + variant_*.svelte + unformatted_ours_*.svelte
+      │      (+ optional output_prettier.svelte when prettier's primary output differs from all stables)
+      │
+      └─ YES, ours rewrites to a THIRD stable form → Divergent-variant
+         └─> input.svelte + divergent_variant_*.svelte + unformatted_ours_*.svelte
+             (+ optional output_prettier.svelte when prettier's primary output differs)
 
 Special case: prettier NEVER converges (every pass changes the output — no fixed point)
    └─> input.* + prettier_nonconvergent.txt + README.md, no prettier-claim files (F5/S18)
@@ -248,6 +252,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 - `output_prettier.svelte` — **Intentional, permanent** formatter differences (**NEVER** "not implemented" - that's a bug to fix!)
 - `prettier_variant_*.svelte` — Prettier-stable, our formatter normalizes to input
 - `variant_*.svelte` — Both formatters keep stable, NOT normalized to input
+- `divergent_variant_*.svelte` — Prettier-stable, our formatter rewrites to a distinct third stable form (NOT input, NOT the form)
 - `prettier_intermediate_*.svelte` — Prettier's unstable first-pass output (from `unformatted_ours_*`, converges to input)
 - `prettier_intermediate_to_variant_*.svelte` — Prettier's unstable first-pass output (from `unformatted_ours_*`, converges to a `variant_*`/`prettier_variant_*`)
 - `audit_signature.txt` — Pins prettier's multi-pass chain from `output_prettier.*` to fixed point (auto-generated; see F4)
@@ -311,6 +316,7 @@ All fixtures use `input.svelte` as canonical source.
    - `output_prettier.*` (prettier formats input differently), OR
    - `prettier_variant_*.*` files (prettier has quirks), OR
    - `variant_*.*` files (dual-stable forms), OR
+   - `divergent_variant_*.*` files (divergent-variant forms), OR
    - `unformatted_ours_*.*` files (testing our formatter only), OR
    - `prettier_intermediate_*.*` or `prettier_intermediate_to_variant_*.*` files (multi-pass convergence), OR
    - `prettier_nonconvergent.txt` (prettier never reaches a fixed point), OR
@@ -319,6 +325,7 @@ All fixtures use `input.svelte` as canonical source.
    - `output_prettier.*` (shows what prettier produces), OR
    - `prettier_variant_*.*` files (shows prettier's stable variants), OR
    - `variant_*.*` files (shows dual-stable forms), OR
+   - `divergent_variant_*.*` files (shows divergent-variant forms), OR
    - `unformatted_ours_*.*` + README.md (for normalization divergence), OR
    - `prettier_nonconvergent.txt` + README.md (prettier has no fixed point — see F5), OR
    - `prettier_rejects.txt` + README.md (prettier throws on the input — see F6)
@@ -326,7 +333,7 @@ All fixtures use `input.svelte` as canonical source.
 11. **S10**: `prettier_variant_*.*` files MUST be in `_prettier_divergence` directories (enforced by S8)
 12. **S11**: `unformatted_ours_*.*` files MUST be in `_prettier_divergence` directories (enforced by S8)
 13. **S12**: `_svelte_divergence` or `_svelte_prettier_divergence` suffix required when `expected_ours.json`/`expected_svelte.json` exist
-14. **S18**: `prettier_nonconvergent.txt` CANNOT coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`, `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `prettier_intermediate_*`) — prettier has no fixed point, so no prettier-anchored claim is expressible. `unformatted_ours_*` stays allowed (it claims only our formatter's normalization)
+14. **S18**: `prettier_nonconvergent.txt` CANNOT coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`, `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`, `prettier_intermediate_*`) — prettier has no fixed point, so no prettier-anchored claim is expressible. `unformatted_ours_*` stays allowed (it claims only our formatter's normalization)
 15. **S19**: `prettier_rejects.txt` follows the same claim-file rules as S18 (prettier throws, so no prettier-anchored claim is expressible; `unformatted_ours_*` stays allowed) AND is mutually exclusive with `prettier_nonconvergent.txt` (prettier either throws or oscillates, never both)
 
 **TypeScript fixture rules** (`input.ts`):
@@ -353,14 +360,16 @@ All fixtures use `input.svelte` as canonical source.
 - **C2**: `output_prettier.*` differs from input (if exists)
 - **C3**: `prettier_variant_*.*` differs from input
 - **C3b**: `variant_*.*` differs from input and from all `prettier_variant_*.*` files
+- **C3c**: `divergent_variant_*.*` differs from input and from all `prettier_variant_*.*` and `variant_*.*` files
 - **C4**: No duplicate `unformatted_*` within same fixture
 - **C5**: No duplicate `prettier_variant_*.*` within same fixture
 - **C5b**: No duplicate `variant_*.*` within same fixture
+- **C5c**: No duplicate `divergent_variant_*.*` within same fixture
 - **C6**: No duplicate input files across fixtures (informational)
 
 **Documentation validations (D)**:
 
-- **D1**: README.md required when divergence artifacts exist (`expected_ours.json`+`expected_svelte.json`, `output_prettier.*`, `prettier_variant_*`, `variant_*`, or `prettier_intermediate_*`); optional extra documentation for other complex fixtures
+- **D1**: README.md required when divergence artifacts exist (`expected_ours.json`+`expected_svelte.json`, `output_prettier.*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`, or `prettier_intermediate_*`); optional extra documentation for other complex fixtures
 
 **Parser validations (P)** - Expected ASTs match parser outputs:
 
@@ -407,11 +416,16 @@ on real codebases.
   - Tests that prettier normalizes these variants to prettier's stable output
 - **N9**: `variant_*.*` dual-stable variant validation:
   - **N9a**: `prettier(file) == file` (prettier idempotent)
-  - **N9b**: `ours(ours(file)) == ours(file)` (our output is idempotent)
+  - **N9b**: `ours(file) == file` (our formatter keeps it verbatim — true dual-stability, not merely reaching *a* fixed point)
   - **N9c**: `ours(file) != input` (must NOT normalize to input — else should be `prettier_variant_*`)
+- **N11**: `divergent_variant_*.*` divergent-variant validation (prettier keeps `V`; ours rewrites `V` to a third stable form):
+  - **N11a**: `prettier(file) == file` (prettier idempotent — prettier phase)
+  - **N11b**: `ours(file) != input` (else should be `prettier_variant_*`)
+  - **N11c**: `ours(file) != file` (else it's dual-stable — should be `variant_*`)
+  - **N11d**: `ours(ours(file)) == ours(file)` (the rewritten third form is itself a fixed point)
 - **N10**: Cross-path discovery — pin Prettier's output of every `unformatted_ours_*`:
   - After N7, unclaimed Prettier outputs from `unformatted_ours_*` (those not == input and not consumed by a `prettier_intermediate*_*`) are checked against the fixture's documented stable forms (`output_prettier.*`, `prettier_variant_*.*`, `variant_*.*`)
-  - **Blocking** when the fixture documents stable forms but the output matches none of them — `ValidationError::UndocumentedPrettierOutput`. This means Prettier drifted, or the target is undocumented; add/update a matching `variant_*`/`prettier_variant_*` (or a `prettier_intermediate*_*` for multi-pass). This is what pins Prettier's _specific_ one-pass-stable output for a normalization divergence (the analogue of N8 for `output_prettier` and N7b for multi-pass convergence).
+  - **Blocking** when the fixture documents stable forms but the output matches none of them — `ValidationError::UndocumentedPrettierOutput`. This means Prettier drifted, or the target is undocumented; add/update a matching `variant_*`/`prettier_variant_*`/`divergent_variant_*` (or a `prettier_intermediate*_*` for multi-pass). This is what pins Prettier's _specific_ one-pass-stable output for a normalization divergence (the analogue of N8 for `output_prettier` and N7b for multi-pass convergence).
   - **Informational** only when the fixture documents the divergence by README alone (no `output_prettier`/`prettier_variant_*`/`variant_*` files): novel outputs are NOTEs suggesting investigation via `deno task fixtures:audit`
 
 **Invalid syntax validations (I)** - Syntax rejection tests:
@@ -474,7 +488,8 @@ Test failing?
    └─ Check prettier: cargo run -p tsv_debug format_prettier unformatted_X.svelte | diff - input.svelte
       ├─ Prettier preserves → Use `deno task fixtures:audit` to classify
       │  ├─ Ours normalizes to input → prettier_variant_*
-      │  └─ Ours keeps stable (not input) → variant_*
+      │  ├─ Ours keeps stable (not input) → variant_*
+      │  └─ Ours rewrites to a third stable form (not input, not the form) → divergent_variant_*
       └─ Prettier normalizes → fix our formatter
 ```
 
@@ -682,7 +697,8 @@ For step-by-step creation, see [fixture_workflow.md Step 6](./fixture_workflow.m
 | Normalizes to baseline | Normalizes to baseline | Valid variant                             |
 | Normalizes to baseline | Differs from baseline  | Formatter bug — fix it                    |
 | Preserves difference   | Normalizes to baseline | Enhancement (tsv better than prettier)    |
-| Preserves difference   | Preserves difference   | DELETE variant (not a normalization test) |
+| Preserves difference   | Keeps the same form    | Not a normalization test — re-home as `variant_*` (dual-stable) |
+| Preserves difference   | Rewrites to a 3rd form | Not a normalization test — re-home as `divergent_variant_*`             |
 
 ### Formatter Divergence: output_prettier.svelte
 
@@ -853,6 +869,25 @@ Both prettier-stable; they differ in our formatter:
 - `prettier_variant_*` — normalizes to `input`
 - `variant_*` — stable (idempotent), NOT `input`
 
+**Pattern 7: Divergent-variant forms (prettier keeps stable, ours rewrites to a third form)**
+
+When prettier keeps a form stable but our formatter rewrites it to a *third* stable
+form — distinct from both the form and `input`, so three stable forms coexist:
+
+```
+fixture_name_prettier_divergence/
+├── input.*                              # Our canonical
+├── divergent_variant_*.*                        # Prettier keeps this; ours rewrites it to a third stable form
+├── unformatted_ours_*.*                 # Optional: source variants
+└── README.md                            # Documents the divergent-variant forms
+```
+
+All three prettier-stable-form kinds differ only in what our formatter does:
+
+- `prettier_variant_*` — ours → `input`
+- `variant_*` — ours keeps it (dual-stable)
+- `divergent_variant_*` — ours → a distinct third stable form (NOT `input`, NOT the form)
+
 **Notes**:
 
 - In `_prettier_divergence` directories, use `unformatted_ours_*.*` instead of `unformatted_*.*` to indicate that only our formatter normalizes these to input (prettier must NOT normalize to input).
@@ -918,9 +953,17 @@ Both prettier-stable; they differ in our formatter:
 **For `variant_*.*` (ONLY in `_prettier_divergence` directories):**
 
 - `prettier(file) == file` (prettier keeps it stable)
-- `ours(ours(file)) == ours(file)` (our output is idempotent)
+- `ours(file) == file` (our formatter keeps it verbatim — true dual-stability)
 - `ours(file) != input` (must NOT normalize to input — else use `prettier_variant_*`)
 - Content must differ from input and from all `prettier_variant_*` files
+
+**For `divergent_variant_*.*` (ONLY in `_prettier_divergence` directories):**
+
+- `prettier(file) == file` (prettier keeps it stable)
+- `ours(file) != input` (must NOT normalize to input — else use `prettier_variant_*`)
+- `ours(file) != file` (must NOT be dual-stable — else use `variant_*`)
+- `ours(ours(file)) == ours(file)` (the rewritten third form is itself a fixed point)
+- Content must differ from input and from all `prettier_variant_*` / `variant_*` files
 
 **Key Design Insight:**
 
@@ -931,6 +974,7 @@ File naming shows validation intent:
 - `unformatted_prettier_*.*` → Normalizes to `output_prettier.*` with prettier (only in `_prettier_divergence` dirs with `output_prettier.*`)
 - `prettier_variant_*.*` → Prettier-stable, our formatter normalizes to input
 - `variant_*.*` → Both formatters keep stable, NOT input
+- `divergent_variant_*.*` → Prettier-stable, our formatter rewrites to a distinct third stable form (NOT input, NOT the form)
 - `prettier_intermediate_*.*` → Documents prettier's unstable intermediate output (requires 2nd pass to stabilize, converges to `input`)
 - `prettier_intermediate_to_variant_*.*` → Same as above, but the 2nd pass converges to a `variant_*`/`prettier_variant_*` file instead of `input`
 
@@ -990,6 +1034,7 @@ When `output_prettier.*` exists, certain validations are **automatically skipped
 - `output_prettier.*` (what prettier produces when different from input)
 - `prettier_variant_*.*` (prettier's stable variants)
 - `variant_*.*` (dual-stable forms)
+- `divergent_variant_*.*` (divergent-variant forms)
 - `unformatted_ours_*.*` + README.md (normalization divergence where prettier(input) == input)
 - `prettier_nonconvergent.txt` + README.md (prettier never reaches a fixed point — no oracle exists)
 - `prettier_rejects.txt` + README.md (prettier throws on the input — no oracle exists)

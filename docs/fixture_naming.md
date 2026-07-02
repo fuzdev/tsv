@@ -6,7 +6,7 @@ Use **descriptive names** when they explain the test case (escape sequences, edg
 
 Consult this when creating new fixtures.
 
-**Terminology**: a `prettier_variant_*` file is a form prettier keeps stable but our formatter normalizes to input; a `variant_*` file is a form both formatters keep stable that is distinct from input. See ./conformance_prettier.md for the full catalog.
+**Terminology**: a `prettier_variant_*` file is a form prettier keeps stable but our formatter normalizes to input; a `variant_*` file is a form both formatters keep stable that is distinct from input; a `divergent_variant_*` file is a form prettier keeps stable but our formatter rewrites to a *third* stable form (distinct from both the form and input). See ./conformance_prettier.md for the full catalog.
 
 ---
 
@@ -258,6 +258,7 @@ Variant files must match the input file extension:
 
 - Ours normalizes to input → `prettier_variant_*`
 - Ours keeps stable (not input) → `variant_*`
+- Ours rewrites to a third stable form (not input, not the form) → `divergent_variant_*`
 - Run `deno task fixtures:audit <pattern>` to classify
 
 **Unformatted variants** (normalization tests):
@@ -455,6 +456,33 @@ but neither normalizes to `input.*`:
 - `prettier_variant_*` — normalizes to `input`
 - `variant_*` — stable (idempotent), NOT `input`
 
+**For documenting divergent-variant forms** (`divergent_variant_*.*`):
+
+When prettier keeps a form stable but our formatter rewrites it to a *third*
+stable form — distinct from both the form and `input`, so three stable forms
+coexist (`input`, prettier's `V`, our `ours(V)`):
+
+- `divergent_variant_own_line` — heritage keyword own-line form (prettier keeps `class P⏎/* c */⏎extends Q`; ours → `class P /* c */ extends Q`)
+- `divergent_variant_spaces` — a blank-line form prettier keeps but ours drops the blank
+- `divergent_variant_nonblock` — a comment-before-`else` form prettier keeps but ours re-collapses the non-block body
+
+**Requirements:**
+
+- Must be in a `_prettier_divergence` directory
+- Extension must match input file
+- `prettier(file) == file` (prettier keeps it stable)
+- `ours(file) != input` (else use `prettier_variant_*`)
+- `ours(file) != file` (else it's dual-stable — use `variant_*`)
+- `ours(ours(file)) == ours(file)` (the rewritten third form is itself a fixed point)
+- Content must differ from input and from all `variant_*` / `prettier_variant_*` files
+- README.md required
+
+**Key distinction from `variant_*` and `prettier_variant_*`:** all three are prettier-stable; they differ in what our formatter does:
+
+- `prettier_variant_*` — ours → `input`
+- `variant_*` — ours keeps it (dual-stable)
+- `divergent_variant_*` — ours → a distinct third stable form
+
 **For documenting prettier non-convergence** (`prettier_nonconvergent.txt`):
 
 When prettier never reaches a fixed point on the input (each pass keeps changing
@@ -463,7 +491,7 @@ no canonical output to record. Add the fixed-name marker file instead:
 
 - Fixed filename `prettier_nonconvergent.txt` (not a variant pattern; content is free-form prose)
 - Must be in a `_prettier_divergence` directory with README.md
-- Cannot coexist with any prettier-claim file (`output_prettier.*`, `unformatted_*`, `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `prettier_intermediate_*`) — S18; `unformatted_ours_*` is allowed
+- Cannot coexist with any prettier-claim file (`output_prettier.*`, `unformatted_*`, `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`, `prettier_intermediate_*`) — S18; `unformatted_ours_*` is allowed
 - The validator live-verifies the claim (F5): `prettier(input) != input` AND `prettier²(input) != prettier(input)`
 - Rare — use only when `deno task fixtures:update:formatted` cannot converge (see ./fixture_overview.md rules F5/S18)
 

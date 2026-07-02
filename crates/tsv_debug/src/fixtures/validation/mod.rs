@@ -46,6 +46,7 @@ pub struct FixtureValidation {
     pub unformatted_prettier_count: usize,
     pub prettier_variant_count: usize,
     pub variant_count: usize,
+    pub divergent_variant_count: usize,
     pub prettier_intermediate_count: usize,
     pub prettier_intermediate_to_variant_count: usize,
     pub invalid_syntax_count: usize,
@@ -80,6 +81,7 @@ impl FixtureValidation {
             unformatted_prettier_count: 0,
             prettier_variant_count: 0,
             variant_count: 0,
+            divergent_variant_count: 0,
             prettier_intermediate_count: 0,
             prettier_intermediate_to_variant_count: 0,
             invalid_syntax_count: 0,
@@ -150,6 +152,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     result.unformatted_prettier_count = files.unformatted_prettier.len();
     result.prettier_variant_count = files.prettier_variant.len();
     result.variant_count = files.variant.len();
+    result.divergent_variant_count = files.divergent_variant.len();
     result.prettier_intermediate_count = files.prettier_intermediate.len();
     result.prettier_intermediate_to_variant_count = files.prettier_intermediate_to_variant.len();
     result.invalid_syntax_count = files.input_invalid.len();

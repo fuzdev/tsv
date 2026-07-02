@@ -259,10 +259,14 @@ pub fn determine_required_suffix(
     has_prettier_variants: bool,
     has_unformatted_ours: bool,
     has_variants: bool,
+    has_divergent_variant: bool,
 ) -> Option<&'static str> {
     let needs_svelte = has_expected_ours || has_expected_svelte;
-    let needs_prettier =
-        has_output_prettier || has_prettier_variants || has_unformatted_ours || has_variants;
+    let needs_prettier = has_output_prettier
+        || has_prettier_variants
+        || has_unformatted_ours
+        || has_variants
+        || has_divergent_variant;
 
     match (needs_svelte, needs_prettier) {
         (true, true) => Some("_svelte_prettier_divergence"),
@@ -318,35 +322,40 @@ mod tests {
 
     #[test]
     fn determine_required_suffix_truth_table() {
-        // (ours, svelte, output_prettier, prettier_variants, unformatted_ours, variants)
+        // (ours, svelte, output_prettier, prettier_variants, unformatted_ours, variants, divergent_variant)
         // expected_ours alone ⇒ svelte divergence.
         assert_eq!(
-            determine_required_suffix(true, false, false, false, false, false),
+            determine_required_suffix(true, false, false, false, false, false, false),
             Some("_svelte_divergence")
         );
         // output_prettier alone ⇒ prettier divergence.
         assert_eq!(
-            determine_required_suffix(false, false, true, false, false, false),
+            determine_required_suffix(false, false, true, false, false, false, false),
             Some("_prettier_divergence")
         );
         // Both sides present ⇒ combined suffix.
         assert_eq!(
-            determine_required_suffix(false, true, false, false, true, false),
+            determine_required_suffix(false, true, false, false, true, false, false),
             Some("_svelte_prettier_divergence")
         );
         // Nothing ⇒ no suffix required.
         assert_eq!(
-            determine_required_suffix(false, false, false, false, false, false),
+            determine_required_suffix(false, false, false, false, false, false, false),
             None
         );
         // unformatted_ours alone flips the prettier side on.
         assert_eq!(
-            determine_required_suffix(false, false, false, false, true, false),
+            determine_required_suffix(false, false, false, false, true, false, false),
+            Some("_prettier_divergence")
+        );
+        // divergent_variant alone flips the prettier side on.
+        assert_eq!(
+            determine_required_suffix(false, false, false, false, false, false, true),
             Some("_prettier_divergence")
         );
         // expected_svelte alone flips the svelte side on.
         assert_eq!(
-            determine_required_suffix(false, true, false, false, false, false),
+            determine_required_suffix(false, true, false, false, false, false, false),
             Some("_svelte_divergence")
         );
     }

@@ -32,6 +32,12 @@ pub struct FixtureFiles {
     /// `variant_*`: dual-stable forms both formatters keep stable (distinct
     /// from input, unlike `prettier_variant_*`).
     pub variant: Vec<String>,
+    /// `divergent_variant_*`: prettier-stable forms our formatter rewrites to a *third*
+    /// stable form (distinct from both `V` and input). Unlike `variant_*` (both
+    /// keep `V`) and `prettier_variant_*` (ours → input), ours settles on a form
+    /// that is neither — the divergent-variant category (three distinct stable
+    /// forms: input, `V`, and `ours(V)`).
+    pub divergent_variant: Vec<String>,
     /// `prettier_intermediate_*` (excluding `prettier_intermediate_to_variant_*`):
     /// prettier's unstable first-pass output from `unformatted_ours_*` files;
     /// the second pass converges to input.
@@ -95,6 +101,7 @@ impl FixtureFiles {
         files.unformatted_prettier.sort();
         files.prettier_variant.sort();
         files.variant.sort();
+        files.divergent_variant.sort();
         files.prettier_intermediate.sort();
         files.prettier_intermediate_to_variant.sort();
         files.input_invalid.sort();
@@ -126,6 +133,8 @@ impl FixtureFiles {
             Some(&mut self.prettier_variant)
         } else if filename.starts_with("variant_") {
             Some(&mut self.variant)
+        } else if filename.starts_with("divergent_variant_") {
+            Some(&mut self.divergent_variant)
         } else if filename.starts_with("input_invalid_") {
             Some(&mut self.input_invalid)
         } else {
@@ -173,6 +182,7 @@ mod tests {
             ("unformatted_prettier", &files.unformatted_prettier),
             ("prettier_variant", &files.prettier_variant),
             ("variant", &files.variant),
+            ("divergent_variant", &files.divergent_variant),
             ("prettier_intermediate", &files.prettier_intermediate),
             (
                 "prettier_intermediate_to_variant",
@@ -194,6 +204,7 @@ mod tests {
             ("unformatted_prettier_x.svelte", "unformatted_prettier"),
             ("prettier_variant_x.svelte", "prettier_variant"),
             ("variant_x.svelte", "variant"),
+            ("divergent_variant_x.svelte", "divergent_variant"),
             ("prettier_intermediate_x.svelte", "prettier_intermediate"),
             (
                 "prettier_intermediate_to_variant_x.svelte",

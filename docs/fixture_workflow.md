@@ -223,7 +223,7 @@ cargo run -p tsv_debug canonical_parse tests/fixtures/.../input.svelte | head -8
 0. **Load [conformance_prettier.md](./conformance_prettier.md) FIRST** — REQUIRED before any divergence. Read §Comment Position Philosophy and the §Comment relocation catalog to (a) confirm the divergence is sanctioned (not a bug you're papering over) and (b) check whether it's already cataloged. If a sibling rule exists, match its shape; if new, add a catalog entry + one-line note there as part of this change. The README and conformance entry must agree.
 1. Create directory with `_prettier_divergence` suffix
 2. Add `README.md` explaining why tsv differs — match the concise style of sibling READMEs (prettier form ↔ tsv form ↔ reason + conformance link)
-3. Document with: `output_prettier.*`, `prettier_variant_*.*`, `variant_*.*`, `unformatted_ours_*.*`, `prettier_intermediate_*.*`, or `prettier_intermediate_to_variant_*.*` — see [fixture_naming.md](./fixture_naming.md#prettier-divergence-file-naming) for details
+3. Document with: `output_prettier.*`, `prettier_variant_*.*`, `variant_*.*`, `divergent_variant_*.*`, `unformatted_ours_*.*`, `prettier_intermediate_*.*`, or `prettier_intermediate_to_variant_*.*` — see [fixture_naming.md](./fixture_naming.md#prettier-divergence-file-naming) for details
 4. Use `deno task fixtures:audit <pattern>` to investigate novel prettier outputs
 
 `deno task fixtures:update:formatted` may also auto-generate an `audit_signature.txt` next to `output_prettier.*` when prettier requires multiple passes on it. Treat it as a sibling of `output_prettier.*` — never edit by hand; regenerate with the same command. See ./fixture_overview.md (rule F4).
@@ -324,7 +324,7 @@ diff .../input.svelte /tmp/c.svelte && echo "✓ compact normalizes"
 diff .../input.svelte /tmp/s.svelte && echo "✓ spaces normalizes"
 ```
 
-**If a variant doesn't normalize**: It may be a `prettier_variant_*.*` (prettier stable, ours normalizes to input) or `variant_*.*` (both formatters keep stable). Use `deno task fixtures:audit <pattern>` to investigate. See [fixture_overview.md](./fixture_overview.md#unformatted-variant-doesnt-normalize-prettier-variant-discovery).
+**If a variant doesn't normalize**: It may be a `prettier_variant_*.*` (prettier stable, ours normalizes to input), a `variant_*.*` (both formatters keep stable), or a `divergent_variant_*.*` (prettier stable, ours rewrites to a distinct third stable form). Use `deno task fixtures:audit <pattern>` to investigate. See [fixture_overview.md](./fixture_overview.md#unformatted-variant-doesnt-normalize-prettier-variant-discovery).
 
 ---
 

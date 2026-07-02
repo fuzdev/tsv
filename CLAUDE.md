@@ -533,6 +533,7 @@ tests/fixtures/example_fixture/
 ├── output_prettier.svelte          # OPTIONAL: Prettier's output (when different from input)
 ├── prettier_variant_*.svelte         # OPTIONAL: Prettier's stable variants our formatter normalizes to input
 ├── variant_*.svelte        # OPTIONAL: Dual-stable forms (both formatters keep stable, NOT input)
+├── divergent_variant_*.svelte      # OPTIONAL: Divergent variant (prettier keeps stable, ours rewrites to a distinct third stable form)
 ├── prettier_intermediate_*.svelte  # OPTIONAL: Prettier's unstable first-pass output (converges to input)
 ├── prettier_intermediate_to_variant_*.svelte  # OPTIONAL: Prettier's unstable first-pass output (converges to a variant_*/prettier_variant_*)
 ├── audit_signature.txt             # OPTIONAL: Auto-generated; pins prettier's multi-pass chain from output_prettier.* (F4)
@@ -558,6 +559,7 @@ tests/fixtures/example_fixture/
 - **Formatter differs intentionally**: Add `output_prettier.*` (requires `_prettier_divergence` suffix)
 - **Prettier has stable variants (ours normalizes)**: Add `prettier_variant_*.*` files (requires `_prettier_divergence` suffix)
 - **Dual-stable forms (both keep stable)**: Add `variant_*.*` files (requires `_prettier_divergence` suffix)
+- **Divergent variant (prettier keeps stable, ours → third form)**: Add `divergent_variant_*.*` files (requires `_prettier_divergence` suffix)
 - **Normalization to input divergence**: `unformatted_ours_*.*` normalizes to input with our formatter only
 - **Normalization to output_prettier**: `unformatted_prettier_*.*` normalizes to `output_prettier.*` with prettier
 - **Prettier never converges (no oracle)**: Add `prettier_nonconvergent.txt` + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files)

@@ -559,10 +559,10 @@ impl<'a> Printer<'a> {
                 has_line
                     || (group_mode && {
                         let next_start = items[i + 1].span.start;
-                        let comma_pos = self.comma_between(heritage_item_end(&items[i]), next_start);
-                        comments_in_range(self.comments, comma_pos, next_start).any(|c| {
-                            self.is_stranded_after_comma_block(c, comma_pos, next_start)
-                        })
+                        let comma_pos =
+                            self.comma_between(heritage_item_end(&items[i]), next_start);
+                        comments_in_range(self.comments, comma_pos, next_start)
+                            .any(|c| self.is_stranded_after_comma_block(c, comma_pos, next_start))
                     })
             })
             .collect();
@@ -721,7 +721,11 @@ impl<'a> Printer<'a> {
                 let line = d.line();
                 let mut joined_parts: DocBuf = smallvec![item_docs[0]];
                 for (idx, &item_doc) in item_docs.iter().enumerate().skip(1) {
-                    joined_parts.push(if comma_baked[idx - 1] { line } else { comma_line });
+                    joined_parts.push(if comma_baked[idx - 1] {
+                        line
+                    } else {
+                        comma_line
+                    });
                     joined_parts.push(item_doc);
                 }
                 let types_joined = d.concat(&joined_parts);
