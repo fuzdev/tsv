@@ -186,6 +186,22 @@ normalization fixture) — so the parse gap only surfaces on unformatted
 source, where the corpus parse comparison skips it as a canonical parse
 failure.
 
+**Decorator private-name member chains** (`@C.#p`): the TC39 decorators
+grammar includes `DecoratorMemberExpression . PrivateIdentifier`, and test262
+grades it (`decorator-member-expr-private-identifier.js`, including escaped
+and keyword-named forms like `#\u{6F}` and `#await`). acorn-typescript
+rejects the bare form (`Unexpected token`); tsv parses it per the grammar, as
+does prettier's typescript parser. The bare form is not format-stable — a
+private name in the chain fails prettier's `isDecoratorMemberExpression`
+check, so both tsv and prettier normalize `@C.#p` to the parenthesized
+`@(C.#p)`, which every parser accepts — so the divergence only surfaces on
+unformatted source. The
+[private_member](../tests/fixtures/typescript/typescript_specific/decorators/private_member/)
+normalization fixture pins the acceptance via its `unformatted_no_parens`
+variant; a bare private-name head (`@#p`) is not in the grammar and stays
+rejected. **Upstream candidate**: acorn-typescript decorator
+`PrivateIdentifier` member step.
+
 **Anonymous class-expression `id` for implements-first heritage**
 (`class implements I {}`): acorn-typescript omits the `id` key entirely from an
 anonymous class *expression* whose first heritage clause is `implements` with no
