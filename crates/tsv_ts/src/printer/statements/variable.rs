@@ -17,7 +17,6 @@ use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
-use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{INDENT, PRINT_WIDTH};
 
 /// Build the fluid assignment layout: break after `=` only when the full line
@@ -196,50 +195,24 @@ impl<'a> Printer<'a> {
                 // The declarator-separating comma. A block comment keeps the author's
                 // side of it: before → trails the previous init; after → leads the next
                 // declarator. (Only consulted when `has_block_comment`.)
-                let comma_pos = find_char_skipping_comments(
-                    self.source.as_bytes(),
-                    prev_end as usize,
-                    curr_start as usize,
-                    b',',
-                )
-                .map_or(curr_start, |p| p as u32);
+                let comma_pos = self
+                    .find_char_outside_comments(prev_end, curr_start, b',')
+                    .unwrap_or(curr_start);
 
                 if should_break {
                     if has_line_comment {
                         // Line comment(s) between declarators: comma must go before
                         // the first line comment, block comments go before the comma.
-                        // e.g. `a = 1 /* c1 */,\n// c2\nb = 2` or `a = 1, // c1\n// c2\nb = 2`
+                        // e.g. `a = 1 /* c1 */,\n// c2\nb = 2` or `a = 1, // c1\n// c2\nb = 2`.
+                        // These declarators aren't wrapped in `d.indent()`, so the
+                        // continuation break carries explicit `INDENT` text.
                         let comments: CommentVec<'_> =
                             comments_in_range(self.comments, prev_end, curr_start).collect();
-                        let first_line_idx = comments.iter().position(|c| !c.is_block).unwrap_or(0);
-
-                        // Block comments before the first line comment
-                        for comment in &comments[..first_line_idx] {
-                            parts.push(d.text(" "));
-                            parts.push(self.build_comment_doc(comment));
-                        }
-
-                        // Comma before the first line comment
-                        parts.push(d.text(","));
-
-                        // Remaining comments (starting with the first line comment)
-                        // `needs_hardline` starts true when block comments precede
-                        // (comma sits between block and line, needs newline after)
-                        let mut needs_hardline = first_line_idx > 0;
-                        for comment in &comments[first_line_idx..] {
-                            if needs_hardline {
-                                parts.push(d.hardline());
-                                parts.push(d.text(INDENT));
-                                parts.push(self.build_comment_doc(comment));
-                            } else {
-                                // Same-line comment trailing the comma: a line comment
-                                // goes through `line_suffix` (zero width) so it never
-                                // forces the preceding declarator's value to break
-                                // (prettier's `lineSuffix`); a block stays inline.
-                                parts.push(self.build_trailing_comment_doc(comment));
-                            }
-                            needs_hardline = !comment.is_block;
-                        }
+                        self.push_inter_declarator_line_comment_gap(
+                            &mut parts,
+                            &comments,
+                            d.text(INDENT),
+                        );
                     } else {
                         // Block comment(s) before the comma trail the previous init
                         // (`a = 1 /* c */,`); after-comma comments lead the next
@@ -324,14 +297,10 @@ impl<'a> Printer<'a> {
                 if declarator.definite
                     && let Expression::Identifier(ident) = &declarator.id
                     && ident.type_annotation().is_none()
-                    && let Some(bang_pos) = find_char_skipping_comments(
-                        self.source.as_bytes(),
-                        id_end as usize,
-                        init_start as usize,
-                        b'!',
-                    )
+                    && let Some(bang_pos) =
+                        self.find_char_outside_comments(id_end, init_start, b'!')
                 {
-                    id_end = bang_pos as u32 + 1;
+                    id_end = bang_pos + 1;
                 }
                 let equals_pos = self.find_equals_position(id_end, init_start);
                 let has_comments_before_eq = self.has_comments_between(id_end, equals_pos);
