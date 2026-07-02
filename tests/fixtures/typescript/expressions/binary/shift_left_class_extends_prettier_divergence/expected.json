@@ -1,0 +1,369 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 235,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `<<` splits into type arguments in a class-extends heritage clause —",
+			"start": 20,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier's typescript parser cannot split it here (see prettier_rejects.txt)",
+			"start": 93,
+			"end": 172,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 234,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 225,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 174,
+					"end": 224,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 51
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 180,
+							"end": 223,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 50
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 180,
+								"end": 182,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "b1"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 185,
+								"end": 223,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 12
+									},
+									"end": {
+										"line": 4,
+										"column": 50
+									}
+								},
+								"id": null,
+								"superClass": {
+									"type": "Identifier",
+									"start": 199,
+									"end": 201,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 26
+										},
+										"end": {
+											"line": 4,
+											"column": 28
+										}
+									},
+									"name": "fn"
+								},
+								"superTypeParameters": {
+									"type": "TSTypeParameterInstantiation",
+									"start": 201,
+									"end": 220,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 28
+										},
+										"end": {
+											"line": 4,
+											"column": 47
+										}
+									},
+									"params": [
+										{
+											"type": "TSFunctionType",
+											"start": 202,
+											"end": 219,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 29
+												},
+												"end": {
+													"line": 4,
+													"column": 46
+												}
+											},
+											"typeParameters": {
+												"type": "TSTypeParameterDeclaration",
+												"start": 202,
+												"end": 205,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 29
+													},
+													"end": {
+														"line": 4,
+														"column": 32
+													}
+												},
+												"params": [
+													{
+														"type": "TSTypeParameter",
+														"start": 203,
+														"end": 204,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 30
+															},
+															"end": {
+																"line": 4,
+																"column": 31
+															}
+														},
+														"name": "T"
+													}
+												]
+											},
+											"parameters": [
+												{
+													"type": "Identifier",
+													"start": 206,
+													"end": 210,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 33
+														},
+														"end": {
+															"line": 4,
+															"column": 37
+														}
+													},
+													"name": "v",
+													"typeAnnotation": {
+														"type": "TSTypeAnnotation",
+														"start": 207,
+														"end": 210,
+														"loc": {
+															"start": {
+																"line": 4,
+																"column": 34
+															},
+															"end": {
+																"line": 4,
+																"column": 37
+															}
+														},
+														"typeAnnotation": {
+															"type": "TSTypeReference",
+															"start": 209,
+															"end": 210,
+															"loc": {
+																"start": {
+																	"line": 4,
+																	"column": 36
+																},
+																"end": {
+																	"line": 4,
+																	"column": 37
+																}
+															},
+															"typeName": {
+																"type": "Identifier",
+																"start": 209,
+																"end": 210,
+																"loc": {
+																	"start": {
+																		"line": 4,
+																		"column": 36
+																	},
+																	"end": {
+																		"line": 4,
+																		"column": 37
+																	}
+																},
+																"name": "T"
+															}
+														}
+													}
+												}
+											],
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 212,
+												"end": 219,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 39
+													},
+													"end": {
+														"line": 4,
+														"column": 46
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSVoidKeyword",
+													"start": 215,
+													"end": 219,
+													"loc": {
+														"start": {
+															"line": 4,
+															"column": 42
+														},
+														"end": {
+															"line": 4,
+															"column": 46
+														}
+													}
+												}
+											}
+										}
+									]
+								},
+								"body": {
+									"type": "ClassBody",
+									"start": 221,
+									"end": 223,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 48
+										},
+										"end": {
+											"line": 4,
+											"column": 50
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `<<` splits into type arguments in a class-extends heritage clause —",
+							"start": 20,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " prettier's typescript parser cannot split it here (see prettier_rejects.txt)",
+							"start": 93,
+							"end": 172
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

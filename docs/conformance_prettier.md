@@ -498,8 +498,40 @@ prettier import-phase support — promote to fixtures once it lands.
 This input is **valid** by tsv's parse oracle (Svelte / acorn-typescript) and our formatter keeps it stable, but prettier's `typescript` parser/printer **throws** on it — so there is no `output_prettier.*` oracle. The fixture carries a `prettier_rejects.txt` marker pinning the exact error; rule F6 live-verifies that prettier still rejects the input (failing loudly if the bug is fixed upstream or the error morphs). It reproduces in plain prettier (`parser: 'typescript'`, zero Svelte) and is fine under `babel-ts`; prettier-plugin-svelte routes `lang="ts"` formatting through the real `typescript` parser rather than `babel-ts`, so it surfaces there too.
 
 - Optional chain to private field (`x?.#a`) — `An optional chain cannot contain private identifiers.` — [private_fields_optional_chain](../tests/fixtures/typescript/declarations/class/private_fields_optional_chain_prettier_divergence/)
+- `<<` type-argument split in a class-extends clause (`class extends fn<<T>(v: T) => void> {}`) — `',' expected.` — [shift_left_class_extends](../tests/fixtures/typescript/expressions/binary/shift_left_class_extends_prettier_divergence/)
+- `<<` split opening a type assertion (`<<T>() => R>x`) — `Expression expected.` — [shift_left_type_assertion](../tests/fixtures/typescript/expressions/binary/shift_left_type_assertion_prettier_divergence/)
+- `<<` split in a `typeof` query's type arguments (`typeof f<<T>() => void>`) — `';' expected.` — [shift_left_typeof_query](../tests/fixtures/typescript/expressions/binary/shift_left_typeof_query_prettier_divergence/)
+- `using`/`await using` cast (`using as T`, `(await using) satisfies T`) — `',' expected.` — [using/cast](../tests/fixtures/typescript/typescript_specific/using/cast_prettier_divergence/)
 
 **Optional chain to private field**: `x?.#a` is valid modern JS (ecma262 `OptionalChain : ?. PrivateIdentifier`, from the private-fields-in-`in` era). typescript-estree rejects it; tsv keeps it stable. The comprehensive (prettier-formattable) private-field cases live in [private_fields](../tests/fixtures/typescript/declarations/class/private_fields/).
+
+**`<<` type-argument splits tsc never makes**: a `<<` token can split into `<` `<`
+when the first type argument is a generic function type (the sole `<`-initial
+type) — acorn-typescript splits it wherever type arguments are legal, and tsv
+follows acorn. tsc splits it only in some positions, so prettier's `typescript`
+parser throws on the rest:
+
+- **class-extends clause** (`class extends fn<<T>(v: T) => void> {}`): a heritage
+  clause takes a `LeftHandSideExpression`, so an actual left-shift is impossible
+  there and the split is unambiguous.
+- **type assertion** (`<<T>() => R>x`): a statement cannot begin with an
+  operand-less `<<`.
+- **`typeof` query type arguments** (`type Y = typeof f<<T>() => void>`): a type
+  position has no shift operator.
+
+The positions where tsc does split — call, `new`, optional call, bare
+instantiation, and type references — are prettier-formattable and covered as
+ordinary fixtures in
+[shift_left_vs_type_args](../tests/fixtures/typescript/expressions/binary/shift_left_vs_type_args/).
+
+**`using`/`await using` cast**: `using as T` / `(await using) satisfies T` is a
+cast of the identifier `using` in acorn-typescript (and so in tsv); tsc instead
+commits to a `using` *declaration* whose binding is named `as`/`satisfies` and
+throws when no `=` follows. The reverse form (`using as = r;`) parses in tsc
+and is rejected by acorn and tsv. Every other identifier-shaped word after
+`using` is a binding attempt in both parsers — those cases are ordinary
+`_svelte_divergence` fixtures (acorn has no `using` declarations at all); only
+the cast keywords diverge from tsc, in tsv's favor of the drop-in oracle.
 
 ### Tabs-Only Alignment
 
@@ -677,6 +709,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Conditional `extends` to check (line) → Trailing the extends-type — [check_extends_line_comment](../tests/fixtures/typescript/types/conditional/check_extends_line_comment_prettier_divergence/)
 - Mapped `:` to value (line) → Breaks the `[K in T]` brackets, trailing the comment after the key type — [mapped_value_line_comment](../tests/fixtures/typescript/types/mapped_value_line_comment_prettier_divergence/)
 - Mapped key to `]` (line) → Both break the `[K in T]` brackets and keep the comment trailing the key with `]` on its own line; prettier also drops `K in T` to its own indented line (tsv keeps it on the `[` line) — [mapped_key_line_comment](../tests/fixtures/typescript/types/mapped_key_line_comment_prettier_divergence/)
+- Mapped member without a value type, trailing block → Into the brackets, after the key constraint (`{ [K in B /* c */] }`); tsv keeps it trailing the member, after `]` or the optional modifier — [mapped/no_value_comment](../tests/fixtures/typescript/types/mapped/no_value_comment_prettier_divergence/)
 - Type predicate `is` to type (line) → Trailing the body `{` — [predicate_is_line_comment](../tests/fixtures/typescript/types/predicate_is_line_comment_prettier_divergence/)
 - Property signature `:` to union type (line) → Onto its own line after `:`; tsv trails it on `:` + indents the union — [annotation](../tests/fixtures/typescript/types/comments/annotation_prettier_divergence/)
 - Destructuring binding `:` to union type (≥1 line) → Each onto its own line after `:`; tsv trails the first on `:` + indents — [annotation_multiple_line](../tests/fixtures/typescript/types/comments/annotation_multiple_line_prettier_divergence/)

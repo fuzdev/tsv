@@ -87,10 +87,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         );
 
         // Check for `using` contextual keyword (ES2024 Explicit Resource Management)
-        // `for (using resource of resources) { ... }`
+        // `for (using resource of resources) { ... }`. The binding must be a
+        // same-line binding word that is not `of`: `for (using of items)` is a
+        // for-of whose LHS is the plain identifier `using` (a using ForBinding
+        // cannot be named `of`), and a line break demotes `using` the same way.
         let is_using = *self.current_kind() == TokenKind::Identifier
             && self.current_value() == "using"
-            && self.peek_is_identifier();
+            && self.peek_is_same_line_binding_word()
+            && self.peek_value() != "of";
 
         // Check for `await using` in for-of
         // `for await (await using resource of resources) { ... }`

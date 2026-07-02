@@ -29,4 +29,19 @@
 			console.log(resource.getValue());
 		}
 	}
+
+	// Contextual keywords as binding names — any identifier-shaped word that
+	// is not an expression continuation (`in`/`instanceof`/`as`/`satisfies`)
+	// binds, even when it lexes as a keyword
+	using async = getResource();
+	using undefined = getResource();
+	using of = getResource();
+
+	// Contextual-keyword binding in a for-of head (only `of` itself is
+	// excluded there)
+	function keywords(resources: Iterable<Disposable>) {
+		for (using async of resources) {
+			console.log(async.getValue());
+		}
+	}
 </script>
