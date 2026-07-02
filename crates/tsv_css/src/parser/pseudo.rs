@@ -31,7 +31,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     // `advance()` overwrites, and dispatch happens after the name token is consumed.
     let name_ident = parser.current_identifier();
     let name = parser.alloc_str_in(name_ident);
-    let mut end = (parser.base_offset() + parser.current_end) as u32; // Capture end of name token
+    let mut end = parser.span_pos(parser.current_end); // Capture end of name token
     parser.advance()?;
 
     // Check for arguments: :nth-child(2n+1), :is(), :not(), etc.
@@ -62,13 +62,10 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     }
 }
 
-/// Parse pseudo-class arguments: nth-child(2n+1), is(div, span)
-/// Returns (Option<PseudoClassArgs>, end_position_of_closing_paren)
-///
-/// Creates semantic args for recognized pseudo-classes:
-/// - :nth-child(), :nth-of-type(), :nth-last-child(), :nth-last-of-type() → PseudoClassArgs::Nth
-/// - :is(), :not(), :where(), :has(), :global() → PseudoClassArgs::SelectorList
-/// - Others: returns None (unknown pseudo-classes)
+/// Parse a pseudo-class/element argument list `( … )`, dispatching to a per-family
+/// helper by the (lowercased) pseudo name. Returns `(Option<PseudoClassArgs>,
+/// end_position_of_closing_paren)`; `None` args are unknown pseudo-classes whose
+/// argument isn't a selector list.
 ///
 /// `is_pseudo_element` distinguishes `::slotted`/`::part` (the real pseudo-elements,
 /// which build the dedicated `Slotted`/`Part` args dropped from the public AST) from
@@ -77,6 +74,9 @@ pub(crate) fn parse_pseudo_selector<'arena>(
 /// `Slotted`/`Part` args off pseudo-classes, so they fall through to the generic
 /// selector-list path and convert to a `PseudoClassSelector` matching Svelte —
 /// rather than reaching the convert layer, which exposes no pseudo-element args.
+///
+/// Every helper takes `args_start` — the source position just after `(`, where each
+/// family's `span` begins — and owns its own `)` capture.
 fn parse_pseudo_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     pseudo_name: &str,
@@ -102,364 +102,335 @@ fn parse_pseudo_args<'arena>(
         pseudo_name
     };
 
-    // Parse arguments for ::slotted() pseudo-element
+    // Dispatch by pseudo family.
     //
-    // Per CSS Scoping Module Level 1: `::slotted( <compound-selector> )`
-    // A compound selector is a sequence of simple selectors without combinators.
-    // Only the `::` pseudo-element form builds these args; a single-colon `:slotted(...)`
-    // falls through to the generic selector-list path (matching Svelte's PseudoClassSelector).
-    if is_pseudo_element && pseudo_name == "slotted" {
-        // Register leading/trailing gap comments (`::slotted(/* c */ div)`) so the
-        // printer interleaves them via `comment_blocks_in_range`. Only the edge
-        // positions are valid — a comment between compound parts reads as
-        // whitespace, which a compound selector forbids (parseCss rejects it too).
-        parser.skip_whitespace_registering_comments()?;
-
-        // Parse compound selector (sequence of simple selectors, no combinators)
-        let compound_start = parser.current_start;
-        let mut compound_selectors = parser.bvec();
-
-        // Parse simple selectors until we hit a combinator or closing paren
-        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
-            parser.skip_whitespace_registering_comments()?;
-
-            if parser.check(TokenKind::RightParen) {
-                break;
-            }
-
-            // Check for combinators (not allowed in compound selectors)
-            if parser.check(TokenKind::GreaterThan)
-                || parser.check(TokenKind::Plus)
-                || parser.check(TokenKind::Tilde)
-                || parser.check(TokenKind::ColumnCombinator)
-            {
-                return Err(
-                    parser.error_msg("Combinators not allowed in ::slotted() compound selector")
-                );
-            }
-
-            // Try to parse one simple selector
-            // This will fail if we hit something invalid (like a descendant combinator)
-            let selector = super::selectors::parse_simple_selector(parser)?;
-            compound_selectors.push(selector);
-
-            parser.skip_whitespace_registering_comments()?;
-        }
-
-        if compound_selectors.is_empty() {
-            return Err(parser.error_msg_at(
-                "::slotted() requires a compound selector argument",
-                parser.base_offset() + compound_start,
-            ));
-        }
-
-        let end = parser.expect_and_capture(TokenKind::RightParen)?;
-
-        return Ok((
-            Some(PseudoClassArgs::Slotted {
-                selectors: compound_selectors.into_bump_slice(),
-                span: Span {
-                    start: (parser.base_offset() + args_start) as u32,
-                    end,
-                },
-            }),
-            end,
-        ));
-    }
-
-    // Parse arguments for ::part() pseudo-element
+    // `::slotted`/`::part` build their dedicated pseudo-element args only for the `::`
+    // form; a single-colon `:slotted`/`:part` has no guard match and falls to
+    // `parse_unknown_args`' selector-list path (matching Svelte's PseudoClassSelector).
     //
-    // Per CSS Shadow Parts Specification: `::part( <ident>+ )`
-    // One or more space-separated identifiers (NOT selectors).
-    // Only the `::` pseudo-element form builds these args; a single-colon `:part(...)`
-    // falls through to the generic selector-list path (matching Svelte's PseudoClassSelector).
-    if is_pseudo_element && pseudo_name == "part" {
-        // Register leading/trailing gap comments (`::part(/* c */ label)`) so the
-        // printer interleaves them. A comment between two idents reads as
-        // whitespace, splitting the identifier run — parseCss rejects it.
-        parser.skip_whitespace_registering_comments()?;
-
-        // `value_span` covers the identifier run (first ident start .. last ident
-        // end), so the printer locates the gap comments around it — mirrors `Nth`.
-        let value_start = parser.current_start;
-        let mut value_end = value_start;
-        let mut idents = parser.bvec();
-
-        // Parse space-separated identifiers
-        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
-            if !parser.check(TokenKind::Identifier) {
-                return Err(parser.error_msg("::part() requires identifier arguments"));
-            }
-
-            let ident_str = parser.current_identifier();
-            let ident = parser.alloc_str_in(ident_str);
-            idents.push(ident);
-            value_end = parser.current_end;
-            parser.advance()?;
-
-            parser.skip_whitespace_registering_comments()?;
+    // `:dir()`/`:lang()`/`::highlight()` take a single identifier per CSS spec, but
+    // Svelte parses their argument as an ordinary selector list (a comma-separated
+    // `:lang(en, fr)` becomes two `TypeSelector`s, not one `"en, fr"` name), so they
+    // share the strict complex-selector-list grammar with `:not()`/`:global()`. That
+    // also matches prettier's argument formatting (comma-spacing normalization and
+    // wide-list breaking) and Svelte's rejection of non-selector args like
+    // `:lang("en")`. `::highlight`'s args are dropped at the pseudo-element convert
+    // boundary; the selector list only feeds the formatter.
+    match pseudo_name {
+        "slotted" if is_pseudo_element => parse_slotted_args(parser, args_start),
+        "part" if is_pseudo_element => parse_part_args(parser, args_start),
+        "is" | "not" | "where" | "has" | "global" | "dir" | "lang" | "highlight" => {
+            parse_selector_list_args(parser, args_start, pseudo_name)
         }
-
-        if idents.is_empty() {
-            return Err(parser.error_msg_at(
-                "::part() requires at least one identifier",
-                parser.base_offset() + args_start,
-            ));
-        }
-
-        let end = parser.expect_and_capture(TokenKind::RightParen)?;
-
-        return Ok((
-            Some(PseudoClassArgs::Part {
-                idents: idents.into_bump_slice(),
-                span: Span {
-                    start: (parser.base_offset() + args_start) as u32,
-                    end,
-                },
-                value_span: Span {
-                    start: (parser.base_offset() + value_start) as u32,
-                    end: (parser.base_offset() + value_end) as u32,
-                },
-            }),
-            end,
-        ));
-    }
-
-    // Parse identifier arguments for spec-compliant pseudo-classes/elements
-    //
-    // These take single identifiers per CSS spec:
-    // - :dir(ltr | rtl) → direction identifier
-    // - :lang(en-US) → language code
-    // - ::highlight(search-results) → custom highlight name
-    //
-    // Note: Svelte's parser quirk treats these as selectors in public AST (handled at conversion)
-    if matches!(pseudo_name, "dir" | "lang" | "highlight") {
-        // Register leading/trailing gap comments (`:dir(/* c */ ltr)`) so the
-        // printer interleaves them via `wrap_args_gap_comments` — the same rule as
-        // `::part()`. The argument is a single identifier, so a comment can only
-        // lead or trail it; both edge positions are valid (parseCss accepts them).
-        parser.skip_whitespace_registering_comments()?;
-
-        // `value_span` covers the identifier value (first token start .. last token
-        // end); the value text is recovered from it at convert/print time, so it is
-        // never stored (mirrors `SimpleSelector::{Type, Class, Id}`).
-        let value_start = parser.current_start;
-        let mut value_end = value_start;
-
-        // Advance over the tokens that form the value (may span several — e.g. the
-        // hyphenated `en-US`), registering any interior comment rather than folding
-        // it into the value span.
-        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
-            if parser.check(TokenKind::Whitespace) {
-                parser.advance()?;
-                continue;
-            }
-            if parser.check(TokenKind::Comment) {
-                parser.register_current_comment();
-                parser.advance()?;
-                continue;
-            }
-            value_end = parser.current_end;
-            parser.advance()?;
-        }
-
-        let paren_end = parser.expect_and_capture(TokenKind::RightParen)?;
-
-        return Ok((
-            Some(PseudoClassArgs::Identifier {
-                span: Span {
-                    start: (parser.base_offset() + args_start) as u32,
-                    end: paren_end,
-                },
-                value_span: Span {
-                    start: (parser.base_offset() + value_start) as u32,
-                    end: (parser.base_offset() + value_end) as u32,
-                },
-            }),
-            paren_end,
-        ));
-    }
-
-    // Parse selector list for logical pseudo-classes
-    //
-    // Per CSS Selectors Level 4, each pseudo-class accepts different selector types:
-    // - :has() → <<relative-selector-list>> (can start with combinators: `:has(> img)`)
-    // - :is(), :where() → <<forgiving-selector-list>> (invalid selectors wrapped as Invalid, not failed)
-    // - :not() → <<complex-real-selector-list>> (complex selectors, strict parsing)
-    // - :global() → Svelte-specific, uses complex selectors
-    if matches!(pseudo_name, "is" | "not" | "where" | "has" | "global") {
-        // Register a leading comment (`:is(/* c */ .a)`) so the printer interleaves it.
-        parser.skip_whitespace_registering_comments()?;
-
-        let selector_list = match pseudo_name {
-            "has" => {
-                // :has() uses relative selectors (can start with combinators)
-                parse_relative_selector_list(parser)?
-            }
-            "is" | "where" => {
-                // :is() and :where() use forgiving selector lists
-                // Invalid selectors wrapped as SimpleSelector::Invalid (never fails)
-                parse_forgiving_selector_list(parser)?
-            }
-            "not" | "global" => {
-                // :not() and :global() use complex selectors (strict parsing)
-                parse_complex_selector_list(parser)?
-            }
-            // The enclosing `matches!` restricts `pseudo_name` to exactly these five.
-            #[allow(clippy::unreachable)] // guarded by the matches! above
-            _ => unreachable!("pseudo_name is is/not/where/has/global per the matches! guard"),
-        };
-
-        // Register a trailing comment (`:is(.a /* c */)`) so the printer interleaves it.
-        parser.skip_whitespace_registering_comments()?;
-
-        let end = parser.expect_and_capture(TokenKind::RightParen)?;
-
-        return Ok((
-            Some(PseudoClassArgs::SelectorList {
-                selectors: selector_list,
-                span: Span {
-                    start: (parser.base_offset() + args_start) as u32,
-                    end,
-                },
-            }),
-            end,
-        ));
-    }
-
-    // For nth-* pseudo-classes, parse An+B notation and optional "of <selector-list>"
-    // Per CSS Selectors Level 4: :nth-child(An+B [of S]?)
-    let args = match pseudo_name {
         "nth-child" | "nth-of-type" | "nth-last-child" | "nth-last-of-type" | "nth-col"
-        | "nth-last-col" => {
-            // Parse An+B part (collect tokens until "of" keyword or closing paren).
-            // Comments in the gaps around the An+B text are registered so the
-            // printer can reconstruct them; comments *inside* the An+B stay part
-            // of its verbatim value text (consumed by the scan loop below).
+        | "nth-last-col" => parse_nth_args(parser, args_start),
+        _ => parse_unknown_args(parser, args_start),
+    }
+}
+
+/// `::slotted( <compound-selector> )` — a sequence of simple selectors without
+/// combinators (CSS Scoping 1). Leading/trailing gap comments are registered so the
+/// printer interleaves them via `comment_blocks_in_range`; only the edge positions
+/// are valid — a comment between compound parts reads as whitespace, which a
+/// compound selector forbids (parseCss rejects it too).
+fn parse_slotted_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    args_start: usize,
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+    parser.skip_whitespace_registering_comments()?;
+
+    // Parse compound selector (sequence of simple selectors, no combinators)
+    let compound_start = parser.current_start;
+    let mut compound_selectors = parser.bvec();
+
+    // Parse simple selectors until we hit a combinator or closing paren
+    while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
+        parser.skip_whitespace_registering_comments()?;
+
+        if parser.check(TokenKind::RightParen) {
+            break;
+        }
+
+        // Check for combinators (not allowed in compound selectors)
+        if parser.check(TokenKind::GreaterThan)
+            || parser.check(TokenKind::Plus)
+            || parser.check(TokenKind::Tilde)
+            || parser.check(TokenKind::ColumnCombinator)
+        {
+            return Err(
+                parser.error_msg("Combinators not allowed in ::slotted() compound selector")
+            );
+        }
+
+        // Try to parse one simple selector
+        // This will fail if we hit something invalid (like a descendant combinator)
+        let selector = super::selectors::parse_simple_selector(parser)?;
+        compound_selectors.push(selector);
+
+        parser.skip_whitespace_registering_comments()?;
+    }
+
+    if compound_selectors.is_empty() {
+        return Err(parser.error_msg_at(
+            "::slotted() requires a compound selector argument",
+            parser.base_offset() + compound_start,
+        ));
+    }
+
+    let end = parser.expect_and_capture(TokenKind::RightParen)?;
+
+    Ok((
+        Some(PseudoClassArgs::Slotted {
+            selectors: compound_selectors.into_bump_slice(),
+            span: Span {
+                start: parser.span_pos(args_start),
+                end,
+            },
+        }),
+        end,
+    ))
+}
+
+/// `::part( <ident>+ )` — one or more space-separated identifiers, NOT selectors
+/// (CSS Shadow Parts). Leading/trailing gap comments are registered for the printer;
+/// a comment between two idents reads as whitespace, splitting the run — parseCss
+/// rejects it. `value_span` covers the identifier run (first ident start .. last
+/// ident end) so the printer locates the gap comments around it (mirrors `Nth`).
+fn parse_part_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    args_start: usize,
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+    parser.skip_whitespace_registering_comments()?;
+
+    let value_start = parser.current_start;
+    let mut value_end = value_start;
+    let mut idents = parser.bvec();
+
+    // Parse space-separated identifiers
+    while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
+        if !parser.check(TokenKind::Identifier) {
+            return Err(parser.error_msg("::part() requires identifier arguments"));
+        }
+
+        let ident_str = parser.current_identifier();
+        let ident = parser.alloc_str_in(ident_str);
+        idents.push(ident);
+        value_end = parser.current_end;
+        parser.advance()?;
+
+        parser.skip_whitespace_registering_comments()?;
+    }
+
+    if idents.is_empty() {
+        return Err(parser.error_msg_at(
+            "::part() requires at least one identifier",
+            parser.base_offset() + args_start,
+        ));
+    }
+
+    let end = parser.expect_and_capture(TokenKind::RightParen)?;
+
+    Ok((
+        Some(PseudoClassArgs::Part {
+            idents: idents.into_bump_slice(),
+            span: Span {
+                start: parser.span_pos(args_start),
+                end,
+            },
+            value_span: Span {
+                start: parser.span_pos(value_start),
+                end: parser.span_pos(value_end),
+            },
+        }),
+        end,
+    ))
+}
+
+/// Selector-list pseudo-classes, each with a different selector grammar per CSS
+/// Selectors 4:
+/// - `:has()` → relative selector list (can start with combinators: `:has(> img)`)
+/// - `:is()`, `:where()` → forgiving selector list (invalid selectors kept as
+///   `Invalid`, never fails)
+/// - `:not()`, `:global()`, `:dir()`, `:lang()`, `::highlight()` → complex real
+///   selector list (strict). The identifier-arg pseudos live here because Svelte
+///   parses their argument as a selector list too — `:lang(en, fr)` is two
+///   `TypeSelector`s, and a non-selector arg like `:lang("en")` is a parse error
+///   (which the strict grammar reproduces).
+///
+/// Leading/trailing gap comments are registered so the printer interleaves them.
+fn parse_selector_list_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    args_start: usize,
+    pseudo_name: &str,
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+    // Register a leading comment (`:is(/* c */ .a)`) so the printer interleaves it.
+    parser.skip_whitespace_registering_comments()?;
+
+    let selector_list = match pseudo_name {
+        "has" => {
+            // :has() uses relative selectors (can start with combinators)
+            parse_relative_selector_list(parser)?
+        }
+        "is" | "where" => {
+            // :is() and :where() use forgiving selector lists
+            // Invalid selectors wrapped as SimpleSelector::Invalid (never fails)
+            parse_forgiving_selector_list(parser)?
+        }
+        "not" | "global" | "dir" | "lang" | "highlight" => {
+            // :not()/:global() and the identifier-arg pseudos use complex selectors
+            // (strict parsing)
+            parse_complex_selector_list(parser)?
+        }
+        // The dispatcher restricts `pseudo_name` to exactly these eight.
+        #[allow(clippy::unreachable)] // guarded by the dispatch matches!
+        _ => unreachable!(
+            "pseudo_name is is/not/where/has/global/dir/lang/highlight per the dispatch guard"
+        ),
+    };
+
+    // Register a trailing comment (`:is(.a /* c */)`) so the printer interleaves it.
+    parser.skip_whitespace_registering_comments()?;
+
+    let end = parser.expect_and_capture(TokenKind::RightParen)?;
+
+    Ok((
+        Some(PseudoClassArgs::SelectorList {
+            selectors: selector_list,
+            span: Span {
+                start: parser.span_pos(args_start),
+                end,
+            },
+        }),
+        end,
+    ))
+}
+
+/// `nth-*` pseudo-classes: `An+B` notation plus an optional `of <selector-list>`
+/// (CSS Selectors 4: `:nth-child(An+B [of S]?)`). Comments in the gaps around the
+/// An+B text are registered for the printer; a comment *inside* the An+B stays part
+/// of its verbatim value text. `value_span` covers just the trimmed An+B so the
+/// printer can find the surrounding gap comments.
+fn parse_nth_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    args_start: usize,
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+    parser.skip_whitespace_registering_comments()?;
+    let anb_start = parser.current_start;
+
+    // Scan tokens until we hit "of" keyword or closing paren
+    let mut anb_end = anb_start;
+    let mut found_of = false;
+    let mut depth = 0;
+
+    while !parser.check(TokenKind::Eof) {
+        if parser.check(TokenKind::RightParen) && depth == 0 {
+            // End of nth args
+            break;
+        }
+        if depth == 0 && parser.check(TokenKind::Identifier) && parser.current_identifier() == "of"
+        {
+            // Found "of" keyword - An+B part ends here
+            found_of = true;
+            parser.advance()?; // consume "of"
+            break;
+        }
+        if parser.check(TokenKind::LeftParen) {
+            depth += 1;
+        } else if parser.check(TokenKind::RightParen) {
+            depth -= 1;
+        }
+        // Everything else — idents (`odd`, `n`), numbers, `+`/`-`,
+        // whitespace, comments — extends the raw An+B text.
+        anb_end = parser.current_end;
+        parser.advance()?;
+    }
+
+    // Extract An+B value. The scan extends `anb_end` over whitespace and
+    // comment tokens, so trim to the real text and keep its span — the
+    // printer uses it to locate the gap comments around the An+B.
+    let anb_raw = &parser.source()[anb_start..anb_end];
+    let anb_trimmed_start = anb_start + (anb_raw.len() - anb_raw.trim_start().len());
+    let anb_value = parser.alloc_str_in(anb_raw.trim());
+    let value_span = Span {
+        start: parser.span_pos(anb_trimmed_start),
+        end: parser.span_pos(anb_trimmed_start + anb_value.len()),
+    };
+
+    // Parse optional selector list after "of"
+    let of_selector = if found_of {
+        parser.skip_whitespace_registering_comments()?;
+        Some(parse_complex_selector_list(parser)?)
+    } else {
+        None
+    };
+
+    parser.skip_whitespace_registering_comments()?;
+    let span_end = parser.span_pos(parser.current_start); // End before closing paren
+    let paren_end = parser.expect_and_capture(TokenKind::RightParen)?; // End after closing paren
+
+    Ok((
+        Some(PseudoClassArgs::Nth {
+            value: anb_value,
+            of_selector,
+            span: Span {
+                start: parser.span_pos(args_start),
+                end: span_end,
+            },
+            value_span,
+        }),
+        paren_end,
+    ))
+}
+
+/// Unknown pseudo-class/element (`:current()`, `:state()`, `::cue()`, …). Try to
+/// parse the argument as a complex selector list first (the common case, sharing
+/// `:is()`'s printer arm which already interleaves gap comments); if that fails the
+/// argument isn't a selector, so skip to the matching `)` and return `None`.
+fn parse_unknown_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    args_start: usize,
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+    // Register leading/trailing gap comments (`:current(/* c */ .a)`); the
+    // built `SelectorList` args share `:is()`'s printer arm, which already
+    // interleaves them, so this path is parser-only.
+    parser.skip_whitespace_registering_comments()?;
+
+    // Try to parse as a selector list (complex selectors, strict parsing)
+    match parse_complex_selector_list(parser) {
+        Ok(selector_list) => {
             parser.skip_whitespace_registering_comments()?;
-            let anb_start = parser.current_start;
+            let end = parser.expect_and_capture(TokenKind::RightParen)?;
 
-            // Scan tokens until we hit "of" keyword or closing paren
-            let mut anb_end = anb_start;
-            let mut found_of = false;
-            let mut depth = 0;
-
-            while !parser.check(TokenKind::Eof) {
-                if parser.check(TokenKind::RightParen) && depth == 0 {
-                    // End of nth args
-                    break;
-                }
-                if depth == 0
-                    && parser.check(TokenKind::Identifier)
-                    && parser.current_identifier() == "of"
-                {
-                    // Found "of" keyword - An+B part ends here
-                    found_of = true;
-                    parser.advance()?; // consume "of"
-                    break;
-                }
+            Ok((
+                Some(PseudoClassArgs::SelectorList {
+                    selectors: selector_list,
+                    span: Span {
+                        start: parser.span_pos(args_start),
+                        end,
+                    },
+                }),
+                end,
+            ))
+        }
+        Err(_) => {
+            // Parsing as selector list failed - skip arguments
+            // This handles pseudo-classes with non-selector arguments
+            let mut depth = 1;
+            while depth > 0 && !parser.check(TokenKind::Eof) {
                 if parser.check(TokenKind::LeftParen) {
                     depth += 1;
                 } else if parser.check(TokenKind::RightParen) {
                     depth -= 1;
-                }
-                // Everything else — idents (`odd`, `n`), numbers, `+`/`-`,
-                // whitespace, comments — extends the raw An+B text.
-                anb_end = parser.current_end;
-                parser.advance()?;
-            }
-
-            // Extract An+B value. The scan extends `anb_end` over whitespace and
-            // comment tokens, so trim to the real text and keep its span — the
-            // printer uses it to locate the gap comments around the An+B.
-            let anb_raw = &parser.source()[anb_start..anb_end];
-            let anb_trimmed_start = anb_start + (anb_raw.len() - anb_raw.trim_start().len());
-            let anb_value = parser.alloc_str_in(anb_raw.trim());
-            let value_span = Span {
-                start: (parser.base_offset() + anb_trimmed_start) as u32,
-                end: (parser.base_offset() + anb_trimmed_start + anb_value.len()) as u32,
-            };
-
-            // Parse optional selector list after "of"
-            let of_selector = if found_of {
-                parser.skip_whitespace_registering_comments()?;
-                Some(parse_complex_selector_list(parser)?)
-            } else {
-                None
-            };
-
-            parser.skip_whitespace_registering_comments()?;
-            let span_end = (parser.base_offset() + parser.current_start) as u32; // End before closing paren
-            let paren_end = parser.expect_and_capture(TokenKind::RightParen)?; // End after closing paren
-
-            (
-                Some(PseudoClassArgs::Nth {
-                    value: anb_value,
-                    of_selector,
-                    span: Span {
-                        start: (parser.base_offset() + args_start) as u32,
-                        end: span_end,
-                    },
-                    value_span,
-                }),
-                paren_end,
-            )
-        }
-        _ => {
-            // Unknown pseudo-class/pseudo-element - try parsing as selector list
-            // This handles generic pseudo-classes like :current(), :state(), etc.
-            // and pseudo-elements like ::cue(), ::highlight(), etc.
-            //
-            // Approach: Try to parse as selector list first (most common case)
-            // If that fails, skip the arguments (for pseudo-classes with non-selector args)
-            //
-            // Register leading/trailing gap comments (`:current(/* c */ .a)`); the
-            // built `SelectorList` args share `:is()`'s printer arm, which already
-            // interleaves them, so this path is parser-only.
-            parser.skip_whitespace_registering_comments()?;
-
-            // Try to parse as a selector list (complex selectors, strict parsing)
-            let selector_result = parse_complex_selector_list(parser);
-
-            match selector_result {
-                Ok(selector_list) => {
-                    parser.skip_whitespace_registering_comments()?;
-                    let end = parser.expect_and_capture(TokenKind::RightParen)?;
-
-                    (
-                        Some(PseudoClassArgs::SelectorList {
-                            selectors: selector_list,
-                            span: Span {
-                                start: (parser.base_offset() + args_start) as u32,
-                                end,
-                            },
-                        }),
-                        end,
-                    )
-                }
-                Err(_) => {
-                    // Parsing as selector list failed - skip arguments
-                    // This handles pseudo-classes with non-selector arguments
-                    let mut depth = 1;
-                    while depth > 0 && !parser.check(TokenKind::Eof) {
-                        if parser.check(TokenKind::LeftParen) {
-                            depth += 1;
-                        } else if parser.check(TokenKind::RightParen) {
-                            depth -= 1;
-                            if depth == 0 {
-                                break;
-                            }
-                        }
-                        if depth > 0 {
-                            parser.advance()?;
-                        }
+                    if depth == 0 {
+                        break;
                     }
-                    let end = parser.expect_and_capture(TokenKind::RightParen)?;
-                    (None, end)
+                }
+                if depth > 0 {
+                    parser.advance()?;
                 }
             }
+            let end = parser.expect_and_capture(TokenKind::RightParen)?;
+            Ok((None, end))
         }
-    };
-
-    Ok(args)
+    }
 }
