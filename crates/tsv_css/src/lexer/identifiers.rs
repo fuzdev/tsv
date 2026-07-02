@@ -80,7 +80,17 @@ pub(crate) fn read_identifier(
             Some('\\') => {
                 // Check if this is a valid escape sequence
                 let Some(next_ch) = source[*pos + 1..].chars().next() else {
-                    // Backslash at end of input - end identifier
+                    // Backslash at end of input. If the identifier already has
+                    // content, end it before the backslash; but when the `\` is
+                    // the FIRST char scanned, breaking would return a zero-width
+                    // token — the caller's token loop would re-dispatch at the
+                    // same position forever (and accumulate tokens unboundedly
+                    // on the token-tree paths). A lone `\` at EOF is a parse
+                    // error per css-syntax §4.3.7 (consume an escaped code
+                    // point); the strict-throw model rejects it.
+                    if *pos == start {
+                        return Err(lex_err("Unexpected end of input after backslash", *pos));
+                    }
                     break;
                 };
 
@@ -90,7 +100,15 @@ pub(crate) fn read_identifier(
                     let ch = decode_unicode_escape(source, pos)?;
                     buf.push(ch);
                 } else if next_ch == '\n' || next_ch == '\r' || next_ch == '\x0C' {
-                    // Newline after backslash - invalid escape, end identifier
+                    // Newline after backslash - invalid escape. Same zero-width
+                    // hazard as the EOF branch above: error rather than spin
+                    // when the `\` is the first char scanned. (Svelte's parseCss
+                    // is lenient here and reads the `\` into the value; tsv
+                    // follows the css-syntax parse-error posture — see
+                    // conformance_svelte.md §CSS Parser Scope & Error Model.)
+                    if *pos == start {
+                        return Err(lex_err("Invalid escape: backslash before newline", *pos));
+                    }
                     break;
                 } else {
                     // Single character escape: backslash followed by any character
