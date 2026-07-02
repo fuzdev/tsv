@@ -1,0 +1,840 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 395,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A private name in the member chain keeps the parens — the bare form",
+			"start": 75,
+			"end": 145,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `@A.#fn` is valid per the TC39 decorators grammar and normalizes here",
+			"start": 148,
+			"end": 220,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A call on a chain containing a private name",
+			"start": 243,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The chain can continue past the private name",
+			"start": 314,
+			"end": 361,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 49
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 394,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 385,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 384,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 28,
+						"end": 384,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 32,
+								"end": 47,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 17
+									}
+								},
+								"static": true,
+								"computed": false,
+								"key": {
+									"type": "PrivateIdentifier",
+									"start": 39,
+									"end": 42,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 9
+										},
+										"end": {
+											"line": 3,
+											"column": 12
+										}
+									},
+									"name": "fn"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 42,
+									"end": 47,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 12
+										},
+										"end": {
+											"line": 3,
+											"column": 17
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 45,
+										"end": 47,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 15
+											},
+											"end": {
+												"line": 3,
+												"column": 17
+											}
+										},
+										"body": []
+									}
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 50,
+								"end": 71,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 23
+									}
+								},
+								"static": true,
+								"computed": false,
+								"key": {
+									"type": "PrivateIdentifier",
+									"start": 57,
+									"end": 59,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 9
+										},
+										"end": {
+											"line": 4,
+											"column": 11
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "ObjectExpression",
+									"start": 62,
+									"end": 70,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 14
+										},
+										"end": {
+											"line": 4,
+											"column": 22
+										}
+									},
+									"properties": [
+										{
+											"type": "Property",
+											"start": 64,
+											"end": 68,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 16
+												},
+												"end": {
+													"line": 4,
+													"column": 20
+												}
+											},
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 64,
+												"end": 65,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 16
+													},
+													"end": {
+														"line": 4,
+														"column": 17
+													}
+												},
+												"name": "b"
+											},
+											"value": {
+												"type": "Literal",
+												"start": 67,
+												"end": 68,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 19
+													},
+													"end": {
+														"line": 4,
+														"column": 20
+													}
+												},
+												"value": 0,
+												"raw": "0"
+											},
+											"kind": "init"
+										}
+									]
+								}
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 223,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 18
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 232,
+									"end": 234,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 11
+										},
+										"end": {
+											"line": 8,
+											"column": 13
+										}
+									},
+									"name": "m1"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 234,
+									"end": 239,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 13
+										},
+										"end": {
+											"line": 8,
+											"column": 18
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 237,
+										"end": 239,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 16
+											},
+											"end": {
+												"line": 8,
+												"column": 18
+											}
+										},
+										"body": []
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 223,
+										"end": 231,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 10
+											}
+										},
+										"expression": {
+											"type": "MemberExpression",
+											"start": 225,
+											"end": 230,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 4
+												},
+												"end": {
+													"line": 8,
+													"column": 9
+												}
+											},
+											"object": {
+												"type": "Identifier",
+												"start": 225,
+												"end": 226,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 4
+													},
+													"end": {
+														"line": 8,
+														"column": 5
+													}
+												},
+												"name": "A"
+											},
+											"property": {
+												"type": "PrivateIdentifier",
+												"start": 227,
+												"end": 230,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 6
+													},
+													"end": {
+														"line": 8,
+														"column": 9
+													}
+												},
+												"name": "fn"
+											},
+											"computed": false,
+											"optional": false
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A private name in the member chain keeps the parens — the bare form",
+										"start": 75,
+										"end": 145
+									},
+									{
+										"type": "Line",
+										"value": " `@A.#fn` is valid per the TC39 decorators grammar and normalizes here",
+										"start": 148,
+										"end": 220
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 292,
+								"end": 310,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 20
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 303,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 13
+										},
+										"end": {
+											"line": 11,
+											"column": 15
+										}
+									},
+									"name": "m2"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 305,
+									"end": 310,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 15
+										},
+										"end": {
+											"line": 11,
+											"column": 20
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 308,
+										"end": 310,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 18
+											},
+											"end": {
+												"line": 11,
+												"column": 20
+											}
+										},
+										"body": []
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 292,
+										"end": 302,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 12
+											}
+										},
+										"expression": {
+											"type": "CallExpression",
+											"start": 294,
+											"end": 301,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 4
+												},
+												"end": {
+													"line": 11,
+													"column": 11
+												}
+											},
+											"callee": {
+												"type": "MemberExpression",
+												"start": 294,
+												"end": 299,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 4
+													},
+													"end": {
+														"line": 11,
+														"column": 9
+													}
+												},
+												"object": {
+													"type": "Identifier",
+													"start": 294,
+													"end": 295,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 4
+														},
+														"end": {
+															"line": 11,
+															"column": 5
+														}
+													},
+													"name": "A"
+												},
+												"property": {
+													"type": "PrivateIdentifier",
+													"start": 296,
+													"end": 299,
+													"loc": {
+														"start": {
+															"line": 11,
+															"column": 6
+														},
+														"end": {
+															"line": 11,
+															"column": 9
+														}
+													},
+													"name": "fn"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [],
+											"optional": false
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A call on a chain containing a private name",
+										"start": 243,
+										"end": 289
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 364,
+								"end": 381,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 19
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 374,
+									"end": 376,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 12
+										},
+										"end": {
+											"line": 14,
+											"column": 14
+										}
+									},
+									"name": "m3"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 376,
+									"end": 381,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 14
+										},
+										"end": {
+											"line": 14,
+											"column": 19
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 379,
+										"end": 381,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 17
+											},
+											"end": {
+												"line": 14,
+												"column": 19
+											}
+										},
+										"body": []
+									}
+								},
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 364,
+										"end": 373,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 11
+											}
+										},
+										"expression": {
+											"type": "MemberExpression",
+											"start": 366,
+											"end": 372,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 4
+												},
+												"end": {
+													"line": 14,
+													"column": 10
+												}
+											},
+											"object": {
+												"type": "MemberExpression",
+												"start": 366,
+												"end": 370,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 4
+													},
+													"end": {
+														"line": 14,
+														"column": 8
+													}
+												},
+												"object": {
+													"type": "Identifier",
+													"start": 366,
+													"end": 367,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 4
+														},
+														"end": {
+															"line": 14,
+															"column": 5
+														}
+													},
+													"name": "A"
+												},
+												"property": {
+													"type": "PrivateIdentifier",
+													"start": 368,
+													"end": 370,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 6
+														},
+														"end": {
+															"line": 14,
+															"column": 8
+														}
+													},
+													"name": "a"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"property": {
+												"type": "Identifier",
+												"start": 371,
+												"end": 372,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 9
+													},
+													"end": {
+														"line": 14,
+														"column": 10
+													}
+												},
+												"name": "b"
+											},
+											"computed": false,
+											"optional": false
+										}
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " The chain can continue past the private name",
+										"start": 314,
+										"end": 361
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
