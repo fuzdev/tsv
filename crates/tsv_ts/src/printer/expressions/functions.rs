@@ -964,12 +964,11 @@ impl<'a> Printer<'a> {
     /// and line comments have a newline after (returns true).
     pub(crate) fn has_own_line_post_arrow_comment(&self, sig_end: u32, body_start: u32) -> bool {
         for comment in comments_in_range(self.comments, sig_end, body_start) {
-            if !comment.is_block {
-                // Line comments always have a newline after them
-                return true;
-            }
-            // Check if there's a newline after this block comment's end
-            if !self.is_same_line(comment.span.end, body_start) {
+            // A line comment, a multiline block, or a block that starts on its own
+            // line (a newline precedes it) forces the body onto its own line. A
+            // single-line block glued to `=>` keeps the body hugged even when the
+            // body follows on the next source line (`=> /* c */⏎expr` → `=> /* c */ expr`).
+            if self.comment_forces_own_line(comment) {
                 return true;
             }
         }

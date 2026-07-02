@@ -337,6 +337,26 @@ impl<'a> Printer<'a> {
     /// Use for any position where a comment appears before an expression (RHS of `=`,
     /// after keywords like `return`/`await`, after operators like `!`/`...`, etc.).
     pub(crate) fn build_rhs_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
+        self.build_rhs_comments_opt_impl(start, end, false)
+    }
+
+    /// Like `build_rhs_comments_opt`, but a single-line block comment glued to the
+    /// operator (not on its own line) hugs the value with a space even when the
+    /// value follows on the next source line — prettier pulls the value up in the
+    /// assignment/call layout (`= /* c */⏎v` → `= /* c */ v`). Positions that keep
+    /// the author's line break for a glued block (decorators, `return`/`throw`/`await`
+    /// keyword operands, object property values, …) stay on the non-gluing
+    /// `build_rhs_comments_opt`.
+    pub(crate) fn build_rhs_comments_glued_opt(&self, start: u32, end: u32) -> Option<DocId> {
+        self.build_rhs_comments_opt_impl(start, end, true)
+    }
+
+    fn build_rhs_comments_opt_impl(
+        &self,
+        start: u32,
+        end: u32,
+        glue_inline_block: bool,
+    ) -> Option<DocId> {
         let d = self.d();
         let mut parts = DocBuf::new();
         let mut comments = comments_in_range(self.comments, start, end).peekable();
@@ -345,7 +365,12 @@ impl<'a> Printer<'a> {
             // The next thing after this comment is the following comment, or the
             // value itself (`end`) for the last one.
             let next = comments.peek().map_or(end, |c| c.span.start);
-            if comment.is_block && self.is_same_line(comment.span.end, next) {
+            // A glued (not own-line) single-line block hugs the value with a space
+            // when `glue_inline_block` is set, even across a source newline.
+            let glue_across_newline = glue_inline_block && !self.comment_forces_own_line(comment);
+            if comment.is_block
+                && (self.is_same_line(comment.span.end, next) || glue_across_newline)
+            {
                 // Value (or next comment) shares the `*/` line — keep it glued.
                 parts.push(d.text(" "));
             } else {

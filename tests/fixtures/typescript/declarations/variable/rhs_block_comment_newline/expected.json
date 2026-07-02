@@ -1,0 +1,287 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 264,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Block comment glued to `=` with the value on the next line: the newline",
+			"start": 10,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " collapses and the initializer stays inline.",
+			"start": 86,
+			"end": 132,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 144,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 11
+				},
+				"end": {
+					"line": 4,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Own-line comment (a newline precedes it) keeps the break after `=`.",
+			"start": 157,
+			"end": 227,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 241,
+			"end": 248,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 263,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 254,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 134,
+					"end": 154,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 21
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 140,
+							"end": 153,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 20
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 140,
+								"end": 141,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 152,
+								"end": 153,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 19
+									},
+									"end": {
+										"line": 4,
+										"column": 20
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 144,
+										"end": 151
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Block comment glued to `=` with the value on the next line: the newline",
+							"start": 10,
+							"end": 84
+						},
+						{
+							"type": "Line",
+							"value": " collapses and the initializer stays inline.",
+							"start": 86,
+							"end": 132
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 229,
+					"end": 253,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 235,
+							"end": 252,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 235,
+								"end": 236,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 251,
+								"end": 252,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"name": "e",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 241,
+										"end": 248
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line comment (a newline precedes it) keeps the break after `=`.",
+							"start": 157,
+							"end": 227
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

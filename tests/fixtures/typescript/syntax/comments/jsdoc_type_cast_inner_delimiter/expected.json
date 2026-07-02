@@ -1,0 +1,309 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 424,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An inner /* in the comment body does not end it: the comment starts with * and",
+			"start": 10,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " carries the @type tag, so it IS a cast and the parens are kept.",
+			"start": 93,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* z /* @type {T} ",
+			"start": 171,
+			"end": 192,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 11
+				},
+				"end": {
+					"line": 4,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A single /* opener means the content starts with a space, not *, so this is NOT",
+			"start": 200,
+			"end": 282,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a cast even though @type appears later; the parens are ordinary grouping and get stripped.",
+			"start": 284,
+			"end": 377,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 94
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " z /** @type {T} ",
+			"start": 389,
+			"end": 410,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 11
+				},
+				"end": {
+					"line": 8,
+					"column": 32
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 423,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 414,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 161,
+					"end": 197,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 167,
+							"end": 196,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 167,
+								"end": 168,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 194,
+								"end": 195,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 34
+									},
+									"end": {
+										"line": 4,
+										"column": 35
+									}
+								},
+								"name": "x",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* z /* @type {T} ",
+										"start": 171,
+										"end": 192
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An inner /* in the comment body does not end it: the comment starts with * and",
+							"start": 10,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " carries the @type tag, so it IS a cast and the parens are kept.",
+							"start": 93,
+							"end": 159
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 379,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 35
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 385,
+							"end": 412,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 34
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 385,
+								"end": 386,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 411,
+								"end": 412,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 33
+									},
+									"end": {
+										"line": 8,
+										"column": 34
+									}
+								},
+								"name": "y",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " z /** @type {T} ",
+										"start": 389,
+										"end": 410
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A single /* opener means the content starts with a space, not *, so this is NOT",
+							"start": 200,
+							"end": 282
+						},
+						{
+							"type": "Line",
+							"value": " a cast even though @type appears later; the parens are ordinary grouping and get stripped.",
+							"start": 284,
+							"end": 377
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

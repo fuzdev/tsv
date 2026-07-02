@@ -1261,7 +1261,11 @@ impl<'a> Printer<'a> {
                         let init_start = init.span().start;
                         let eq_pos = self.find_equals_position(id_end, init_start);
                         parts.push(d.text(" = "));
-                        if let Some(comments) = self.build_rhs_comments_opt(eq_pos + 1, init_start)
+                        // A single-line block glued to `=` hugs the value even across a
+                        // source newline (`i = /* c */⏎0` → `i = /* c */ 0`), so it does
+                        // not force the whole for-header to break; matches prettier.
+                        if let Some(comments) =
+                            self.build_rhs_comments_glued_opt(eq_pos + 1, init_start)
                         {
                             parts.push(comments);
                         }

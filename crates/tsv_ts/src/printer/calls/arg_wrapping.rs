@@ -92,8 +92,10 @@ pub(crate) fn prepend_arrow_body_comments(
 ) -> DocId {
     let arrow_end = printer.find_arrow_token_for(arrow) + "=>".len() as u32;
 
-    // Prepend inline comments between `=>` and body
-    if let Some(lc) = printer.build_rhs_comments_opt(arrow_end, body_start) {
+    // Prepend inline comments between `=>` and body. Glued: a single-line block
+    // hugged to `=>` stays with the body across a source newline, matching the main
+    // arrow-body path (`has_own_line_post_arrow_comment`) and prettier.
+    if let Some(lc) = printer.build_rhs_comments_glued_opt(arrow_end, body_start) {
         printer.d().concat(&[lc, body_doc])
     } else {
         body_doc
@@ -418,7 +420,8 @@ pub(crate) fn build_args_split_last(
 
     // Leading comments between `(` and the first argument (e.g., /** @type {T} */).
     // Not handled by per-arg building — prepended to both head_parts and all_args_broken.
-    let leading_comment_doc = printer.build_rhs_comments_opt(paren_open, arguments[0].span().start);
+    let leading_comment_doc =
+        printer.build_rhs_comments_glued_opt(paren_open, arguments[0].span().start);
 
     // Build head docs (all but last) with commas and inline block comments
     // Comments are placed relative to the comma based on their source position

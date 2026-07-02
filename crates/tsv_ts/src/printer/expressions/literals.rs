@@ -420,8 +420,10 @@ impl<'a> Printer<'a> {
         // Check for comments between `...` and the argument (e.g., `.../* comment */ arr`)
         let dots_end = spread.span.start + "...".len() as u32;
         let arg_start = spread.argument.span().start;
-        // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before)
-        let comment_doc = self.build_rhs_comments_opt(dots_end, arg_start);
+        // Use trailing_space variant: `.../* comment */ arg` (space after comment, not before).
+        // A single-line block glued to `...` hugs the argument even across a source
+        // newline (`.../* c */⏎arg` → `.../* c */ arg`), matching prettier.
+        let comment_doc = self.build_rhs_comments_glued_opt(dots_end, arg_start);
 
         // Check for trailing comments from stripped grouping parens: `...(x /* c */)`
         let argument_end = spread.argument.span().end;

@@ -474,7 +474,7 @@ fn try_single_arg_comment_paths(
     // Use build_rhs_comments_opt to get spaces between consecutive block comments:
     // fn(/** @type {A} */ /** @type {B} */ expr) — not fn(/** @type {A} *//** @type {B} */ expr)
     if let Some(inline_comments) = printer
-        .build_rhs_comments_opt(paren_open, arg_start)
+        .build_rhs_comments_glued_opt(paren_open, arg_start)
         .filter(|_| !has_own_line_trailing_comment)
     {
         // Argument-context builder so a binary/logical chain gets its
