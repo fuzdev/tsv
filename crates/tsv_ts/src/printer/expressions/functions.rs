@@ -1216,6 +1216,20 @@ impl<'a> Printer<'a> {
             return d.text("()");
         }
 
+        // Zero-comment fast gate: one binary search over the whole params window.
+        // Every comment sub-query below (the hug/force-break predicates and the
+        // per-gap lookups in the build loop) is bounded within
+        // [window_start, window_end], and `comments_in_range` only yields comments
+        // fully inside its range — so when no comment lies inside the window, every
+        // sub-query is provably empty/false. Skip them all, including the per-gap
+        // `find_comma_after` trivia scans, whose results feed only comment placement.
+        let comments_present = {
+            let window_start = params_start.unwrap_or_else(|| params[0].span().start);
+            let last_end = params[params.len() - 1].span().end;
+            let window_end = trailing_comments_end.map_or(last_end, |end| end.max(last_end));
+            self.has_comments_between(window_start, window_end)
+        };
+
         // Prettier's shouldHugFunctionParameters: single param that's an object/array pattern
         // gets hugged - no breaks added around it, the pattern handles its own expansion.
         // This keeps `({` and `}: Type)` together, letting the pattern's content break:
@@ -1236,12 +1250,14 @@ impl<'a> Printer<'a> {
         //   function fn(
         //       a?: { b: T },
         //   ): void {}
-        let no_leading_comments = !self.has_comments_between(
-            params_start.unwrap_or_else(|| params[0].span().start),
-            params[0].span().start,
-        );
-        let no_trailing_comments = trailing_comments_end
-            .is_none_or(|end| !self.has_comments_between(params[0].span().end, end));
+        let no_leading_comments = !comments_present
+            || !self.has_comments_between(
+                params_start.unwrap_or_else(|| params[0].span().start),
+                params[0].span().start,
+            );
+        let no_trailing_comments = !comments_present
+            || trailing_comments_end
+                .is_none_or(|end| !self.has_comments_between(params[0].span().end, end));
         let should_hug_single_pattern = params.len() == 1
             && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
             && no_leading_comments
@@ -1255,13 +1271,13 @@ impl<'a> Printer<'a> {
 
         // Check if any trailing line comments exist on params
         // If so, we must use hardlines to force the group to break
-        let has_trailing_line_comment =
-            self.has_trailing_line_comment_in_params(params, trailing_comments_end);
+        let has_trailing_line_comment = comments_present
+            && self.has_trailing_line_comment_in_params(params, trailing_comments_end);
 
         // Check if any leading line comments exist on their own line before params
         // Line comments on their own line also force break
         let has_leading_own_line_comment =
-            self.has_leading_own_line_comment_in_params(params, params_start);
+            comments_present && self.has_leading_own_line_comment_in_params(params, params_start);
 
         // Prettier rule: force break when 2+ params and at least one is TSParameterProperty
         // (has access modifiers like private/public/protected/readonly)
@@ -1308,9 +1324,13 @@ impl<'a> Printer<'a> {
                     // leading comment (or the param itself) — prettier keeps one blank
                     // line in the expanded list. `search_start` is the previous param's
                     // end, so the gap spans the comma too.
-                    let check_pos = comments_in_range(self.comments, search_start, param_start)
-                        .next()
-                        .map_or(param_start, |c| c.span.start);
+                    let check_pos = if comments_present {
+                        comments_in_range(self.comments, search_start, param_start)
+                            .next()
+                            .map_or(param_start, |c| c.span.start)
+                    } else {
+                        param_start
+                    };
                     self.push_blank_preserving_hardline(&mut inner_parts, search_start, check_pos);
                 } else {
                     inner_parts.push(d.line());
@@ -1320,16 +1340,18 @@ impl<'a> Printer<'a> {
             // Add leading comments for this param
             // Use proper line breaks for line comments on their own line
             // For non-first params, find comma position to filter properly
-            let prev_comma_pos = if i > 0 {
-                self.find_comma_after(params[i - 1].span().end)
-            } else {
-                None
-            };
-            inner_parts.push(self.build_leading_param_comments(
-                search_start,
-                param_start,
-                prev_comma_pos,
-            ));
+            if comments_present {
+                let prev_comma_pos = if i > 0 {
+                    self.find_comma_after(params[i - 1].span().end)
+                } else {
+                    None
+                };
+                inner_parts.push(self.build_leading_param_comments(
+                    search_start,
+                    param_start,
+                    prev_comma_pos,
+                ));
+            }
 
             // Use FunctionParameter context for object patterns
             inner_parts.push(self.build_function_parameter_doc(param));
@@ -1344,7 +1366,10 @@ impl<'a> Printer<'a> {
             // Find comma position. For the last param, locate a source trailing
             // comma (within the trailing range) so an after-comma block comment is
             // preserved after the comma rather than relocated before it.
-            let comma_pos = if !is_last {
+            // Consumed only by comment placement, so the zero-comment gate skips the scan.
+            let comma_pos = if !comments_present {
+                None
+            } else if !is_last {
                 self.find_comma_after(param.span().end)
             } else {
                 self.find_comma_after(param.span().end)
@@ -1352,10 +1377,13 @@ impl<'a> Printer<'a> {
             };
 
             // Collect same-line comments
-            let same_line_comments: CommentVec<'_> =
+            let same_line_comments: CommentVec<'_> = if comments_present {
                 comments_in_range(self.comments, param.span().end, search_end)
                     .filter(|c| self.is_same_line(param.span().end, c.span.start))
-                    .collect();
+                    .collect()
+            } else {
+                CommentVec::new()
+            };
 
             // Block comments BEFORE comma go before comma
             for comment in same_line_comments
@@ -1396,7 +1424,7 @@ impl<'a> Printer<'a> {
 
             // Own-line comments (on their own line after last param, before `)`)
             // Only for the last param - non-last param comments are handled as leading for next param
-            if is_last {
+            if is_last && comments_present {
                 let mut prev_own = param.span().end;
                 for comment in comments_in_range(self.comments, param.span().end, search_end)
                     .filter(|c| !self.is_same_line(param.span().end, c.span.start))
