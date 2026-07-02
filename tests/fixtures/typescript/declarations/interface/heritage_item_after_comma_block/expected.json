@@ -1,0 +1,409 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 263,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " After-comma block hugging the next item leads it (stays after the comma)",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 120,
+			"end": 127,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 24
+				},
+				"end": {
+					"line": 3,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Before-comma and after-comma blocks in one gap each keep their side",
+			"start": 135,
+			"end": 205,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 229,
+			"end": 237,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 23
+				},
+				"end": {
+					"line": 6,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 239,
+			"end": 247,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 33
+				},
+				"end": {
+					"line": 6,
+					"column": 41
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 262,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 253,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 97,
+					"end": 132,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 36
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 107,
+						"end": 108,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 12
+							}
+						},
+						"name": "A"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 117,
+							"end": 118,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 21
+								},
+								"end": {
+									"line": 3,
+									"column": 22
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 117,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 21
+									},
+									"end": {
+										"line": 3,
+										"column": 22
+									}
+								},
+								"name": "I"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 120,
+									"end": 127
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 128,
+							"end": 129,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 32
+								},
+								"end": {
+									"line": 3,
+									"column": 33
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 128,
+								"end": 129,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 32
+									},
+									"end": {
+										"line": 3,
+										"column": 33
+									}
+								},
+								"name": "J"
+							}
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 130,
+						"end": 132,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 34
+							},
+							"end": {
+								"line": 3,
+								"column": 36
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " After-comma block hugging the next item leads it (stays after the comma)",
+							"start": 20,
+							"end": 95
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 207,
+					"end": 252,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 46
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 217,
+						"end": 218,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 11
+							},
+							"end": {
+								"line": 6,
+								"column": 12
+							}
+						},
+						"name": "B"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 227,
+							"end": 228,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 21
+								},
+								"end": {
+									"line": 6,
+									"column": 22
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 227,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 21
+									},
+									"end": {
+										"line": 6,
+										"column": 22
+									}
+								},
+								"name": "I"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 229,
+									"end": 237
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 248,
+							"end": 249,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 42
+								},
+								"end": {
+									"line": 6,
+									"column": 43
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 248,
+								"end": 249,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 42
+									},
+									"end": {
+										"line": 6,
+										"column": 43
+									}
+								},
+								"name": "J"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 239,
+									"end": 247
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 250,
+						"end": 252,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 44
+							},
+							"end": {
+								"line": 6,
+								"column": 46
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Before-comma and after-comma blocks in one gap each keep their side",
+							"start": 135,
+							"end": 205
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

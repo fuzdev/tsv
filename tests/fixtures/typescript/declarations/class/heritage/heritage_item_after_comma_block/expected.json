@@ -1,0 +1,411 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 261,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " After-comma block hugging the next item leads it (stays after the comma)",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 119,
+			"end": 126,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 23
+				},
+				"end": {
+					"line": 3,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Before-comma and after-comma blocks in one gap each keep their side",
+			"start": 134,
+			"end": 204,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 227,
+			"end": 235,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 22
+				},
+				"end": {
+					"line": 6,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 237,
+			"end": 245,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 32
+				},
+				"end": {
+					"line": 6,
+					"column": 40
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 260,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 251,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 97,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 35
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 103,
+						"end": 104,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 116,
+							"end": 117,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 20
+								},
+								"end": {
+									"line": 3,
+									"column": 21
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 116,
+								"end": 117,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 20
+									},
+									"end": {
+										"line": 3,
+										"column": 21
+									}
+								},
+								"name": "I"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 119,
+									"end": 126
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 127,
+							"end": 128,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 31
+								},
+								"end": {
+									"line": 3,
+									"column": 32
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 127,
+								"end": 128,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 31
+									},
+									"end": {
+										"line": 3,
+										"column": 32
+									}
+								},
+								"name": "J"
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 129,
+						"end": 131,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 33
+							},
+							"end": {
+								"line": 3,
+								"column": 35
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " After-comma block hugging the next item leads it (stays after the comma)",
+							"start": 20,
+							"end": 95
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 206,
+					"end": 250,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 45
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 212,
+						"end": 213,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 7
+							},
+							"end": {
+								"line": 6,
+								"column": 8
+							}
+						},
+						"name": "B"
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 225,
+							"end": 226,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 20
+								},
+								"end": {
+									"line": 6,
+									"column": 21
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 225,
+								"end": 226,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 20
+									},
+									"end": {
+										"line": 6,
+										"column": 21
+									}
+								},
+								"name": "I"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 227,
+									"end": 235
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 246,
+							"end": 247,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 41
+								},
+								"end": {
+									"line": 6,
+									"column": 42
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 246,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 41
+									},
+									"end": {
+										"line": 6,
+										"column": 42
+									}
+								},
+								"name": "J"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 237,
+									"end": 245
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 248,
+						"end": 250,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 43
+							},
+							"end": {
+								"line": 6,
+								"column": 45
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Before-comma and after-comma blocks in one gap each keep their side",
+							"start": 134,
+							"end": 204
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

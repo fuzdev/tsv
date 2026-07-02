@@ -1,0 +1,387 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 282,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Stranded after-comma block (a newline before the next declarator): stays on the comma line",
+			"start": 10,
+			"end": 103,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 94
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 117,
+			"end": 125,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 13
+				},
+				"end": {
+					"line": 3,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Before-comma block plus a stranded after-comma block: each stays on its side of the comma",
+			"start": 138,
+			"end": 230,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 93
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 243,
+			"end": 251,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 12
+				},
+				"end": {
+					"line": 7,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 253,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 22
+				},
+				"end": {
+					"line": 7,
+					"column": 30
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 281,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 272,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 105,
+					"end": 135,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 109,
+							"end": 115,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 11
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 109,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 7
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 114,
+								"end": 115,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 11
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 117,
+									"end": 125
+								}
+							]
+						},
+						{
+							"type": "VariableDeclarator",
+							"start": 128,
+							"end": 134,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 128,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 4
+									}
+								},
+								"name": "b1"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 133,
+								"end": 134,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Stranded after-comma block (a newline before the next declarator): stays on the comma line",
+							"start": 10,
+							"end": 103
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 232,
+					"end": 271,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 236,
+							"end": 242,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 5
+								},
+								"end": {
+									"line": 7,
+									"column": 11
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 236,
+								"end": 238,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 5
+									},
+									"end": {
+										"line": 7,
+										"column": 7
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 241,
+								"end": 242,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 10
+									},
+									"end": {
+										"line": 7,
+										"column": 11
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 243,
+									"end": 251
+								}
+							]
+						},
+						{
+							"type": "VariableDeclarator",
+							"start": 264,
+							"end": 270,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 2
+								},
+								"end": {
+									"line": 8,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 264,
+								"end": 266,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 4
+									}
+								},
+								"name": "b2"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 269,
+								"end": 270,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 253,
+									"end": 261
+								}
+							]
+						}
+					],
+					"kind": "let",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Before-comma block plus a stranded after-comma block: each stays on its side of the comma",
+							"start": 138,
+							"end": 230
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

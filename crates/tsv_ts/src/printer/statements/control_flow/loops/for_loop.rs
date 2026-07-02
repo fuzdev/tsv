@@ -1253,9 +1253,7 @@ impl<'a> Printer<'a> {
             decl_docs.push(d.line());
             return;
         }
-        let comma_pos = self
-            .find_char_outside_comments(prev_end, curr_start, b',')
-            .unwrap_or(curr_start);
+        let comma_pos = self.comma_between(prev_end, curr_start);
 
         if self.has_line_comments_between(prev_end, curr_start) {
             // A line comment forces the break. The whole declarator run is wrapped
@@ -1264,21 +1262,23 @@ impl<'a> Printer<'a> {
             // declarator is the `hardline` below.
             let comments: CommentVec<'_> =
                 comments_in_range(self.comments, prev_end, curr_start).collect();
-            self.push_inter_declarator_line_comment_gap(decl_docs, &comments, d.empty());
+            self.push_inter_declarator_line_comment_gap(decl_docs, &comments, comma_pos, d.empty());
             decl_docs.push(d.hardline());
         } else {
             // Blocks only: a before-comma block trails the previous initializer; the
             // width-based `line` separates; after-comma blocks lead the next
             // declarator (an own-line block drops to its own line and forces the group
-            // to break, an inline block hugs `, /* c */ x`).
-            for comment in comments_in_range(self.comments, prev_end, comma_pos) {
-                decl_docs.push(d.text(" "));
-                decl_docs.push(self.build_comment_doc(comment));
-            }
+            // to break, an inline block hugs `, /* c */ x`). A stranded after-comma
+            // block (on the comma's line, newline before the next declarator) trails
+            // the comma instead — preserving the author's placement; prettier relocates
+            // it before the comma.
+            self.push_before_comma_blocks(decl_docs, prev_end, comma_pos);
             decl_docs.push(d.text(","));
+            self.push_stranded_after_comma_blocks(decl_docs, comma_pos, curr_start);
             decl_docs.push(d.line());
-            let after: CommentVec<'_> =
-                comments_in_range(self.comments, comma_pos, curr_start).collect();
+            let after: CommentVec<'_> = comments_in_range(self.comments, comma_pos, curr_start)
+                .filter(|c| !self.is_stranded_after_comma_block(c, comma_pos, curr_start))
+                .collect();
             self.push_leading_comment_run(
                 decl_docs,
                 after.iter().copied(),

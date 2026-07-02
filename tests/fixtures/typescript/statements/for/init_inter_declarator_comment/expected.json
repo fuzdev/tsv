@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 538,
+	"end": 825,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,104 @@
 					"column": 11
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing block before the comma plus a same-line line comment: both trail the comma.",
+			"start": 530,
+			"end": 617,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 637,
+			"end": 645,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 12
+				},
+				"end": {
+					"line": 27,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 647,
+			"end": 652,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 22
+				},
+				"end": {
+					"line": 27,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Own-line line comment after the comma sits on its own line below.",
+			"start": 686,
+			"end": 754,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 778,
+			"end": 783,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 3
+				},
+				"end": {
+					"line": 36,
+					"column": 8
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 537,
+		"end": 824,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 528,
+			"end": 815,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 24,
+					"line": 41,
 					"column": 9
 				}
 			},
@@ -1128,6 +1208,500 @@
 							"value": " Own-line block between declarators leads the next one on its own line.",
 							"start": 391,
 							"end": 464
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 619,
+					"end": 683,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 627,
+						"end": 661,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 2
+							},
+							"end": {
+								"line": 28,
+								"column": 8
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 631,
+								"end": 636,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 6
+									},
+									"end": {
+										"line": 27,
+										"column": 11
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 631,
+									"end": 632,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 6
+										},
+										"end": {
+											"line": 27,
+											"column": 7
+										}
+									},
+									"name": "r"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 635,
+									"end": 636,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 10
+										},
+										"end": {
+											"line": 27,
+											"column": 11
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c5 ",
+										"start": 637,
+										"end": 645
+									}
+								]
+							},
+							{
+								"type": "VariableDeclarator",
+								"start": 656,
+								"end": 661,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 3
+									},
+									"end": {
+										"line": 28,
+										"column": 8
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 656,
+									"end": 657,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 3
+										},
+										"end": {
+											"line": 28,
+											"column": 4
+										}
+									},
+									"name": "s"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 660,
+									"end": 661,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 7
+										},
+										"end": {
+											"line": 28,
+											"column": 8
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c6",
+										"start": 647,
+										"end": 652
+									}
+								]
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 665,
+						"end": 670,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 2
+							},
+							"end": {
+								"line": 29,
+								"column": 7
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 665,
+							"end": 666,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 2
+								},
+								"end": {
+									"line": 29,
+									"column": 3
+								}
+							},
+							"name": "r"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 669,
+							"end": 670,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 6
+								},
+								"end": {
+									"line": 29,
+									"column": 7
+								}
+							},
+							"value": 9,
+							"raw": "9"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 674,
+						"end": 677,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 2
+							},
+							"end": {
+								"line": 30,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 674,
+							"end": 675,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 2
+								},
+								"end": {
+									"line": 30,
+									"column": 3
+								}
+							},
+							"name": "r"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 681,
+						"end": 683,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 3
+							},
+							"end": {
+								"line": 31,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing block before the comma plus a same-line line comment: both trail the comma.",
+							"start": 530,
+							"end": 617
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 756,
+					"end": 814,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 5
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 764,
+						"end": 792,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 2
+							},
+							"end": {
+								"line": 37,
+								"column": 8
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 768,
+								"end": 773,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 6
+									},
+									"end": {
+										"line": 35,
+										"column": 11
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 768,
+									"end": 769,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 6
+										},
+										"end": {
+											"line": 35,
+											"column": 7
+										}
+									},
+									"name": "t"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 772,
+									"end": 773,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 10
+										},
+										"end": {
+											"line": 35,
+											"column": 11
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								}
+							},
+							{
+								"type": "VariableDeclarator",
+								"start": 787,
+								"end": 792,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 3
+									},
+									"end": {
+										"line": 37,
+										"column": 8
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 787,
+									"end": 788,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 3
+										},
+										"end": {
+											"line": 37,
+											"column": 4
+										}
+									},
+									"name": "u"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 791,
+									"end": 792,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 7
+										},
+										"end": {
+											"line": 37,
+											"column": 8
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c7",
+										"start": 778,
+										"end": 783
+									}
+								]
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 796,
+						"end": 801,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 2
+							},
+							"end": {
+								"line": 38,
+								"column": 7
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 796,
+							"end": 797,
+							"loc": {
+								"start": {
+									"line": 38,
+									"column": 2
+								},
+								"end": {
+									"line": 38,
+									"column": 3
+								}
+							},
+							"name": "t"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 800,
+							"end": 801,
+							"loc": {
+								"start": {
+									"line": 38,
+									"column": 6
+								},
+								"end": {
+									"line": 38,
+									"column": 7
+								}
+							},
+							"value": 9,
+							"raw": "9"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 805,
+						"end": 808,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 2
+							},
+							"end": {
+								"line": 39,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 805,
+							"end": 806,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 2
+								},
+								"end": {
+									"line": 39,
+									"column": 3
+								}
+							},
+							"name": "t"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 812,
+						"end": 814,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 3
+							},
+							"end": {
+								"line": 40,
+								"column": 5
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line line comment after the comma sits on its own line below.",
+							"start": 686,
+							"end": 754
 						}
 					]
 				}

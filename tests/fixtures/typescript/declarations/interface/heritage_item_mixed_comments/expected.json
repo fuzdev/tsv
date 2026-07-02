@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 240,
+	"end": 497,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,104 @@
 					"column": 11
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Trailing block before the comma plus a same-line line comment: both trail the comma",
+			"start": 232,
+			"end": 318,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 347,
+			"end": 355,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 5
+				},
+				"end": {
+					"line": 19,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 357,
+			"end": 362,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 15
+				},
+				"end": {
+					"line": 19,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Own-line line comment after the comma sits on its own line below",
+			"start": 373,
+			"end": 440,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 473,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 3
+				},
+				"end": {
+					"line": 26,
+					"column": 8
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 239,
+		"end": 496,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 230,
+			"end": 487,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 15,
+					"line": 28,
 					"column": 9
 				}
 			},
@@ -394,6 +474,268 @@
 							"value": " Line then block comment between extends items",
 							"start": 126,
 							"end": 174
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 320,
+					"end": 370,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 330,
+						"end": 331,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 11
+							},
+							"end": {
+								"line": 17,
+								"column": 12
+							}
+						},
+						"name": "C"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 345,
+							"end": 346,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 3
+								},
+								"end": {
+									"line": 19,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 345,
+								"end": 346,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 3
+									},
+									"end": {
+										"line": 19,
+										"column": 4
+									}
+								},
+								"name": "I"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 347,
+									"end": 355
+								}
+							]
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 366,
+							"end": 367,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 3
+								},
+								"end": {
+									"line": 20,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 366,
+								"end": 367,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 3
+									},
+									"end": {
+										"line": 20,
+										"column": 4
+									}
+								},
+								"name": "J"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 357,
+									"end": 362
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 368,
+						"end": 370,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 5
+							},
+							"end": {
+								"line": 20,
+								"column": 7
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Trailing block before the comma plus a same-line line comment: both trail the comma",
+							"start": 232,
+							"end": 318
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 442,
+					"end": 486,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 7
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 452,
+						"end": 453,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 11
+							},
+							"end": {
+								"line": 23,
+								"column": 12
+							}
+						},
+						"name": "D"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 467,
+							"end": 468,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 3
+								},
+								"end": {
+									"line": 25,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 467,
+								"end": 468,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 3
+									},
+									"end": {
+										"line": 25,
+										"column": 4
+									}
+								},
+								"name": "I"
+							}
+						},
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 482,
+							"end": 483,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 3
+								},
+								"end": {
+									"line": 27,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 482,
+								"end": 483,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 3
+									},
+									"end": {
+										"line": 27,
+										"column": 4
+									}
+								},
+								"name": "J"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 473,
+									"end": 478
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 484,
+						"end": 486,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 5
+							},
+							"end": {
+								"line": 27,
+								"column": 7
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line line comment after the comma sits on its own line below",
+							"start": 373,
+							"end": 440
 						}
 					]
 				}

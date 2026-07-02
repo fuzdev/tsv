@@ -614,6 +614,18 @@ impl<'a> Printer<'a> {
         .map(|pos| pos as u32)
     }
 
+    /// Position of the comma separating two consecutive list items in
+    /// `[prev_end, next_start)`, ignoring commas inside comments. The shared anchor
+    /// for splitting a gap's comments into before-comma (trailing the previous item)
+    /// and after-comma (leading the next / stranded). Falls back to `next_start` when
+    /// none is found — a defensive case (list items always have a real separator);
+    /// the fallback keeps the split lossless: the whole gap then reads as before-comma
+    /// (trailing the previous item), so no comment is dropped.
+    pub(crate) fn comma_between(&self, prev_end: u32, next_start: u32) -> u32 {
+        self.find_char_outside_comments(prev_end, next_start, b',')
+            .unwrap_or(next_start)
+    }
+
     /// Check if there are line comments (// style) between two positions
     ///
     /// Uses binary search: O(log n + k) where k is comments in range

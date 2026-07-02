@@ -167,7 +167,9 @@ impl<'a> Printer<'a> {
     /// (`= 0 /* c */`); the comma is placed before the first line comment; then
     /// each remaining comment either trails the comma on the same output line (a
     /// line comment via `line_suffix`, a same-line block inline) or drops onto its
-    /// own line after a `hardline`. `continuation` is emitted right after each
+    /// own line after a `hardline`. The first line comment trails iff it was
+    /// authored on the comma's line (`comma_pos` → no intervening newline); an
+    /// own-line one drops below. `continuation` is emitted right after each
     /// own-line `hardline`: the variable-declaration site passes `INDENT` text
     /// (its declarators aren't wrapped in `d.indent()`), the for-init site passes
     /// an empty doc (its run is). Does NOT emit the trailing break to the next
@@ -177,6 +179,7 @@ impl<'a> Printer<'a> {
         &self,
         parts: &mut DocBuf,
         comments: &[&Comment],
+        comma_pos: u32,
         continuation: DocId,
     ) {
         let d = self.d();
@@ -186,10 +189,12 @@ impl<'a> Printer<'a> {
             parts.push(self.build_comment_doc(comment));
         }
         parts.push(d.text(","));
-        // `needs_hardline` starts true when block comments precede the comma (it
-        // then sits between them and the first line comment, so the next comment
-        // drops to its own line).
-        let mut needs_hardline = first_line_idx > 0;
+        // The first line comment trails the comma when authored on the comma's
+        // line (no newline between); an own-line one drops below. After a line
+        // comment every following comment is on its own line (set in the loop).
+        let mut needs_hardline = comments
+            .get(first_line_idx)
+            .is_some_and(|c| self.has_newline_between(comma_pos, c.span.start));
         for comment in &comments[first_line_idx..] {
             if needs_hardline {
                 parts.push(d.hardline());
@@ -199,6 +204,61 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_trailing_comment_doc(comment));
             }
             needs_hardline = !comment.is_block;
+        }
+    }
+
+    /// A block comment after the comma that sits on the comma's own line (no
+    /// newline between the comma and the comment) while a newline separates it
+    /// from the next item — a **stranded** comment. It trails the comma,
+    /// preserving the author's placement, rather than dropping to its own line;
+    /// prettier relocates it *before* the comma. Mirrors the call-argument
+    /// stranded rule (`calls/arg_comments.rs`). See conformance_prettier.md
+    /// §Comment relocation. (A block that instead *hugs* the next item — no
+    /// newline before it — leads that item and matches prettier, so it is not
+    /// stranded.)
+    pub(crate) fn is_stranded_after_comma_block(
+        &self,
+        comment: &Comment,
+        comma_pos: u32,
+        next_start: u32,
+    ) -> bool {
+        comment.is_block
+            && !self.has_newline_between(comma_pos, comment.span.start)
+            && !self.is_same_line(comment.span.end, next_start)
+    }
+
+    /// Emit the **before-comma** block comments in `[start, comma_pos)` trailing
+    /// the preceding item (` /* c */`), preserving the author's side of the comma.
+    /// The caller pushes the comma after this. Shared by the variable-declarator,
+    /// for-init, and heritage inter-item sites; the after-comma counterparts are
+    /// [`Self::push_stranded_after_comma_blocks`] (stranded, trails the comma) and
+    /// the site's leading run (a block hugging the next item leads it).
+    pub(crate) fn push_before_comma_blocks(&self, parts: &mut DocBuf, start: u32, comma_pos: u32) {
+        let d = self.d();
+        for comment in comments_in_range(self.comments, start, comma_pos) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+        }
+    }
+
+    /// Emit the **stranded** after-comma block comments in `[comma_pos, next_start)`
+    /// trailing the comma (` /* c */`), preserving the author's placement. The
+    /// caller pushes the comma before this and handles the remaining (non-stranded)
+    /// after-comma comments as leading comments on the next item. Shared by the
+    /// variable-declarator, for-init, and heritage inter-item sites; see
+    /// [`Self::is_stranded_after_comma_block`].
+    pub(crate) fn push_stranded_after_comma_blocks(
+        &self,
+        parts: &mut DocBuf,
+        comma_pos: u32,
+        next_start: u32,
+    ) {
+        let d = self.d();
+        for comment in comments_in_range(self.comments, comma_pos, next_start) {
+            if self.is_stranded_after_comma_block(comment, comma_pos, next_start) {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            }
         }
     }
 
