@@ -1,10 +1,11 @@
 # compound_comment_run_svelte_prettier_divergence
 
 A run of two or more **glued** comments between compound members
-(`.a/* c *//* d */.b`) is inter-token trivia per [CSS Syntax 3 §comments](https://www.w3.org/TR/css-syntax-3/#comment-diagram):
-with no whitespace anywhere, the comments are removed at tokenization and the
-class selectors are adjacent, so the selector is a **compound** (`.a.b`), not a
-descendant (`.a .b`). tsv keeps it a compound and emits the glued comment run
+(`.a/* c *//* d */.b`) is inter-token trivia — [Consume a token](https://www.w3.org/TR/css-syntax-3/#consume-token)
+begins by [consuming comments](https://www.w3.org/TR/css-syntax-3/#consume-comment),
+which "returns nothing": with no whitespace anywhere, the comments are removed at
+tokenization and the class selectors are adjacent, so the selector is a
+**compound** (`.a.b`), not a descendant (`.a .b`). tsv keeps it a compound and emits the glued comment run
 **verbatim** (never inserting a space between the two comments — that space would
 tokenize as whitespace and turn the compound into a descendant on re-parse).
 

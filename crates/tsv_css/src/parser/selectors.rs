@@ -17,7 +17,8 @@ use tsv_lang::{ParseError, Span};
 /// For selectors that CAN start with combinators, use `parse_relative_selector_list()` instead.
 /// See: CSS Selectors Level 4 - <<complex-selector-list>> vs <<relative-selector-list>>
 /// Register comment(s) sitting between a complex selector and its `,` separator
-/// (comments are inter-token whitespace per css-syntax-3) — but only when a comma
+/// (comments are inter-token trivia removed at tokenization — no token, not even
+/// whitespace — per css-syntax-3) — but only when a comma
 /// actually follows, so a trailing comment before `{` is left for `parse_rule` (it
 /// sits outside the list span and is inline-printed as a pre-brace comment). The
 /// lookahead is non-destructive.
@@ -418,7 +419,8 @@ pub(crate) fn parse_combinator(
     let whitespace_start = parser.span_pos(parser.current_start());
     parser.skip_whitespace()?;
 
-    // A comment in the combinator gap is inter-token whitespace (css-syntax-3): register
+    // A comment in the combinator gap is inter-token trivia — no token, not even
+    // whitespace (css-syntax-3): register
     // it and continue only when the selector actually continues past it (a selector or
     // explicit combinator follows). A trailing comment before `{`/`,`/`)` is left
     // unconsumed for the caller's pre-brace / pseudo-arg handling. `had_gap_comment`
