@@ -7,30 +7,29 @@ use super::{
     convert_type_parameter_declaration, convert_type_parameter_instantiation, create_location,
 };
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::LocationMapper;
 
 pub(in crate::ast) fn convert_arrow_function_expression<'src>(
     arrow: &internal::ArrowFunctionExpression<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-    offset: usize,
 ) -> public::ArrowFunctionExpression<'src> {
     let body = match &arrow.body {
         internal::ArrowFunctionBody::Expression(expr) => public::ArrowFunctionBody::Expression(
-            Box::new(convert_expression(expr, source, loc, interner, offset)),
+            Box::new(convert_expression(expr, source, loc, interner)),
         ),
         internal::ArrowFunctionBody::BlockStatement(block) => {
             public::ArrowFunctionBody::BlockStatement(convert_block_statement(
-                block, source, loc, interner, offset,
+                block, source, loc, interner,
             ))
         }
     };
     public::ArrowFunctionExpression {
         node_type: "ArrowFunctionExpression",
-        start: arrow.span.start,
-        end: arrow.span.end,
-        loc: create_location(arrow.span, loc, offset),
+        start: loc.pos(arrow.span.start),
+        end: loc.pos(arrow.span.end),
+        loc: create_location(arrow.span, loc),
         id: None,
         expression: arrow.body.is_expression(),
         generator: false,
@@ -38,37 +37,36 @@ pub(in crate::ast) fn convert_arrow_function_expression<'src>(
         params: arrow
             .params
             .iter()
-            .map(|p| convert_expression(p, source, loc, interner, offset))
+            .map(|p| convert_expression(p, source, loc, interner))
             .collect(),
         body,
         type_parameters: arrow
             .type_parameters
             .as_ref()
-            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
+            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner)),
         return_type: arrow
             .return_type
             .as_ref()
-            .map(|rt| convert_type_annotation(rt, source, loc, interner, offset)),
+            .map(|rt| convert_type_annotation(rt, source, loc, interner)),
     }
 }
 
 pub(in crate::ast) fn convert_function_expression<'src>(
     func: &internal::FunctionExpression<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-    offset: usize,
 ) -> public::FunctionExpression<'src> {
     public::FunctionExpression {
         node_type: "FunctionExpression",
-        start: func.span.start,
-        end: func.span.end,
-        loc: create_location(func.span, loc, offset),
+        start: loc.pos(func.span.start),
+        end: loc.pos(func.span.end),
+        loc: create_location(func.span, loc),
         id: func.id.as_ref().map(|id| public::Identifier {
             node_type: "Identifier",
-            start: id.span.start,
-            end: id.span.end,
-            loc: create_location(id.span, loc, offset),
+            start: loc.pos(id.span.start),
+            end: loc.pos(id.span.end),
+            loc: create_location(id.span, loc),
             name: public::name_cow(id.span, source, id.name, interner),
             optional: id.optional,
             type_annotation: None,
@@ -80,47 +78,40 @@ pub(in crate::ast) fn convert_function_expression<'src>(
         type_parameters: func
             .type_parameters
             .as_ref()
-            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner, offset)),
+            .map(|tp| convert_type_parameter_declaration(tp, source, loc, interner)),
         params: func
             .params
             .iter()
-            .map(|p| convert_expression(p, source, loc, interner, offset))
+            .map(|p| convert_expression(p, source, loc, interner))
             .collect(),
         return_type: func
             .return_type
             .as_ref()
-            .map(|rt| convert_type_annotation(rt, source, loc, interner, offset)),
-        body: convert_block_statement(&func.body, source, loc, interner, offset),
+            .map(|rt| convert_type_annotation(rt, source, loc, interner)),
+        body: convert_block_statement(&func.body, source, loc, interner),
     }
 }
 
 pub(in crate::ast) fn convert_new_expression<'src>(
     new_expr: &internal::NewExpression<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-    offset: usize,
 ) -> public::NewExpression<'src> {
     public::NewExpression {
         node_type: "NewExpression",
-        start: new_expr.span.start,
-        end: new_expr.span.end,
-        loc: create_location(new_expr.span, loc, offset),
-        callee: Box::new(convert_expression(
-            new_expr.callee,
-            source,
-            loc,
-            interner,
-            offset,
-        )),
+        start: loc.pos(new_expr.span.start),
+        end: loc.pos(new_expr.span.end),
+        loc: create_location(new_expr.span, loc),
+        callee: Box::new(convert_expression(new_expr.callee, source, loc, interner)),
         type_arguments: new_expr
             .type_arguments
             .as_ref()
-            .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
+            .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner)),
         arguments: new_expr
             .arguments
             .iter()
-            .map(|arg| convert_expression(arg, source, loc, interner, offset))
+            .map(|arg| convert_expression(arg, source, loc, interner))
             .collect(),
     }
 }
@@ -131,12 +122,11 @@ pub(in crate::ast) fn convert_new_expression<'src>(
 pub(in crate::ast) fn convert_call_expression<'src>(
     call: &internal::CallExpression<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-    offset: usize,
     in_chain: bool,
 ) -> public::CallExpression<'src> {
-    let mut callee = convert_expression_inner(call.callee, source, loc, interner, offset, in_chain);
+    let mut callee = convert_expression_inner(call.callee, source, loc, interner, in_chain);
     // acorn-typescript's `?.<T>(...)` path marks the callee node itself optional
     // (its parseSubscript sets `base.optional = true` before parsing the type args)
     if call.optional && call.type_arguments.is_some() {
@@ -155,18 +145,18 @@ pub(in crate::ast) fn convert_call_expression<'src>(
         || (call.span.start >= call.callee.span().start && call.callee.has_optional_in_chain());
     public::CallExpression {
         node_type: "CallExpression",
-        start: call.span.start,
-        end: call.span.end,
-        loc: create_location(call.span, loc, offset),
+        start: loc.pos(call.span.start),
+        end: loc.pos(call.span.end),
+        loc: create_location(call.span, loc),
         callee: Box::new(callee),
         type_arguments: call
             .type_arguments
             .as_ref()
-            .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner, offset)),
+            .map(|ta| convert_type_parameter_instantiation(ta, source, loc, interner)),
         arguments: call
             .arguments
             .iter()
-            .map(|arg| convert_expression(arg, source, loc, interner, offset))
+            .map(|arg| convert_expression(arg, source, loc, interner))
             .collect(),
         optional: if call.type_arguments.is_some() && !in_optional_chain {
             None
@@ -182,31 +172,23 @@ pub(in crate::ast) fn convert_call_expression<'src>(
 pub(in crate::ast) fn convert_member_expression<'src>(
     member: &internal::MemberExpression<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-    offset: usize,
     in_chain: bool,
 ) -> public::MemberExpression<'src> {
     public::MemberExpression {
         node_type: "MemberExpression",
-        start: member.span.start,
-        end: member.span.end,
-        loc: create_location(member.span, loc, offset),
+        start: loc.pos(member.span.start),
+        end: loc.pos(member.span.end),
+        loc: create_location(member.span, loc),
         object: Box::new(convert_expression_inner(
             member.object,
             source,
             loc,
             interner,
-            offset,
             in_chain,
         )),
-        property: Box::new(convert_expression(
-            member.property,
-            source,
-            loc,
-            interner,
-            offset,
-        )),
+        property: Box::new(convert_expression(member.property, source, loc, interner)),
         computed: member.computed,
         optional: Some(member.optional),
     }
@@ -215,51 +197,36 @@ pub(in crate::ast) fn convert_member_expression<'src>(
 pub(in crate::ast) fn convert_conditional_expression<'src>(
     cond: &internal::ConditionalExpression<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-    offset: usize,
 ) -> public::ConditionalExpression<'src> {
     public::ConditionalExpression {
         node_type: "ConditionalExpression",
-        start: cond.span.start,
-        end: cond.span.end,
-        loc: create_location(cond.span, loc, offset),
-        test: Box::new(convert_expression(cond.test, source, loc, interner, offset)),
-        consequent: Box::new(convert_expression(
-            cond.consequent,
-            source,
-            loc,
-            interner,
-            offset,
-        )),
-        alternate: Box::new(convert_expression(
-            cond.alternate,
-            source,
-            loc,
-            interner,
-            offset,
-        )),
+        start: loc.pos(cond.span.start),
+        end: loc.pos(cond.span.end),
+        loc: create_location(cond.span, loc),
+        test: Box::new(convert_expression(cond.test, source, loc, interner)),
+        consequent: Box::new(convert_expression(cond.consequent, source, loc, interner)),
+        alternate: Box::new(convert_expression(cond.alternate, source, loc, interner)),
     }
 }
 
 pub(in crate::ast) fn convert_await_expression<'src>(
     await_expr: &internal::AwaitExpression<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-    offset: usize,
 ) -> public::AwaitExpression<'src> {
     public::AwaitExpression {
         node_type: "AwaitExpression",
-        start: await_expr.span.start,
-        end: await_expr.span.end,
-        loc: create_location(await_expr.span, loc, offset),
+        start: loc.pos(await_expr.span.start),
+        end: loc.pos(await_expr.span.end),
+        loc: create_location(await_expr.span, loc),
         argument: Box::new(convert_expression(
             await_expr.argument,
             source,
             loc,
             interner,
-            offset,
         )),
     }
 }
@@ -267,19 +234,18 @@ pub(in crate::ast) fn convert_await_expression<'src>(
 pub(in crate::ast) fn convert_yield_expression<'src>(
     yield_expr: &internal::YieldExpression<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-    offset: usize,
 ) -> public::YieldExpression<'src> {
     public::YieldExpression {
         node_type: "YieldExpression",
-        start: yield_expr.span.start,
-        end: yield_expr.span.end,
-        loc: create_location(yield_expr.span, loc, offset),
+        start: loc.pos(yield_expr.span.start),
+        end: loc.pos(yield_expr.span.end),
+        loc: create_location(yield_expr.span, loc),
         argument: yield_expr
             .argument
             .as_ref()
-            .map(|arg| Box::new(convert_expression(arg, source, loc, interner, offset))),
+            .map(|arg| Box::new(convert_expression(arg, source, loc, interner))),
         delegate: yield_expr.delegate,
     }
 }

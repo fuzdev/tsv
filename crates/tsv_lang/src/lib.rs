@@ -2,7 +2,8 @@
 //!
 //! This crate provides core types shared across all language implementations:
 //! - `Span` - source code location tracking
-//! - `LocationTracker` - line/column information
+//! - `LocationTracker` / `ByteToCharMap` / `LocationMapper` - line/column
+//!   information and byte→UTF-16 position mapping
 //! - `ParseError` - error types and result aliases
 //! - `OutputBuffer` - shared printer output utilities
 //! - `config` - hardcoded formatter settings (`PRINT_WIDTH` / `TAB_WIDTH` / `INDENT`)
@@ -35,7 +36,7 @@ pub use comment::{
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
-pub use location::{ByteToCharMap, LocationTracker, Position, SourceLocation};
+pub use location::{ByteToCharMap, LocationMapper, LocationTracker, Position, SourceLocation};
 pub use output::{OutputBuffer, write_indent};
 pub use sizing::{
     estimated_ast_arena_capacity, estimated_interner_capacity, estimated_json_capacity,

@@ -9,9 +9,11 @@
 //! The sub-step decomposition differs per language because the
 //! `convert_ast_json` implementations differ:
 //!
-//! - **typescript**: convert (typed public AST) → to_value → translate →
-//!   to_string. The shipped path instead runs convert → typed translate
-//!   (multibyte only) → direct to_string — both pipelines are timed.
+//! - **typescript**: convert (typed public AST, byte-space) → to_value →
+//!   translate → to_string. The shipped path instead runs a single *fused*
+//!   conversion (tracker + map build + char-space emission via
+//!   `LocationMapper` — no separate translation walk) → direct to_string —
+//!   both pipelines are timed.
 //! - **svelte**: convert → to_value → attach (template expression comments,
 //!   mutates the `Value`) → translate → to_string for the `Value` path; the
 //!   shipped path runs convert → typed attach (island-scoped, converts only
@@ -50,7 +52,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use tsv_cli::cli::input::ParserType;
-use tsv_lang::{ByteToCharMap, LocationTracker, estimated_ast_arena_capacity};
+use tsv_lang::{ByteToCharMap, LocationMapper, LocationTracker, estimated_ast_arena_capacity};
 
 use super::profile::{format_duration, format_size, lang_label, median_us, resolve_profile_files};
 use crate::cli::CliError;
@@ -133,6 +135,7 @@ struct FileResult {
     to_string_us: f64,
     typed_attach_us: f64,
     typed_translate_us: f64,
+    fused_convert_us: f64,
     direct_us: f64,
     value_us: f64,
     shipped_us: f64,
@@ -164,6 +167,7 @@ struct StepDurations {
     to_string: Vec<Duration>,
     typed_attach: Vec<Duration>,
     typed_translate: Vec<Duration>,
+    fused_convert: Vec<Duration>,
     direct: Vec<Duration>,
     value: Vec<Duration>,
     shipped: Vec<Duration>,
@@ -211,6 +215,7 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
         to_string_us: median(steps.to_string),
         typed_attach_us: median(steps.typed_attach),
         typed_translate_us: median(steps.typed_translate),
+        fused_convert_us: median(steps.fused_convert),
         direct_us: median(steps.direct),
         value_us: median(steps.value),
         shipped_us: median(steps.shipped),
@@ -219,11 +224,12 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
     })
 }
 
-/// One TS iteration. Sub-steps mirror `tsv_ts::convert_ast_json` plus the FFI
-/// `to_string` boundary; `typed_translate` + `direct` mirror the shipped
-/// typed pipeline (`convert_ast_json_string`). The typed walk mutates the
-/// public tree in place, so it runs only after `to_value` has captured the
-/// untranslated tree.
+/// One TS iteration. Sub-steps mirror `tsv_ts::convert_ast_json` (byte-space
+/// convert → to_value → `Value` translate → to_string) plus the FFI
+/// `to_string` boundary; `fused_convert` + `direct` mirror the shipped
+/// pipeline (`convert_ast_json_string`), whose conversion emits final
+/// char-space positions through `LocationMapper` — no separate translation
+/// walk exists on that path.
 #[allow(clippy::expect_used)] // mirrors convert_ast_json's own expect on Serialize
 fn profile_ts_once(
     source: &str,
@@ -236,12 +242,15 @@ fn profile_ts_once(
     let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
     steps.parse.push(t.elapsed());
 
+    // `new_ecmascript` mirrors the shipped TS entry points (acorn's
+    // LineTerminator set); an LF-only tracker here would make `shipped_match`
+    // false-flag files containing bare CR / U+2028 / U+2029.
     let t = Instant::now();
-    let tracker = LocationTracker::new(source);
-    let mut public_ast = tsv_ts::ast::convert::convert_program(
+    let tracker = LocationTracker::new_ecmascript(source);
+    let public_ast = tsv_ts::ast::convert::convert_program(
         &ast,
         source,
-        &tracker,
+        LocationMapper::identity(&tracker),
         tsv_ts::ast::convert::Schema::Acorn,
     );
     steps.convert.push(t.elapsed());
@@ -260,22 +269,24 @@ fn profile_ts_once(
     let wire = serde_json::to_string(&value).expect("Value serialization cannot fail");
     steps.to_string.push(t.elapsed());
 
-    // The map build is inside the timed region: the shipped
-    // `convert_ast_json_string` constructs its own map per call, and the
-    // `Value` translate sub-step above times its map build too — excluding
-    // it here would bias the walk-vs-walk comparison in the typed walk's
-    // favor.
+    // Shipped mirror: the fused tracker+map single-scan build + fused
+    // conversion in one timed region — exactly the per-call work
+    // `convert_ast_json_string` does before serializing.
     let t = Instant::now();
-    let typed_map = ByteToCharMap::new(source);
-    tsv_ts::ast::convert::translate_byte_to_char_offsets_typed(
-        &mut public_ast,
-        &typed_map,
-        &tracker,
+    let (fused_tracker, fused_map) = LocationTracker::new_ecmascript_with_map(source);
+    let fused_ast = tsv_ts::ast::convert::convert_program(
+        &ast,
+        source,
+        LocationMapper {
+            tracker: &fused_tracker,
+            map: &fused_map,
+        },
+        tsv_ts::ast::convert::Schema::Acorn,
     );
-    steps.typed_translate.push(t.elapsed());
+    steps.fused_convert.push(t.elapsed());
 
     let t = Instant::now();
-    let direct = serde_json::to_string(&public_ast).expect("AST types derive Serialize correctly");
+    let direct = serde_json::to_string(&fused_ast).expect("AST types derive Serialize correctly");
     steps.direct.push(t.elapsed());
 
     let first = meta.is_none();
@@ -292,7 +303,7 @@ fn profile_ts_once(
         steps,
         meta,
         first,
-        (public_ast, value, direct),
+        (public_ast, fused_ast, value, direct),
         wire,
         || {
             serde_json::to_string(&tsv_ts::convert_ast_json(&ast, source))
@@ -539,6 +550,7 @@ struct LangAggregate {
     to_string_us: f64,
     typed_attach_us: f64,
     typed_translate_us: f64,
+    fused_convert_us: f64,
     direct_us: f64,
     value_us: f64,
     shipped_us: f64,
@@ -556,11 +568,23 @@ impl LangAggregate {
         self.attach_us > 0.0
     }
 
-    /// The shipped typed pipeline as a sub-step sum (drops excluded) —
+    /// Does this language's shipped path fuse translation into conversion
+    /// (TS)? Svelte and CSS still run a typed translation walk over the
+    /// byte-space conversion.
+    fn has_fused_convert(&self) -> bool {
+        self.fused_convert_us > 0.0
+    }
+
+    /// The shipped typed pipeline as a sub-step sum (drops excluded). Fused
+    /// (TS): one char-space conversion + direct to_string. Otherwise:
     /// convert + typed attach (svelte only, 0 elsewhere) + typed translate +
     /// direct to_string.
     fn typed_pipeline_us(&self) -> f64 {
-        self.convert_us + self.typed_attach_us + self.typed_translate_us + self.direct_us
+        if self.has_fused_convert() {
+            self.fused_convert_us + self.direct_us
+        } else {
+            self.convert_us + self.typed_attach_us + self.typed_translate_us + self.direct_us
+        }
     }
 }
 
@@ -589,6 +613,7 @@ fn aggregate(results: &[FileResult]) -> Vec<(ParserType, LangAggregate)> {
         agg.to_string_us += r.to_string_us;
         agg.typed_attach_us += r.typed_attach_us;
         agg.typed_translate_us += r.typed_translate_us;
+        agg.fused_convert_us += r.fused_convert_us;
         agg.direct_us += r.direct_us;
         agg.value_us += r.value_us;
         agg.shipped_us += r.shipped_us;
@@ -659,17 +684,26 @@ fn print_report(
                 format_duration(a.typed_attach_us)
             );
         }
+        if a.has_fused_convert() {
+            eprintln!(
+                "  fused convert    {:>10}  (tracker + map build + char-space conversion; no translate walk)",
+                format_duration(a.fused_convert_us)
+            );
+        } else {
+            eprintln!(
+                "  typed translate  {:>10}  (map build + typed walk; walk is multibyte-only)",
+                format_duration(a.typed_translate_us)
+            );
+        }
         eprintln!(
-            "  typed translate  {:>10}  (map build + typed walk; walk is multibyte-only)",
-            format_duration(a.typed_translate_us)
-        );
-        eprintln!(
-            "  typed pipeline   {:>10}  = convert{} + typed translate + direct → {:.2}x of materialization",
+            "  typed pipeline   {:>10}  = {} + direct → {:.2}x of materialization",
             format_duration(a.typed_pipeline_us()),
-            if a.has_attach_pass() {
-                " + typed attach"
+            if a.has_fused_convert() {
+                "fused convert"
+            } else if a.has_attach_pass() {
+                "convert + typed attach + typed translate"
             } else {
-                ""
+                "convert + typed translate"
             },
             if a.materialize_us > 0.0 {
                 a.typed_pipeline_us() / a.materialize_us
@@ -740,6 +774,7 @@ fn print_json(
                 "to_string_us": a.to_string_us,
                 "typed_attach_us": a.typed_attach_us,
                 "typed_translate_us": a.typed_translate_us,
+                "fused_convert_us": a.fused_convert_us,
                 "direct_us": a.direct_us,
                 "value_us": a.value_us,
                 "shipped_us": a.shipped_us,
@@ -771,6 +806,7 @@ fn print_json(
                 "to_string_us": r.to_string_us,
                 "typed_attach_us": r.typed_attach_us,
                 "typed_translate_us": r.typed_translate_us,
+                "fused_convert_us": r.fused_convert_us,
                 "direct_us": r.direct_us,
                 "value_us": r.value_us,
                 "shipped_us": r.shipped_us,

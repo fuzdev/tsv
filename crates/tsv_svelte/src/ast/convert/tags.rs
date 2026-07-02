@@ -9,7 +9,7 @@
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{LocationMapper, LocationTracker};
 use tsv_ts::ast::convert::convert_expression;
 
 use super::convert_pattern_expression;
@@ -20,7 +20,12 @@ pub(super) fn convert_html_tag<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::HtmlTag<'src> {
-    let expression = convert_expression(&tag.expression, source, loc, interner, 0);
+    let expression = convert_expression(
+        &tag.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
 
     public::HtmlTag {
         node_type: "HtmlTag",
@@ -37,7 +42,7 @@ pub(super) fn convert_const_tag(
     interner: &DefaultStringInterner,
 ) -> public::ConstTag {
     let id_value = convert_pattern_expression(&tag.id, source, loc, interner);
-    let init = convert_expression(&tag.init, source, loc, interner, 0);
+    let init = convert_expression(&tag.init, source, LocationMapper::identity(loc), interner);
 
     let declarator_start = tag.id.span().start;
     let declarator_end = tag.init.span().end;
@@ -78,9 +83,8 @@ pub(super) fn convert_declaration_tag(
     let declaration = super::to_json_value(&tsv_ts::ast::convert::convert_variable_declaration(
         &tag.declaration,
         source,
-        loc,
+        LocationMapper::identity(loc),
         interner,
-        0,
     ));
 
     public::DeclarationTag {
@@ -100,7 +104,7 @@ pub(super) fn convert_debug_tag<'src>(
     let identifiers = tag
         .identifiers
         .iter()
-        .map(|id| convert_expression(id, source, loc, interner, 0).into())
+        .map(|id| convert_expression(id, source, LocationMapper::identity(loc), interner).into())
         .collect();
 
     public::DebugTag {
@@ -117,7 +121,12 @@ pub(super) fn convert_render_tag<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::RenderTag<'src> {
-    let expression = convert_expression(&tag.expression, source, loc, interner, 0);
+    let expression = convert_expression(
+        &tag.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
 
     public::RenderTag {
         node_type: "RenderTag",
