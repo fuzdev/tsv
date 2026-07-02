@@ -17,8 +17,10 @@ use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolve
 /// sub-render fully on the stack (no heap allocation), mirroring the fits path's
 /// `SmallVec<[(DocId, Mode); 16]>`. `N = 8` is the measured knee of the
 /// per-call high-water distribution (≈89% of CSS top-level renders and ≈99.7%
-/// of the high-frequency `render_single_doc_inner` calls stay inline); its
-/// 128-byte inline footprint matches the fits stack and the `DocBuf` convention.
+/// of the high-frequency `render_single_doc_inner` calls stay inline — measured
+/// before the tail-continuation rewrite, which only lowered stack transit, so
+/// the knee holds a fortiori); its 128-byte inline footprint matches the fits
+/// stack and the `DocBuf` convention.
 type CmdStack = SmallVec<[ArenaCommand; 8]>;
 
 /// Inline-backed pending `line_suffix` buffer. Line suffixes are sparse — the
@@ -68,7 +70,14 @@ fn trim_last_line(mut s: String) -> String {
 ///
 /// Uses cached width when available to skip `visual_width()` for the common
 /// no-newline case. Still needs `resolve_text()` to get the actual string for output.
-#[inline]
+///
+/// `inline(always)`: plain `#[inline]` left this outlined (a measured ~4%
+/// standalone symbol paying call overhead once per `Text` node — the most
+/// common node kind), and there are only two call sites, one per render loop.
+/// Forcing it measured instructions −0.8% on both corpora with cycles and
+/// branch-misses down alongside — a real win, not an icache artifact.
+#[allow(clippy::inline_always)]
+#[inline(always)]
 fn render_text<R: TextResolver + ?Sized>(
     text: &super::types::DocText,
     output: &mut String,
@@ -408,11 +417,22 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     embed: &EmbedContext,
     resolver: Option<&R>,
 ) {
-    let mut commands: CmdStack = smallvec::smallvec![ArenaCommand {
+    // Tail-continuation dispatch: `cmd` is the command being processed; arms
+    // that forward to exactly one child (Indent, Group, Concat's first child,
+    // …) assign `cmd` and `continue` instead of pushing it — the pushed-last
+    // command would be popped right back on the next iteration (LIFO), so this
+    // skips that stack round trip (SmallVec spill checks both ways plus the
+    // reload feeding the dispatch load chain). Traversal order is identical,
+    // and `commands` holds the same pending set at every fits/fill lookahead
+    // (those run before the continuation would have been pushed). Only
+    // terminal arms (Text, Line, Fill, …) fall through to the pop at the
+    // bottom of the loop.
+    let mut commands: CmdStack = SmallVec::new();
+    let mut cmd = ArenaCommand {
         indent: start_indent_level,
         mode: Mode::Break,
         doc,
-    }];
+    };
 
     let mut line_suffix: LineSuffixBuf = SmallVec::new();
     let mut group_mode_map = GroupModeMap::default();
@@ -432,7 +452,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
     #[cfg(feature = "swallow_check")]
     let mut swallow = crate::doc::swallow::SwallowTracker::new();
 
-    while let Some(cmd) = commands.pop() {
+    loop {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
                 #[cfg(feature = "swallow_check")]
@@ -515,18 +535,21 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 
             DocNode::Indent(inner) => {
                 let inner = *inner;
-                commands.push(cmd.indented(inner));
+                cmd = cmd.indented(inner);
+                continue;
             }
 
             DocNode::Dedent(inner) => {
                 let inner = *inner;
-                commands.push(cmd.dedented(inner));
+                cmd = cmd.dedented(inner);
+                continue;
             }
 
             DocNode::Align { n, contents } => {
                 let n = *n;
                 let contents = *contents;
-                commands.push(cmd.with_indent(n, contents));
+                cmd = cmd.with_indent(n, contents);
+                continue;
             }
 
             DocNode::Group {
@@ -540,7 +563,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let id = *id;
                 let should_break = *should_break;
 
-                if !expanded_states.is_empty() {
+                let (chosen_mode, chosen_doc) = if !expanded_states.is_empty() {
                     // conditionalGroup: try each state until one fits.
                     // Prettier: only use most expanded when group's OWN should_break is true.
                     // Parent mode being Break does NOT skip the fits check — conditional
@@ -548,12 +571,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     if should_break {
                         // Prettier: if (doc.break) → use most expanded in break mode
                         let states = expanded_states.resolve(children_vec);
-                        let most_expanded = states.last().copied().unwrap_or(contents);
-                        let chosen_mode = Mode::Break;
-                        commands.push(cmd.with_mode(chosen_mode, most_expanded));
-                        if let Some(group_id) = id {
-                            group_mode_map.insert(group_id, chosen_mode);
-                        }
+                        (Mode::Break, states.last().copied().unwrap_or(contents))
                     } else {
                         // Fits check regardless of parent mode — matches Prettier
                         let effective_width = render
@@ -571,25 +589,19 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                             resolver,
                         );
 
-                        let mut chosen_mode: Mode = Mode::Break;
-
                         if contents_fit {
-                            chosen_mode = Mode::Flat;
-                            commands.push(cmd.with_mode(chosen_mode, contents));
+                            (Mode::Flat, contents)
                         } else {
+                            // Try each earlier state flat, in order; the final
+                            // state is the Break fallback (`states` is non-empty
+                            // — the `!expanded_states.is_empty()` guard above).
                             let states = expanded_states.resolve(children_vec);
-
-                            let mut found = false;
-                            for i in 0..states.len() {
-                                if i == states.len() - 1 {
-                                    chosen_mode = Mode::Break;
-                                    commands.push(cmd.with_mode(Mode::Break, states[i]));
-                                    found = true;
-                                    break;
-                                }
+                            let last = states.len() - 1;
+                            let mut chosen = (Mode::Break, states[last]);
+                            for &state in &states[..last] {
                                 let state_fits = arena_fits_with_lookahead(
                                     arena,
-                                    states[i],
+                                    state,
                                     Mode::Flat,
                                     &commands,
                                     remaining_width,
@@ -597,32 +609,15 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                                     resolver,
                                 );
                                 if state_fits {
-                                    chosen_mode = Mode::Flat;
-                                    commands.push(cmd.with_mode(Mode::Flat, states[i]));
-                                    found = true;
+                                    chosen = (Mode::Flat, state);
                                     break;
                                 }
                             }
-
-                            if !found {
-                                chosen_mode = Mode::Break;
-                                commands.push(cmd.with_mode(
-                                    Mode::Break,
-                                    states.last().copied().unwrap_or(contents),
-                                ));
-                            }
+                            chosen
                         }
-
-                        if let Some(group_id) = id {
-                            group_mode_map.insert(group_id, chosen_mode);
-                        }
-                    } // close else (fits check branch)
-                } else if should_break || arena.will_break(contents) {
-                    let chosen_mode = Mode::Break;
-                    commands.push(cmd.with_mode(chosen_mode, contents));
-                    if let Some(group_id) = id {
-                        group_mode_map.insert(group_id, chosen_mode);
                     }
+                } else if should_break || arena.will_break(contents) {
+                    (Mode::Break, contents)
                 } else {
                     let effective_width = render
                         .print_width
@@ -637,12 +632,14 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                         embed,
                         resolver,
                     );
-                    let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
-                    commands.push(cmd.with_mode(chosen_mode, contents));
-                    if let Some(group_id) = id {
-                        group_mode_map.insert(group_id, chosen_mode);
-                    }
+                    (if fits { Mode::Flat } else { Mode::Break }, contents)
+                };
+
+                if let Some(group_id) = id {
+                    group_mode_map.insert(group_id, chosen_mode);
                 }
+                cmd = cmd.with_mode(chosen_mode, chosen_doc);
+                continue;
             }
 
             DocNode::IsolatedGroup { contents } => {
@@ -662,7 +659,8 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     resolver,
                 );
                 let chosen_mode = if fits { Mode::Flat } else { Mode::Break };
-                commands.push(cmd.with_mode(chosen_mode, contents));
+                cmd = cmd.with_mode(chosen_mode, contents);
+                continue;
             }
 
             DocNode::IfBreak {
@@ -675,7 +673,8 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                     None => cmd.mode == Mode::Break,
                 };
                 let chosen = if broke { *break_doc } else { *flat_doc };
-                commands.push(cmd.with_doc(chosen));
+                cmd = cmd.with_doc(chosen);
+                continue;
             }
 
             DocNode::IndentIfBreak {
@@ -686,19 +685,24 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
                 let contents = *contents;
                 let group_id = *group_id;
                 let negate = *negate;
-                commands.push(process_indent_if_break(
+                cmd = process_indent_if_break(
                     contents,
                     group_id,
                     negate,
                     Some(&group_mode_map),
                     &cmd,
-                ));
+                );
+                continue;
             }
 
             DocNode::Concat(range) => {
                 let kids = range.resolve(children_vec);
-                for &child in kids.iter().rev() {
-                    commands.push(cmd.with_doc(child));
+                if let Some((&first, rest)) = kids.split_first() {
+                    for &child in rest.iter().rev() {
+                        commands.push(cmd.with_doc(child));
+                    }
+                    cmd = cmd.with_doc(first);
+                    continue;
                 }
             }
 
@@ -720,16 +724,17 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
 
             DocNode::WithContext { doc, context } => {
                 let inner_doc = *doc;
-                let context = context.clone();
 
                 if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
+                    let context = context.clone();
                     let parts = fill_range.resolve(children_vec);
                     render_fill_iterative(
                         arena, parts, output, pos, cmd.indent, render, embed, &context, &commands,
                         resolver,
                     );
                 } else {
-                    commands.push(cmd.with_doc(inner_doc));
+                    cmd = cmd.with_doc(inner_doc);
+                    continue;
                 }
             }
 
@@ -753,6 +758,12 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
             DocNode::BreakParent => {
                 // No-op during rendering
             }
+        }
+
+        // Terminal arm: take the next pending command off the stack.
+        match commands.pop() {
+            Some(next) => cmd = next,
+            None => break,
         }
     }
 
@@ -818,11 +829,15 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     resolver: Option<&R>,
     suffix_buffer: Option<&mut LineSuffixBuf>,
 ) {
-    let mut commands: CmdStack = smallvec::smallvec![ArenaCommand {
+    // Tail-continuation dispatch — same shape as `render_doc_iterative` (see
+    // the comment there): single-continuation arms assign `cmd` and `continue`;
+    // terminal arms fall through to the pop at the bottom of the loop.
+    let mut commands: CmdStack = SmallVec::new();
+    let mut cmd = ArenaCommand {
         indent: indent_level,
         mode,
         doc,
-    }];
+    };
 
     let tracking_suffix = suffix_buffer.is_some();
     let mut dummy_suffix: LineSuffixBuf = SmallVec::new();
@@ -836,7 +851,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     let nodes: &[DocNode] = &nodes_outer;
     let children_vec: &[DocId] = &children_outer;
 
-    while let Some(cmd) = commands.pop() {
+    loop {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
                 render_text(t, output, pos, resolver);
@@ -882,18 +897,21 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
             DocNode::Indent(inner) => {
                 let inner = *inner;
-                commands.push(cmd.indented(inner));
+                cmd = cmd.indented(inner);
+                continue;
             }
 
             DocNode::Dedent(inner) => {
                 let inner = *inner;
-                commands.push(cmd.dedented(inner));
+                cmd = cmd.dedented(inner);
+                continue;
             }
 
             DocNode::Align { n, contents } => {
                 let n = *n;
                 let contents = *contents;
-                commands.push(cmd.with_indent(n, contents));
+                cmd = cmd.with_indent(n, contents);
+                continue;
             }
 
             DocNode::Group {
@@ -907,7 +925,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 let should_break = *should_break;
 
                 if !tracking_suffix {
-                    commands.push(cmd.with_doc(contents));
+                    cmd = cmd.with_doc(contents);
                 } else if !expanded_states.is_empty() {
                     let effective_width = render
                         .print_width
@@ -923,17 +941,15 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                         embed,
                         resolver,
                     ) {
-                        commands.push(cmd.with_mode(Mode::Flat, contents));
+                        cmd = cmd.with_mode(Mode::Flat, contents);
                     } else {
+                        // Try each earlier state flat, in order; the final state
+                        // is the Break fallback (`states` is non-empty — the
+                        // `!expanded_states.is_empty()` guard above).
                         let states = expanded_states.resolve(children_vec);
-
-                        let mut found = false;
-                        for (i, &state) in states.iter().enumerate() {
-                            if i == states.len() - 1 {
-                                commands.push(cmd.with_mode(Mode::Break, state));
-                                found = true;
-                                break;
-                            }
+                        let last = states.len() - 1;
+                        let mut chosen = (Mode::Break, states[last]);
+                        for &state in &states[..last] {
                             if arena_fits_with_lookahead(
                                 arena,
                                 state,
@@ -943,18 +959,14 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                                 embed,
                                 resolver,
                             ) {
-                                commands.push(cmd.with_mode(Mode::Flat, state));
-                                found = true;
+                                chosen = (Mode::Flat, state);
                                 break;
                             }
                         }
-                        if !found {
-                            let fallback = states.last().copied().unwrap_or(contents);
-                            commands.push(cmd.with_mode(Mode::Break, fallback));
-                        }
+                        cmd = cmd.with_mode(chosen.0, chosen.1);
                     }
                 } else if should_break || arena.will_break(contents) {
-                    commands.push(cmd.with_mode(Mode::Break, contents));
+                    cmd = cmd.with_mode(Mode::Break, contents);
                 } else {
                     let effective_width = render
                         .print_width
@@ -973,15 +985,16 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     } else {
                         Mode::Break
                     };
-                    commands.push(cmd.with_mode(chosen_mode, contents));
+                    cmd = cmd.with_mode(chosen_mode, contents);
                 }
+                continue;
             }
 
             DocNode::IsolatedGroup { contents } => {
                 let contents = *contents;
 
                 if !tracking_suffix {
-                    commands.push(cmd.with_doc(contents));
+                    cmd = cmd.with_doc(contents);
                 } else {
                     let effective_width = render
                         .print_width
@@ -1000,8 +1013,9 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                     } else {
                         Mode::Break
                     };
-                    commands.push(cmd.with_mode(chosen_mode, contents));
+                    cmd = cmd.with_mode(chosen_mode, contents);
                 }
+                continue;
             }
 
             DocNode::IfBreak {
@@ -1014,7 +1028,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 // IndentIfBreak defaults below.
                 let broke = group_id.is_none() && cmd.mode == Mode::Break;
                 let chosen = if broke { *break_doc } else { *flat_doc };
-                commands.push(cmd.with_doc(chosen));
+                cmd = cmd.with_doc(chosen);
+                continue;
             }
 
             DocNode::IndentIfBreak {
@@ -1025,15 +1040,18 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 let contents = *contents;
                 let group_id = *group_id;
                 let negate = *negate;
-                commands.push(process_indent_if_break(
-                    contents, group_id, negate, None, &cmd,
-                ));
+                cmd = process_indent_if_break(contents, group_id, negate, None, &cmd);
+                continue;
             }
 
             DocNode::Concat(range) => {
                 let kids = range.resolve(children_vec);
-                for &child in kids.iter().rev() {
-                    commands.push(cmd.with_doc(child));
+                if let Some((&first, rest)) = kids.split_first() {
+                    for &child in rest.iter().rev() {
+                        commands.push(cmd.with_doc(child));
+                    }
+                    cmd = cmd.with_doc(first);
+                    continue;
                 }
             }
 
@@ -1060,10 +1078,10 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
 
             DocNode::WithContext { doc, context } => {
                 let inner_doc = *doc;
-                let context = context.clone();
 
                 if tracking_suffix {
                     if let DocNode::Fill(fill_range) = &nodes[inner_doc.index()] {
+                        let context = context.clone();
                         let parts = fill_range.resolve(children_vec);
                         render_fill_iterative(
                             arena,
@@ -1078,10 +1096,12 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                             resolver,
                         );
                     } else {
-                        commands.push(cmd.with_doc(inner_doc));
+                        cmd = cmd.with_doc(inner_doc);
+                        continue;
                     }
                 } else {
-                    commands.push(cmd.with_doc(inner_doc));
+                    cmd = cmd.with_doc(inner_doc);
+                    continue;
                 }
             }
 
@@ -1090,7 +1110,8 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
                 if tracking_suffix {
                     line_suffix.push(cmd.with_doc(inner));
                 } else {
-                    commands.push(cmd.with_doc(inner));
+                    cmd = cmd.with_doc(inner);
+                    continue;
                 }
             }
 
@@ -1101,6 +1122,12 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
             }
 
             DocNode::BreakParent => {}
+        }
+
+        // Terminal arm: take the next pending command off the stack.
+        match commands.pop() {
+            Some(next) => cmd = next,
+            None => break,
         }
     }
 }
