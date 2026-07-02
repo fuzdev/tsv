@@ -1,13 +1,14 @@
 # dir_lang_comment_prettier_divergence
 
-Comments inside a `:dir()` / `:lang()` identifier argument are preserved on both
-sides of the value — before it (`:dir(/* c */ ltr)`, `:lang(/* c */ en)`) and
-after it (`:dir(rtl /* c */)`, `:lang(en-US /* c */)`). The argument is a single
-identifier, so a comment can only lead or trail it; both edge positions are valid
-and accepted by parseCss.
+Comments inside a `:dir()` / `:lang()` argument are preserved on both sides of the
+value — before it (`:dir(/* c */ ltr)`, `:lang(/* c */ en)`) and after it
+(`:dir(rtl /* c */)`, `:lang(en-US /* c */)`). These args parse as an ordinary
+selector list (Svelte's model — `:lang(en, fr)` is two `TypeSelector`s), so a gap
+comment leads or trails the list exactly like `:is()`; both edge positions are
+valid and accepted by parseCss.
 
-`:dir` and `:lang` share one parser path — the same identifier-argument grammar
-`::highlight()` uses (see [highlight_comment](../../pseudo_element/highlight_comment_prettier_divergence/)).
+`:dir`, `:lang`, and `::highlight()` share one parser path — the strict
+selector-list grammar `:not()` / `:global()` use (see [highlight_comment](../../pseudo_element/highlight_comment_prettier_divergence/)).
 
 ## Prettier divergence
 
