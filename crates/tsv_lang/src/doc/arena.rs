@@ -610,6 +610,13 @@ impl DocArena {
     /// These two shapes are ~7% of all doc nodes on real corpora (single-child
     /// alone ~6%), so collapsing them at this chokepoint cuts build allocation,
     /// arena memory, and the render/`fits`/memo traversal that scans every node.
+    ///
+    /// Nested-`Concat` splicing (copying a `Concat` part's children inline —
+    /// associativity makes it output-identical) was prototyped and measured a
+    /// net instruction regression (+0.2–0.5% on 4 of 6 corpora): the per-part
+    /// node-kind check runs on every child slot while the savings accrue only
+    /// on nested nodes, and inner concats average ~6 children, so the children
+    /// vec grew +78%. Don't re-attempt without a new idea.
     pub fn concat(&self, docs: &[DocId]) -> DocId {
         match docs {
             [] => self.empty(),
