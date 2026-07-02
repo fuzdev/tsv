@@ -434,6 +434,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )
     }
 
+    /// Convert a raw `source`-relative offset into an absolute `Span` coordinate:
+    /// `base_offset`-shifted and narrowed to `u32`. Raw offsets index `self.source`
+    /// (e.g. `self.current.start as usize`, a captured scan position); `Span` fields
+    /// store the shifted `u32`. Centralizes the `(base_offset + pos) as u32` boundary
+    /// cast — the `u32` sibling of `current_pos` (which stays `usize` for indexing).
+    #[inline]
+    pub(super) fn span_pos(&self, raw: usize) -> u32 {
+        (self.base_offset + raw) as u32
+    }
+
     /// Get the end position of the previously consumed token (with base_offset).
     ///
     /// Useful for determining where statements end after consuming optional tokens
@@ -1198,7 +1208,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let new_start = self.current.start as usize + 1;
                 // Drop comments drained by a discarded peek — the seek below
                 // re-lexes that region, and they'd be collected twice.
-                let relex_from = (new_start + self.base_offset) as u32;
+                let relex_from = self.span_pos(new_start);
                 while self
                     .comments
                     .last()
