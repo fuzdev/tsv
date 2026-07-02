@@ -859,7 +859,8 @@ convention **at the Rust source/crate level**: each language crate
 (`tsv_ts`, `tsv_css`, `tsv_svelte`) is self-contained — owns its internal
 AST, public AST, parser, formatter, and convert layer — and exposes the same
 free-function API (`parse()`, `format()`, `convert_ast()`,
-`convert_ast_json()`, `convert_ast_json_string()`). **No central `Language`
+`convert_ast_json()`, `convert_ast_json_bytes()`,
+`convert_ast_json_string()`). **No central `Language`
 trait, no registry, no enum dispatch.** Two properties follow:
 
 - **Optimal artifacts**: concrete types end-to-end, no dyn dispatch, WASM

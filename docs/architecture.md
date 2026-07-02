@@ -125,13 +125,26 @@ pub fn parse(source: &str) -> Result<InternalAst, ParseError>;
 pub fn format(ast: &InternalAst, source: &str) -> String;
 pub fn convert_ast(ast: &InternalAst, source: &str) -> PublicAst;
 pub fn convert_ast_json(ast: &InternalAst, source: &str) -> serde_json::Value;
+pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
 ```
 
-`convert_ast_json_string` is the hot path for compact wire output (FFI,
-WASM, CLI non-pretty): byte-identical to serializing `convert_ast_json`'s
-`Value`, but it serializes the typed public AST directly and skips the
-intermediate `Value` — in every language, on every input. tsv_svelte's
+`convert_ast_json_bytes` is the hot path for compact wire output (FFI,
+CLI non-pretty): byte-identical to serializing `convert_ast_json`'s
+`Value`, without materializing that `Value` — in every language, on every
+input. The output is valid UTF-8 by construction, and returning bytes lets
+byte-oriented boundaries skip the O(output) UTF-8 validation a `String`
+requires (the wire is ~15× the source); `convert_ast_json_string` is the
+same bytes plus that one validation, for `&str` boundaries (the WASM
+binding's `JSON.parse`, N-API strings). tsv_ts goes furthest: a writer-mode conversion
+(`ast/convert/write/`) emits the wire JSON directly during a single walk
+of the *internal* AST — the typed public tree is never built either — with
+byte→UTF-16 offset translation fused into the walk via `LocationMapper`
+(final char-space positions emitted directly; ASCII sources are byte-space
+passthrough). The writer is a third emission mode of the same acorn quirk
+catalog, held byte-identical to the typed conversion by the fixture
+suite's string-path identity gates. tsv_svelte and tsv_css serialize
+their typed public ASTs directly. tsv_svelte's
 template-expression comments (outside `<script>`) go through an
 island-scoped attachment pass first: only the expressions a comment lands
 on convert to `serde_json::Value` islands (`ExpressionIsland::Attached`)
@@ -655,7 +668,7 @@ tsv runs on the system allocator — no `#[global_allocator]`, no alternative-al
 
 **Lazy work over eager caching.** Line/column positions are computed only at serialization time, via O(log n) binary search over newline offsets (`LocationTracker`). Error context (source line, caret) is extracted only when an error is displayed. Svelte `Text::data()` decodes entities only when entities are present, borrowing `raw` otherwise.
 
-**Boundaries — serialize once, copy once.** `convert_ast_json_string` serializes the typed public AST straight to a JSON string, skipping the intermediate `serde_json::Value` (see [Closed Scope, Open Convention](#closed-scope-open-convention)), into a buffer pre-sized from source length (`tsv_lang::estimated_json_capacity`, ~20 wire bytes per source byte — the JSON sibling of the render-path pre-sizing above). FFI returns a leaked `Box<[u8]>` the caller frees via `tsv_free` — one serialization, one buffer; the full ownership and panic-safety contract is in [crates/tsv_ffi/CLAUDE.md](../crates/tsv_ffi/CLAUDE.md). WASM ships the AST across the boundary as a single JSON string and hands it to the engine's native `JSON.parse` rather than building the JS object graph node-by-node. The CLI reads each file into one `String` and drops all per-file state before the next; worker threads share only an atomic index into the file list.
+**Boundaries — serialize once, copy once.** `convert_ast_json_string` emits compact wire JSON without the intermediate `serde_json::Value` — tsv_ts writes it directly from the internal AST, tsv_svelte/tsv_css serialize their typed public ASTs (see [Closed Scope, Open Convention](#closed-scope-open-convention)) — into a buffer pre-sized from source length (`tsv_lang::estimated_json_capacity`, ~20 wire bytes per source byte — the JSON sibling of the render-path pre-sizing above). FFI returns a leaked `Box<[u8]>` the caller frees via `tsv_free` — one serialization, one buffer; the full ownership and panic-safety contract is in [crates/tsv_ffi/CLAUDE.md](../crates/tsv_ffi/CLAUDE.md). WASM ships the AST across the boundary as a single JSON string and hands it to the engine's native `JSON.parse` rather than building the JS object graph node-by-node. The CLI reads each file into one `String` and drops all per-file state before the next; worker threads share only an atomic index into the file list.
 
 Profiling methodology — including when to reach for heap profiling — is in [performance.md](./performance.md).
 

@@ -42,8 +42,8 @@ fn convert_attributes<'src>(
 
 /// Find the `export` keyword position in source, scanning past decorators.
 /// Used when a decorated class is exported — acorn's export node starts at
-/// `export`, not at the decorator.
-fn find_export_start(source: &str, span_start: u32) -> u32 {
+/// `export`, not at the decorator. (`pub(super)`: shared with the JSON writer.)
+pub(super) fn find_export_start(source: &str, span_start: u32) -> u32 {
     // Skip comments so an `export` inside one (`@dec /* export */ export …`)
     // isn't mistaken for the keyword, which would mislocate the node's start.
     tsv_lang::source_scan::find_keyword(

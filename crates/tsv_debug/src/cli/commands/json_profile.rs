@@ -1,6 +1,6 @@
 //! Profile the parse→JSON materialization sub-steps (the FFI parse path).
 //!
-//! `tsv_ffi`'s `tsv_parse_<lang>` runs `parse` + `convert_ast_json_string`.
+//! `tsv_ffi`'s `tsv_parse_<lang>` runs `parse` + `convert_ast_json_bytes`.
 //! This command times each sub-step of the `Value`-based pipeline separately,
 //! the direct typed pipeline (typed offset translation +
 //! `serde_json::to_string(&public_ast)`), and the shipped
@@ -10,10 +10,12 @@
 //! `convert_ast_json` implementations differ:
 //!
 //! - **typescript**: convert (typed public AST, byte-space) → to_value →
-//!   translate → to_string. The shipped path instead runs a single *fused*
-//!   conversion (tracker + map build + char-space emission via
-//!   `LocationMapper` — no separate translation walk) → direct to_string —
-//!   both pipelines are timed.
+//!   translate → to_string. The shipped path is the *JSON writer*
+//!   (`write_program_json`): tracker + map build + one internal-AST walk
+//!   emitting final char-space wire JSON directly — no typed tree at all.
+//!   The fused typed pipeline the writer replaced (tracker + map build +
+//!   char-space conversion via `LocationMapper` → direct to_string) is
+//!   still timed as the tree-building baseline and parity anchor.
 //! - **svelte**: convert → to_value → attach (template expression comments,
 //!   mutates the `Value`) → translate → to_string for the `Value` path; the
 //!   shipped path runs convert → typed attach (island-scoped, converts only
@@ -137,6 +139,7 @@ struct FileResult {
     typed_translate_us: f64,
     fused_convert_us: f64,
     direct_us: f64,
+    write_us: f64,
     value_us: f64,
     shipped_us: f64,
     /// Whether the direct path's output is byte-identical to the `Value`
@@ -144,7 +147,7 @@ struct FileResult {
     /// (svelte's island-scoped attach, the multibyte translation) run before
     /// `direct` is captured, so a `false` is a parity bug.
     direct_match: Option<bool>,
-    /// Whether `convert_ast_json_string` (the shipped FFI path) is
+    /// Whether `convert_ast_json_bytes` (the shipped FFI path) is
     /// byte-identical to the `Value` path. Comparable on every file.
     shipped_match: Option<bool>,
 }
@@ -169,6 +172,7 @@ struct StepDurations {
     typed_translate: Vec<Duration>,
     fused_convert: Vec<Duration>,
     direct: Vec<Duration>,
+    write: Vec<Duration>,
     value: Vec<Duration>,
     shipped: Vec<Duration>,
 }
@@ -217,6 +221,7 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
         typed_translate_us: median(steps.typed_translate),
         fused_convert_us: median(steps.fused_convert),
         direct_us: median(steps.direct),
+        write_us: median(steps.write),
         value_us: median(steps.value),
         shipped_us: median(steps.shipped),
         direct_match: meta.direct_match,
@@ -226,10 +231,11 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
 
 /// One TS iteration. Sub-steps mirror `tsv_ts::convert_ast_json` (byte-space
 /// convert → to_value → `Value` translate → to_string) plus the FFI
-/// `to_string` boundary; `fused_convert` + `direct` mirror the shipped
-/// pipeline (`convert_ast_json_string`), whose conversion emits final
-/// char-space positions through `LocationMapper` — no separate translation
-/// walk exists on that path.
+/// `to_string` boundary; `fused_convert` + `direct` mirror the fused typed
+/// pipeline (char-space conversion through `LocationMapper` → to_string) —
+/// the tree-building baseline the JSON writer replaced, kept as the
+/// `direct_match` parity anchor; `write` mirrors the shipped pipeline
+/// (`convert_ast_json_string`): tracker + map build + `write_program_json`.
 #[allow(clippy::expect_used)] // mirrors convert_ast_json's own expect on Serialize
 fn profile_ts_once(
     source: &str,
@@ -269,9 +275,10 @@ fn profile_ts_once(
     let wire = serde_json::to_string(&value).expect("Value serialization cannot fail");
     steps.to_string.push(t.elapsed());
 
-    // Shipped mirror: the fused tracker+map single-scan build + fused
-    // conversion in one timed region — exactly the per-call work
-    // `convert_ast_json_string` does before serializing.
+    // Fused-typed baseline: the tracker+map single-scan build + fused
+    // conversion in one timed region — the tree-building pipeline the JSON
+    // writer replaced (and the `direct_match` parity anchor for the
+    // `LocationMapper` fused conversion).
     let t = Instant::now();
     let (fused_tracker, fused_map) = LocationTracker::new_ecmascript_with_map(source);
     let fused_ast = tsv_ts::ast::convert::convert_program(
@@ -289,6 +296,23 @@ fn profile_ts_once(
     let direct = serde_json::to_string(&fused_ast).expect("AST types derive Serialize correctly");
     steps.direct.push(t.elapsed());
 
+    // Shipped mirror: tracker+map build + the JSON writer — exactly the
+    // per-call work `convert_ast_json_string` does (the shipped whole-call
+    // row adds only the intermediates' drops, which for the writer are just
+    // the tracker and map).
+    let t = Instant::now();
+    let (write_tracker, write_map) = LocationTracker::new_ecmascript_with_map(source);
+    let written = tsv_ts::ast::convert::write_program_json(
+        &ast,
+        source,
+        LocationMapper {
+            tracker: &write_tracker,
+            map: &write_map,
+        },
+        tsv_ts::ast::convert::Schema::Acorn,
+    );
+    steps.write.push(t.elapsed());
+
     let first = meta.is_none();
     if first {
         *meta = Some(IterMeta {
@@ -303,19 +327,19 @@ fn profile_ts_once(
         steps,
         meta,
         first,
-        (public_ast, fused_ast, value, direct),
+        (public_ast, fused_ast, value, direct, written),
         wire,
         || {
             serde_json::to_string(&tsv_ts::convert_ast_json(&ast, source))
                 .expect("Value serialization cannot fail")
         },
-        || tsv_ts::convert_ast_json_string(&ast, source),
+        || tsv_ts::convert_ast_json_bytes(&ast, source),
     );
     Ok(())
 }
 
 /// Time the `Value` baseline (`to_string(convert_ast_json)`) and shipped
-/// (`convert_ast_json_string`) paths as whole calls. Unlike the sub-step
+/// (`convert_ast_json_bytes` — what the FFI boundary calls) paths as whole calls. Unlike the sub-step
 /// timings, these include dropping the intermediates (tree, `Value`,
 /// map/tracker) inside the timed region — exactly what the FFI boundary pays
 /// per call. Records the shipped identity check on the first iteration.
@@ -330,7 +354,7 @@ fn profile_whole_calls<I>(
     intermediates: I,
     wire: String,
     value_fn: impl Fn() -> String,
-    shipped_fn: impl Fn() -> String,
+    shipped_fn: impl Fn() -> Vec<u8>,
 ) {
     black_box(&intermediates);
     drop(intermediates);
@@ -351,7 +375,7 @@ fn profile_whole_calls<I>(
     steps.shipped.push(t.elapsed());
 
     if let (Some(wire), Some(m)) = (wire_check, meta.as_mut()) {
-        m.shipped_match = Some(wire == shipped);
+        m.shipped_match = Some(wire.as_bytes() == shipped.as_slice());
     }
     black_box(shipped);
 }
@@ -459,7 +483,7 @@ fn profile_svelte_once(
             serde_json::to_string(&tsv_svelte::convert_ast_json(&ast, source))
                 .expect("Value serialization cannot fail")
         },
-        || tsv_svelte::convert_ast_json_string(&ast, source),
+        || tsv_svelte::convert_ast_json_bytes(&ast, source),
     );
     Ok(())
 }
@@ -530,7 +554,7 @@ fn profile_css_once(
             serde_json::to_string(&tsv_css::convert_ast_json(&ast, source))
                 .expect("Value serialization cannot fail")
         },
-        || tsv_css::convert_ast_json_string(&ast, source),
+        || tsv_css::convert_ast_json_bytes(&ast, source),
     );
     Ok(())
 }
@@ -552,6 +576,7 @@ struct LangAggregate {
     typed_translate_us: f64,
     fused_convert_us: f64,
     direct_us: f64,
+    write_us: f64,
     value_us: f64,
     shipped_us: f64,
     materialize_us: f64,
@@ -568,17 +593,24 @@ impl LangAggregate {
         self.attach_us > 0.0
     }
 
-    /// Does this language's shipped path fuse translation into conversion
-    /// (TS)? Svelte and CSS still run a typed translation walk over the
-    /// byte-space conversion.
+    /// Does this language fuse translation into conversion (TS)? Svelte and
+    /// CSS still run a typed translation walk over the byte-space conversion.
     fn has_fused_convert(&self) -> bool {
         self.fused_convert_us > 0.0
     }
 
-    /// The shipped typed pipeline as a sub-step sum (drops excluded). Fused
-    /// (TS): one char-space conversion + direct to_string. Otherwise:
-    /// convert + typed attach (svelte only, 0 elsewhere) + typed translate +
-    /// direct to_string.
+    /// Does this language's shipped path emit wire JSON directly from the
+    /// internal AST (TS's `write_program_json`)? For Svelte and CSS the
+    /// shipped path is still the typed pipeline.
+    fn has_write(&self) -> bool {
+        self.write_us > 0.0
+    }
+
+    /// The typed pipeline as a sub-step sum (drops excluded). Fused (TS):
+    /// one char-space conversion + direct to_string — the tree-building
+    /// baseline the JSON writer replaced. Otherwise: convert + typed attach
+    /// (svelte only, 0 elsewhere) + typed translate + direct to_string —
+    /// still the shipped shape for those languages.
     fn typed_pipeline_us(&self) -> f64 {
         if self.has_fused_convert() {
             self.fused_convert_us + self.direct_us
@@ -615,6 +647,7 @@ fn aggregate(results: &[FileResult]) -> Vec<(ParserType, LangAggregate)> {
         agg.typed_translate_us += r.typed_translate_us;
         agg.fused_convert_us += r.fused_convert_us;
         agg.direct_us += r.direct_us;
+        agg.write_us += r.write_us;
         agg.value_us += r.value_us;
         agg.shipped_us += r.shipped_us;
         agg.materialize_us += r.materialize_us();
@@ -711,12 +744,23 @@ fn print_report(
                 0.0
             },
         );
+        if a.has_write() {
+            eprintln!(
+                "  write            {:>10}  = tracker + map build + JSON writer (the shipped pipeline) → {:.2}x of typed pipeline",
+                format_duration(a.write_us),
+                if a.typed_pipeline_us() > 0.0 {
+                    a.write_us / a.typed_pipeline_us()
+                } else {
+                    0.0
+                },
+            );
+        }
         eprintln!(
             "  value baseline   {:>10}  = to_string(convert_ast_json) whole call, incl. drops",
             format_duration(a.value_us),
         );
         eprintln!(
-            "  shipped          {:>10}  = convert_ast_json_string whole call → {:.2}x of value baseline",
+            "  shipped          {:>10}  = convert_ast_json_bytes whole call → {:.2}x of value baseline",
             format_duration(a.shipped_us),
             if a.value_us > 0.0 {
                 a.shipped_us / a.value_us
@@ -776,6 +820,7 @@ fn print_json(
                 "typed_translate_us": a.typed_translate_us,
                 "fused_convert_us": a.fused_convert_us,
                 "direct_us": a.direct_us,
+                "write_us": a.write_us,
                 "value_us": a.value_us,
                 "shipped_us": a.shipped_us,
                 "materialize_us": a.materialize_us,
@@ -808,6 +853,7 @@ fn print_json(
                 "typed_translate_us": r.typed_translate_us,
                 "fused_convert_us": r.fused_convert_us,
                 "direct_us": r.direct_us,
+                "write_us": r.write_us,
                 "value_us": r.value_us,
                 "shipped_us": r.shipped_us,
                 "materialize_us": r.materialize_us(),
