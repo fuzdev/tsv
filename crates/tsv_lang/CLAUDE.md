@@ -9,7 +9,7 @@ All language crates (tsv_ts, tsv_css, tsv_svelte) depend on tsv_lang. It provide
 Each module's visibility (in parens) reflects `pub use`-only modules (private) vs directly-imported modules (`pub mod`, used as `tsv_lang::doc::{...}` etc.).
 
 - `span` (`span.rs`, private) — `Span { start: u32, end: u32 }` — compact source positions
-- `location` (`location.rs`, private) — `LocationTracker` — lazy line/column via O(log n) binary search
+- `location` (`location.rs`, private) — `LocationTracker` (lazy line/column via O(log n) binary search), `ByteToCharMap` (byte → UTF-16 code-unit offsets; `identity()` for byte-space passthrough), and `LocationMapper` (tracker + map bundle the AST-conversion layers thread — with a real map it emits final char-space positions during conversion, fusing out the post-conversion translation walk; with the identity map it is exact byte-space passthrough)
 - `error` (`error.rs`, private) — `ParseError` with context extraction and caret formatting
 - `config` (`config.rs`, private) — `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts + `EmbedContext` / `LayoutMode` (no runtime config)
 - `doc` (`doc/*.rs`, pub) — Document builder — arena-based Prettier-compatible IR
@@ -111,9 +111,11 @@ let output = printer.into_string();
 ### AST Conversion
 
 ```rust
-// Internal AST → Public JSON AST:
+// Internal AST → Public JSON AST (byte-space; the Value pipeline translates after):
 let tracker = LocationTracker::new(source);
-let public = convert_program(&program, source, &tracker, Schema::Acorn);
+let public = convert_program(&program, source, LocationMapper::identity(&tracker), Schema::Acorn);
+// The wire hot path passes a real map instead — LocationMapper { tracker, map } —
+// so conversion emits final UTF-16 positions directly (no translation walk).
 // Use Schema::SvelteScript when converting a Svelte non-lang="ts" <script>
 // (Svelte's parser omits importKind/exportKind=value and always emits
 // `attributes` on import/export declarations).

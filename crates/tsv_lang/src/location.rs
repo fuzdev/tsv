@@ -25,13 +25,16 @@ pub struct SourceLocation {
 /// Rust strings are byte-indexed, but JS (and Svelte/acorn) uses UTF-16
 /// code unit indices. For ASCII-only sources, byte == char offset, so the map is empty.
 /// For sources with multibyte UTF-8 characters, the map stores the UTF-16 code unit
-/// offset for each byte position.
+/// offset for each byte position. (A sparse per-multibyte-char representation
+/// with binary-search lookup was measured at +3% instructions on a
+/// multibyte-dense corpus — the O(1) dense lookup wins; don't re-derive.)
 ///
 /// Characters in the BMP (U+0000-U+FFFF) count as 1 UTF-16 code unit.
 /// Characters outside the BMP (U+10000+, e.g., most emoji) count as 2 (surrogate pair).
 ///
 /// Only valid for byte positions at character boundaries (i.e., positions returned
-/// by the parser, which always point to the start of a character).
+/// by the parser, which always point to the start of a character); a byte
+/// position inside a multibyte character resolves to that character's start.
 #[derive(Debug)]
 pub struct ByteToCharMap {
     /// For each byte position, the corresponding UTF-16 code unit offset.
@@ -46,32 +49,22 @@ impl ByteToCharMap {
     /// For ASCII-only sources, returns an empty map (fast path).
     pub fn new(source: &str) -> Self {
         if source.is_ascii() {
-            return Self {
-                offsets: Vec::new(),
-                has_multibyte: false,
-            };
+            return Self::identity();
         }
 
         let mut offsets = vec![0u32; source.len() + 1];
         let mut utf16_idx = 0u32;
         for (byte_idx, ch) in source.char_indices() {
-            offsets[byte_idx] = utf16_idx;
+            // Every byte of the character gets the character's UTF-16 offset,
+            // so a byte position inside a multibyte char resolves to that
+            // char's start.
+            for offset in &mut offsets[byte_idx..byte_idx + ch.len_utf8()] {
+                *offset = utf16_idx;
+            }
             // Characters outside BMP need 2 UTF-16 code units (surrogate pair)
             utf16_idx += ch.len_utf16() as u32;
         }
         offsets[source.len()] = utf16_idx;
-
-        // Fill intermediate bytes (inside multibyte characters) with the
-        // UTF-16 offset of the character they belong to. This handles
-        // cases where a byte position falls in the middle of a multibyte char.
-        let mut last = 0u32;
-        for offset in &mut offsets {
-            if *offset == 0 && last > 0 {
-                *offset = last;
-            } else {
-                last = *offset;
-            }
-        }
 
         Self {
             offsets,
@@ -79,9 +72,22 @@ impl ByteToCharMap {
         }
     }
 
+    /// The identity map: every byte offset translates to itself.
+    ///
+    /// Passing this to a `LocationMapper` selects byte-space emission — the
+    /// mode the `Value` oracle pipeline and `tsv_svelte`'s byte-space
+    /// conversion contract require.
+    pub const fn identity() -> Self {
+        Self {
+            offsets: Vec::new(),
+            has_multibyte: false,
+        }
+    }
+
     /// Convert a byte offset to a UTF-16 code unit offset
     ///
-    /// For ASCII-only sources, returns the byte offset unchanged.
+    /// For ASCII-only sources, returns the byte offset unchanged. Offsets
+    /// past the end of the source also translate to themselves.
     #[inline]
     pub fn byte_to_char(&self, byte_offset: u32) -> u32 {
         if !self.has_multibyte {
@@ -97,6 +103,70 @@ impl ByteToCharMap {
     #[inline]
     pub fn has_multibyte(&self) -> bool {
         self.has_multibyte
+    }
+}
+
+/// A `LocationTracker` paired with a `ByteToCharMap`: converts byte spans to
+/// emitted positions in one step.
+///
+/// AST-conversion layers thread this instead of a bare tracker so position
+/// emission and byte→UTF-16 translation fuse into one pass:
+///
+/// - with a real map (`ByteToCharMap::new(source)`), `pos` and
+///   `span_to_location` emit final UTF-16 code-unit offsets and char-based
+///   columns directly — no post-conversion translation walk;
+/// - with `ByteToCharMap::identity()`, both are exact byte-space passthrough —
+///   the mode required by pipelines that translate positions later (the
+///   `serde_json::Value` oracle path, `tsv_svelte`'s byte-space conversion
+///   contract).
+///
+/// The fused column math is the delta-0 case of `translate_column`'s
+/// delta-preserving rule: `char_col = map(offset) − map(line_start)`. It is
+/// byte-identical to running the byte-space conversion plus the translation
+/// walk because every conversion site derives `loc` from the same span it
+/// writes into `start`/`end`.
+#[derive(Clone, Copy, Debug)]
+pub struct LocationMapper<'a> {
+    pub tracker: &'a LocationTracker,
+    pub map: &'a ByteToCharMap,
+}
+
+impl<'a> LocationMapper<'a> {
+    /// A byte-space passthrough mapper over `tracker` (identity map).
+    pub fn identity(tracker: &'a LocationTracker) -> Self {
+        static IDENTITY: ByteToCharMap = ByteToCharMap::identity();
+        Self {
+            tracker,
+            map: &IDENTITY,
+        }
+    }
+
+    /// Translate an emitted byte offset (UTF-16 code units with a real map,
+    /// identity in byte-space mode).
+    #[inline]
+    pub fn pos(&self, byte_offset: u32) -> u32 {
+        self.map.byte_to_char(byte_offset)
+    }
+
+    /// Convert a byte offset to a `Position` whose column is in the map's
+    /// output space (shares the tracker's line lookup — no extra search).
+    pub fn position(&self, byte_offset: u32) -> Position {
+        let (line, byte_column) = self.tracker.get_line_column(byte_offset as usize);
+        let column = if self.map.has_multibyte() {
+            let line_start = byte_offset as usize - byte_column;
+            (self.map.byte_to_char(byte_offset) - self.map.byte_to_char(line_start as u32)) as usize
+        } else {
+            byte_column
+        };
+        Position { line, column }
+    }
+
+    /// Convert a byte span to a `SourceLocation` in the map's output space.
+    pub fn span_to_location(&self, span: Span) -> SourceLocation {
+        SourceLocation {
+            start: self.position(span.start),
+            end: self.position(span.end),
+        }
     }
 }
 
@@ -122,6 +192,11 @@ impl LocationTracker {
     /// U+2028, U+2029) — acorn's rule, applied everywhere including inside
     /// string literals. Used for standalone TypeScript locations.
     pub fn new_ecmascript(source: &str) -> Self {
+        if source.is_ascii() {
+            return Self {
+                line_starts: ascii_ecmascript_line_starts(source.as_bytes()),
+            };
+        }
         let mut line_starts = vec![0];
         let mut chars = source.char_indices().peekable();
         while let Some((i, ch)) = chars.next() {
@@ -140,6 +215,65 @@ impl LocationTracker {
             }
         }
         Self { line_starts }
+    }
+
+    /// Build the ECMAScript-rule tracker and the byte→UTF-16 map in one
+    /// source scan.
+    ///
+    /// The pair `convert_ast_json_string` needs per call — built separately
+    /// they cost two full `char_indices` passes over the source; fused they
+    /// cost one (plus the shared `is_ascii` pre-check, which selects a
+    /// byte-level line scan + identity map on the common all-ASCII path).
+    /// Byte-identical to `new_ecmascript(source)` + `ByteToCharMap::new(source)`.
+    pub fn new_ecmascript_with_map(source: &str) -> (Self, ByteToCharMap) {
+        if source.is_ascii() {
+            return (
+                Self {
+                    line_starts: ascii_ecmascript_line_starts(source.as_bytes()),
+                },
+                ByteToCharMap::identity(),
+            );
+        }
+
+        let mut line_starts = vec![0];
+        let mut offsets = vec![0u32; source.len() + 1];
+        let mut utf16_idx = 0u32;
+        let mut chars = source.char_indices().peekable();
+        while let Some((i, ch)) = chars.next() {
+            let len_utf8 = ch.len_utf8();
+            // Every byte of the character gets the character's UTF-16 offset,
+            // so a byte position inside a multibyte char resolves to that
+            // char's start.
+            for offset in &mut offsets[i..i + len_utf8] {
+                *offset = utf16_idx;
+            }
+            utf16_idx += ch.len_utf16() as u32;
+            match ch {
+                '\n' | '\u{2028}' | '\u{2029}' => line_starts.push(i + len_utf8),
+                '\r' => {
+                    // CRLF counts as a single line terminator; the consumed
+                    // '\n' still fills its map slot and counts one UTF-16 unit.
+                    if let Some(&(j, '\n')) = chars.peek() {
+                        chars.next();
+                        offsets[j] = utf16_idx;
+                        utf16_idx += 1;
+                        line_starts.push(j + 1);
+                    } else {
+                        line_starts.push(i + 1);
+                    }
+                }
+                _ => {}
+            }
+        }
+        offsets[source.len()] = utf16_idx;
+
+        (
+            Self { line_starts },
+            ByteToCharMap {
+                offsets,
+                has_multibyte: true,
+            },
+        )
     }
 
     pub fn get_line_column(&self, offset: usize) -> (usize, usize) {
@@ -192,38 +326,6 @@ impl LocationTracker {
         SourceLocation { start, end }
     }
 
-    /// Convert a Span to a SourceLocation with offset adjustment
-    ///
-    /// Useful for embedded content where AST has global positions but LocationTracker
-    /// is created from a substring. The offset is subtracted from the span positions
-    /// before conversion.
-    ///
-    /// # Example
-    /// ```
-    /// use tsv_lang::{LocationTracker, Span};
-    ///
-    /// // Full source: "<script>const x = 1;</script>"
-    /// // LocationTracker created from: "const x = 1;"
-    /// let embedded_source = "const x = 1;";
-    /// let tracker = LocationTracker::new(embedded_source);
-    /// let offset = 8; // Position where "const" starts in full source
-    ///
-    /// // Span from full source
-    /// let span = Span { start: 8, end: 13 }; // "const" in full source
-    ///
-    /// // Convert with offset to get position in embedded source
-    /// let loc = tracker.span_to_location_with_offset(span, offset);
-    /// assert_eq!(loc.start.line, 1);
-    /// assert_eq!(loc.start.column, 0); // "const" is at start of embedded source
-    /// ```
-    pub fn span_to_location_with_offset(&self, span: Span, offset: usize) -> SourceLocation {
-        let adjusted_span = Span {
-            start: span.start - offset as u32,
-            end: span.end - offset as u32,
-        };
-        self.span_to_location(adjusted_span)
-    }
-
     /// Get the byte offset of the start of the line containing the given byte offset
     ///
     /// Used to compute character-based columns: `char_column = byte_to_char(offset) - byte_to_char(line_start)`.
@@ -234,6 +336,28 @@ impl LocationTracker {
         };
         self.line_starts[line_idx]
     }
+}
+
+/// ECMAScript-rule line starts for ASCII-only source: no U+2028/U+2029
+/// possible, so line terminators are single bytes with CRLF fusing.
+fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<usize> {
+    let mut line_starts = vec![0];
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\n' => line_starts.push(i + 1),
+            b'\r' => {
+                // CRLF counts as a single line terminator
+                if bytes.get(i + 1) == Some(&b'\n') {
+                    i += 1;
+                }
+                line_starts.push(i + 1);
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    line_starts
 }
 
 #[cfg(test)]
@@ -326,6 +450,81 @@ mod tests {
         assert_eq!(m.byte_to_char(0), 0);
         assert_eq!(m.byte_to_char(4), 2); // 'x'
         assert_eq!(m.byte_to_char(5), 3); // end-of-string sentinel
+    }
+
+    #[test]
+    fn test_byte_to_char_adjacent_multibyte() {
+        // "日本x": 日 = bytes 0..3 / unit 0, 本 = bytes 3..6 / unit 1, x = byte 6 / unit 2.
+        let m = ByteToCharMap::new("日本x");
+        assert_eq!(m.byte_to_char(0), 0);
+        assert_eq!(m.byte_to_char(3), 1); // second char's start, no ASCII gap
+        assert_eq!(m.byte_to_char(4), 1); // interior of 本
+        assert_eq!(m.byte_to_char(6), 2); // 'x'
+        assert_eq!(m.byte_to_char(7), 3); // end-of-string sentinel
+    }
+
+    #[test]
+    fn test_byte_to_char_past_end_is_identity() {
+        // Offsets past the end translate to themselves, even on a multibyte map.
+        let m = ByteToCharMap::new("é");
+        assert_eq!(m.byte_to_char(2), 1); // end sentinel: 1 UTF-16 unit
+        assert_eq!(m.byte_to_char(3), 3); // past the end
+        assert_eq!(m.byte_to_char(99), 99);
+    }
+
+    #[test]
+    fn test_new_ecmascript_with_map_matches_separate_builds() {
+        // Mixed content: CRLF, lone CR, U+2028, multibyte inside and at line
+        // boundaries, astral char — every branch of the fused scan.
+        for source in [
+            "abc",
+            "a\r\nb\rc\nd",
+            "aé\r\né😀\u{2028}x\ry\n中",
+            "\u{2028}\r\n😀",
+            "",
+        ] {
+            let (tracker, map) = LocationTracker::new_ecmascript_with_map(source);
+            let expected_tracker = LocationTracker::new_ecmascript(source);
+            let expected_map = ByteToCharMap::new(source);
+            assert_eq!(
+                tracker.line_starts, expected_tracker.line_starts,
+                "line starts diverge on {source:?}"
+            );
+            assert_eq!(map.has_multibyte(), expected_map.has_multibyte());
+            for b in 0..=(source.len() as u32 + 2) {
+                assert_eq!(
+                    map.byte_to_char(b),
+                    expected_map.byte_to_char(b),
+                    "map diverges at byte {b} on {source:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_location_mapper_identity_is_byte_space() {
+        // bytes: a=0, é=1..3, \n=3, b=4, é=5..7, ' '=7, c=8
+        let source = "aé\nbé c";
+        let tracker = LocationTracker::new_ecmascript(source);
+        let m = LocationMapper::identity(&tracker);
+        assert_eq!(m.pos(8), 8);
+        let p = m.position(8); // 'c'
+        assert_eq!((p.line, p.column), (2, 4)); // byte column
+    }
+
+    #[test]
+    fn test_location_mapper_fused_char_columns() {
+        let source = "aé\nbé c";
+        let tracker = LocationTracker::new_ecmascript(source);
+        let map = ByteToCharMap::new(source);
+        let m = LocationMapper {
+            tracker: &tracker,
+            map: &map,
+        };
+        assert_eq!(m.pos(8), 6); // 'c' in UTF-16 code units
+        let loc = m.span_to_location(Span { start: 4, end: 8 }); // "bé c" minus 'c'
+        assert_eq!((loc.start.line, loc.start.column), (2, 0));
+        assert_eq!((loc.end.line, loc.end.column), (2, 3)); // é is 1 UTF-16 unit
     }
 
     #[test]

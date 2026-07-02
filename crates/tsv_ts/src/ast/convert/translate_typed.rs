@@ -2,8 +2,13 @@
 //!
 //! Counterpart to `translate_byte_to_char_offsets` (the `serde_json::Value`
 //! walk in `convert/mod.rs`): same translation semantics, but applied to the
-//! typed tree so `convert_ast_json_string` can serialize multibyte sources
-//! directly — no intermediate `Value` materialization on the wire hot path.
+//! typed tree. `tsv_ts`'s own string path no longer runs this walk — its
+//! `convert_ast_json_string` fuses translation into conversion via
+//! `LocationMapper` — but `tsv_svelte`'s hybrid typed walk still translates
+//! byte-space typed subtrees in place: embedded script `Program`s
+//! (`ProgramIsland::Typed`) and template-expression islands
+//! (`ExpressionIsland::Typed`), which must stay byte-space through Svelte's
+//! comment-attach and `inject_loc_character` passes.
 //!
 //! Parity contract: output must be byte-identical to the `Value` walk. The
 //! rules ported from there:

@@ -9,7 +9,7 @@
 use crate::ast::{internal, public};
 use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::{InfallibleResolve, LocationMapper, LocationTracker};
 use tsv_ts::ast::convert::convert_expression;
 
 use super::comment_attachment::{
@@ -62,7 +62,12 @@ pub(super) fn convert_script<'src>(
     } else {
         tsv_ts::ast::convert::Schema::SvelteScript
     };
-    let mut program = tsv_ts::ast::convert::convert_program(&script.content, source, loc, schema);
+    let mut program = tsv_ts::ast::convert::convert_program(
+        &script.content,
+        source,
+        LocationMapper::identity(loc),
+        schema,
+    );
 
     // Svelte uses the line of the <script> tag itself, not the content start
     // (matters when the opening tag spans multiple lines, e.g., multiline attr values)
@@ -408,13 +413,18 @@ pub(super) fn convert_special_element<'src>(
                 });
             }
         }
-        to_json_value(&convert_expression(e, source, loc, interner, 0))
+        to_json_value(&convert_expression(
+            e,
+            source,
+            LocationMapper::identity(loc),
+            interner,
+        ))
     });
 
     let expression = elem
         .kind
         .expression()
-        .map(|e| convert_expression(e, source, loc, interner, 0).into());
+        .map(|e| convert_expression(e, source, LocationMapper::identity(loc), interner).into());
 
     public::SpecialElement {
         node_type: elem.kind.node_type(),
