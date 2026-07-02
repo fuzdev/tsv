@@ -176,7 +176,12 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
 #[cfg(feature = "convert")]
 pub fn convert_ast<'src>(program: &Program<'_>, source: &'src str) -> ast::public::Program<'src> {
     let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
-    ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn)
+    ast::convert::convert_program(
+        program,
+        source,
+        tsv_lang::LocationMapper::identity(&tracker),
+        ast::convert::Schema::Acorn,
+    )
 }
 
 /// Convert internal AST to JSON with character-based positions
@@ -190,8 +195,14 @@ pub fn convert_ast<'src>(program: &Program<'_>, source: &'src str) -> ast::publi
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Value {
     let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
-    let public_ast =
-        ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn);
+    // Byte-space convert + `Value` translation walk: the independent oracle
+    // for the fused string path (`convert_ast_json_string`).
+    let public_ast = ast::convert::convert_program(
+        program,
+        source,
+        tsv_lang::LocationMapper::identity(&tracker),
+        ast::convert::Schema::Acorn,
+    );
     let mut json = serde_json::to_value(&public_ast).expect("AST types derive Serialize correctly");
     let map = tsv_lang::ByteToCharMap::new(source);
     ast::convert::translate_byte_to_char_offsets(&mut json, &map, &tracker);
@@ -203,21 +214,27 @@ pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Valu
 /// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but
 /// serializes the typed public AST directly, skipping the intermediate
 /// `serde_json::Value` (`serde_json`'s `preserve_order` keeps struct-field key
-/// order). For ASCII sources byte offsets already equal char offsets; multibyte
-/// sources get the typed offset-translation walk
-/// (`translate_byte_to_char_offsets_typed`) before serialization. This is the
-/// hot path for the FFI/WASM parse bindings and the CLI's compact output.
+/// order), and fuses the byte→UTF-16 offset translation into the conversion
+/// pass itself: `convert_program` receives the `ByteToCharMap` via
+/// `LocationMapper` and emits final char-space positions directly, so no
+/// post-conversion translation walk runs. For ASCII sources the map is empty
+/// and emission is byte-space passthrough. This is the hot path for the
+/// FFI/WASM parse bindings and the CLI's compact output.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
-    let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
-    let mut public_ast =
-        ast::convert::convert_program(program, source, &tracker, ast::convert::Schema::Acorn);
-    // No ASCII gate: `ByteToCharMap::new` short-circuits to an empty map for
-    // ASCII sources and the typed walk early-returns on it, so gating here
-    // would just scan the source a second time.
-    let map = tsv_lang::ByteToCharMap::new(source);
-    ast::convert::translate_byte_to_char_offsets_typed(&mut public_ast, &map, &tracker);
+    // One fused source scan builds both; ASCII sources take a byte-level
+    // line scan and get the identity map.
+    let (tracker, map) = tsv_lang::LocationTracker::new_ecmascript_with_map(source);
+    let public_ast = ast::convert::convert_program(
+        program,
+        source,
+        tsv_lang::LocationMapper {
+            tracker: &tracker,
+            map: &map,
+        },
+        ast::convert::Schema::Acorn,
+    );
     let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
     String::from_utf8(buf).expect("serde_json emits valid UTF-8")

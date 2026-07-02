@@ -9,7 +9,7 @@
 use crate::ast::{internal, public};
 use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{LocationMapper, LocationTracker};
 use tsv_ts::ast::convert::convert_expression;
 use tsv_ts::ast::public::name_cow;
 
@@ -70,7 +70,12 @@ fn convert_attach_tag<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::AttachTag<'src> {
-    let expression = convert_expression(&tag.expression, source, loc, interner, 0);
+    let expression = convert_expression(
+        &tag.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
 
     public::AttachTag {
         node_type: "AttachTag",
@@ -86,7 +91,12 @@ fn convert_spread_attribute<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::SpreadAttribute<'src> {
-    let expression = convert_expression(&spread.expression, source, loc, interner, 0);
+    let expression = convert_expression(
+        &spread.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
 
     public::SpreadAttribute {
         node_type: "SpreadAttribute",
