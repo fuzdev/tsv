@@ -287,6 +287,7 @@ The boolean **connectors** `and`/`or`/`not` are **preserved** (`@supports (a: b)
 - Selector before `{` (in at-rule) — [selector_before_opening_brace_in_atrule](../tests/fixtures/css/tokens/comments/selector_before_opening_brace_in_atrule_prettier_divergence/)
 - Selector list — [selector_list](../tests/fixtures/css/tokens/comments/selector_list_prettier_divergence/)
 - Selector list (nested `:is()` / before-comma) — [selector_nested_comment](../tests/fixtures/css/tokens/comments/selector_nested_comment_prettier_divergence/)
+- Multi-line comment in gaps (comma / before `{` / value) — the comment interior stays verbatim (continuation lines keep their authored column, never reindented by the `<style>` embedding); tsv joins the gap single-spaced while prettier preserves the authored layout (an own-line comment stays own-line) — [multi_line_gap](../tests/fixtures/css/tokens/comments/multi_line_gap_prettier_divergence/)
 - :nth-\*() arg gaps (before the An+B, around `of`, after the `of` list) — [nth_comment](../tests/fixtures/css/selectors/pseudo_class/nth_comment_svelte_prettier_divergence/): gap comments normalize to single-space separation; a comment **inside** the An+B expression text freezes the An+B verbatim (no operator respacing — it would corrupt comment content), matching prettier, which also skips An+B normalization when a comment is present
 
 ### Whitespace: BOM Handling

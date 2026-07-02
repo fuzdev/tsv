@@ -1,0 +1,235 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 403,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 83,
+					"end": 114,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 83,
+							"end": 90,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 83,
+											"end": 90
+										}
+									],
+									"start": 83,
+									"end": 90
+								}
+							]
+						},
+						{
+							"type": "ComplexSelector",
+							"start": 107,
+							"end": 114,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class2",
+											"start": 107,
+											"end": 114
+										}
+									],
+									"start": 107,
+									"end": 114
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 115,
+					"end": 133,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 119,
+							"end": 129,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 83,
+				"end": 133
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 164,
+					"end": 171,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 164,
+							"end": 171,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class3",
+											"start": 164,
+											"end": 171
+										}
+									],
+									"start": 164,
+									"end": 171
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 184,
+					"end": 203,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 188,
+							"end": 199,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 164,
+				"end": 203
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 231,
+					"end": 234,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 231,
+							"end": 234,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 231,
+											"end": 234
+										}
+									],
+									"start": 231,
+									"end": 234
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 235,
+					"end": 265,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 239,
+							"end": 261,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 231,
+				"end": 265
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 369,
+					"end": 373,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 369,
+							"end": 373,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "span",
+											"start": 369,
+											"end": 373
+										}
+									],
+									"start": 369,
+									"end": 373
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 374,
+					"end": 394,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 378,
+							"end": 390,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 369,
+				"end": 394
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 395,
+			"styles": "\n\t/* comma gap - the comment joins the selector line, interior verbatim */\n\t.class1, /* x1\ny1\nz1 */ .class2 {\n\t\tcolor: red;\n\t}\n\n\t/* before opening brace */\n\t.class3 /* x2\ny2 */ {\n\t\tcolor: blue;\n\t}\n\n\t/* declaration value */\n\tdiv {\n\t\tcolor: /* x3\ny3 */ red;\n\t}\n\n\t/* between rules - a continuation line may itself start with a comment opener */\n\t/* x4\n/* y4\nz4 */\n\tspan {\n\t\tcolor: green;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 404,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
