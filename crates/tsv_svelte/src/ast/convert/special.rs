@@ -51,8 +51,6 @@ pub(super) fn convert_script<'src>(
     interner: &DefaultStringInterner,
     html_leading_comment: Option<&internal::HtmlComment>,
 ) -> public::Script<'src> {
-    let context = script.context.as_str();
-
     // Detect whether this is a TypeScript script (lang="ts") or plain script.
     // Plain scripts use Svelte's parser conventions (no importKind/exportKind for "value",
     // always include `attributes` on import/export declarations).
