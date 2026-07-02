@@ -234,41 +234,46 @@ fn parse_pseudo_args<'arena>(
     //
     // Note: Svelte's parser quirk treats these as selectors in public AST (handled at conversion)
     if matches!(pseudo_name, "dir" | "lang" | "highlight") {
-        // TODO: gap comments are mishandled here — a leading comment is dropped
-        // (`:dir(/* c */ ltr)` → `:dir(ltr)`) and a trailing one is absorbed into
-        // the value glued (`:dir(ltr /* c */)` → `:dir(ltr/* c */)`). Unlike the
-        // ::slotted()/::part()/unknown-pseudo paths (register + interleave), this
-        // needs the value scan to stop folding comment tokens into `ident_value`
-        // and a full-parens span + value_span so the printer can interleave. Its
-        // own fixture-first pass (parseCss accepts these; prettier preserves the
-        // spacing → _prettier_divergence).
-        parser.skip_whitespace_and_comments()?;
+        // Register leading/trailing gap comments (`:dir(/* c */ ltr)`) so the
+        // printer interleaves them via `wrap_args_gap_comments` — the same rule as
+        // `::part()`. The argument is a single identifier, so a comment can only
+        // lead or trail it; both edge positions are valid (parseCss accepts them).
+        parser.skip_whitespace_registering_comments()?;
 
-        // Parse identifier (or consume tokens until closing paren)
-        let ident_start = parser.current_start;
-        let mut ident_parts = Vec::new();
+        // `value_span` covers the identifier value (first token start .. last token
+        // end); the value text is recovered from it at convert/print time, so it is
+        // never stored (mirrors `SimpleSelector::{Type, Class, Id}`).
+        let value_start = parser.current_start;
+        let mut value_end = value_start;
 
-        // Collect tokens that form the identifier (may include hyphens, etc.)
+        // Advance over the tokens that form the value (may span several — e.g. the
+        // hyphenated `en-US`), registering any interior comment rather than folding
+        // it into the value span.
         while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
             if parser.check(TokenKind::Whitespace) {
                 parser.advance()?;
                 continue;
             }
-            ident_parts.push(parser.current_value().to_string());
+            if parser.check(TokenKind::Comment) {
+                parser.register_current_comment();
+                parser.advance()?;
+                continue;
+            }
+            value_end = parser.current_end;
             parser.advance()?;
         }
-
-        let ident_value = ident_parts.join("");
-        let ident_end = parser.current_start;
 
         let paren_end = parser.expect_and_capture(TokenKind::RightParen)?;
 
         return Ok((
             Some(PseudoClassArgs::Identifier {
-                value: parser.alloc_str_in(&ident_value),
                 span: Span {
-                    start: (parser.base_offset() + ident_start) as u32,
-                    end: (parser.base_offset() + ident_end) as u32,
+                    start: (parser.base_offset() + args_start) as u32,
+                    end: paren_end,
+                },
+                value_span: Span {
+                    start: (parser.base_offset() + value_start) as u32,
+                    end: (parser.base_offset() + value_end) as u32,
                 },
             }),
             paren_end,
