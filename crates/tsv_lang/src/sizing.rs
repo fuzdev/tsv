@@ -58,7 +58,12 @@ pub fn estimated_ast_arena_capacity(source_len: usize) -> usize {
 /// span vec, and the backend's `cap * 5`-byte string buffer) collapse to one
 /// up-front allocation each. Over-provisioning is ~2.6x the map on the median
 /// file — modest — and the interner is per-file (no cross-file reuse: it has no
-/// `reset()`), so it is freed promptly.
+/// `reset()`), so it is freed promptly. Low-symbol-density inputs (a data-URI
+/// `url(…)`, a minified bundle, a comment-dominated file) over-provision
+/// proportionally more, but the cost is memory-only and one-shot (a lower map
+/// load factor, not slower lookups) and stays smaller in absolute terms than
+/// the `estimated_ast_arena_capacity` / `estimated_json_capacity` pre-sizes it
+/// sits beside — so no ceiling is warranted.
 const SOURCE_BYTES_PER_INTERNED_SYMBOL: usize = 32;
 
 /// Pre-size estimate (in distinct symbols) for the per-file string interner.
