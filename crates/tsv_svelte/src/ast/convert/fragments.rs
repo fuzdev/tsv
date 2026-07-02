@@ -6,7 +6,7 @@
 use crate::ast::{internal, public};
 use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{LocationMapper, LocationTracker};
 use tsv_ts::ast::convert::convert_expression;
 use tsv_ts::ast::public::name_cow;
 
@@ -141,7 +141,12 @@ pub(super) fn convert_expression_tag<'src>(
     interner: &DefaultStringInterner,
 ) -> public::ExpressionTag<'src> {
     // Delegate to tsv_ts for expression conversion
-    let ts_expr = convert_expression(&tag.expression, source, loc, interner, 0);
+    let ts_expr = convert_expression(
+        &tag.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
 
     public::ExpressionTag {
         node_type: "ExpressionTag",

@@ -6,7 +6,7 @@
 use serde::Serialize;
 
 use crate::ast::{internal, public};
-use tsv_lang::{Comment, LocationTracker, Span};
+use tsv_lang::{Comment, LocationMapper, LocationTracker, Span};
 use tsv_ts::ast::convert::convert_expression;
 
 // Module declarations
@@ -79,7 +79,7 @@ fn convert_pattern_expression(
     loc: &LocationTracker,
     interner: &string_interner::DefaultStringInterner,
 ) -> serde_json::Value {
-    let mut converted = convert_expression(expr, source, loc, interner, 0);
+    let mut converted = convert_expression(expr, source, LocationMapper::identity(loc), interner);
     let is_destructure = matches!(
         converted,
         tsv_ts::ast::public::Expression::ObjectPattern(_)

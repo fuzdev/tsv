@@ -8,7 +8,7 @@
 use crate::ast::{internal, public};
 use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{LocationTracker, Span};
+use tsv_lang::{LocationMapper, LocationTracker, Span};
 use tsv_ts::ast::convert::convert_expression;
 
 use super::{convert_attribute_value, convert_expression_tag, span_to_name_loc, to_json_value};
@@ -35,7 +35,7 @@ pub(super) fn convert_on_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0).into());
+        .map(|e| convert_expression(e, source, LocationMapper::identity(loc), interner).into());
 
     public::OnDirective {
         start: d.span.start,
@@ -154,7 +154,7 @@ pub(super) fn convert_use_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0).into());
+        .map(|e| convert_expression(e, source, LocationMapper::identity(loc), interner).into());
 
     public::UseDirective {
         start: d.span.start,
@@ -176,7 +176,7 @@ pub(super) fn convert_transition_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0).into());
+        .map(|e| convert_expression(e, source, LocationMapper::identity(loc), interner).into());
 
     public::TransitionDirective {
         start: d.span.start,
@@ -200,7 +200,7 @@ pub(super) fn convert_animate_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0).into());
+        .map(|e| convert_expression(e, source, LocationMapper::identity(loc), interner).into());
 
     public::AnimateDirective {
         start: d.span.start,
@@ -222,7 +222,7 @@ pub(super) fn convert_let_directive<'src>(
     let expression = d
         .expression
         .as_ref()
-        .map(|e| convert_expression(e, source, loc, interner, 0).into());
+        .map(|e| convert_expression(e, source, LocationMapper::identity(loc), interner).into());
 
     public::LetDirective {
         start: d.span.start,
@@ -249,7 +249,7 @@ fn convert_directive_expression(
 ) -> serde_json::Value {
     if has_expression_tag {
         // Explicit: normal conversion with loc
-        let converted = convert_expression(expr, source, loc, interner, 0);
+        let converted = convert_expression(expr, source, LocationMapper::identity(loc), interner);
         to_json_value(&converted)
     } else {
         // Shorthand: synthetic identifier without loc, Svelte field ordering.

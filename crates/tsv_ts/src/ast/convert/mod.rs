@@ -2,7 +2,7 @@
 
 use super::internal;
 use super::public;
-use tsv_lang::{ByteToCharMap, LocationTracker, Span};
+use tsv_lang::{ByteToCharMap, LocationMapper, LocationTracker, Span};
 
 /// Schema choice for public-AST serialization.
 ///
@@ -261,22 +261,14 @@ pub(super) fn to_public_location(loc: tsv_lang::SourceLocation) -> public::Sourc
     }
 }
 
-/// Create source location, automatically handling offset if needed
+/// Create a public source location for an emitted byte span.
 ///
-/// Unified helper that eliminates repetitive if/else checks throughout conversion.
-/// When offset is 0, uses fast path directly. When offset is non-zero, adjusts span accordingly.
+/// The mapper decides the output space: identity map → byte columns (the
+/// `Value` oracle and `tsv_svelte` byte-space contracts), real map → UTF-16
+/// char columns emitted directly (the fused `convert_ast_json_string` path).
 #[inline]
-pub(super) fn create_location(
-    span: Span,
-    tracker: &LocationTracker,
-    offset: usize,
-) -> public::SourceLocation {
-    let loc = if offset == 0 {
-        tracker.span_to_location(span)
-    } else {
-        tracker.span_to_location_with_offset(span, offset)
-    };
-    to_public_location(loc)
+pub(super) fn create_location(span: Span, loc: LocationMapper<'_>) -> public::SourceLocation {
+    to_public_location(loc.span_to_location(span))
 }
 
 /// Convert an `f64` literal value to a `serde_json::Number`, mapping non-finite
@@ -294,20 +286,20 @@ pub(super) fn json_number_from_f64(n: f64) -> serde_json::Number {
 pub fn convert_program<'src>(
     program: &internal::Program<'_>,
     source: &'src str,
-    loc: &LocationTracker,
+    loc: LocationMapper<'_>,
     schema: Schema,
 ) -> public::Program<'src> {
     let interner = program.interner.borrow();
 
     public::Program {
         node_type: "Program",
-        start: program.span.start,
-        end: program.span.end,
-        loc: create_location(program.span, loc, 0),
+        start: loc.pos(program.span.start),
+        end: loc.pos(program.span.end),
+        loc: create_location(program.span, loc),
         body: program
             .body
             .iter()
-            .map(|s| convert_statement(s, source, loc, &interner, 0, schema))
+            .map(|s| convert_statement(s, source, loc, &interner, schema))
             .collect(),
         source_type: program.goal.source_type(),
     }

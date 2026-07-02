@@ -9,7 +9,7 @@
 
 use crate::ast::{internal, public};
 use string_interner::DefaultStringInterner;
-use tsv_lang::LocationTracker;
+use tsv_lang::{LocationMapper, LocationTracker};
 use tsv_ts::ast::convert::convert_expression;
 
 use super::{convert_fragment, convert_pattern_expression};
@@ -20,7 +20,7 @@ pub(super) fn convert_if_block<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::IfBlock<'src> {
-    let ts_expr = convert_expression(&block.test, source, loc, interner, 0);
+    let ts_expr = convert_expression(&block.test, source, LocationMapper::identity(loc), interner);
 
     public::IfBlock {
         node_type: "IfBlock",
@@ -42,7 +42,12 @@ pub(super) fn convert_each_block<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::EachBlock<'src> {
-    let expression = convert_expression(&block.expression, source, loc, interner, 0);
+    let expression = convert_expression(
+        &block.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
     let context = block
         .context
         .as_ref()
@@ -50,7 +55,7 @@ pub(super) fn convert_each_block<'src>(
     let key = block
         .key
         .as_ref()
-        .map(|k| convert_expression(k, source, loc, interner, 0));
+        .map(|k| convert_expression(k, source, LocationMapper::identity(loc), interner));
 
     public::EachBlock {
         node_type: "EachBlock",
@@ -74,7 +79,12 @@ pub(super) fn convert_await_block<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::AwaitBlock<'src> {
-    let expression = convert_expression(&block.expression, source, loc, interner, 0);
+    let expression = convert_expression(
+        &block.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
     // Simple identifier bindings get `character` in loc from Svelte's read_identifier().
     // Destructure patterns go through read_pattern() which produces columns +1.
     let value = block
@@ -114,7 +124,12 @@ pub(super) fn convert_key_block<'src>(
     loc: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> public::KeyBlock<'src> {
-    let expression = convert_expression(&block.expression, source, loc, interner, 0);
+    let expression = convert_expression(
+        &block.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
 
     public::KeyBlock {
         node_type: "KeyBlock",
@@ -132,12 +147,17 @@ pub(super) fn convert_snippet_block<'src>(
     interner: &DefaultStringInterner,
 ) -> public::SnippetBlock<'src> {
     // Svelte's read_identifier() adds `character` to loc for the snippet name.
-    let mut expression = convert_expression(&block.expression, source, loc, interner, 0);
+    let mut expression = convert_expression(
+        &block.expression,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    );
     expression.inject_loc_character();
     let parameters = block
         .parameters
         .iter()
-        .map(|p| convert_expression(p, source, loc, interner, 0).into())
+        .map(|p| convert_expression(p, source, LocationMapper::identity(loc), interner).into())
         .collect();
 
     public::SnippetBlock {
