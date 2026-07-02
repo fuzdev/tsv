@@ -222,23 +222,36 @@ impl DocText {
         }
     }
 
-    /// Get the cached visual width, if available.
+    /// Get the cached visual width.
     ///
-    /// Returns `Some(w)` for Static/Owned with precomputed width (u16::MAX = newline).
-    /// Returns `None` for Symbol or when width was not precomputed (TEXT_WIDTH_NOT_COMPUTED).
+    /// Decodes the stored `u16` (a real width or one of the two sentinel
+    /// values) into [`CachedWidth`], so callers can't mistake
+    /// [`TEXT_WIDTH_HAS_NEWLINE`] for an actual width — every consumer must
+    /// handle the newline case explicitly. `Symbol` is always
+    /// [`CachedWidth::NotComputed`] (identifiers are measured on demand).
     #[inline]
-    pub const fn cached_width(&self) -> Option<u16> {
+    pub const fn cached_width(&self) -> CachedWidth {
         match self {
-            DocText::Static(_, w) | DocText::Owned(_, w) | DocText::SourceSpan(_, w) => {
-                if *w == TEXT_WIDTH_NOT_COMPUTED {
-                    None
-                } else {
-                    Some(*w)
-                }
-            }
-            DocText::Symbol(_) => None,
+            DocText::Static(_, w) | DocText::Owned(_, w) | DocText::SourceSpan(_, w) => match *w {
+                TEXT_WIDTH_NOT_COMPUTED => CachedWidth::NotComputed,
+                TEXT_WIDTH_HAS_NEWLINE => CachedWidth::HasNewline,
+                w => CachedWidth::Width(w),
+            },
+            DocText::Symbol(_) => CachedWidth::NotComputed,
         }
     }
+}
+
+/// Decoded form of a [`DocText`] width slot — see [`DocText::cached_width`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CachedWidth {
+    /// Precomputed single-line visual width.
+    Width(u16),
+    /// The text contains a newline — there is no single-line width; fits
+    /// treats the line as ending inside this text.
+    HasNewline,
+    /// Not precomputed (ASCII policy or `Symbol`) — measure on demand.
+    NotComputed,
 }
 
 /// Resolve DocText to a string, using resolver if provided

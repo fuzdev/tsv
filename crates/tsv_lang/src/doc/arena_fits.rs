@@ -6,7 +6,27 @@ use crate::printing::visual_width;
 use smallvec::SmallVec;
 
 use super::arena::{ArenaCommand, DocArena, DocId, DocNode, FLAT_WIDTH_BREAKS, FLAT_WIDTH_UNKNOWN};
-use super::types::{LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TextResolver, resolve_text};
+use super::types::{CachedWidth, DocText, LineKind, Mode, TextResolver, resolve_text};
+
+/// Flat width of a text node, or `None` when the text contains a newline (the
+/// line ends inside it, so it has no single-line width). The one definition of
+/// the cached-or-measure fallback, backing [`flat_width_memo`]'s `Text` arm —
+/// its only caller, since the fits walk's `Text` arm reaches it via the memo.
+#[inline]
+fn text_flat_width<R: TextResolver + ?Sized>(t: &DocText, resolver: Option<&R>) -> Option<u32> {
+    match t.cached_width() {
+        CachedWidth::Width(w) => Some(u32::from(w)),
+        CachedWidth::HasNewline => None,
+        CachedWidth::NotComputed => {
+            let s = resolve_text(t, resolver);
+            if s.contains('\n') {
+                None
+            } else {
+                Some(visual_width(s, TAB_WIDTH) as u32)
+            }
+        }
+    }
+}
 
 /// Flat-mode width of a subtree for the `arena_fits` fast-path, memoized per
 /// `DocId`. `Some(w)` = break-free subtree occupying `w` columns flat; `None` =
@@ -26,18 +46,7 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
         w => return Some(w),
     }
     let result: Option<u32> = match &nodes[id.index()] {
-        DocNode::Text(t) => match t.cached_width() {
-            Some(w) if w == TEXT_WIDTH_HAS_NEWLINE => None,
-            Some(w) => Some(u32::from(w)),
-            None => {
-                let s = resolve_text(t, resolver);
-                if s.contains('\n') {
-                    None
-                } else {
-                    Some(visual_width(s, TAB_WIDTH) as u32)
-                }
-            }
-        },
+        DocNode::Text(t) => text_flat_width(t, resolver),
         // Contains hardlines → no break-free flat width (like a newline-bearing
         // `Text` or a `Line(Hard)`); force the `arena_fits` walk.
         DocNode::MultilineText(_) => None,
@@ -103,8 +112,6 @@ fn flat_width_memo<R: TextResolver + ?Sized>(
 
 /// Check if a doc fits in the remaining width, looking ahead at remaining commands.
 ///
-/// Arena-based version of `fits_with_lookahead`.
-///
 /// `embed` is currently unused — fits decisions only need the fixed
 /// [`crate::TAB_WIDTH`]. The parameter is threaded so internal callers from
 /// `arena_render` can pass it uniformly.
@@ -162,20 +169,21 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
         }
 
         match &nodes[current_id.index()] {
-            DocNode::Text(t) => {
-                match t.cached_width() {
-                    Some(w) if w == TEXT_WIDTH_HAS_NEWLINE => return true,
-                    Some(w) => remaining -= w as isize,
-                    None => {
-                        // Not cached (Symbol or ASCII) — fall back to resolve + visual_width
-                        let s = resolve_text(t, resolver);
-                        if s.contains('\n') {
-                            return true;
-                        }
-                        remaining -= visual_width(s, TAB_WIDTH) as isize;
-                    }
-                }
-            }
+            // Reached only in Break mode (the Flat-mode fast path above already
+            // consulted the memo). A text's flat width is mode-independent, so
+            // the memo applies here too — caching the resolve+measure that
+            // Break-mode visits would otherwise repeat per fits call.
+            DocNode::Text(_) => match flat_width_memo(
+                current_id,
+                &nodes,
+                &children_vec,
+                flat_cache.as_mut_slice(),
+                resolver,
+            ) {
+                Some(w) => remaining -= w as isize,
+                // Newline-bearing text ends the line — everything so far fit.
+                None => return true,
+            },
 
             DocNode::MultilineText(s) => {
                 // Equivalent to walking `[Text(first_line), Line(Hard), …]`: the
@@ -306,180 +314,43 @@ pub fn arena_fits<R: TextResolver + ?Sized>(
 }
 
 /// Check if multiple docs fit sequentially in the remaining width.
+///
+/// Thin wrapper over [`arena_fits_with_lookahead`]: the first doc is the main
+/// doc, the rest ride as look-ahead rest commands (consumed back-to-front by
+/// the walk, hence the reversed collect; their `indent` is unread there).
+/// Replaces what was a full copy of the fits walk that had drifted — it
+/// lacked the `flat_width_memo` fast path and its `Group` arm ignored
+/// `should_break`/`expanded_states`.
 pub(super) fn arena_fits_multi<R: TextResolver + ?Sized>(
     arena: &DocArena,
     doc_ids: &[DocId],
     width: usize,
     mode: Mode,
-    _embed: &EmbedContext,
+    embed: &EmbedContext,
     resolver: Option<&R>,
 ) -> bool {
     if width == usize::MAX {
         return true;
     }
-
-    let nodes = arena.borrow_nodes();
-    let children_vec = arena.borrow_children();
-    let mut stack: SmallVec<[(DocId, Mode); 16]> = SmallVec::new();
-    let mut remaining_width = width as isize;
-
-    for &doc_id in doc_ids.iter().rev() {
-        stack.push((doc_id, mode));
-    }
-
-    while let Some((current_id, current_mode)) = stack.pop() {
-        match &nodes[current_id.index()] {
-            DocNode::Text(t) => {
-                match t.cached_width() {
-                    Some(w) if w == TEXT_WIDTH_HAS_NEWLINE => return true,
-                    Some(w) => {
-                        remaining_width -= w as isize;
-                        if remaining_width < 0 {
-                            return false;
-                        }
-                    }
-                    None => {
-                        // Not cached (Symbol or ASCII) — fall back to resolve + visual_width
-                        let s = resolve_text(t, resolver);
-                        if s.contains('\n') {
-                            return true;
-                        }
-                        remaining_width -= visual_width(s, TAB_WIDTH) as isize;
-                        if remaining_width < 0 {
-                            return false;
-                        }
-                    }
-                }
-            }
-
-            DocNode::MultilineText(s) => {
-                // Mirrors the `[Text(first_line), Line(Hard)]` walk: the first
-                // line's width counts; then the first newline ends the line.
-                let first = s.split('\n').next().unwrap_or("");
-                remaining_width -= visual_width(first, TAB_WIDTH) as isize;
-                if remaining_width < 0 {
-                    return false;
-                }
-                return true;
-            }
-
-            DocNode::Line(kind) => match kind {
-                LineKind::Hard | LineKind::Literal => return true,
-                _ if current_mode == Mode::Break => return true,
-                LineKind::Soft => {}
-                LineKind::Normal => {
-                    remaining_width -= 1;
-                    if remaining_width < 0 {
-                        return false;
-                    }
-                }
-            },
-
-            DocNode::Group { contents, .. } => {
-                stack.push((*contents, current_mode));
-            }
-
-            DocNode::IsolatedGroup { contents } => {
-                stack.push((*contents, current_mode));
-            }
-
-            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-                stack.push((*inner, current_mode));
-            }
-
-            DocNode::Align { contents, .. } => {
-                stack.push((*contents, current_mode));
-            }
-
-            DocNode::IndentIfBreak { contents, .. } => {
-                stack.push((*contents, current_mode));
-            }
-
-            DocNode::IfBreak {
-                break_doc,
-                flat_doc,
-                group_id,
-            } => {
-                // A group-id if_break keys on a group that, during this
-                // hypothetical fits test, is still unresolved → treat as flat.
-                // This keeps trailing text (e.g. a block head's `}`) counted in
-                // the keyed group's own width so it breaks at the right boundary.
-                let chosen = if group_id.is_none() && current_mode == Mode::Break {
-                    *break_doc
-                } else {
-                    *flat_doc
-                };
-                stack.push((chosen, current_mode));
-            }
-
-            DocNode::Concat(range) => {
-                let kids = range.resolve(&children_vec);
-                for &child in kids.iter().rev() {
-                    stack.push((child, current_mode));
-                }
-            }
-
-            DocNode::Fill(range) => {
-                let kids = range.resolve(&children_vec);
-                for &child in kids.iter().rev() {
-                    stack.push((child, current_mode));
-                }
-            }
-
-            DocNode::WithContext { doc, context } => {
-                remaining_width -= context.trailing_reserve as isize;
-                if remaining_width < 0 {
-                    return false;
-                }
-                stack.push((*doc, current_mode));
-            }
-
-            DocNode::LineSuffix(_) => {}
-            DocNode::LineSuffixBoundary => {}
-            DocNode::BreakParent => return false,
-        }
-    }
-
-    remaining_width >= 0
-}
-
-/// Update position after rendering a text string, accounting for tab expansion.
-///
-/// The overwhelmingly common input here is short ASCII with no newline — every
-/// interned identifier (`Symbol`) and every static punctuation/keyword token
-/// reaches this via `render_text`'s uncached-width arm. For those the previous
-/// shape scanned the bytes three times (`rfind('\n')` + `visual_width`'s own
-/// `is_ascii` + tab count). The fast path below folds the newline reset, tab
-/// expansion, and width accumulation into a single forward byte pass, so no
-/// backward `memchr` scan runs. The first non-ASCII byte hands off to
-/// `update_pos_for_text_unicode` (cold-outlined to keep this fast path lean and
-/// inlinable, mirroring `skip_trivia` / `skip_trivia_scan`). Byte-identical to
-/// the prior implementation by construction.
-#[inline]
-pub(super) fn update_pos_for_text(pos: &mut usize, s: &str) {
-    let mut col = *pos;
-    for &b in s.as_bytes() {
-        match b {
-            b'\n' => col = 0,
-            b'\t' => col += TAB_WIDTH,
-            0..=0x7f => col += 1,
-            _ => return update_pos_for_text_unicode(pos, s),
-        }
-    }
-    *pos = col;
-}
-
-/// Grapheme-aware fallback for `update_pos_for_text` when the text contains a
-/// non-ASCII byte. Re-measures the whole string from scratch (the fast path's
-/// partial `col` is intentionally dropped) so a combining mark attaching to an
-/// ASCII base char is never split mid-grapheme — the original pre-fusion logic,
-/// verbatim. Cold: non-ASCII text is rare in the render stream.
-#[cold]
-#[inline(never)]
-fn update_pos_for_text_unicode(pos: &mut usize, s: &str) {
-    if let Some(last_newline_pos) = s.rfind('\n') {
-        *pos = visual_width(&s[last_newline_pos + 1..], TAB_WIDTH);
-    } else {
-        *pos += visual_width(s, TAB_WIDTH);
-    }
+    let Some((&first, rest)) = doc_ids.split_first() else {
+        return true;
+    };
+    let rest_commands: SmallVec<[ArenaCommand; 4]> = rest
+        .iter()
+        .rev()
+        .map(|&doc| ArenaCommand {
+            indent: 0,
+            mode,
+            doc,
+        })
+        .collect();
+    arena_fits_with_lookahead(
+        arena,
+        first,
+        mode,
+        &rest_commands,
+        width as isize,
+        embed,
+        resolver,
+    )
 }
