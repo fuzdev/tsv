@@ -696,9 +696,73 @@ pub fn visual_width(s: &str, tab_width: usize) -> usize {
         let tab_count = s.as_bytes().iter().filter(|&&b| b == b'\t').count();
         return s.len() + tab_count * (tab_width - 1);
     }
-    s.graphemes(true)
-        .map(|g| grapheme_width(g, tab_width))
-        .sum()
+    visual_width_mixed(s, tab_width)
+}
+
+/// Width of a string containing non-ASCII: byte-count maximal ASCII runs,
+/// grapheme-walk only the non-ASCII stretches. Cluster-identical to walking
+/// every grapheme (one non-ASCII char must not change how the ASCII majority
+/// is measured), which pins three boundary constraints the code can't show:
+///
+/// - An ASCII run followed by a non-ASCII char hands its LAST char to the
+///   grapheme walker — that char may start a cluster crossing the boundary
+///   (combining mark on an ASCII base `e\u{0301}`, keycap `1\u{FE0F}\u{20E3}`,
+///   and ASCII+ZWJ, the one such cluster whose width (emoji rule: 2) differs
+///   from the sum of its chars' widths, so it must be walked whole).
+/// - The walker advances whole clusters and returns to byte counting only at
+///   a cluster boundary, so a cluster that absorbs a *following* ASCII char
+///   (Prepend, e.g. `\u{0600}1`) is consumed there and never double-counted.
+///   Every switch position is a true cluster boundary of the full string,
+///   except a CRLF split by a run boundary — the only ASCII-ASCII cluster —
+///   which is width-preserving (both chars are width 0 on both paths).
+/// - Run bytes use grapheme-path char semantics — printable 1, tab
+///   `tab_width`, control/DEL 0 — NOT the pure-ASCII fast path's byte count
+///   (which keeps its historical controls-count-as-1 behavior).
+fn visual_width_mixed(s: &str, tab_width: usize) -> usize {
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let mut width = 0usize;
+    let mut i = 0usize;
+    while i < len {
+        if bytes[i].is_ascii() {
+            // Single pass: accumulate the run's width while finding its end.
+            while i < len && bytes[i].is_ascii() {
+                width += ascii_char_width(bytes[i], tab_width);
+                i += 1;
+            }
+            if i == len {
+                return width;
+            }
+            // Non-ASCII follows: un-count the run's last char and hand it to
+            // the grapheme walker (it may start a boundary-crossing cluster).
+            i -= 1;
+            width -= ascii_char_width(bytes[i], tab_width);
+        }
+        for g in s[i..].graphemes(true) {
+            width += grapheme_width(g, tab_width);
+            i += g.len();
+            if i < len && bytes[i].is_ascii() {
+                break;
+            }
+        }
+    }
+    width
+}
+
+/// Width of one ASCII char: printable 1, tab `tab_width`, control/DEL 0.
+/// Must agree with [`grapheme_width`] on a single-char ASCII cluster (there
+/// `'\t'` is special-cased and `char::width` yields 1 for printables, `None`→0
+/// for controls) — `visual_width_mixed`'s run counting relies on the two being
+/// interchangeable, and the parity tests enforce it.
+#[inline]
+const fn ascii_char_width(b: u8, tab_width: usize) -> usize {
+    if b == b'\t' {
+        tab_width
+    } else if b < 0x20 || b == 0x7f {
+        0
+    } else {
+        1
+    }
 }
 
 /// Calculate width of a single grapheme cluster.
@@ -835,6 +899,97 @@ mod tests {
         assert_eq!(visual_width("a\u{200B}b", 2), 2);
         // lone combining mark: must not panic, width 0
         assert_eq!(visual_width("\u{0301}", 2), 0);
+    }
+
+    /// The pre-hybrid implementation: walk every grapheme cluster. The hybrid
+    /// `visual_width_mixed` must be value-identical to this on every input.
+    fn visual_width_reference(s: &str, tab_width: usize) -> usize {
+        s.graphemes(true)
+            .map(|g| grapheme_width(g, tab_width))
+            .sum()
+    }
+
+    #[test]
+    fn test_visual_width_mixed_matches_reference_exhaustive() {
+        // Chars chosen to hit every boundary rule: ASCII printable/control/
+        // tab/CR/LF/DEL, combining mark (Extend), ZWJ + pictographic + skin
+        // tone (the emoji-modifier rule), variation selector + keycap,
+        // Prepend (U+0600 absorbs a following char), regional-indicator pair
+        // (GB12 pairing), CJK/wide, zero-width space.
+        const POOL: &[char] = &[
+            'a',
+            '1',
+            ' ',
+            '\t',
+            '\r',
+            '\n',
+            '\u{7f}',
+            '\u{1}',
+            '\u{0301}',
+            'é',
+            '中',
+            '⭐',
+            '🙂',
+            '\u{1F3FD}',
+            '\u{200D}',
+            '\u{FE0F}',
+            '\u{20E3}',
+            '\u{0600}',
+            '\u{200B}',
+            '\u{1F1FA}',
+            '\u{1F1F8}',
+        ];
+        let mut s = String::new();
+        for &a in POOL {
+            for &b in POOL {
+                for &c in POOL {
+                    s.clear();
+                    s.push(a);
+                    s.push(b);
+                    s.push(c);
+                    for tw in [2usize, 4] {
+                        assert_eq!(
+                            visual_width_mixed(&s, tw),
+                            visual_width_reference(&s, tw),
+                            "triple {s:?} tab_width {tw}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_visual_width_mixed_matches_reference_targeted() {
+        // Longer shapes the triple product can't reach: long ASCII runs with
+        // sparse non-ASCII (the case the hybrid optimizes), cluster chains at
+        // run boundaries, and multi-switch alternation.
+        for s in [
+            "a long ascii prefix with a trailing accent e\u{0301} and more ascii after",
+            "/** JSDoc with one arrow → in the middle of a long comment line */",
+            "1\u{FE0F}\u{20E3}x",
+            "x\u{200D}\u{1F642}y",
+            "\u{0600}12ab",
+            "ab\r\né\r\ncd",
+            "\té\ta\t中\t",
+            "🇺🇸🇺🇸🇺a🇺🇸",
+            "e\u{0301}\u{0301}a\u{0301}",
+            "中中中 spaces 中中中",
+            "🙂🏽\u{200D}🙂a🙂\u{200D}",
+            "trailing run then unicode é",
+            "é leading unicode then run",
+            "é",
+            "aé",
+            "éa",
+        ] {
+            for tw in [2usize, 4] {
+                assert_eq!(
+                    visual_width_mixed(s, tw),
+                    visual_width_reference(s, tw),
+                    "input {s:?} tab_width {tw}"
+                );
+            }
+        }
     }
 
     #[test]

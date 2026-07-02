@@ -30,7 +30,9 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use types::{DocContext, DocText, GroupId, LineKind, Mode, SourceTextResolver, TextResolver};
+pub use types::{
+    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, SourceTextResolver, TextResolver,
+};
 
 /// Stack buffer for assembling a node's doc parts before handing them to
 /// `DocArena::concat` / `fill`. Language printers build one such `Vec<DocId>` per
@@ -141,6 +143,43 @@ mod arena_tests {
         assert_eq!(available_width(1, 50, 0), 50);
         // saturating floor: never underflows below 0.
         assert_eq!(available_width(0, 200, 0), 0);
+    }
+
+    #[test]
+    fn test_text_width_precompute_clamps_below_sentinels() {
+        use super::arena::DocNode;
+        use super::types::CachedWidth;
+
+        let cached = |s: String| {
+            let arena = DocArena::new();
+            let id = arena.text_owned(s);
+            let nodes = arena.borrow_nodes();
+            let DocNode::Text(t) = &nodes[id.index()] else {
+                panic!("expected text node");
+            };
+            t.cached_width()
+        };
+
+        const MAX_CACHEABLE: u16 = u16::MAX - 2; // one below TEXT_WIDTH_NOT_COMPUTED
+
+        // Width 65,533 (32,766 CJK × 2 + 1): the widest exactly-cacheable text.
+        assert_eq!(
+            cached("中".repeat(32_766) + "x"),
+            CachedWidth::Width(MAX_CACHEABLE)
+        );
+        // Width 65,534 would alias TEXT_WIDTH_NOT_COMPUTED; must clamp.
+        assert_eq!(
+            cached("中".repeat(32_767)),
+            CachedWidth::Width(MAX_CACHEABLE)
+        );
+        // Width 65,536+ would wrap under a bare `as u16` (→ "always fits");
+        // must clamp instead.
+        assert_eq!(
+            cached("中".repeat(40_000)),
+            CachedWidth::Width(MAX_CACHEABLE)
+        );
+        // Newline-bearing text is flagged, never measured.
+        assert_eq!(cached("中\n中".to_string()), CachedWidth::HasNewline);
     }
 
     #[test]

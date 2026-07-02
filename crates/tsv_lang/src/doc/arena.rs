@@ -217,6 +217,33 @@ impl ArenaCommand {
 pub(super) const FLAT_WIDTH_UNKNOWN: u32 = u32::MAX;
 pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 
+/// The width-cache policy shared by [`DocArena::text_owned`] and
+/// [`DocArena::source_span`]: skip ASCII (the byte-count fast path measures on
+/// demand for less than caching costs), flag newline-bearing text, else take
+/// the grapheme path once (it may be re-measured many times in fits).
+///
+/// The measured width is clamped below the sentinels. Unlike the `u32`
+/// flat-width cache above (where aliasing needs a ~4 GB subtree and is benign
+/// anyway), a `u16` alias is reachable — a single-line non-ASCII text ≥65,534
+/// columns — and `as u16` alone would be wrong twice over: 65,535 aliases
+/// `TEXT_WIDTH_HAS_NEWLINE` (fits would treat the line as ending inside the
+/// text) and ≥65,536 wraps (a huge text cached as narrow → "always fits").
+/// Clamping is verdict-preserving: every fits comparison is against a print
+/// width orders of magnitude below the clamp, so "65,533" and the true width
+/// answer identically. The same holds for the other consumer, `render_text`'s
+/// column advance — the column only feeds threshold comparisons (print width,
+/// `first_line_offset`) far below the clamp, and resets at each newline.
+#[inline]
+fn precompute_text_width(s: &str) -> u16 {
+    if s.is_ascii() {
+        TEXT_WIDTH_NOT_COMPUTED
+    } else if s.contains('\n') {
+        TEXT_WIDTH_HAS_NEWLINE
+    } else {
+        visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+    }
+}
+
 /// Arena allocator for document nodes.
 ///
 /// All doc nodes are stored contiguously in `nodes`. Multi-child nodes
@@ -350,8 +377,8 @@ impl DocArena {
     /// Create a text doc from a static string (zero allocation).
     ///
     /// Never precomputes width. Static strings are short ASCII punctuation,
-    /// keywords, and operators — `visual_width()`'s ASCII fast path handles
-    /// them in ~3ns, so caching saves nothing vs the construction cost.
+    /// keywords, and operators — `visual_width()`'s ASCII byte-count fast path
+    /// measures them on demand for less than the caching would cost.
     #[inline]
     pub fn text(&self, s: &'static str) -> DocId {
         self.alloc(DocNode::Text(DocText::Static(s, TEXT_WIDTH_NOT_COMPUTED)))
@@ -359,21 +386,10 @@ impl DocArena {
 
     /// Create a text doc from an owned string.
     ///
-    /// Only precomputes width for non-ASCII strings (unicode template text,
-    /// formatted string literals). These trigger expensive grapheme segmentation
-    /// (~100-500ns) and may be measured multiple times in fits.
-    ///
-    /// ASCII owned strings use `visual_width()`'s fast path (~3-5ns per visit),
-    /// making caching unnecessary.
+    /// Width-cache policy: see [`precompute_text_width`].
     #[inline]
     pub fn text_owned(&self, s: String) -> DocId {
-        let w = if s.is_ascii() {
-            TEXT_WIDTH_NOT_COMPUTED // ASCII is cheap, don't bother
-        } else if s.contains('\n') {
-            TEXT_WIDTH_HAS_NEWLINE
-        } else {
-            visual_width(&s, TAB_WIDTH) as u16
-        };
+        let w = precompute_text_width(&s);
         self.alloc(DocNode::Text(DocText::Owned(s, w)))
     }
 
@@ -417,14 +433,7 @@ impl DocArena {
     /// arena and is re-resolved at render via a [`super::SourceTextResolver`].
     #[inline]
     pub fn source_span(&self, span: Span, source: &str) -> DocId {
-        let slice = span.extract(source);
-        let w = if slice.is_ascii() {
-            TEXT_WIDTH_NOT_COMPUTED // ASCII is cheap, don't bother
-        } else if slice.contains('\n') {
-            TEXT_WIDTH_HAS_NEWLINE
-        } else {
-            visual_width(slice, TAB_WIDTH) as u16
-        };
+        let w = precompute_text_width(span.extract(source));
         self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
     }
 
