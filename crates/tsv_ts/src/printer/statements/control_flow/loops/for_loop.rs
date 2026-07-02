@@ -1260,16 +1260,29 @@ impl<'a> Printer<'a> {
                         let id_end = declarator.id.span().end;
                         let init_start = init.span().start;
                         let eq_pos = self.find_equals_position(id_end, init_start);
-                        parts.push(d.text(" = "));
-                        // A single-line block glued to `=` hugs the value even across a
-                        // source newline (`i = /* c */⏎0` → `i = /* c */ 0`), so it does
-                        // not force the whole for-header to break; matches prettier.
-                        if let Some(comments) =
-                            self.build_rhs_comments_glued_opt(eq_pos + 1, init_start)
+                        // A comment after `=` that forces a break (line comment, or an
+                        // own-line / multiline block) breaks after the `=` and keeps the
+                        // comment on its own line — the same handling as a variable
+                        // declarator (gluing it up onto the `=` line would be
+                        // non-idempotent). A single-line block glued inline to `=` still
+                        // hugs the value across a source newline (`i = /* c */⏎0` →
+                        // `i = /* c */ 0`) and keeps the header flat.
+                        if let Some(rhs) =
+                            self.build_eq_comment_break_rhs(eq_pos, init_start, || {
+                                self.wrap_for_init_in(init, self.build_expression_doc(init))
+                            })
                         {
-                            parts.push(comments);
+                            parts.push(rhs);
+                        } else {
+                            parts.push(d.text(" = "));
+                            if let Some(comments) =
+                                self.build_rhs_comments_glued_opt(eq_pos + 1, init_start)
+                            {
+                                parts.push(comments);
+                            }
+                            parts
+                                .push(self.wrap_for_init_in(init, self.build_expression_doc(init)));
                         }
-                        parts.push(self.wrap_for_init_in(init, self.build_expression_doc(init)));
                     }
                 }
                 d.concat(&parts)

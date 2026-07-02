@@ -596,73 +596,31 @@ impl<'a> Printer<'a> {
                     && !is_arrow_with_breakable_left;
                 drop(interner);
 
-                // Check for line comments after = which force a break
-                let has_line_comments_after_eq =
-                    self.has_line_comments_between(equals_pos + 1, init_start);
-
-                // Check for a comment after `=` that forces break-after-operator.
-                // Prettier ref: hasLeadingOwnLineComment → break-after-operator in
-                // chooseLayout. A comment forces the break when it's multiline (its own
-                // newlines break the group) or own-line — a newline *precedes* it, so it
-                // starts a fresh line. A single-line block glued to `=` stays inline even
-                // when the value follows on the next line (`= /* c */⏎v` → `= /* c */ v`).
-                let has_own_line_comment_after_eq = has_comments_after_eq
-                    && comments_in_range(self.comments, rhs_comments_start, init_start)
-                        .any(|c| self.comment_forces_own_line(c));
-
                 // Curried arrows with return type always break after `=`
                 let is_curried_arrow = is_curried_arrow_with_return_type(init);
 
-                if is_multiline_string || has_line_comments_after_eq {
-                    // Multiline strings or line comments: mandatory break after `=`
+                if let Some(rhs) = self.build_eq_comment_break_rhs(equals_pos, init_start, || {
+                    self.build_init_value_doc(init, declarator.span.end)
+                }) {
+                    // A comment after `=` forces a break (line comment → partition;
+                    // own-line / multiline block → break-after-operator hang). Shared
+                    // with the for-loop init clause.
+                    push_lhs(&mut parts, id_doc);
+                    parts.push(rhs);
+                } else if is_multiline_string {
+                    // Multiline string with no comment forcing a break: mandatory break
+                    // after `=`. An inline block glued to `=` trails it on that line.
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
-                    if has_comments_after_eq {
-                        // Single pass: partition comments into same-line (inline) and
-                        // different-line (leading) relative to the `=` sign.
-                        let mut leading_comments = DocBuf::new();
-                        let after_eq: CommentVec<'_> =
-                            comments_in_range(self.comments, equals_pos + 1, init_start).collect();
-                        for (ci, comment) in after_eq.iter().enumerate() {
-                            if self.is_same_line(equals_pos, comment.span.start) {
-                                // Inline comment on same line as =
-                                parts.push(d.text(" "));
-                                parts.push(self.build_comment_doc(comment));
-                            } else {
-                                leading_comments.push(self.build_comment_doc(comment));
-                                // Preserve an author blank line before the next comment
-                                // or the value, matching prettier.
-                                let next =
-                                    after_eq.get(ci + 1).map_or(init_start, |c| c.span.start);
-                                self.push_blank_preserving_hardline(
-                                    &mut leading_comments,
-                                    comment.span.end,
-                                    next,
-                                );
-                            }
-                        }
-                        parts.push(d.indent(d.concat(&[
-                            d.hardline(),
-                            d.concat(&leading_comments),
-                            self.build_init_value_doc(init, declarator.span.end),
-                        ])));
-                    } else {
-                        parts.push(d.indent(d.concat(&[
-                            d.hardline(),
-                            self.build_init_value_doc(init, declarator.span.end),
-                        ])));
+                    if let Some(inline) =
+                        self.build_inline_comments_between_doc_opt(equals_pos + 1, init_start)
+                    {
+                        parts.push(inline);
                     }
-                } else if has_own_line_comment_after_eq {
-                    // A multiline or own-line comment after `=` forces break-after-operator
-                    // layout. Prettier ref: hasLeadingOwnLineComment → break-after-operator
-                    push_lhs(&mut parts, id_doc);
-                    parts.push(d.text(" ="));
-                    let comments_doc = self
-                        .build_rhs_comments_opt(rhs_comments_start, init_start)
-                        .unwrap_or_else(|| d.empty());
-                    let init_doc = self.build_init_value_doc(init, declarator.span.end);
-                    let rhs_doc = d.concat(&[comments_doc, init_doc]);
-                    parts.push(hang_after_operator(d, rhs_doc));
+                    parts.push(d.indent(d.concat(&[
+                        d.hardline(),
+                        self.build_init_value_doc(init, declarator.span.end),
+                    ])));
                 } else if is_curried_arrow {
                     // Curried arrow with return type: mandatory break after `=`
                     // The arrow expression formatter handles the rest of the breaking

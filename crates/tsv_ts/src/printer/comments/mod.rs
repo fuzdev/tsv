@@ -463,4 +463,74 @@ impl<'a> Printer<'a> {
             None => value_doc,
         }
     }
+
+    /// Build the `= value` RHS for an initializer whose `=`→value gap
+    /// (`eq_pos + 1 .. value_start`) holds a comment that forces break handling,
+    /// or `None` when the caller should emit its normal inline `= value` form (no
+    /// comment, or a single inline block that glues to the value). The returned doc
+    /// begins at `" ="`; the caller emits the LHS (name/pattern) before it.
+    /// `build_value` is called only when a break is forced, so a comment-free
+    /// initializer never pays to build the value doc here.
+    ///
+    /// Shared by variable declarators and for-loop init clauses so both place a
+    /// comment after `=` identically:
+    ///
+    /// - **Line comment** after `=`: mandatory break after `=`. A comment on the
+    ///   `=`'s line trails it inline; a comment on its own line leads the value on
+    ///   its own line (author blank lines preserved). Diverges from prettier, which
+    ///   relocates the line comment to trail the whole statement — tsv preserves the
+    ///   author's placement (see [`conformance_prettier.md` §Comment relocation]).
+    /// - **Own-line / multiline block** after `=`: break-after-operator hang, the
+    ///   comment on its own line (matches prettier's `hasLeadingOwnLineComment`).
+    /// - **Inline block** glued to `=`, or no comment: `None` — the caller keeps the
+    ///   value on the `=` line (`= /* c */ value`).
+    pub(crate) fn build_eq_comment_break_rhs(
+        &self,
+        eq_pos: u32,
+        value_start: u32,
+        build_value: impl FnOnce() -> DocId,
+    ) -> Option<DocId> {
+        let d = self.d();
+        if !self.has_comments_between(eq_pos + 1, value_start) {
+            return None;
+        }
+        if self.has_line_comments_between(eq_pos + 1, value_start) {
+            // Line comment → mandatory break. Partition the run: a comment on the
+            // `=`'s line trails it; the rest lead the value on their own lines.
+            let after_eq: CommentVec<'_> =
+                comments_in_range(self.comments, eq_pos + 1, value_start).collect();
+            let mut trailing = DocBuf::new();
+            let mut leading = DocBuf::new();
+            for (ci, comment) in after_eq.iter().enumerate() {
+                if self.is_same_line(eq_pos, comment.span.start) {
+                    trailing.push(d.text(" "));
+                    trailing.push(self.build_comment_doc(comment));
+                } else {
+                    leading.push(self.build_comment_doc(comment));
+                    // Preserve an author blank line before the next comment / value.
+                    let next = after_eq.get(ci + 1).map_or(value_start, |c| c.span.start);
+                    self.push_blank_preserving_hardline(&mut leading, comment.span.end, next);
+                }
+            }
+            Some(d.concat(&[
+                d.text(" ="),
+                d.concat(&trailing),
+                d.indent(d.concat(&[d.hardline(), d.concat(&leading), build_value()])),
+            ]))
+        } else if comments_in_range(self.comments, eq_pos + 1, value_start)
+            .any(|c| self.comment_forces_own_line(c))
+        {
+            // Own-line / multiline block → break-after-operator hang.
+            let comments_doc = self
+                .build_rhs_comments_opt(eq_pos + 1, value_start)
+                .unwrap_or_else(|| d.empty());
+            Some(d.concat(&[
+                d.text(" ="),
+                layout::hang_after_operator(d, d.concat(&[comments_doc, build_value()])),
+            ]))
+        } else {
+            // Only an inline block glued to `=`: caller emits `= /* c */ value`.
+            None
+        }
+    }
 }
