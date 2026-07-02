@@ -1,0 +1,120 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 187,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 51,
+					"end": 73,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 51,
+							"end": 73,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 51,
+											"end": 57
+										}
+									],
+									"start": 51,
+									"end": 73
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 74,
+					"end": 92,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 78,
+							"end": 88,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 51,
+				"end": 92
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 136,
+					"end": 158,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 136,
+							"end": 158,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 136,
+											"end": 142
+										}
+									],
+									"start": 136,
+									"end": 158
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 159,
+					"end": 178,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 163,
+							"end": 174,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 136,
+				"end": 178
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 179,
+			"styles": "\n\t/* comment before the part identifier */\n\t::part(/* c1 */ name1) {\n\t\tcolor: red;\n\t}\n\n\t/* comment after the part identifier */\n\t::part(name2 /* c2 */) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 188,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

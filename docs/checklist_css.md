@@ -52,7 +52,8 @@ Foundation for all CSS parsing. Spec: `css-syntax-3` (REC)
 - Multi-line comments
 - Comments in selectors
 - Comments in `:nth-*()` args (An+B gaps, around `of`, after the `of` list; a comment inside the An+B text freezes it verbatim)
-- Comments in `::part()` / `::slotted()` / `:dir()`-family / unknown-pseudo args — NOT preserved yet (dropped; see the TODO in `parser/pseudo.rs`)
+- Comments in `::slotted()` / `::part()` / unknown-pseudo args (leading/trailing gaps; between-element positions are rejected by both parsers)
+- Comments in `:dir()` / `:lang()` / `::highlight()` identifier args — NOT preserved yet (leading dropped, trailing absorbed into the value; see the TODO in `parser/pseudo.rs`)
 - Comments in declarations
 - Comments in at-rules
 - Consecutive comments

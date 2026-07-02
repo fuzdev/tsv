@@ -1,0 +1,176 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 199,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 53,
+					"end": 79,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 53,
+							"end": 79,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "current",
+											"args": {
+												"type": "SelectorList",
+												"start": 71,
+												"end": 78,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 71,
+														"end": 78,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class1",
+																		"start": 71,
+																		"end": 78
+																	}
+																],
+																"start": 71,
+																"end": 78
+															}
+														]
+													}
+												]
+											},
+											"start": 53,
+											"end": 79
+										}
+									],
+									"start": 53,
+									"end": 79
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 80,
+					"end": 98,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 84,
+							"end": 94,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 53,
+				"end": 98
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 144,
+					"end": 170,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 144,
+							"end": 170,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "current",
+											"args": {
+												"type": "SelectorList",
+												"start": 153,
+												"end": 160,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 153,
+														"end": 160,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class2",
+																		"start": 153,
+																		"end": 160
+																	}
+																],
+																"start": 153,
+																"end": 160
+															}
+														]
+													}
+												]
+											},
+											"start": 144,
+											"end": 170
+										}
+									],
+									"start": 144,
+									"end": 170
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 171,
+					"end": 190,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 175,
+							"end": 186,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 144,
+				"end": 190
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 191,
+			"styles": "\n\t/* comment before the argument selector */\n\t:current(/* c1 */ .class1) {\n\t\tcolor: red;\n\t}\n\n\t/* comment after the argument selector */\n\t:current(.class2 /* c2 */) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 200,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
