@@ -61,28 +61,44 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Internal type parsing with ASI control. This is the full-type entry, where
-    /// function/constructor types are grammatically allowed — clear
-    /// `fn_type_disallowed` so nested full-type positions (type arguments, tuple
-    /// members, object-type members, conditional branches, parenthesized inners)
-    /// parse them greedily even when reached from a constituent/operand parse.
+    /// function/constructor types are grammatically allowed — clear both
+    /// type-context restrictions (`with_full_type_context`) so nested full-type
+    /// positions (type arguments, tuple members, object-type members,
+    /// conditional branches, parenthesized inners) parse them greedily even when
+    /// reached from a constituent/operand parse.
     fn parse_type_inner(
         &mut self,
         respect_asi_bracket: bool,
     ) -> Result<TSType<'arena>, ParseError> {
-        self.with_fn_type_disallowed(false, |p| {
+        debug_assert!(self.pending_conditional_extends.is_none());
+        self.with_full_type_context(|p| {
             let start = p.current_pos().0;
             let check_type = p.parse_union_type_inner(respect_asi_bracket)?;
 
-            // Check for conditional type: `T extends U ? V : W`. The `extends` must not
-            // be preceded by a line terminator (TS `CheckType [no LineTerminator here]
-            // extends ExtendsType`): a newline before it ends the type, leaving `extends`
-            // a stray token (acorn-typescript's `hasPrecedingLineBreak` guard). Same
-            // restricted-production rule as the arrow `=>` (see `expect_arrow`).
-            if p.check(&TokenKind::Keyword(KeywordKind::Extends)) && !p.had_line_terminator {
+            // A constrained infer inside `check_type` hit `?` directly after its
+            // constraint at this allow-conditional position: the constraint
+            // re-binds as this conditional's extends clause and the current token
+            // is the `?` (see `pending_conditional_extends`). Otherwise check for
+            // `T extends U ? V : W`. The `extends` must not be preceded by a line
+            // terminator (TS `CheckType [no LineTerminator here] extends
+            // ExtendsType`): a newline before it ends the type, leaving `extends`
+            // a stray token (acorn-typescript's `hasPrecedingLineBreak` guard).
+            // Same restricted-production rule as the arrow `=>` (see
+            // `expect_arrow`).
+            let extends_type = if let Some(rebound) = p.pending_conditional_extends.take() {
+                debug_assert!(p.check(&TokenKind::Question));
+                Some(rebound)
+            } else if p.check(&TokenKind::Keyword(KeywordKind::Extends)) && !p.had_line_terminator {
                 p.advance()?; // consume 'extends'
 
-                let extends_type = p.parse_union_type()?;
+                // The extends clause cannot itself be a conditional — a nested
+                // `? T : F` binds to this conditional; parens re-enable it.
+                Some(p.with_conditional_type_disallowed(true, Self::parse_union_type)?)
+            } else {
+                None
+            };
 
+            if let Some(extends_type) = extends_type {
                 // Expect '?'
                 p.expect(&TokenKind::Question)?;
 
@@ -435,22 +451,44 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let name = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
 
-        // Optional constraint: `infer U extends C`. Parse the constraint as a
-        // union type (not a full type) so a trailing `? T : F` binds to the
-        // enclosing conditional rather than being swallowed as a nested
-        // conditional — TS's rule that the constraint's `extends` can't itself
-        // start a conditional. Parens re-enable it (`infer U extends (A ? B : C)`),
-        // since the parenthesized-type parser recurses into the full type grammar.
-        // Mirrors how a conditional's `extends_type` is parsed (`parse_type_inner`).
+        // Optional constraint: `infer U extends C`. The constraint is parsed
+        // with conditionals disallowed and function types re-enabled (acorn
+        // parses it as a full type in the disallow-conditional context), so a
+        // nested `? T : F` binds outward rather than being swallowed as a
+        // nested conditional. Parens re-enable conditionals
+        // (`infer U extends (A ? B : C)`), since the parenthesized-type parser
+        // recurses into the full type grammar. Mirrors how a conditional's
+        // `extends_type` is parsed (`parse_type_inner`).
+        //
+        // At an allow-conditional position, a `?` directly after the
+        // constraint means it was never a constraint at all:
+        // `infer U extends C ? T : F` is a conditional whose check is the bare
+        // `infer U` and whose extends clause is `C` (acorn rolls back its
+        // constraint tryParse and re-parses at the conditional level; the
+        // already-parsed type is handed to `parse_type_inner` via
+        // `pending_conditional_extends` instead of re-lexing). The re-bound
+        // `extends` honors the conditional's no-line-terminator rule: after a
+        // newline the constraint is kept, and the enclosing context then
+        // rejects the stray `?` — matching acorn, whose rolled-back re-parse
+        // refuses the `extends` and rejects on the stray token.
         let mut end = id_end as u32;
-        let constraint = if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
+        let mut constraint = None;
+        if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
+            let extends_preceded_by_lt = self.had_line_terminator;
             self.advance()?; // consume 'extends'
-            let constraint_type = self.parse_union_type()?;
-            end = constraint_type.span().end;
-            Some(self.alloc(constraint_type))
-        } else {
-            None
-        };
+            let constraint_type = self.with_conditional_type_disallowed(true, |p| {
+                p.with_fn_type_disallowed(false, Self::parse_union_type)
+            })?;
+            if !self.conditional_type_disallowed
+                && !extends_preceded_by_lt
+                && self.check(&TokenKind::Question)
+            {
+                self.pending_conditional_extends = Some(constraint_type);
+            } else {
+                end = constraint_type.span().end;
+                constraint = Some(self.alloc(constraint_type));
+            }
+        }
 
         Ok(TSType::Infer(TSInferType {
             type_parameter: TSTypeParameter {
@@ -835,58 +873,54 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         // Try to parse as function parameters
-        let params: &'arena [Expression<'arena>] =
-            self.parse_function_type_params()?.into_bump_slice();
+        let (params, saw_comma) = self.parse_function_type_params()?;
+        let params: &'arena [Expression<'arena>] = params.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
-        // Check for arrow => to determine if it's a function type
-        if self.check(&TokenKind::Arrow) {
-            let arrow_start = self.current_pos().0 as u32;
-            self.advance()?; // consume '=>'
-            // Parse return type, which may be a type predicate (asserts x, x is T)
-            let return_type = self.parse_return_type_inner(arrow_start)?;
-            let end = return_type.span.end;
-
-            Ok(TSType::Function(TSFunctionType {
-                type_parameters: None,
-                params,
-                return_type,
-                span: Span::new(start as u32, end),
-            }))
-        } else if params.len() == 1 && !self.is_function_param(&params[0]) {
-            // Single identifier without type annotation or optional marker:
-            // `(T)` is a parenthesized type reference, not a function type
-            if let Expression::Identifier(id) = &params[0] {
-                let type_ref = TSType::TypeReference(TSTypeReference {
+        // A single identifier without type annotation, optional marker, comma,
+        // or a following `=>` is a parenthesized type: a type reference `(T)`,
+        // or the this-type `(this)` — `this` is a valid parameter name
+        // (`parse_function_type_param`), so it lands here too.
+        if !self.check(&TokenKind::Arrow)
+            && !saw_comma
+            && let [Expression::Identifier(id)] = params
+            && id.type_annotation().is_none()
+            && !id.optional
+        {
+            let inner = if id.name == self.intern("this") {
+                TSType::ThisType(TSThisType { span: id.span })
+            } else {
+                TSType::TypeReference(TSTypeReference {
                     type_name: TSEntityName::Identifier(id.clone()),
                     type_arguments: None,
                     span: id.span,
-                });
-                // Use end of closing paren, not end of inner type
-                let end = self.prev_token_end() as u32;
-                Ok(TSType::Parenthesized(TSParenthesizedType {
-                    type_annotation: self.alloc(type_ref),
-                    span: Span::new(start as u32, end),
-                }))
-            } else {
-                Err(self.error_msg("Invalid parenthesized type"))
-            }
-        } else {
-            // Empty params or params with types - function type with implicit void return
-            let end = self.current_pos().0 as u32;
-            Ok(TSType::Function(TSFunctionType {
-                type_parameters: None,
-                params,
-                return_type: TSTypeAnnotation {
-                    type_annotation: self.alloc(TSType::Keyword(TSKeywordType::new(
-                        TSKeywordKind::Void,
-                        Span::new(end, end),
-                    ))),
-                    span: Span::new(end, end),
-                },
+                })
+            };
+            // Use end of closing paren, not end of inner type
+            let end = self.prev_token_end() as u32;
+            return Ok(TSType::Parenthesized(TSParenthesizedType {
+                type_annotation: self.alloc(inner),
                 span: Span::new(start as u32, end),
-            }))
+            }));
         }
+
+        // Anything else committed to a function-type parameter list (annotated
+        // — including `this: T` — optional, empty, rest, pattern, trailing
+        // comma, or multiple params), so the `=>` and return type are required
+        // — there is no implicit-void function type (acorn rejects `(x: T)` /
+        // `()` without `=>`). The return type may be a type predicate
+        // (asserts x, x is T).
+        let arrow_start = self.current_pos().0 as u32;
+        self.expect(&TokenKind::Arrow)?;
+        let return_type = self.parse_return_type_inner(arrow_start)?;
+        let end = return_type.span.end;
+
+        Ok(TSType::Function(TSFunctionType {
+            type_parameters: None,
+            params,
+            return_type,
+            span: Span::new(start as u32, end),
+        }))
     }
 
     /// Check if current token definitely starts a type (not a valid parameter name)
@@ -955,7 +989,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
-        let params = self.parse_function_type_params()?.into_bump_slice();
+        let (params, _saw_comma) = self.parse_function_type_params()?;
+        let params = params.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
         // Expect arrow
@@ -997,7 +1032,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse parameter list
         self.expect(&TokenKind::ParenOpen)?;
-        let params = self.parse_function_type_params()?.into_bump_slice();
+        let (params, _saw_comma) = self.parse_function_type_params()?;
+        let params = params.into_bump_slice();
         self.expect(&TokenKind::ParenClose)?;
 
         // Expect arrow
@@ -1017,25 +1053,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    /// Check if an expression is a function parameter (has type annotation)
-    fn is_function_param(&self, expr: &Expression<'_>) -> bool {
-        match expr {
-            Expression::Identifier(id) => id.type_annotation().is_some() || id.optional,
-            _ => true,
-        }
-    }
-
-    /// Parse function type parameters
+    /// Parse function type parameters. The returned flag is whether any comma
+    /// was consumed — a `(T,)` list commits to a function type even though it
+    /// holds a single bare identifier, so the parenthesized-type
+    /// reinterpretation in `parse_parenthesized_or_function_type` needs it.
     fn parse_function_type_params(
         &mut self,
-    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+    ) -> Result<(bumpalo::collections::Vec<'arena, Expression<'arena>>, bool), ParseError> {
         let mut params = self.bvec();
+        let mut saw_comma = false;
 
         if !self.check(&TokenKind::ParenClose) {
             let first = self.parse_function_type_param()?;
             let mut rest_seen = matches!(&first, Expression::RestElement(_));
             params.push(first);
             while self.eat(TokenKind::Comma) {
+                saw_comma = true;
                 // A rest parameter must be last: nothing — not even a trailing
                 // comma — may follow it (see `parse_parameter_list`).
                 if rest_seen {
@@ -1051,7 +1084,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
         }
 
-        Ok(params)
+        Ok((params, saw_comma))
     }
 
     /// Parse a single function type parameter: an identifier (`x: T`), the `this`

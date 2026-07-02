@@ -253,11 +253,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Used in for-loop headers to distinguish `for (x in y)` from expressions.
     /// The `in` keyword is recognized as the for-in separator, not as a binary operator.
     pub(super) fn parse_expression_no_in(&mut self) -> Result<Expression<'arena>, ParseError> {
-        let old_allow_in = self.allow_in;
-        self.allow_in = false;
-        let result = self.parse_expression();
-        self.allow_in = old_allow_in;
-        result
+        self.with_context_flag(|p| &mut p.allow_in, false, Self::parse_expression)
     }
 
     /// Run `f` with the `[In]` grammar parameter forced to `[+In]` (`allow_in =
@@ -271,11 +267,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        let old_allow_in = self.allow_in;
-        self.allow_in = true;
-        let result = f(self);
-        self.allow_in = old_allow_in;
-        result
+        self.with_context_flag(|p| &mut p.allow_in, true, f)
     }
 
     /// Pratt parser: parse expression with minimum binding power
@@ -671,19 +663,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// ES decorators grammar (TC39 Stage 3, which `tsv` supports):
     ///
     /// - `@(Expression)` — a parenthesized **full** expression, or
-    /// - `@Ident(.Ident)*` — a `DecoratorMemberExpression`: an identifier
-    ///   reference followed by a `.`-member chain,
+    /// - `@Ident(.Ident | .#private)*` — a `DecoratorMemberExpression`: an
+    ///   identifier reference followed by a `.`-member chain whose properties
+    ///   are identifier names or private names (`DecoratorMemberExpression .
+    ///   PrivateIdentifier` in the TC39 grammar),
     ///
     /// each optionally followed by a **single** trailing call `(...)`.
     ///
     /// Deliberately narrower than a full `AssignmentExpression`: binary
-    /// operators, computed/optional member access (`[…]`, `?.`), `#private`
-    /// properties, tagged templates, `!`, and `++`/`--` are not part of the
-    /// grammar. Leaving them unconsumed is what lets the construct *after* the
-    /// decorator parse — e.g. the `*` of a decorated generator method
-    /// (`@fn *a() {}`), which a full-expression parse would otherwise swallow as
-    /// multiplication. A full expression must be parenthesized (`@(a + b)`).
-    /// Mirrors `@sveltejs/acorn-typescript`'s `parseDecorator`.
+    /// operators, computed/optional member access (`[…]`, `?.`), tagged
+    /// templates, `!`, and `++`/`--` are not part of the grammar. Leaving them
+    /// unconsumed is what lets the construct *after* the decorator parse — e.g.
+    /// the `*` of a decorated generator method (`@fn *a() {}`), which a
+    /// full-expression parse would otherwise swallow as multiplication. A full
+    /// expression must be parenthesized (`@(a + b)`).
+    /// Mirrors `@sveltejs/acorn-typescript`'s `parseDecorator`, except the
+    /// `.#private` chain step, which acorn-typescript rejects (a lag behind the
+    /// TC39 grammar — see `docs/conformance_svelte.md` §TypeScript Corrections).
     pub(in crate::parser) fn parse_decorator_expression(
         &mut self,
     ) -> Result<Expression<'arena>, ParseError> {
@@ -711,26 +707,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // `DecoratorMemberExpression`: a `.`-member chain. Property names are
-            // liberal (keywords allowed: `@a.class`), but `#private`, computed
-            // `[…]`, and optional `?.` access are not part of the grammar.
+            // liberal (keywords allowed: `@a.class`) and private names are part
+            // of the grammar (`@C.#p`); computed `[…]` and optional `?.` access
+            // are not.
             while *self.current_kind() == TokenKind::Dot {
                 self.advance()?; // consume '.'
-                if !self.current_is_identifier_or_keyword() {
-                    return Err(self.error_expected_after("property name", "."));
-                }
-                let (prop_start, prop_end) = self.current_pos();
-                let name = self.intern(self.current_property_name());
-                self.advance()?;
-                let property = self.arena.alloc(Expression::Identifier(Identifier::simple(
-                    name,
-                    Span::new(prop_start as u32, prop_end as u32),
-                )));
+                let (property, prop_end) = self.parse_dot_property()?;
                 let span = Span::new(expr.actual_start, prop_end as u32);
                 expr = ParsedExpr::with_end(
                     self.arena,
                     Expression::MemberExpression(MemberExpression {
                         object: expr.expr,
-                        property,
+                        property: self.arena.alloc(property),
                         computed: false,
                         optional: false,
                         span,
@@ -768,9 +756,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(expr.expr.clone())
     }
 
-    /// Parse postfix expressions: member access (`.`, `[`), call expressions (`()`)
-    ///
-    /// Handles chained expressions like `obj.prop`, `arr[0]`, `foo()`, `obj.method().prop`
     /// Wrap `expr` in a `TSNonNullExpression`, consuming the current `!` token. The
     /// span starts at `expr.actual_start` so it covers any grouping parens (`(a?.b)!`),
     /// which `TSNonNullExpression::seals_optional_chain` relies on. Callers gate on
@@ -793,6 +778,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ))
     }
 
+    /// Parse the property after a consumed `.` or `?.`: a private name
+    /// (`obj.#p`) or an identifier/keyword name — keywords are valid property
+    /// names (`obj.class`, `obj.if`, `obj.default()`). Returns the property
+    /// expression and its end position; errors when neither follows.
+    fn parse_dot_property(&mut self) -> Result<(Expression<'arena>, usize), ParseError> {
+        if *self.current_kind() == TokenKind::Hash {
+            let private_id = self.parse_private_identifier()?;
+            let end = private_id.span.end_usize();
+            Ok((Expression::PrivateIdentifier(private_id), end))
+        } else if self.current_is_identifier_or_keyword() {
+            let (prop_start, prop_end) = self.current_pos();
+            let name = self.intern(self.current_property_name());
+            self.advance()?;
+            Ok((
+                Expression::Identifier(Identifier::simple(
+                    name,
+                    Span::new(prop_start as u32, prop_end as u32),
+                )),
+                prop_end,
+            ))
+        } else {
+            Err(self.error_expected_after("property name", "."))
+        }
+    }
+
+    /// Parse postfix expressions: member access (`.`, `[`), call expressions (`()`)
+    ///
+    /// Handles chained expressions like `obj.prop`, `arr[0]`, `foo()`, `obj.method().prop`
     fn parse_postfix_expression(
         &mut self,
         mut left: ParsedExpr<'arena>,
@@ -810,28 +823,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::Dot => {
                     // Member access: obj.prop or obj.#private
                     self.advance()?; // consume '.'
-
-                    // Property must be an identifier, keyword, or private identifier
-                    // Keywords are valid property names: obj.class, obj.if, obj.default()
-                    let (property, prop_end) = if *self.current_kind() == TokenKind::Hash {
-                        // Private identifier: obj.#private
-                        let private_id = self.parse_private_identifier()?;
-                        let end = private_id.span.end_usize();
-                        (Expression::PrivateIdentifier(private_id), end)
-                    } else if self.current_is_identifier_or_keyword() {
-                        let (prop_start, prop_end) = self.current_pos();
-                        let name = self.intern(self.current_property_name());
-                        self.advance()?;
-                        (
-                            Expression::Identifier(Identifier::simple(
-                                name,
-                                Span::new(prop_start as u32, prop_end as u32),
-                            )),
-                            prop_end,
-                        )
-                    } else {
-                        return Err(Box::new(self.error_expected_after("property name", ".")));
-                    };
+                    let (property, prop_end) = self.parse_dot_property()?;
 
                     let span = Span::new(left.actual_start, prop_end as u32);
                     left = ParsedExpr::with_end(
@@ -852,43 +844,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     optional_chained = true;
 
                     match self.current_kind() {
-                        TokenKind::Hash => {
-                            // obj?.#private - optional private property access
-                            let private_id = self.parse_private_identifier()?;
-                            let prop_end = private_id.span.end_usize();
+                        TokenKind::Hash | TokenKind::Identifier | TokenKind::Keyword(_) => {
+                            // obj?.prop or obj?.#private - optional property access
+                            let (property, prop_end) = self.parse_dot_property()?;
 
                             let span = Span::new(left.actual_start, prop_end as u32);
                             left = ParsedExpr::with_end(
                                 self.arena,
                                 Expression::MemberExpression(MemberExpression {
                                     object: left.expr,
-                                    property: arena
-                                        .alloc(Expression::PrivateIdentifier(private_id)),
-                                    computed: false,
-                                    optional: true,
-                                    span,
-                                }),
-                                prop_end,
-                            );
-                        }
-                        TokenKind::Identifier | TokenKind::Keyword(_) => {
-                            // obj?.prop - optional property access
-                            // Keywords are valid property names: obj?.class, obj?.if, obj?.default()
-                            let (prop_start, prop_end) = self.current_pos();
-                            let name = self.intern(self.current_property_name());
-                            self.advance()?;
-
-                            let span = Span::new(left.actual_start, prop_end as u32);
-                            left = ParsedExpr::with_end(
-                                self.arena,
-                                Expression::MemberExpression(MemberExpression {
-                                    object: left.expr,
-                                    property: arena.alloc(Expression::Identifier(
-                                        Identifier::simple(
-                                            name,
-                                            Span::new(prop_start as u32, prop_end as u32),
-                                        ),
-                                    )),
+                                    property: arena.alloc(property),
                                     computed: false,
                                     optional: true,
                                     span,

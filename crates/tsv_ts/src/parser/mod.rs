@@ -145,6 +145,29 @@ pub struct Parser<'a, 'arena> {
     /// members, object-type members, conditional branches, parenthesized inners)
     /// parse function types greedily again.
     fn_type_disallowed: bool,
+    /// Whether the type grammar disallows conditional types at the current
+    /// position: the extends clause of a conditional type and the constraint of
+    /// a constrained `infer` (acorn-typescript's
+    /// `inDisallowConditionalTypesContext`). Read by the constrained-infer
+    /// parse: at a disallow position `infer U extends C ? …` keeps `C` as the
+    /// constraint (the `?` belongs to the enclosing conditional); at an allow
+    /// position the same tokens are a conditional whose check is the bare
+    /// `infer U` (see `pending_conditional_extends`). Cleared at every
+    /// full-type descent (`parse_type`), matching acorn's allow-context resets
+    /// (parenthesized inners, tuple/object members, type arguments, and — via
+    /// its explicit signature wrapper — function/constructor-type params and
+    /// returns).
+    conditional_type_disallowed: bool,
+    /// Hand-off from the constrained-infer parse to `parse_type_inner`: when
+    /// `infer U extends C` at an allow-conditional position is directly
+    /// followed by `?`, the already-parsed `C` re-binds as the extends clause
+    /// of a conditional whose check is the bare `infer U` (acorn rolls back
+    /// its constraint tryParse and re-parses `extends C` at the conditional
+    /// level; this hand-off reproduces that without re-lexing). Set only when
+    /// the current token is `?`; consumed by the innermost enclosing
+    /// `parse_type_inner`, which nothing can precede (every intermediate
+    /// union/intersection/array/operand loop breaks on `?`).
+    pending_conditional_extends: Option<TSType<'arena>>,
 }
 
 impl<'a, 'arena> Parser<'a, 'arena> {
@@ -275,6 +298,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // level is `[~Await]` (`ScriptBody[~Await]`).
             in_await: matches!(goal, Goal::Module),
             fn_type_disallowed: false, // Top level is a full-type position
+            conditional_type_disallowed: false, // Top level allows conditional types
+            pending_conditional_extends: None,
         })
     }
 
@@ -586,6 +611,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             && self.await_is_identifier()
     }
 
+    /// Shared body of the `with_*` context combinators: run `f` with the
+    /// boolean context flag selected by `flag` set to `value`, restoring the
+    /// prior value afterward (on success and error alike).
+    pub(super) fn with_context_flag<T>(
+        &mut self,
+        flag: fn(&mut Self) -> &mut bool,
+        value: bool,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        let saved = std::mem::replace(flag(self), value);
+        let result = f(self);
+        *flag(self) = saved;
+        result
+    }
+
     /// Run `f` with the `[Await]` context set to `value`, restoring it
     /// afterward (on success and error alike). Mirrors `with_allow_in`; wrap a
     /// function-like scope's params+body so a nested async/non-async scope sets
@@ -595,11 +635,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         value: bool,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        let saved = self.in_await;
-        self.in_await = value;
-        let result = f(self);
-        self.in_await = saved;
-        result
+        self.with_context_flag(|p| &mut p.in_await, value, f)
     }
 
     /// Run `f` with the function-type-disallowed context set to `value`,
@@ -612,11 +648,33 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         value: bool,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
     ) -> Result<T, ParseError> {
-        let saved = self.fn_type_disallowed;
-        self.fn_type_disallowed = value;
-        let result = f(self);
-        self.fn_type_disallowed = saved;
-        result
+        self.with_context_flag(|p| &mut p.fn_type_disallowed, value, f)
+    }
+
+    /// Run `f` with the conditional-type-disallowed context set to `value`,
+    /// restoring it afterward (on success and error alike). Mirrors
+    /// `with_fn_type_disallowed`. Set `true` around a conditional's extends
+    /// clause and a constrained infer's constraint; set `false` at full-type
+    /// entry (`parse_type`) so nested positions parse conditionals greedily
+    /// again.
+    pub(super) fn with_conditional_type_disallowed<T>(
+        &mut self,
+        value: bool,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        self.with_context_flag(|p| &mut p.conditional_type_disallowed, value, f)
+    }
+
+    /// Run `f` at a full-type position — both type-context restrictions
+    /// (`fn_type_disallowed`, `conditional_type_disallowed`) cleared, each
+    /// restored afterward — so nested full-type positions parse function and
+    /// conditional types greedily even when reached from a constituent/operand
+    /// parse. Wraps the full-type entry (`parse_type_inner`).
+    pub(super) fn with_full_type_context<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        self.with_fn_type_disallowed(false, |p| p.with_conditional_type_disallowed(false, f))
     }
 
     /// Like `try_intern_binding_name`, but also accepts the `this` keyword as the
