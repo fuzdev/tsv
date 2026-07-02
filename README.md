@@ -254,9 +254,11 @@ Web Standards:
 - [W3C webref](https://github.com/w3c/webref) - Machine-readable web specs
 - [web-platform-tests/wpt](https://github.com/web-platform-tests/wpt/) - Test suites for Web platform specs
 
-Claude Code was instrumental to this project, and tsv wouldn't exist without LLMs.
+Claude Code was instrumental to this project,
+and tsv wouldn't exist without LLMs because of the high coding labor requirements.
 Source code of projects similar to tsv was not used by agents
 or consulted by the author unless listed above.
+The author learned Rust in 2015 but wrote only simple programs before tsv (with a failed attempt at a game).
 
 ## License
 
