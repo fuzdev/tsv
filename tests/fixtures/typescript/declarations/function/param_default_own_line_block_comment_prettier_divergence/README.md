@@ -8,18 +8,23 @@ positions, and both formatters preserve each when given as input:
 - Form B (before `=`, dual-stable): `a /* c */ = b` — comment on the name (`variant_before_equals.svelte`)
 
 The divergence is in how the formatters **normalize an own-line layout** — when
-the author breaks the line after the comment so the value sits on its own line
-(`a = /* c */⏎b`, `unformatted_ours_own_line.svelte`):
+the author breaks the line inside the default gap. There are two such authorings,
+and **tsv collapses both to Form A** (`a = /* c */ b`) — the comment stays inline
+on the value side (block comments inline losslessly). Prettier also keeps the
+comment inline but on a different side of `=`, splitting by *where* the break falls:
 
-- **tsv** collapses to Form A (`a = /* c */ b`) — the comment stays on the value side.
-- **Prettier** collapses to Form B (`a /* c */ = b`) — it relocates the comment
-  across `=` onto the name.
+- Value on its own line, comment still trailing `=` (`a = /* c */⏎b`,
+  `unformatted_ours_own_line.svelte`) → prettier collapses to **Form B**
+  (`a /* c */ = b`) — the comment relocates across `=` onto the name.
+- Comment on its own line, `=` left bare (`a =⏎/* c */⏎b`,
+  `unformatted_ours_comment_own_line.svelte`) → prettier floats the comment out to
+  **lead the whole parameter** on its own line (`/* c */⏎a = b`,
+  `variant_lead_own_line.svelte`, dual-stable) — the parameter list breaks.
 
-Either way the comment ends up inline (block comments inline losslessly), so
-neither formatter wraps here; they just pick different canonical sides of `=` for
-the ambiguous own-line input. Per [Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy),
+Per [Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy),
 tsv keeps the comment where the author wrote it relative to the value (after `=`)
-rather than floating it onto the name. The line-comment form is a separate
+rather than floating it onto the name or out past the binding. The line-comment
+form is a separate
 divergence — there prettier floats the comment out to *trail* the parameter
 (`a = b // c`); see
 [param_default_line_comment](../param_default_line_comment_prettier_divergence/).
