@@ -10,6 +10,26 @@ use string_interner::{DefaultStringInterner, DefaultSymbol};
 use tsv_lang::{Comment, ParseError, SharedInterner, Span};
 use tsv_ts::Expression;
 
+/// Build an expression `Comment` from its already-shifted `span` / `content_span`.
+/// `content` is the comment body, read only to compute the `multiline` flag (whether
+/// it holds a line terminator). Centralizes the `Comment` shape shared by the
+/// source-scan (`extract_ts_comments`) and live-lexer (`try_read_js_comment`) paths.
+fn expression_comment(
+    span: Span,
+    content_span: Span,
+    is_block: bool,
+    content: &str,
+    emit_character_field: bool,
+) -> Comment {
+    Comment {
+        content_span,
+        is_block,
+        multiline: content.contains('\n'),
+        span,
+        emit_character_field,
+    }
+}
+
 pub(crate) struct SvelteParser<'a, 'arena> {
     /// Bump arena that owns every AST node this parser allocates — the template
     /// AST and (via the embedding APIs that receive `&'arena Bump`) the embedded
@@ -232,19 +252,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
                 // Extract comment content (without /* */)
                 let comment_content = &content[start + 2..end.saturating_sub(2)];
-                self.expression_comments.push(Comment {
-                    content_span: Span {
-                        start: (base_offset + start + 2) as u32,
-                        end: (base_offset + end.saturating_sub(2)) as u32,
-                    },
-                    is_block: true,
-                    multiline: comment_content.contains('\n'),
-                    span: Span {
-                        start: (base_offset + start) as u32,
-                        end: (base_offset + end) as u32,
-                    },
-                    emit_character_field: false,
-                });
+                self.expression_comments.push(expression_comment(
+                    Span::new((base_offset + start) as u32, (base_offset + end) as u32),
+                    Span::new(
+                        (base_offset + start + 2) as u32,
+                        (base_offset + end.saturating_sub(2)) as u32,
+                    ),
+                    true,
+                    comment_content,
+                    false,
+                ));
 
                 // Replace comment with spaces in result
                 result.replace_range(start..end, &" ".repeat(end - start));
@@ -259,19 +276,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
                 // Extract comment content (without //)
                 let comment_content = &content[start + 2..end];
-                self.expression_comments.push(Comment {
-                    content_span: Span {
-                        start: (base_offset + start + 2) as u32,
-                        end: (base_offset + end) as u32,
-                    },
-                    is_block: false,
-                    multiline: comment_content.contains('\n'),
-                    span: Span {
-                        start: (base_offset + start) as u32,
-                        end: (base_offset + end) as u32,
-                    },
-                    emit_character_field: false,
-                });
+                self.expression_comments.push(expression_comment(
+                    Span::new((base_offset + start) as u32, (base_offset + end) as u32),
+                    Span::new((base_offset + start + 2) as u32, (base_offset + end) as u32),
+                    false,
+                    comment_content,
+                    false,
+                ));
 
                 // Replace comment with spaces in result
                 result.replace_range(start..end, &" ".repeat(end - start));
@@ -322,19 +333,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 }
 
                 let content = &self.source[content_start..end];
-                self.expression_comments.push(Comment {
-                    content_span: Span {
-                        start: content_start as u32,
-                        end: end as u32,
-                    },
-                    is_block: false,
-                    multiline: content.contains('\n'),
-                    span: Span {
-                        start: pos as u32,
-                        end: end as u32,
-                    },
-                    emit_character_field: true,
-                });
+                self.expression_comments.push(expression_comment(
+                    Span::new(pos as u32, end as u32),
+                    Span::new(content_start as u32, end as u32),
+                    false,
+                    content,
+                    true,
+                ));
 
                 self.advance_to_position(end)?;
                 Ok(true)
@@ -356,19 +361,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
                 let content = &self.source[content_start..end];
                 let comment_end = end + 2; // past */
-                self.expression_comments.push(Comment {
-                    content_span: Span {
-                        start: content_start as u32,
-                        end: end as u32,
-                    },
-                    is_block: true,
-                    multiline: content.contains('\n'),
-                    span: Span {
-                        start: pos as u32,
-                        end: comment_end as u32,
-                    },
-                    emit_character_field: true,
-                });
+                self.expression_comments.push(expression_comment(
+                    Span::new(pos as u32, comment_end as u32),
+                    Span::new(content_start as u32, end as u32),
+                    true,
+                    content,
+                    true,
+                ));
 
                 self.advance_to_position(comment_end)?;
                 Ok(true)
