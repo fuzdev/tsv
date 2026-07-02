@@ -204,6 +204,24 @@ pub enum SimpleSelector<'arena> {
     },
 }
 
+impl SimpleSelector<'_> {
+    /// Get the span of this simple selector.
+    pub fn span(&self) -> Span {
+        match self {
+            SimpleSelector::Type { span, .. }
+            | SimpleSelector::Universal { span, .. }
+            | SimpleSelector::Class { span }
+            | SimpleSelector::Id { span }
+            | SimpleSelector::Attribute { span, .. }
+            | SimpleSelector::PseudoClass { span, .. }
+            | SimpleSelector::PseudoElement { span, .. }
+            | SimpleSelector::Nesting { span }
+            | SimpleSelector::Percentage { span, .. }
+            | SimpleSelector::Invalid { span } => *span,
+        }
+    }
+}
+
 /// Pseudo-class/pseudo-element argument types (semantic representation)
 ///
 /// Stores semantic data (what the args mean), not output structure.
@@ -254,9 +272,14 @@ pub enum PseudoClassArgs<'arena> {
     /// Order-independent: `::part(tab active)` = `::part(active tab)`
     ///
     /// Examples: `label`, `tab`, `tab active`, `button primary`
+    ///
+    /// `span` covers the argument content (inside the parentheses); `value_span`
+    /// covers just the identifier run, so the printer can find the comments in the
+    /// gaps around it (before the first ident, after the last), mirroring `Nth`.
     Part {
         idents: &'arena [&'arena str], // Space-separated part names
         span: Span,
+        value_span: Span,
     },
 
     /// Identifier argument for spec-compliant pseudo-classes/elements
