@@ -12,7 +12,7 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
 with Svelte as the only JS framework. 
 The extensibility story is currently limited to using its Rust crates as libraries;
-bridging to JS and/or WASM plugins is an open question.
+bridging to JS and/or WASM plugins is an open question (currently leaning against for performance and simplicity).
 For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
 This is an early release, and reports and feedback are appreciated -
@@ -258,7 +258,7 @@ Claude Code was instrumental to this project,
 and tsv wouldn't exist without LLMs because of the high coding labor requirements.
 Source code of projects similar to tsv was not used by agents
 or consulted by the author unless listed above.
-The author learned Rust in 2015 but wrote only simple programs before tsv (with a failed attempt at a game).
+The author learned Rust in 2015 but wrote only simple programs and some abandoned toys before tsv.
 
 ## License
 
