@@ -110,7 +110,10 @@ pub(crate) fn is_false(b: &bool) -> bool {
 /// source. Resolving the symbol is a cheap interner lookup (no allocation); the
 /// `String` allocation — the thing this avoids — only happens on the owned
 /// branch, where the slice and the name genuinely differ.
-pub(crate) fn name_cow<'src>(
+///
+/// `pub` so hosts with interned names in their own public ASTs apply the same
+/// guard (`tsv_svelte` uses it for element/attribute names).
+pub fn name_cow<'src>(
     span: Span,
     source: &'src str,
     sym: DefaultSymbol,

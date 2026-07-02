@@ -4,9 +4,11 @@
 // The fragment is the core container for template content.
 
 use crate::ast::{internal, public};
+use std::borrow::Cow;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationTracker};
+use tsv_lang::LocationTracker;
 use tsv_ts::ast::convert::convert_expression;
+use tsv_ts::ast::public::name_cow;
 
 use super::{
     convert_attribute_node, convert_await_block, convert_const_tag, convert_debug_tag,
@@ -91,13 +93,16 @@ pub(super) fn convert_fragment_node<'src>(
     }
 }
 
-fn convert_comment(comment: &internal::HtmlComment, source: &str) -> public::Comment {
+fn convert_comment<'src>(
+    comment: &internal::HtmlComment,
+    source: &'src str,
+) -> public::Comment<'src> {
     // Note: internal uses `content`, public uses `data` (Svelte's naming)
     public::Comment {
         node_type: "Comment",
         start: comment.span.start,
         end: comment.span.end,
-        data: comment.content(source).to_string(),
+        data: Cow::Borrowed(comment.content(source)),
     }
 }
 
@@ -117,7 +122,7 @@ fn convert_element<'src>(
         node_type,
         start: elem.span.start,
         end: elem.span.end,
-        name: interner.resolve_infallible(elem.name).to_string(),
+        name: name_cow(elem.name_span, source, elem.name, interner),
         name_loc: span_to_name_loc(elem.name_span, loc),
         kind: elem.kind,
         attributes: elem
@@ -146,14 +151,14 @@ pub(super) fn convert_expression_tag<'src>(
     }
 }
 
-pub(super) fn convert_text(text: &internal::Text, source: &str) -> public::Text {
+pub(super) fn convert_text<'src>(text: &internal::Text, source: &'src str) -> public::Text<'src> {
     // raw contains original source with entities (&lt;, &#65;, etc.)
     // data contains decoded text (<, A, etc.)
     public::Text {
         node_type: "Text",
         start: text.span.start,
         end: text.span.end,
-        raw: text.raw(source).to_string(),
-        data: text.data(source).into_owned(),
+        raw: Cow::Borrowed(text.raw(source)),
+        data: text.data(source),
     }
 }

@@ -51,8 +51,6 @@ pub(super) fn convert_script<'src>(
     interner: &DefaultStringInterner,
     html_leading_comment: Option<&internal::HtmlComment>,
 ) -> public::Script<'src> {
-    let context = script.context.as_str();
-
     // Detect whether this is a TypeScript script (lang="ts") or plain script.
     // Plain scripts use Svelte's parser conventions (no importKind/exportKind for "value",
     // always include `attributes` on import/export declarations).
@@ -106,7 +104,7 @@ pub(super) fn convert_script<'src>(
         node_type: "Script",
         start: script.span.start,
         end: script.span.end,
-        context: context.to_string(),
+        context: script.context.as_str(),
         content,
         attributes: script
             .attributes
@@ -209,10 +207,13 @@ fn find_option_values<'arena>(
 }
 
 /// Extract a plain text value from attribute values.
-fn text_value(values: &[internal::AttributeValue<'_>], source: &str) -> Option<String> {
+fn text_value<'src>(
+    values: &[internal::AttributeValue<'_>],
+    source: &'src str,
+) -> Option<Cow<'src, str>> {
     values.iter().find_map(|v| {
         if let internal::AttributeValue::Text(text) = v {
-            Some(text.data(source).into_owned())
+            Some(text.data(source))
         } else {
             None
         }
@@ -419,7 +420,7 @@ pub(super) fn convert_special_element<'src>(
         node_type: elem.kind.node_type(),
         start: elem.span.start,
         end: elem.span.end,
-        name: elem.kind.tag_name().to_string(),
+        name: elem.kind.tag_name(),
         name_loc: span_to_name_loc(elem.name_span, loc),
         attributes: elem
             .attributes
