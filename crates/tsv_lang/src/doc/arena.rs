@@ -756,6 +756,11 @@ impl DocArena {
         Self::will_break_memo(id, &nodes, &children, cache.as_mut_slice())
     }
 
+    /// Split into an inline cache probe over an outlined recursive fill: the
+    /// same subtree is re-checked far more often than it is first computed, so
+    /// the warm path is a load + compare at the call site instead of a full
+    /// call.
+    #[inline]
     fn will_break_memo(
         id: DocId,
         nodes: &[DocNode],
@@ -765,6 +770,20 @@ impl DocArena {
         if let Some(cached) = cache[id.index()] {
             return cached;
         }
+        Self::will_break_fill(id, nodes, children, cache)
+    }
+
+    /// The cold half of [`Self::will_break_memo`]: compute and cache whether a
+    /// subtree forces a break. Runs at most once per node; recursion goes back
+    /// through the inline probe so warm children never re-enter here.
+    #[cold]
+    #[inline(never)]
+    fn will_break_fill(
+        id: DocId,
+        nodes: &[DocNode],
+        children: &[DocId],
+        cache: &mut [Option<bool>],
+    ) -> bool {
         let result = match &nodes[id.index()] {
             DocNode::Text(_) => false,
             // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
