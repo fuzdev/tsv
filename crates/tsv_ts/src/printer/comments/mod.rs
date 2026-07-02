@@ -161,6 +161,47 @@ impl<'a> Printer<'a> {
         );
     }
 
+    /// Emit the comma and inter-declarator comments for a declarator gap that
+    /// contains a **line** comment (the forced-break case). Block comments before
+    /// the first line comment trail the previous initializer inline
+    /// (`= 0 /* c */`); the comma is placed before the first line comment; then
+    /// each remaining comment either trails the comma on the same output line (a
+    /// line comment via `line_suffix`, a same-line block inline) or drops onto its
+    /// own line after a `hardline`. `continuation` is emitted right after each
+    /// own-line `hardline`: the variable-declaration site passes `INDENT` text
+    /// (its declarators aren't wrapped in `d.indent()`), the for-init site passes
+    /// an empty doc (its run is). Does NOT emit the trailing break to the next
+    /// declarator — the caller owns that, since the indent strategy differs.
+    /// Shared by the variable-declarator and for-init inter-declarator sites.
+    pub(crate) fn push_inter_declarator_line_comment_gap(
+        &self,
+        parts: &mut DocBuf,
+        comments: &[&Comment],
+        continuation: DocId,
+    ) {
+        let d = self.d();
+        let first_line_idx = comments.iter().position(|c| !c.is_block).unwrap_or(0);
+        for comment in &comments[..first_line_idx] {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
+        }
+        parts.push(d.text(","));
+        // `needs_hardline` starts true when block comments precede the comma (it
+        // then sits between them and the first line comment, so the next comment
+        // drops to its own line).
+        let mut needs_hardline = first_line_idx > 0;
+        for comment in &comments[first_line_idx..] {
+            if needs_hardline {
+                parts.push(d.hardline());
+                parts.push(continuation);
+                parts.push(self.build_comment_doc(comment));
+            } else {
+                parts.push(self.build_trailing_comment_doc(comment));
+            }
+            needs_hardline = !comment.is_block;
+        }
+    }
+
     /// Build a Doc for inline comments between two positions with specified spacing and filter
     ///
     /// Returns a Doc containing all comments in the range with the specified spacing.

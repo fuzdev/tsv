@@ -4,7 +4,7 @@
 // for-in/for-of left/right printing.
 
 use crate::ast::internal::{self, Expression, Statement};
-use crate::printer::{CommentVec, Printer};
+use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -1238,6 +1238,56 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit the separator between two for-init declarators (the `prev_end →
+    /// curr_start` gap): the comma plus any inter-declarator comments, kept on the
+    /// author's side of the comma — a before-comma block trails the previous
+    /// initializer (`… = 0 /* c */,`), an after-comma comment leads the next
+    /// declarator (`, /* c */ x`). A line comment trails the comma via `line_suffix`
+    /// and, like an own-line block, forces the per-declarator break; inline blocks
+    /// stay width-based (the `line` collapses when the group fits). Mirrors the
+    /// variable-declarator inter-declarator comment placement.
+    fn push_for_init_declarator_gap(&self, decl_docs: &mut DocBuf, prev_end: u32, curr_start: u32) {
+        let d = self.d();
+        if !self.has_comments_between(prev_end, curr_start) {
+            decl_docs.push(d.text(","));
+            decl_docs.push(d.line());
+            return;
+        }
+        let comma_pos = self
+            .find_char_outside_comments(prev_end, curr_start, b',')
+            .unwrap_or(curr_start);
+
+        if self.has_line_comments_between(prev_end, curr_start) {
+            // A line comment forces the break. The whole declarator run is wrapped
+            // in a `d.indent()` by the caller, so continuation lines need no
+            // explicit indent text (empty). The trailing break to the next
+            // declarator is the `hardline` below.
+            let comments: CommentVec<'_> =
+                comments_in_range(self.comments, prev_end, curr_start).collect();
+            self.push_inter_declarator_line_comment_gap(decl_docs, &comments, d.empty());
+            decl_docs.push(d.hardline());
+        } else {
+            // Blocks only: a before-comma block trails the previous initializer; the
+            // width-based `line` separates; after-comma blocks lead the next
+            // declarator (an own-line block drops to its own line and forces the group
+            // to break, an inline block hugs `, /* c */ x`).
+            for comment in comments_in_range(self.comments, prev_end, comma_pos) {
+                decl_docs.push(d.text(" "));
+                decl_docs.push(self.build_comment_doc(comment));
+            }
+            decl_docs.push(d.text(","));
+            decl_docs.push(d.line());
+            let after: CommentVec<'_> =
+                comments_in_range(self.comments, comma_pos, curr_start).collect();
+            self.push_leading_comment_run(
+                decl_docs,
+                after.iter().copied(),
+                curr_start,
+                LeadingGlue::Terminal,
+            );
+        }
+    }
+
     fn build_for_init_doc(&self, init: &internal::ForInit<'_>) -> DocId {
         let d = self.d();
         // The init clause is `[~In]`: an `in` binary must be parenthesized so it
@@ -1250,12 +1300,18 @@ impl<'a> Printer<'a> {
         let saved_in_for_init = self.in_for_init.replace(true);
         let result = match init {
             internal::ForInit::VariableDeclaration(decl) => {
-                let mut parts: DocBuf = smallvec![d.text(decl.kind.as_str()), d.text(" ")];
+                // Build each declarator's `id = value` doc.
+                let mut decl_docs: DocBuf = DocBuf::new();
                 for (i, declarator) in decl.declarations.iter().enumerate() {
                     if i > 0 {
-                        parts.push(d.text(", "));
+                        let prev_end = decl.declarations[i - 1].span.end;
+                        self.push_for_init_declarator_gap(
+                            &mut decl_docs,
+                            prev_end,
+                            declarator.span.start,
+                        );
                     }
-                    parts.push(self.build_expression_doc(&declarator.id));
+                    let mut one: DocBuf = smallvec![self.build_expression_doc(&declarator.id)];
                     if let Some(init) = &declarator.init {
                         let id_end = declarator.id.span().end;
                         let init_start = init.span().start;
@@ -1272,20 +1328,30 @@ impl<'a> Printer<'a> {
                                 self.wrap_for_init_in(init, self.build_expression_doc(init))
                             })
                         {
-                            parts.push(rhs);
+                            one.push(rhs);
                         } else {
-                            parts.push(d.text(" = "));
+                            one.push(d.text(" = "));
                             if let Some(comments) =
                                 self.build_rhs_comments_glued_opt(eq_pos + 1, init_start)
                             {
-                                parts.push(comments);
+                                one.push(comments);
                             }
-                            parts
-                                .push(self.wrap_for_init_in(init, self.build_expression_doc(init)));
+                            one.push(self.wrap_for_init_in(init, self.build_expression_doc(init)));
                         }
                     }
+                    decl_docs.push(d.concat(&one));
                 }
-                d.concat(&parts)
+                let kind = d.text(decl.kind.as_str());
+                if decl.declarations.len() > 1 {
+                    // Multiple declarators break on width: they stay on one line when the
+                    // init clause fits and drop onto their own lines (continuation
+                    // indented one level) when it doesn't — matching prettier's
+                    // `printVariableDeclaration`. A declarator whose `=` comment forces a
+                    // break also breaks the group (its hardline propagates).
+                    d.group(d.concat(&[kind, d.text(" "), d.indent(d.concat(&decl_docs))]))
+                } else {
+                    d.concat(&[kind, d.text(" "), d.concat(&decl_docs)])
+                }
             }
             internal::ForInit::Expression(expr) => {
                 // Sequence expressions in for loop init don't need outer parens
