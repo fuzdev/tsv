@@ -132,6 +132,20 @@ impl<'arena> Expression<'arena> {
         }
     }
 
+    /// Peel internal-only `JsdocCast` wrappers, returning the expression the
+    /// public AST will actually carry — a cast converts to its inner
+    /// expression (paren-free, matching acorn/Svelte), so structural checks
+    /// against "the converted node" must look through the wrapper. Note the
+    /// wrapper's own `span()` covers the parens; the public node's span is the
+    /// unwrapped inner's.
+    pub fn unwrap_jsdoc_casts(&self) -> &Expression<'arena> {
+        let mut e = self;
+        while let Expression::JsdocCast(cast) = e {
+            e = cast.inner;
+        }
+        e
+    }
+
     /// Check if this expression is a chain root that needs ChainExpression wrapping.
     ///
     /// Returns true if this is a MemberExpression/CallExpression (or TSNonNullExpression

@@ -137,7 +137,7 @@ pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
     json
 }
 
-/// Convert internal AST to a compact JSON string with character-based positions
+/// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
 /// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but
 /// serializes the typed public AST directly — skipping the intermediate
@@ -148,10 +148,12 @@ pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
 /// common comment-free template). ASCII sources then serialize as-is;
 /// multibyte sources get the typed offset-translation walk
 /// (`ast::convert::translate_byte_to_char_offsets_typed`) first. This is the
-/// hot path for the FFI/WASM parse bindings and the CLI's compact output.
+/// hot path for the FFI parse binding and the CLI's compact output — the
+/// bytes are valid UTF-8 by construction (serde_json only emits UTF-8), and
+/// byte-oriented consumers skip the O(output) validation a `String` requires.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
-pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
+pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
     let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     // One tracker shared by conversion and the multibyte translation walk
     // (each build is a full-source line-index scan).
@@ -171,7 +173,19 @@ pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
         ast::convert::translate_byte_to_char_offsets_typed(&mut public_ast, &map, &tracker);
     }
     serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
-    String::from_utf8(buf).expect("serde_json emits valid UTF-8")
+    buf
+}
+
+/// Convert internal AST to a compact JSON string with character-based positions
+///
+/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the
+/// WASM binding's `JSON.parse`, N-API strings): same wire bytes plus one
+/// UTF-8 validation of the output. Byte-oriented consumers should prefer the
+/// bytes variant.
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes(root, source)).expect("serde_json emits valid UTF-8")
 }
 
 /// Byte spans of the instance/module `<script>` element contents.

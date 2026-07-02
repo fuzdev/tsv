@@ -243,11 +243,7 @@ pub(in crate::ast) fn convert_class_expression<'src>(
 /// A `JsdocCast` is internal-only and converts to its inner expression, so the
 /// wrapper's own span never reaches the public AST — unwrap to match.
 fn converted_start(e: &internal::Expression<'_>) -> u32 {
-    let mut e = e;
-    while let internal::Expression::JsdocCast(cast) = e {
-        e = cast.inner;
-    }
-    e.span().start
+    e.unwrap_jsdoc_casts().span().start
 }
 
 /// acorn-typescript quirk: when `extends Base<T>` is on a different line from the

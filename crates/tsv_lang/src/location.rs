@@ -151,14 +151,32 @@ impl<'a> LocationMapper<'a> {
     /// Convert a byte offset to a `Position` whose column is in the map's
     /// output space (shares the tracker's line lookup — no extra search).
     pub fn position(&self, byte_offset: u32) -> Position {
+        self.pos_and_position(byte_offset).1
+    }
+
+    /// The emitted offset (`pos`) plus its `Position`, in one translation —
+    /// the per-endpoint form direct wire emitters use: `pos` + `position`
+    /// called separately would translate `byte_offset` through the map twice
+    /// on the multibyte path.
+    #[inline]
+    pub fn pos_and_position(&self, byte_offset: u32) -> (u32, Position) {
         let (line, byte_column) = self.tracker.get_line_column(byte_offset as usize);
-        let column = if self.map.has_multibyte() {
+        if self.map.has_multibyte() {
+            let pos = self.map.byte_to_char(byte_offset);
             let line_start = byte_offset as usize - byte_column;
-            (self.map.byte_to_char(byte_offset) - self.map.byte_to_char(line_start as u32)) as usize
+            let column = (pos - self.map.byte_to_char(line_start as u32)) as usize;
+            (pos, Position { line, column })
         } else {
-            byte_column
-        };
-        Position { line, column }
+            // Byte-space passthrough: the map is identity, so the emitted
+            // offset is the byte offset itself.
+            (
+                byte_offset,
+                Position {
+                    line,
+                    column: byte_column,
+                },
+            )
+        }
     }
 
     /// Convert a byte span to a `SourceLocation` in the map's output space.

@@ -127,12 +127,14 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib --json
 ```
 
 Output shows, per language: parse vs materialization, the sub-step shares,
-the shipped typed pipeline's sub-step sum ("typed pipeline" — for TS a
-single fused conversion + direct, since `convert_ast_json_string` emits
-char-space positions through `LocationMapper` with no separate translation
-walk; for Svelte/CSS convert + typed attach (Svelte only) + typed translate
-+ direct), and the whole-call "value baseline" vs "shipped" pair, plus both
-identity-check counts.
+the typed pipeline's sub-step sum ("typed pipeline" — for TS a single fused
+char-space conversion through `LocationMapper` + direct, the tree-building
+baseline the JSON writer replaced; for Svelte/CSS convert + typed attach
+(Svelte only) + typed translate + direct, still those languages' shipped
+shape), for TS a "write" row mirroring the shipped pipeline (tracker + map
+build + `write_program_json`, the writer that emits wire JSON straight from
+the internal AST), and the whole-call "value baseline" vs "shipped" pair,
+plus both identity-check counts.
 
 **Sub-step timings exclude drop costs** — each intermediate outlives its
 timed region, and recursively freeing a large tree/`Value` is a

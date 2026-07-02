@@ -38,10 +38,12 @@ mod patterns;
 mod statements;
 mod translate_typed;
 mod types;
+mod write;
 
 pub use translate_typed::{
     translate_byte_to_char_offsets_typed, translate_expression_byte_to_char_offsets_typed,
 };
+pub use write::write_program_json;
 
 // Re-export conversion functions (pub(in crate::ast) for internal use)
 pub(in crate::ast) use control_flow::*;

@@ -56,19 +56,22 @@ fn format_panic(payload: &(dyn std::any::Any + Send)) -> String {
 }
 
 /// Helper to convert source pointer to &str and run a closure returning the
-/// output string verbatim (formatted source, or already-serialized JSON).
+/// output payload verbatim (formatted source `String`, or already-serialized
+/// JSON wire bytes — the parse path returns `Vec<u8>` so the writer's
+/// UTF-8-by-construction output is never re-validated).
 /// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
 ///
 /// # Safety
 /// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
-unsafe fn with_source_string<F>(
+unsafe fn with_source_string<F, B>(
     source_ptr: *const u8,
     source_len: usize,
     out_len: *mut usize,
     f: F,
 ) -> *mut u8
 where
-    F: FnOnce(&str) -> Result<String, String> + panic::UnwindSafe,
+    F: FnOnce(&str) -> Result<B, String> + panic::UnwindSafe,
+    B: Into<Vec<u8>>,
 {
     let source = match unsafe { extract_source(source_ptr, source_len, out_len) } {
         Ok(s) => s,
@@ -76,7 +79,7 @@ where
     };
 
     match panic::catch_unwind(|| f(source)) {
-        Ok(Ok(result)) => string_to_ptr(result, out_len),
+        Ok(Ok(result)) => bytes_to_ptr(result, out_len),
         Ok(Err(e)) => error_result(&e, out_len),
         Err(payload) => error_result(&format_panic(&*payload), out_len),
     }
@@ -110,16 +113,17 @@ where
         Ok(Ok(ast)) => {
             // Prevent compiler from optimizing away the parse
             std::hint::black_box(ast);
-            string_to_ptr(String::new(), out_len) // Success: empty string
+            bytes_to_ptr(Vec::new(), out_len) // Success: empty output
         }
         Ok(Err(e)) => error_result(&e, out_len),
         Err(payload) => error_result(&format_panic(&*payload), out_len),
     }
 }
 
-/// Convert a String to a raw pointer, writing the length to `out_len`.
-fn string_to_ptr(s: String, out_len: *mut usize) -> *mut u8 {
-    let bytes = s.into_bytes().into_boxed_slice();
+/// Convert an output payload (JSON bytes or a formatted `String` — anything
+/// byte-convertible) to a raw pointer, writing the length to `out_len`.
+fn bytes_to_ptr(payload: impl Into<Vec<u8>>, out_len: *mut usize) -> *mut u8 {
+    let bytes = payload.into().into_boxed_slice();
     // Safety: out_len is guaranteed valid by caller contract
     unsafe { *out_len = bytes.len() };
     Box::into_raw(bytes).cast::<u8>()
@@ -130,7 +134,7 @@ fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
     let error = serde_json::json!({ "error": message });
     #[allow(clippy::unwrap_used)] // JSON serialization of simple object won't fail
     let json = serde_json::to_string(&error).unwrap();
-    string_to_ptr(json, out_len)
+    bytes_to_ptr(json, out_len)
 }
 
 /// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
@@ -157,7 +161,7 @@ macro_rules! lang_bindings {
                 with_source_string(source_ptr, source_len, out_len, |source| {
                     with_ast_arena(|arena| {
                         let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
-                        Ok($lang::convert_ast_json_string(&ast, source))
+                        Ok($lang::convert_ast_json_bytes(&ast, source))
                     })
                 })
             }
