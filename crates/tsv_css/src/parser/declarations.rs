@@ -97,7 +97,7 @@ pub(crate) fn parse_rule<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     nested: bool,
 ) -> Result<CssRule<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start;
+    let start = parser.span_pos(parser.current_start);
 
     // Nested rules use relative selectors (can start with combinators like `> .child`)
     // Top-level rules use complex selectors (cannot start with combinators)
@@ -117,7 +117,7 @@ pub(crate) fn parse_rule<'arena>(
     }
 
     // Expect { and capture its start
-    let block_start = parser.base_offset() + parser.current_start;
+    let block_start = parser.span_pos(parser.current_start);
     parser.expect(TokenKind::LeftBrace)?;
     parser.skip_whitespace()?;
 
@@ -163,19 +163,19 @@ pub(crate) fn parse_rule<'arena>(
     if !parser.check(TokenKind::RightBrace) {
         return Err(parser.error_expected("'}'"));
     }
-    let block_end = parser.base_offset() + parser.current_end;
+    let block_end = parser.span_pos(parser.current_end);
     parser.advance()?; // consume }
 
     Ok(CssRule {
         selector,
         block_span: Span {
-            start: block_start as u32,
-            end: block_end as u32,
+            start: block_start,
+            end: block_end,
         },
         declarations: declarations.into_bump_slice(),
         span: Span {
-            start: start as u32,
-            end: block_end as u32,
+            start,
+            end: block_end,
         },
     })
 }

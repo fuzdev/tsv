@@ -81,28 +81,34 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.comments.push(comment);
     }
 
-    /// Register the current token as a comment.
-    /// Assumes current token is a Comment. Extracts content without `/* */` delimiters.
-    pub(crate) fn register_current_comment(&mut self) {
+    /// Build a `Comment` for the current block-comment token, delimiters excluded
+    /// from `content_span`. Does not advance — callers decide whether to register it
+    /// (`register_current_comment`) or consume and return it (`parse_block_comment`).
+    fn build_current_comment(&self) -> Comment {
         debug_assert!(matches!(self.current_kind, TokenKind::Comment));
-        let comment_start = self.base_offset + self.current_start;
-        let comment_end = self.base_offset + self.current_end;
         // Content excludes the `/* */` delimiters; recovered on demand as a
         // source slice rather than copied.
         let multiline = self.source[self.current_start + 2..self.current_end - 2].contains('\n');
-        self.add_comment(Comment {
+        Comment {
             content_span: Span {
-                start: (comment_start + 2) as u32,
-                end: (comment_end - 2) as u32,
+                start: self.span_pos(self.current_start + 2),
+                end: self.span_pos(self.current_end - 2),
             },
             is_block: true,
             multiline,
             span: Span {
-                start: comment_start as u32,
-                end: comment_end as u32,
+                start: self.span_pos(self.current_start),
+                end: self.span_pos(self.current_end),
             },
             emit_character_field: false,
-        });
+        }
+    }
+
+    /// Register the current token as a comment.
+    /// Assumes current token is a Comment. Extracts content without `/* */` delimiters.
+    pub(crate) fn register_current_comment(&mut self) {
+        let comment = self.build_current_comment();
+        self.add_comment(comment);
     }
 
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
@@ -176,7 +182,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         if !self.check(kind) {
             return Err(self.error_expected_found(&kind.to_string()));
         }
-        let end = (self.base_offset + self.current_end) as u32;
+        let end = self.span_pos(self.current_end);
         self.advance()?;
         Ok(end)
     }
@@ -280,24 +286,10 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// Parse the current comment token into a `Comment` and advance past it.
     /// Caller must verify `current_kind` is `TokenKind::Comment` before calling.
     pub(crate) fn parse_block_comment(&mut self) -> Result<Comment, ParseError> {
-        let comment_start = self.base_offset + self.current_start;
-        let comment_end = self.base_offset + self.current_end;
-        let multiline = self.source[self.current_start + 2..self.current_end - 2].contains('\n');
+        let comment = self.build_current_comment();
         self.advance()?;
         self.skip_whitespace()?;
-        Ok(Comment {
-            content_span: Span {
-                start: (comment_start + 2) as u32,
-                end: (comment_end - 2) as u32,
-            },
-            is_block: true,
-            multiline,
-            span: Span {
-                start: comment_start as u32,
-                end: comment_end as u32,
-            },
-            emit_character_field: false,
-        })
+        Ok(comment)
     }
 
     // Error Helpers
