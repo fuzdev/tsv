@@ -9,7 +9,6 @@ pub mod dimensions;
 pub mod functions;
 pub mod lists;
 pub(crate) mod parser;
-pub mod spacing;
 pub mod strings;
 
 use crate::ast::internal::CssValue;
@@ -21,7 +20,6 @@ use tsv_lang::Span;
 pub use colors::{parse_color, parse_color_function};
 pub use dimensions::parse_dimension;
 pub use functions::parse_function_arguments;
-pub use spacing::should_add_space_between;
 pub use strings::parse_string_literal;
 
 // Note: classify_separators is used internally by ValueParser but not exported publicly

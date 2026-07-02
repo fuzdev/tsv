@@ -178,7 +178,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Self::with_interner_and_goal(
             source,
             0,
-            Rc::new(RefCell::new(DefaultStringInterner::new())),
+            Rc::new(RefCell::new(DefaultStringInterner::with_capacity(
+                tsv_lang::estimated_interner_capacity(source.len()),
+            ))),
             goal,
             arena,
         )

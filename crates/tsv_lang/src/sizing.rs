@@ -46,3 +46,28 @@ pub fn estimated_ast_arena_capacity(source_len: usize) -> usize {
         .saturating_mul(AST_ARENA_BYTES_PER_SOURCE_BYTE)
         .max(512)
 }
+
+/// Estimated source bytes per distinct interned symbol.
+///
+/// Every parse interns each distinct identifier (and property/type name) once
+/// into a per-file `string-interner`. Measured across corpora (2108 files,
+/// zzz/fuz_app/svelte/kit/svelte-docinfo), the per-file distribution of source
+/// bytes per distinct symbol has median ~84 (25th percentile ~53); dividing by
+/// 32 sizes the interner's dedup map + span vec a little above the actual symbol
+/// count for ~95% of files, so the from-empty doubling reallocs (the map, the
+/// span vec, and the backend's `cap * 5`-byte string buffer) collapse to one
+/// up-front allocation each. Over-provisioning is ~2.6x the map on the median
+/// file — modest — and the interner is per-file (no cross-file reuse: it has no
+/// `reset()`), so it is freed promptly.
+const SOURCE_BYTES_PER_INTERNED_SYMBOL: usize = 32;
+
+/// Pre-size estimate (in distinct symbols) for the per-file string interner.
+///
+/// Feed to `DefaultStringInterner::with_capacity(...)` at each parse entry point
+/// that creates its own interner (`tsv_ts` standalone, `tsv_svelte`; embedded TS
+/// shares the host document's interner and constructs none). No floor: a tiny
+/// source maps to a capacity of 0, and `with_capacity(0)` allocates nothing, so
+/// a one-line input keeps its zero-allocation start.
+pub fn estimated_interner_capacity(source_len: usize) -> usize {
+    source_len / SOURCE_BYTES_PER_INTERNED_SYMBOL
+}

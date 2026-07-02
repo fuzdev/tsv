@@ -211,14 +211,22 @@ pub(crate) fn parse_declaration<'arena>(
     // - parens for functions like `url(data:image/png;base64,...)`
     // - braces and brackets for custom properties (`<declaration-value>` per CSS Syntax
     //   Level 3 §4.3.7 permits balanced `()` / `[]` / `{}` blocks)
-    let mut value_parts = Vec::new();
     let mut has_value_comment = false;
     let mut value_end = value_start;
-    // Per-part end bookkeeping for !important stripping, aligned with value_parts:
-    // (value_end before this part was pushed, this part's token end). Comments are not
-    // parts but do advance value_end, so a simple prev/prev-prev pair would roll back
-    // to the wrong position when comments sit next to `!important`.
-    let mut part_ends: Vec<(usize, usize)> = Vec::new();
+    // The value text is re-extracted verbatim from source below (`parse_value_from_source`),
+    // so the token scan never materializes the parts — it only needs (a) whether any part
+    // exists (emptiness) and (b) enough about the last two parts to strip a trailing
+    // `!important`. Track a rolling two-part window instead of a `Vec<String>`:
+    //   - `*_is_bang` / `*_is_important`: is the part the `!` marker / the `important` keyword
+    //   - `*_ends`: (value_end before this part, this part's token end) — for the span rollback
+    // Comments are not parts but do advance `value_end`, so the window pair correctly rolls
+    // back past a comment that sits next to `!important`.
+    let mut part_count: usize = 0;
+    let mut last_is_bang = false;
+    let mut last_is_important = false;
+    let mut last_ends: (usize, usize) = (0, 0);
+    let mut prev_is_bang = false;
+    let mut prev_ends: (usize, usize) = (0, 0);
     let mut paren_depth: i32 = 0;
     let mut brace_depth: i32 = 0;
     let mut bracket_depth: i32 = 0;
@@ -241,18 +249,21 @@ pub(crate) fn parse_declaration<'arena>(
             _ => {}
         }
 
-        // Convert token to string representation for value
-        let value_str = match &parser.current_kind {
-            // Internal AST: use decoded value (spec-compliant)
-            TokenKind::Identifier => parser.current_identifier().to_string(),
-            TokenKind::String { quote } => {
-                let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                format!("{quote}{content}{quote}")
-            }
-            TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
-                // Extract raw value from source - preserves exact representation
-                parser.current_value().to_string()
-            }
+        // Classify the token only for `!important` stripping (the value text itself is
+        // re-extracted from source below, never reconstructed here).
+        let (is_bang, is_important) = match &parser.current_kind {
+            // An identifier can't be `!`; it can be `important` (case-insensitive).
+            TokenKind::Identifier => (
+                false,
+                parser
+                    .current_identifier()
+                    .eq_ignore_ascii_case("important"),
+            ),
+            // A quoted string / number / percentage / dimension is never `!` or `important`.
+            TokenKind::String { .. }
+            | TokenKind::Number
+            | TokenKind::Percentage
+            | TokenKind::Dimension { .. } => (false, false),
             TokenKind::Whitespace => {
                 parser.advance()?;
                 continue;
@@ -265,68 +276,58 @@ pub(crate) fn parse_declaration<'arena>(
                 parser.advance()?;
                 continue;
             }
-            TokenKind::Bang => "!".to_string(),
+            TokenKind::Bang => (true, false),
             _ => {
-                // Other tokens (including brackets/braces/parens) - include as-is from source
-                parser.current_value().to_string()
+                // Other tokens (brackets/braces/parens/etc.) - classify from source.
+                let text = parser.current_value();
+                (text == "!", text.eq_ignore_ascii_case("important"))
             }
         };
 
         let token_end = parser.base_offset() + parser.current_end;
-        part_ends.push((value_end, token_end));
-        value_parts.push(value_str);
+        // Roll the two-part window (previous <- last <- this).
+        prev_is_bang = last_is_bang;
+        prev_ends = last_ends;
+        last_is_bang = is_bang;
+        last_is_important = is_important;
+        last_ends = (value_end, token_end);
+        part_count += 1;
         value_end = token_end;
         parser.advance()?;
     }
 
-    // Check for !important at the end of value
-    let important_end = if value_parts.len() >= 2 {
-        let last = value_parts.last().map(String::as_str);
-        let second_last = value_parts.get(value_parts.len() - 2).map(String::as_str);
-        if second_last == Some("!") && last.is_some_and(|s| s.eq_ignore_ascii_case("important")) {
-            // End of the `important` token itself (a trailing comment may have advanced
-            // value_end past it); roll the value span back to just before the `!` was
-            // pushed, which keeps any comments between the value and the `!`.
-            let end_with_important = part_ends[value_parts.len() - 1].1;
-            value_end = part_ends[value_parts.len() - 2].0;
-            value_parts.pop();
-            value_parts.pop();
-            Some(end_with_important as u32)
-        } else {
-            None
-        }
+    // Check for !important at the end of value: the second-to-last part is `!` and the
+    // last is `important` (case-insensitive).
+    let important_matched = part_count >= 2 && prev_is_bang && last_is_important;
+    let important_end = if important_matched {
+        // End of the `important` token itself (a trailing comment may have advanced
+        // value_end past it); roll the value span back to just before the `!` was
+        // scanned, which keeps any comments between the value and the `!`.
+        let end_with_important = last_ends.1;
+        value_end = prev_ends.0;
+        Some(end_with_important as u32)
     } else {
         None
     };
 
-    // Join value parts intelligently - only add spaces when needed
-    // Most CSS values don't need spaces (translateX(0), not translateX ( 0 ))
-    let value_str = if value_parts.is_empty() {
-        String::new()
+    // The value is empty when no parts remain after the optional `!important` strip.
+    // (Every part is non-empty, so the old "join all parts and check is_empty" — whose
+    // joined string was used for nothing else, since the value is parsed from source —
+    // reduces to this count check.)
+    let value_is_empty = if important_matched {
+        part_count - 2 == 0
     } else {
-        let mut result = String::new();
-        for (i, part) in value_parts.iter().enumerate() {
-            if i > 0 {
-                // Add space only between certain token combinations
-                let prev_part = &value_parts[i - 1];
-                let needs_space = super::value::should_add_space_between(prev_part, part);
-                if needs_space {
-                    result.push(' ');
-                }
-            }
-            result.push_str(part);
-        }
-        result
+        part_count == 0
     };
 
-    // Allow empty value_str if we have comments (e.g., `color: /* comment */;`)
+    // Allow empty value if we have comments (e.g., `color: /* comment */;`)
     // Svelte treats the comment as the value in this case.
     // Also allow an empty custom-property value (`--a:;`): css-variables-1 makes the
     // value optional (`<declaration-value>?`), and css-syntax-3 trims leading/trailing
     // whitespace, so the value is empty regardless of spacing. The empty value parses to
     // an empty identifier and prints as a single space (`--a: ;`), the form
     // css-variables-1 mandates for serialization. Non-custom empty values stay an error.
-    if value_str.is_empty() && !has_value_comment && !property.starts_with("--") {
+    if value_is_empty && !has_value_comment && !property.starts_with("--") {
         return Err(parser.error_msg_at("Empty CSS value", start));
     }
 

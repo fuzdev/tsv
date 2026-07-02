@@ -155,13 +155,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         parse_expressions: bool,
     ) -> Result<AttributeNode<'arena>, ParseError> {
-        let name_str = self.current_value().to_string();
+        // `&'a str` borrows the source, so it survives the `&mut self` call below.
+        let name_str = self.current_value();
 
         // Check if this is a directive (contains colon)
         if let Some(colon_idx) = name_str.find(':') {
             let prefix = &name_str[..colon_idx];
             if let Some(directive_type) = DirectiveType::from_prefix(prefix) {
-                return self.parse_directive(directive_type, &name_str, colon_idx);
+                return self.parse_directive(directive_type, name_str, colon_idx);
             }
         }
 
@@ -680,8 +681,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Err(self.error_expected_found("attribute name"));
         }
 
-        let name_str = self.current_value().to_string();
-        let name = self.intern(&name_str);
+        let name = self.intern(self.current_value());
         let name_end = self.current_end; // Save end position of name token
         self.advance()?;
 
