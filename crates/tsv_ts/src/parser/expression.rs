@@ -1505,13 +1505,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if i < 4 || &bytes[i - 2..i] != b"*/" {
             return false;
         }
-        // Find the start of that block comment (block comments don't nest in JS,
-        // so the last `/*` before `*/` opens it).
-        let Some(open) = self.source[..i - 2].rfind("/*") else {
-            return false;
-        };
-        let value = &self.source[open + 2..i - 2]; // text between `/*` and `*/`
-        is_jsdoc_type_cast_comment(value)
+        // Resolve the comment through the lexer's spans rather than re-scanning the
+        // source. A `/*` can appear inside this comment's own body *or* a preceding
+        // line comment / string literal, and byte scanning can't tell those apart from
+        // the real opener — mis-slicing the content would drop a real cast
+        // (`/** z /* @type {T} */`) or fabricate one (`/* z /** @type {T} */`). The
+        // comment ending here was just drained into `self.comments`; match it by its
+        // host-coordinate end and test its exact (delimiter-excluded) content.
+        let token_end = (i + self.base_offset) as u32;
+        self.comments
+            .iter()
+            .rev()
+            .find(|c| c.span.end == token_end)
+            .is_some_and(|c| {
+                c.is_block && {
+                    let start = c.content_span.start as usize - self.base_offset;
+                    let end = c.content_span.end as usize - self.base_offset;
+                    is_jsdoc_type_cast_comment(&self.source[start..end])
+                }
+            })
     }
 
     /// Parse a TypeScript angle-bracket type assertion: `<Type>expr`

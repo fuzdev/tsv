@@ -1,0 +1,265 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 181,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Single-line block glued to `(` with the argument on the next line stays inline.",
+			"start": 10,
+			"end": 92,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 97,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 4
+				},
+				"end": {
+					"line": 3,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Own-line comment keeps the break.",
+			"start": 111,
+			"end": 147,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 155,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 180,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 171,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 94,
+					"end": 108,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 94,
+						"end": 107,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 14
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 94,
+							"end": 96,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 105,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 13
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 97,
+										"end": 104
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single-line block glued to `(` with the argument on the next line stays inline.",
+							"start": 10,
+							"end": 92
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 149,
+					"end": 170,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 149,
+						"end": 169,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 149,
+							"end": 151,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 1
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "gn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 165,
+								"end": 166,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 155,
+										"end": 162
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line comment keeps the break.",
+							"start": 111,
+							"end": 147
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

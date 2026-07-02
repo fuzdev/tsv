@@ -82,7 +82,9 @@ impl<'a> Printer<'a> {
         let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
         let argument_start = unary.argument.span().start;
         let argument_end = unary.argument.span().end;
-        let leading_comments_opt = self.build_rhs_comments_opt(operator_end, argument_start);
+        // A single-line block glued to the operator hugs the operand even across a
+        // source newline (`!/* c */⏎x` → `!(/* c */ x)`), matching prettier.
+        let leading_comments_opt = self.build_rhs_comments_glued_opt(operator_end, argument_start);
 
         // Check for trailing comments after the argument but inside the original parens.
         // When the parser strips grouping parens from `!(x /* c */)`, the comment
@@ -97,10 +99,13 @@ impl<'a> Printer<'a> {
         let has_own_line_trailing_comment =
             comments_in_range(self.comments, argument_end, unary.span.end)
                 .any(|c| !c.is_block || self.has_newline_between(argument_end, c.span.start));
+        // A line comment is already caught by `has_line_comments_between` above; here
+        // a leading block forces the multiline layout only when it can't glue inline
+        // (multiline, or own-line with a newline before it).
         let needs_multiline = self.has_line_comments_between(operator_end, argument_start)
             || has_own_line_trailing_comment
-            || (leading_comments_opt.is_some()
-                && self.has_newline_between(operator_end, argument_start));
+            || comments_in_range(self.comments, operator_end, argument_start)
+                .any(|c| self.comment_forces_own_line(c));
 
         let argument_doc = if leading_comments_opt.is_some() || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
@@ -119,23 +124,12 @@ impl<'a> Printer<'a> {
             if needs_multiline {
                 // Multiline layout: !(\n  /* c */\n  expr\n) or !(\n  expr // c\n)
                 let mut indent_parts: DocBuf = smallvec![d.hardline()];
-                // Add leading comments — use hardline if the comment and the next
-                // comment / argument are on different lines, space if same line. An
-                // author blank line before the argument / next comment is preserved.
-                let leading: CommentVec<'_> =
-                    comments_in_range(self.comments, operator_end, argument_start).collect();
-                for (ci, comment) in leading.iter().enumerate() {
-                    indent_parts.push(self.build_comment_doc(comment));
-                    let next = leading.get(ci + 1).map_or(argument_start, |c| c.span.start);
-                    if self.has_newline_between(comment.span.end, next) {
-                        self.push_blank_preserving_hardline(
-                            &mut indent_parts,
-                            comment.span.end,
-                            next,
-                        );
-                    } else {
-                        indent_parts.push(d.text(" "));
-                    }
+                // Leading comments between operator and operand: same per-line
+                // block/line layout (blank-preserving hardlines, inline blocks hugged)
+                // as the inline path. Non-gluing here — the layout is already vertical,
+                // so a single-line block keeps the author's break to the next line.
+                if let Some(leading) = self.build_rhs_comments_opt(operator_end, argument_start) {
+                    indent_parts.push(leading);
                 }
                 indent_parts.push(inner);
                 // Add trailing comments with appropriate spacing

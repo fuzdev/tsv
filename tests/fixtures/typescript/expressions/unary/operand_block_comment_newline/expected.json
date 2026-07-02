@@ -1,0 +1,380 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 204,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Single-line block glued to a unary operator with the operand on the next line stays inline.",
+			"start": 10,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 95
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 118,
+			"end": 125,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 13
+				},
+				"end": {
+					"line": 3,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 152,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 19
+				},
+				"end": {
+					"line": 5,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 176,
+			"end": 183,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 9
+				},
+				"end": {
+					"line": 7,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 203,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 106,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 112,
+							"end": 130,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 112,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 116,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 25
+									}
+								},
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 126,
+									"end": 129,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 21
+										},
+										"end": {
+											"line": 3,
+											"column": 24
+										}
+									},
+									"name": "foo",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 118,
+											"end": 125
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Single-line block glued to a unary operator with the operand on the next line stays inline.",
+							"start": 10,
+							"end": 104
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 134,
+					"end": 165,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 140,
+							"end": 164,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 140,
+								"end": 141,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 144,
+								"end": 164,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 31
+									}
+								},
+								"operator": "typeof",
+								"prefix": true,
+								"argument": {
+									"type": "Identifier",
+									"start": 160,
+									"end": 163,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 27
+										},
+										"end": {
+											"line": 5,
+											"column": 30
+										}
+									},
+									"name": "foo",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 152,
+											"end": 159
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 168,
+					"end": 193,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 26
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 168,
+						"end": 192,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 25
+							}
+						},
+						"operator": "delete",
+						"prefix": true,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 184,
+							"end": 191,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 17
+								},
+								"end": {
+									"line": 7,
+									"column": 24
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 184,
+								"end": 187,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 17
+									},
+									"end": {
+										"line": 7,
+										"column": 20
+									}
+								},
+								"name": "foo"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 188,
+								"end": 191,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 21
+									},
+									"end": {
+										"line": 7,
+										"column": 24
+									}
+								},
+								"name": "bar"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 176,
+									"end": 183
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
