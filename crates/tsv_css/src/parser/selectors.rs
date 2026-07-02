@@ -38,7 +38,7 @@ fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), Pars
 pub(crate) fn parse_complex_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start();
+    let start = parser.span_pos(parser.current_start());
     let mut selectors = parser.bvec();
 
     // Parse first complex selector
@@ -61,10 +61,7 @@ pub(crate) fn parse_complex_selector_list<'arena>(
 
     Ok(SelectorList {
         selectors: selectors.into_bump_slice(),
-        span: Span {
-            start: start as u32,
-            end,
-        },
+        span: Span { start, end },
     })
 }
 
@@ -96,7 +93,7 @@ pub(crate) fn parse_complex_selector_list<'arena>(
 pub(crate) fn parse_forgiving_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start();
+    let start = parser.span_pos(parser.current_start());
     let mut selectors = parser.bvec();
 
     loop {
@@ -133,14 +130,11 @@ pub(crate) fn parse_forgiving_selector_list<'arena>(
     }
 
     // Calculate end position from last selector, or use start if empty
-    let end = selectors.last().map_or(start as u32, |s| s.span.end);
+    let end = selectors.last().map_or(start, |s| s.span.end);
 
     Ok(SelectorList {
         selectors: selectors.into_bump_slice(),
-        span: Span {
-            start: start as u32,
-            end,
-        },
+        span: Span { start, end },
     })
 }
 
@@ -245,7 +239,7 @@ fn extract_selector_until_comma_or_end<'a>(
 pub(crate) fn parse_relative_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start();
+    let start = parser.span_pos(parser.current_start());
     let mut selectors = parser.bvec();
 
     // Parse first relative complex selector
@@ -268,10 +262,7 @@ pub(crate) fn parse_relative_selector_list<'arena>(
 
     Ok(SelectorList {
         selectors: selectors.into_bump_slice(),
-        span: Span {
-            start: start as u32,
-            end,
-        },
+        span: Span { start, end },
     })
 }
 
@@ -291,7 +282,7 @@ pub(crate) fn parse_relative_selector_list<'arena>(
 fn parse_relative_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<ComplexSelector<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start();
+    let start = parser.span_pos(parser.current_start());
     let mut children = parser.bvec();
 
     // Check if we start with an EXPLICIT combinator (>, +, ~, ||)
@@ -334,10 +325,7 @@ fn parse_relative_complex_selector<'arena>(
 
     Ok(ComplexSelector {
         children: children.into_bump_slice(),
-        span: Span {
-            start: start as u32,
-            end,
-        },
+        span: Span { start, end },
     })
 }
 
@@ -345,7 +333,7 @@ fn parse_relative_complex_selector<'arena>(
 pub(crate) fn parse_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<ComplexSelector<'arena>, ParseError> {
-    let start = parser.base_offset() + parser.current_start();
+    let start = parser.span_pos(parser.current_start());
     let mut children = parser.bvec();
 
     // First relative selector has no combinator
@@ -379,10 +367,7 @@ pub(crate) fn parse_complex_selector<'arena>(
 
     Ok(ComplexSelector {
         children: children.into_bump_slice(),
-        span: Span {
-            start: start as u32,
-            end,
-        },
+        span: Span { start, end },
     })
 }
 
@@ -396,7 +381,7 @@ pub(crate) fn parse_explicit_combinator(
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
     parser.skip_whitespace()?;
 
-    let combinator_start = parser.base_offset() + parser.current_start();
+    let combinator_start = parser.span_pos(parser.current_start());
 
     let combinator = match &parser.current_kind {
         TokenKind::GreaterThan => Some(Combinator::Child),
@@ -407,15 +392,15 @@ pub(crate) fn parse_explicit_combinator(
     };
 
     if let Some(comb) = combinator {
-        let end = parser.base_offset() + parser.current_end;
+        let end = parser.span_pos(parser.current_end);
         parser.advance()?; // consume combinator token
         parser.skip_whitespace()?;
 
         Ok(Some((
             comb,
             Span {
-                start: combinator_start as u32,
-                end: end as u32,
+                start: combinator_start,
+                end,
             },
         )))
     } else {
@@ -429,14 +414,14 @@ pub(crate) fn parse_combinator(
     parser: &mut CssParser<'_, '_>,
 ) -> Result<Option<(Combinator, Span)>, ParseError> {
     // Capture position before skipping whitespace for descendant combinator
-    let whitespace_start = parser.base_offset() + parser.current_start();
+    let whitespace_start = parser.span_pos(parser.current_start());
     parser.skip_whitespace()?;
 
     // Don't skip comments - parse_complex_selector checks for them before calling this
     // If we're here and there's a comment, it means it's terminal (before {, ,, or EOF)
     // and we should return None to stop parsing selectors
 
-    let combinator_start = parser.base_offset() + parser.current_start();
+    let combinator_start = parser.span_pos(parser.current_start());
 
     let combinator = match &parser.current_kind {
         TokenKind::GreaterThan => Some(Combinator::Child),
@@ -460,7 +445,7 @@ pub(crate) fn parse_combinator(
             // Descendant is whitespace - span from end of previous to start of next
             (whitespace_start, combinator_start)
         } else {
-            (combinator_start, parser.base_offset() + parser.current_end)
+            (combinator_start, parser.span_pos(parser.current_end))
         };
 
         if comb != Combinator::Descendant {
@@ -468,13 +453,7 @@ pub(crate) fn parse_combinator(
             parser.skip_whitespace()?;
         }
 
-        Some((
-            comb,
-            Span {
-                start: start as u32,
-                end: end as u32,
-            },
-        ))
+        Some((comb, Span { start, end }))
     } else {
         None
     };
@@ -520,7 +499,7 @@ fn parse_relative_selector<'arena>(
         }
     }
 
-    let end = parser.base_offset() + parser.current_start();
+    let end = parser.span_pos(parser.current_start());
 
     if selectors.is_empty() {
         return Err(parser.error_expected_at("selector", start));
@@ -532,7 +511,7 @@ fn parse_relative_selector<'arena>(
         selectors: selectors.into_bump_slice(),
         span: Span {
             start: start as u32,
-            end: end as u32,
+            end,
         },
     })
 }
@@ -578,26 +557,26 @@ pub(crate) fn parse_simple_selector<'arena>(
                 if !parser.check(TokenKind::Identifier) {
                     return Err(parser.error_expected_after("element name", "namespace prefix"));
                 }
-                let end = parser.base_offset() + parser.current_end;
+                let end = parser.span_pos(parser.current_end);
                 parser.advance()?;
 
                 Ok(SimpleSelector::Type {
                     namespace,
                     span: Span {
                         start: start as u32,
-                        end: end as u32,
+                        end,
                     },
                 })
             } else {
                 // No namespace, just a regular type selector; its text is recovered
                 // from `span` at print time, so nothing is copied into the arena.
                 parser.advance()?;
-                let end = parser.base_offset() + parser.current_start();
+                let end = parser.span_pos(parser.current_start());
                 Ok(SimpleSelector::Type {
                     namespace: None,
                     span: Span {
                         start: start as u32,
-                        end: end as u32,
+                        end,
                     },
                 })
             }
@@ -610,12 +589,12 @@ pub(crate) fn parse_simple_selector<'arena>(
             }
             // The class name's text is recovered from `span` at print time, so
             // nothing is copied into the arena.
-            let end = parser.base_offset() + parser.current_end;
+            let end = parser.span_pos(parser.current_end);
             parser.advance()?;
             Ok(SimpleSelector::Class {
                 span: Span {
                     start: start as u32,
-                    end: end as u32,
+                    end,
                 },
             })
         }
@@ -627,12 +606,12 @@ pub(crate) fn parse_simple_selector<'arena>(
             }
             // The ID name's text is recovered from `span` at print time, so nothing
             // is copied into the arena.
-            let end = parser.base_offset() + parser.current_end;
+            let end = parser.span_pos(parser.current_end);
             parser.advance()?;
             Ok(SimpleSelector::Id {
                 span: Span {
                     start: start as u32,
-                    end: end as u32,
+                    end,
                 },
             })
         }
@@ -654,24 +633,24 @@ pub(crate) fn parse_simple_selector<'arena>(
 
                 // The element name's text is recovered from `span` at print time, so
                 // nothing is copied into the arena.
-                let end = parser.base_offset() + parser.current_end;
+                let end = parser.span_pos(parser.current_end);
                 parser.advance()?;
 
                 Ok(SimpleSelector::Type {
                     namespace: Some("*"), // Universal namespace
                     span: Span {
                         start: start as u32,
-                        end: end as u32,
+                        end,
                     },
                 })
             } else {
                 // Just a universal selector (no namespace)
-                let end = parser.base_offset() + parser.current_start();
+                let end = parser.span_pos(parser.current_start());
                 Ok(SimpleSelector::Universal {
                     namespace: None,
                     span: Span {
                         start: start as u32,
-                        end: end as u32,
+                        end,
                     },
                 })
             }
@@ -686,12 +665,12 @@ pub(crate) fn parse_simple_selector<'arena>(
         }
         TokenKind::Ampersand => {
             // Nesting selector: &
-            let end = parser.base_offset() + parser.current_end;
+            let end = parser.span_pos(parser.current_end);
             parser.advance()?;
             Ok(SimpleSelector::Nesting {
                 span: Span {
                     start: start as u32,
-                    end: end as u32,
+                    end,
                 },
             })
         }
@@ -702,13 +681,13 @@ pub(crate) fn parse_simple_selector<'arena>(
             let value = value_str.parse::<f64>().map_err(|_| {
                 parser.error_msg_at(&format!("Invalid percentage value: {value_str}"), start)
             })?;
-            let end = parser.base_offset() + parser.current_end;
+            let end = parser.span_pos(parser.current_end);
             parser.advance()?;
             Ok(SimpleSelector::Percentage {
                 value,
                 span: Span {
                     start: start as u32,
-                    end: end as u32,
+                    end,
                 },
             })
         }
@@ -721,26 +700,26 @@ pub(crate) fn parse_simple_selector<'arena>(
             if parser.check(TokenKind::Identifier) {
                 // The element name's text is recovered from `span` at print time, so
                 // nothing is copied into the arena.
-                let end = parser.base_offset() + parser.current_end;
+                let end = parser.span_pos(parser.current_end);
                 parser.advance()?;
 
                 Ok(SimpleSelector::Type {
                     namespace: Some(""), // Empty string = explicit no namespace
                     span: Span {
                         start: start as u32,
-                        end: end as u32,
+                        end,
                     },
                 })
             } else if parser.check(TokenKind::Asterisk) {
                 // |* - universal selector with explicit no namespace
-                let end = parser.base_offset() + parser.current_end;
+                let end = parser.span_pos(parser.current_end);
                 parser.advance()?;
 
                 Ok(SimpleSelector::Universal {
                     namespace: Some(""), // Empty string = explicit no namespace
                     span: Span {
                         start: start as u32,
-                        end: end as u32,
+                        end,
                     },
                 })
             } else {
