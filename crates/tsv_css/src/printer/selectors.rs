@@ -451,7 +451,7 @@ impl<'a> Printer<'a> {
                             &leading,
                             &trailing,
                         );
-                        d.concat(&[d.text("("), inner, d.text(")")])
+                        self.paren_wrap(inner)
                     }
                     Some(selectors) => {
                         // The of-gap comments (`of /* c */ .a`) lead the selector list.
@@ -491,7 +491,7 @@ impl<'a> Printer<'a> {
                     }
                     _ => compound,
                 };
-                d.concat(&[d.text("("), inner, d.text(")")])
+                self.paren_wrap(inner)
             }
             internal::PseudoClassArgs::Part {
                 idents,
@@ -502,15 +502,7 @@ impl<'a> Printer<'a> {
                 // (`::part(/* lead */ label /* trail */)`).
                 let inner =
                     self.wrap_args_gap_comments(d.text_owned(idents.join(" ")), *span, *value_span);
-                d.concat(&[d.text("("), inner, d.text(")")])
-            }
-            internal::PseudoClassArgs::Identifier { span, value_span } => {
-                // The value is emitted verbatim from source (zero-alloc `source_span`,
-                // like `build_dimension_doc`). Interleave leading/trailing comments
-                // outside it (`:dir(/* lead */ ltr /* trail */)`), like `::part()`.
-                let value = d.source_span(*value_span, self.source);
-                let inner = self.wrap_args_gap_comments(value, *span, *value_span);
-                d.concat(&[d.text("("), inner, d.text(")")])
+                self.paren_wrap(inner)
             }
         }
     }
@@ -549,6 +541,15 @@ impl<'a> Printer<'a> {
             parts.push(d.text_owned(trailing.to_string()));
         }
         d.concat(&parts)
+    }
+
+    /// Wrap pseudo-argument content in literal `(`…`)` with no break points — the
+    /// non-breaking counterpart of `wrap_pseudo_args`, for argument forms that never
+    /// break (the `::slotted()` compound, `::part()` idents, `:dir()`/`:lang()`
+    /// identifier, and the bare `:nth-*()` An+B).
+    fn paren_wrap(&self, inner: DocId) -> DocId {
+        let d = self.d();
+        d.concat(&[d.text("("), inner, d.text(")")])
     }
 
     /// Wrap pseudo-argument content in the standard breakable envelope:

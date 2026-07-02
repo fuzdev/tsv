@@ -268,6 +268,15 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.base_offset + self.current_start
     }
 
+    /// Convert a raw `source`-relative offset into an absolute `Span` coordinate:
+    /// `base_offset`-shifted and narrowed to `u32`. Raw offsets index `self.source`
+    /// (e.g. `current_start`, a captured scan position); `Span` fields store the
+    /// shifted `u32`. Centralizes the `(base_offset + pos) as u32` boundary cast.
+    #[inline]
+    pub(crate) fn span_pos(&self, raw: usize) -> u32 {
+        (self.base_offset + raw) as u32
+    }
+
     /// Parse the current comment token into a `Comment` and advance past it.
     /// Caller must verify `current_kind` is `TokenKind::Comment` before calling.
     pub(crate) fn parse_block_comment(&mut self) -> Result<Comment, ParseError> {

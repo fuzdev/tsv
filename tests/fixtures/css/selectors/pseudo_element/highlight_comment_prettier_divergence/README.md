@@ -1,13 +1,13 @@
 # highlight_comment_prettier_divergence
 
 Comments inside a `::highlight()` name argument are preserved on both sides of the
-identifier — before it (`::highlight(/* c */ name1)`) and after it
-(`::highlight(name2 /* c */)`). The argument is a single custom-highlight
-identifier, so a comment can only lead or trail it; both edge positions are valid
-and accepted by parseCss.
+value — before it (`::highlight(/* c */ name1)`) and after it
+(`::highlight(name2 /* c */)`). The argument parses as an ordinary selector list
+(Svelte's model), so a gap comment leads or trails the list exactly like `:is()`;
+both edge positions are valid and accepted by parseCss.
 
-`::highlight()` shares one parser path with the `:dir()` / `:lang()` identifier
-arguments (see [dir_lang_comment](../../pseudo_class/dir_lang_comment_prettier_divergence/)).
+`::highlight()` shares one parser path with the `:dir()` / `:lang()` args — the
+strict selector-list grammar `:not()` / `:global()` use (see [dir_lang_comment](../../pseudo_class/dir_lang_comment_prettier_divergence/)).
 
 ## Prettier divergence
 
@@ -27,6 +27,6 @@ preserves the source whitespace instead. See
 
 ## Related
 
-- [dir_lang_comment](../../pseudo_class/dir_lang_comment_prettier_divergence/) — the `:dir()`/`:lang()` identifier args (same parser path, same normalization)
+- [dir_lang_comment](../../pseudo_class/dir_lang_comment_prettier_divergence/) — the `:dir()`/`:lang()` selector-list args (same parser path, same normalization)
 - [part_comment](../part_comment_prettier_divergence/) — the `::part()` identifier arg (same normalization)
 - [slotted_comment](../slotted_comment_prettier_divergence/) — the `::slotted()` compound arg (same normalization)

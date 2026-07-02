@@ -281,24 +281,6 @@ pub enum PseudoClassArgs<'arena> {
         span: Span,
         value_span: Span,
     },
-
-    /// Identifier argument for spec-compliant pseudo-classes/elements
-    ///
-    /// Used for pseudo-classes and pseudo-elements that take a single identifier per spec:
-    /// - :dir() - takes direction identifier (ltr, rtl)
-    /// - :lang() - takes language code (en, en-US, fr-CA, etc.)
-    /// - ::highlight() - takes custom highlight name
-    ///
-    /// Note: Svelte's parser treats these as selectors in public AST (quirk applied at conversion)
-    ///
-    /// The value text is not stored — it is a verbatim source slice recovered from
-    /// `value_span`, the same span-only model as `SimpleSelector::{Type, Class, Id}`
-    /// (see the "raw strings never duplicated in AST" invariant). `span` covers the
-    /// argument content (inside the parentheses, closing paren included) so the
-    /// printer can find the gap comments around the value; `value_span` covers just
-    /// the value, giving both the printed text and the Svelte-matching public-AST
-    /// node span — the two-span shape mirrors `Part`.
-    Identifier { span: Span, value_span: Span },
 }
 
 impl PseudoClassArgs<'_> {
@@ -309,7 +291,6 @@ impl PseudoClassArgs<'_> {
             PseudoClassArgs::SelectorList { span, .. } => *span,
             PseudoClassArgs::Slotted { span, .. } => *span,
             PseudoClassArgs::Part { span, .. } => *span,
-            PseudoClassArgs::Identifier { span, .. } => *span,
         }
     }
 }

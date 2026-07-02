@@ -262,7 +262,8 @@ fn convert_declaration<'src>(
 
 /// Wrap a single simple selector in Svelte's triple-wrapper
 /// (SelectorList → ComplexSelector → RelativeSelector → selector), all sharing
-/// `span`. Used for the `Nth` and identifier (`:dir(ltr)`) pseudo-class args.
+/// `span`. Used for the `Nth` pseudo-class arg, whose `Nth` node is the wrapped
+/// selector.
 fn wrap_single_selector<'src>(
     selector: public::SimpleSelector<'src>,
     span: Span,
@@ -321,31 +322,16 @@ fn convert_pseudo_class_args<'src>(
             wrap_single_selector(nth, *span, scope)
         }
         internal::PseudoClassArgs::SelectorList { selectors, .. } => {
-            // For :is(), :not(), :where(), :has(), :global() - convert the nested selector list
-            // Filter out Invalid selectors (from forgiving parsing)
+            // For :is()/:not()/:where()/:has()/:global() and the identifier-arg
+            // pseudos (:dir()/:lang()/::highlight()) - convert the nested selector
+            // list. Filter out Invalid selectors (from forgiving parsing).
+            //
+            // SVELTE QUIRK: `:dir(ltr)`/`:lang(en-US)` args are ordinary selector
+            // lists in Svelte's AST, not identifiers — a `TypeSelector` per
+            // comma-separated range (`:lang(en, fr)` is two). Escaped names decode
+            // via the shared `TypeSelector` path (`raw_selector_name`), so
+            // `:dir(\6c\74\72)` exposes `ltr` while the printer keeps the raw form.
             convert_selector_list_filtered(selectors, source, scope)
-        }
-        internal::PseudoClassArgs::Identifier { value_span, .. } => {
-            // SVELTE QUIRK: Identifier arguments (e.g., :dir(ltr), :lang(en-US)) are wrapped
-            // in a SelectorList → ComplexSelector → RelativeSelector → TypeSelector structure
-            // even though the spec says they should be identifiers, not selectors.
-            //
-            // This matches Svelte's parser behavior for compatibility.
-            //
-            // `value_span` (not the full-parens `span`) is the value's own range, so
-            // both the name text and the wrapping nodes' start/end match Svelte's —
-            // see `parse_pseudo_args`. Emitted verbatim, the raw form the printer
-            // keeps (unlike a real `TypeSelector`, which decodes escapes via
-            // `raw_selector_name`).
-            // TODO: if Svelte decodes CSS escapes in these args, route through
-            // `raw_selector_name` — needs a fixture proving the decode first.
-            let type_selector = public::SimpleSelector::Named(public::NamedSelector {
-                node_type: "TypeSelector",
-                name: Cow::Borrowed(value_span.extract(source)),
-                start: value_span.start,
-                end: value_span.end,
-            });
-            wrap_single_selector(type_selector, *value_span, scope)
         }
         // Slotted/Part args are parsed internally (for the formatter/tooling) but NOT
         // exposed in the public AST — Svelte omits pseudo-element args from its JSON.
@@ -706,6 +692,26 @@ fn pseudo_name_end(source: &str, span: Span, has_args: bool) -> u32 {
     }
 }
 
+/// Build a public `NamedSelector` node (`TypeSelector` / `ClassSelector` /
+/// `IdSelector` / `NestingSelector`) — the shared shape behind type, universal,
+/// class, id, and nesting selectors. (The `:dir()`/`:lang()` identifier args also
+/// land here, as ordinary `TypeSelector`s via the selector-list convert path.)
+/// Taking a single `span` for both `start` and `end` keeps the two in lockstep
+/// (they always come from the same node); the caller computes `name` (a raw source
+/// slice, a half-decoded `raw_selector_name`, or a constant like `"*"`/`"&"`).
+fn named_selector<'src>(
+    node_type: &'static str,
+    name: Cow<'src, str>,
+    span: Span,
+) -> public::SimpleSelector<'src> {
+    public::SimpleSelector::Named(public::NamedSelector {
+        node_type,
+        name,
+        start: span.start,
+        end: span.end,
+    })
+}
+
 /// Convert a SimpleSelector to the typed public node.
 fn convert_simple_selector<'src>(
     simple: &internal::SimpleSelector<'_>,
@@ -728,38 +734,18 @@ fn convert_simple_selector<'src>(
                 let prefix = raw.find('|').map_or(0, |i| i + 1);
                 raw_selector_name(source, *span, prefix)
             };
-            public::SimpleSelector::Named(public::NamedSelector {
-                node_type: "TypeSelector",
-                name: raw_name,
-                start: span.start,
-                end: span.end,
-            })
+            named_selector("TypeSelector", raw_name, *span)
         }
         internal::SimpleSelector::Universal { namespace: _, span } => {
             // Svelte represents universal selector as TypeSelector with name "*"
             // SVELTE QUIRK: Namespace prefixes are parsed but NOT included in the JSON AST
-            public::SimpleSelector::Named(public::NamedSelector {
-                node_type: "TypeSelector",
-                name: Cow::Borrowed("*"),
-                start: span.start,
-                end: span.end,
-            })
+            named_selector("TypeSelector", Cow::Borrowed("*"), *span)
         }
         internal::SimpleSelector::Class { span } => {
-            public::SimpleSelector::Named(public::NamedSelector {
-                node_type: "ClassSelector",
-                name: raw_selector_name(source, *span, 1),
-                start: span.start,
-                end: span.end,
-            })
+            named_selector("ClassSelector", raw_selector_name(source, *span, 1), *span)
         }
         internal::SimpleSelector::Id { span } => {
-            public::SimpleSelector::Named(public::NamedSelector {
-                node_type: "IdSelector",
-                name: raw_selector_name(source, *span, 1),
-                start: span.start,
-                end: span.end,
-            })
+            named_selector("IdSelector", raw_selector_name(source, *span, 1), *span)
         }
         internal::SimpleSelector::Attribute {
             namespace,
@@ -837,12 +823,7 @@ fn convert_simple_selector<'src>(
             })
         }
         internal::SimpleSelector::Nesting { span } => {
-            public::SimpleSelector::Named(public::NamedSelector {
-                node_type: "NestingSelector",
-                name: Cow::Borrowed("&"),
-                start: span.start,
-                end: span.end,
-            })
+            named_selector("NestingSelector", Cow::Borrowed("&"), *span)
         }
         internal::SimpleSelector::Percentage { value, span } => {
             // Format value as string with % suffix to match Svelte
