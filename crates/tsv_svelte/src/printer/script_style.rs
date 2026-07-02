@@ -9,6 +9,55 @@ use crate::printer::Printer;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::doc::{self, DocBuf, arena::DocId};
 
+/// Whether `line` ends inside an unclosed `/* … */` block comment, given whether it
+/// started inside one. Scans with string awareness so a `/*` inside a quoted CSS
+/// value (`content: '/*'`) doesn't open a comment; string state never carries across
+/// lines (an unescaped newline ends a CSS string).
+///
+/// The per-line projection of `tsv_lang::source_scan`'s `TriviaProfile::CSS`
+/// semantics, kept as its own state machine because `skip_trivia` can neither
+/// resume inside an already-open comment nor report whether the span it skipped
+/// was left unterminated.
+// TODO: an unquoted `url()` token may legally contain `/*` (css-syntax url-token);
+// the CSS lexer currently rejects such input outright, so formatted output never
+// carries one — if url-token lexing lands, this scan must learn to skip `url(…)`.
+fn line_ends_inside_block_comment(line: &str, starts_inside: bool) -> bool {
+    let bytes = line.as_bytes();
+    let mut in_comment = starts_inside;
+    let mut in_string: Option<u8> = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if in_comment {
+            if b == b'*' && bytes.get(i + 1) == Some(&b'/') {
+                in_comment = false;
+                i += 2;
+                continue;
+            }
+        } else if let Some(quote) = in_string {
+            if b == b'\\' {
+                i += 2;
+                continue;
+            }
+            if b == quote {
+                in_string = None;
+            }
+        } else {
+            match b {
+                b'/' if bytes.get(i + 1) == Some(&b'*') => {
+                    in_comment = true;
+                    i += 2;
+                    continue;
+                }
+                b'\'' | b'"' => in_string = Some(b),
+                _ => {}
+            }
+        }
+        i += 1;
+    }
+    in_comment
+}
+
 impl<'a> Printer<'a> {
     /// Format a Script tag
     ///
@@ -201,20 +250,15 @@ impl<'a> Printer<'a> {
             self.indent_level += 1;
             let mut in_multiline_comment = false;
             for line in css_trimmed.lines() {
-                let trimmed = line.trim_start();
+                // A line that starts inside an open block comment is comment interior:
+                // indenting it would mutate the comment's content (and compound every
+                // pass, since the reparsed content keeps the added tab), so it's
+                // written verbatim. Comments can open mid-line (selector/value gaps),
+                // hence the full-line scan rather than a line-start check.
+                let is_comment_continuation = in_multiline_comment;
+                in_multiline_comment = line_ends_inside_block_comment(line, in_multiline_comment);
 
-                // Check if this is a comment continuation BEFORE updating state
-                // (prettier preserves exact spacing in comment continuations)
-                let is_comment_continuation = in_multiline_comment && !trimmed.starts_with("/*");
-
-                // Track if we're inside a multi-line comment
-                if trimmed.starts_with("/*") && !trimmed.contains("*/") {
-                    in_multiline_comment = true;
-                } else if in_multiline_comment && trimmed.contains("*/") {
-                    in_multiline_comment = false;
-                }
-
-                // Don't indent blank lines or multi-line comment continuation lines
+                // Don't indent blank lines or comment interior lines
                 if !line.is_empty() && !is_comment_continuation {
                     self.write_indent();
                 }
@@ -318,5 +362,39 @@ impl<'a> Printer<'a> {
             )
         };
         self.write(&output);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::line_ends_inside_block_comment;
+
+    #[test]
+    fn detects_mid_line_comment_open() {
+        assert!(line_ends_inside_block_comment(".a, /* x", false));
+        assert!(!line_ends_inside_block_comment(".a, /* x */ .b {", false));
+        assert!(line_ends_inside_block_comment(
+            "color: red; /* x */ /* y",
+            false
+        ));
+    }
+
+    #[test]
+    fn resumes_inside_open_comment() {
+        assert!(line_ends_inside_block_comment("still inside", true));
+        assert!(!line_ends_inside_block_comment("y */ .b {", true));
+        // `/*` inside an open comment is content, not a nested opener
+        assert!(!line_ends_inside_block_comment("/* y */", true));
+        assert!(line_ends_inside_block_comment("y */ /* z", true));
+    }
+
+    #[test]
+    fn comment_glyphs_in_strings_are_content() {
+        assert!(!line_ends_inside_block_comment("content: '/*';", false));
+        assert!(!line_ends_inside_block_comment("content: \"/*\";", false));
+        // an escaped quote does not close the string
+        assert!(!line_ends_inside_block_comment(r"content: 'a\'/*';", false));
+        // a quote inside an open comment does not start a string
+        assert!(line_ends_inside_block_comment("' */ /* x", true));
     }
 }
