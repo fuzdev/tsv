@@ -49,6 +49,7 @@ pub struct ValidationSummary {
     pub total_unformatted_prettier: usize,
     pub total_prettier_variant: usize,
     pub total_variant: usize,
+    pub total_divergent_variant: usize,
     pub total_prettier_intermediate: usize,
     pub total_prettier_intermediate_to_variant: usize,
     pub total_invalid_syntax: usize,
@@ -69,6 +70,7 @@ impl ValidationSummary {
         self.total_unformatted_prettier += result.unformatted_prettier_count;
         self.total_prettier_variant += result.prettier_variant_count;
         self.total_variant += result.variant_count;
+        self.total_divergent_variant += result.divergent_variant_count;
         self.total_prettier_intermediate += result.prettier_intermediate_count;
         self.total_prettier_intermediate_to_variant +=
             result.prettier_intermediate_to_variant_count;
@@ -249,6 +251,12 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
         }
         if summary.total_variant > 0 {
             variant_parts.push(format!("{} variant_*", summary.total_variant));
+        }
+        if summary.total_divergent_variant > 0 {
+            variant_parts.push(format!(
+                "{} divergent_variant_*",
+                summary.total_divergent_variant
+            ));
         }
         if summary.total_prettier_intermediate > 0 {
             variant_parts.push(format!(

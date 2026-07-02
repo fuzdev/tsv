@@ -28,7 +28,7 @@ use crate::fixtures::{
 /// S16: Svelte divergence dirs CANNOT have `expected.json`
 /// S18: `prettier_nonconvergent.txt` requires a prettier divergence dir and CANNOT
 ///      coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`,
-///      `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`,
+///      `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`,
 ///      `prettier_intermediate_*`) — prettier has no fixed point, so no
 ///      prettier-anchored claim is expressible (`unformatted_ours_*` stays allowed:
 ///      it claims only OUR normalization)
@@ -84,6 +84,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 !files.prettier_variant.is_empty(),
                 !files.unformatted_ours.is_empty(),
                 !files.variant.is_empty(),
+                !files.divergent_variant.is_empty(),
             )
             .unwrap_or("_svelte_divergence");
 
@@ -188,8 +189,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     // S18/S19: a prettier no-oracle marker (prettier_nonconvergent.txt — no fixed
     // point; prettier_rejects.txt — prettier throws) contradicts every
     // prettier-anchored claim file. There is no canonical prettier output to record
-    // (output_prettier.*), no stable form to preserve (prettier_variant_*/variant_*),
-    // and nothing prettier can normalize a variant to (unformatted_*/
+    // (output_prettier.*), no stable form to preserve (prettier_variant_*/variant_*/
+    // divergent_variant_*), and nothing prettier can normalize a variant to (unformatted_*/
     // unformatted_prettier_*/prettier_intermediate_*). unformatted_ours_* stays
     // allowed: it claims only OUR formatter's normalization.
     if files.prettier_nonconvergent || files.prettier_rejects {
@@ -208,6 +209,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             .chain(&files.unformatted_prettier)
             .chain(&files.prettier_variant)
             .chain(&files.variant)
+            .chain(&files.divergent_variant)
             .chain(&files.prettier_intermediate)
             .chain(&files.prettier_intermediate_to_variant)
         {
@@ -218,7 +220,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 "{marker} cannot coexist with prettier-claim files.\n\
                 The marker asserts prettier cannot serve as an oracle on this input, so no\n\
                 prettier-anchored claim (output_prettier.*, prettier_variant_*, variant_*,\n\
-                unformatted_*, unformatted_prettier_*, prettier_intermediate_*) is expressible.\n\
+                divergent_variant_*, unformatted_*, unformatted_prettier_*, prettier_intermediate_*) is expressible.\n\
                 Conflicting file(s): {}\n\
                 Either delete the marker (if prettier can format input now) or remove the claim files.",
                 conflicts.join(", ")
@@ -256,7 +258,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         prettier_variant_contents.push((variant_name.clone(), variant_content));
     }
 
-    // Check variant_* variants
+    // Check variant_* variants, collecting contents for the divergent_variant_* cross-check
+    let mut variant_contents: Vec<(String, String)> = Vec::new();
     for variant_name in &files.variant {
         let variant_path = fixture_dir.join(variant_name);
         let variant_content = read_file(&variant_path)?;
@@ -279,17 +282,57 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 ));
             }
         }
+        variant_contents.push((variant_name.clone(), variant_content));
+    }
+
+    // Check divergent_variant_* forms (prettier keeps V, ours rewrites V to a third form)
+    for tw_name in &files.divergent_variant {
+        let tw_path = fixture_dir.join(tw_name);
+        let tw_content = read_file(&tw_path)?;
+
+        // Must differ from input (else ours would be collapsing to input — a
+        // prettier_variant_*, not a divergent-variant form)
+        if tw_content == input_content {
+            return Err(format!(
+                "divergent_variant_*{input_ext} form '{tw_name}' is identical to {} (a divergent_variant form must be a distinct stable form)",
+                fixture.input_file
+            ));
+        }
+
+        // Must differ from every prettier_variant_* and variant_* file — the three
+        // stable forms (input, this V, ours(V)) are what make it divergent_variant; if V
+        // coincides with a documented variant, one of the two is misclassified.
+        for (pv_name, pv_content) in &prettier_variant_contents {
+            if tw_content == *pv_content {
+                return Err(format!(
+                    "divergent_variant_*{input_ext} form '{tw_name}' is identical to prettier_variant file '{pv_name}'.\n\
+                    A divergent_variant_* form must be distinct from prettier_variant_* files."
+                ));
+            }
+        }
+        for (v_name, v_content) in &variant_contents {
+            if tw_content == *v_content {
+                return Err(format!(
+                    "divergent_variant_*{input_ext} form '{tw_name}' is identical to variant file '{v_name}'.\n\
+                    A divergent_variant_* form must be distinct from variant_* files."
+                ));
+            }
+        }
     }
 
     // S8: Check directory naming - prettier divergence suffix required when prettier validation should be skipped
     let has_prettier_variant_files = !files.prettier_variant.is_empty();
     let has_variant_files = !files.variant.is_empty();
+    let has_divergent_variant_files = !files.divergent_variant.is_empty();
     let has_output_prettier = output_prettier_path.exists();
 
     // Divergence documentation: files that show what prettier produces
-    // (unformatted_ours_* tests OUR formatter, doesn't document prettier's output)
-    let has_divergence_documentation =
-        has_output_prettier || has_prettier_variant_files || has_variant_files;
+    // (unformatted_ours_* tests OUR formatter, doesn't document prettier's output).
+    // divergent_variant_* pins a prettier-stable form our formatter rewrites, so it counts.
+    let has_divergence_documentation = has_output_prettier
+        || has_prettier_variant_files
+        || has_variant_files
+        || has_divergent_variant_files;
 
     let has_prettier_intermediate_files = !files.prettier_intermediate.is_empty();
     let has_prettier_intermediate_to_variant_files =
@@ -299,6 +342,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     let needs_prettier_divergence_suffix = has_output_prettier
         || has_prettier_variant_files
         || has_variant_files
+        || has_divergent_variant_files
         || !files.unformatted_ours.is_empty()
         || !files.unformatted_prettier.is_empty()
         || has_prettier_intermediate_files
@@ -322,6 +366,13 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             reasons.push(format!(
                 "{} variant_*{} file(s)",
                 files.variant.len(),
+                input_ext
+            ));
+        }
+        if has_divergent_variant_files {
+            reasons.push(format!(
+                "{} divergent_variant_*{} file(s)",
+                files.divergent_variant.len(),
                 input_ext
             ));
         }
@@ -369,6 +420,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             has_prettier_variant_files,
             !files.unformatted_ours.is_empty(),
             has_variant_files,
+            has_divergent_variant_files,
         )
         .unwrap_or("_prettier_divergence");
 
@@ -413,6 +465,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     // Acceptable documentation:
     // - output_prettier.* (shows prettier formats input differently)
     // - prettier_variant_*.* (shows prettier's stable variants)
+    // - variant_*.* (shows dual-stable forms)
+    // - divergent_variant_*.* (shows a prettier-stable form our formatter rewrites to a third form)
     // - unformatted_ours_*.* + README.md (for normalization divergence where prettier(input)==input)
     let readme_path = fixture_dir.join("README.md");
     let has_readme = readme_path.exists();
@@ -438,6 +492,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 - {output_prettier_filename} (if prettier formats input differently)\n\
                 - prettier_variant_*{input_ext} files (if prettier has stable variants our formatter normalizes)\n\
                 - variant_*{input_ext} files (if both formatters keep the form stable)\n\
+                - divergent_variant_*{input_ext} files (if prettier keeps the form but our formatter rewrites it to a third stable form)\n\
                 - unformatted_ours_*{input_ext} files + README.md (if divergence is about normalization)\n\
                 - {PRETTIER_NONCONVERGENT_FILENAME} + README.md (if prettier never reaches a fixed point)\n\
                 - {PRETTIER_REJECTS_FILENAME} + README.md (if prettier throws on the input)"
@@ -450,7 +505,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 Parser divergence is documented (expected_ours.json + expected_svelte.json).\n\
                 Formatter divergence is NOT documented.\n\n\
                 Either:\n\
-                - Add {output_prettier_filename} or prettier_variant_*{input_ext} or variant_*{input_ext} to document formatter divergence, OR\n\
+                - Add {output_prettier_filename} or prettier_variant_*{input_ext} or variant_*{input_ext} or divergent_variant_*{input_ext} to document formatter divergence, OR\n\
                 - Add unformatted_ours_*{input_ext} + README.md for normalization divergence, OR\n\
                 - Add {PRETTIER_NONCONVERGENT_FILENAME} + README.md if prettier never reaches a fixed point, OR\n\
                 - Add {PRETTIER_REJECTS_FILENAME} + README.md if prettier throws on the input, OR\n\
@@ -545,6 +600,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     let has_formatter_divergence = output_prettier_path.exists();
     let has_prettier_variants = !files.prettier_variant.is_empty();
     let has_variants = !files.variant.is_empty();
+    let has_divergent_variant = !files.divergent_variant.is_empty();
     let has_prettier_intermediate = !files.prettier_intermediate.is_empty();
     let has_prettier_intermediate_to_variant = !files.prettier_intermediate_to_variant.is_empty();
 
@@ -552,6 +608,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         || has_formatter_divergence
         || has_prettier_variants
         || has_variants
+        || has_divergent_variant
         || has_prettier_intermediate
         || has_prettier_intermediate_to_variant
         || files.prettier_nonconvergent
@@ -576,6 +633,11 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         }
         if has_variants {
             reasons.push(format!("- Prettier stable variants (variant_*{input_ext})"));
+        }
+        if has_divergent_variant {
+            reasons.push(format!(
+                "- Divergent-variant forms (divergent_variant_*{input_ext})"
+            ));
         }
         if has_prettier_intermediate {
             reasons.push(format!(
