@@ -1,0 +1,88 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 76,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 14,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 14,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "root",
+											"args": null,
+											"start": 9,
+											"end": 14
+										}
+									],
+									"start": 9,
+									"end": 14
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 15,
+					"end": 67,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 19,
+							"end": 29,
+							"property": "--a",
+							"value": "(x;y)"
+						},
+						{
+							"type": "Declaration",
+							"start": 33,
+							"end": 43,
+							"property": "--b",
+							"value": "[x;y]"
+						},
+						{
+							"type": "Declaration",
+							"start": 47,
+							"end": 63,
+							"property": "--c",
+							"value": "var(--d, ;)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 67
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 68,
+			"styles": "\n\t:root {\n\t\t--a: (x;y);\n\t\t--b: [x;y];\n\t\t--c: var(--d, ;);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 77,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
