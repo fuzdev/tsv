@@ -346,6 +346,19 @@ pub struct CssDeclaration<'arena> {
     /// `None` means no !important. Use `is_important()` for the bool check.
     pub important_end: Option<u32>,
     pub span: Span,
+    /// Absolute (host-coordinate, like `span`) byte offset of the real
+    /// `property : value` colon — the one the parser `expect`s, outside any
+    /// comment/string. Recorded at parse time so the wire-JSON writer splits
+    /// property/value without re-scanning for it. The colon is one ASCII byte, so
+    /// the value starts at `colon_offset + 1`.
+    pub colon_offset: u32,
+    /// Whether a `/* … */` block comment appears anywhere in the declaration
+    /// extent (the property→colon gap, or the value / `!important` / trailing
+    /// region up to the terminator). Precomputed from the lexer's comment tokens so
+    /// the writer takes a zero-scan fast path — split at `colon_offset`, value just
+    /// trimmed — in the common no-comment case, and the comment-aware split/strip
+    /// path only when true.
+    pub has_block_comment: bool,
 }
 
 impl CssDeclaration<'_> {

@@ -23,7 +23,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 
 - `parse_embedded(source, base_offset, arena: &'arena Bump) -> Result<CssStyleSheet<'arena>>` — same parser, but span positions are shifted by `base_offset` so they index into the parent Svelte file; `arena` is the host document's `Bump`, so the embedded CSS AST shares it
 - `format_embedded(&stylesheet, source, EmbedContext)` — formats with `EmbedContext::base_indent_offset` so wrapped lines respect outer Svelte indentation
-- `ast::convert::write_css_node` — emits one embedded-`<style>` CSS node's wire JSON (no `metadata`, `AstScope::Embedded`); `tsv_svelte`'s writer composes it for the `<style>` element's `children`
+- `ast::convert::write_css_node` — emits one embedded-`<style>` CSS node's wire JSON (no `metadata`); `tsv_svelte`'s writer composes it for the `<style>` element's `children`
 
 ## Distinctives
 

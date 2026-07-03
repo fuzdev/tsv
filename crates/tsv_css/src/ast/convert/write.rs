@@ -33,15 +33,15 @@
 //! that per-node call structure is visible; keep the literals inline.
 
 use super::super::internal;
-use super::AstScope;
 use super::{
     convert_prelude_to_string, pseudo_name_end, raw_selector_name, scan_to_terminator,
     selector_contains_invalid, split_declaration_svelte_compat, strip_css_comments,
 };
+use std::borrow::Cow;
 use tsv_lang::{ByteToCharMap, JsonWriter, Span, write_array, write_or_null};
 
 /// `parseCss()` constant metadata payloads — always the `Default` (all-`false`,
-/// `null` unit) shapes, emitted only on standalone CSS (`AstScope::Standalone`).
+/// `null` unit) shapes, emitted only on standalone CSS (`Ctx::has_metadata`).
 /// The `,"metadata":…` prefix folds the leading comma into the constant.
 const RULE_META: &str = ",\"metadata\":{\"parent_rule\":null,\"has_local_selectors\":false,\"has_global_selectors\":false,\"is_global_block\":false}";
 const COMPLEX_META: &str = ",\"metadata\":{\"rule\":null,\"is_global\":false,\"used\":false}";
@@ -53,7 +53,10 @@ const RELATIVE_META: &str =
 struct Ctx<'a> {
     source: &'a str,
     map: &'a ByteToCharMap,
-    scope: AstScope,
+    /// Whether to attach `parseCss()` `metadata` (standalone `.css`) or omit it
+    /// (embedded `<style>`). Precomputed once — the two shapes are otherwise the
+    /// same walk — so the per-node metadata sites are a bare bool test.
+    has_metadata: bool,
 }
 
 impl Ctx<'_> {
@@ -74,17 +77,17 @@ pub(crate) fn write_stylesheet_file_bytes(
     let ctx = Ctx {
         source,
         map: &map,
-        scope: AstScope::Standalone,
+        has_metadata: true,
     };
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     write_stylesheet_file(&mut w, nodes, &ctx);
     w.into_bytes()
 }
 
-/// Emit one embedded-`<style>` CSS node (`AstScope::Embedded`, no `metadata`)
-/// into a caller-owned writer — the composition entry the Svelte writer uses for
-/// a `<style>` element's `children`. `map` must be built from the host document
-/// (spans are in host-file coordinates).
+/// Emit one embedded-`<style>` CSS node (no `metadata`) into a caller-owned
+/// writer — the composition entry the Svelte writer uses for a `<style>`
+/// element's `children`. `map` must be built from the host document (spans are in
+/// host-file coordinates).
 pub fn write_css_node(
     w: &mut JsonWriter,
     node: &internal::CssNode<'_>,
@@ -94,7 +97,7 @@ pub fn write_css_node(
     let ctx = Ctx {
         source,
         map,
-        scope: AstScope::Embedded,
+        has_metadata: false,
     };
     write_node(w, node, &ctx);
 }
@@ -130,7 +133,7 @@ fn write_rule(w: &mut JsonWriter, rule: &internal::CssRule<'_>, ctx: &Ctx<'_>) {
     w.u32(ctx.pos(rule.span.start));
     w.raw(",\"end\":");
     w.u32(ctx.pos(rule.span.end));
-    if ctx.scope.has_metadata() {
+    if ctx.has_metadata {
         w.raw(RULE_META);
     }
     w.raw("}");
@@ -198,8 +201,21 @@ fn write_declaration(w: &mut JsonWriter, decl: &internal::CssDeclaration<'_>, ct
         .map_or(decl.span.end, |e| e.max(decl.span.end));
     let end = scan_to_terminator(ctx.source, content_end as usize);
     let decl_source = &ctx.source[decl.span.start as usize..end];
-    let (property_source, value_source) = split_declaration_svelte_compat(decl_source);
-    let value = strip_css_comments(value_source);
+    let colon = (decl.colon_offset - decl.span.start) as usize;
+    let (property_source, value): (&str, Cow<'_, str>) = if decl.has_block_comment {
+        // Rare: a block comment sits somewhere in the declaration — apply the
+        // Svelte property/value split quirk and strip comments from the value.
+        let (p, v) = split_declaration_svelte_compat(decl_source, colon);
+        (p, strip_css_comments(v))
+    } else {
+        // Common: no comments anywhere → split at the recorded colon; the value is
+        // the post-colon source trimmed (exactly what `strip_css_comments` reduces
+        // to with nothing to strip, `trim_start` then trim = `trim`). No re-scans.
+        (
+            &decl_source[..colon],
+            Cow::Borrowed(decl_source[colon + 1..].trim()),
+        )
+    };
 
     w.raw("{\"type\":\"Declaration\",\"start\":");
     w.u32(ctx.pos(decl.span.start));
@@ -257,7 +273,7 @@ fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>,
     w.u32(ctx.pos(c.span.end));
     w.raw(",\"children\":");
     write_array(w, c.children, |w, r| write_relative_selector(w, r, ctx));
-    if ctx.scope.has_metadata() {
+    if ctx.has_metadata {
         w.raw(COMPLEX_META);
     }
     w.raw("}");
@@ -277,7 +293,7 @@ fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_
     w.u32(ctx.pos(r.span.start));
     w.raw(",\"end\":");
     w.u32(ctx.pos(r.span.end));
-    if ctx.scope.has_metadata() {
+    if ctx.has_metadata {
         w.raw(RELATIVE_META);
     }
     w.raw("}");
@@ -340,7 +356,9 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.raw(",\"name\":");
             w.string(&name);
             w.raw(",\"matcher\":");
-            write_or_null(w, matcher.as_ref(), |w, m| w.string(m.as_str()));
+            // `as_str()` is a static escape-free operator (`=`/`~=`/`|=`/…), like
+            // the sibling `Combinator` name — skip the serde escape scan.
+            write_or_null(w, matcher.as_ref(), |w, m| w.token(m.as_str()));
             w.raw(",\"value\":");
             write_or_null(w, value.as_ref(), |w, v| w.string(v));
             w.raw(",\"flags\":");
@@ -514,11 +532,11 @@ fn write_wrap_single_selector(
     w.u32(s);
     w.raw(",\"end\":");
     w.u32(e);
-    if ctx.scope.has_metadata() {
+    if ctx.has_metadata {
         w.raw(RELATIVE_META);
     }
     w.raw("}]"); // close RelativeSelector, ComplexSelector.children
-    if ctx.scope.has_metadata() {
+    if ctx.has_metadata {
         w.raw(COMPLEX_META);
     }
     w.raw("}]}"); // close ComplexSelector, SelectorList.children, SelectorList
