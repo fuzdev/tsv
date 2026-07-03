@@ -228,6 +228,7 @@ The boolean **connectors** `and`/`or`/`not` are **preserved** (`@supports (a: b)
 
 - Column combinator `||` — ◆parser_compat — [column](../tests/fixtures/css/selectors/combinators/column_prettier_divergence/)
 - :nth-child() An+B — ◆stable_quirk — [nth_child](../tests/fixtures/css/selectors/pseudo_class/nth_child_prettier_divergence/)
+- An+B leading `+` in pseudo-args — ◆stable_quirk — [nth_leading_plus](../tests/fixtures/css/selectors/pseudo_class/nth_leading_plus_prettier_divergence/): a bare An+B term inside functional pseudo-class args (`:foo(+2n + 1)`, `:is(+3)`, `:not(+n)`) is a single `Nth` (Svelte's `parseCss`, which tsv matches), so tsv keeps the leading `+` glued to its coefficient; prettier reads the leading `+` as a combinator and spaces it (`:foo(+ 2n + 1)`). A leading `-` doesn't diverge (both keep `-n + 3` glued)
 - :nth-child(… of S) `of` spacing — ◆stable_quirk — [nth_child_of](../tests/fixtures/css/selectors/pseudo_class/nth_child_of_svelte_prettier_divergence/): tsv always emits single spaces around `of`; prettier collapses whitespace runs there but never inserts an absent space, so a glued `of.class` stays glued
 - Pseudo-args indent (single compound) — ◆design_choice — [compound_args_indent](../tests/fixtures/css/selectors/pseudo_class/compound_args_indent_long_prettier_divergence/)
 - Nested pseudo-args indent — ◆design_choice — [nested_where_is](../tests/fixtures/css/selectors/pseudo_class/nested_where_is_long_prettier_divergence/)

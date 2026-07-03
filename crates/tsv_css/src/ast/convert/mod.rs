@@ -305,21 +305,32 @@ fn convert_pseudo_class_args<'src>(
             value,
             of_selector,
             span,
-            value_span: _,
+            value_span,
         } => {
             // If there's an "of <selector-list>", include it in the Nth node
             // (CSS Selectors Level 4: :nth-child(An+B of S)).
             let selector = of_selector.as_ref().map(|selectors| {
                 Box::new(convert_selector_list_filtered(selectors, source, scope))
             });
+            // Anchor the public span's START at the An+B token, not at `(`, so a
+            // leading comment (`:nth-child(/* c */ 2n)`) isn't absorbed into it —
+            // matching parseCss and tsv's own selector-list args (`:is(/* c */ .a)`,
+            // which already anchor past the comment). A no-op without a leading
+            // comment (`value_span.start == span.start`); the internal `span` is
+            // unchanged, so the printer still uses `[span.start, value_span.start)`
+            // to interleave the gap comment.
+            let public_span = Span {
+                start: value_span.start,
+                end: span.end,
+            };
             let nth = public::SimpleSelector::Nth(public::Nth {
                 node_type: "Nth",
                 value: Cow::Owned((*value).to_string()),
-                start: span.start,
-                end: span.end,
+                start: public_span.start,
+                end: public_span.end,
                 selector,
             });
-            wrap_single_selector(nth, *span, scope)
+            wrap_single_selector(nth, public_span, scope)
         }
         internal::PseudoClassArgs::SelectorList { selectors, .. } => {
             // For :is()/:not()/:where()/:has()/:global() and the identifier-arg
@@ -832,6 +843,21 @@ fn convert_simple_selector<'src>(
                 value: Cow::Owned(value_str),
                 start: span.start,
                 end: span.end,
+            })
+        }
+        internal::SimpleSelector::Nth { span } => {
+            // An An+B term inside pseudo-class args. parseCss stores the value verbatim
+            // (the raw source slice — never operator-normalized like the printer's
+            // output). For an `An+B of S` term the span folds in the ` of ` (`"2n of "`),
+            // matching Svelte, which reads `S` as sibling selectors rather than a nested
+            // list — so `selector` is always `None` here (only the dedicated `:nth-*()`
+            // path nests `S` under `Nth.selector`).
+            public::SimpleSelector::Nth(public::Nth {
+                node_type: "Nth",
+                value: Cow::Borrowed(&source[span.start as usize..span.end as usize]),
+                start: span.start,
+                end: span.end,
+                selector: None,
             })
         }
         // `Invalid` is only ever produced by `parse_forgiving_selector_list` (the

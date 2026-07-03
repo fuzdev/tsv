@@ -602,6 +602,29 @@ pub(crate) fn parse_simple_selector<'arena>(
 ) -> Result<SimpleSelector<'arena>, ParseError> {
     let start = parser.base_offset() + parser.current_start();
 
+    // Inside functional pseudo-class args, a `<number>`/`<an+b>` term (followed by
+    // `,`/`)`, or by ` of S`) is an `Nth` simple selector — checked before the
+    // type-selector arm so `:foo(odd)`/`:is(n)` read as `Nth`, not a `TypeSelector`.
+    // Mirrors Svelte's `read_selector`, whose `REGEX_NTH_OF` is gated on
+    // `inside_pseudo_class` and tried before the combinator (so the `+` in `2n+1` is
+    // An+B, not a next-sibling combinator). An `An+B of S` term folds ` of ` into the
+    // span (`match_nth_value`) and leaves `S` to parse as ordinary sibling selectors.
+    if parser.in_pseudo_args
+        && let Some(value_end) = match_nth_value(parser.source(), parser.current_start())
+    {
+        // Consume the token run spanning the An+B value text (its boundary aligns
+        // with a token boundary — the matcher only ends on complete lexical units).
+        while parser.current_start() < value_end && !parser.check(TokenKind::Eof) {
+            parser.advance()?;
+        }
+        return Ok(SimpleSelector::Nth {
+            span: Span {
+                start: start as u32,
+                end: parser.span_pos(value_end),
+            },
+        });
+    }
+
     match &parser.current_kind {
         TokenKind::Identifier => {
             // Type selector: div, span, etc. Could also be a namespace prefix:
@@ -791,5 +814,193 @@ pub(crate) fn parse_simple_selector<'arena>(
             &format!("Unexpected token in selector: {}", parser.current_kind),
             start,
         )),
+    }
+}
+
+/// ASCII whitespace as Svelte's `\s` sees it in An+B: space, tab, LF, CR, FF, and VT
+/// (`U+000B`). This is JS `\s` restricted to ASCII — note it includes VT, which CSS
+/// whitespace (`is_css_whitespace`) excludes, because the An+B grammar is Svelte's
+/// `REGEX_NTH_OF` (a JS regex), not the CSS tokenizer; tsv's selector lexer treats VT
+/// as `\s` for the same parity (see the `combinator_control_whitespace` divergence).
+/// Multibyte Unicode `\s` (NBSP, …) is out of scope, matching tsv's ASCII-only `\s`.
+fn is_anb_ws(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | b'\n' | b'\r' | b'\x0b' | b'\x0c')
+}
+
+/// Advance past An+B whitespace (`\s*`) from `i`, returning the first non-whitespace
+/// offset.
+fn skip_anb_ws(bytes: &[u8], mut i: usize) -> usize {
+    while bytes.get(i).copied().is_some_and(is_anb_ws) {
+        i += 1;
+    }
+    i
+}
+
+/// Advance past ASCII digits (`\d*`) from `i`, returning the offset after the run.
+fn skip_digits(bytes: &[u8], mut i: usize) -> usize {
+    while bytes.get(i).is_some_and(u8::is_ascii_digit) {
+        i += 1;
+    }
+    i
+}
+
+/// Match an `An+B` term inside pseudo-class args at byte offset `pos`, returning the
+/// offset just past the term's value text. A port of Svelte's `read_selector` Nth
+/// production, `REGEX_NTH_OF`, including both terminator branches:
+///
+/// - `(?=\s*[,)])` — a bare An+B (`2n`, `odd`): the lookahead consumes nothing, so the
+///   value ends at the An+B.
+/// - `\s+of\s+` — an `An+B of S` term (`2n of .x`): Svelte folds the ` of ` (and its
+///   surrounding whitespace) into the `Nth` value and reads `S` as ordinary sibling
+///   selectors — it is NOT a nested selector list here. So the returned end covers
+///   `An+B` through the whitespace after `of`, and the caller's selector loop parses
+///   `S` next. This matches Svelte even though the dedicated `:nth-*()` path
+///   (`parse_nth_args`) deliberately diverges to a nested `Nth.selector` — the `of S`
+///   form is spec-defined only for `nth-*`, so there tsv applies its principled
+///   nesting, while here (where Svelte merely over-accepts An+B) tsv matches Svelte.
+fn match_nth_value(source: &str, pos: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let value_end = match_an_plus_b(bytes, pos)?;
+    // `(?=\s*[,)])`: optional whitespace then `,`/`)`.
+    let after = skip_anb_ws(bytes, value_end);
+    if matches!(bytes.get(after), Some(b',' | b')')) {
+        return Some(value_end);
+    }
+    // `\s+of\s+`: at least one whitespace (`after > value_end`), the lowercase `of`
+    // keyword (case-sensitive, like Svelte's flagless regex), then at least one
+    // whitespace. The value folds through the trailing whitespace run.
+    if after > value_end && bytes[after..].starts_with(b"of") {
+        let of_end = after + 2;
+        let after_of = skip_anb_ws(bytes, of_end);
+        if after_of > of_end {
+            return Some(after_of);
+        }
+    }
+    None
+}
+
+/// The An+B value grammar from `REGEX_NTH_OF`, without the terminator:
+/// `even | odd | \+?(\d+ | \d*n(\s*[+-]\s*\d+)?) | -\d*n(\s*\+\s*\d+)`. Returns the end
+/// offset of the value, or `None` if no An+B starts at `start`. Case-sensitive on the
+/// `even`/`odd`/`n` literals, matching Svelte's regex.
+fn match_an_plus_b(bytes: &[u8], start: usize) -> Option<usize> {
+    // `even` / `odd` keywords (the terminator check rejects `evens`/`oddball`).
+    if bytes[start..].starts_with(b"even") {
+        return Some(start + 4);
+    }
+    if bytes[start..].starts_with(b"odd") {
+        return Some(start + 3);
+    }
+
+    let sign = bytes
+        .get(start)
+        .copied()
+        .filter(|b| matches!(b, b'+' | b'-'));
+    let after_sign = start + usize::from(sign.is_some());
+
+    // `\d*` — the `A` coefficient when `n` follows, else the whole integer `B`.
+    let after_digits = skip_digits(bytes, after_sign);
+    let had_digits = after_digits > after_sign;
+
+    if bytes.get(after_digits) == Some(&b'n') {
+        let after_n = after_digits + 1; // `\d*n`
+        // Optional `\s*[+-]\s*\d+` tail. A leading `-` requires it and permits only `+`
+        // (`-\d*n(\s*\+\s*\d+)`); otherwise it is optional and permits `+`/`-`.
+        match match_anb_tail(bytes, after_n, sign == Some(b'-')) {
+            Some(end) => Some(end),
+            // `-n` / `-2n` alone (leading `-`, no tail) is not a valid An+B.
+            None => (sign != Some(b'-')).then_some(after_n),
+        }
+    } else if had_digits && sign != Some(b'-') {
+        // `\+?\d+` — a plain integer `B` (no `n`); a leading `-` is not permitted.
+        Some(after_digits)
+    } else {
+        None
+    }
+}
+
+/// Match the `\s*[+-]\s*\d+` An+B tail at `pos`. When `plus_only` (the leading-`-`
+/// branch) only `+` is accepted. Returns the end offset, or `None` if no tail is present.
+fn match_anb_tail(bytes: &[u8], pos: usize, plus_only: bool) -> Option<usize> {
+    let op_pos = skip_anb_ws(bytes, pos);
+    let op = *bytes.get(op_pos)?;
+    if op != b'+' && (plus_only || op != b'-') {
+        return None;
+    }
+    let digits_start = skip_anb_ws(bytes, op_pos + 1);
+    let end = skip_digits(bytes, digits_start);
+    (end > digits_start).then_some(end)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::match_nth_value;
+
+    /// `match_nth_value` recognizes the same An+B terms Svelte's `REGEX_NTH_OF` does,
+    /// via both terminator branches: `(?=\s*[,)])` (a bare An+B) and `\s+of\s+` (an
+    /// `An+B of S` term, whose ` of ` folds into the matched value). Each input carries
+    /// a terminator; the expected value is the matched text (`Some(len)` means the term
+    /// ends at `len`).
+    #[test]
+    fn nth_value_matches_svelte_regex() {
+        // Accepted — the returned length is the matched value width (before `S`/the stop).
+        for (input, value) in [
+            ("2n)", "2n"),
+            ("2n+1)", "2n+1"),
+            ("2n + 1)", "2n + 1"),
+            ("2n - 1)", "2n - 1"),
+            // VT (`U+000B`) is whitespace to Svelte's `\s`, so it separates An+B tokens.
+            ("2n\x0b+\x0b1)", "2n\x0b+\x0b1"),
+            ("0)", "0"),
+            ("123)", "123"),
+            ("+3)", "+3"),
+            ("+2n)", "+2n"),
+            ("+2n+1)", "+2n+1"),
+            ("n)", "n"),
+            ("odd)", "odd"),
+            ("even)", "even"),
+            ("-n+3)", "-n+3"),
+            ("-2n+1)", "-2n+1"),
+            ("-n + 3)", "-n + 3"),
+            // Terminator lookahead permits whitespace, and `,` as well as `)`.
+            ("2n )", "2n"),
+            ("2n,", "2n"),
+            ("odd ,", "odd"),
+            // `\s+of\s+`: the ` of ` (with trailing whitespace) folds into the value;
+            // `S` follows and is left for the selector loop.
+            ("2n of .x)", "2n of "),
+            ("odd of .a, .b)", "odd of "),
+            ("-n + 3 of .a .b)", "-n + 3 of "),
+            ("2n  of  .x)", "2n  of  "),
+        ] {
+            assert_eq!(
+                match_nth_value(input, 0),
+                Some(value.len()),
+                "expected {input:?} to match {value:?}"
+            );
+        }
+
+        // Rejected — not an An+B in a pseudo-arg position (Svelte's regex fails too).
+        for input in [
+            "-n)",       // leading `-` requires a `+B` tail
+            "-2n)",      // same
+            "-1)",       // a plain integer may not lead with `-`
+            "nth)",      // `n` followed by more ident chars (terminator fails)
+            "evens)",    // `even` prefix, but terminator lands on `s`
+            "div)",      // an ordinary type selector
+            ".a)",       // a class selector
+            "2n .foo)",  // no terminator after the An+B (a following selector)
+            "+)",        // a sign with no digits/`n`
+            "2nx)",      // `2n` followed by an ident char
+            "2n of.x)",  // `\s+of\s+` needs whitespace after `of`
+            "2nof .x)",  // `\s+of\s+` needs whitespace before `of`
+            "2n often )", // `of` prefix, but the trailing `\s+` lands on `ten`
+        ] {
+            assert_eq!(
+                match_nth_value(input, 0),
+                None,
+                "expected {input:?} to not match an An+B"
+            );
+        }
     }
 }

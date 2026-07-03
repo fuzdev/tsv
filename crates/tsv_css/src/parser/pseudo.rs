@@ -116,16 +116,37 @@ fn parse_pseudo_args<'arena>(
     // wide-list breaking) and Svelte's rejection of non-selector args like
     // `:lang("en")`. `::highlight`'s args are dropped at the pseudo-element convert
     // boundary; the selector list only feeds the formatter.
+    // The two arms that read a general selector list from pseudo-class args run with
+    // `in_pseudo_args` set, so a bare `<number>`/`<an+b>` term parses as an `Nth`
+    // simple selector (Svelte's `inside_pseudo_class` gate). `nth-*` has its own An+B
+    // grammar (`parse_nth_args`), and `::slotted`/`::part` take a compound/ident list,
+    // so none of those need the flag.
     match pseudo_name {
         "slotted" if is_pseudo_element => parse_slotted_args(parser, args_start),
         "part" if is_pseudo_element => parse_part_args(parser, args_start),
         "is" | "not" | "where" | "has" | "global" | "dir" | "lang" | "highlight" => {
-            parse_selector_list_args(parser, args_start, pseudo_name)
+            with_pseudo_args(parser, |p| {
+                parse_selector_list_args(p, args_start, pseudo_name)
+            })
         }
         "nth-child" | "nth-of-type" | "nth-last-child" | "nth-last-of-type" | "nth-col"
         | "nth-last-col" => parse_nth_args(parser, args_start),
-        _ => parse_unknown_args(parser, args_start),
+        _ => with_pseudo_args(parser, |p| parse_unknown_args(p, args_start)),
     }
+}
+
+/// Run `f` with `in_pseudo_args` set, restoring the previous value afterward (on both
+/// the ok and error paths). Nested pseudo-class args (`:is(:not(2n))`) restore to the
+/// outer `true`, and the top level returns to `false`.
+fn with_pseudo_args<'arena, R>(
+    parser: &mut CssParser<'_, 'arena>,
+    f: impl FnOnce(&mut CssParser<'_, 'arena>) -> Result<R, ParseError>,
+) -> Result<R, ParseError> {
+    let saved = parser.in_pseudo_args;
+    parser.in_pseudo_args = true;
+    let result = f(parser);
+    parser.in_pseudo_args = saved;
+    result
 }
 
 /// `::slotted( <compound-selector> )` — a sequence of simple selectors without

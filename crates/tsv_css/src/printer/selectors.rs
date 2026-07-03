@@ -532,6 +532,19 @@ impl<'a> Printer<'a> {
             }
             internal::SimpleSelector::Nesting { .. } => d.text("&"),
             internal::SimpleSelector::Percentage { value, .. } => d.text_owned(format!("{value}%")),
+            internal::SimpleSelector::Nth { span } => {
+                // Normalize An+B operator spacing (`2n+1` → `2n + 1`) to match prettier,
+                // exactly like the dedicated `:nth-child` args path. An `An+B of S` term
+                // folds ` of ` into the value (matching Svelte — see `match_nth_value`):
+                // split it off, normalize the An+B, and re-emit ` of ` with a single
+                // trailing space so the following sibling selector (`S`) stays separated
+                // in the glued compound.
+                let raw = span.extract(self.source);
+                match split_nth_of(raw) {
+                    Some(anb) => d.text_owned(format!("{} of ", Self::normalize_an_plus_b(anb))),
+                    None => d.text_owned(Self::normalize_an_plus_b(raw)),
+                }
+            }
             internal::SimpleSelector::Invalid { span } => {
                 d.text_owned(span.extract(self.source).trim().to_string())
             }
@@ -786,6 +799,16 @@ impl<'a> Printer<'a> {
 
         result.trim().to_string()
     }
+}
+
+/// Split an `An+B of S` term's folded value (`"2n of "`, `"-n + 3 of "`) into its
+/// `An+B` prefix, or `None` for a bare An+B (`"2n"`, `"odd"`). The parser
+/// (`match_nth_value`) only ever produces `"<An+B>\s+of\s+"` or `"<An+B>"`, so the
+/// `of` — when present — is a trailing whole word preceded by whitespace; the
+/// whitespace check rejects a hypothetical An+B ending in the letters `of`.
+fn split_nth_of(value: &str) -> Option<&str> {
+    let anb = value.trim_end().strip_suffix("of")?;
+    anb.ends_with(char::is_whitespace).then(|| anb.trim_end())
 }
 
 /// Lowercase the An+B `n` variable when it carries a numeric coefficient
