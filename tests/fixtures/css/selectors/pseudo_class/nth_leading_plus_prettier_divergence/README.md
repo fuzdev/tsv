@@ -5,8 +5,12 @@ A leading `+` sign on an `An+B` term inside functional pseudo-class args. Svelte
 `+` glued to its coefficient and only normalizes the interior operator spacing.
 Prettier's selector parser reads the leading `+` as a combinator and spaces it out.
 
-tsv: `:foo(+2n + 1)`, `:is(+3)`, `:not(+n)` (leading sign glued)
-Prettier: `:foo(+ 2n + 1)`, `:is(+ 3)`, `:not(+ n)` (leading `+` spaced)
+tsv: `:foo(+2n + 1)`, `:is(+3)`, `:not(+n)`, `:nth-child(+2n + 1)` (leading sign glued)
+Prettier: `:foo(+ 2n + 1)`, `:is(+ 3)`, `:not(+ n)`, `:nth-child(+ 2n + 1)` (leading `+` spaced)
+
+The `:nth-child(+2n + 1)` case exercises the dedicated `:nth-child` An+B reader
+(`parse_nth_args`), distinct from the bare-`An+B` reader (`match_nth_value`) the
+`:foo`/`:is`/`:not` args use — the same leading-`+` divergence holds through both paths.
 
 ## Reason
 
