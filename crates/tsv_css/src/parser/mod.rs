@@ -220,16 +220,23 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// positions; this variant is only safe where the skipped range is re-emitted
     /// verbatim or comments are recovered by other means (e.g. the declaration
     /// property→colon gap, reconstructed by the svelte-compat property split).
-    pub(crate) fn skip_whitespace_and_comments(&mut self) -> Result<(), ParseError> {
+    ///
+    /// Returns whether any comment was skipped — the declaration property→colon
+    /// gap uses this to fold into `CssDeclaration::has_block_comment` without a
+    /// re-scan.
+    pub(crate) fn skip_whitespace_and_comments(&mut self) -> Result<bool, ParseError> {
+        let mut saw_comment = false;
         loop {
-            if self.check(TokenKind::Whitespace) || matches!(&self.current_kind, TokenKind::Comment)
-            {
+            if self.check(TokenKind::Whitespace) {
+                self.advance()?;
+            } else if matches!(&self.current_kind, TokenKind::Comment) {
+                saw_comment = true;
                 self.advance()?;
             } else {
                 break;
             }
         }
-        Ok(())
+        Ok(saw_comment)
     }
 
     /// Skip whitespace and **register** any comments encountered into `self.comments`.
