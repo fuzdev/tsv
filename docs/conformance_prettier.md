@@ -510,6 +510,7 @@ This input is **valid** by tsv's parse oracle (Svelte / acorn-typescript / `pars
 - `<<` split in a `typeof` query's type arguments (`typeof f<<T>() => void>`) — `';' expected.` — [shift_left_typeof_query](../tests/fixtures/typescript/expressions/binary/shift_left_typeof_query_prettier_divergence/)
 - `using`/`await using` cast (`using as T`, `(await using) satisfies T`) — `',' expected.` — [using/cast](../tests/fixtures/typescript/typescript_specific/using/cast_prettier_divergence/)
 - `@supports (margin: 0))` — unbalanced-paren `@supports` prelude; prettier's CSS parser (postcss, not `typescript`) throws — `Unbalanced parenthesis` — [supports_unbalanced_paren](../tests/fixtures/css/at_rules/supports_unbalanced_paren_prettier_divergence/)
+- `url(a\)b)` — unquoted `url()` with an escaped `)`; per CSS Syntax 3 §4.3.6 a url-token ends at the first *unescaped* `)`, so this is valid (parseCss accepts), but prettier's postcss miscounts the escaped `)` and throws — `Unbalanced parenthesis` — [url_escaped_paren](../tests/fixtures/css/values/functions/url_escaped_paren_prettier_divergence/)
 
 **Optional chain to private field**: `x?.#a` is valid modern JS (ecma262 `OptionalChain : ?. PrivateIdentifier`, from the private-fields-in-`in` era). typescript-estree rejects it; tsv keeps it stable. The comprehensive (prettier-formattable) private-field cases live in [private_fields](../tests/fixtures/typescript/declarations/class/private_fields/).
 
