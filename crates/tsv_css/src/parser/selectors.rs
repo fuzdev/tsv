@@ -982,18 +982,18 @@ mod tests {
 
         // Rejected — not an An+B in a pseudo-arg position (Svelte's regex fails too).
         for input in [
-            "-n)",       // leading `-` requires a `+B` tail
-            "-2n)",      // same
-            "-1)",       // a plain integer may not lead with `-`
-            "nth)",      // `n` followed by more ident chars (terminator fails)
-            "evens)",    // `even` prefix, but terminator lands on `s`
-            "div)",      // an ordinary type selector
-            ".a)",       // a class selector
-            "2n .foo)",  // no terminator after the An+B (a following selector)
-            "+)",        // a sign with no digits/`n`
-            "2nx)",      // `2n` followed by an ident char
-            "2n of.x)",  // `\s+of\s+` needs whitespace after `of`
-            "2nof .x)",  // `\s+of\s+` needs whitespace before `of`
+            "-n)",        // leading `-` requires a `+B` tail
+            "-2n)",       // same
+            "-1)",        // a plain integer may not lead with `-`
+            "nth)",       // `n` followed by more ident chars (terminator fails)
+            "evens)",     // `even` prefix, but terminator lands on `s`
+            "div)",       // an ordinary type selector
+            ".a)",        // a class selector
+            "2n .foo)",   // no terminator after the An+B (a following selector)
+            "+)",         // a sign with no digits/`n`
+            "2nx)",       // `2n` followed by an ident char
+            "2n of.x)",   // `\s+of\s+` needs whitespace after `of`
+            "2nof .x)",   // `\s+of\s+` needs whitespace before `of`
             "2n often )", // `of` prefix, but the trailing `\s+` lands on `ten`
         ] {
             assert_eq!(
