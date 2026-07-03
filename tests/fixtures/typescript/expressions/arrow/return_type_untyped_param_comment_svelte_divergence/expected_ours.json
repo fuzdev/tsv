@@ -138,28 +138,6 @@
 										"column": 29
 									}
 								},
-								"id": null,
-								"expression": true,
-								"generator": false,
-								"async": false,
-								"params": [],
-								"body": {
-									"type": "Literal",
-									"start": 47,
-									"end": 48,
-									"loc": {
-										"start": {
-											"line": 2,
-											"column": 28
-										},
-										"end": {
-											"line": 2,
-											"column": 29
-										}
-									},
-									"value": 0,
-									"raw": "0"
-								},
 								"returnType": {
 									"type": "TSTypeAnnotation",
 									"start": 32,
@@ -213,6 +191,28 @@
 											"end": 43
 										}
 									]
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Literal",
+									"start": 47,
+									"end": 48,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 28
+										},
+										"end": {
+											"line": 2,
+											"column": 29
+										}
+									},
+									"value": 0,
+									"raw": "0"
 								}
 							}
 						}
@@ -278,45 +278,6 @@
 										"column": 30
 									}
 								},
-								"id": null,
-								"expression": true,
-								"generator": false,
-								"async": false,
-								"params": [
-									{
-										"type": "Identifier",
-										"start": 62,
-										"end": 63,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 12
-											},
-											"end": {
-												"line": 3,
-												"column": 13
-											}
-										},
-										"name": "x"
-									}
-								],
-								"body": {
-									"type": "Literal",
-									"start": 79,
-									"end": 80,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 29
-										},
-										"end": {
-											"line": 3,
-											"column": 30
-										}
-									},
-									"value": 0,
-									"raw": "0"
-								},
 								"returnType": {
 									"type": "TSTypeAnnotation",
 									"start": 64,
@@ -370,6 +331,45 @@
 											"end": 75
 										}
 									]
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 62,
+										"end": 63,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 12
+											},
+											"end": {
+												"line": 3,
+												"column": 13
+											}
+										},
+										"name": "x"
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 79,
+									"end": 80,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 29
+										},
+										"end": {
+											"line": 3,
+											"column": 30
+										}
+									},
+									"value": 0,
+									"raw": "0"
 								}
 							}
 						}
@@ -435,28 +435,6 @@
 										"column": 29
 									}
 								},
-								"id": null,
-								"expression": true,
-								"generator": false,
-								"async": false,
-								"params": [],
-								"body": {
-									"type": "Literal",
-									"start": 110,
-									"end": 111,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 28
-										},
-										"end": {
-											"line": 4,
-											"column": 29
-										}
-									},
-									"value": 0,
-									"raw": "0"
-								},
 								"returnType": {
 									"type": "TSTypeAnnotation",
 									"start": 95,
@@ -510,6 +488,28 @@
 											}
 										]
 									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "Literal",
+									"start": 110,
+									"end": 111,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 28
+										},
+										"end": {
+											"line": 4,
+											"column": 29
+										}
+									},
+									"value": 0,
+									"raw": "0"
 								}
 							}
 						}

@@ -47,6 +47,8 @@ pub enum ValidationError {
     ParserExpectedSvelteOutdated,
     #[error("our parser output differs from expected.json")]
     ParserOursDiffersFromExpected,
+    #[error("our parser output matches expected.json semantically but field order differs")]
+    ParserOursFieldOrderDiffers,
     #[error("Parser error: {0}")]
     ParserError(String),
     #[error("Parser error (svelte_divergence): {0}")]
@@ -230,6 +232,9 @@ impl ValidationError {
         match self {
             Self::StructureValidationFailed(_) => "See error message for details",
             Self::ParserOursDiffersFromExpected => "Fix the parser to match expected.json",
+            Self::ParserOursFieldOrderDiffers => {
+                "Match the canonical field order at the writer site, or catalog as a _svelte_divergence (expected_ours.json + expected_svelte.json)"
+            }
             Self::ParserExpectedJsonOutdated
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated => {
@@ -424,6 +429,7 @@ impl ValidationError {
             Self::StructureValidationFailed(_) => "Structure",
 
             Self::ParserOursDiffersFromExpected
+            | Self::ParserOursFieldOrderDiffers
             | Self::ParserExpectedJsonOutdated
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated

@@ -68,7 +68,7 @@ pub fn write_program_json(
 ) -> Vec<u8> {
     let interner = program.interner.borrow();
     let mut ctx = Ctx::new(source, loc, &interner);
-    ctx.import_options_null = schema.is_svelte_script();
+    ctx.vanilla_acorn = schema.is_svelte_script();
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     write_program(&mut w, program, &ctx, schema);
     w.into_bytes()
@@ -120,7 +120,7 @@ pub fn write_variable_declaration_embedded(
     interner: &DefaultStringInterner,
 ) {
     let ctx = Ctx::new(source, loc, interner);
-    write_variable_declaration(w, var_decl, &ctx);
+    write_variable_declaration(w, var_decl, &ctx, false);
 }
 
 /// `write_variable_declaration_embedded` with a per-node comment map — the fused
@@ -136,7 +136,7 @@ pub fn write_variable_declaration_embedded_with_comments(
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
     ctx.comments = Some(comments);
-    write_variable_declaration(w, var_decl, &ctx);
+    write_variable_declaration(w, var_decl, &ctx, false);
 }
 
 /// Emit an embedded expression whose top-level `Identifier` carries an injected
@@ -209,8 +209,6 @@ fn write_identifier_expression_with_character_in(
 /// - **Both**: `loc` is omitted on the pattern's **top-level** `TSTypeAnnotation`
 ///   only — the one Svelte's `read_context` synthesizes itself (no `loc`);
 ///   annotations nested inside it come from the acorn parse and keep `loc`.
-///
-/// Patterns never collect comments, so there is no attach pass.
 pub fn write_pattern_embedded(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
@@ -218,7 +216,35 @@ pub fn write_pattern_embedded(
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
 ) {
+    write_pattern_embedded_impl(w, expr, source, loc, interner, None);
+}
+
+/// `write_pattern_embedded` with a per-node comment map — a destructure
+/// pattern *can* carry comments (`{@const { b = /* c */ 1 } = expr}`):
+/// canonical parses it as a synthetic `(pattern = 1)` acorn expression whose
+/// comment attach covers the pattern subtree. Attached comments emit at each
+/// node's close.
+pub fn write_pattern_embedded_with_comments(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+    comments: &WriterComments,
+) {
+    write_pattern_embedded_impl(w, expr, source, loc, interner, Some(comments));
+}
+
+fn write_pattern_embedded_impl(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+    comments: Option<&WriterComments>,
+) {
     let mut ctx = Ctx::new(source, loc, interner);
+    ctx.comments = comments;
     // The pattern root's own annotation is the `read_context`-synthesized one
     // whose `loc` is omitted (a block-pattern root is always an identifier or a
     // destructure, so no other root shape can carry one).
@@ -302,7 +328,7 @@ pub fn write_program_embedded(
     comments: Option<&WriterComments>,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
-    ctx.import_options_null = schema.is_svelte_script();
+    ctx.vanilla_acorn = schema.is_svelte_script();
     ctx.comments = comments;
     let (start_pos, end_pos) = loc_override;
     w.raw("{\"type\":\"Program\",\"start\":");
@@ -350,10 +376,14 @@ pub(super) struct Ctx<'a> {
     /// every ordinary emission, so the hot path pays only a never-taken compare
     /// per node close.
     pub(super) comments: Option<&'a WriterComments>,
-    /// Svelte non-`lang="ts"` `<script>` quirk: emit `,"options":null` on every
-    /// `ImportExpression` (vanilla acorn always does; acorn-typescript omits it).
-    /// Inactive (`false`) for standalone TS and every `lang="ts"` script.
-    pub(super) import_options_null: bool,
+    /// The canonical parser for this document is **vanilla acorn** (a Svelte
+    /// non-`lang="ts"` component), not acorn-typescript. Drives the
+    /// vanilla-only wire quirks: `,"options":null` on every `ImportExpression`
+    /// (vanilla acorn always emits it; acorn-typescript omits it), and
+    /// `value`-before-`kind` on get/set `Property` nodes (acorn-typescript's
+    /// get/set path assigns `kind` first). `false` for standalone TS and every
+    /// `lang="ts"` component.
+    pub(super) vanilla_acorn: bool,
 }
 
 impl<'a> Ctx<'a> {
@@ -367,7 +397,7 @@ impl<'a> Ctx<'a> {
             pattern_line: 0,
             pattern_ann_span: Span::new(0, 0),
             comments: None,
-            import_options_null: false,
+            vanilla_acorn: false,
         }
     }
 }
@@ -418,24 +448,14 @@ pub(super) fn node_header(w: &mut JsonWriter, node_type: &str, span: Span, ctx: 
     node_header_impl::<false>(w, node_type, span, ctx);
 }
 
-/// The `node_header` variant that injects `character` into `loc.start`/`loc.end`
-/// (byte offset in final char space) — the fused `inject_loc_character`. Used
-/// only for the top-level `Identifier` of a simple block pattern, so the pattern
-/// `+1`-column adjustment is applied here too for uniformity (it never actually
-/// co-occurs with character injection — destructure has no character).
-#[inline]
-pub(super) fn node_header_with_character(
-    w: &mut JsonWriter,
-    node_type: &str,
-    span: Span,
-    ctx: &Ctx<'_>,
-) {
-    node_header_impl::<true>(w, node_type, span, ctx);
-}
-
-/// Shared body of `node_header`/`node_header_with_character`; `CHARACTER` is a
-/// compile-time constant, so each wrapper monomorphizes to its own straight-line
-/// emission (no runtime branch on the per-node hot path).
+/// Shared body of `node_header` and the name-first identifier emission;
+/// `CHARACTER` (the fused `inject_loc_character`, injected into
+/// `loc.start`/`loc.end` for the top-level `Identifier` of a simple block
+/// pattern / shorthand) is a compile-time constant, so each wrapper
+/// monomorphizes to its own straight-line emission (no runtime branch on the
+/// per-node hot path). The pattern `+1`-column adjustment applies in both
+/// (it never actually co-occurs with character injection — destructure has
+/// no character).
 fn node_header_impl<const CHARACTER: bool>(
     w: &mut JsonWriter,
     node_type: &str,
@@ -448,11 +468,19 @@ fn node_header_impl<const CHARACTER: bool>(
             .all(|b| b != b'"' && b != b'\\' && b >= 0x20),
         "node type must be escape-free: {node_type:?}"
     );
-    let (start_pos, start) = ctx.loc.pos_and_position(span.start);
-    let (end_pos, end) = ctx.loc.pos_and_position(span.end);
     w.raw("{\"type\":\"");
     w.raw(node_type);
-    w.raw("\",\"start\":");
+    w.raw("\"");
+    position_fields::<CHARACTER>(w, span, ctx);
+}
+
+/// The `,"start":…,"end":…,"loc":{…}` position fields (final char space) —
+/// the tail of `node_header_impl`, also emitted after a leading `name` for
+/// the Svelte-constructed identifiers whose fields precede the positions.
+fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
+    let (start_pos, start) = ctx.loc.pos_and_position(span.start);
+    let (end_pos, end) = ctx.loc.pos_and_position(span.end);
+    w.raw(",\"start\":");
     w.u32(start_pos);
     w.raw(",\"end\":");
     w.u32(end_pos);
@@ -638,7 +666,9 @@ pub(super) fn write_identifier_parts(
 
 /// `write_identifier_parts` with `character` injected into the node's `loc`
 /// (the fused `inject_loc_character`) — the top-level `Identifier` of a simple
-/// Svelte block pattern / shorthand.
+/// Svelte block pattern / shorthand. Svelte's parser constructs these
+/// identifiers itself, with `name` ahead of the positions
+/// (`{type, name, start, end, loc}`), unlike acorn-parsed identifiers.
 pub(super) fn write_identifier_parts_with_character(
     w: &mut JsonWriter,
     span: Span,
@@ -648,12 +678,13 @@ pub(super) fn write_identifier_parts_with_character(
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
-    node_header_with_character(w, "Identifier", span, ctx);
-    write_identifier_fields(w, span, sym, optional, type_annotation, decorators, ctx);
+    w.raw("{\"type\":\"Identifier\",\"name\":");
+    write_name(w, sym, ctx);
+    position_fields::<true>(w, span, ctx);
+    write_identifier_tail(w, span, optional, type_annotation, decorators, ctx);
 }
 
-/// The `Identifier` fields after the node header: `name`, then the skip-if-empty
-/// `optional` / `typeAnnotation` / `decorators`, then the closing `}`.
+/// The `Identifier` fields after the node header: `name`, then the tail.
 #[inline]
 fn write_identifier_fields(
     w: &mut JsonWriter,
@@ -666,6 +697,20 @@ fn write_identifier_fields(
 ) {
     w.raw(",\"name\":");
     write_name(w, sym, ctx);
+    write_identifier_tail(w, span, optional, type_annotation, decorators, ctx);
+}
+
+/// The skip-if-empty `Identifier` fields (`optional` / `typeAnnotation` /
+/// `decorators`) and the closing `}`.
+#[inline]
+fn write_identifier_tail(
+    w: &mut JsonWriter,
+    span: Span,
+    optional: bool,
+    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
+    decorators: Option<&[internal::Decorator<'_>]>,
+    ctx: &Ctx<'_>,
+) {
     if optional {
         w.raw(",\"optional\":true");
     }

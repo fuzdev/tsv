@@ -2,6 +2,7 @@
 
 use super::super::super::internal;
 use super::expressions::{write_expression, write_expressions};
+use super::functions::write_function_expression;
 use super::{Ctx, JsonWriter, close_node, node_header, write_array, write_type_annotation_field};
 use tsv_lang::Span;
 
@@ -82,7 +83,11 @@ pub(super) fn write_rest_element(
 }
 
 /// Emits a `Property` node. Field order: `method`, `shorthand`, `computed`,
-/// `key`, `kind`, `value`.
+/// `key`, then `value`/`kind` — acorn assigns `value` before `kind` in every
+/// shape except two acorn-typescript paths that assign `kind` first: get/set
+/// (`parseGetterSetter`) and generic object methods (`m<T>() {}`, the
+/// `parsePropertyValue` override). Vanilla acorn (`ctx.vanilla_acorn`) assigns
+/// `value` first everywhere.
 pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Property", prop.span, ctx);
     w.raw(",\"method\":");
@@ -93,11 +98,35 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
     w.bool(prop.computed);
     w.raw(",\"key\":");
     write_expression(w, &prop.key, ctx);
-    w.raw(",\"kind\":\"");
-    w.raw(prop.kind.as_str());
-    w.raw("\",\"value\":");
-    write_expression(w, &prop.value, ctx);
+    let getset = !matches!(prop.kind, internal::PropertyKind::Init);
+    let generic_method = prop.method
+        && matches!(&prop.value, internal::Expression::FunctionExpression(f)
+            if f.type_parameters.is_some());
+    if (getset || generic_method) && !ctx.vanilla_acorn {
+        w.raw(",\"kind\":\"");
+        w.raw(prop.kind.as_str());
+        w.raw("\",\"value\":");
+        write_property_value(w, prop, ctx);
+    } else {
+        w.raw(",\"value\":");
+        write_property_value(w, prop, ctx);
+        w.raw(",\"kind\":\"");
+        w.raw(prop.kind.as_str());
+        w.raw("\"");
+    }
     close_node(w, "Property", prop.span, ctx);
+}
+
+/// A method/get/set value goes through acorn's `parseMethod`, whose
+/// `typeParameters` are grafted post-hoc (serialize after `body`).
+fn write_property_value(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
+    let method_value = prop.method || !matches!(prop.kind, internal::PropertyKind::Init);
+    match (&prop.value, method_value) {
+        (internal::Expression::FunctionExpression(f), true) => {
+            write_function_expression(w, f, ctx, true);
+        }
+        _ => write_expression(w, &prop.value, ctx),
+    }
 }
 
 /// Emits an `AssignmentPattern` node, with the span override the

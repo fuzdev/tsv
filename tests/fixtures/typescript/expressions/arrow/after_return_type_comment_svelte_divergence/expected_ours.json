@@ -154,6 +154,44 @@
 										"column": 47
 									}
 								},
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 94,
+									"end": 102,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 22
+										},
+										"end": {
+											"line": 3,
+											"column": 30
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 96,
+										"end": 102,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 24
+											},
+											"end": {
+												"line": 3,
+												"column": 30
+											}
+										}
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " block ",
+											"start": 103,
+											"end": 114
+										}
+									]
+								},
 								"id": null,
 								"expression": true,
 								"generator": false,
@@ -222,44 +260,6 @@
 									},
 									"value": 1,
 									"raw": "1"
-								},
-								"returnType": {
-									"type": "TSTypeAnnotation",
-									"start": 94,
-									"end": 102,
-									"loc": {
-										"start": {
-											"line": 3,
-											"column": 22
-										},
-										"end": {
-											"line": 3,
-											"column": 30
-										}
-									},
-									"typeAnnotation": {
-										"type": "TSNumberKeyword",
-										"start": 96,
-										"end": 102,
-										"loc": {
-											"start": {
-												"line": 3,
-												"column": 24
-											},
-											"end": {
-												"line": 3,
-												"column": 30
-											}
-										}
-									},
-									"trailingComments": [
-										{
-											"type": "Block",
-											"value": " block ",
-											"start": 103,
-											"end": 114
-										}
-									]
 								}
 							}
 						}
@@ -333,27 +333,6 @@
 										"column": 37
 									}
 								},
-								"id": null,
-								"expression": false,
-								"generator": false,
-								"async": false,
-								"params": [],
-								"body": {
-									"type": "BlockStatement",
-									"start": 156,
-									"end": 158,
-									"loc": {
-										"start": {
-											"line": 4,
-											"column": 35
-										},
-										"end": {
-											"line": 4,
-											"column": 37
-										}
-									},
-									"body": []
-								},
 								"returnType": {
 									"type": "TSTypeAnnotation",
 									"start": 134,
@@ -391,6 +370,27 @@
 											"end": 152
 										}
 									]
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 156,
+									"end": 158,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 35
+										},
+										"end": {
+											"line": 4,
+											"column": 37
+										}
+									},
+									"body": []
 								}
 							}
 						}
@@ -455,27 +455,6 @@
 										"line": 5,
 										"column": 52
 									}
-								},
-								"id": null,
-								"expression": false,
-								"generator": false,
-								"async": true,
-								"params": [],
-								"body": {
-									"type": "BlockStatement",
-									"start": 210,
-									"end": 212,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 50
-										},
-										"end": {
-											"line": 5,
-											"column": 52
-										}
-									},
-									"body": []
 								},
 								"returnType": {
 									"type": "TSTypeAnnotation",
@@ -562,6 +541,27 @@
 											"end": 206
 										}
 									]
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 210,
+									"end": 212,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 50
+										},
+										"end": {
+											"line": 5,
+											"column": 52
+										}
+									},
+									"body": []
 								}
 							}
 						}

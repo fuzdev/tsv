@@ -94,7 +94,7 @@ pub(super) fn write_statement(
             close_node(w, "ExpressionStatement", expr_stmt.span, ctx);
         }
         internal::Statement::VariableDeclaration(var_decl) => {
-            write_variable_declaration(w, var_decl, ctx);
+            write_variable_declaration(w, var_decl, ctx, false);
         }
         internal::Statement::TSTypeAliasDeclaration(type_alias) => {
             write_type_alias_declaration(w, type_alias, ctx);
@@ -112,7 +112,7 @@ pub(super) fn write_statement(
             write_function_declaration(w, func_decl, ctx);
         }
         internal::Statement::ClassDeclaration(class_decl) => {
-            write_class_declaration(w, class_decl, ctx);
+            write_class_declaration(w, class_decl, ctx, false);
         }
         internal::Statement::ExportNamedDeclaration(export_decl) => {
             let export_kind = kind_token(
@@ -133,7 +133,7 @@ pub(super) fn write_statement(
             }
             w.raw(",\"declaration\":");
             write_or_null(w, export_decl.declaration.as_ref(), |w, d| {
-                write_statement(w, d, ctx, schema);
+                write_exported_declaration(w, d, ctx, schema);
             });
             w.raw(",\"specifiers\":");
             write_array(w, export_decl.specifiers, |w, s| {
@@ -277,9 +277,9 @@ pub(super) fn write_statement(
             write_bare_node(w, "DebuggerStatement", dbg.span, ctx);
         }
         internal::Statement::TSInterfaceDeclaration(iface) => {
-            write_interface_declaration(w, iface, ctx);
+            write_interface_declaration(w, iface, ctx, false);
         }
-        internal::Statement::TSDeclareFunction(func) => write_declare_function(w, func, ctx),
+        internal::Statement::TSDeclareFunction(func) => write_declare_function(w, func, ctx, false),
         internal::Statement::TSEnumDeclaration(enum_decl) => {
             write_enum_declaration(w, enum_decl, ctx);
         }
@@ -343,15 +343,49 @@ pub(super) fn write_block_statement(
     close_node(w, "BlockStatement", block.span, ctx);
 }
 
+/// Emit an `export`ed declaration. Same dispatch as `write_statement`, but the
+/// `declare`-carrying declarations get `exported = true`: acorn-typescript's
+/// `parseExportDeclaration` stamps `declare` on the *finished* node (post-hoc),
+/// unlike the statement-level `tsTryParseDeclare` prefix assignment — so
+/// `export declare` serializes `declare` last.
+fn write_exported_declaration(
+    w: &mut JsonWriter,
+    stmt: &internal::Statement<'_>,
+    ctx: &Ctx<'_>,
+    schema: Schema,
+) {
+    match stmt {
+        internal::Statement::VariableDeclaration(var_decl) => {
+            write_variable_declaration(w, var_decl, ctx, true);
+        }
+        internal::Statement::ClassDeclaration(class_decl) => {
+            write_class_declaration(w, class_decl, ctx, true);
+        }
+        internal::Statement::TSInterfaceDeclaration(iface) => {
+            write_interface_declaration(w, iface, ctx, true);
+        }
+        internal::Statement::TSDeclareFunction(func) => write_declare_function(w, func, ctx, true),
+        _ => write_statement(w, stmt, ctx, schema),
+    }
+}
+
 /// Emits a `VariableDeclaration` node (each declarator a `VariableDeclarator`).
-/// Field order: `declarations` (each: `id`, `definite` only when true, `init`
-/// nullable), `kind`, `declare` (only when true).
+/// Field order: `declare?` (statement position), `declarations` (each: `id`,
+/// `definite` only when true, `init` nullable), `kind`, `declare?` (export
+/// position) — acorn-typescript's statement-level `declare` is stamped before
+/// the declaration parses (`tsTryParseDeclare`), while `export declare` stamps
+/// the finished node (`parseExportDeclaration`), so the field's position
+/// depends on `exported`.
 pub(super) fn write_variable_declaration(
     w: &mut JsonWriter,
     var_decl: &internal::VariableDeclaration<'_>,
     ctx: &Ctx<'_>,
+    exported: bool,
 ) {
     node_header(w, "VariableDeclaration", var_decl.span, ctx);
+    if var_decl.declare && !exported {
+        w.raw(",\"declare\":true");
+    }
     w.raw(",\"declarations\":");
     write_array(w, var_decl.declarations, |w, d| {
         node_header(w, "VariableDeclarator", d.span, ctx);
@@ -366,7 +400,7 @@ pub(super) fn write_variable_declaration(
     });
     w.raw(",\"kind\":");
     w.token(var_decl.kind.as_str());
-    if var_decl.declare {
+    if var_decl.declare && exported {
         w.raw(",\"declare\":true");
     }
     close_node(w, "VariableDeclaration", var_decl.span, ctx);

@@ -40,7 +40,7 @@ pub(super) fn write_for_statement(
     w.raw(",\"init\":");
     match &for_stmt.init {
         Some(internal::ForInit::VariableDeclaration(decl)) => {
-            write_variable_declaration(w, decl, ctx);
+            write_variable_declaration(w, decl, ctx, false);
         }
         Some(internal::ForInit::Expression(expr)) => write_expression(w, expr, ctx),
         None => w.null(),
@@ -62,7 +62,7 @@ pub(super) fn write_for_statement(
 fn write_for_in_of_left(w: &mut JsonWriter, left: &internal::ForInOfLeft<'_>, ctx: &Ctx<'_>) {
     match left {
         internal::ForInOfLeft::VariableDeclaration(decl) => {
-            write_variable_declaration(w, decl, ctx);
+            write_variable_declaration(w, decl, ctx, false);
         }
         internal::ForInOfLeft::Pattern(expr) => write_expression(w, expr, ctx),
     }
@@ -141,14 +141,15 @@ pub(super) fn write_switch_statement(
     w.raw(",\"discriminant\":");
     write_expression(w, &switch_stmt.discriminant, ctx);
     w.raw(",\"cases\":");
+    // acorn initializes `consequent` before parsing `test`, so it serializes first.
     write_array(w, switch_stmt.cases, |w, case| {
         node_header(w, "SwitchCase", case.span, ctx);
-        w.raw(",\"test\":");
-        write_or_null(w, case.test.as_ref(), |w, t| write_expression(w, t, ctx));
         w.raw(",\"consequent\":");
         write_array(w, case.consequent, |w, s| {
             write_statement(w, s, ctx, SCHEMA);
         });
+        w.raw(",\"test\":");
+        write_or_null(w, case.test.as_ref(), |w, t| write_expression(w, t, ctx));
         close_node(w, "SwitchCase", case.span, ctx);
     });
     close_node(w, "SwitchStatement", switch_stmt.span, ctx);
@@ -227,9 +228,10 @@ pub(super) fn write_labeled_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "LabeledStatement", labeled.span, ctx);
-    w.raw(",\"label\":");
-    write_identifier_plain(w, &labeled.label, ctx);
+    // acorn assigns `body` before `label`, so it serializes first.
     w.raw(",\"body\":");
     write_statement(w, labeled.body, ctx, SCHEMA);
+    w.raw(",\"label\":");
+    write_identifier_plain(w, &labeled.label, ctx);
     close_node(w, "LabeledStatement", labeled.span, ctx);
 }

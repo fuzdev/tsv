@@ -21,9 +21,8 @@ use tsv_ts::ast::convert::{
 };
 
 use super::comment_attachment::{
-    CommentAttachmentContext, attach_comments_recursively, attach_const_tag_declaration,
-    attach_declaration_tag_declaration, attach_expression_list, comment_to_json,
-    try_attach_comments_to_node,
+    CommentAttachmentContext, attach_comments_recursively, attach_declaration_tag_declaration,
+    attach_expression_list, comment_to_json, try_attach_comments_to_node,
 };
 
 /// Emit an internal expression's byte-space wire JSON (identity map) and parse
@@ -76,12 +75,15 @@ pub(super) fn build_expression_writer_comments(
 
 /// Build the per-node comment map for a comment-bearing `{@const id = init}`.
 ///
-/// Svelte runs `add_comments` on the **init expression directly**, so only the
-/// init subtree can carry comments — the map is read off an init-only skeleton
-/// wrapped in the minimal declaration shape `attach_const_tag_declaration`
-/// navigates (`declarations[0].init`). The `VariableDeclaration`/
-/// `VariableDeclarator` envelope carries no comments and is reproduced at emit
-/// time.
+/// Canonical Svelte runs **two** acorn parses, each with its own comment
+/// attach: `read_pattern` parses a destructure id as a synthetic
+/// `(pattern = 1)` expression (so an id-internal comment attaches inside the
+/// pattern subtree — e.g. a destructure default's literal), and
+/// `read_expression` parses the init (comments from after the id through the
+/// tag close attach in the init subtree). Comments *between* the pattern and
+/// the `=` are a canonical parse error, so the two windows partition the tag.
+/// The `VariableDeclaration`/`VariableDeclarator` envelope carries no comments
+/// and is reproduced at emit time.
 pub(super) fn build_const_tag_writer_comments(
     tag: &internal::ConstTag<'_>,
     template_comments: &[&Comment],
@@ -89,18 +91,25 @@ pub(super) fn build_const_tag_writer_comments(
     tracker: &LocationTracker,
     interner: &DefaultStringInterner,
 ) -> WriterComments {
-    let init_skeleton = expression_skeleton(&tag.init, source, tracker, interner);
-    let mut declaration = serde_json::json!({
-        "declarations": [{ "init": init_skeleton }],
-    });
-    attach_const_tag_declaration(
-        &mut declaration,
+    let id_span = tag.id.span();
+    let mut id_skeleton = expression_skeleton(&tag.id, source, tracker, interner);
+    try_attach_comments_to_node(
+        &mut id_skeleton,
         template_comments,
         source,
-        tag.span.start,
+        id_span.start,
+        id_span.end,
+    );
+    let mut init_skeleton = expression_skeleton(&tag.init, source, tracker, interner);
+    try_attach_comments_to_node(
+        &mut init_skeleton,
+        template_comments,
+        source,
+        id_span.end,
         tag.span.end,
     );
-    WriterComments::from_attached_skeleton(&declaration)
+    let combined = serde_json::json!({ "id": id_skeleton, "init": init_skeleton });
+    WriterComments::from_attached_skeleton(&combined)
 }
 
 /// Build the per-node comment map for a comment-bearing `{const …}` / `{let …}`

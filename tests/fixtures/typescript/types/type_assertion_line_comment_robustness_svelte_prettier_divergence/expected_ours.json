@@ -455,7 +455,6 @@
 												},
 												"name": "x"
 											},
-											"kind": "init",
 											"value": {
 												"type": "Literal",
 												"start": 272,
@@ -472,7 +471,8 @@
 												},
 												"value": 1,
 												"raw": "1"
-											}
+											},
+											"kind": "init"
 										}
 									],
 									"leadingComments": [

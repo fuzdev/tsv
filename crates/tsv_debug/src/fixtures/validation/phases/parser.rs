@@ -39,8 +39,12 @@ pub(in crate::fixtures::validation) fn validate_parser_ours(
 /// Validate our parser output matches expected.json (non-divergence fixtures only)
 ///
 /// For non-divergence fixtures, expected.json should match both the canonical parser
-/// AND our parser. Uses semantic (serde_json::Value) comparison to ignore field ordering
-/// differences between our parser and the canonical parser.
+/// AND our parser. Byte-strict: compares the tabbed serialization against the file
+/// content exactly like P1/P2/P3, so wire *field-order* divergences fail too
+/// (`preserve_order` keeps real key order on both sides, and both sides are
+/// `to_json_with_tabs` output, so number/escape formatting is already normalized).
+/// A mismatch that is semantically equal as `serde_json::Value` (key-order-insensitive)
+/// is reported as a field-order divergence to make triage self-identifying.
 pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
     result: &mut FixtureValidation,
     fixture: &Fixture,
@@ -65,6 +69,11 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
         }
     };
 
+    if paths.ast_json_tabs == expected_str {
+        result.add_success(ValidationSuccess::ParserOursMatchesExpected);
+        return;
+    }
+
     let expected_json: serde_json::Value = match serde_json::from_str(&expected_str) {
         Ok(v) => v,
         Err(e) => {
@@ -75,10 +84,8 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
         }
     };
 
-    // Semantic (Value) comparison — ignores key-order differences between
-    // our parser and the canonical parser
     if paths.ast_json == expected_json {
-        result.add_success(ValidationSuccess::ParserOursMatchesExpected);
+        result.add_error(ValidationError::ParserOursFieldOrderDiffers);
     } else {
         result.add_error(ValidationError::ParserOursDiffersFromExpected);
     }

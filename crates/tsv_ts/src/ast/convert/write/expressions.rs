@@ -163,7 +163,7 @@ pub(super) fn write_expression_inner(
             write_arrow_function_expression(w, arrow, ctx);
         }
         internal::Expression::FunctionExpression(func) => {
-            write_function_expression(w, func, ctx);
+            write_function_expression(w, func, ctx, false);
         }
         internal::Expression::ClassExpression(class_expr) => {
             write_class_expression(w, class_expr, ctx);
@@ -361,7 +361,7 @@ pub(super) fn write_expression_inner(
             // Svelte non-`lang="ts"` script quirk: vanilla acorn appends
             // `options: null`; acorn-typescript omits it. Appended last (after
             // `arguments`) so field order matches vanilla acorn.
-            if ctx.import_options_null {
+            if ctx.vanilla_acorn {
                 w.raw(",\"options\":null");
             }
             close_node(w, "ImportExpression", import_expr.span, ctx);

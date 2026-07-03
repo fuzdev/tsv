@@ -39,8 +39,8 @@ pub use write::{
     WriterComments, write_expression_embedded, write_expression_embedded_with_comments,
     write_identifier_expression_with_character,
     write_identifier_expression_with_character_and_comments, write_pattern_embedded,
-    write_program_embedded, write_program_json, write_variable_declaration_embedded,
-    write_variable_declaration_embedded_with_comments,
+    write_pattern_embedded_with_comments, write_program_embedded, write_program_json,
+    write_variable_declaration_embedded, write_variable_declaration_embedded_with_comments,
 };
 
 /// Translate a column from byte-based to char-based, preserving any prior adjustment (e.g., +1)
