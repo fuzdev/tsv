@@ -1,0 +1,58 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 87,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 17,
+				"name": "import",
+				"prelude": "",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 19,
+				"end": 31,
+				"name": "import",
+				"prelude": "foo",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 33,
+				"end": 51,
+				"name": "import",
+				"prelude": "ident bar",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 53,
+				"end": 78,
+				"name": "import",
+				"prelude": "layerish",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 79,
+			"styles": "\n\t@import;\n\t@import foo;\n\t@import ident bar;\n\t@import /* c */ layerish;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 88,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
