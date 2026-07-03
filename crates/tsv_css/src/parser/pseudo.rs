@@ -1,6 +1,7 @@
 use super::CssParser;
 use super::selectors::{
-    parse_complex_selector_list, parse_forgiving_selector_list, parse_relative_selector_list,
+    nth_arg_is_anb, parse_complex_selector_list, parse_forgiving_selector_list,
+    parse_relative_selector_list,
 };
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
@@ -160,6 +161,30 @@ fn with_pseudo_args<'arena, R>(
     result
 }
 
+/// Finish a selector-list-style pseudo-class argument: register a trailing gap comment
+/// (`:is(.a /* c */)`) so the printer interleaves it, consume the closing `)`, and build
+/// the `SelectorList` args spanning `args_start..)`. The shared tail of the
+/// `:is()`/`:not()`-family path, the `:nth-*()` selector-list fallback, and the
+/// unknown-pseudo selector path.
+fn finish_selector_list_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    args_start: usize,
+    selectors: SelectorList<'arena>,
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+    parser.skip_whitespace_registering_comments()?;
+    let end = parser.expect_and_capture(TokenKind::RightParen)?;
+    Ok((
+        Some(PseudoClassArgs::SelectorList {
+            selectors,
+            span: Span {
+                start: parser.span_pos(args_start),
+                end,
+            },
+        }),
+        end,
+    ))
+}
+
 /// `::part( <ident>+ )` — one or more space-separated identifiers, NOT selectors
 /// (CSS Shadow Parts). Leading/trailing gap comments are registered for the printer;
 /// a comment between two idents reads as whitespace, splitting the run — parseCss
@@ -260,36 +285,41 @@ fn parse_selector_list_args<'arena>(
         ),
     };
 
-    // Register a trailing comment (`:is(.a /* c */)`) so the printer interleaves it.
-    parser.skip_whitespace_registering_comments()?;
-
-    let end = parser.expect_and_capture(TokenKind::RightParen)?;
-
-    Ok((
-        Some(PseudoClassArgs::SelectorList {
-            selectors: selector_list,
-            span: Span {
-                start: parser.span_pos(args_start),
-                end,
-            },
-        }),
-        end,
-    ))
+    finish_selector_list_args(parser, args_start, selector_list)
 }
 
-/// `nth-*` pseudo-classes: `An+B` notation plus an optional `of <selector-list>`
-/// (CSS Selectors 4: `:nth-child(An+B [of S]?)`). Comments in the gaps around the
-/// An+B text are registered for the printer; a comment *inside* the An+B stays part
-/// of its verbatim value text. `value_span` covers just the trimmed An+B so the
-/// printer can find the surrounding gap comments. The optional `of S` selector list is
-/// parsed with `in_pseudo_args` set (see the call site), so it accepts the same bare
-/// `<number>`/`<an+b>` terms a direct functional-pseudo arg does.
+/// `nth-*` pseudo-classes: the spec grammar is `:nth-child(<An+B> [of S]?)` (CSS
+/// Selectors 4), where `S` is a `<complex-real-selector-list>`. Only a clean leading
+/// `<an+b>` term (per the css-syntax-3 microsyntax, comment-tolerant) optionally
+/// followed by `of S` takes this dedicated `Nth` path; the leading An+B follows the
+/// *spec* grammar, so `:nth-child(-3)`/`(-2n)`/`(-n)` read as a single `Nth` where
+/// Svelte's reader mishandles them (`_svelte_divergence`), and `of S` nests as
+/// `Nth.of_selector` where Svelte flattens.
+///
+/// Any other argument (a bare selector `:nth-child(.a)`, a selector list
+/// `:nth-child(.a, .b)`, an unterminated An+B keyword `:nth-child(even odd)`, a
+/// comma-list `:nth-child(2n, .foo)`) is spec-invalid; `nth_arg_is_anb` demotes it to
+/// the ordinary complex-selector-list path so tsv reproduces parseCss's structured AST
+/// (drop-in parity) instead of raw-capturing it as one opaque `Nth` value.
+///
+/// Comments in the gaps around the An+B text are registered for the printer; a comment
+/// *inside* the An+B stays part of its verbatim value text. `value_span` covers just
+/// the trimmed An+B so the printer can find the surrounding gap comments. The `of S`
+/// list is parsed with `in_pseudo_args` set (see the call site), so it accepts the same
+/// bare `<number>`/`<an+b>` terms a direct functional-pseudo arg does.
 fn parse_nth_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
     parser.skip_whitespace_registering_comments()?;
     let anb_start = parser.current_start;
+
+    // Not a clean `<an+b> [of S]?`: parse as an ordinary complex-selector-list (like
+    // `:is()`/`:not()`), matching parseCss for selector-shaped `:nth-*()` arguments.
+    if !nth_arg_is_anb(parser.source(), anb_start) {
+        let selectors = with_pseudo_args(parser, parse_complex_selector_list)?;
+        return finish_selector_list_args(parser, args_start, selectors);
+    }
 
     // Scan tokens until we hit "of" keyword or closing paren
     let mut anb_end = anb_start;
@@ -377,21 +407,7 @@ fn parse_unknown_args<'arena>(
 
     // Try to parse as a selector list (complex selectors, strict parsing)
     match parse_complex_selector_list(parser) {
-        Ok(selector_list) => {
-            parser.skip_whitespace_registering_comments()?;
-            let end = parser.expect_and_capture(TokenKind::RightParen)?;
-
-            Ok((
-                Some(PseudoClassArgs::SelectorList {
-                    selectors: selector_list,
-                    span: Span {
-                        start: parser.span_pos(args_start),
-                        end,
-                    },
-                }),
-                end,
-            ))
-        }
+        Ok(selector_list) => finish_selector_list_args(parser, args_start, selector_list),
         Err(_) => {
             // Parsing as selector list failed - skip arguments
             // This handles pseudo-classes with non-selector arguments
