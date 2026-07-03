@@ -5,12 +5,14 @@ An own-line line comment between a do-while's `}` and its `while`
 relocates it inside the `while` condition parens, breaking the condition across
 lines.
 
-Covers both the directly-preceding comment and a blank-line-before-comment case.
-`variant_comment_before_while.svelte` pins the directly-preceding form, which is
-dual-stable (both formatters keep it). `divergent_variant_spaces.svelte` pins prettier's
-stable blank-line-inside-parens form: prettier keeps the blank, but tsv drops it
-and settles on a third stable form (distinct from both prettier's and the input) —
-a divergent variant.
+A blank line the author leaves *above* the comment is dropped — a body/keyword
+never sits below a blank (see §"No blank above a body block's `{`" in the
+conformance doc); the `unformatted_ours_*` variants pin that normalization.
+`variant_comment_before_while.svelte` pins prettier's relocated form (comment
+inside the condition parens), which is dual-stable. `divergent_variant_spaces.svelte`
+pins prettier's stable blank-line-*inside*-parens form: prettier keeps *that* blank,
+but tsv drops it and settles on a third stable form (distinct from both prettier's
+and the input) — a divergent variant.
 
 ## Reason
 

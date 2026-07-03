@@ -74,7 +74,9 @@ impl<'a> Printer<'a> {
     ///
     /// Handles:
     /// - Inline comments: added with leading space on same line
-    /// - Own-line comments: added with hardline, preserving blank lines before them
+    /// - Own-line comments: added with hardline; the first hugs the previous
+    ///   token (a leading blank in the gap is dropped), while blank lines between
+    ///   subsequent comments are preserved
     ///
     /// Returns the end position after the last comment (for tracking).
     fn build_comments_between_parts(
@@ -91,10 +93,17 @@ impl<'a> Printer<'a> {
             parts.push(self.build_comment_doc(comment));
         }
 
-        // Own-line comments: preserve blank lines before them
+        // Own-line comments: the *first* one hugs the previous token — an authored
+        // blank line in a control-flow gap before a body-leading comment is always
+        // dropped, so a body block's `{` never sits below a blank. Uniform across
+        // `if`/`while`/`for`/`do`/`else`/`try`/`catch`/`switch`/… and consistent
+        // with tsv's own handling when `{` is on the header line (`if (a) {\n\n// c`
+        // also collapses). Blanks *between* subsequent comments are preserved.
         let mut end = prev_end;
         for comment in own_line {
-            if self.has_blank_line_between(end, comment.span.start) {
+            let keep_blank =
+                end != prev_end && self.has_blank_line_between(end, comment.span.start);
+            if keep_blank {
                 // Blank line then comment: literalline (empty) + hardline (indented)
                 parts.push(d.literalline());
                 parts.push(d.hardline());

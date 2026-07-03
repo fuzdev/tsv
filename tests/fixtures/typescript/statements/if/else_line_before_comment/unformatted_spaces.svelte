@@ -14,24 +14,6 @@
 	}
 
 
-	// Line comment before else - blank line above (preserved)
-	if  (cond1
-		  )  {
-
-		fn1(  );
-
-	}
-
-
-
-	// comment (blank above)
-	else  {
-
-		fn2(  );
-
-	}
-
-
 	// Trailing comment before else - stays attached (existing behavior)
 	if  (  cond1  )  {
 

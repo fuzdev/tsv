@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 227,
+	"end": 258,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Trailing comment after )",
+			"value": " Own-line line comment before else; a blank line above it is dropped",
 			"start": 10,
-			"end": 37,
+			"end": 80,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,63 +22,47 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 28
+					"column": 71
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " trailing",
-			"start": 49,
-			"end": 60,
+			"value": " c1",
+			"start": 102,
+			"end": 107,
 			"loc": {
 				"start": {
-					"line": 3,
-					"column": 11
-				},
-				"end": {
-					"line": 3,
-					"column": 22
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " Own-line comment before {",
-			"start": 77,
-			"end": 105,
-			"loc": {
-				"start": {
-					"line": 8,
+					"line": 6,
 					"column": 1
 				},
 				"end": {
-					"line": 8,
-					"column": 29
+					"line": 6,
+					"column": 6
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " own line",
-			"start": 118,
-			"end": 129,
+			"value": " Own-line block comment before else; a blank line above it is dropped",
+			"start": 128,
+			"end": 199,
 			"loc": {
 				"start": {
-					"line": 10,
+					"line": 11,
 					"column": 1
 				},
 				"end": {
-					"line": 10,
-					"column": 12
+					"line": 11,
+					"column": 72
 				}
 			}
 		},
 		{
-			"type": "Line",
-			"value": " Blank line before comment",
-			"start": 146,
-			"end": 174,
+			"type": "Block",
+			"value": " c2 ",
+			"start": 221,
+			"end": 229,
 			"loc": {
 				"start": {
 					"line": 15,
@@ -86,23 +70,7 @@
 				},
 				"end": {
 					"line": 15,
-					"column": 29
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " blank before",
-			"start": 187,
-			"end": 202,
-			"loc": {
-				"start": {
-					"line": 17,
-					"column": 1
-				},
-				"end": {
-					"line": 17,
-					"column": 16
+					"column": 9
 				}
 			}
 		}
@@ -110,223 +78,176 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 226,
+		"end": 257,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 217,
+			"end": 248,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 21,
+					"line": 19,
 					"column": 9
 				}
 			},
 			"body": [
 				{
-					"type": "WhileStatement",
-					"start": 39,
-					"end": 74,
+					"type": "IfStatement",
+					"start": 82,
+					"end": 125,
 					"loc": {
 						"start": {
 							"line": 3,
 							"column": 1
 						},
 						"end": {
-							"line": 6,
-							"column": 2
-						}
-					},
-					"test": {
-						"type": "Identifier",
-						"start": 46,
-						"end": 47,
-						"loc": {
-							"start": {
-								"line": 3,
-								"column": 8
-							},
-							"end": {
-								"line": 3,
-								"column": 9
-							}
-						},
-						"name": "a",
-						"trailingComments": [
-							{
-								"type": "Line",
-								"value": " trailing",
-								"start": 49,
-								"end": 60
-							}
-						]
-					},
-					"body": {
-						"type": "BlockStatement",
-						"start": 62,
-						"end": 74,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 6,
-								"column": 2
-							}
-						},
-						"body": [
-							{
-								"type": "ExpressionStatement",
-								"start": 66,
-								"end": 71,
-								"loc": {
-									"start": {
-										"line": 5,
-										"column": 2
-									},
-									"end": {
-										"line": 5,
-										"column": 7
-									}
-								},
-								"expression": {
-									"type": "CallExpression",
-									"start": 66,
-									"end": 70,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 2
-										},
-										"end": {
-											"line": 5,
-											"column": 6
-										}
-									},
-									"callee": {
-										"type": "Identifier",
-										"start": 66,
-										"end": 68,
-										"loc": {
-											"start": {
-												"line": 5,
-												"column": 2
-											},
-											"end": {
-												"line": 5,
-												"column": 4
-											}
-										},
-										"name": "fn"
-									},
-									"arguments": [],
-									"optional": false
-								}
-							}
-						]
-					},
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " Trailing comment after )",
-							"start": 10,
-							"end": 37
-						}
-					]
-				},
-				{
-					"type": "WhileStatement",
-					"start": 107,
-					"end": 143,
-					"loc": {
-						"start": {
 							"line": 9,
-							"column": 1
-						},
-						"end": {
-							"line": 13,
 							"column": 2
 						}
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 114,
-						"end": 115,
+						"start": 86,
+						"end": 87,
 						"loc": {
 							"start": {
-								"line": 9,
-								"column": 8
+								"line": 3,
+								"column": 5
 							},
 							"end": {
-								"line": 9,
-								"column": 9
+								"line": 3,
+								"column": 6
 							}
 						},
 						"name": "a"
 					},
-					"body": {
+					"consequent": {
 						"type": "BlockStatement",
-						"start": 131,
-						"end": 143,
+						"start": 89,
+						"end": 100,
 						"loc": {
 							"start": {
-								"line": 11,
-								"column": 1
+								"line": 3,
+								"column": 8
 							},
 							"end": {
-								"line": 13,
+								"line": 5,
 								"column": 2
 							}
 						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 135,
-								"end": 140,
+								"start": 93,
+								"end": 97,
 								"loc": {
 									"start": {
-										"line": 12,
+										"line": 4,
 										"column": 2
 									},
 									"end": {
-										"line": 12,
-										"column": 7
+										"line": 4,
+										"column": 6
 									}
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 135,
-									"end": 139,
+									"start": 93,
+									"end": 96,
 									"loc": {
 										"start": {
-											"line": 12,
+											"line": 4,
 											"column": 2
 										},
 										"end": {
-											"line": 12,
-											"column": 6
+											"line": 4,
+											"column": 5
 										}
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 135,
-										"end": 137,
+										"start": 93,
+										"end": 94,
 										"loc": {
 											"start": {
-												"line": 12,
+												"line": 4,
 												"column": 2
 											},
 											"end": {
-												"line": 12,
-												"column": 4
+												"line": 4,
+												"column": 3
 											}
 										},
-										"name": "fn"
+										"name": "f"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 114,
+						"end": 125,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 118,
+								"end": 122,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 118,
+									"end": 121,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 118,
+										"end": 119,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 3
+											}
+										},
+										"name": "g"
 									},
 									"arguments": [],
 									"optional": false
@@ -336,109 +257,174 @@
 						"leadingComments": [
 							{
 								"type": "Line",
-								"value": " own line",
-								"start": 118,
-								"end": 129
+								"value": " c1",
+								"start": 102,
+								"end": 107
 							}
 						]
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Own-line comment before {",
-							"start": 77,
-							"end": 105
+							"value": " Own-line line comment before else; a blank line above it is dropped",
+							"start": 10,
+							"end": 80
 						}
 					]
 				},
 				{
-					"type": "WhileStatement",
-					"start": 176,
-					"end": 216,
+					"type": "IfStatement",
+					"start": 201,
+					"end": 247,
 					"loc": {
 						"start": {
-							"line": 16,
+							"line": 12,
 							"column": 1
 						},
 						"end": {
-							"line": 20,
+							"line": 18,
 							"column": 2
 						}
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 183,
-						"end": 184,
+						"start": 205,
+						"end": 206,
 						"loc": {
 							"start": {
-								"line": 16,
-								"column": 8
+								"line": 12,
+								"column": 5
 							},
 							"end": {
-								"line": 16,
-								"column": 9
+								"line": 12,
+								"column": 6
 							}
 						},
 						"name": "a"
 					},
-					"body": {
+					"consequent": {
 						"type": "BlockStatement",
-						"start": 204,
-						"end": 216,
+						"start": 208,
+						"end": 219,
 						"loc": {
 							"start": {
-								"line": 18,
-								"column": 1
+								"line": 12,
+								"column": 8
 							},
 							"end": {
-								"line": 20,
+								"line": 14,
 								"column": 2
 							}
 						},
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 208,
-								"end": 213,
+								"start": 212,
+								"end": 216,
 								"loc": {
 									"start": {
-										"line": 19,
+										"line": 13,
 										"column": 2
 									},
 									"end": {
-										"line": 19,
-										"column": 7
+										"line": 13,
+										"column": 6
 									}
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 208,
-									"end": 212,
+									"start": 212,
+									"end": 215,
 									"loc": {
 										"start": {
-											"line": 19,
+											"line": 13,
 											"column": 2
 										},
 										"end": {
-											"line": 19,
-											"column": 6
+											"line": 13,
+											"column": 5
 										}
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 208,
-										"end": 210,
+										"start": 212,
+										"end": 213,
 										"loc": {
 											"start": {
-												"line": 19,
+												"line": 13,
 												"column": 2
 											},
 											"end": {
-												"line": 19,
-												"column": 4
+												"line": 13,
+												"column": 3
 											}
 										},
-										"name": "fn"
+										"name": "f"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": {
+						"type": "BlockStatement",
+						"start": 236,
+						"end": 247,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 240,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 240,
+									"end": 243,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 240,
+										"end": 241,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 3
+											}
+										},
+										"name": "g"
 									},
 									"arguments": [],
 									"optional": false
@@ -447,19 +433,19 @@
 						],
 						"leadingComments": [
 							{
-								"type": "Line",
-								"value": " blank before",
-								"start": 187,
-								"end": 202
+								"type": "Block",
+								"value": " c2 ",
+								"start": 221,
+								"end": 229
 							}
 						]
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Blank line before comment",
-							"start": 146,
-							"end": 174
+							"value": " Own-line block comment before else; a blank line above it is dropped",
+							"start": 128,
+							"end": 199
 						}
 					]
 				}

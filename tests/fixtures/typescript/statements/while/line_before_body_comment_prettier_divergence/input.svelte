@@ -14,7 +14,6 @@
 
 	// Blank line before comment
 	while (a)
-
 	// blank before
 	{
 		fn();
