@@ -319,7 +319,7 @@ The boolean **connectors** `and`/`or`/`not` are **preserved** (`@supports (a: b)
 - Inline content (expression) — ◆design_choice — [inline_content_hug_long](../tests/fixtures/svelte/elements/inline_content_hug_long_prettier_divergence/) — breakable-expression content also lays out **block-style** (uniform with text/element content), where prettier dangles. See [§Svelte: Inline content block-style](#svelte-inline-content-block-style).
 - Block multiline attrs hug — ◆print_width — [block_multiline_attrs_content_hug](../tests/fixtures/svelte/elements/block_multiline_attrs_content_hug_prettier_divergence/)
 - Fill expr break boundary — ◆print_width — [fill_expr_break_boundary_long](../tests/fixtures/svelte/elements/fill_expr_break_boundary_long_prettier_divergence/)
-- @debug comments — ◆content_preservation — [debug_comment](../tests/fixtures/svelte/tags/debug/debug_comment_prettier_divergence/)
+- @debug comments — ◆content_preservation — [debug_comment](../tests/fixtures/svelte/tags/debug/debug_comment_prettier_divergence/), [debug_comma_comment](../tests/fixtures/svelte/tags/debug/debug_comma_comment_prettier_divergence/) (the inter-item, post-comma position)
 - svelte:element `this` — ◆prettier_bug — [svelte_element_this_string](../tests/fixtures/svelte/special_elements/svelte_element_this_string_prettier_divergence/)
 - svelte:element class ws — ◆prettier_bug — [svelte_element_class_whitespace](../tests/fixtures/svelte/special_elements/svelte_element_class_whitespace_prettier_divergence/)
 - Space after block element — ◆prettier_bug — [space_after_block](../tests/fixtures/svelte/elements/space_after_block_prettier_divergence/)

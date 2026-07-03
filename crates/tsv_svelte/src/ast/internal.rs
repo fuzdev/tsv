@@ -702,15 +702,15 @@ impl<'arena> FragmentNode<'arena> {
     }
 }
 
-/// Svelte Element kind - distinguishes HTML elements from components
+/// Svelte Element kind - distinguishes HTML elements from components.
+///
+/// Classification-only (the printer's block/inline decision + the writer's
+/// `RegularElement`/`Component` `type` tag, both by `match`); never serialized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "convert", derive(serde::Serialize))]
 pub enum ElementKind {
     /// HTML element: `<div>`, `<span>`, `<input>`, etc. (lowercase first character)
-    #[cfg_attr(feature = "convert", serde(rename = "Html"))]
     Html,
     /// Svelte component: `<MyComponent>`, `<Button>`, etc. (uppercase first character)
-    #[cfg_attr(feature = "convert", serde(rename = "Component"))]
     Component,
 }
 

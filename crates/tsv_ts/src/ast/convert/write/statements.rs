@@ -1,8 +1,7 @@
-// Statement dispatcher and simple statements — the writer twin of
-// `convert::statements`.
+// Statement dispatcher and simple statements.
 
 use super::super::super::internal;
-use super::super::{Schema, statements::find_export_start};
+use super::super::Schema;
 use super::control_flow::{
     write_break_statement, write_continue_statement, write_do_while_statement,
     write_for_in_statement, write_for_of_statement, write_for_statement, write_if_statement,
@@ -21,14 +20,27 @@ use super::types::{
     write_declare_function, write_entity_name, write_enum_declaration, write_interface_declaration,
 };
 use super::{
-    Ctx, JsonWriter, kind_token, node_header, write_array, write_bare_node, write_identifier_plain,
-    write_literal, write_or_null,
+    Ctx, JsonWriter, close_node, kind_token, node_header, write_array, write_bare_node,
+    write_identifier_plain, write_literal, write_or_null,
 };
 use tsv_lang::Span;
 
+/// The `export` keyword's start, skipping comments so an `export` inside one
+/// (`@dec /* export */ export …`) isn't mistaken for the keyword (which would
+/// mislocate the node's start).
+fn find_export_start(source: &str, span_start: u32) -> u32 {
+    tsv_lang::source_scan::find_keyword(
+        source.as_bytes(),
+        span_start as usize,
+        source.len(),
+        b"export",
+        tsv_lang::source_scan::TriviaProfile::JS,
+    )
+    .map_or(span_start, |pos| pos as u32)
+}
+
 /// The export node's start: a decorated exported class starts at `export`,
-/// not at the decorator (shared by both export arms, mirroring
-/// `convert_statement`'s per-arm scans).
+/// not at the decorator (shared by both export arms).
 fn export_start(source: &str, span_start: u32, class_is_decorated: bool) -> u32 {
     if class_is_decorated {
         find_export_start(source, span_start)
@@ -37,9 +49,9 @@ fn export_start(source: &str, span_start: u32, class_is_decorated: bool) -> u32 
     }
 }
 
-/// Mirrors `convert_attributes` + the `attributes` field's skip rule: a `with`
-/// clause emits its attributes (possibly `[]`); no clause emits `[]` under the
-/// Svelte schema and omits the field under acorn.
+/// Emit the `attributes` field with its skip rule: a `with` clause emits its
+/// attributes (possibly `[]`); no clause emits `[]` under the Svelte schema and
+/// omits the field under acorn.
 fn write_attributes_field(
     w: &mut JsonWriter,
     attributes: Option<&[internal::ImportAttribute<'_>]>,
@@ -59,7 +71,7 @@ fn write_attributes_field(
     }
 }
 
-/// Mirrors `convert_statement`.
+/// Emit a `Statement`, dispatching on its variant.
 pub(super) fn write_statement(
     w: &mut JsonWriter,
     stmt: &internal::Statement<'_>,
@@ -79,7 +91,7 @@ pub(super) fn write_statement(
                 w.raw(",\"directive\":");
                 w.string(&raw[1..raw.len() - 1]);
             }
-            w.raw("}");
+            close_node(w, "ExpressionStatement", expr_stmt.span, ctx);
         }
         internal::Statement::VariableDeclaration(var_decl) => {
             write_variable_declaration(w, var_decl, ctx);
@@ -91,7 +103,7 @@ pub(super) fn write_statement(
             node_header(w, "ReturnStatement", ret.span, ctx);
             w.raw(",\"argument\":");
             write_or_null(w, ret.argument.as_ref(), |w, e| write_expression(w, e, ctx));
-            w.raw("}");
+            close_node(w, "ReturnStatement", ret.span, ctx);
         }
         internal::Statement::BlockStatement(block) => {
             write_block_statement(w, block, ctx);
@@ -132,14 +144,10 @@ pub(super) fn write_statement(
                 write_literal(w, s, ctx);
             });
             write_attributes_field(w, export_decl.attributes, ctx, schema);
-            w.raw("}");
+            close_node(w, "ExportNamedDeclaration", export_span, ctx);
         }
         internal::Statement::ExportDefaultDeclaration(export_decl) => {
-            let export_kind = if schema.is_svelte_script() {
-                None
-            } else {
-                Some("value")
-            };
+            let export_kind = kind_token(false, schema);
             let start = export_start(
                 ctx.source,
                 export_decl.span.start,
@@ -154,7 +162,7 @@ pub(super) fn write_statement(
             }
             w.raw(",\"declaration\":");
             write_export_default_value(w, &export_decl.declaration, ctx);
-            w.raw("}");
+            close_node(w, "ExportDefaultDeclaration", export_span, ctx);
         }
         internal::Statement::ExportAllDeclaration(export_decl) => {
             let export_kind = kind_token(
@@ -173,19 +181,19 @@ pub(super) fn write_statement(
             w.raw(",\"source\":");
             write_literal(w, &export_decl.source, ctx);
             write_attributes_field(w, export_decl.attributes, ctx, schema);
-            w.raw("}");
+            close_node(w, "ExportAllDeclaration", export_decl.span, ctx);
         }
         internal::Statement::TSExportAssignment(export_assign) => {
             node_header(w, "TSExportAssignment", export_assign.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, &export_assign.expression, ctx);
-            w.raw("}");
+            close_node(w, "TSExportAssignment", export_assign.span, ctx);
         }
         internal::Statement::TSNamespaceExportDeclaration(ns_export) => {
             node_header(w, "TSNamespaceExportDeclaration", ns_export.span, ctx);
             w.raw(",\"id\":");
             write_identifier_plain(w, &ns_export.id, ctx);
-            w.raw("}");
+            close_node(w, "TSNamespaceExportDeclaration", ns_export.span, ctx);
         }
         internal::Statement::ImportDeclaration(import_decl) => {
             let import_kind = kind_token(
@@ -208,7 +216,7 @@ pub(super) fn write_statement(
             w.raw(",\"source\":");
             write_literal(w, &import_decl.source, ctx);
             write_attributes_field(w, import_decl.attributes, ctx, schema);
-            w.raw("}");
+            close_node(w, "ImportDeclaration", import_decl.span, ctx);
         }
         internal::Statement::TSImportEqualsDeclaration(import_eq) => {
             node_header(w, "TSImportEqualsDeclaration", import_eq.span, ctx);
@@ -227,13 +235,13 @@ pub(super) fn write_statement(
                     node_header(w, "TSExternalModuleReference", ext_ref.span, ctx);
                     w.raw(",\"expression\":");
                     write_literal(w, &ext_ref.expression, ctx);
-                    w.raw("}");
+                    close_node(w, "TSExternalModuleReference", ext_ref.span, ctx);
                 }
                 internal::TSModuleReference::EntityName(entity_name) => {
                     write_entity_name(w, entity_name, ctx);
                 }
             }
-            w.raw("}");
+            close_node(w, "TSImportEqualsDeclaration", import_eq.span, ctx);
         }
         // Control flow statements
         internal::Statement::IfStatement(if_stmt) => write_if_statement(w, if_stmt, ctx),
@@ -281,7 +289,7 @@ pub(super) fn write_statement(
     }
 }
 
-/// Mirrors `convert_module_declaration`. Field order: `global` (only when
+/// Emits a `TSModuleDeclaration` node. Field order: `global` (only when
 /// true), `id`, `body?` (omitted for shorthand ambient modules), `declare`
 /// (only when true).
 pub(super) fn write_module_declaration(
@@ -308,7 +316,7 @@ pub(super) fn write_module_declaration(
                 write_array(w, block.body, |w, s| {
                     write_statement(w, s, ctx, Schema::Acorn);
                 });
-                w.raw("}");
+                close_node(w, "TSModuleBlock", block.span, ctx);
             }
             internal::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
                 write_module_declaration(w, nested, ctx);
@@ -318,10 +326,10 @@ pub(super) fn write_module_declaration(
     if decl.declare {
         w.raw(",\"declare\":true");
     }
-    w.raw("}");
+    close_node(w, "TSModuleDeclaration", decl.span, ctx);
 }
 
-/// Mirrors `convert_block_statement` (always TypeScript context).
+/// Emits a `BlockStatement` node (always TypeScript context).
 pub(super) fn write_block_statement(
     w: &mut JsonWriter,
     block: &internal::BlockStatement<'_>,
@@ -332,10 +340,10 @@ pub(super) fn write_block_statement(
     write_array(w, block.body, |w, s| {
         write_statement(w, s, ctx, Schema::Acorn);
     });
-    w.raw("}");
+    close_node(w, "BlockStatement", block.span, ctx);
 }
 
-/// Mirrors `convert_variable_declaration` + `convert_variable_declarator`.
+/// Emits a `VariableDeclaration` node (each declarator a `VariableDeclarator`).
 /// Field order: `declarations` (each: `id`, `definite` only when true, `init`
 /// nullable), `kind`, `declare` (only when true).
 pub(super) fn write_variable_declaration(
@@ -354,12 +362,12 @@ pub(super) fn write_variable_declaration(
         }
         w.raw(",\"init\":");
         write_or_null(w, d.init.as_ref(), |w, e| write_expression(w, e, ctx));
-        w.raw("}");
+        close_node(w, "VariableDeclarator", d.span, ctx);
     });
     w.raw(",\"kind\":");
     w.token(var_decl.kind.as_str());
     if var_decl.declare {
         w.raw(",\"declare\":true");
     }
-    w.raw("}");
+    close_node(w, "VariableDeclaration", var_decl.span, ctx);
 }

@@ -939,7 +939,14 @@ impl<'a> Printer<'a> {
         pattern: &internal::AssignmentPattern<'_>,
     ) -> DocId {
         let d = self.d();
-        let left_doc = self.build_expression_doc(pattern.left);
+        // A type-assertion target keeps its required parens (`{ a: (b as T) =
+        // 1 }` — bare `b as T = 1` is a TS parse error); non-null `b!` stays
+        // bare. Same rule as an assignment expression's left.
+        let left_doc = if self.needs_parens(pattern.left, ParenContext::AssignmentTarget) {
+            d.parens(self.build_expression_doc(pattern.left))
+        } else {
+            self.build_expression_doc(pattern.left)
+        };
 
         let left_end = pattern.left.span().end;
         let rhs_start = pattern.right.span().start;

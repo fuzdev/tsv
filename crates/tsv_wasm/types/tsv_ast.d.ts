@@ -1,19 +1,19 @@
 /**
- * Hand-maintained TypeScript declarations for the tsv public AST.
+ * Hand-maintained TypeScript declarations for the tsv wire JSON (the public
+ * AST each parse export returns).
  *
- * Mirrors the Rust public AST types in:
- *   - crates/tsv_ts/src/ast/public/
- *   - crates/tsv_css/src/ast/public.rs
- *   - crates/tsv_svelte/src/ast/public.rs
+ * Mirrors what the wire-JSON writers emit:
+ *   - crates/tsv_ts/src/ast/convert/write/
+ *   - crates/tsv_css/src/ast/convert/write.rs
+ *   - crates/tsv_svelte/src/ast/convert/write.rs
  *
  * Bundled inside `@fuzdev/tsv_parse_wasm` and `@fuzdev/tsv_wasm`. Any change
- * to a `pub` field in the Rust sources must be mirrored here — see
+ * to the JSON a writer emits must be mirrored here — see
  * `crates/tsv_wasm/CLAUDE.md` for the maintenance checklist.
  *
- * Field names follow `#[serde(rename = "...")]` where present, otherwise
- * the Rust field name verbatim. Optional fields use `T?` for
- * `#[serde(skip_serializing_if = "Option::is_none")]`, and `T | null`
- * for plain `Option<T>` (always emitted).
+ * Field names are exactly the keys the writer emits. A field emitted only
+ * conditionally (`if let Some(..)` / `if flag`) is optional (`T?`); a field
+ * always emitted with a `null` fallback (`write_or_null`) is `T | null`.
  */
 
 //

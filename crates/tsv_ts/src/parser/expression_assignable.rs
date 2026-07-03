@@ -54,11 +54,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// target; `Binding` (function params, destructuring bindings) rejects both —
     /// matching acorn-typescript's `isBinding` split. The assertion/cast node is kept
     /// here; the public AST unwraps it at the convert boundary (acorn drops the
-    /// cast/assertion from a simple `=` left).
+    /// cast/assertion from a simple `=` left and from an `AssignmentPattern` left).
     pub(super) fn to_assignable(
         &self,
         expr: Expression<'arena>,
         context: AssignableContext,
+    ) -> Result<Expression<'arena>, ParseError> {
+        self.to_assignable_impl(expr, context, false)
+    }
+
+    /// The recursive core of `to_assignable`. `nested` is true when converting a
+    /// pattern *child* (a property value, array element, or rest argument) rather
+    /// than the whole assignment left. It gates the parenthesized-cast rejection:
+    /// acorn accepts a grouping-parenthesized cast as the whole `=` left or as an
+    /// `AssignmentPattern` left (`({ a: (b as T) = 1 } = x)` — the inner-`=`
+    /// conversion unwraps it), but rejects it as a bare nested target
+    /// (`({ a: (b as T) } = x)` → "Assigning to rvalue"), while a bare
+    /// *unparenthesized* nested cast is kept (`({ a: b as T } = x)`).
+    fn to_assignable_impl(
+        &self,
+        expr: Expression<'arena>,
+        context: AssignableContext,
+        nested: bool,
     ) -> Result<Expression<'arena>, ParseError> {
         match expr {
             // Identifier is already a valid assignment target
@@ -130,7 +147,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     e.span().start_usize(),
                                 ));
                             }
-                            Some(self.to_assignable(e.clone(), context)?)
+                            Some(self.to_assignable_impl(e.clone(), context, true)?)
                         }
                         None => None,
                     };
@@ -151,9 +168,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             )),
 
             // AssignmentExpression in pattern context becomes AssignmentPattern
-            // This handles default values like `{a = 1}` which was parsed as shorthand
+            // This handles default values like `{a = 1}` which was parsed as shorthand.
+            // The left converts as non-nested: it is an `=` left in its own right, so a
+            // parenthesized cast is a valid target there (acorn's inner-`=` conversion
+            // unwraps it; the convert layer mirrors that unwrap at emission). That
+            // inner-`=` conversion runs at expression-parse time in acorn — before the
+            // enclosing construct is known — so it applies in a for-head too
+            // (`for ([(a as T) = 1] of x)` is accepted); ForHead therefore converts the
+            // left under Assignment rules. Binding stays Binding: params reject the
+            // cast ("unexpected type cast in parameter position").
             Expression::AssignmentExpression(assign) => {
-                let left = self.to_assignable(assign.left.clone(), context)?;
+                let left_context = match context {
+                    AssignableContext::ForHead => AssignableContext::Assignment,
+                    c => c,
+                };
+                let left = self.to_assignable_impl(assign.left.clone(), left_context, false)?;
                 Ok(Expression::AssignmentPattern(AssignmentPattern {
                     left: self.alloc(left),
                     right: assign.right,
@@ -177,13 +206,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // for-head must wrap a bare Identifier/MemberExpression (assertions are
             // illegal there). The node is kept (the formatter preserves the parens);
             // convert unwraps it unconditionally.
+            // Nested (a bare pattern child), only a plain inner target is legal —
+            // acorn sees the JSDoc parens as ordinary grouping, which it accepts
+            // around a simple target but rejects around a cast.
             Expression::JsdocCast(ref cast)
                 if matches!(
                     context,
                     AssignableContext::Assignment | AssignableContext::ForHead
                 ) && matches!(
-                    match context {
-                        AssignableContext::Assignment => cast.inner.skip_type_assertions(),
+                    match (context, nested) {
+                        (AssignableContext::Assignment, false) => cast.inner.skip_type_assertions(),
                         _ => cast.inner,
                     },
                     Expression::Identifier(_) | Expression::MemberExpression(_)
@@ -197,8 +229,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // wraps a *simple* target (Identifier/MemberExpression): acorn accepts
             // `(x as T) = …` / `(x.y! as U) = …` but rejects an assertion wrapping a
             // destructuring pattern (`([a, b] as T) = …`), and rejects it in a for-head
-            // (`for ((x as T) of …)`) / binding position (acorn's `isBinding` split). The
-            // node is kept (the formatter reproduces prettier's `(x as T) = …`); convert
+            // (`for ((x as T) of …)`) / binding position (acorn's `isBinding` split).
+            // Nested (a bare pattern child), the cast must additionally be
+            // *unparenthesized* — `({ a: b as T } = x)` is kept, but
+            // `({ a: (b as T) } = x)` is acorn's "Assigning to rvalue". The node is
+            // kept (the formatter reproduces prettier's `(x as T) = …`); convert
             // unwraps it for a simple `=` left.
             Expression::TSAsExpression(_)
             | Expression::TSSatisfiesExpression(_)
@@ -208,7 +243,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     && matches!(
                         expr.skip_type_assertions(),
                         Expression::Identifier(_) | Expression::MemberExpression(_)
-                    ) =>
+                    )
+                    && !(nested && self.preceded_by_open_paren(expr.span().start_usize())) =>
             {
                 Ok(expr)
             }
@@ -216,6 +252,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Invalid assignment target
             _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
         }
+    }
+
+    /// Whether the previous non-trivia byte before `start` (a full-file offset)
+    /// is `(` — i.e. the expression starting at `start` sits directly inside
+    /// grouping parens. Walks back over whitespace; a comment ending where the
+    /// walk stops is hopped via the lexer-recorded spans in `self.comments`
+    /// (byte-scanning backwards can't delimit comments reliably — same technique
+    /// as `paren_preceded_by_jsdoc_cast_comment`). Used by the nested
+    /// parenthesized-cast rejection in `to_assignable_impl`, so it only runs on
+    /// the rare cast-in-pattern path.
+    fn preceded_by_open_paren(&self, start: usize) -> bool {
+        let bytes = self.source.as_bytes();
+        let mut i = start - self.base_offset;
+        loop {
+            while i > 0 && bytes[i - 1].is_ascii_whitespace() {
+                i -= 1;
+            }
+            // If the walk stopped inside (or at the end of) a recorded comment,
+            // hop to the comment's start and keep walking.
+            let pos = (i + self.base_offset) as u32;
+            match self
+                .comments
+                .iter()
+                .rev()
+                .find(|c| c.span.start < pos && pos <= c.span.end)
+            {
+                Some(c) => i = c.span.start as usize - self.base_offset,
+                None => break,
+            }
+        }
+        i > 0 && bytes[i - 1] == b'('
     }
 
     /// Build the "trailing comma after a rest element" syntax error (`[...a,]` /
@@ -240,7 +307,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         spread: &SpreadElement<'arena>,
         context: AssignableContext,
     ) -> Result<RestElement<'arena>, ParseError> {
-        let argument = self.to_assignable(spread.argument.clone(), context)?;
+        let argument = self.to_assignable_impl(spread.argument.clone(), context, true)?;
         if matches!(argument, Expression::AssignmentPattern(_)) {
             return Err(self.error_msg_at(
                 "A rest element cannot have a default value",
@@ -263,7 +330,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         match prop {
             ObjectProperty::Property(p) => {
                 // Convert the value to a pattern
-                let value = self.to_assignable(p.value.clone(), context)?;
+                let value = self.to_assignable_impl(p.value.clone(), context, true)?;
 
                 Ok(ObjectPatternProperty::Property(Property {
                     key: p.key,

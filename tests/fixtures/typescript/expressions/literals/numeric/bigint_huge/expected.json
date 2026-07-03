@@ -1,0 +1,221 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 292,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " 34 hex digits (beyond u128): value/bigint are the full decimal digits",
+			"start": 10,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Beyond-u128 decimal with separators (bigint strips the separators)",
+			"start": 141,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 70
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 291,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 282,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 84,
+					"end": 138,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 55
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 90,
+							"end": 137,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 54
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 90,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"name": "hugeHex"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 100,
+								"end": 137,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 17
+									},
+									"end": {
+										"line": 3,
+										"column": 54
+									}
+								},
+								"value": "87112285931760246646623899502532662132735",
+								"raw": "0xffffffffffffffffffffffffffffffffffn",
+								"bigint": "87112285931760246646623899502532662132735"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 34 hex digits (beyond u128): value/bigint are the full decimal digits",
+							"start": 10,
+							"end": 82
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 212,
+					"end": 281,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 70
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 218,
+							"end": 280,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 69
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 218,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 14
+									}
+								},
+								"name": "hugeDec"
+							},
+							"init": {
+								"type": "Literal",
+								"start": 228,
+								"end": 280,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 17
+									},
+									"end": {
+										"line": 6,
+										"column": 69
+									}
+								},
+								"value": "340282366920938463463374607431768211456",
+								"raw": "340_282_366_920_938_463_463_374_607_431_768_211_456n",
+								"bigint": "340282366920938463463374607431768211456"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Beyond-u128 decimal with separators (bigint strips the separators)",
+							"start": 141,
+							"end": 210
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
