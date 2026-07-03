@@ -28,6 +28,7 @@ pub mod value_normalization;
 mod values;
 
 use crate::ast::internal::{Comment, CssBlockChild, CssDeclaration, CssNode, CssStyleSheet};
+use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
     CommentPosition, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, classify_comment_fast,
     comments_in_range,
@@ -150,11 +151,29 @@ impl<'a> Printer<'a> {
     /// Detected by scanning the source text directly (value comments are not stored in the Vec).
     pub(crate) fn has_value_comments_in_decl(&self, decl: &CssDeclaration<'_>) -> bool {
         let decl_source = decl.span.extract(self.source);
-        if let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) {
-            let value_part = &decl_source[colon_pos + 1..];
-            value_part.contains("/*")
-        } else {
-            false
+        let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) else {
+            return false;
+        };
+        let value_part = &decl_source[colon_pos + 1..];
+        // Fast path: no `/*` at all → no block comment possible.
+        if !value_part.contains("/*") {
+            return false;
+        }
+        // A `/*` is present, but it's only a real value comment when it isn't opaque
+        // token content — inside a string (`content: "a/*b"`) or an unquoted `url()`
+        // (`url(a/*b)`) the `/*` is literal, not a comment start. Lex the value and look
+        // for an actual `Comment` token (the lexer consumes String/Url tokens whole), so
+        // the naive substring scan can't false-positive there.
+        let mut lexer = Lexer::new(value_part);
+        loop {
+            match lexer.next_token() {
+                Ok(t) if t.kind == TokenKind::Comment => return true,
+                Ok(t) if t.kind == TokenKind::Eof => return false,
+                Ok(_) => {}
+                // A lex error (e.g. a genuinely unterminated `/* …`) — fall back to the
+                // conservative substring answer rather than dropping a real comment.
+                Err(_) => return true,
+            }
         }
     }
 

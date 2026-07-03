@@ -75,23 +75,35 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             continue;
         }
 
-        // `url(...)` in a raw prelude (e.g. `@namespace url(http://…)`): the content is
-        // an opaque `<url-token>`, not a `property: value` query, so raw-extract it
-        // verbatim. Otherwise the property-colon normalization below inserts a space
-        // after the `:` in `http://`, corrupting it to `http: //`. Shares the
-        // declaration-path's `url::trim_url_raw` (and matches prettier's
-        // `printer-postcss.js`) — only the whitespace just inside the parens is trimmed.
-        // Quoted `url('…')` is preserved verbatim too (unchanged).
-        // Detect `url` on the raw source slice, not the decoded identifier: `advance()`
-        // drops the decoded value when a token arrives via the peek cache (which the
-        // whitespace branch above populates), so `current_identifier()` is unreliable
-        // here. A `url(` function token requires the literal `url`, so the raw slice is
-        // also the correct thing to match. Match case-insensitively (so the opaque
-        // content is raw-extracted, dodging the property-colon corruption, for `URL(`
-        // too) but only *trim* the inner whitespace for the lowercase spelling: per
-        // css-syntax-3 a `<url-token>` is matched ASCII-case-insensitively, yet prettier
-        // (postcss) only canonicalizes the lowercase `url(`, preserving `URL(  …  )`
-        // verbatim — so trimming uppercase would diverge from prettier.
+        // Unquoted `url(...)` in a raw prelude (e.g. `@namespace url(http://…)`): the
+        // lexer consumed it as one opaque `<url-token>` (so an interior `/*`/`:` is
+        // literal, not a comment / property-colon). Raw-extract it verbatim, trimming only
+        // the whitespace just inside the parens — like the declaration path (shared
+        // `url::trim_url_raw`) and prettier's `printer-postcss.js`. Only the lowercase
+        // `url(` is canonicalized; `URL(  …  )` stays verbatim (postcss preserves it), so
+        // trimming is gated on the lowercase spelling.
+        if matches!(parser.current_kind, TokenKind::Url) {
+            let raw = parser.current_value();
+            let part = if raw.starts_with("url(") {
+                trim_url_raw(raw).unwrap_or_else(|| raw.to_string())
+            } else {
+                raw.to_string()
+            };
+            prelude_parts.push(part);
+            prev_token_kind = Some(TokenKind::Url);
+            last_non_whitespace_kind = Some(TokenKind::Url);
+            parser.advance()?;
+            continue;
+        }
+
+        // Quoted `url("…")` stays ident + `(` + string (a function-token, not a url-token),
+        // so it reaches here as an `Identifier`. Consume the balanced parens as one unit and
+        // normalize the inner string quote (`url("x")` → `url('x')`) under `normalize_quotes`
+        // (@namespace), matching prettier. Detect `url` on the raw source slice, not the
+        // decoded identifier: `advance()` drops the decoded value when a token arrives via
+        // the peek cache (which the whitespace branch above populates), so
+        // `current_identifier()` is unreliable here — and a `url(` function requires the
+        // literal `url` anyway. Only the lowercase spelling is canonicalized (as above).
         if matches!(parser.current_kind, TokenKind::Identifier)
             && parser.current_value().eq_ignore_ascii_case("url")
             && matches!(parser.peek_kind(), Ok(TokenKind::LeftParen))

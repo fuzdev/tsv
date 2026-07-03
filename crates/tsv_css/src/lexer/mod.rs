@@ -125,8 +125,74 @@ impl<'a> Lexer<'a> {
     /// so both dispatch arms (`$`-prefixed and plain) share the handoff.
     fn read_identifier(&mut self) -> Result<Token, Box<ParseError>> {
         let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
+        // css-syntax "consume an ident-like token": an ident whose value is an
+        // ASCII-case-insensitive `url`, immediately followed by `(` whose first
+        // non-whitespace content isn't a quote, is a `<url-token>` — consume it opaquely
+        // to the matching `)` so an interior `/*`, `:`, `,` etc. is literal content, not
+        // a comment / colon / separator. Quoted `url("…")` stays ident + `(` + string (a
+        // function-token). Match the decoded value so an escaped spelling still counts.
+        let ident_text = decoded.as_deref().map_or(
+            &self.source[token.start as usize..token.end as usize],
+            |s| s.as_str(),
+        );
+        if ident_text.eq_ignore_ascii_case("url")
+            && self.current_char() == Some('(')
+            && let Some(url) = self.consume_url_token(token.start)
+        {
+            // The url-token text is recovered verbatim from its span — no decode.
+            self.decoded = None;
+            return Ok(url);
+        }
         self.decoded = decoded;
         Ok(token)
+    }
+
+    /// From `self.pos` at the `(` after a `url` ident, try to consume an opaque
+    /// `<url-token>` (css-syntax §4.3.6). Returns `None` — leaving `self.pos` unmoved,
+    /// so the caller lexes `(` normally — when the parens open a quoted string (that's a
+    /// function-token, `url("…")`). Otherwise consumes to the matching **unescaped** `)`
+    /// (or EOF: an unterminated url-token is taken as-is; tsv doesn't model bad-url
+    /// recovery) and returns the whole `url(...)` as one `TokenKind::Url`.
+    fn consume_url_token(&mut self, url_start: u32) -> Option<Token> {
+        // Peek past `(` and any leading whitespace to classify the first content char.
+        let after_paren = self.pos + 1; // `(` is one byte
+        let mut i = after_paren;
+        while let Some(ch) = self.source[i..].chars().next() {
+            if ch.is_whitespace() {
+                i += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        // A quote opens a string arg → `url("…")` is a function-token, not a url-token.
+        if matches!(self.source[i..].chars().next(), Some('"' | '\'')) {
+            return None;
+        }
+        // Opaque scan from just inside `(` to the matching unescaped `)` (or EOF).
+        let mut j = after_paren;
+        loop {
+            match self.source[j..].chars().next() {
+                None => break, // EOF before `)` — unterminated; take what we have
+                Some('\\') => {
+                    // Escaped code point: the `\` and the next char are both content.
+                    j += 1;
+                    if let Some(esc) = self.source[j..].chars().next() {
+                        j += esc.len_utf8();
+                    }
+                }
+                Some(')') => {
+                    j += 1; // include the closing `)`
+                    break;
+                }
+                Some(ch) => j += ch.len_utf8(),
+            }
+        }
+        self.pos = j;
+        Some(Token {
+            kind: TokenKind::Url,
+            start: url_start,
+            end: j as u32,
+        })
     }
 
     pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {

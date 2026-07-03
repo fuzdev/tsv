@@ -236,7 +236,11 @@ impl<'a> Printer<'a> {
             return d.text_owned(raw.to_string());
         }
 
-        if name == "url" {
+        // `url` is matched ASCII-case-insensitively (css-syntax): `URL(…)` is a url too, so
+        // it takes the same opaque/verbatim path (casing preserved via `span`) rather than
+        // generic-function normalization — which would space an interior `/*` in the now-
+        // lexed `URL(x/*y)` url-token. Matches the empty-args url check above.
+        if name.eq_ignore_ascii_case("url") {
             // Quoted url() — a single string arg. Print it through the normal string
             // path so the quote is normalized (`"x"` → `'x'`), matching prettier.
             if let [arg @ CssValue::String { .. }] = args {
