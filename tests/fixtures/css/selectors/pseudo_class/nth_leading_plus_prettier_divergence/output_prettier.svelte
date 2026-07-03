@@ -13,4 +13,9 @@
 	:not(+ n) {
 		color: green;
 	}
+
+	/* leading + via the dedicated :nth-child An+B path */
+	:nth-child(+ 2n + 1) {
+		color: yellow;
+	}
 </style>

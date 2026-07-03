@@ -118,9 +118,11 @@ fn parse_pseudo_args<'arena>(
     // boundary; the selector list only feeds the formatter.
     // The two arms that read a general selector list from pseudo-class args run with
     // `in_pseudo_args` set, so a bare `<number>`/`<an+b>` term parses as an `Nth`
-    // simple selector (Svelte's `inside_pseudo_class` gate). `nth-*` has its own An+B
-    // grammar (`parse_nth_args`), and `::slotted`/`::part` take a compound/ident list,
-    // so none of those need the flag.
+    // simple selector (Svelte's `inside_pseudo_class` gate). `nth-*` scans its own An+B
+    // grammar (`parse_nth_args`), so its leading term needs no flag — but its optional
+    // `of S` selector list sets `in_pseudo_args` locally (a bare `<an+b>` term in `S`
+    // reads as an `Nth`, matching `:not()`'s strict list). `::slotted`/`::part` take a
+    // compound/ident list and never need it.
     match pseudo_name {
         "slotted" if is_pseudo_element => parse_slotted_args(parser, args_start),
         "part" if is_pseudo_element => parse_part_args(parser, args_start),
@@ -330,7 +332,9 @@ fn parse_selector_list_args<'arena>(
 /// (CSS Selectors 4: `:nth-child(An+B [of S]?)`). Comments in the gaps around the
 /// An+B text are registered for the printer; a comment *inside* the An+B stays part
 /// of its verbatim value text. `value_span` covers just the trimmed An+B so the
-/// printer can find the surrounding gap comments.
+/// printer can find the surrounding gap comments. The optional `of S` selector list is
+/// parsed with `in_pseudo_args` set (see the call site), so it accepts the same bare
+/// `<number>`/`<an+b>` terms a direct functional-pseudo arg does.
 fn parse_nth_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
@@ -377,10 +381,16 @@ fn parse_nth_args<'arena>(
         end: parser.span_pos(anb_trimmed_start + anb_value.len()),
     };
 
-    // Parse optional selector list after "of"
+    // Parse optional selector list after "of". `S` is a `<complex-real-selector-list>`
+    // (CSS Selectors 4), parsed with `in_pseudo_args` set — the same production a direct
+    // functional-pseudo arg uses (Svelte's `read_selector_list(inside_pseudo_class)`), so
+    // a bare `<number>`/`<an+b>` term in `S` (`2n of 123`) reads as an `Nth` simple
+    // selector rather than an unexpected `<number>`/`<dimension>` token.
     let of_selector = if found_of {
         parser.skip_whitespace_registering_comments()?;
-        Some(parse_complex_selector_list(parser)?)
+        Some(with_pseudo_args(parser, |p| {
+            parse_complex_selector_list(p)
+        })?)
     } else {
         None
     };

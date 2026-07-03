@@ -1,0 +1,287 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 225,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 83,
+					"end": 105,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 83,
+							"end": 105,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 83,
+											"end": 84
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 95,
+												"end": 104,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 95,
+														"end": 104,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n of ",
+																		"start": 95,
+																		"end": 101
+																	},
+																	{
+																		"type": "Nth",
+																		"value": "123",
+																		"start": 101,
+																		"end": 104
+																	}
+																],
+																"start": 95,
+																"end": 104
+															}
+														]
+													}
+												]
+											},
+											"start": 84,
+											"end": 105
+										}
+									],
+									"start": 83,
+									"end": 105
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 106,
+					"end": 124,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 110,
+							"end": 120,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 83,
+				"end": 124
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 127,
+					"end": 148,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 127,
+							"end": 148,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 127,
+											"end": 128
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 139,
+												"end": 147,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 139,
+														"end": 147,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n of ",
+																		"start": 139,
+																		"end": 145
+																	},
+																	{
+																		"type": "Nth",
+																		"value": "2n",
+																		"start": 145,
+																		"end": 147
+																	}
+																],
+																"start": 139,
+																"end": 147
+															}
+														]
+													}
+												]
+											},
+											"start": 128,
+											"end": 148
+										}
+									],
+									"start": 127,
+									"end": 148
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 149,
+					"end": 168,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 153,
+							"end": 164,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 127,
+				"end": 168
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 171,
+					"end": 195,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 171,
+							"end": 195,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 171,
+											"end": 172
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-last-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 188,
+												"end": 194,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 188,
+														"end": 194,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "3 of ",
+																		"start": 188,
+																		"end": 193
+																	},
+																	{
+																		"type": "Nth",
+																		"value": "7",
+																		"start": 193,
+																		"end": 194
+																	}
+																],
+																"start": 188,
+																"end": 194
+															}
+														]
+													}
+												]
+											},
+											"start": 172,
+											"end": 195
+										}
+									],
+									"start": 171,
+									"end": 195
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 196,
+					"end": 216,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 200,
+							"end": 212,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 171,
+				"end": 216
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 217,
+			"styles": "\n\t/* :nth-child(An+B of S) where S is a bare An+B/number term (2n, 123) */\n\ta:nth-child(2n of 123) {\n\t\tcolor: red;\n\t}\n\n\ta:nth-child(2n of 2n) {\n\t\tcolor: blue;\n\t}\n\n\ta:nth-last-child(3 of 7) {\n\t\tcolor: green;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 226,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,226 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 313,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 228,
+					"end": 243,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 228,
+							"end": 243,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 228,
+											"end": 229
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 240,
+												"end": 242,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 240,
+														"end": 242,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "-n",
+																		"start": 240,
+																		"end": 242
+																	}
+																],
+																"start": 240,
+																"end": 242
+															}
+														]
+													}
+												]
+											},
+											"start": 229,
+											"end": 243
+										}
+									],
+									"start": 228,
+									"end": 243
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 244,
+					"end": 262,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 248,
+							"end": 258,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 228,
+				"end": 262
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 265,
+					"end": 284,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 265,
+							"end": 284,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 265,
+											"end": 266
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 277,
+												"end": 283,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 277,
+														"end": 283,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "-n",
+																		"start": 277,
+																		"end": 279
+																	}
+																],
+																"start": 277,
+																"end": 279
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 279,
+																	"end": 280
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "-",
+																		"start": 280,
+																		"end": 281
+																	}
+																],
+																"start": 279,
+																"end": 281
+															},
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": " ",
+																	"start": 281,
+																	"end": 282
+																},
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "3",
+																		"start": 282,
+																		"end": 283
+																	}
+																],
+																"start": 281,
+																"end": 283
+															}
+														]
+													}
+												]
+											},
+											"start": 266,
+											"end": 284
+										}
+									],
+									"start": 265,
+									"end": 284
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 285,
+					"end": 304,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 289,
+							"end": 300,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 265,
+				"end": 304
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 305,
+			"styles": "\n\t/* Leading -n An+B forms that Svelte's :nth-child reader mis-parses (as a type\n\t   selector, or a flattened type-selector + combinator chain), where tsv reads a\n\t   single Nth per the css-syntax-3 An+B microsyntax. */\n\ta:nth-child(-n) {\n\t\tcolor: red;\n\t}\n\n\ta:nth-child(-n - 3) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 314,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
