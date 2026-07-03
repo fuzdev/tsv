@@ -121,7 +121,13 @@ pub(super) fn strip_css_comments(input: &str) -> Cow<'_, str> {
         }
         emit(&mut out, &mut rest, ch);
     }
-    Cow::Owned(out.trim().to_string())
+    // Trim in place — truncate trailing whitespace, then drain leading — instead of
+    // `out.trim().to_string()`, which copied the whole (already-owned) buffer again.
+    let end = out.trim_end().len();
+    out.truncate(end);
+    let start = out.len() - out.trim_start().len();
+    out.drain(..start);
+    Cow::Owned(out)
 }
 
 /// Push `ch` to `out` and advance `rest` past it.
