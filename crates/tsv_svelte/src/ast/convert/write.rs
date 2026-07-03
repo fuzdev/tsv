@@ -400,7 +400,9 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     w.raw(",\"end\":");
     w.u32(ctx.pos(elem.span.end));
     w.raw(",\"name\":");
-    w.string(elem.kind.tag_name());
+    // Escape-free `&'static str` (`svelte:head`, `slot`, `title`, …) → skip the
+    // serde string-escape scan.
+    w.token(elem.kind.tag_name());
     w.raw(",\"name_loc\":");
     write_name_loc(w, elem.name_span, ctx);
     w.raw(",\"attributes\":");
@@ -1295,7 +1297,8 @@ fn write_script(
     w.raw(",\"end\":");
     w.u32(ctx.pos(script.span.end));
     w.raw(",\"context\":");
-    w.string(script.context.as_str());
+    // Escape-free `&'static str` (`default` / `module`) → skip the serde scan.
+    w.token(script.context.as_str());
     w.raw(",\"content\":");
     // `lang="ts"` scripts follow acorn's schema; a plain `<script>` follows
     // Svelte's (omit `importKind`/`exportKind="value"`, always emit `attributes`,
