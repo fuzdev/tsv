@@ -196,9 +196,11 @@ fn parse_part_args<'arena>(
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
     parser.skip_whitespace_registering_comments()?;
 
-    let value_start = parser.current_start;
-    let mut value_end = value_start;
     let mut idents = parser.bvec();
+    // Per-ident spans, parallel to `idents`, so the printer can find comments in
+    // the interior gaps between the names (and derive the whole-run span: first
+    // start .. last end).
+    let mut ident_spans: bumpalo::collections::Vec<'_, Span> = parser.bvec();
 
     // Parse space-separated identifiers
     while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
@@ -209,7 +211,10 @@ fn parse_part_args<'arena>(
         let ident_str = parser.current_identifier();
         let ident = parser.alloc_str_in(ident_str);
         idents.push(ident);
-        value_end = parser.current_end;
+        ident_spans.push(Span {
+            start: parser.span_pos(parser.current_start),
+            end: parser.span_pos(parser.current_end),
+        });
         parser.advance()?;
 
         parser.skip_whitespace_registering_comments()?;
@@ -227,13 +232,10 @@ fn parse_part_args<'arena>(
     Ok((
         Some(PseudoClassArgs::Part {
             idents: idents.into_bump_slice(),
+            ident_spans: ident_spans.into_bump_slice(),
             span: Span {
                 start: parser.span_pos(args_start),
                 end,
-            },
-            value_span: Span {
-                start: parser.span_pos(value_start),
-                end: parser.span_pos(value_end),
             },
         }),
         end,
