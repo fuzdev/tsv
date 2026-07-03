@@ -1,4 +1,4 @@
-use super::{CssParser, is_boolean_operator, is_boolean_operator_keyword};
+use super::{CssParser, is_boolean_operator_keyword};
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::selectors::parse_complex_selector_list;
@@ -30,10 +30,7 @@ pub(super) fn parse_condition_query<'arena>(
     let mut current_connector_raw: Option<&'arena str> = None;
     let mut end_pos = start;
 
-    while !parser.check(TokenKind::LeftBrace)
-        && !parser.check(TokenKind::Semicolon)
-        && !parser.check(TokenKind::Eof)
-    {
+    while !parser.at_prelude_end() {
         parser.skip_whitespace()?;
 
         // Register comments between condition parts (e.g., `(a) /* comment */ and (b)`)
@@ -323,84 +320,80 @@ pub(super) fn parse_container_prelude<'arena>(
     Ok((container_name, condition, span))
 }
 
-/// Parse @scope prelude into structured selector lists
+/// Parse @scope prelude into structured selector lists.
 ///
-/// CSS Syntax: `@scope (<scope-start>) [to (<scope-end>)]`
+/// CSS Syntax (css-cascade-6): `@scope [(<scope-start>)]? [to (<scope-end>)]?` —
+/// **both clauses are independently optional**, so all four combinations are valid
+/// (parseCss accepts each): a bare `@scope { … }`, root-only, limit-only, and both.
 ///
 /// Examples:
+/// - `` (empty) - bare `@scope { … }`, scopes to the enclosing context
 /// - `(.card)` - scope root only
 /// - `(.card) to (.footer)` - scope root and limit
+/// - `to (.footer)` - scope limit only
 /// - `(article > header)` - with combinator
+///
+/// The span covers the authored prelude (first clause start to last `)`); when both
+/// clauses are absent it is a zero-width span at the cursor, so the public AST's
+/// `prelude` string extracts to `""` (matching parseCss).
 pub(super) fn parse_scope_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<(SelectorList<'arena>, Option<SelectorList<'arena>>, Span), ParseError> {
+) -> Result<
+    (
+        Option<SelectorList<'arena>>,
+        Option<SelectorList<'arena>>,
+        Span,
+    ),
+    ParseError,
+> {
     let start = parser.span_pos(parser.current_start);
+    // Widens to each clause's closing `)`; stays at `start` when no clause is present.
+    let mut end = start;
 
-    // Expect opening paren
-    if !parser.check(TokenKind::LeftParen) {
-        return Err(parser.error_expected("'(' in @scope prelude"));
-    }
-    parser.advance()?; // consume '('
-    parser.skip_whitespace()?;
-
-    // Parse root selector list
-    let root = parse_complex_selector_list(parser)?;
-
-    parser.skip_whitespace()?;
-
-    // Expect closing paren
-    if !parser.check(TokenKind::RightParen) {
-        return Err(parser.error_expected_after("')'", "@scope root selectors"));
-    }
-    let end_after_root_paren = parser.span_pos(parser.current_end);
-    parser.advance()?; // consume ')'
-
-    // Note: Don't skip whitespace yet - we need to check for "to" keyword
-    // Check for optional "to" clause
-    parser.skip_whitespace()?;
-    let (limit, end_pos) = if parser.check(TokenKind::Identifier) {
-        let identifier = parser.current_identifier();
-        // `to` is a case-insensitive grammar keyword; canonicalized to lowercase
-        // at the printer (the `" to ("` literal in `print_css_atrule`).
-        if identifier.eq_ignore_ascii_case("to") {
-            parser.advance()?; // consume "to"
-            parser.skip_whitespace()?;
-
-            // Expect opening paren
-            if !parser.check(TokenKind::LeftParen) {
-                return Err(parser.error_expected_after("'('", "'to' in @scope prelude"));
-            }
-            parser.advance()?; // consume '('
-            parser.skip_whitespace()?;
-
-            // Parse limit selector list
-            let limit_selectors = parse_complex_selector_list(parser)?;
-
-            parser.skip_whitespace()?;
-
-            // Expect closing paren
-            if !parser.check(TokenKind::RightParen) {
-                return Err(parser.error_expected_after("')'", "@scope limit selectors"));
-            }
-            let end_after_limit_paren = parser.span_pos(parser.current_end);
-            parser.advance()?; // consume ')'
-            parser.skip_whitespace()?;
-
-            (Some(limit_selectors), end_after_limit_paren)
-        } else {
-            (None, end_after_root_paren)
+    // Optional root clause: `(<scope-start>)`.
+    let root = if parser.check(TokenKind::LeftParen) {
+        parser.advance()?; // consume '('
+        parser.skip_whitespace()?;
+        let root_selectors = parse_complex_selector_list(parser)?;
+        parser.skip_whitespace()?;
+        if !parser.check(TokenKind::RightParen) {
+            return Err(parser.error_expected_after("')'", "@scope root selectors"));
         }
+        end = parser.span_pos(parser.current_end);
+        parser.advance()?; // consume ')'
+        parser.skip_whitespace()?;
+        Some(root_selectors)
     } else {
-        (None, end_after_root_paren)
+        None
     };
 
-    // Span covers the entire prelude (up to and including the last ')')
-    let span = Span {
-        start,
-        end: end_pos,
+    // Optional limit clause: `to (<scope-end>)` — valid with or without a root.
+    // `to` is a case-insensitive grammar keyword; canonicalized to lowercase at the
+    // printer (the `" to ("` literal in `print_css_atrule`).
+    let limit = if parser.check(TokenKind::Identifier)
+        && parser.current_identifier().eq_ignore_ascii_case("to")
+    {
+        parser.advance()?; // consume "to"
+        parser.skip_whitespace()?;
+        if !parser.check(TokenKind::LeftParen) {
+            return Err(parser.error_expected_after("'('", "'to' in @scope prelude"));
+        }
+        parser.advance()?; // consume '('
+        parser.skip_whitespace()?;
+        let limit_selectors = parse_complex_selector_list(parser)?;
+        parser.skip_whitespace()?;
+        if !parser.check(TokenKind::RightParen) {
+            return Err(parser.error_expected_after("')'", "@scope limit selectors"));
+        }
+        end = parser.span_pos(parser.current_end);
+        parser.advance()?; // consume ')'
+        parser.skip_whitespace()?;
+        Some(limit_selectors)
+    } else {
+        None
     };
 
-    Ok((root, limit, span))
+    Ok((root, limit, Span { start, end }))
 }
 
 /// Parse @import prelude into structured values
@@ -588,89 +581,35 @@ fn parse_function_value<'arena>(
         // This ensures `supports(  display:  grid  )` → `supports(display: grid)`
         parser.skip_whitespace()?;
 
+        // The condition text is recovered verbatim from `span` at print time (see the
+        // printer), so only its span and whether it holds any content matter here — there
+        // is no normalized string to build. `condition_end` tracks the last non-whitespace
+        // token, so leading/trailing whitespace is trimmed from the span. Track paren depth
+        // so a nested `(…)`/`fn(…)` inside the condition doesn't end the arg at its first
+        // inner `)` — the grammar is `supports( <supports-condition> | <declaration> )`
+        // (css-cascade-4/5 §import-conditions), so `supports((display: grid))`,
+        // `supports(not (a: b))`, and `supports(selector(a > b))` are all valid; only the
+        // matching depth-0 `)` (the `supports(` close) ends the arg.
         let condition_start = parser.span_pos(parser.current_start);
-        let mut condition_parts = Vec::new();
-        let mut prev_token_kind: Option<TokenKind> = None;
-        let mut last_non_whitespace_kind: Option<TokenKind> = None;
         let mut condition_end = condition_start;
+        let mut has_content = false;
+        let mut depth: u32 = 0;
 
-        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
-            // Skip whitespace after '(' or before ')'
-            if parser.check(TokenKind::Whitespace) {
-                let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                    || matches!(parser.peek_kind(), Ok(TokenKind::RightParen));
-
-                parser.advance()?;
-
-                if skip_whitespace {
-                    continue;
-                }
-                condition_parts.push(" ".to_string());
-                prev_token_kind = Some(TokenKind::Whitespace);
-                continue;
+        while !parser.check(TokenKind::Eof) {
+            match parser.current_kind {
+                TokenKind::RightParen if depth == 0 => break,
+                TokenKind::LeftParen => depth += 1,
+                TokenKind::RightParen => depth -= 1,
+                _ => {}
             }
-
-            let part = match &parser.current_kind {
-                TokenKind::Identifier => parser.current_identifier().to_string(),
-                TokenKind::String { quote } => {
-                    let content =
-                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                    format!("{quote}{content}{quote}")
-                }
-                TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
-                    parser.current_value().to_string()
-                }
-                _ => parser.current_value().to_string(),
-            };
-
-            // Check for boolean operators (for complex supports conditions)
-            let is_bool_op = is_boolean_operator(parser);
-            if is_bool_op && !matches!(prev_token_kind, Some(TokenKind::Whitespace)) {
-                condition_parts.push(" ".to_string());
-            }
-
-            // Remove trailing whitespace before ':'
-            if matches!(parser.current_kind, TokenKind::Colon) {
-                while condition_parts.last().is_some_and(|s| s == " ") {
-                    condition_parts.pop();
-                }
-            }
-
-            condition_parts.push(part);
-
-            let current_kind = parser.current_kind;
-            condition_end = parser.span_pos(parser.current_end);
-            parser.advance()?;
-
-            // Add space after boolean operators or ':'
             if !parser.check(TokenKind::Whitespace) {
-                if is_bool_op {
-                    condition_parts.push(" ".to_string());
-                } else if matches!(current_kind, TokenKind::Colon) {
-                    // Add space after ':' in property:value pairs
-                    if matches!(
-                        last_non_whitespace_kind,
-                        Some(TokenKind::Identifier)
-                            | Some(TokenKind::Number)
-                            | Some(TokenKind::Dimension { .. })
-                            | Some(TokenKind::Percentage)
-                    ) {
-                        condition_parts.push(" ".to_string());
-                    }
-                }
+                has_content = true;
+                condition_end = parser.span_pos(parser.current_end);
             }
-
-            prev_token_kind = Some(current_kind);
-            if !matches!(current_kind, TokenKind::Whitespace) {
-                last_non_whitespace_kind = Some(current_kind);
-            }
+            parser.advance()?;
         }
 
-        // Condition text recovered verbatim from `span` at print time; the join is
-        // only used to decide whether there's any content to push.
-        let joined = condition_parts.join("");
-        let condition_text = joined.trim();
-        if !condition_text.is_empty() {
+        if has_content {
             args.push(CssValue::Identifier {
                 span: Span {
                     start: condition_start,
