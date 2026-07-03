@@ -6,9 +6,7 @@
 // emission path; `convert_ast_json_bytes`/`_string` in `lib.rs` call it, and
 // `convert_ast_json` parses its bytes back into a `Value`.
 
-use std::borrow::Cow;
-use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::{ByteToCharMap, InfallibleResolve, LocationTracker, Span};
+use tsv_lang::{ByteToCharMap, LocationTracker};
 
 /// Schema choice for public-AST serialization.
 ///
@@ -81,42 +79,43 @@ pub(super) fn bigint_to_decimal(val: &str) -> String {
         val
     };
     if let Some(hex) = val.strip_prefix("0x").or_else(|| val.strip_prefix("0X")) {
-        u128::from_str_radix(hex, 16).map_or_else(|_| val.to_string(), |n| n.to_string())
+        u128::from_str_radix(hex, 16)
+            .map_or_else(|_| radix_digits_to_decimal(hex, 16), |n| n.to_string())
     } else if let Some(oct) = val.strip_prefix("0o").or_else(|| val.strip_prefix("0O")) {
-        u128::from_str_radix(oct, 8).map_or_else(|_| val.to_string(), |n| n.to_string())
+        u128::from_str_radix(oct, 8)
+            .map_or_else(|_| radix_digits_to_decimal(oct, 8), |n| n.to_string())
     } else if let Some(bin) = val.strip_prefix("0b").or_else(|| val.strip_prefix("0B")) {
-        u128::from_str_radix(bin, 2).map_or_else(|_| val.to_string(), |n| n.to_string())
+        u128::from_str_radix(bin, 2)
+            .map_or_else(|_| radix_digits_to_decimal(bin, 2), |n| n.to_string())
     } else {
         val.to_string()
     }
 }
 
-/// Borrow an interned name from `source` when the span's source slice is exactly
-/// the name (the overwhelming case — a plain identifier reference); own the
-/// resolved name otherwise.
-///
-/// The slice can't be borrowed blindly: a *binding* identifier's `span` covers
-/// the whole binding, type annotation included (`x: T`), not just the name, and
-/// an escaped identifier (`\u{78}`) decodes to a name distinct from its raw
-/// source. Resolving the symbol is a cheap interner lookup (no allocation); the
-/// `String` allocation — the thing this avoids — only happens on the owned
-/// branch, where the slice and the name genuinely differ.
-///
-/// `pub` so hosts with interned names in their own wire JSON apply the same
-/// guard (`tsv_svelte`'s writer uses it for element/attribute names). The TS
-/// writer's own `write_name` inlines the same test, emitting either branch
-/// directly without a `Cow`.
-pub fn name_cow<'src>(
-    span: Span,
-    source: &'src str,
-    sym: DefaultSymbol,
-    interner: &DefaultStringInterner,
-) -> Cow<'src, str> {
-    let resolved = interner.resolve_infallible(sym);
-    let raw = span.extract(source);
-    if raw == resolved {
-        Cow::Borrowed(raw)
-    } else {
-        Cow::Owned(resolved.to_string())
+/// Decimal digits of an arbitrarily long radix-2/8/16 digit string — the
+/// beyond-`u128` fallback (rare: >32 hex digits). Schoolbook multiply-add
+/// over a little-endian decimal-digit accumulator; the digits were already
+/// validated by the lexer.
+fn radix_digits_to_decimal(digits: &str, radix: u32) -> String {
+    let mut dec: Vec<u8> = vec![0];
+    for ch in digits.chars() {
+        let Some(d) = ch.to_digit(radix) else {
+            continue; // unreachable: the lexer validated every digit
+        };
+        let mut carry = d;
+        for slot in &mut dec {
+            let v = u32::from(*slot) * radix + carry;
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                *slot = (v % 10) as u8;
+            }
+            carry = v / 10;
+        }
+        while carry > 0 {
+            #[allow(clippy::cast_possible_truncation)]
+            dec.push((carry % 10) as u8);
+            carry /= 10;
+        }
     }
+    dec.iter().rev().map(|&d| char::from(b'0' + d)).collect()
 }

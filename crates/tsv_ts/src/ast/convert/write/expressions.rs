@@ -104,11 +104,10 @@ pub(super) fn write_expression_inner(
             );
         }
         internal::Expression::PrivateIdentifier(pid) => {
-            // The span includes the leading `#`; the public `name` excludes it.
-            let name_span = Span::new(pid.span.start + 1, pid.span.end);
             node_header(w, "PrivateIdentifier", pid.span, ctx);
             w.raw(",\"name\":");
-            write_name(w, name_span, pid.name, ctx);
+            // The interned name excludes the leading `#` (the public shape).
+            write_name(w, pid.name, ctx);
             close_node(w, "PrivateIdentifier", pid.span, ctx);
         }
         internal::Expression::ObjectExpression(obj) => {

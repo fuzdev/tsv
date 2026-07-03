@@ -672,7 +672,7 @@ Key test files:
 
 - `tests/fixtures_tests.rs` - Unified fixture validation (parser + formatter)
 - `crates/tsv_debug/src/fixtures/` - Fixture data model (`model.rs`), discovery (`discovery.rs`), and variant discovery (`variants.rs`)
-- `crates/tsv_debug/src/fixtures/validation/` - Validation logic: structure rules (`structure.rs`), per-phase checks (`phases.rs`), typed errors (`errors.rs`), summary printing (`summary.rs`)
+- `crates/tsv_debug/src/fixtures/validation/` - Validation logic: structure rules (`structure.rs`), per-phase checks (`phases/`), typed errors (`errors.rs`), summary printing (`summary.rs`)
 - `crates/tsv_debug/src/cli/commands/fixtures_*.rs` - Fixture generation commands
 
 **See [fixture_workflow.md](./fixture_workflow.md#quick-reference) for command reference.**

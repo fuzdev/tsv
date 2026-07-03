@@ -12,14 +12,16 @@ use super::{
 use internal::TSKeywordKind;
 use tsv_lang::InfallibleResolve;
 
-/// Emits a `TSTypeAnnotation` node. In Svelte block-pattern context
-/// (`ctx.strip_type_ann_loc`) the `loc` field is omitted.
+/// Emits a `TSTypeAnnotation` node. A Svelte block pattern's top-level
+/// annotation (`ctx.pattern_ann_span`) omits the `loc` field — Svelte's
+/// `read_context` synthesizes that node itself, without `loc`; nested
+/// annotations keep theirs.
 pub(super) fn write_type_annotation(
     w: &mut JsonWriter,
     type_annotation: &internal::TSTypeAnnotation<'_>,
     ctx: &Ctx<'_>,
 ) {
-    if ctx.strip_type_ann_loc {
+    if type_annotation.span == ctx.pattern_ann_span {
         // `{type, start, end, typeAnnotation}` — no `loc` (the block-pattern quirk).
         let span = type_annotation.span;
         w.raw("{\"type\":\"TSTypeAnnotation\",\"start\":");

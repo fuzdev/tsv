@@ -206,9 +206,9 @@ fn write_identifier_expression_with_character_in(
 /// - **Simple identifier**: `character` is injected into the top-level
 ///   `Identifier`'s `loc` (`inject_loc_character`) — Svelte reports it on the
 ///   identifiers `read_identifier` creates directly.
-/// - **Both**: `loc` is omitted on every `TSTypeAnnotation`
-///   (`strip_type_annotation_loc` — Svelte's block-pattern parser doesn't emit it,
-///   unlike acorn-typescript in script context).
+/// - **Both**: `loc` is omitted on the pattern's **top-level** `TSTypeAnnotation`
+///   only — the one Svelte's `read_context` synthesizes itself (no `loc`);
+///   annotations nested inside it come from the acorn parse and keep `loc`.
 ///
 /// Patterns never collect comments, so there is no attach pass.
 pub fn write_pattern_embedded(
@@ -219,8 +219,18 @@ pub fn write_pattern_embedded(
     interner: &DefaultStringInterner,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
-    // Block patterns strip `TSTypeAnnotation` `loc` on every branch.
-    ctx.strip_type_ann_loc = true;
+    // The pattern root's own annotation is the `read_context`-synthesized one
+    // whose `loc` is omitted (a block-pattern root is always an identifier or a
+    // destructure, so no other root shape can carry one).
+    let top_annotation = match expr {
+        internal::Expression::ObjectPattern(o) => o.type_annotation.as_ref(),
+        internal::Expression::ArrayPattern(a) => a.type_annotation.as_ref(),
+        internal::Expression::Identifier(id) => id.type_annotation(),
+        _ => None,
+    };
+    if let Some(ann) = top_annotation {
+        ctx.pattern_ann_span = ann.span;
+    }
     match expr {
         internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => {
             // Destructure: `+1`-column adjustment on the start line (when `> 1`).
@@ -243,7 +253,9 @@ pub fn write_pattern_embedded(
             );
         }
         // Any other non-destructure pattern: `inject_loc_character` is a no-op
-        // (it only touches a top-level `Identifier`), so just strip type-ann loc.
+        // (it only touches a top-level `Identifier`), and a block-pattern root
+        // is always an identifier or a destructure, so no top-level annotation
+        // can exist here.
         _ => expressions::write_expression(w, expr, &ctx),
     }
 }
@@ -315,9 +327,10 @@ pub fn write_program_embedded(
 /// The per-document environment every writer function shares (`source`, the
 /// `LocationMapper`, and the interner).
 ///
-/// `pattern_line` / `strip_type_ann_loc` are the two Svelte block-pattern quirks
-/// (`write_pattern_embedded`): they are inert (`0` / `false`) for every ordinary
-/// emission, so the hot path pays only a never-taken compare per position.
+/// `pattern_line` / `pattern_ann_span` are the two Svelte block-pattern quirks
+/// (`write_pattern_embedded`): they are inert (`0` / the empty span) for every
+/// ordinary emission, so the hot path pays only a never-taken compare per
+/// position (or per annotation).
 #[derive(Clone, Copy)]
 pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
@@ -327,9 +340,11 @@ pub(super) struct Ctx<'a> {
     /// which the pattern starts, or `0` when inactive. A node's `loc` column is
     /// bumped `+1` on this line only, reproducing `adjust_read_pattern_columns`.
     pub(super) pattern_line: usize,
-    /// Block-pattern quirk: omit `loc` on `TSTypeAnnotation` nodes
-    /// (`strip_type_annotation_loc`). Inactive (`false`) outside patterns.
-    pub(super) strip_type_ann_loc: bool,
+    /// Block-pattern quirk: the span of the pattern's **top-level**
+    /// `TSTypeAnnotation`, whose `loc` is omitted (Svelte's `read_context`
+    /// synthesizes that node itself, without `loc`; nested annotations keep
+    /// theirs). The empty span (never a real annotation) when inactive.
+    pub(super) pattern_ann_span: Span,
     /// Per-node attached comments (Svelte comment-attach paths — a
     /// comment-bearing `<script>` `Program` or template expression). `None` for
     /// every ordinary emission, so the hot path pays only a never-taken compare
@@ -350,7 +365,7 @@ impl<'a> Ctx<'a> {
             loc,
             interner,
             pattern_line: 0,
-            strip_type_ann_loc: false,
+            pattern_ann_span: Span::new(0, 0),
             comments: None,
             import_options_null: false,
         }
@@ -525,30 +540,29 @@ pub(super) fn kind_token(is_type: bool, schema: Schema) -> Option<&'static str> 
     }
 }
 
-/// The name-emission counterpart of `super::name_cow`: borrow the source slice
-/// when it equals the resolved name, else the resolved name — the writer emits
-/// either directly (no `Cow`, no allocation on either branch).
+/// Emit an interned name. The resolved symbol *is* the wire value (decoded —
+/// an escaped identifier's `\u{78}` source form decodes to `x`), so it is
+/// written directly; no source-slice compare, no allocation.
 #[inline]
-pub(super) fn write_name(
-    w: &mut JsonWriter,
-    span: Span,
-    sym: string_interner::DefaultSymbol,
-    ctx: &Ctx<'_>,
-) {
+pub(super) fn write_name(w: &mut JsonWriter, sym: string_interner::DefaultSymbol, ctx: &Ctx<'_>) {
     use tsv_lang::InfallibleResolve;
-    let resolved = ctx.interner.resolve_infallible(sym);
-    let raw = span.extract(ctx.source);
-    w.string(if raw == resolved { raw } else { resolved });
+    w.string(ctx.interner.resolve_infallible(sym));
 }
 
-/// Emit a numeric literal value the way acorn's JSON does: integral doubles as
-/// expanded shortest-round-trip integers (JS `JSON.stringify` semantics),
-/// non-finite as `0` (JSON has no NaN/Inf, and acorn emits 0), everything else
-/// as ryu.
+/// Emit a numeric literal value the way acorn's JSON does: non-finite as
+/// `null` (JSON has no Infinity/NaN — an overflow literal like `1e999`),
+/// integral doubles as expanded shortest-round-trip integers (JS
+/// `JSON.stringify` semantics), everything else as ryu.
+///
+/// Known divergence (pre-existing, carried over from the typed converter):
+/// integral doubles in `(u64::MAX, 1e21)` — e.g. `1e20` — emit ryu's `1e+20`
+/// where JS prints expanded digits.
+/// TODO: emit JS-style expanded text for integral doubles beyond `u64` up to
+/// 1e21 (fixtures-first).
 pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
     if !n.is_finite() {
-        // NaN/±Inf → integer 0 (acorn parity).
-        w.raw("0");
+        // ±Inf → null, matching JSON.stringify (a parsed literal is never NaN).
+        w.null();
         return;
     }
     if n.fract() == 0.0 {
@@ -649,7 +663,7 @@ fn write_identifier_fields(
     ctx: &Ctx<'_>,
 ) {
     w.raw(",\"name\":");
-    write_name(w, span, sym, ctx);
+    write_name(w, sym, ctx);
     if optional {
         w.raw(",\"optional\":true");
     }

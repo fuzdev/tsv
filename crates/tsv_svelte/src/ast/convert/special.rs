@@ -22,7 +22,7 @@ use tsv_ts::ast::convert::{
 
 use super::comment_attachment::{
     CommentAttachmentContext, attach_comments_recursively, attach_const_tag_declaration,
-    attach_declaration_tag_declaration, attach_snippet_parameters, comment_to_json,
+    attach_declaration_tag_declaration, attach_expression_list, comment_to_json,
     try_attach_comments_to_node,
 };
 
@@ -80,8 +80,8 @@ pub(super) fn build_expression_writer_comments(
 /// init subtree can carry comments — the map is read off an init-only skeleton
 /// wrapped in the minimal declaration shape `attach_const_tag_declaration`
 /// navigates (`declarations[0].init`). The `VariableDeclaration`/
-/// `VariableDeclarator` envelope and the `end = tag.span.end - 1` rewrite carry
-/// no comments and are reproduced at emit time.
+/// `VariableDeclarator` envelope carries no comments and is reproduced at emit
+/// time.
 pub(super) fn build_const_tag_writer_comments(
     tag: &internal::ConstTag<'_>,
     template_comments: &[&Comment],
@@ -92,7 +92,6 @@ pub(super) fn build_const_tag_writer_comments(
     let init_skeleton = expression_skeleton(&tag.init, source, tracker, interner);
     let mut declaration = serde_json::json!({
         "declarations": [{ "init": init_skeleton }],
-        "end": tag.init.span().end,
     });
     attach_const_tag_declaration(
         &mut declaration,
@@ -131,30 +130,36 @@ pub(super) fn build_declaration_tag_writer_comments(
     WriterComments::from_attached_skeleton(&value)
 }
 
-/// Build the merged per-node comment map for a comment-bearing `{#snippet}`
-/// parameter list. The parameters share one advancing cursor
-/// (`attach_snippet_parameters`) so an inter-parameter comment is claimed once,
-/// so the whole list is skeletonized together, attached, and read back into one
-/// map keyed by each parameter's spans.
-pub(super) fn build_snippet_parameters_writer_comments(
-    parameters: &[tsv_ts::ast::internal::Expression<'_>],
+/// Build the merged per-node comment map for a comment-bearing expression list
+/// (`{#snippet}` parameters, multi-identifier `{@debug}`). Canonical Svelte
+/// parses the list in one acorn parse, so the whole list is skeletonized
+/// together, attached via one shared queue (`attach_expression_list` — an
+/// inter-item comment is claimed exactly once, per acorn's same-line rule),
+/// and read back into one map keyed by each item's spans. `wrapper_end` is the
+/// discarded parse wrapper's end (`{@debug}`'s `SequenceExpression` — its last
+/// item never claims a trailing comment); `None` for snippet parameters.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn build_expression_list_writer_comments(
+    items: &[tsv_ts::ast::internal::Expression<'_>],
     template_comments: &[&Comment],
     source: &str,
     tracker: &LocationTracker,
     interner: &DefaultStringInterner,
     container_start: u32,
     range_end: u32,
+    wrapper_end: Option<u32>,
 ) -> WriterComments {
-    let mut values: Vec<serde_json::Value> = parameters
+    let mut values: Vec<serde_json::Value> = items
         .iter()
         .map(|p| expression_skeleton(p, source, tracker, interner))
         .collect();
-    attach_snippet_parameters(
+    attach_expression_list(
         &mut values,
         template_comments,
         source,
         container_start,
         range_end,
+        wrapper_end,
     );
     WriterComments::from_attached_skeleton(&serde_json::Value::Array(values))
 }
@@ -265,7 +270,7 @@ pub(super) fn script_has_lang_ts(
 /// Find a named attribute's value in `<svelte:options>` attributes.
 ///
 /// `pub(super)` so the wire-JSON writer reproduces `<svelte:options>` extraction
-/// (scalar props + `customElement`) without materializing a `public::SvelteOptions`.
+/// (scalar props + `customElement`) without materializing a typed options struct.
 pub(super) fn find_option_values<'arena>(
     attrs: &[internal::AttributeNode<'arena>],
     name: &str,

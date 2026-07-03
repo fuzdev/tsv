@@ -41,7 +41,7 @@ pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, write_array, write_or_null};
-pub use location::{ByteToCharMap, LocationMapper, LocationTracker, Position, SourceLocation};
+pub use location::{ByteToCharMap, LocationMapper, LocationTracker, Position};
 pub use output::{OutputBuffer, write_indent};
 pub use sizing::{
     estimated_ast_arena_capacity, estimated_interner_capacity, estimated_json_capacity,

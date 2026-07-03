@@ -93,18 +93,18 @@ pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
-/// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but emits
-/// the wire JSON directly during a single walk of the *internal* Svelte AST — the
-/// typed public `Root` is never materialized. A **writer-mode conversion**
-/// (`ast/convert/write.rs`) fuses byte→UTF-16 offset translation into the walk:
-/// the Svelte spine (elements, blocks, tags, directives, attributes, `name_loc`)
-/// emits final char-space positions directly, comment-free template expressions
-/// route through `tsv_ts`'s embedded expression writer, and the residual
-/// `serde_json::Value` islands (root comments, `<svelte:options>`, block
-/// patterns, `{@const}`/`{const}`/`{let}` declarations, `<svelte:element>` tags,
-/// `<script>` content) reuse the existing byte-space convert + attach builders,
-/// translated per island. Embedded `<style>` children fuse via `tsv_css`'s
-/// `write_css_node`. This is the hot path for the FFI parse binding and the
+/// Emits the wire JSON directly during a single walk of the *internal* Svelte
+/// AST — no typed public tree, no intermediate `serde_json::Value` for the
+/// output. A **writer-mode conversion** (`ast/convert/write.rs`) fuses
+/// byte→UTF-16 offset translation into the walk: the whole document — the
+/// Svelte spine (elements, blocks, tags, directives, attributes, `name_loc`),
+/// embedded template expressions and `<script>` content via `tsv_ts`'s
+/// embedded writers, `<style>` children via `tsv_css`'s `write_css_node` —
+/// emits final char-space positions directly. Comment-bearing islands
+/// (template expressions with comments, comment-carrying `<script>`s) first
+/// precompute a span-keyed `WriterComments` map off a byte-space skeleton
+/// (`ast/convert/special.rs`), which the fused emit consults at each node's
+/// close. This is the hot path for the FFI parse binding and the
 /// CLI's compact output — the bytes are valid UTF-8 by construction (every
 /// emitted byte is a source slice or ASCII fragment), and byte-oriented
 /// consumers skip the O(output) validation a `String` requires.

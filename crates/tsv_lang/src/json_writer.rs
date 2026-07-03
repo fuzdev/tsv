@@ -15,9 +15,10 @@
 //!
 //! **Escape / format parity contract**: static structure and tokens are written
 //! verbatim (debug-asserted escape-free); dynamic strings and non-integral `f64`
-//! delegate to `serde_json::to_writer`, so escaping and ryu formatting match the
-//! typed serialization exactly; integers have a unique decimal form and are
-//! hand-formatted (two-digit-pair, the hot path emitting several ints per node).
+//! delegate to `serde_json::to_writer`, so escaping and ryu formatting are
+//! exactly `serde_json`'s (the canonical parsers' `JSON.stringify` parity the
+//! fixtures pin); integers have a unique decimal form and are hand-formatted
+//! (two-digit-pair, the hot path emitting several ints per node).
 
 /// Compact-JSON output buffer.
 ///
@@ -74,7 +75,7 @@ impl JsonWriter {
     }
 
     /// A dynamic string value, JSON-escaped and quoted. Delegates to
-    /// `serde_json` so the escape set matches the typed serialization exactly.
+    /// `serde_json` so the escape set is exactly `serde_json`'s.
     #[inline]
     #[allow(clippy::expect_used)]
     pub fn string(&mut self, s: &str) {

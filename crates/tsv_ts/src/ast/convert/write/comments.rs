@@ -187,6 +187,22 @@ impl WriterComments {
             emit_trailing(w);
         }
     }
+
+    /// Debug-only guard, called after an island's fused emit completes: every
+    /// collected entry must have been consumed by a node close. An unconsumed
+    /// entry means the fused emit never closed a node with the skeleton's
+    /// `(start, end, type)` key — skeleton/fused drift that would silently drop
+    /// the comment from the wire.
+    #[inline]
+    pub fn debug_assert_consumed(&self) {
+        debug_assert!(
+            self.map
+                .values()
+                .flatten()
+                .all(|entry| entry.consumed.get()),
+            "WriterComments entry not consumed — skeleton/fused span-key drift would drop a comment"
+        );
+    }
 }
 
 /// Convert a `leadingComments`/`trailingComments` JSON array to `WireComment`s.

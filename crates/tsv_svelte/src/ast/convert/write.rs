@@ -31,11 +31,12 @@
 //!   expression fuses via `write_expression_embedded_with_comments`, emitting each
 //!   node's `leadingComments`/`trailingComments` at its close.
 //! - **Snippet names / parameters** fuse the same way (with `character`
-//!   injection / the shared inter-parameter cursor).
+//!   injection / the shared one-queue list attach, matching canonical's single
+//!   acorn parse of the list — multi-identifier `{@debug}` rides the same path).
 //! - **`{@const}` / `{const}` / `{let}` declarations** fuse their
-//!   `VariableDeclaration` structure; when the document has a template comment the
-//!   init/declaration subtree carries a `WriterComments` map and the `{@const}`
-//!   `end = tag.span.end - 1` rewrite is emitted directly.
+//!   `VariableDeclaration` structure (the `{@const}` declaration `end` is always
+//!   `tag.span.end - 1`, Svelte's `parser.index - 1`); when the document has a
+//!   template comment the init/declaration subtree carries a `WriterComments` map.
 //! - **`<script>` content** always fuses via `write_program_embedded`: an
 //!   eligible script (`lang="ts"` ∧ no script comments ∧ no preceding HTML
 //!   comment) with no map; an ineligible one (a plain non-`lang="ts"` script, one
@@ -60,10 +61,9 @@ use crate::ast::internal;
 use string_interner::DefaultStringInterner;
 use tsv_css::ast::convert::write_css_node;
 use tsv_lang::{
-    ByteToCharMap, Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span,
-    estimated_json_capacity, write_array,
+    ByteToCharMap, Comment, InfallibleResolve, JsonWriter, LocationMapper, LocationTracker,
+    Position, Span, estimated_json_capacity, write_array,
 };
-use tsv_ts::ast::convert::name_cow;
 use tsv_ts::ast::convert::{
     Schema, translate_column, write_expression_embedded, write_expression_embedded_with_comments,
     write_identifier_expression_with_character,
@@ -75,8 +75,8 @@ use tsv_ts::ast::convert::{
 use super::comment_attachment::{get_comment_value, is_template_comment};
 use super::special::{
     bool_option, build_const_tag_writer_comments, build_declaration_tag_writer_comments,
-    build_expression_writer_comments, build_script_writer_comments,
-    build_snippet_parameters_writer_comments, find_option_values, script_has_lang_ts, text_value,
+    build_expression_list_writer_comments, build_expression_writer_comments,
+    build_script_writer_comments, find_option_values, script_has_lang_ts, text_value,
 };
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
@@ -319,6 +319,7 @@ fn write_generic_island(
             range_end,
         );
         write_expression_embedded_with_comments(w, expr, ctx.source, ctx.loc, ctx.interner, &wc);
+        wc.debug_assert_consumed();
     } else {
         write_expression_embedded(w, expr, ctx.source, ctx.loc, ctx.interner);
     }
@@ -357,8 +358,7 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     w.raw(",\"end\":");
     w.u32(ctx.pos(elem.span.end));
     w.raw(",\"name\":");
-    let name = name_cow(elem.name_span, ctx.source, elem.name, ctx.interner);
-    w.string(&name);
+    w.string(ctx.interner.resolve_infallible(elem.name));
     w.raw(",\"name_loc\":");
     write_name_loc(w, elem.name_span, ctx);
     w.raw(",\"attributes\":");
@@ -385,11 +385,10 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
     w.raw(",\"fragment\":");
     write_fragment(w, &elem.fragment, ctx);
-    // `<svelte:element this={…}>` tag — the comment-attach dispatcher keys
-    // `SvelteElement` on `tag`. A plain-string `this="x"` is a Svelte-style
-    // `Literal` (no `loc`, single-quoted `raw`) that carries no expression parse,
-    // so no template comment can attach — emit it fused. Every other `this={…}`
-    // is a generic island.
+    // `<svelte:element this={…}>` tag. A plain-string `this="x"` is a
+    // Svelte-style `Literal` (no `loc`, single-quoted `raw`) that carries no
+    // expression parse, so no template comment can attach — emit it fused.
+    // Every other `this={…}` is a generic island keyed on the element's span.
     if let Some(tag_expr) = elem.kind.tag() {
         w.raw(",\"tag\":");
         write_special_tag(w, tag_expr, elem.span, ctx);
@@ -405,7 +404,7 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
 /// A `<svelte:element this={…}>` tag. A plain-string value is a Svelte-style
 /// `Literal` (`{type, value, raw, start, end}` — no `loc`, single-quoted `raw`)
 /// fused directly; everything else is a generic island keyed on the element's
-/// span (matching the comment-attach dispatcher's `SvelteElement` arm).
+/// span (the window Svelte's own comment attach uses for `SvelteElement`).
 fn write_special_tag(
     w: &mut JsonWriter,
     tag_expr: &tsv_ts::ast::internal::Expression<'_>,
@@ -655,15 +654,18 @@ fn write_snippet_name(
             ctx.interner,
             &wc,
         );
+        wc.debug_assert_consumed();
     } else {
         write_identifier_expression_with_character(w, expr, ctx.source, ctx.loc, ctx.interner);
     }
 }
 
 /// Snippet parameters. Comment-free (the common case): each fuses. Otherwise a
-/// `WriterComments` map is precomputed off a byte-space skeleton so
-/// `attach_snippet_parameters`' shared cursor can claim each inter-parameter
-/// comment once, then each parameter fuse-emits with it.
+/// `WriterComments` map is precomputed off a byte-space skeleton via the shared
+/// list attach (`attach_expression_list` — one queue, each inter-parameter
+/// comment claimed once per acorn's same-line rule), then each parameter
+/// fuse-emits with it. No wrapper-end suppression: canonical parses the list in
+/// a function context whose wrapper ends past every param.
 fn write_snippet_parameters(
     w: &mut JsonWriter,
     parameters: &[tsv_ts::ast::internal::Expression<'_>],
@@ -672,7 +674,7 @@ fn write_snippet_parameters(
     ctx: &Ctx<'_>,
 ) {
     if !parameters.is_empty() && ctx.any_comment_in(container_start, range_end) {
-        let wc = build_snippet_parameters_writer_comments(
+        let wc = build_expression_list_writer_comments(
             parameters,
             ctx.comments,
             ctx.source,
@@ -680,10 +682,12 @@ fn write_snippet_parameters(
             ctx.interner,
             container_start,
             range_end,
+            None,
         );
         write_array(w, parameters, |w, p| {
             write_expression_embedded_with_comments(w, p, ctx.source, ctx.loc, ctx.interner, &wc);
         });
+        wc.debug_assert_consumed();
     } else {
         write_array(w, parameters, |w, p| {
             write_expression_embedded(w, p, ctx.source, ctx.loc, ctx.interner);
@@ -718,42 +722,64 @@ fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx
 }
 
 /// Emits a `DebugTag` node (`{@debug a, b}`).
+///
+/// A multi-identifier tag is ONE canonical acorn parse (a `SequenceExpression`
+/// wrapper, discarded after identifier extraction), so its comment attach runs
+/// once across the list with the wrapper-end trailing suppression. A single
+/// identifier is itself the parse root and takes the generic-island path
+/// (root-fallback trailing).
 fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DebugTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"identifiers\":");
-    write_array(w, tag.identifiers, |w, id| {
-        write_generic_island(w, id, tag.span.start, tag.span.end, ctx);
-    });
+    if tag.identifiers.len() > 1 && ctx.any_comment_in(tag.span.start, tag.span.end) {
+        let wc = build_expression_list_writer_comments(
+            tag.identifiers,
+            ctx.comments,
+            ctx.source,
+            ctx.tracker,
+            ctx.interner,
+            tag.span.start,
+            tag.span.end,
+            tag.identifiers.last().map(|id| id.span().end),
+        );
+        write_array(w, tag.identifiers, |w, id| {
+            write_expression_embedded_with_comments(w, id, ctx.source, ctx.loc, ctx.interner, &wc);
+        });
+        wc.debug_assert_consumed();
+    } else {
+        write_array(w, tag.identifiers, |w, id| {
+            write_generic_island(w, id, tag.span.start, tag.span.end, ctx);
+        });
+    }
     w.raw("}");
 }
 
 /// Emits a `ConstTag` node (`{@const id = init}`).
 ///
-/// The `declaration` `VariableDeclaration` is hand-built (single declarator,
-/// `start = tag.span.start + 2` past `{@`, `end = init.end`). The template attach
-/// pass (`attach_const_tag_declaration`) — which runs iff the document has any
-/// template comment — attaches comments to the `init` subtree *and* rewrites the
-/// declaration `end` to `tag.span.end - 1` (the byte before the closing `}`). So
-/// the comment-free document fuses; a document with template comments precomputes
-/// a `WriterComments` map (structure + attach + the `end` rewrite) and fuse-emits
-/// with it.
+/// The `declaration` `VariableDeclaration` is hand-built the way Svelte's
+/// parser builds it: single declarator, `start = tag.span.start + 2` (past
+/// `{@`), declarator `end = init.end`, declaration `end = tag.span.end - 1`
+/// (`parser.index - 1`, the byte before the closing `}`). The comment-free
+/// document fuses directly; a document with template comments precomputes a
+/// `WriterComments` map off an init-only skeleton (Svelte runs `add_comments`
+/// on the init expression alone) and fuse-emits with it.
 fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"declaration\":");
+    // The declaration `end` is always `tag.span.end - 1` — canonical Svelte
+    // hard-codes `parser.index - 1` (the byte before the closing `}`).
+    let decl_end = ctx.pos(tag.span.end - 1);
     if ctx.comments.is_empty() {
-        // No template comment in the document: the declaration `end` is the
-        // init's end (no `end = tag.span.end - 1` rewrite runs).
-        write_const_declaration(w, tag, ctx.pos(tag.init.span().end), None, ctx);
+        write_const_declaration(w, tag, decl_end, None, ctx);
     } else {
-        // The attach pass runs (the document has a template comment): comments
-        // attach to the init subtree and the declaration `end` is rewritten to
-        // `tag.span.end - 1` (the byte before the closing `}`).
+        // The document has template comments: precompute the init-subtree
+        // attach map (comments attach to the init only).
         let wc = build_const_tag_writer_comments(
             tag,
             ctx.comments,
@@ -761,14 +787,15 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
             ctx.tracker,
             ctx.interner,
         );
-        write_const_declaration(w, tag, ctx.pos(tag.span.end - 1), Some(&wc), ctx);
+        write_const_declaration(w, tag, decl_end, Some(&wc), ctx);
+        wc.debug_assert_consumed();
     }
     w.raw("}");
 }
 
 /// Emit a `{@const}`'s hand-built `VariableDeclaration`. `decl_end` is the
-/// already-mapped declaration `end` (init end without comments, `tag.span.end-1`
-/// with); `comments`, when present, feeds the init's fused per-node attach.
+/// already-mapped declaration `end` (`tag.span.end - 1`); `comments`, when
+/// present, feeds the init's fused per-node attach.
 fn write_const_declaration(
     w: &mut JsonWriter,
     tag: &internal::ConstTag<'_>,
@@ -807,11 +834,12 @@ fn write_const_declaration(
 
 /// Emits a `DeclarationTag` node (`{const …}` / `{let …}`).
 ///
-/// The `declaration` is a real TS `VariableDeclaration`. As with `{@const}`, the
-/// template attach pass (`attach_declaration_tag_declaration`) — active iff the
-/// document has any template comment — rewrites the declaration `end` to
-/// `tag.span.end - 1` and attaches comments across the tree, so the comment-free
-/// document fuses via `write_variable_declaration_embedded`.
+/// The `declaration` is a real TS `VariableDeclaration`, emitted with its own
+/// span `end` in both states (canonical keeps acorn's end for DeclarationTag —
+/// unlike `ConstTag`, no `-1` rewrite). The comment-free document fuses via
+/// `write_variable_declaration_embedded`; a comment-bearing one precomputes the
+/// island's `WriterComments` (`attach_declaration_tag_declaration` attaches
+/// across the whole tree).
 fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DeclarationTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -838,6 +866,7 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             ctx.interner,
             &wc,
         );
+        wc.debug_assert_consumed();
     }
     w.raw("}");
 }
@@ -871,8 +900,7 @@ fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx
     w.raw(",\"end\":");
     w.u32(ctx.pos(attr.span.end));
     w.raw(",\"name\":");
-    let name = name_cow(attr.name_span, ctx.source, attr.name, ctx.interner);
-    w.string(&name);
+    w.string(ctx.interner.resolve_infallible(attr.name));
     w.raw(",\"name_loc\":");
     write_name_loc(w, attr.name_span, ctx);
     w.raw(",\"value\":");
@@ -1076,8 +1104,8 @@ fn write_transition_directive(
 }
 
 /// `bind:`/`class:` share an expression: the explicit form (`bind:x={e}`) is a
-/// generic island keyed on the directive span (the comment-attach dispatcher's
-/// `is_object` guard admits comment attach there); the shorthand form (`bind:x`)
+/// generic island keyed on the directive span (a real expression parse, so
+/// template comments can attach); the shorthand form (`bind:x`)
 /// is a synthetic loc-free `Identifier` with Svelte field order (`start, end,
 /// type, name`) that never carries a comment, emitted fused.
 fn write_directive_value_expression(
@@ -1250,6 +1278,9 @@ fn write_script(
         ))
     };
     write_script_program_fused(w, script, ctx, schema, writer_comments.as_ref());
+    if let Some(wc) = &writer_comments {
+        wc.debug_assert_consumed();
+    }
     w.raw(",\"attributes\":");
     write_value_attributes(w, script.attributes, ctx);
     w.raw("}");
@@ -1471,5 +1502,48 @@ fn write_optional_fragment(
     match fragment {
         Some(f) => write_fragment(w, f, ctx),
         None => w.null(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::Value;
+
+    /// Parse full Svelte source and return the public JSON AST.
+    fn convert_svelte(source: &str) -> Value {
+        let arena = bumpalo::Bump::new();
+        // Test inputs are hardcoded valid sources; a parse failure should panic
+        #[allow(clippy::expect_used)]
+        let root = crate::parse(source, &arena).expect("parse");
+        crate::convert_ast_json(&root, source)
+    }
+
+    // Svelte hard-codes a `{@const}` declaration's `end` to `parser.index - 1`
+    // (the byte before the closing `}`) — independent of interior whitespace
+    // and of whether the document carries template comments. Not expressible
+    // as a fixture: the trigger (whitespace before `}`) is never format-stable.
+    #[test]
+    fn const_tag_declaration_end_is_byte_before_closing_brace() {
+        // `}` at byte 28; the init ends at 27 — the end must be 28.
+        let ast = convert_svelte("{#snippet s()}{@const x = 1 }{/snippet}");
+        let decl = &ast["fragment"]["nodes"][0]["body"]["nodes"][0]["declaration"];
+        assert_eq!(decl["end"], 28);
+
+        // The same tag in a comment-bearing document: identical end.
+        let ast = convert_svelte("{#snippet s()}{@const x = 1 }{/snippet}\n{/* c */ y}");
+        let decl = &ast["fragment"]["nodes"][0]["body"]["nodes"][0]["declaration"];
+        assert_eq!(decl["end"], 28);
+    }
+
+    // A `{let}`/`{const}` DeclarationTag keeps acorn's declaration `end`
+    // (canonical Svelte applies no `-1` rewrite there, unlike `{@const}`) — in
+    // both document states.
+    #[test]
+    fn declaration_tag_end_is_acorns_declaration_end() {
+        let ast = convert_svelte("{let x = 1 }");
+        assert_eq!(ast["fragment"]["nodes"][0]["declaration"]["end"], 10);
+
+        let ast = convert_svelte("{let x = 1 }\n{/* c */ y}");
+        assert_eq!(ast["fragment"]["nodes"][0]["declaration"]["end"], 10);
     }
 }

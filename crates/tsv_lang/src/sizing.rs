@@ -1,7 +1,7 @@
-// Sizing heuristics for allocation pre-sizing — the public-AST JSON wire buffer
+// Sizing heuristics for allocation pre-sizing — the wire-JSON output buffer
 // and the parse-time bump arena.
 
-/// Estimated compact-JSON bytes per source byte for public-AST output.
+/// Estimated compact-JSON bytes per source byte for the wire-JSON output.
 ///
 /// Per-file means measured across corpora cluster tightly: TypeScript ~18.5x
 /// (zzz, 90 files), Svelte ~17.6x (zzz, 123 files), CSS ~19.8x (prettier css
@@ -11,13 +11,13 @@
 /// (TS max ~30x) pay one doubling.
 const JSON_BYTES_PER_SOURCE_BYTE: usize = 20;
 
-/// Pre-size estimate for serializing a public AST to compact JSON.
+/// Pre-size estimate for a document's compact wire-JSON output.
 ///
-/// Used by each language's `convert_ast_json_string` to allocate the output
-/// buffer up front instead of growing it through `serde_json`'s default
-/// doubling (the JSON wire form runs ~20x the source length, so default
-/// growth pays many large reallocs). The floor covers tiny sources whose
-/// output is mostly fixed envelope.
+/// Used by each language's wire-JSON writer (`convert_ast_json_bytes`) to
+/// allocate the `JsonWriter` buffer up front instead of growing it through
+/// `Vec`'s default doubling (the JSON wire form runs ~20x the source length,
+/// so default growth pays many large reallocs). The floor covers tiny sources
+/// whose output is mostly fixed envelope.
 pub fn estimated_json_capacity(source_len: usize) -> usize {
     source_len
         .saturating_mul(JSON_BYTES_PER_SOURCE_BYTE)

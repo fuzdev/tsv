@@ -7,12 +7,13 @@
 //! ```rust,ignore
 //! use tsv_ts::{parse, format, convert_ast_json_bytes};
 //!
-//! // Parse TypeScript code
+//! // Parse TypeScript code (the caller owns the bump arena the AST borrows)
 //! let source = "const x: number = 42;";
-//! let ast = parse(source)?;
+//! let arena = bumpalo::Bump::new();
+//! let ast = parse(source, &arena)?;
 //!
 //! // Format TypeScript code
-//! let formatted = format(&ast);
+//! let formatted = format(&ast, source);
 //!
 //! // Emit the wire JSON AST
 //! let json_bytes = convert_ast_json_bytes(&ast, source);

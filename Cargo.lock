@@ -617,7 +617,6 @@ version = "0.1.0"
 dependencies = [
  "bumpalo",
  "futures-util",
- "serde",
  "serde_json",
  "tokio",
  "tsv_cli",

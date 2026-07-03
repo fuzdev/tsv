@@ -24,10 +24,10 @@ etc. with no post-build patcher.
 ## JSON-String Transport
 
 The AST crosses the JS↔WASM boundary as **one compact JSON string**:
-`parse_*` builds it with the lang crate's `convert_ast_json_string` (no
-intermediate `serde_json::Value`; TS emits the string directly from the
-internal AST via its JSON writer, CSS/Svelte serialize their typed public
-ASTs) and calls the engine's native `JSON.parse` from Rust via
+`parse_*` builds it with the lang crate's `convert_ast_json_string` (each
+language's wire-JSON writer emits it directly from the internal AST — no
+intermediate `serde_json::Value` or typed public tree) and calls the
+engine's native `JSON.parse` from Rust via
 `js_sys::JSON::parse`, so the export signature stays the typed object.
 Building the JS object graph node-by-node with `serde_wasm_bindgen` is
 measurably slower.
