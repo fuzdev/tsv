@@ -583,11 +583,10 @@ impl<'a> Printer<'a> {
 
     /// Build the parenthesized argument doc for a pseudo-class/element.
     ///
-    /// Selector-list args (`:is()`, `:not()`, `:where()`, `:has()`, `::slotted()`
-    /// list form, `:nth-child(... of S)`) wrap as `group("(" indent(softline join)
-    /// softline ")")` — inline when they fit, one-per-line indented when they
-    /// don't. `::slotted()` compound args, `::part()` idents, and identifier args
-    /// never break.
+    /// Selector-list args (`:is()`, `:not()`, `:where()`, `:has()`, `::slotted()`,
+    /// `:nth-child(... of S)`) wrap as `group("(" indent(softline join) softline ")")`
+    /// — inline when they fit, one-per-line indented when they don't. `::part()` idents
+    /// and identifier args never break.
     fn build_pseudo_args_doc(&self, args: &internal::PseudoClassArgs<'_>) -> DocId {
         let d = self.d();
         match args {
@@ -642,30 +641,6 @@ impl<'a> Printer<'a> {
                     }
                 }
             }
-            internal::PseudoClassArgs::Slotted { selectors, span } => {
-                // A compound selector (no combinators) — never breaks.
-                let mut parts = DocBuf::new();
-                let n = selectors.len();
-                for (j, simple) in selectors.iter().enumerate() {
-                    parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
-                }
-                let compound = d.concat(&parts);
-                // Interleave leading/trailing comments inside the parens but outside
-                // the compound (`::slotted(/* lead */ div /* trail */)`), using the
-                // compound's own bounds. The parser guarantees ≥1 selector, so the
-                // fallback is unreachable in practice.
-                let inner = match (selectors.first(), selectors.last()) {
-                    (Some(first), Some(last)) => {
-                        let content = Span {
-                            start: first.span().start,
-                            end: last.span().end,
-                        };
-                        self.wrap_args_gap_comments(compound, *span, content)
-                    }
-                    _ => compound,
-                };
-                self.paren_wrap(inner)
-            }
             internal::PseudoClassArgs::Part {
                 idents,
                 span,
@@ -717,9 +692,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Wrap pseudo-argument content in literal `(`…`)` with no break points — the
-    /// non-breaking counterpart of `wrap_pseudo_args`, for argument forms that never
-    /// break (the `::slotted()` compound, `::part()` idents, `:dir()`/`:lang()`
-    /// identifier, and the bare `:nth-*()` An+B).
+    /// non-breaking counterpart of `wrap_pseudo_args`, for the two argument forms that
+    /// never break: the `::part()` idents and the bare `:nth-*()` An+B. The
+    /// selector-list forms (`:is()`/`:not()`/`::slotted()`/`:dir()`, and the `:nth-*(…
+    /// of S)` of-list) route through the breakable `wrap_pseudo_args` instead.
     fn paren_wrap(&self, inner: DocId) -> DocId {
         let d = self.d();
         d.concat(&[d.text("("), inner, d.text(")")])

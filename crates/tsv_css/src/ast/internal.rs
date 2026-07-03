@@ -255,24 +255,15 @@ pub enum PseudoClassArgs<'arena> {
         value_span: Span,
     },
 
-    /// Selector list for :is(), :not(), :where(), :has()
+    /// Selector list for `:is()`, `:not()`, `:where()`, `:has()`, and `::slotted()`
     ///
     /// Contains a full SelectorList that can include multiple complex selectors.
-    /// Used for logical combinations and relational selectors.
+    /// Used for logical combinations, relational selectors, and `::slotted()` — whose
+    /// spec grammar is `<compound-selector>` but which parseCss parses (and tsv
+    /// reproduces) as a lenient `<complex-selector-list>`, dropping it from the wire
+    /// AST at the pseudo-element convert boundary.
     SelectorList {
         selectors: SelectorList<'arena>,
-        span: Span,
-    },
-
-    /// Compound selector for ::slotted() pseudo-element
-    ///
-    /// Per CSS Scoping Module Level 1: `::slotted( <compound-selector> )`
-    /// A compound selector is a sequence of simple selectors without combinators.
-    ///
-    /// Examples: `*`, `div`, `.foo`, `div.foo#bar:hover`, `[slot]`
-    /// Invalid: `div span` (combinator), `div > span` (combinator)
-    Slotted {
-        selectors: &'arena [SimpleSelector<'arena>], // Compound selector (no combinators)
         span: Span,
     },
 
@@ -302,7 +293,6 @@ impl PseudoClassArgs<'_> {
         match self {
             PseudoClassArgs::Nth { span, .. } => *span,
             PseudoClassArgs::SelectorList { span, .. } => *span,
-            PseudoClassArgs::Slotted { span, .. } => *span,
             PseudoClassArgs::Part { span, .. } => *span,
         }
     }
