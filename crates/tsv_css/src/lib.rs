@@ -179,24 +179,21 @@ pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_j
 
 /// Like `convert_ast_json`, serialized to compact JSON wire bytes
 ///
-/// Serializes the typed public AST (`convert_stylesheet_file`) directly, skipping
-/// the intermediate `serde_json::Value` (matching `tsv_ts`/`tsv_svelte`). For
-/// ASCII sources byte offsets already equal char offsets; multibyte sources get
-/// the typed offset-translation walk (`translate_byte_to_char_offsets_typed`)
-/// before serialization. Byte-identical to
-/// `serde_json::to_string(&convert_ast_json(...))`; the hot path for the
-/// FFI parse binding and the CLI's compact output — the bytes are valid UTF-8
-/// by construction (serde_json only emits UTF-8), and byte-oriented consumers
+/// Emits the wire JSON directly from the internal AST via the writer
+/// (`ast/convert/write.rs`), never materializing the typed public tree, and
+/// fuses the byte→char offset translation into that walk (each position through
+/// a `ByteToCharMap`; identity on ASCII). The writer is a third emission mode of
+/// the same `parseCss()` quirk catalog — every `write_*` mirrors its `convert_*`
+/// twin and reuses its raw-source reconstruction helpers, so they stay in
+/// lockstep (gated by the fixture suite's string-path identity check against the
+/// `Value` oracle and `corpus:compare:parse --multibyte-only`). Byte-identical
+/// to `serde_json::to_string(&convert_ast_json(...))`; the hot path for the FFI
+/// parse binding and the CLI's compact output — the bytes are valid UTF-8 by
+/// construction (source slices + ASCII fragments), and byte-oriented consumers
 /// skip the O(output) validation a `String` requires.
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
 pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
-    let mut public_ast = ast::convert::convert_stylesheet_file(stylesheet.nodes, source);
-    let map = tsv_lang::ByteToCharMap::new(source);
-    ast::convert::translate_byte_to_char_offsets_typed(&mut public_ast, &map);
-    let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
-    serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
-    buf
+    ast::convert::write_stylesheet_file_bytes(stylesheet.nodes, source)
 }
 
 /// Like `convert_ast_json_bytes`, as a `String` for `&str` boundaries (the

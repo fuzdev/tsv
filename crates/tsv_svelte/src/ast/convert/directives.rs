@@ -240,7 +240,10 @@ pub(super) fn convert_let_directive<'src>(
 /// Shorthand directives (`bind:value`, `class:active`) produce a synthetic
 /// Identifier without `loc` and with Svelte field ordering (`start, end, type, name`).
 /// Explicit directives (`bind:value={a}`) use the normal acorn-style conversion.
-fn convert_directive_expression(
+///
+/// `pub(super)` so the wire-JSON writer (`ast/convert/write.rs`) reuses the same
+/// shorthand/explicit split.
+pub(super) fn convert_directive_expression(
     expr: &tsv_ts::ast::internal::Expression<'_>,
     has_expression_tag: bool,
     source: &str,

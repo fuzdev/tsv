@@ -12,7 +12,8 @@
 //! - `escapes` - escape sequence utilities for printers
 //! - `printing` - shared printing utilities for printers
 //! - `interner` - string interner utilities for printers
-//! - `json` - sizing heuristic for public-AST JSON output buffers
+//! - `sizing` - sizing heuristics for public-AST JSON / arena buffers
+//! - `json_writer` - shared wire-JSON emission substrate (`json` feature)
 
 mod comment;
 mod config;
@@ -20,6 +21,8 @@ pub mod doc;
 mod error;
 mod escapes;
 mod interner;
+#[cfg(feature = "json")]
+mod json_writer;
 mod location;
 mod output;
 pub mod printing;
@@ -36,6 +39,8 @@ pub use comment::{
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result};
 pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
+#[cfg(feature = "json")]
+pub use json_writer::{JsonWriter, write_array, write_or_null};
 pub use location::{ByteToCharMap, LocationMapper, LocationTracker, Position, SourceLocation};
 pub use output::{OutputBuffer, write_indent};
 pub use sizing::{

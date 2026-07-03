@@ -7,7 +7,7 @@ use super::expressions::{ExprFlags, write_expression, write_expression_inner, wr
 use super::statements::{write_block_statement, write_statement};
 use super::types::{write_index_signature, write_type, write_type_parameter_instantiation};
 use super::{
-    Ctx, JsonWriter, node_header, write_array, write_identifier_plain,
+    Ctx, JsonWriter, close_node, node_header, write_array, write_identifier_plain,
     write_identifier_with_optional, write_name, write_or_null, write_return_type_field,
     write_type_annotation_field, write_type_parameters_field,
 };
@@ -35,7 +35,7 @@ pub(super) fn write_decorator(
             strip_optional: !parenthesized,
         },
     );
-    w.raw("}");
+    close_node(w, "Decorator", decorator.span, ctx);
 }
 
 /// Emit a `decorators` field when the internal node carries decorators
@@ -67,7 +67,7 @@ pub(super) fn write_type_alias_declaration(
     if type_alias.declare {
         w.raw(",\"declare\":true");
     }
-    w.raw("}");
+    close_node(w, "TSTypeAliasDeclaration", type_alias.span, ctx);
 }
 
 /// Mirrors `convert_function_declaration`. Field order: `id` (nullable),
@@ -93,7 +93,7 @@ pub(super) fn write_function_declaration(
     write_return_type_field(w, func_decl.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func_decl.body, ctx);
-    w.raw("}");
+    close_node(w, "FunctionDeclaration", func_decl.span, ctx);
 }
 
 /// The super-class wrap decision (mirrors `maybe_wrap_super_class`): when
@@ -142,7 +142,7 @@ fn write_super_class_fields(
         write_expression(w, e, ctx);
         w.raw(",\"typeArguments\":");
         write_type_parameter_instantiation(w, stp, ctx);
-        w.raw("}");
+        close_node(w, "TSInstantiationExpression", ws, ctx);
     } else {
         write_or_null(w, super_class, |w, e| write_expression(w, e, ctx));
         if let Some(stp) = super_type_parameters {
@@ -183,7 +183,7 @@ pub(super) fn write_class_declaration(
     write_implements_field(w, class_decl.implements, ctx);
     w.raw(",\"body\":");
     write_class_body(w, &class_decl.body, ctx);
-    w.raw("}");
+    close_node(w, "ClassDeclaration", class_decl.span, ctx);
 }
 
 /// Mirrors `convert_class_expression` (no `declare` field).
@@ -212,7 +212,7 @@ pub(super) fn write_class_expression(
     write_implements_field(w, class_expr.implements, ctx);
     w.raw(",\"body\":");
     write_class_body(w, &class_expr.body, ctx);
-    w.raw("}");
+    close_node(w, "ClassExpression", class_expr.span, ctx);
 }
 
 /// `implements` is `Option<Vec>` skipped when convert leaves it `None` (an
@@ -249,13 +249,13 @@ fn write_class_body(w: &mut JsonWriter, body: &internal::ClassBody<'_>, ctx: &Ct
             write_array(w, block.body, |w, s| {
                 write_statement(w, s, ctx, Schema::Acorn);
             });
-            w.raw("}");
+            close_node(w, "StaticBlock", block.span, ctx);
         }
         internal::ClassMember::IndexSignature(sig) => {
             write_index_signature(w, sig, ctx);
         }
     });
-    w.raw("}");
+    close_node(w, "ClassBody", body.span, ctx);
 }
 
 /// Mirrors `convert_method_definition`. Field order: `decorators?`,
@@ -305,12 +305,8 @@ fn write_method_definition(
         ("FunctionExpression", Some(&func.body))
     };
     w.raw(",\"value\":");
-    node_header(
-        w,
-        value_type,
-        Span::new(func.params_start, func.span.end),
-        ctx,
-    );
+    let value_span = Span::new(func.params_start, func.span.end);
+    node_header(w, value_type, value_span, ctx);
     w.raw(",\"id\":");
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
@@ -326,7 +322,9 @@ fn write_method_definition(
         w.raw(",\"body\":");
         write_block_statement(w, body, ctx);
     }
-    w.raw("}}");
+    // Close the `value` function node, then the `MethodDefinition`.
+    close_node(w, value_type, value_span, ctx);
+    close_node(w, "MethodDefinition", method.span, ctx);
 }
 
 /// Mirrors `convert_property_definition`. Field order: `decorators?`,
@@ -374,7 +372,7 @@ fn write_property_definition(
     write_type_annotation_field(w, prop.type_annotation.as_ref(), ctx);
     w.raw(",\"value\":");
     write_or_null(w, prop.value.as_ref(), |w, v| write_expression(w, v, ctx));
-    w.raw("}");
+    close_node(w, "PropertyDefinition", prop.span, ctx);
 }
 
 /// Mirrors `convert_type_parameter_declaration` (and its byte-identical
@@ -394,7 +392,7 @@ pub(super) fn write_type_parameter_declaration(
         w.u32(ctx.loc.pos(pos));
         w.raw("}");
     }
-    w.raw("}");
+    close_node(w, "TSTypeParameterDeclaration", params.span, ctx);
 }
 
 /// Mirrors `convert_type_parameter`. Field order: `const`/`in`/`out` (each
@@ -424,7 +422,7 @@ pub(super) fn write_type_parameter(
         w.raw(",\"default\":");
         write_type(w, d, ctx);
     }
-    w.raw("}");
+    close_node(w, "TSTypeParameter", param.span, ctx);
 }
 
 /// Mirrors `convert_expression_with_type_arguments` (implements clause) +
@@ -441,7 +439,7 @@ fn write_expression_with_type_arguments(
         w.raw(",\"typeParameters\":");
         write_type_parameter_instantiation(w, ta, ctx);
     }
-    w.raw("}");
+    close_node(w, "TSExpressionWithTypeArguments", heritage.span, ctx);
 }
 
 /// Mirrors `convert_entity_name_to_expression`: `Foo` emits an `Identifier`
@@ -460,7 +458,8 @@ fn write_entity_name_to_expression(
             write_entity_name_to_expression(w, &qn.left, ctx);
             w.raw(",\"property\":");
             write_identifier_with_optional(w, &qn.right, ctx);
-            w.raw(",\"computed\":false,\"optional\":false}");
+            w.raw(",\"computed\":false,\"optional\":false");
+            close_node(w, "MemberExpression", qn.span, ctx);
         }
     }
 }

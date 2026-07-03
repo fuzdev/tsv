@@ -5,7 +5,9 @@ use super::super::Schema;
 use super::declarations::{write_class_declaration, write_function_declaration};
 use super::expressions::write_expression;
 use super::types::{write_declare_function, write_interface_declaration};
-use super::{Ctx, JsonWriter, kind_token, node_header, write_identifier_plain, write_literal};
+use super::{
+    Ctx, JsonWriter, close_node, kind_token, node_header, write_identifier_plain, write_literal,
+};
 
 /// Mirrors `convert_import_specifier`.
 pub(super) fn write_import_specifier(
@@ -19,7 +21,7 @@ pub(super) fn write_import_specifier(
             node_header(w, "ImportDefaultSpecifier", default_spec.span, ctx);
             w.raw(",\"local\":");
             write_identifier_plain(w, &default_spec.local, ctx);
-            w.raw("}");
+            close_node(w, "ImportDefaultSpecifier", default_spec.span, ctx);
         }
         internal::ImportSpecifier::Named(named_spec) => {
             let import_kind = kind_token(
@@ -35,13 +37,13 @@ pub(super) fn write_import_specifier(
                 w.raw(",\"importKind\":");
                 w.token(kind);
             }
-            w.raw("}");
+            close_node(w, "ImportSpecifier", named_spec.span, ctx);
         }
         internal::ImportSpecifier::Namespace(ns_spec) => {
             node_header(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
             w.raw(",\"local\":");
             write_identifier_plain(w, &ns_spec.local, ctx);
-            w.raw("}");
+            close_node(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
         }
     }
 }
@@ -60,7 +62,7 @@ pub(super) fn write_import_attribute(
     }
     w.raw(",\"value\":");
     write_literal(w, &attr.value, ctx);
-    w.raw("}");
+    close_node(w, "ImportAttribute", attr.span, ctx);
 }
 
 /// Mirrors `convert_export_specifier`. Field order: `local`, `exported`,
@@ -84,7 +86,7 @@ pub(super) fn write_export_specifier(
         w.raw(",\"exportKind\":");
         w.token(kind);
     }
-    w.raw("}");
+    close_node(w, "ExportSpecifier", spec.span, ctx);
 }
 
 /// Mirrors `convert_module_export_name`: an identifier emits an `Identifier`

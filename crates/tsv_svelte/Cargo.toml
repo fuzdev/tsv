@@ -8,7 +8,7 @@ description = "Svelte parsing and formatting library"
 default = ["convert"]
 # Public AST + JSON serialization layer. Forwards to tsv_ts/tsv_css
 # because Svelte's convert layer reuses their JSON helpers.
-convert = ["dep:serde", "dep:serde_json", "tsv_ts/convert", "tsv_css/convert"]
+convert = ["dep:serde", "dep:serde_json", "tsv_lang/json", "tsv_ts/convert", "tsv_css/convert"]
 
 [dependencies]
 tsv_lang.workspace = true

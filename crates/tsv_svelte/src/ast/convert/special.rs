@@ -8,14 +8,231 @@
 
 use crate::ast::{internal, public};
 use std::borrow::Cow;
+use std::collections::VecDeque;
 use string_interner::DefaultStringInterner;
-use tsv_lang::{InfallibleResolve, LocationMapper, LocationTracker};
-use tsv_ts::ast::convert::convert_expression;
+use tsv_lang::{
+    Comment, InfallibleResolve, JsonWriter, LocationMapper, LocationTracker, Position,
+    estimated_json_capacity,
+};
+use tsv_ts::ast::convert::{
+    Schema, WriterComments, convert_expression, write_expression_embedded, write_program_embedded,
+};
+
+use tsv_ts::ast::convert::write_variable_declaration_embedded;
 
 use super::comment_attachment::{
-    CommentAttachmentContext, attach_comments_recursively, comment_to_json,
+    CommentAttachmentContext, attach_comments_recursively, attach_const_tag_declaration,
+    attach_declaration_tag_declaration, attach_snippet_parameters, comment_to_json,
+    try_attach_comments_to_node,
 };
 use super::{convert_attribute_node, convert_fragment, span_to_name_loc, to_json_value};
+
+/// Emit an internal expression's byte-space wire JSON (identity map) and parse
+/// it back — the reusable skeleton the island-scoped attach passes mutate.
+#[allow(clippy::expect_used)]
+fn expression_skeleton(
+    expr: &tsv_ts::ast::internal::Expression<'_>,
+    source: &str,
+    tracker: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> serde_json::Value {
+    let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len()));
+    write_expression_embedded(
+        &mut w,
+        expr,
+        source,
+        LocationMapper::identity(tracker),
+        interner,
+    );
+    serde_json::from_slice(w.as_bytes()).expect("writer emits valid JSON")
+}
+
+/// Build the per-node comment map for a comment-bearing template expression
+/// island (`{expr}`, block test, directive expression, `{@debug}` id, spread,
+/// `<svelte:element>` tag/`<svelte:component>` expression, snippet name).
+///
+/// The writer emits the expression's byte-space wire JSON, it's run through the
+/// island-scoped attach (`try_attach_comments_to_node` — the same window the
+/// `Value` dispatcher uses), and the assignments are read back into a
+/// `WriterComments` the fused emit consults at each node's close. Byte-identical
+/// to the `Value` oracle's convert + attach + splice.
+pub(super) fn build_expression_writer_comments(
+    expr: &tsv_ts::ast::internal::Expression<'_>,
+    template_comments: &[&Comment],
+    source: &str,
+    tracker: &LocationTracker,
+    interner: &DefaultStringInterner,
+    container_start: u32,
+    range_end: u32,
+) -> WriterComments {
+    let mut value = expression_skeleton(expr, source, tracker, interner);
+    try_attach_comments_to_node(
+        &mut value,
+        template_comments,
+        source,
+        container_start,
+        range_end,
+    );
+    WriterComments::from_attached_skeleton(&value)
+}
+
+/// Build the per-node comment map for a comment-bearing `{@const id = init}`.
+///
+/// Svelte runs `add_comments` on the **init expression directly**, so only the
+/// init subtree can carry comments — the map is read off an init-only skeleton
+/// wrapped in the minimal declaration shape `attach_const_tag_declaration`
+/// navigates (`declarations[0].init`). The `VariableDeclaration`/
+/// `VariableDeclarator` envelope and the `end = tag.span.end - 1` rewrite carry
+/// no comments and are reproduced at emit time.
+pub(super) fn build_const_tag_writer_comments(
+    tag: &internal::ConstTag<'_>,
+    template_comments: &[&Comment],
+    source: &str,
+    tracker: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> WriterComments {
+    let init_skeleton = expression_skeleton(&tag.init, source, tracker, interner);
+    let mut declaration = serde_json::json!({
+        "declarations": [{ "init": init_skeleton }],
+        "end": tag.init.span().end,
+    });
+    attach_const_tag_declaration(
+        &mut declaration,
+        template_comments,
+        source,
+        tag.span.start,
+        tag.span.end,
+    );
+    WriterComments::from_attached_skeleton(&declaration)
+}
+
+/// Build the per-node comment map for a comment-bearing `{const …}` / `{let …}`
+/// declaration tag. The declaration is a real TS `VariableDeclaration`, so
+/// comments attach across its whole tree (`attach_declaration_tag_declaration`).
+pub(super) fn build_declaration_tag_writer_comments(
+    var_decl: &tsv_ts::ast::internal::VariableDeclaration<'_>,
+    template_comments: &[&Comment],
+    source: &str,
+    tracker: &LocationTracker,
+    interner: &DefaultStringInterner,
+    tag_start: u32,
+    tag_end: u32,
+) -> WriterComments {
+    let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len()));
+    write_variable_declaration_embedded(
+        &mut w,
+        var_decl,
+        source,
+        LocationMapper::identity(tracker),
+        interner,
+    );
+    #[allow(clippy::expect_used)]
+    let mut value: serde_json::Value =
+        serde_json::from_slice(w.as_bytes()).expect("writer emits valid JSON");
+    attach_declaration_tag_declaration(&mut value, template_comments, source, tag_start, tag_end);
+    WriterComments::from_attached_skeleton(&value)
+}
+
+/// Build the merged per-node comment map for a comment-bearing `{#snippet}`
+/// parameter list. The parameters share one advancing cursor
+/// (`attach_snippet_parameters`) so an inter-parameter comment is claimed once,
+/// so the whole list is skeletonized together, attached, and read back into one
+/// map keyed by each parameter's spans.
+pub(super) fn build_snippet_parameters_writer_comments(
+    parameters: &[tsv_ts::ast::internal::Expression<'_>],
+    template_comments: &[&Comment],
+    source: &str,
+    tracker: &LocationTracker,
+    interner: &DefaultStringInterner,
+    container_start: u32,
+    range_end: u32,
+) -> WriterComments {
+    let mut values: Vec<serde_json::Value> = parameters
+        .iter()
+        .map(|p| expression_skeleton(p, source, tracker, interner))
+        .collect();
+    attach_snippet_parameters(
+        &mut values,
+        template_comments,
+        source,
+        container_start,
+        range_end,
+    );
+    WriterComments::from_attached_skeleton(&serde_json::Value::Array(values))
+}
+
+/// Build the per-node comment map for a comment-bearing (or preceding-HTML)
+/// `<script>` `Program`, for the fused writer to consult at each node's close.
+///
+/// The writer emits the `Program`'s byte-space wire JSON (the exact structure
+/// the final fused emit produces, in byte offsets so the acorn positions line
+/// up), it's run through the shared attach DFS with the script's own comments,
+/// the preceding HTML comment is prepended to the `Program`'s `leadingComments`
+/// (Svelte's `{type: "Line", value}` shape), and the assignments are read back
+/// into a span-keyed `WriterComments`. The `options: null` non-TS quirk is
+/// reproduced at emit time (schema-driven), not here, so it never perturbs the
+/// attach walk.
+pub(super) fn build_script_writer_comments(
+    script: &internal::Script<'_>,
+    source: &str,
+    tracker: &LocationTracker,
+    interner: &DefaultStringInterner,
+    html_leading_comment: Option<&internal::HtmlComment>,
+    schema: Schema,
+) -> WriterComments {
+    // Byte-space skeleton (identity map). `loc` is unused by attach — a dummy
+    // override suffices; the final fused emit supplies the real tag-line `loc`.
+    let dummy = Position { line: 1, column: 0 };
+    let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len()));
+    write_program_embedded(
+        &mut w,
+        &script.content,
+        source,
+        LocationMapper::identity(tracker),
+        interner,
+        schema,
+        (dummy, dummy),
+        None,
+    );
+    #[allow(clippy::expect_used)]
+    let mut program_json: serde_json::Value =
+        serde_json::from_slice(w.as_bytes()).expect("writer emits valid JSON");
+
+    // Attach the script's own comments (byte positions) via acorn's DFS queue.
+    let comment_queue: VecDeque<serde_json::Value> = script
+        .content
+        .comments
+        .iter()
+        .map(|c| comment_to_json(c, source))
+        .collect();
+    let mut ctx = CommentAttachmentContext {
+        comments: comment_queue,
+        source,
+    };
+    attach_comments_recursively(&mut program_json, &mut ctx);
+
+    // Prepend the preceding HTML comment as the Program's first leadingComment
+    // (Svelte reports it as `{type: "Line", value}` with no positions).
+    if let Some(comment) = html_leading_comment
+        && let serde_json::Value::Object(map) = &mut program_json
+    {
+        let html_comment = serde_json::json!({
+            "type": "Line",
+            "value": comment.content(source),
+        });
+        match map.get_mut("leadingComments") {
+            Some(serde_json::Value::Array(arr)) => arr.insert(0, html_comment),
+            _ => {
+                map.insert(
+                    "leadingComments".to_string(),
+                    serde_json::Value::Array(vec![html_comment]),
+                );
+            }
+        }
+    }
+
+    WriterComments::from_attached_skeleton(&program_json)
+}
 
 /// Detect if a script tag has `lang="ts"` attribute.
 ///
@@ -23,7 +240,10 @@ use super::{convert_attribute_node, convert_fragment, span_to_name_loc, to_json_
 /// Otherwise (plain `<script>`), it's parsed by Svelte's parser (Svelte context), which
 /// omits `importKind`/`exportKind` for "value" and always includes `attributes` on
 /// import/export declarations.
-fn script_has_lang_ts(
+///
+/// `pub(super)` so the wire-JSON writer reuses the exact `lang="ts"` test behind
+/// the fused-Program eligibility gate.
+pub(super) fn script_has_lang_ts(
     script: &internal::Script<'_>,
     source: &str,
     interner: &DefaultStringInterner,
@@ -58,9 +278,9 @@ pub(super) fn convert_script<'src>(
 
     // Delegate to tsv_ts for program conversion, using the appropriate schema
     let schema = if is_lang_ts {
-        tsv_ts::ast::convert::Schema::Acorn
+        Schema::Acorn
     } else {
-        tsv_ts::ast::convert::Schema::SvelteScript
+        Schema::SvelteScript
     };
     let mut program = tsv_ts::ast::convert::convert_program(
         &script.content,
@@ -140,7 +360,7 @@ fn attached_program_json(
     // Each comment is emitted once: tsv corrects acorn-typescript's backtrack-reparse comment
     // duplication rather than replicating it (see docs/conformance_svelte.md §Comment Attachment
     // Differences).
-    let comment_queue: std::collections::VecDeque<serde_json::Value> = script
+    let comment_queue: VecDeque<serde_json::Value> = script
         .content
         .comments
         .iter()
@@ -195,7 +415,10 @@ fn attached_program_json(
 
 /// Convert internal SvelteOptions to public format
 /// Find a named attribute's value in `<svelte:options>` attributes.
-fn find_option_values<'arena>(
+///
+/// `pub(super)` so the wire-JSON writer reproduces `<svelte:options>` extraction
+/// (scalar props + `customElement`) without materializing a `public::SvelteOptions`.
+pub(super) fn find_option_values<'arena>(
     attrs: &[internal::AttributeNode<'arena>],
     name: &str,
     interner: &DefaultStringInterner,
@@ -212,7 +435,9 @@ fn find_option_values<'arena>(
 }
 
 /// Extract a plain text value from attribute values.
-fn text_value<'src>(
+///
+/// `pub(super)` — shared with the wire-JSON writer's fused `<svelte:options>`.
+pub(super) fn text_value<'src>(
     values: &[internal::AttributeValue<'_>],
     source: &'src str,
 ) -> Option<Cow<'src, str>> {
@@ -226,7 +451,9 @@ fn text_value<'src>(
 }
 
 /// Find a boolean option — shorthand (`name`) or explicit (`name={true/false}`).
-fn bool_option(
+///
+/// `pub(super)` — shared with the wire-JSON writer's fused `<svelte:options>`.
+pub(super) fn bool_option(
     attrs: &[internal::AttributeNode<'_>],
     name: &str,
     interner: &DefaultStringInterner,
@@ -395,31 +622,10 @@ pub(super) fn convert_special_element<'src>(
     interner: &DefaultStringInterner,
 ) -> public::SpecialElement<'src> {
     // Extract tag and expression from the kind enum
-    let tag = elem.kind.tag().map(|e| {
-        // For plain string attributes (this="hello"), Svelte produces a Literal
-        // without loc and with single-quoted raw, rather than normal expression conversion
-        if let tsv_ts::ast::internal::Expression::Literal(lit) = e
-            && let tsv_ts::ast::internal::LiteralValue::String(cooked) = &lit.value
-        {
-            let raw_source = lit.span.extract(source);
-            if !raw_source.starts_with('\'') && !raw_source.starts_with('"') {
-                let content = cooked.resolve(lit.span, source);
-                return serde_json::json!({
-                    "type": "Literal",
-                    "value": content,
-                    "raw": format!("'{content}'"),
-                    "start": lit.span.start,
-                    "end": lit.span.end,
-                });
-            }
-        }
-        to_json_value(&convert_expression(
-            e,
-            source,
-            LocationMapper::identity(loc),
-            interner,
-        ))
-    });
+    let tag = elem
+        .kind
+        .tag()
+        .map(|e| convert_special_tag_value(e, source, loc, interner));
 
     let expression = elem
         .kind
@@ -441,6 +647,42 @@ pub(super) fn convert_special_element<'src>(
         tag,
         expression,
     }
+}
+
+/// Convert a `<svelte:element this={…}>` tag expression to its public JSON `Value`.
+///
+/// Plain string attributes (`this="hello"`) become a Svelte-style `Literal`
+/// without `loc` and with single-quoted `raw`, matching Svelte's parser; every
+/// other expression goes through the normal acorn conversion. Positions are
+/// byte-based (the caller translates). Shared with the wire-JSON writer
+/// (`ast/convert/write.rs`) so the quirk lives in one place.
+pub(super) fn convert_special_tag_value(
+    e: &tsv_ts::ast::internal::Expression<'_>,
+    source: &str,
+    loc: &LocationTracker,
+    interner: &DefaultStringInterner,
+) -> serde_json::Value {
+    if let tsv_ts::ast::internal::Expression::Literal(lit) = e
+        && let tsv_ts::ast::internal::LiteralValue::String(cooked) = &lit.value
+    {
+        let raw_source = lit.span.extract(source);
+        if !raw_source.starts_with('\'') && !raw_source.starts_with('"') {
+            let content = cooked.resolve(lit.span, source);
+            return serde_json::json!({
+                "type": "Literal",
+                "value": content,
+                "raw": format!("'{content}'"),
+                "start": lit.span.start,
+                "end": lit.span.end,
+            });
+        }
+    }
+    to_json_value(&convert_expression(
+        e,
+        source,
+        LocationMapper::identity(loc),
+        interner,
+    ))
 }
 
 /// Inject `"options": null` on all ImportExpression nodes in a JSON AST.

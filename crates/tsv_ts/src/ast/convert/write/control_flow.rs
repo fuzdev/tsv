@@ -4,7 +4,9 @@ use super::super::super::internal;
 use super::super::Schema;
 use super::expressions::write_expression;
 use super::statements::{write_block_statement, write_statement, write_variable_declaration};
-use super::{Ctx, JsonWriter, node_header, write_array, write_identifier_plain, write_or_null};
+use super::{
+    Ctx, JsonWriter, close_node, node_header, write_array, write_identifier_plain, write_or_null,
+};
 
 /// Control flow bodies never contain import/export declarations, so the schema
 /// doesn't matter; `Acorn` for simplicity (mirrors convert's `SCHEMA`).
@@ -25,7 +27,7 @@ pub(super) fn write_if_statement(
     write_or_null(w, if_stmt.alternate.as_ref(), |w, alt| {
         write_statement(w, alt, ctx, SCHEMA);
     });
-    w.raw("}");
+    close_node(w, "IfStatement", if_stmt.span, ctx);
 }
 
 /// Mirrors `convert_for_statement`. `init`/`test`/`update` are nullable.
@@ -53,7 +55,7 @@ pub(super) fn write_for_statement(
     });
     w.raw(",\"body\":");
     write_statement(w, for_stmt.body, ctx, SCHEMA);
-    w.raw("}");
+    close_node(w, "ForStatement", for_stmt.span, ctx);
 }
 
 /// Mirrors `convert_for_in_of_left` (an untagged declaration-or-pattern).
@@ -79,7 +81,7 @@ pub(super) fn write_for_in_statement(
     write_expression(w, &for_in.right, ctx);
     w.raw(",\"body\":");
     write_statement(w, for_in.body, ctx, SCHEMA);
-    w.raw("}");
+    close_node(w, "ForInStatement", for_in.span, ctx);
 }
 
 /// Mirrors `convert_for_of_statement`. Field order: `await`, `left`, `right`,
@@ -99,7 +101,7 @@ pub(super) fn write_for_of_statement(
     write_expression(w, &for_of.right, ctx);
     w.raw(",\"body\":");
     write_statement(w, for_of.body, ctx, SCHEMA);
-    w.raw("}");
+    close_node(w, "ForOfStatement", for_of.span, ctx);
 }
 
 /// Mirrors `convert_while_statement`.
@@ -113,7 +115,7 @@ pub(super) fn write_while_statement(
     write_expression(w, &while_stmt.test, ctx);
     w.raw(",\"body\":");
     write_statement(w, while_stmt.body, ctx, SCHEMA);
-    w.raw("}");
+    close_node(w, "WhileStatement", while_stmt.span, ctx);
 }
 
 /// Mirrors `convert_do_while_statement`. Field order: `body`, `test`.
@@ -127,7 +129,7 @@ pub(super) fn write_do_while_statement(
     write_statement(w, do_while.body, ctx, SCHEMA);
     w.raw(",\"test\":");
     write_expression(w, &do_while.test, ctx);
-    w.raw("}");
+    close_node(w, "DoWhileStatement", do_while.span, ctx);
 }
 
 /// Mirrors `convert_switch_statement` + `convert_switch_case`.
@@ -148,9 +150,9 @@ pub(super) fn write_switch_statement(
         write_array(w, case.consequent, |w, s| {
             write_statement(w, s, ctx, SCHEMA);
         });
-        w.raw("}");
+        close_node(w, "SwitchCase", case.span, ctx);
     });
-    w.raw("}");
+    close_node(w, "SwitchStatement", switch_stmt.span, ctx);
 }
 
 /// Mirrors `convert_try_statement` + `convert_catch_clause`. `handler` and
@@ -170,13 +172,13 @@ pub(super) fn write_try_statement(
         write_or_null(w, clause.param.as_ref(), |w, p| write_expression(w, p, ctx));
         w.raw(",\"body\":");
         write_block_statement(w, &clause.body, ctx);
-        w.raw("}");
+        close_node(w, "CatchClause", clause.span, ctx);
     });
     w.raw(",\"finalizer\":");
     write_or_null(w, try_stmt.finalizer.as_ref(), |w, f| {
         write_block_statement(w, f, ctx);
     });
-    w.raw("}");
+    close_node(w, "TryStatement", try_stmt.span, ctx);
 }
 
 /// Mirrors `convert_throw_statement`.
@@ -188,7 +190,7 @@ pub(super) fn write_throw_statement(
     node_header(w, "ThrowStatement", throw_stmt.span, ctx);
     w.raw(",\"argument\":");
     write_expression(w, &throw_stmt.argument, ctx);
-    w.raw("}");
+    close_node(w, "ThrowStatement", throw_stmt.span, ctx);
 }
 
 /// Mirrors `convert_break_statement`. `label` is nullable.
@@ -202,7 +204,7 @@ pub(super) fn write_break_statement(
     write_or_null(w, break_stmt.label.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
-    w.raw("}");
+    close_node(w, "BreakStatement", break_stmt.span, ctx);
 }
 
 /// Mirrors `convert_continue_statement`. `label` is nullable.
@@ -216,7 +218,7 @@ pub(super) fn write_continue_statement(
     write_or_null(w, continue_stmt.label.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
-    w.raw("}");
+    close_node(w, "ContinueStatement", continue_stmt.span, ctx);
 }
 
 /// Mirrors `convert_labeled_statement`.
@@ -230,5 +232,5 @@ pub(super) fn write_labeled_statement(
     write_identifier_plain(w, &labeled.label, ctx);
     w.raw(",\"body\":");
     write_statement(w, labeled.body, ctx, SCHEMA);
-    w.raw("}");
+    close_node(w, "LabeledStatement", labeled.span, ctx);
 }

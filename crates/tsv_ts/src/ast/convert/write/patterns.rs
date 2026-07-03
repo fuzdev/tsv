@@ -3,7 +3,7 @@
 
 use super::super::super::internal;
 use super::expressions::{write_expression, write_expressions};
-use super::{Ctx, JsonWriter, node_header, write_array, write_type_annotation_field};
+use super::{Ctx, JsonWriter, close_node, node_header, write_array, write_type_annotation_field};
 use tsv_lang::Span;
 
 /// Mirrors `convert_template_literal`. Field order: `expressions`, `quasis`
@@ -19,7 +19,7 @@ pub(super) fn write_template_literal(
     write_expressions(w, template.expressions, ctx);
     w.raw(",\"quasis\":");
     write_array(w, template.quasis, |w, q| write_template_element(w, q, ctx));
-    w.raw("}");
+    close_node(w, "TemplateLiteral", template.span, ctx);
 }
 
 /// Mirrors `convert_template_element`: acorn excludes the delimiters from the
@@ -48,7 +48,7 @@ pub(super) fn write_template_element(
     }
     w.raw("},\"tail\":");
     w.bool(element.tail);
-    w.raw("}");
+    close_node(w, "TemplateElement", adjusted_span, ctx);
 }
 
 /// Mirrors `convert_object_pattern`. Field order: `properties`, `optional`
@@ -68,7 +68,7 @@ pub(super) fn write_object_pattern(
         w.raw(",\"optional\":true");
     }
     write_type_annotation_field(w, obj.type_annotation.as_ref(), ctx);
-    w.raw("}");
+    close_node(w, "ObjectPattern", obj.span, ctx);
 }
 
 /// Mirrors `convert_rest_element`.
@@ -81,7 +81,7 @@ pub(super) fn write_rest_element(
     w.raw(",\"argument\":");
     write_expression(w, rest.argument, ctx);
     write_type_annotation_field(w, rest.type_annotation.as_ref(), ctx);
-    w.raw("}");
+    close_node(w, "RestElement", rest.span, ctx);
 }
 
 /// Mirrors `convert_property`. Field order: `method`, `shorthand`, `computed`,
@@ -100,7 +100,7 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
     w.raw(prop.kind.as_str());
     w.raw("\",\"value\":");
     write_expression(w, &prop.value, ctx);
-    w.raw("}");
+    close_node(w, "Property", prop.span, ctx);
 }
 
 /// Mirrors the `AssignmentPattern` arm of `convert_expression_inner`, with the
@@ -117,5 +117,5 @@ pub(super) fn write_assignment_pattern(
     write_expression(w, pattern.left, ctx);
     w.raw(",\"right\":");
     write_expression(w, pattern.right, ctx);
-    w.raw("}");
+    close_node(w, "AssignmentPattern", span, ctx);
 }

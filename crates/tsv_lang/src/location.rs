@@ -294,6 +294,47 @@ impl LocationTracker {
         )
     }
 
+    /// Build the LF-only tracker (Svelte's `locate-character` convention — only
+    /// `\n` starts a line; CR/U+2028/U+2029 do not) and the byte→UTF-16 map in
+    /// one source scan. The Svelte sibling of `new_ecmascript_with_map`, for the
+    /// wire-JSON writer's fused char-space emission over the Svelte spine.
+    /// Byte-identical to `new(source)` + `ByteToCharMap::new(source)`.
+    pub fn new_with_map(source: &str) -> (Self, ByteToCharMap) {
+        if source.is_ascii() {
+            return (
+                Self {
+                    line_starts: ascii_lf_line_starts(source.as_bytes()),
+                },
+                ByteToCharMap::identity(),
+            );
+        }
+
+        let mut line_starts = vec![0];
+        let mut offsets = vec![0u32; source.len() + 1];
+        let mut utf16_idx = 0u32;
+        for (i, ch) in source.char_indices() {
+            // Every byte of the character gets the character's UTF-16 offset,
+            // so a byte position inside a multibyte char resolves to that
+            // char's start.
+            for offset in &mut offsets[i..i + ch.len_utf8()] {
+                *offset = utf16_idx;
+            }
+            utf16_idx += ch.len_utf16() as u32;
+            if ch == '\n' {
+                line_starts.push(i + 1);
+            }
+        }
+        offsets[source.len()] = utf16_idx;
+
+        (
+            Self { line_starts },
+            ByteToCharMap {
+                offsets,
+                has_multibyte: true,
+            },
+        )
+    }
+
     pub fn get_line_column(&self, offset: usize) -> (usize, usize) {
         let line_idx = match self.line_starts.binary_search(&offset) {
             Ok(idx) => idx, // Exact match - this offset is at the start of a line
@@ -354,6 +395,18 @@ impl LocationTracker {
         };
         self.line_starts[line_idx]
     }
+}
+
+/// LF-only line starts for ASCII-only source (Svelte's `locate-character`
+/// convention: only `\n` starts a line — no CR/CRLF fusing).
+fn ascii_lf_line_starts(bytes: &[u8]) -> Vec<usize> {
+    let mut line_starts = vec![0];
+    for (i, &b) in bytes.iter().enumerate() {
+        if b == b'\n' {
+            line_starts.push(i + 1);
+        }
+    }
+    line_starts
 }
 
 /// ECMAScript-rule line starts for ASCII-only source: no U+2028/U+2029
@@ -507,6 +560,35 @@ mod tests {
             assert_eq!(
                 tracker.line_starts, expected_tracker.line_starts,
                 "line starts diverge on {source:?}"
+            );
+            assert_eq!(map.has_multibyte(), expected_map.has_multibyte());
+            for b in 0..=(source.len() as u32 + 2) {
+                assert_eq!(
+                    map.byte_to_char(b),
+                    expected_map.byte_to_char(b),
+                    "map diverges at byte {b} on {source:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_new_with_map_matches_separate_builds() {
+        // LF-only: CR / U+2028 / U+2029 are NOT line starts; multibyte inside and
+        // at line boundaries; astral char — the map half must match `new` + `new`.
+        for source in [
+            "abc",
+            "a\r\nb\rc\nd",
+            "aé\r\né😀\u{2028}x\ry\n中",
+            "\u{2028}\r\n😀",
+            "",
+        ] {
+            let (tracker, map) = LocationTracker::new_with_map(source);
+            let expected_tracker = LocationTracker::new(source);
+            let expected_map = ByteToCharMap::new(source);
+            assert_eq!(
+                tracker.line_starts, expected_tracker.line_starts,
+                "LF-only line starts diverge on {source:?}"
             );
             assert_eq!(map.has_multibyte(), expected_map.has_multibyte());
             for b in 0..=(source.len() as u32 + 2) {

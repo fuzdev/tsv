@@ -21,8 +21,8 @@ use super::types::{
     write_declare_function, write_entity_name, write_enum_declaration, write_interface_declaration,
 };
 use super::{
-    Ctx, JsonWriter, kind_token, node_header, write_array, write_bare_node, write_identifier_plain,
-    write_literal, write_or_null,
+    Ctx, JsonWriter, close_node, kind_token, node_header, write_array, write_bare_node,
+    write_identifier_plain, write_literal, write_or_null,
 };
 use tsv_lang::Span;
 
@@ -79,7 +79,7 @@ pub(super) fn write_statement(
                 w.raw(",\"directive\":");
                 w.string(&raw[1..raw.len() - 1]);
             }
-            w.raw("}");
+            close_node(w, "ExpressionStatement", expr_stmt.span, ctx);
         }
         internal::Statement::VariableDeclaration(var_decl) => {
             write_variable_declaration(w, var_decl, ctx);
@@ -91,7 +91,7 @@ pub(super) fn write_statement(
             node_header(w, "ReturnStatement", ret.span, ctx);
             w.raw(",\"argument\":");
             write_or_null(w, ret.argument.as_ref(), |w, e| write_expression(w, e, ctx));
-            w.raw("}");
+            close_node(w, "ReturnStatement", ret.span, ctx);
         }
         internal::Statement::BlockStatement(block) => {
             write_block_statement(w, block, ctx);
@@ -132,7 +132,7 @@ pub(super) fn write_statement(
                 write_literal(w, s, ctx);
             });
             write_attributes_field(w, export_decl.attributes, ctx, schema);
-            w.raw("}");
+            close_node(w, "ExportNamedDeclaration", export_span, ctx);
         }
         internal::Statement::ExportDefaultDeclaration(export_decl) => {
             let export_kind = if schema.is_svelte_script() {
@@ -154,7 +154,7 @@ pub(super) fn write_statement(
             }
             w.raw(",\"declaration\":");
             write_export_default_value(w, &export_decl.declaration, ctx);
-            w.raw("}");
+            close_node(w, "ExportDefaultDeclaration", export_span, ctx);
         }
         internal::Statement::ExportAllDeclaration(export_decl) => {
             let export_kind = kind_token(
@@ -173,19 +173,19 @@ pub(super) fn write_statement(
             w.raw(",\"source\":");
             write_literal(w, &export_decl.source, ctx);
             write_attributes_field(w, export_decl.attributes, ctx, schema);
-            w.raw("}");
+            close_node(w, "ExportAllDeclaration", export_decl.span, ctx);
         }
         internal::Statement::TSExportAssignment(export_assign) => {
             node_header(w, "TSExportAssignment", export_assign.span, ctx);
             w.raw(",\"expression\":");
             write_expression(w, &export_assign.expression, ctx);
-            w.raw("}");
+            close_node(w, "TSExportAssignment", export_assign.span, ctx);
         }
         internal::Statement::TSNamespaceExportDeclaration(ns_export) => {
             node_header(w, "TSNamespaceExportDeclaration", ns_export.span, ctx);
             w.raw(",\"id\":");
             write_identifier_plain(w, &ns_export.id, ctx);
-            w.raw("}");
+            close_node(w, "TSNamespaceExportDeclaration", ns_export.span, ctx);
         }
         internal::Statement::ImportDeclaration(import_decl) => {
             let import_kind = kind_token(
@@ -208,7 +208,7 @@ pub(super) fn write_statement(
             w.raw(",\"source\":");
             write_literal(w, &import_decl.source, ctx);
             write_attributes_field(w, import_decl.attributes, ctx, schema);
-            w.raw("}");
+            close_node(w, "ImportDeclaration", import_decl.span, ctx);
         }
         internal::Statement::TSImportEqualsDeclaration(import_eq) => {
             node_header(w, "TSImportEqualsDeclaration", import_eq.span, ctx);
@@ -227,13 +227,13 @@ pub(super) fn write_statement(
                     node_header(w, "TSExternalModuleReference", ext_ref.span, ctx);
                     w.raw(",\"expression\":");
                     write_literal(w, &ext_ref.expression, ctx);
-                    w.raw("}");
+                    close_node(w, "TSExternalModuleReference", ext_ref.span, ctx);
                 }
                 internal::TSModuleReference::EntityName(entity_name) => {
                     write_entity_name(w, entity_name, ctx);
                 }
             }
-            w.raw("}");
+            close_node(w, "TSImportEqualsDeclaration", import_eq.span, ctx);
         }
         // Control flow statements
         internal::Statement::IfStatement(if_stmt) => write_if_statement(w, if_stmt, ctx),
@@ -308,7 +308,7 @@ pub(super) fn write_module_declaration(
                 write_array(w, block.body, |w, s| {
                     write_statement(w, s, ctx, Schema::Acorn);
                 });
-                w.raw("}");
+                close_node(w, "TSModuleBlock", block.span, ctx);
             }
             internal::TSModuleDeclarationBody::TSModuleDeclaration(nested) => {
                 write_module_declaration(w, nested, ctx);
@@ -318,7 +318,7 @@ pub(super) fn write_module_declaration(
     if decl.declare {
         w.raw(",\"declare\":true");
     }
-    w.raw("}");
+    close_node(w, "TSModuleDeclaration", decl.span, ctx);
 }
 
 /// Mirrors `convert_block_statement` (always TypeScript context).
@@ -332,7 +332,7 @@ pub(super) fn write_block_statement(
     write_array(w, block.body, |w, s| {
         write_statement(w, s, ctx, Schema::Acorn);
     });
-    w.raw("}");
+    close_node(w, "BlockStatement", block.span, ctx);
 }
 
 /// Mirrors `convert_variable_declaration` + `convert_variable_declarator`.
@@ -354,12 +354,12 @@ pub(super) fn write_variable_declaration(
         }
         w.raw(",\"init\":");
         write_or_null(w, d.init.as_ref(), |w, e| write_expression(w, e, ctx));
-        w.raw("}");
+        close_node(w, "VariableDeclarator", d.span, ctx);
     });
     w.raw(",\"kind\":");
     w.token(var_decl.kind.as_str());
     if var_decl.declare {
         w.raw(",\"declare\":true");
     }
-    w.raw("}");
+    close_node(w, "VariableDeclaration", var_decl.span, ctx);
 }

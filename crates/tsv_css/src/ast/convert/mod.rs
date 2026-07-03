@@ -23,9 +23,12 @@ use tsv_lang::Span;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
 
 mod translate_typed;
+mod write;
 pub use translate_typed::{
     translate_byte_to_char_offsets_typed, translate_style_sheet_byte_to_char_offsets_typed,
 };
+pub use write::write_css_node;
+pub(crate) use write::write_stylesheet_file_bytes;
 
 /// Whether the public AST is being built for a standalone `.css` file or an
 /// embedded `<style>` block. `parseCss()` attaches constant `metadata` to
