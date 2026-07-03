@@ -1,0 +1,261 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 205,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 44,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 15,
+							"end": 40,
+							"property": "background",
+							"value": "url(foo/*bar)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 44
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 46,
+					"end": 47,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 46,
+							"end": 47,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "b",
+											"start": 46,
+											"end": 47
+										}
+									],
+									"start": 46,
+									"end": 47
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 48,
+					"end": 94,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 52,
+							"end": 90,
+							"property": "background",
+							"value": "url(http://a.fuz.dev/x/*y)"
+						}
+					]
+				},
+				"start": 46,
+				"end": 94
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 96,
+					"end": 97,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 96,
+							"end": 97,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "c",
+											"start": 96,
+											"end": 97
+										}
+									],
+									"start": 96,
+									"end": 97
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 98,
+					"end": 127,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 102,
+							"end": 123,
+							"property": "background",
+							"value": "url(a*/b)"
+						}
+					]
+				},
+				"start": 96,
+				"end": 127
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 129,
+					"end": 130,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 129,
+							"end": 130,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "d",
+											"start": 129,
+											"end": 130
+										}
+									],
+									"start": 129,
+									"end": 130
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 131,
+					"end": 161,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 135,
+							"end": 157,
+							"property": "background",
+							"value": "url(/*x*/)"
+						}
+					]
+				},
+				"start": 129,
+				"end": 161
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 163,
+					"end": 164,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 163,
+							"end": 164,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "e",
+											"start": 163,
+											"end": 164
+										}
+									],
+									"start": 163,
+									"end": 164
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 165,
+					"end": 196,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 169,
+							"end": 192,
+							"property": "background",
+							"value": "url('a/*b')"
+						}
+					]
+				},
+				"start": 163,
+				"end": 196
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 197,
+			"styles": "\n\ta {\n\t\tbackground: url(foo/*bar);\n\t}\n\tb {\n\t\tbackground: url(http://a.fuz.dev/x/*y);\n\t}\n\tc {\n\t\tbackground: url(a*/b);\n\t}\n\td {\n\t\tbackground: url(/*x*/);\n\t}\n\te {\n\t\tbackground: url('a/*b');\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 206,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

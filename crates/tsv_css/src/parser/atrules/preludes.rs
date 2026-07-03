@@ -442,6 +442,26 @@ pub(super) fn parse_import_prelude<'arena>(
             },
         });
         parser.advance()?;
+    } else if matches!(parser.current_kind, TokenKind::Url) {
+        // Unquoted `url(...)` — the lexer consumed it as one opaque `<url-token>`. Mirror
+        // `parse_function_value`'s empty-args url shape (name + span): the printer and the
+        // public-AST conversion reconstruct the verbatim, inner-ws-trimmed `url(...)` from
+        // the function span, so structured `@import url(…) layer/supports/media` wrapping
+        // still works (unlike a raw fallback, which would drop that structure).
+        let value_start = parser.span_pos(parser.current_start);
+        let value_end = parser.span_pos(parser.current_end);
+        values.push(CssValue::Function {
+            // The printer's empty-args url path only reads `name` as a url-detection key
+            // (`eq_ignore_ascii_case("url")`); the emitted text and the public AST both
+            // come from `span`, so real casing/content is preserved regardless.
+            name: "url",
+            args: &[],
+            span: Span {
+                start: value_start,
+                end: value_end,
+            },
+        });
+        parser.advance()?;
     } else {
         // Not a `<url>`/`<string>` first value, so this isn't a structurable @import.
         // Per CSS Syntax 3 the prelude is still consumed as component values (an invalid

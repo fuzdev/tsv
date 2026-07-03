@@ -41,6 +41,11 @@ pub enum TokenKind {
     Number,                     // value: source[start..end]
     Percentage,                 // value: source[start..end-1] (excludes %)
     Dimension { unit_len: u8 }, // value: source[start..end-unit_len], unit: source[end-unit_len..end]
+    // Opaque `<url-token>`: an *unquoted* `url(...)` spanning `url(` … `)` verbatim
+    // (css-syntax §4.3.6). Consumed whole by the lexer so `/*`, `:`, etc. inside are
+    // literal content, not a comment / colon. Quoted `url("…")` stays an identifier +
+    // `(` + string (a function-token). value: source[start..end].
+    Url,
 
     // Comments - content: source[start+2..end-2] (excludes /* */)
     Comment,
@@ -86,6 +91,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Number => write!(f, "number"),
             TokenKind::Percentage => write!(f, "percentage"),
             TokenKind::Dimension { .. } => write!(f, "dimension"),
+            TokenKind::Url => write!(f, "url"),
             TokenKind::Comment => write!(f, "comment"),
             TokenKind::Whitespace => write!(f, "whitespace"),
             TokenKind::Eof => write!(f, "end of file"),

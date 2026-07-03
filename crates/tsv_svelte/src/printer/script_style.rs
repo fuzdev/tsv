@@ -43,6 +43,14 @@ fn line_ends_inside_block_comment(line: &str, starts_inside: bool) -> bool {
                 in_string = None;
             }
         } else {
+            // An unquoted `url(...)` is an opaque `<url-token>` — an interior `/*` is
+            // literal, not a comment start (css-syntax §4.3.6). Skip it whole so it can't
+            // open comment mode, matching the CSS lexer. (Quoted `url("…")` is a function
+            // — its string is handled by the `in_string` branch above.)
+            if let Some(next) = skip_unquoted_url(bytes, i) {
+                i = next;
+                continue;
+            }
             match b {
                 b'/' if bytes.get(i + 1) == Some(&b'*') => {
                     in_comment = true;
@@ -56,6 +64,41 @@ fn line_ends_inside_block_comment(line: &str, starts_inside: bool) -> bool {
         i += 1;
     }
     in_comment
+}
+
+/// If `bytes[i..]` begins a standalone, unquoted `url(` (ASCII-ci; `url` not glued to a
+/// preceding identifier char; first non-whitespace content not a quote), return the index
+/// just past its closing `)` — so the caller skips the opaque url-token whole. `None`
+/// otherwise, including quoted `url("…")` (a function-token, left to the string handling).
+/// Mirrors the CSS lexer's `consume_url_token`.
+fn skip_unquoted_url(bytes: &[u8], i: usize) -> Option<usize> {
+    // `url` must be a standalone ident, not the tail of one (`myurl(`, `bg-url(`).
+    let prev_is_ident = i > 0 && {
+        let p = bytes[i - 1];
+        p.is_ascii_alphanumeric() || p == b'-' || p == b'_' || p >= 0x80
+    };
+    if prev_is_ident || !bytes.get(i..i + 4)?.eq_ignore_ascii_case(b"url(") {
+        return None;
+    }
+    // Quoted content (`url( "x" )`) is a function-token, not a url-token.
+    let mut j = i + 4;
+    while matches!(bytes.get(j), Some(b' ' | b'\t')) {
+        j += 1;
+    }
+    if matches!(bytes.get(j), Some(b'"' | b'\'')) {
+        return None;
+    }
+    // Consume to the matching unescaped `)` (or line end — a url-token never spans
+    // output lines, so an unclosed run means the rest of the line is url content).
+    let mut k = i + 4;
+    while k < bytes.len() {
+        match bytes[k] {
+            b'\\' => k += 2,
+            b')' => return Some(k + 1),
+            _ => k += 1,
+        }
+    }
+    Some(k)
 }
 
 impl<'a> Printer<'a> {
