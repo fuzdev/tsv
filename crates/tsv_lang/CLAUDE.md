@@ -9,7 +9,7 @@ All language crates (tsv_ts, tsv_css, tsv_svelte) depend on tsv_lang. It provide
 Each module's visibility (in parens) reflects `pub use`-only modules (private) vs directly-imported modules (`pub mod`, used as `tsv_lang::doc::{...}` etc.).
 
 - `span` (`span.rs`, private) — `Span { start: u32, end: u32 }` — compact source positions
-- `location` (`location.rs`, private) — `LocationTracker` (lazy line/column via O(log n) binary search), `ByteToCharMap` (byte → UTF-16 code-unit offsets; `identity()` for byte-space passthrough), and `LocationMapper` (tracker + map bundle the AST-conversion layers thread — with a real map it emits final char-space positions during conversion, fusing out the post-conversion translation walk; with the identity map it is exact byte-space passthrough)
+- `location` (`location.rs`, private) — `LocationTracker` (line/column via binary search on line starts, fronted by a 1-entry line-range cache that turns the sequential-emission common case into an O(1) range check), `ByteToCharMap` (byte → UTF-16 code-unit offsets; `identity()` for byte-space passthrough), and `LocationMapper` (tracker + map bundle the AST-conversion layers thread — with a real map it emits final char-space positions during conversion, fusing out the post-conversion translation walk; with the identity map it is exact byte-space passthrough)
 - `error` (`error.rs`, private) — `ParseError` with context extraction and caret formatting
 - `config` (`config.rs`, private) — `PRINT_WIDTH` / `TAB_WIDTH` / `INDENT` consts + `EmbedContext` / `LayoutMode` (no runtime config)
 - `doc` (`doc/*.rs`, pub) — Document builder — arena-based Prettier-compatible IR
