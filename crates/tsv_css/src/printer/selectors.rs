@@ -643,13 +643,21 @@ impl<'a> Printer<'a> {
             }
             internal::PseudoClassArgs::Part {
                 idents,
+                ident_spans,
                 span,
-                value_span,
             } => {
-                // Interleave leading/trailing comments outside the identifier run
-                // (`::part(/* lead */ label /* trail */)`).
-                let inner =
-                    self.wrap_args_gap_comments(d.text_owned(idents.join(" ")), *span, *value_span);
+                // The identifier run spans the first name's start to the last name's
+                // end (`ident_spans` is non-empty — the parser rejects empty
+                // `::part()`); leading/trailing comments sit outside it.
+                let run_span = Span {
+                    start: ident_spans[0].start,
+                    end: ident_spans[ident_spans.len() - 1].end,
+                };
+                // Interleave any interior comments between the names, then wrap the
+                // leading/trailing comments outside the run
+                // (`::part(/* lead */ a /* mid */ b /* trail */)`).
+                let run = self.build_part_idents_doc(idents, ident_spans, run_span);
+                let inner = self.wrap_args_gap_comments(run, *span, run_span);
                 self.paren_wrap(inner)
             }
         }
@@ -668,6 +676,40 @@ impl<'a> Printer<'a> {
         let trailing =
             self.comment_blocks_in_range(content_span.end, args_span.end.saturating_sub(1));
         self.wrap_inner_with_comments(inner, &leading, &trailing)
+    }
+
+    /// Build the `::part()` identifier run, interleaving any comment that sits in
+    /// an interior gap between two names at its authored position with single-space
+    /// separation — the shared selector-comment normalization (`comments_in_range`
+    /// lookup, the same rule as `:is()`/combinator-boundary comments). The common
+    /// comment-free case (`run_span` has no comment, or a single name) stays a
+    /// plain single-space join. `run_span` bounds the run between the first and
+    /// last name; leading/trailing comments sit outside it and are handled by the
+    /// caller's `wrap_args_gap_comments`.
+    fn build_part_idents_doc(
+        &self,
+        idents: &[&str],
+        ident_spans: &[Span],
+        run_span: Span,
+    ) -> DocId {
+        let d = self.d();
+        if idents.len() < 2 || !has_comments_in_range(self.comments, run_span.start, run_span.end) {
+            return d.text_owned(idents.join(" "));
+        }
+        let mut parts = DocBuf::new();
+        for (i, ident) in idents.iter().enumerate() {
+            if i > 0 {
+                parts.push(d.text(" "));
+                let gap =
+                    self.comment_blocks_in_range(ident_spans[i - 1].end, ident_spans[i].start);
+                if !gap.is_empty() {
+                    parts.push(d.text_owned(gap));
+                    parts.push(d.text(" "));
+                }
+            }
+            parts.push(d.text_owned(ident.to_string()));
+        }
+        d.concat(&parts)
     }
 
     /// Prepend a leading comment and append a trailing comment around an inner doc,
