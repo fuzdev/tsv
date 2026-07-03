@@ -1,20 +1,17 @@
 //! Writer-mode conversion: emit compact wire JSON directly from the internal AST.
 //!
-//! This is the third emission mode of the acorn quirk catalog, next to the typed
-//! conversion (`convert_program`) and the `Value` translation walk
-//! (`convert_ast_json`). It walks the *internal* AST once and writes the final
-//! JSON bytes as it goes, never materializing the typed public tree — the hot
-//! path behind `convert_ast_json_string` (FFI/WASM parse bindings, CLI compact
-//! output).
+//! This is the **sole emission path** for the TS wire JSON: it walks the
+//! *internal* AST once and writes the final JSON bytes as it goes, never
+//! materializing a typed public tree — the hot path behind
+//! `convert_ast_json_bytes`/`_string` (FFI/WASM parse bindings, CLI compact
+//! output; `convert_ast_json` parses these bytes back into a `Value`).
 //!
-//! **Byte-identity contract**: every function here must emit exactly the bytes
-//! `serde_json::to_string` produces for the corresponding `convert_*` result —
-//! same field order (the public struct's declaration order), same
-//! `skip_serializing_if` behavior, same `null`s for non-skipped `Option`s, and
-//! the same scalar formatting. Each `write_*` function mirrors its `convert_*`
-//! twin in the sibling `convert` submodules; change them in lockstep. The
-//! fixture suite's string-path identity check (writer vs `Value` oracle, every
-//! fixture plus synthesized multibyte variants) enforces the lockstep.
+//! **Byte-identity contract**: the wire JSON is a faithful emission of the
+//! acorn quirk catalog — each node's field order, `skip_serializing_if`
+//! behavior, `null`s for non-skipped `Option`s, and scalar formatting match
+//! acorn-typescript's JSON exactly. The gate is the canonical parser's
+//! `expected.json` (fixture Phase 2b), on every fixture plus the multibyte and
+//! `<script>`-comment fixtures that exercise the fused offset translation.
 //!
 //! Scalar formatting delegates to `serde_json` wherever its output is not
 //! trivially reproducible: dynamic strings (`to_writer` runs the exact escape
@@ -55,10 +52,9 @@ use types::{write_type_annotation, write_type_parameter_instantiation};
 
 /// Convert an internal `Program` straight to its compact wire-JSON bytes.
 ///
-/// The writer twin of `convert_program` + `serde_json::to_string`: byte-identical
-/// output, one AST walk, no intermediate tree. The mapper decides the offset
-/// space exactly as it does for `convert_program` (identity → byte space, real
-/// map → UTF-16 code units).
+/// One AST walk, no intermediate tree. The mapper decides the offset space:
+/// identity → byte space (the embedded byte-space skeletons `tsv_svelte` builds),
+/// real map → UTF-16 code units (the shipped char-space wire).
 ///
 /// Returns `Vec<u8>` rather than `String`: every emitted byte comes from `&str`
 /// slices and ASCII fragments, so the output is valid UTF-8 by construction,
@@ -256,7 +252,7 @@ pub fn write_pattern_embedded(
     }
 }
 
-/// Mirrors `convert_program`.
+/// Emit the `Program` node.
 fn write_program(
     w: &mut JsonWriter,
     program: &internal::Program<'_>,
@@ -272,7 +268,7 @@ fn write_program(
 }
 
 /// Emit an embedded `<script>` `Program`'s wire JSON into a caller-owned writer —
-/// the writer sibling of `convert_program`, for `tsv_svelte` composing a
+/// for `tsv_svelte` composing a
 /// `<script>` block's `content` into its own buffer. Shares the host document's
 /// interner and `LocationMapper` (spans are host-file coordinates), threads the
 /// `Schema`, and — unlike a standalone `Program` — emits the node's own `loc`
@@ -402,11 +398,10 @@ pub(super) fn write_bare_node(w: &mut JsonWriter, node_type: &str, span: Span, c
 ///
 /// Leaves the object open — the caller appends its remaining fields and the
 /// closing `}`. `span` is the span every one of `start`/`end`/`loc` derives
-/// from (the invariant `create_location` relies on for fused translation);
-/// the `loc` body mirrors `create_location` + the `SourceLocation`/`Position`
-/// serialization (TS conversion never sets `Position.character`, so it is
-/// always omitted). Static fragments are pre-fused into the fewest buffer
-/// writes — this runs once per node.
+/// from (start/end are the fused char-space positions, `loc` their
+/// line/column form); TS emits no `Position.character`, so it is always
+/// omitted. Static fragments are pre-fused into the fewest buffer writes —
+/// this runs once per node.
 pub(super) fn node_header(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
     debug_assert!(
         node_type
@@ -534,9 +529,9 @@ pub(super) fn kind_token(is_type: bool, schema: Schema) -> Option<&'static str> 
     }
 }
 
-/// Mirrors `public::name_cow`: borrow the source slice when it equals the
-/// resolved name, else the resolved name — the writer emits either directly
-/// (no `Cow`, no allocation on either branch).
+/// The name-emission counterpart of `super::name_cow`: borrow the source slice
+/// when it equals the resolved name, else the resolved name — the writer emits
+/// either directly (no `Cow`, no allocation on either branch).
 #[inline]
 pub(super) fn write_name(
     w: &mut JsonWriter,
@@ -550,12 +545,13 @@ pub(super) fn write_name(
     w.string(if raw == resolved { raw } else { resolved });
 }
 
-/// Mirrors `serialize_literal_value` over `json_number_from_f64(n)`: integral
-/// doubles emit as expanded shortest-round-trip integers (JS `JSON.stringify`
-/// semantics), non-finite collapses to `0`, everything else is ryu.
+/// Emit a numeric literal value the way acorn's JSON does: integral doubles as
+/// expanded shortest-round-trip integers (JS `JSON.stringify` semantics),
+/// non-finite as `0` (JSON has no NaN/Inf, and acorn emits 0), everything else
+/// as ryu.
 pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
     if !n.is_finite() {
-        // `json_number_from_f64` maps NaN/±Inf to integer 0.
+        // NaN/±Inf → integer 0 (acorn parity).
         w.raw("0");
         return;
     }

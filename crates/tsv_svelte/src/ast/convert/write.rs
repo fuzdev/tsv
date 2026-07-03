@@ -25,8 +25,8 @@
 //!   `write_identifier_expression_with_character`.
 //! - **Generic template expressions** (`{expr}`, block tests, directive
 //!   expressions, …) emit fused via `tsv_ts`'s `write_expression_embedded`. When
-//!   a template comment lands inside the expression's window (the same
-//!   `any_comment_in` pre-check the typed attach pass uses), the comment
+//!   a template comment lands inside the expression's window (the
+//!   `any_comment_in` pre-check), the comment
 //!   assignments are precomputed into a per-node `WriterComments` map and the
 //!   expression fuses via `write_expression_embedded_with_comments`, emitting each
 //!   node's `leadingComments`/`trailingComments` at its close.
@@ -52,13 +52,11 @@
 //! attached comments serialize *last* within a node exactly as `preserve_order`
 //! places acorn's appended keys, regardless of child-visit order.
 //!
-//! **Byte-identity contract**: every function here emits exactly the bytes
-//! `serde_json::to_string` produces for `convert_root_with_tracker`'s result
-//! after the `Value`-path attach + translate (`convert_ast_json`). The fixture
-//! suite's string-path identity check plus its synthesized multibyte and
-//! template-comment probes enforce the lockstep. `convert_root` /
-//! `convert_ast_json` / the typed attach + translate walks remain the independent
-//! oracle.
+//! **Byte-identity contract**: the wire JSON is a faithful emission of the
+//! Svelte parser's JSON (its acorn `<script>` shape plus `parseCss` `<style>`
+//! shape). The gate is the canonical Svelte parser's `expected.json` (fixture
+//! Phase 2b), including the multibyte and template-comment fixtures that
+//! exercise the fused offset translation and island-scoped comment attach.
 
 use crate::ast::internal;
 use string_interner::DefaultStringInterner;
@@ -67,6 +65,7 @@ use tsv_lang::{
     ByteToCharMap, Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span,
     estimated_json_capacity, write_array,
 };
+use tsv_ts::ast::convert::name_cow;
 use tsv_ts::ast::convert::{
     Schema, translate_column, write_expression_embedded, write_expression_embedded_with_comments,
     write_identifier_expression_with_character,
@@ -74,7 +73,6 @@ use tsv_ts::ast::convert::{
     write_program_embedded, write_variable_declaration_embedded,
     write_variable_declaration_embedded_with_comments,
 };
-use tsv_ts::ast::public::name_cow;
 
 use super::comment_attachment::{get_comment_value, is_template_comment};
 use super::special::{
@@ -85,9 +83,8 @@ use super::special::{
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
 ///
-/// The writer twin of `convert_root_with_tracker` + the `Value`-path attach +
-/// translate + `serde_json::to_string`: byte-identical output, one AST walk, no
-/// intermediate `serde_json::Value` for the spine.
+/// One AST walk, no intermediate `serde_json::Value` for the spine — the fused
+/// char-space wire the FFI/CLI/WASM parse bindings ship.
 pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u8> {
     // LF-only tracker (Svelte's `locate-character` convention) + byte→UTF-16 map
     // in one source scan; the identity map short-circuits on ASCII.
@@ -157,9 +154,8 @@ impl<'a> Ctx<'a> {
         }
     }
 
-    /// Superset pre-check mirroring the typed attach pass: does any template
-    /// comment *start* in `[start, end)`? A miss means the expression stays
-    /// fused (no island conversion, no attach).
+    /// Superset pre-check: does any template comment *start* in `[start, end)`?
+    /// A miss means the expression stays fused (no skeleton, no attach).
     #[inline]
     fn any_comment_in(&self, start: u32, end: u32) -> bool {
         self.comments
@@ -188,7 +184,7 @@ fn preceded_by_quote(source: &str, pos: u32) -> bool {
     )
 }
 
-/// Mirrors `convert_root_with_tracker`. Field order:
+/// Emit the `Root` node. Field order:
 /// `css, js, start, end, type, fragment, options, comments, [instance], [module]`.
 fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
     let source = ctx.source;
@@ -306,9 +302,9 @@ fn write_fragment_node(w: &mut JsonWriter, node: &internal::FragmentNode<'_>, ct
     }
 }
 
-/// A generic template expression island: fused when comment-free, else a `Value`
-/// island (convert + attach + translate + splice) — mirroring the typed attach
-/// pass's `island`.
+/// A generic template expression island: fused when comment-free, else the
+/// comment-bearing path — precompute a `WriterComments` map off a byte-space
+/// skeleton (`build_expression_writer_comments`), then fuse-emit with it.
 fn write_generic_island(
     w: &mut JsonWriter,
     expr: &tsv_ts::ast::internal::Expression<'_>,
@@ -670,7 +666,7 @@ fn write_snippet_name(
 
 /// Snippet parameters. Comment-free (the common case): each fuses. Otherwise the
 /// whole list materializes as `Value`s so `attach_snippet_parameters`' shared
-/// cursor can claim each inter-parameter comment once (mirroring the typed pass).
+/// cursor can claim each inter-parameter comment once.
 fn write_snippet_parameters(
     w: &mut JsonWriter,
     parameters: &[tsv_ts::ast::internal::Expression<'_>],

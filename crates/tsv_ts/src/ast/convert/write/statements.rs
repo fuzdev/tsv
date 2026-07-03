@@ -2,7 +2,7 @@
 // `convert::statements`.
 
 use super::super::super::internal;
-use super::super::{Schema, statements::find_export_start};
+use super::super::Schema;
 use super::control_flow::{
     write_break_statement, write_continue_statement, write_do_while_statement,
     write_for_in_statement, write_for_of_statement, write_for_statement, write_if_statement,
@@ -26,9 +26,22 @@ use super::{
 };
 use tsv_lang::Span;
 
+/// The `export` keyword's start, skipping comments so an `export` inside one
+/// (`@dec /* export */ export …`) isn't mistaken for the keyword (which would
+/// mislocate the node's start).
+fn find_export_start(source: &str, span_start: u32) -> u32 {
+    tsv_lang::source_scan::find_keyword(
+        source.as_bytes(),
+        span_start as usize,
+        source.len(),
+        b"export",
+        tsv_lang::source_scan::TriviaProfile::JS,
+    )
+    .map_or(span_start, |pos| pos as u32)
+}
+
 /// The export node's start: a decorated exported class starts at `export`,
-/// not at the decorator (shared by both export arms, mirroring
-/// `convert_statement`'s per-arm scans).
+/// not at the decorator (shared by both export arms).
 fn export_start(source: &str, span_start: u32, class_is_decorated: bool) -> u32 {
     if class_is_decorated {
         find_export_start(source, span_start)

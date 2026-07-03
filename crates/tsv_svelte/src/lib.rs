@@ -67,43 +67,15 @@ pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::Do
     printer::format_svelte_in(root, source, arena)
 }
 
-/// Convert internal AST to public JSON-compatible AST
-///
-/// # Arguments
-///
-/// * `root` - The internal AST to convert
-/// * `source` - The original source code (for location tracking)
-///
-/// # Returns
-///
-/// A public AST that can be serialized to JSON
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let source = "<div>Hello</div>";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::parse(source, &arena)?;
-/// let public_ast = tsv_svelte::convert_ast(&ast, source);
-/// let json = serde_json::to_string_pretty(&public_ast)?;
-/// ```
-#[cfg(feature = "convert")]
-pub fn convert_ast<'src>(root: &Root<'_>, source: &'src str) -> ast::public::Root<'src> {
-    ast::convert::convert_root(root, source)
-}
-
 /// Convert internal AST to JSON with character-based positions
 ///
-/// Like `convert_ast`, but returns `serde_json::Value` with all byte-based
-/// positions (`start`, `end`, `loc.*.column`, `character`) translated to
-/// Unicode character offsets to match Svelte/acorn output.
-///
-/// This is the `Value` oracle path: every pass here is `Value`-based
-/// (whole-document attach + translate), independent of the typed walks, so
-/// `convert_ast_json_string`'s byte-identity gates cross-check two
-/// implementations. Use it when a `Value` is needed (pretty-printing,
-/// fixture comparison); the compact-wire hot path is
-/// `convert_ast_json_string`.
+/// Returns a `serde_json::Value` parsed from the wire bytes
+/// `convert_ast_json_bytes` emits — a thin wrapper over the sole emission
+/// path, not an independent conversion. All byte-based positions (`start`,
+/// `end`, `loc.*.column`, `character`) are already translated to Unicode
+/// character offsets by the writer. Used where a `Value` is needed (the CLI's
+/// `--pretty`, the fixture gate); byte-oriented consumers should call
+/// `convert_ast_json_bytes` directly.
 ///
 /// # Example
 ///
@@ -116,25 +88,7 @@ pub fn convert_ast<'src>(root: &Root<'_>, source: &'src str) -> ast::public::Roo
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
-    // One tracker shared by conversion and translation (each build is a
-    // full-source line-index scan).
-    let tracker = tsv_lang::LocationTracker::new(source);
-    let public_ast = ast::convert::convert_root_with_tracker(root, source, &tracker);
-    let mut json = serde_json::to_value(&public_ast).expect("AST types derive Serialize correctly");
-
-    // Attach comments to template expressions (outside <script> tags)
-    // Must happen before byte→char translation since comment positions are byte-based
-    let script_spans = script_content_spans(root);
-    ast::convert::attach_template_expression_comments(
-        &mut json,
-        &root.comments,
-        &script_spans,
-        source,
-    );
-
-    let map = tsv_lang::ByteToCharMap::new(source);
-    tsv_ts::ast::convert::translate_byte_to_char_offsets(&mut json, &map, &tracker);
-    json
+    serde_json::from_slice(&convert_ast_json_bytes(root, source)).expect("writer emits valid JSON")
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions

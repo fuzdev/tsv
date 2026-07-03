@@ -23,26 +23,26 @@ A single AST cannot optimize for both manipulation and serialization.
 - Zero serialization overhead
 - Nested ownership (direct traversal, no index lookups)
 
-### Public AST (serialization boundary only)
+### Public wire JSON (serialization boundary only)
 
-- Exact JSON field ordering
-- Plain JSON numbers (u32 spans widen to `usize` at the conversion boundary)
-- Owned strings
-- Serde attributes for serialization
+- Exact JSON field ordering (matching the canonical parser)
+- Plain JSON numbers (byte spans emitted as char / UTF-16 offsets)
+- Source-faithful strings (raw slices reconstructed at the boundary)
+- Emitted directly by the writer (`ast/convert/`), never an intermediate typed tree
 
 ### Solution
 
 ```
 Parse → Internal AST → [Format, Lint, Analyze]
                           ↓ (only when serializing)
-                       convert_ast() → Public AST → JSON
+                       convert_ast_json_bytes() → wire JSON
 ```
 
 Each language crate separates these cleanly:
 
 - `ast/internal` — Optimized for manipulation (file or directory)
-- `ast/public` — Optimized for JSON output (file or directory)
-- `ast/convert` — One-way conversion (file or directory)
+- `ast/convert` — Emits the public wire JSON directly from `internal`, in one
+  walk (the writer), matching the canonical parser's JSON exactly (file or directory)
 
 TypeScript uses directories (`internal/`, `public/`, `convert/`) due to complexity. CSS uses single files. Svelte uses files for AST types but a directory for conversion.
 
@@ -109,7 +109,7 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 **Compile-Time Isolation** — Cargo prevents circular dependencies. CSS changes don't trigger TypeScript recompilation.
 
-**Clean API Boundaries** — Each language exports `parse()`, `format()`, `convert_ast()`. All three `convert_ast()` functions return typed public ASTs (`Program`, `StyleSheet`, `Root`). tsv_ts and tsv_css also provide embedding APIs (`parse_with_interner`, `parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
+**Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (with `convert_ast_json()` a thin `Value` wrapper over the bytes). tsv_ts and tsv_css also provide embedding APIs (`parse_with_interner`, `parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
 **Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm` already done; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
@@ -123,44 +123,38 @@ trait:
 ```rust
 pub fn parse(source: &str) -> Result<InternalAst, ParseError>;
 pub fn format(ast: &InternalAst, source: &str) -> String;
-pub fn convert_ast(ast: &InternalAst, source: &str) -> PublicAst;
-pub fn convert_ast_json(ast: &InternalAst, source: &str) -> serde_json::Value;
 pub fn convert_ast_json_bytes(ast: &InternalAst, source: &str) -> Vec<u8>;
 pub fn convert_ast_json_string(ast: &InternalAst, source: &str) -> String;
+pub fn convert_ast_json(ast: &InternalAst, source: &str) -> serde_json::Value;
 ```
 
-`convert_ast_json_bytes` is the hot path for compact wire output (FFI,
-CLI non-pretty): byte-identical to serializing `convert_ast_json`'s
-`Value`, without materializing that `Value` — in every language, on every
-input. The output is valid UTF-8 by construction, and returning bytes lets
-byte-oriented boundaries skip the O(output) UTF-8 validation a `String`
+`convert_ast_json_bytes` is the **sole emission path** — the hot path for
+compact wire output (FFI, CLI non-pretty) and the source every other JSON
+form derives from. In every language it is a **writer-mode conversion**
+(`ast/convert/write*`) that emits the wire JSON directly during a single
+walk of the *internal* AST — no typed public tree is ever materialized —
+with byte→UTF-16 offset translation fused into the walk via `LocationMapper`
+(final char-space positions emitted directly; ASCII sources are byte-space
+passthrough). The output is valid UTF-8 by construction, and returning bytes
+lets byte-oriented boundaries skip the O(output) UTF-8 validation a `String`
 requires (the wire is ~15× the source); `convert_ast_json_string` is the
 same bytes plus that one validation, for `&str` boundaries (the WASM
-binding's `JSON.parse`, N-API strings). tsv_ts goes furthest: a writer-mode conversion
-(`ast/convert/write/`) emits the wire JSON directly during a single walk
-of the *internal* AST — the typed public tree is never built either — with
-byte→UTF-16 offset translation fused into the walk via `LocationMapper`
-(final char-space positions emitted directly; ASCII sources are byte-space
-passthrough). The writer is a third emission mode of the same acorn quirk
-catalog, held byte-identical to the typed conversion by the fixture
-suite's string-path identity gates. tsv_svelte and tsv_css serialize
-their typed public ASTs directly. tsv_svelte's
-template-expression comments (outside `<script>`) go through an
-island-scoped attachment pass first: only the expressions a comment lands
-on convert to `serde_json::Value` islands (`ExpressionIsland::Attached`)
-so `leadingComments`/`trailingComments` can be injected — the typed
-`tsv_ts` public AST deliberately carries no comment fields — while the
-rest of the document stays typed. `Script.content` is the same island
-shape at conversion time (`ProgramIsland`): a `lang="ts"` script with no
-comments to inject stays a typed `Program`, skipping the per-script JSON
-roundtrip. Attribute and style-directive values are fully typed
-(`AttributeValueField`). ASCII sources then serialize as-is; multibyte
-sources get a
-typed byte→char offset-translation walk first (each crate's
-`translate_byte_to_char_offsets_typed` — tsv_svelte's is a hybrid walk
-that delegates embedded `tsv_ts` expressions and the `tsv_css` `<style>`
-envelope to those crates' typed walks, and its `serde_json::Value`
-islands to the `Value` walk).
+binding's `JSON.parse`, N-API strings), and `convert_ast_json` parses the
+bytes back into a `serde_json::Value` for the `Value` consumers (the CLI's
+`--pretty` tab-serialization, the fixture gate) — a thin wrapper, not an
+independent conversion. Each writer is a faithful emission of the acorn /
+`parseCss` quirk catalog; the fixture suite gates its output against the
+canonical parser's `expected.json` on every fixture (including the multibyte
+and template-comment ones that exercise the fused offset translation and
+island-scoped comment attach). tsv_svelte's template-expression comments
+(outside `<script>`) fuse via an island-scoped attach pass: each
+comment-bearing expression is skeletonized to byte-space wire JSON, run
+through the shared acorn attach, and read back into a span-keyed map the
+fused writer consults at each node's close, so `leadingComments` /
+`trailingComments` serialize in place. `<script>` content, block patterns,
+`{@const}`/`{const}`/`{let}` declarations, and `<svelte:options>` fuse the
+same way, and embedded `<style>` children fuse via `tsv_css`'s
+`write_css_node`.
 
 There is **no central `Language` trait, no plugin registry, no
 language-set enum**. Each language crate (`tsv_ts`, `tsv_css`,
@@ -218,9 +212,9 @@ artifacts for user ergonomics independent of the Rust workspace shape.
 #### Cargo feature surface
 
 `tsv_ts`, `tsv_css`, and `tsv_svelte` each expose a default-on `convert`
-feature that gates `pub mod public`, `pub mod convert`, and the
-`convert_ast` / `convert_ast_json` / `convert_ast_json_string` free
-functions. The format-only WASM
+feature that gates `pub mod convert` (the writer) and the
+`convert_ast_json_bytes` / `convert_ast_json_string` / `convert_ast_json`
+free functions. The format-only WASM
 build (`@fuzdev/tsv_format_wasm`) declares its language deps with
 `default-features = false` so the convert layer is excluded at link
 time; the parse-capable builds (`@fuzdev/tsv_parse_wasm` and the full
@@ -668,7 +662,7 @@ tsv runs on the system allocator — no `#[global_allocator]`, no alternative-al
 
 **Lazy work over eager caching.** Line/column positions are computed only at serialization time, via O(log n) binary search over newline offsets (`LocationTracker`). Error context (source line, caret) is extracted only when an error is displayed. Svelte `Text::data()` decodes entities only when entities are present, borrowing `raw` otherwise.
 
-**Boundaries — serialize once, copy once.** `convert_ast_json_string` emits compact wire JSON without the intermediate `serde_json::Value` — tsv_ts writes it directly from the internal AST, tsv_svelte/tsv_css serialize their typed public ASTs (see [Closed Scope, Open Convention](#closed-scope-open-convention)) — into a buffer pre-sized from source length (`tsv_lang::estimated_json_capacity`, ~20 wire bytes per source byte — the JSON sibling of the render-path pre-sizing above). FFI returns a leaked `Box<[u8]>` the caller frees via `tsv_free` — one serialization, one buffer; the full ownership and panic-safety contract is in [crates/tsv_ffi/CLAUDE.md](../crates/tsv_ffi/CLAUDE.md). WASM ships the AST across the boundary as a single JSON string and hands it to the engine's native `JSON.parse` rather than building the JS object graph node-by-node. The CLI reads each file into one `String` and drops all per-file state before the next; worker threads share only an atomic index into the file list.
+**Boundaries — serialize once, copy once.** `convert_ast_json_string` emits compact wire JSON without any intermediate `serde_json::Value` — all three languages write it directly from the internal AST via the writer (see [Closed Scope, Open Convention](#closed-scope-open-convention)) — into a buffer pre-sized from source length (`tsv_lang::estimated_json_capacity`, ~20 wire bytes per source byte — the JSON sibling of the render-path pre-sizing above). FFI returns a leaked `Box<[u8]>` the caller frees via `tsv_free` — one serialization, one buffer; the full ownership and panic-safety contract is in [crates/tsv_ffi/CLAUDE.md](../crates/tsv_ffi/CLAUDE.md). WASM ships the AST across the boundary as a single JSON string and hands it to the engine's native `JSON.parse` rather than building the JS object graph node-by-node. The CLI reads each file into one `String` and drops all per-file state before the next; worker threads share only an atomic index into the file list.
 
 Profiling methodology — including when to reach for heap profiling — is in [performance.md](./performance.md).
 

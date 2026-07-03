@@ -1,24 +1,24 @@
 //! Writer-mode conversion: emit compact wire JSON directly from the internal
 //! CSS AST.
 //!
-//! The CSS sibling of `tsv_ts`'s `ast/convert/write/` — it walks the *internal*
-//! AST once and writes the final JSON bytes as it goes, never materializing the
-//! typed public tree (`ast::public`). The hot path behind
-//! `convert_ast_json_bytes` (FFI/CLI compact output) and the entry the Svelte
-//! writer composes for embedded `<style>` blocks.
+//! The CSS sibling of `tsv_ts`'s `ast/convert/write/` — the **sole emission
+//! path** for the CSS wire JSON. It walks the *internal* AST once and writes the
+//! final JSON bytes as it goes, never materializing a typed public tree — the
+//! hot path behind `convert_ast_json_bytes` (FFI/CLI compact output) and the
+//! entry the Svelte writer composes for embedded `<style>` blocks.
 //!
-//! **Byte-identity contract**: every function here emits exactly the bytes
-//! `serde_json::to_string` produces for the corresponding `convert_*` result —
-//! same field order (the public struct's declaration order, including the
+//! **Byte-identity contract**: the wire JSON is a faithful emission of the
+//! `parseCss()` quirk catalog — node field order (including the
 //! `AttributeSelector` `start`/`end`-before-`name` and `Rule`
-//! `prelude`/`block`-before-`start`/`end` quirks), same `skip_serializing_if`
-//! behavior (`metadata` on standalone CSS only; `namespace`/`Nth.selector`
-//! skipped when absent), same `null`s for the non-skipped `Option`s
-//! (`combinator`, `matcher`/`value`/`flags`, `PseudoClass.args`), same scalar
-//! formatting. Each `write_*` mirrors its `convert_*` twin in the sibling module
-//! and **reuses its raw-source reconstruction helpers** (`strip_css_comments`,
-//! `split_declaration_svelte_compat`, `raw_selector_name`, …) so the Svelte scan
-//! semantics are defined once; change them in lockstep.
+//! `prelude`/`block`-before-`start`/`end` quirks), the skip rules (`metadata` on
+//! standalone CSS only; `namespace`/`Nth.selector` skipped when absent), the
+//! `null`s for absent-but-present `Option`s (`combinator`, `matcher`/`value`/
+//! `flags`, `PseudoClass.args`), and scalar formatting all match `parseCss`'s
+//! JSON exactly. The gate is the canonical `parseCss` `expected.json` (fixture
+//! Phase 2b) plus `corpus:compare:parse --multibyte-only`. The writer **reuses
+//! the raw-source reconstruction helpers** in the sibling `mod.rs`
+//! (`strip_css_comments`, `split_declaration_svelte_compat`, `raw_selector_name`,
+//! …) so the Svelte scan semantics are defined once.
 //!
 //! CSS public nodes carry only `start`/`end` (no `loc`/columns), so there is no
 //! `LocationTracker`: each position is translated independently via a
@@ -59,8 +59,7 @@ impl Ctx<'_> {
 }
 
 /// Convert the internal CSS nodes straight to standalone-`StyleSheetFile` wire
-/// bytes. The writer twin of `convert_stylesheet_file` + `serde_json::to_string`
-/// (+ the multibyte translate walk): byte-identical output, one AST walk.
+/// bytes — one AST walk, with byte→char offset translation fused in.
 pub(crate) fn write_stylesheet_file_bytes(
     nodes: &[internal::CssNode<'_>],
     source: &str,
@@ -94,8 +93,8 @@ pub fn write_css_node(
     write_node(w, node, &ctx);
 }
 
-/// Mirrors `convert_stylesheet_file`: `type`, `start` (0), `end` (source length),
-/// `children`.
+/// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
+/// length), `children`.
 fn write_stylesheet_file(w: &mut JsonWriter, nodes: &[internal::CssNode<'_>], ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
     w.u32(ctx.pos(0));

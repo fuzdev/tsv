@@ -404,9 +404,9 @@ tsv/
 │   ├── tsv_html/    # HTML element classification and whitespace rules
 │   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
 │   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
-│   ├── tsv_ts/      # TypeScript: parse(), format(), convert_ast()
-│   ├── tsv_css/     # CSS: parse(), format(), convert_ast()
-│   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast()
+│   ├── tsv_ts/      # TypeScript: parse(), format(), convert_ast_json_bytes()
+│   ├── tsv_css/     # CSS: parse(), format(), convert_ast_json_bytes()
+│   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
@@ -420,8 +420,8 @@ tsv/
 
 **Crate pattern** (tsv_ts, tsv_css, tsv_svelte):
 
-- `lib.rs` - Public API: `parse()`, `format()`, `convert_ast()`
-- `ast/` - Internal AST, public AST types, conversion layer
+- `lib.rs` - Public API: `parse()`, `format()`, `convert_ast_json_bytes()`
+- `ast/` - Internal AST + the conversion layer (the wire-JSON writer)
 - `lexer/` - Tokenization
 - `parser/` - AST construction
 - `printer/` - Code formatting (uses doc builder from tsv_lang)
@@ -859,10 +859,10 @@ cargo run -p tsv_debug authoring_audit ~/dev/zzz/src --prettier --dump-dir /tmp/
 tsv ships a closed language set (TypeScript, CSS, Svelte) but is open by
 convention **at the Rust source/crate level**: each language crate
 (`tsv_ts`, `tsv_css`, `tsv_svelte`) is self-contained — owns its internal
-AST, public AST, parser, formatter, and convert layer — and exposes the same
-free-function API (`parse()`, `format()`, `convert_ast()`,
-`convert_ast_json()`, `convert_ast_json_bytes()`,
-`convert_ast_json_string()`). **No central `Language`
+AST, parser, formatter, and convert layer (the wire-JSON writer) — and
+exposes the same free-function API (`parse()`, `format()`,
+`convert_ast_json_bytes()`, `convert_ast_json_string()`,
+`convert_ast_json()`). **No central `Language`
 trait, no registry, no enum dispatch.** Two properties follow:
 
 - **Optimal artifacts**: concrete types end-to-end, no dyn dispatch, WASM

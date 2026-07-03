@@ -55,28 +55,27 @@ function file_size(path: URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-06-26 (the class-heritage `extends <expr>` fix: its DRY parser
-// refactor — replacing the bespoke heritage walk with the shared postfix parser
-// — shaved the parser, on top of accumulated main shrinkage since perf10):
-// format 2,210,007 B (npm); parse 1,559,603 B; all 2,877,818 B. The parse-only
-// build (no printer) shows the parser reduction undiluted; format/all also pick
-// up the SuperClass paren-context printer addition, so they drifted less. (Prior
-// 2026-06-24 perf10 reference: format 2,348,470 B; parse 1,696,075 B; all
-// 3,034,110 B — all down ~5–8%.) Bounds recentered ±8% on the new sizes.
+// Measured 2026-07-03 (retiring the typed public AST: the wire-JSON writer is
+// now the sole emission path, so the `parse` feature drops the `ast::public`
+// structs and their `serde` derives + typed converters — a large shrink):
+// parse 1,217,075 B; all 2,625,338 B (npm == deno, identical `.wasm`). format
+// is unchanged by that work (no convert layer). The parse-only build shows the
+// removed convert/serde layer undiluted. Bounds recentered ±8% on the new
+// parse/all sizes; format's bound is unchanged (2,312,791 B, still in range).
 const BOUNDS = {
 	format: { min: 2_030_000, max: 2_390_000 },
-	parse: { min: 1_435_000, max: 1_685_000 },
-	all: { min: 2_645_000, max: 3_110_000 },
+	parse: { min: 1_120_000, max: 1_315_000 },
+	all: { min: 2_415_000, max: 2_835_000 },
 };
 
-// all = format + parse. `all − format` is the parse feature (parser convert +
-// serde path; measured 685,640 B); `all − parse` is the format feature
-// (printers + doc builder, dropped from the parse-only build at link time;
-// measured 1,338,035 B — grew from 1,189,325 B via perf10's SmallVec sweep,
-// +12.5%, the concentrated cost of the printer-side monomorphization). A delta
-// near zero means a feature gate broke.
+// all = format + parse. `all − format` is the parse feature (parser convert
+// path; measured 312,547 B — down from ~685,640 B when it carried the typed
+// public AST + serde derives, now retired for the wire-JSON writer); `all −
+// parse` is the format feature (printers + doc builder, dropped from the
+// parse-only build at link time; measured 1,408,263 B). A delta near zero
+// means a feature gate broke.
 const DELTAS = {
-	format: { min: 550_000, max: 850_000 }, // all − format
+	format: { min: 285_000, max: 340_000 }, // all − format
 	parse: { min: 1_050_000, max: 1_445_000 }, // all − parse
 };
 

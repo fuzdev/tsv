@@ -47,12 +47,6 @@ pub enum ValidationError {
     ParserExpectedSvelteOutdated,
     #[error("our parser output differs from expected.json")]
     ParserOursDiffersFromExpected,
-    #[error("convert_ast_json_string output differs from the Value path (convert_ast_json)")]
-    ParserJsonStringPathDiverges,
-    #[error("typed-walk parity diverges on {0}")]
-    ParserTypedWalkParityDiverges(String),
-    #[error("typed-walk parity probe {0} failed to parse: {1}")]
-    ParserTypedWalkProbeUnparseable(String, String),
     #[error("Parser error: {0}")]
     ParserError(String),
     #[error("Parser error (svelte_divergence): {0}")]
@@ -240,15 +234,6 @@ impl ValidationError {
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated => {
                 "Run: deno task fixtures:update:parsed <pattern>"
-            }
-            Self::ParserJsonStringPathDiverges => {
-                "Fix convert_ast_json_string (typed comment attach or typed offset translation) to stay byte-identical to convert_ast_json"
-            }
-            Self::ParserTypedWalkParityDiverges(_) => {
-                "Fix the typed walks — a multibyte probe points at translate_typed.rs (a position-bearing field missing from the manual field enumeration); a template-comment probe points at attach_typed.rs (a comment window or reachability mismatch vs the Value dispatcher)"
-            }
-            Self::ParserTypedWalkProbeUnparseable(_, _) => {
-                "The probe content must parse; investigate why prepending a multibyte comment, appending the template-comment expression tag, or extracting <script> content broke parsing"
             }
             Self::ParserError(_) => "Verify input is valid syntax; if valid, fix the parser",
             Self::ParserErrorInDivergence(_) => {
@@ -439,9 +424,6 @@ impl ValidationError {
             Self::StructureValidationFailed(_) => "Structure",
 
             Self::ParserOursDiffersFromExpected
-            | Self::ParserJsonStringPathDiverges
-            | Self::ParserTypedWalkParityDiverges(_)
-            | Self::ParserTypedWalkProbeUnparseable(_, _)
             | Self::ParserExpectedJsonOutdated
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated
@@ -514,8 +496,6 @@ pub enum ValidationSuccess {
     ParserExpectedJsonMatches,
     ParserExpectedOursMatches,
     ParserOursMatchesExpected,
-    ParserJsonStringPathMatches,
-    ParserTypedWalkParityOk(usize), // number of parity probes passed
     ParserExpectedSvelteMatches,
     FormatterInputIdempotent,
     FormatterMatchesPrettier,
@@ -547,12 +527,6 @@ impl fmt::Display for ValidationSuccess {
             Self::ParserExpectedOursMatches => write!(f, "expected_ours.json matches our parser"),
             Self::ParserOursMatchesExpected => {
                 write!(f, "our parser output matches expected.json")
-            }
-            Self::ParserJsonStringPathMatches => {
-                write!(f, "convert_ast_json_string matches the Value path")
-            }
-            Self::ParserTypedWalkParityOk(n) => {
-                write!(f, "{n} typed-walk parity probes passed")
             }
             Self::ParserExpectedSvelteMatches => {
                 write!(f, "expected_svelte.json matches Svelte parser")

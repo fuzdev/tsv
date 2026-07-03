@@ -14,8 +14,6 @@ mod whitespace;
 
 // Re-export commonly used types
 pub use ast::{CssDeclaration, CssNode, CssRule, CssStyleSheet};
-#[cfg(feature = "convert")]
-pub use ast::{StyleContent, StyleSheet};
 pub use tsv_lang::{ParseError, Result};
 
 /// Parse CSS source into internal AST
@@ -131,50 +129,20 @@ pub fn format_embedded(
     printer::format_css_embedded(stylesheet, source, embed)
 }
 
-/// Convert CSS AST to public JSON-compatible AST
-///
-/// # Arguments
-/// * `stylesheet` - CSS stylesheet (nodes + value comments)
-/// * `source` - Original CSS source code
-///
-/// # Returns
-/// A public AST that can be serialized to JSON
-///
-/// # Example
-/// ```
-/// use tsv_css::{parse, convert_ast};
-///
-/// let css = "div { color: red; }";
-/// let arena = bumpalo::Bump::new();
-/// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
-/// let public_ast = convert_ast(&stylesheet, css);
-/// let json = serde_json::to_string_pretty(&public_ast).unwrap();
-/// ```
-#[cfg(feature = "convert")]
-pub fn convert_ast<'src>(stylesheet: &CssStyleSheet<'_>, source: &'src str) -> StyleSheet<'src> {
-    ast::convert::convert_css_nodes(stylesheet.nodes, source)
-}
-
 /// Convert CSS AST to JSON with character-based positions
 ///
-/// Like `convert_ast`, but returns `serde_json::Value` with all byte-based
-/// positions (`start`, `end`) translated to Unicode character offsets.
-///
-/// Produces a standalone `StyleSheetFile` JSON matching Svelte's `parseCss()` output
-/// (no `attributes` or `content` fields, `end` set to full source length).
-///
-/// Builds the typed public AST (`convert_stylesheet_file`), then materializes it
-/// into a `Value` and translates positions there — the `Value` walk stays the
-/// independent oracle the fixture suite checks `convert_ast_json_string`'s typed
-/// walk against.
+/// Returns a `serde_json::Value` parsed from the wire bytes
+/// `convert_ast_json_bytes` emits — a thin wrapper over the sole emission
+/// path, not an independent conversion. Produces a standalone `StyleSheetFile`
+/// JSON matching Svelte's `parseCss()` output (no `attributes` or `content`
+/// fields, `end` set to full source length). Used where a `Value` is needed
+/// (the CLI's `--pretty`, the fixture gate); byte-oriented consumers should
+/// call `convert_ast_json_bytes` directly.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_json::Value {
-    let public_ast = ast::convert::convert_stylesheet_file(stylesheet.nodes, source);
-    let mut json = serde_json::to_value(&public_ast).expect("public CSS AST serializes to a Value");
-    let map = tsv_lang::ByteToCharMap::new(source);
-    ast::convert::translate_byte_to_char_offsets(&mut json, &map);
-    json
+    serde_json::from_slice(&convert_ast_json_bytes(stylesheet, source))
+        .expect("writer emits valid JSON")
 }
 
 /// Like `convert_ast_json`, serialized to compact JSON wire bytes

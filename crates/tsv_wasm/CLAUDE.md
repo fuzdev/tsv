@@ -116,10 +116,10 @@ Maintenance checklist when modifying a public AST struct or enum:
 4. Check `#[serde(skip_serializing*)]` rules — fields with
    `skip_serializing_if = "Option::is_none"` become `T?`;
    `skip_serializing` fields are omitted from the TS interface.
-5. **tsv_ts only**: if the field carries positions (`start`/`end`/`loc`/
-   `character`) or contains nodes that do, add it to the typed
-   offset-translation walk (`tsv_ts/src/ast/convert/translate_typed.rs`) —
-   a missed field means silently untranslated offsets on multibyte sources.
+5. If the field carries positions (`start`/`end`/`loc`/`character`), make sure
+   the writer (`ast/convert/write*`) emits them through the `LocationMapper`
+   (`ctx.pos(...)` / the `loc` helpers) — a raw byte offset means silently
+   untranslated positions on multibyte sources.
 6. Run `cargo test --workspace` and `deno task check:ast-types`.
 
 `deno task check:ast-types` (also part of `deno task check`) invokes

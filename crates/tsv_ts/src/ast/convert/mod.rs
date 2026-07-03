@@ -1,8 +1,14 @@
-// Conversion from internal AST to public AST
+// Conversion from the internal AST to the public wire JSON.
+//
+// The writer (`write/`) emits the compact wire JSON directly from the internal
+// AST in one walk, fusing byte→UTF-16 offset translation into the walk (final
+// char-space positions emitted directly via `LocationMapper`). It is the sole
+// emission path; `convert_ast_json_bytes`/`_string` in `lib.rs` call it, and
+// `convert_ast_json` parses its bytes back into a `Value`.
 
-use super::internal;
-use super::public;
-use tsv_lang::{ByteToCharMap, LocationMapper, LocationTracker, Span};
+use std::borrow::Cow;
+use string_interner::{DefaultStringInterner, DefaultSymbol};
+use tsv_lang::{ByteToCharMap, InfallibleResolve, LocationTracker, Span};
 
 /// Schema choice for public-AST serialization.
 ///
@@ -28,21 +34,9 @@ impl Schema {
     }
 }
 
-// Submodules
-mod control_flow;
-mod declarations;
-mod expressions;
-mod functions;
-mod modules;
-mod patterns;
-mod statements;
-mod translate_typed;
-mod types;
+// The writer — the sole emission mode.
 mod write;
 
-pub use translate_typed::{
-    translate_byte_to_char_offsets_typed, translate_expression_byte_to_char_offsets_typed,
-};
 pub use write::{
     WriterComments, write_expression_embedded, write_expression_embedded_with_comments,
     write_identifier_expression_with_character,
@@ -51,47 +45,14 @@ pub use write::{
     write_variable_declaration_embedded_with_comments,
 };
 
-// Re-export conversion functions (pub(in crate::ast) for internal use)
-pub(in crate::ast) use control_flow::*;
-pub(in crate::ast) use declarations::*;
-pub(in crate::ast) use functions::*;
-pub(in crate::ast) use modules::*;
-pub(in crate::ast) use patterns::*;
-pub(in crate::ast) use statements::*;
-pub(in crate::ast) use types::*;
-
-// Public API exports
-pub use expressions::convert_expression;
-pub use statements::convert_variable_declaration;
-
-/// Translate all byte-based positions in a JSON AST to UTF-16 code-unit positions
-///
-/// JS (acorn/Svelte) uses UTF-16 code-unit offsets (JS string indices),
-/// while Rust strings are byte-indexed. This function post-processes a serialized
-/// JSON AST to convert all `start`, `end`, `loc.*.column`, `character`, and
-/// `name_loc` positions from byte offsets to UTF-16 code-unit offsets.
-///
-/// For ASCII-only sources, this is a no-op (byte == code-unit offset).
-pub fn translate_byte_to_char_offsets(
-    value: &mut serde_json::Value,
-    map: &ByteToCharMap,
-    tracker: &LocationTracker,
-) {
-    if !map.has_multibyte() {
-        return;
-    }
-    translate_positions_recursive(value, map, tracker);
-}
-
 /// Translate a column from byte-based to char-based, preserving any prior adjustment (e.g., +1)
 ///
 /// Computes the expected byte-based column from the byte offset, then the char-based column,
 /// and preserves the delta between the existing column value and the expected byte column.
-/// This ensures adjustments like `adjust_read_pattern_columns` (+1) survive translation.
+/// This ensures adjustments like Svelte's read-pattern `+1` survive translation.
 ///
-/// `pub` so the delta-preserving column math exists once: the typed walks —
-/// `translate_typed` here and `tsv_svelte`'s (which translates `name_loc`
-/// positions) — must match the `Value` walk exactly.
+/// `pub` so the `tsv_svelte` writer reuses it for the `<script>` `Program`'s
+/// tag-line column positions (which it emits in char space directly).
 #[allow(clippy::cast_sign_loss)]
 pub fn translate_column(
     byte_offset: u32,
@@ -102,128 +63,9 @@ pub fn translate_column(
     let line_start = tracker.line_start_byte(byte_offset as usize);
     let expected_byte_col = (byte_offset as usize).saturating_sub(line_start);
     let char_col = map.byte_to_char(byte_offset) - map.byte_to_char(line_start as u32);
-    // Preserve any delta (e.g., +1 from adjust_read_pattern_columns)
+    // Preserve any delta (e.g., +1 from Svelte's read-pattern column shift)
     let delta = (existing_column as i64) - (expected_byte_col as i64);
     ((char_col as i64) + delta) as u64
-}
-
-/// Translate a single loc/name_loc position entry (column + optional character)
-fn translate_loc_position(
-    pos: &mut serde_json::Map<String, serde_json::Value>,
-    byte_offset: u32,
-    map: &ByteToCharMap,
-    tracker: &LocationTracker,
-) {
-    if let Some(existing_col) = pos.get("column").and_then(serde_json::Value::as_u64) {
-        let char_col = translate_column(byte_offset, existing_col, map, tracker);
-        pos.insert(
-            "column".to_string(),
-            serde_json::Value::Number(char_col.into()),
-        );
-    }
-    if pos.contains_key("character") {
-        pos.insert(
-            "character".to_string(),
-            serde_json::Value::Number(map.byte_to_char(byte_offset).into()),
-        );
-    }
-}
-
-fn translate_positions_recursive(
-    value: &mut serde_json::Value,
-    map: &ByteToCharMap,
-    tracker: &LocationTracker,
-) {
-    match value {
-        serde_json::Value::Object(obj) => {
-            // Get the original byte-based start/end before we modify them.
-            // We need these to compute character-based columns for loc.
-            let orig_start = obj
-                .get("start")
-                .and_then(serde_json::Value::as_u64)
-                .map(|v| v as u32);
-            let orig_end = obj
-                .get("end")
-                .and_then(serde_json::Value::as_u64)
-                .map(|v| v as u32);
-
-            // Translate start/end byte offsets to character offsets
-            if let Some(start_byte) = orig_start {
-                obj.insert(
-                    "start".to_string(),
-                    serde_json::Value::Number(map.byte_to_char(start_byte).into()),
-                );
-            }
-            if let Some(end_byte) = orig_end {
-                obj.insert(
-                    "end".to_string(),
-                    serde_json::Value::Number(map.byte_to_char(end_byte).into()),
-                );
-            }
-
-            // Translate loc.start.column and loc.end.column
-            if let Some(serde_json::Value::Object(loc)) = obj.get_mut("loc") {
-                if let (Some(start_byte), Some(serde_json::Value::Object(start_pos))) =
-                    (orig_start, loc.get_mut("start"))
-                {
-                    translate_loc_position(start_pos, start_byte, map, tracker);
-                }
-                if let (Some(end_byte), Some(serde_json::Value::Object(end_pos))) =
-                    (orig_end, loc.get_mut("end"))
-                {
-                    translate_loc_position(end_pos, end_byte, map, tracker);
-                }
-            }
-
-            // Translate name_loc (Svelte-specific: start/end with line, column, character)
-            // For name_loc, the byte offset comes from the `character` field
-            if let Some(serde_json::Value::Object(name_loc)) = obj.get_mut("name_loc") {
-                if let Some(serde_json::Value::Object(start_pos)) = name_loc.get_mut("start")
-                    && let Some(char_byte) = start_pos
-                        .get("character")
-                        .and_then(serde_json::Value::as_u64)
-                        .map(|v| v as u32)
-                {
-                    translate_loc_position(start_pos, char_byte, map, tracker);
-                }
-                if let Some(serde_json::Value::Object(end_pos)) = name_loc.get_mut("end")
-                    && let Some(char_byte) = end_pos
-                        .get("character")
-                        .and_then(serde_json::Value::as_u64)
-                        .map(|v| v as u32)
-                {
-                    translate_loc_position(end_pos, char_byte, map, tracker);
-                }
-            }
-
-            // Translate extra.trailingComma (TSTypeParameterDeclaration `<T,>`):
-            // a byte offset that acorn emits in UTF-16 code units
-            if let Some(serde_json::Value::Object(extra)) = obj.get_mut("extra")
-                && let Some(trailing_comma) = extra
-                    .get("trailingComma")
-                    .and_then(serde_json::Value::as_u64)
-                    .map(|v| v as u32)
-            {
-                extra.insert(
-                    "trailingComma".to_string(),
-                    serde_json::Value::Number(map.byte_to_char(trailing_comma).into()),
-                );
-            }
-
-            // Recurse into all values (skip loc/name_loc which we already handled)
-            for (key, val) in obj.iter_mut() {
-                if key != "loc" && key != "name_loc" {
-                    translate_positions_recursive(val, map, tracker);
-                }
-            }
-        }
-        serde_json::Value::Array(arr) => {
-            for item in arr {
-                translate_positions_recursive(item, map, tracker);
-            }
-        }
-        _ => {}
-    }
 }
 
 /// Convert non-decimal BigInt values to decimal string (matching acorn behavior).
@@ -249,85 +91,32 @@ pub(super) fn bigint_to_decimal(val: &str) -> String {
     }
 }
 
-/// Convert tsv_lang::SourceLocation to public::SourceLocation
+/// Borrow an interned name from `source` when the span's source slice is exactly
+/// the name (the overwhelming case — a plain identifier reference); own the
+/// resolved name otherwise.
 ///
-/// Converts from the generic location type to the TypeScript-specific public type
-/// with serde derives.
-#[inline]
-pub(super) fn to_public_location(loc: tsv_lang::SourceLocation) -> public::SourceLocation {
-    public::SourceLocation {
-        start: public::Position {
-            line: loc.start.line,
-            column: loc.start.column,
-            character: None,
-        },
-        end: public::Position {
-            line: loc.end.line,
-            column: loc.end.column,
-            character: None,
-        },
-    }
-}
-
-/// Create a public source location for an emitted byte span.
+/// The slice can't be borrowed blindly: a *binding* identifier's `span` covers
+/// the whole binding, type annotation included (`x: T`), not just the name, and
+/// an escaped identifier (`\u{78}`) decodes to a name distinct from its raw
+/// source. Resolving the symbol is a cheap interner lookup (no allocation); the
+/// `String` allocation — the thing this avoids — only happens on the owned
+/// branch, where the slice and the name genuinely differ.
 ///
-/// The mapper decides the output space: identity map → byte columns (the
-/// `Value` oracle and `tsv_svelte` byte-space contracts), real map → UTF-16
-/// char columns emitted directly (the fused `convert_ast_json_string` path).
-#[inline]
-pub(super) fn create_location(span: Span, loc: LocationMapper<'_>) -> public::SourceLocation {
-    to_public_location(loc.span_to_location(span))
-}
-
-/// Convert an `f64` literal value to a `serde_json::Number`, mapping non-finite
-/// values (NaN / ±Inf) to `0` for acorn parity — non-finite number literals
-/// don't occur in valid source, and JSON has no representation for them.
-pub(super) fn json_number_from_f64(n: f64) -> serde_json::Number {
-    serde_json::Number::from_f64(n).unwrap_or_else(|| serde_json::Number::from(0))
-}
-
-/// Convert an internal `Program` to the public AST under the given schema.
-///
-/// Use `Schema::Acorn` for standalone TypeScript and Svelte `lang="ts"` scripts;
-/// use `Schema::SvelteScript` for Svelte non-`lang="ts"` `<script>` blocks where
-/// the JSON shape must follow Svelte's parser quirks.
-pub fn convert_program<'src>(
-    program: &internal::Program<'_>,
+/// `pub` so hosts with interned names in their own wire JSON apply the same
+/// guard (`tsv_svelte`'s writer uses it for element/attribute names). The TS
+/// writer's own `write_name` inlines the same test, emitting either branch
+/// directly without a `Cow`.
+pub fn name_cow<'src>(
+    span: Span,
     source: &'src str,
-    loc: LocationMapper<'_>,
-    schema: Schema,
-) -> public::Program<'src> {
-    let interner = program.interner.borrow();
-
-    public::Program {
-        node_type: "Program",
-        start: loc.pos(program.span.start),
-        end: loc.pos(program.span.end),
-        loc: create_location(program.span, loc),
-        body: program
-            .body
-            .iter()
-            .map(|s| convert_statement(s, source, loc, &interner, schema))
-            .collect(),
-        source_type: program.goal.source_type(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::json_number_from_f64;
-
-    #[test]
-    fn json_number_from_f64_finite_and_non_finite() {
-        // Finite values pass through faithfully (the only case valid source hits).
-        assert_eq!(json_number_from_f64(1.5).as_f64(), Some(1.5));
-        assert_eq!(json_number_from_f64(0.0).as_f64(), Some(0.0));
-        assert_eq!(json_number_from_f64(-42.0).as_f64(), Some(-42.0));
-        // Non-finite values never occur in valid source, but the defensive arm
-        // must collapse them to integer 0 — JSON has no NaN/Infinity, and acorn
-        // emits 0 here too.
-        for n in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
-            assert_eq!(json_number_from_f64(n), serde_json::Number::from(0));
-        }
+    sym: DefaultSymbol,
+    interner: &DefaultStringInterner,
+) -> Cow<'src, str> {
+    let resolved = interner.resolve_infallible(sym);
+    let raw = span.extract(source);
+    if raw == resolved {
+        Cow::Borrowed(raw)
+    } else {
+        Cow::Owned(resolved.to_string())
     }
 }

@@ -119,13 +119,8 @@ const ALLOW: &[Allow] = &[
         "css-value",
     ),
     (
-        "tsv_css/src/ast/convert/mod.rs",
-        "let prefix = raw.find('|').map_or(0, |i| i + 1);",
-        "css-value",
-    ),
-    (
-        // The wire-JSON writer's twin of the convert namespace-prefix scan (a `|`
-        // in a bounded selector-name slice — no enclosed comment/string possible).
+        // The wire-JSON writer's namespace-prefix scan (a `|` in a bounded
+        // selector-name slice — no enclosed comment/string possible).
         "tsv_css/src/ast/convert/write.rs",
         "let prefix = raw.find('|').map_or(0, |i| i + 1);",
         "css-value",

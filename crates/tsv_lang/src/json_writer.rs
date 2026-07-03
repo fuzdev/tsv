@@ -89,19 +89,6 @@ impl JsonWriter {
         serde_json::to_writer(&mut self.buf, &n).expect("Vec<u8> write is infallible");
     }
 
-    /// Splice a pre-built `serde_json::Value` into the buffer (compact form).
-    ///
-    /// The composition path for islands a writer defers to the typed + attach
-    /// machinery (comment-bearing embedded expressions, `+1`-column pattern
-    /// islands, const/declaration-tag declarations): build the `Value`, translate
-    /// its offsets, then splice it in place. Byte-identical to serializing the
-    /// same `Value` standalone (the crate is built with `preserve_order`).
-    #[inline]
-    #[allow(clippy::expect_used)]
-    pub fn value(&mut self, v: &serde_json::Value) {
-        serde_json::to_writer(&mut self.buf, v).expect("Vec<u8> write is infallible");
-    }
-
     #[inline]
     pub fn u64(&mut self, n: u64) {
         // Two-digit-pair formatting (itoa's approach): halves the divisions.
