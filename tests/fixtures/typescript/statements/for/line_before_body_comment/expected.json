@@ -1,0 +1,345 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 250,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Own-line comment before the body block",
+			"start": 10,
+			"end": 51,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 63,
+			"end": 67,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 5
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple own-line comments: a blank between them is kept; a blank above the",
+			"start": 84,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " first (the header gap) is dropped",
+			"start": 164,
+			"end": 200,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 212,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 220,
+			"end": 225,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 249,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 53,
+					"end": 81,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 2
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 69,
+						"end": 81,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 73,
+								"end": 78,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 73,
+									"end": 77,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 73,
+										"end": 75,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c",
+								"start": 63,
+								"end": 67
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Own-line comment before the body block",
+							"start": 10,
+							"end": 51
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 202,
+					"end": 239,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 2
+						}
+					},
+					"init": null,
+					"test": null,
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 227,
+						"end": 239,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 231,
+								"end": 236,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 231,
+									"end": 235,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 231,
+										"end": 233,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 212,
+								"end": 217
+							},
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 220,
+								"end": 225
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple own-line comments: a blank between them is kept; a blank above the",
+							"start": 84,
+							"end": 162
+						},
+						{
+							"type": "Line",
+							"value": " first (the header gap) is dropped",
+							"start": 164,
+							"end": 200
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

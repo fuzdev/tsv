@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 100,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 45,
+				"name": "scope",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 16,
+					"end": 45,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 20,
+								"end": 21,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 20,
+										"end": 21,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 20,
+														"end": 21
+													}
+												],
+												"start": 20,
+												"end": 21
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 22,
+								"end": 42,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 27,
+										"end": 37,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 20,
+							"end": 42
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 47,
+				"end": 91,
+				"name": "scope",
+				"prelude": "to (.b)",
+				"block": {
+					"type": "Block",
+					"start": 62,
+					"end": 91,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 66,
+								"end": 67,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 66,
+										"end": 67,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 66,
+														"end": 67
+													}
+												],
+												"start": 66,
+												"end": 67
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 68,
+								"end": 88,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 73,
+										"end": 83,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 66,
+							"end": 88
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 92,
+			"styles": "\n\t@scope {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@scope to (.b) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 101,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

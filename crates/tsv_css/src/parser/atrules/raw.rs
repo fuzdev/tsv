@@ -1,6 +1,7 @@
 use super::{CssParser, is_boolean_operator};
 use crate::lexer::TokenKind;
 use crate::url::trim_url_raw;
+use tsv_lang::printing::format_string_literal;
 use tsv_lang::{ParseError, Span};
 
 /// Build the raw at-rule prelude string (used for both the printer and, for `@media`,
@@ -13,6 +14,10 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     is_selector_list_prelude: bool,
     normalize_whitespace: bool,
+    // `@namespace` normalizes string / `url()` quotes to prettier's single-quote form
+    // (`"x"` → `'x'`, `url("x")` → `url('x')`, per the `singleQuote` option — the same
+    // as declaration values and `@import`); other raw at-rules keep quotes verbatim.
+    normalize_quotes: bool,
 ) -> Result<(&'arena str, Span), ParseError> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
     let prelude_start = parser.span_pos(parser.current_start);
@@ -27,10 +32,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     // - No prelude (@font-face, @starting-style): No prelude to normalize
     // - Identifier preludes (@keyframes, @layer): No colons to worry about
 
-    while !parser.check(TokenKind::LeftBrace)
-        && !parser.check(TokenKind::Semicolon)
-        && !parser.check(TokenKind::Eof)
-    {
+    while !parser.at_prelude_end() {
         if parser.check(TokenKind::Whitespace) {
             // Verbatim mode (non-@media raw at-rules): preserve the source whitespace
             // exactly — prettier and Svelte keep it (`@layer a  ,  b` stays `a  ,  b`).
@@ -73,23 +75,35 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             continue;
         }
 
-        // `url(...)` in a raw prelude (e.g. `@namespace url(http://…)`): the content is
-        // an opaque `<url-token>`, not a `property: value` query, so raw-extract it
-        // verbatim. Otherwise the property-colon normalization below inserts a space
-        // after the `:` in `http://`, corrupting it to `http: //`. Shares the
-        // declaration-path's `url::trim_url_raw` (and matches prettier's
-        // `printer-postcss.js`) — only the whitespace just inside the parens is trimmed.
-        // Quoted `url('…')` is preserved verbatim too (unchanged).
-        // Detect `url` on the raw source slice, not the decoded identifier: `advance()`
-        // drops the decoded value when a token arrives via the peek cache (which the
-        // whitespace branch above populates), so `current_identifier()` is unreliable
-        // here. A `url(` function token requires the literal `url`, so the raw slice is
-        // also the correct thing to match. Match case-insensitively (so the opaque
-        // content is raw-extracted, dodging the property-colon corruption, for `URL(`
-        // too) but only *trim* the inner whitespace for the lowercase spelling: per
-        // css-syntax-3 a `<url-token>` is matched ASCII-case-insensitively, yet prettier
-        // (postcss) only canonicalizes the lowercase `url(`, preserving `URL(  …  )`
-        // verbatim — so trimming uppercase would diverge from prettier.
+        // Unquoted `url(...)` in a raw prelude (e.g. `@namespace url(http://…)`): the
+        // lexer consumed it as one opaque `<url-token>` (so an interior `/*`/`:` is
+        // literal, not a comment / property-colon). Raw-extract it verbatim, trimming only
+        // the whitespace just inside the parens — like the declaration path (shared
+        // `url::trim_url_raw`) and prettier's `printer-postcss.js`. Only the lowercase
+        // `url(` is canonicalized; `URL(  …  )` stays verbatim (postcss preserves it), so
+        // trimming is gated on the lowercase spelling.
+        if matches!(parser.current_kind, TokenKind::Url) {
+            let raw = parser.current_value();
+            let part = if raw.starts_with("url(") {
+                trim_url_raw(raw).unwrap_or_else(|| raw.to_string())
+            } else {
+                raw.to_string()
+            };
+            prelude_parts.push(part);
+            prev_token_kind = Some(TokenKind::Url);
+            last_non_whitespace_kind = Some(TokenKind::Url);
+            parser.advance()?;
+            continue;
+        }
+
+        // Quoted `url("…")` stays ident + `(` + string (a function-token, not a url-token),
+        // so it reaches here as an `Identifier`. Consume the balanced parens as one unit and
+        // normalize the inner string quote (`url("x")` → `url('x')`) under `normalize_quotes`
+        // (@namespace), matching prettier. Detect `url` on the raw source slice, not the
+        // decoded identifier: `advance()` drops the decoded value when a token arrives via
+        // the peek cache (which the whitespace branch above populates), so
+        // `current_identifier()` is unreliable here — and a `url(` function requires the
+        // literal `url` anyway. Only the lowercase spelling is canonicalized (as above).
         if matches!(parser.current_kind, TokenKind::Identifier)
             && parser.current_value().eq_ignore_ascii_case("url")
             && matches!(parser.peek_kind(), Ok(TokenKind::LeftParen))
@@ -119,7 +133,12 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             }
             let raw = &parser.source()[url_start..url_end];
             let part = if is_lowercase_url {
-                trim_url_raw(raw).unwrap_or_else(|| raw.to_string())
+                let trimmed = trim_url_raw(raw).unwrap_or_else(|| raw.to_string());
+                if normalize_quotes {
+                    normalize_url_string_quote(&trimmed)
+                } else {
+                    trimmed
+                }
             } else {
                 raw.to_string()
             };
@@ -138,7 +157,11 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             TokenKind::Identifier => parser.current_value().to_string(),
             TokenKind::String { quote } => {
                 let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                format!("{quote}{content}{quote}")
+                if normalize_quotes {
+                    format_string_literal(content, *quote)
+                } else {
+                    format!("{quote}{content}{quote}")
+                }
             }
             TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
                 parser.current_value().to_string()
@@ -243,4 +266,24 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     };
 
     Ok((content, span))
+}
+
+/// Normalize the inner string quote of a `url("x")` / `url('x')` to prettier's
+/// single-quote form (matching the `@import` and declaration-value url paths); an
+/// unquoted `url(x)` is returned unchanged. Input is `trim_url_raw` output —
+/// `url(<inner>)` with a lowercase, whitespace-trimmed `url(` (4 bytes).
+fn normalize_url_string_quote(url: &str) -> String {
+    if !url.starts_with("url(") || !url.ends_with(')') {
+        return url.to_string();
+    }
+    let inner = &url[4..url.len() - 1];
+    let b = inner.as_bytes();
+    if b.len() >= 2 && (b[0] == b'"' || b[0] == b'\'') && b[b.len() - 1] == b[0] {
+        format!(
+            "url({})",
+            format_string_literal(&inner[1..inner.len() - 1], b[0] as char)
+        )
+    } else {
+        url.to_string()
+    }
 }

@@ -153,7 +153,7 @@ impl<'a> Printer<'a> {
             let mut all_own_line = own_line;
             all_own_line.extend(inline_next);
 
-            // Add comments preserving their position
+            // Add comments preserving their position.
             self.build_comments_between_parts(&mut parts, &inline_prev, &all_own_line, body_end);
 
             // While stays on same line only if: block body, no own-line comments, all inline are block comments

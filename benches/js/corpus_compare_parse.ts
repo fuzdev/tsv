@@ -188,6 +188,24 @@ function get_at_path(root: unknown, path: string): unknown {
 	return node;
 }
 
+/**
+ * True if `node`'s subtree contains an `Nth` whose value carries Svelte's ` of `
+ * (a normal Nth value never does) — the tell of a `:nth-child(An+B of S)` argument.
+ */
+function subtree_has_nth_of(node: unknown): boolean {
+	if (node == null || typeof node !== 'object') return false;
+	const n = node as Record<string, unknown>;
+	if (n.type === 'Nth' && typeof n.value === 'string' && n.value.includes(' of ')) return true;
+	for (const v of Object.values(n)) {
+		if (Array.isArray(v)) {
+			if (v.some(subtree_has_nth_of)) return true;
+		} else if (v && typeof v === 'object' && subtree_has_nth_of(v)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 interface DocumentedMatcher {
 	name: string;
 	/** docs/conformance_svelte.md section the divergence is cataloged under */
@@ -457,6 +475,30 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 				}
 			}
 			return false;
+		},
+	},
+	{
+		// Svelte's parseCss reads `:nth-child(An+B of S)` as `Nth.value = "2n of "`
+		// (the ` of ` leaks in from its REGEX_NTH_OF terminator) and flattens `S` as
+		// sibling simple selectors of the Nth. Per Selectors 4 the `S` is a nested
+		// <complex-selector-list> scoped to the nth term, so tsv keeps `Nth.value =
+		// "2n"` with `S` nested under a tsv-only `Nth.selector` field. The whole args
+		// subtree reshapes: the `Nth.value`/`.selector`, the sibling-count lengths, and
+		// the container span ends all differ. Anchor on Svelte's unambiguous tell — a
+		// canonical `Nth` whose value contains " of " — and absorb only the
+		// reshape-shaped fields, so a genuine content bug inside `S` (a wrong
+		// `.name`/`.type`) still surfaces as undocumented.
+		name: 'nth_of_structure',
+		conformance_section: 'CSS Corrections — :nth-child(An+B of S)',
+		matches: (entry, _canonical_parent, ctx) => {
+			const args_match = entry.path.match(/^(.*\.args)\b/);
+			if (!args_match) return false;
+			if (!subtree_has_nth_of(get_at_path(ctx.canonical_root, args_match[1]))) return false;
+			return (
+				(entry.kind === 'value_mismatch' && /\.(value|start|end)$/.test(entry.path)) ||
+				(entry.kind === 'missing_canonical' && /\.selector$/.test(entry.path)) ||
+				(entry.kind === 'length_mismatch' && /\.(children|selectors)$/.test(entry.path))
+			);
 		},
 	},
 ];

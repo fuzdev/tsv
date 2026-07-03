@@ -247,15 +247,10 @@ pub(super) fn convert_prelude_to_string<'src>(
         // normalized (printer-facing) form; the AST must stay source-faithful, like the
         // `Media`/`Supports`/`Container`/`Values` branches.
         internal::PreludeValue::Raw { span, .. } => strip_css_comments(span.extract(source)),
-        internal::PreludeValue::Selectors {
-            root: _,
-            limit: _,
-            span,
-        } => {
-            // Format selector lists for @scope: (root) [to (limit)]
-            // Extract from source for maximum fidelity
-            strip_css_comments(span.extract(source))
-        }
+        // @scope selector lists: `[(root)]? [to (limit)]?`. Extracted verbatim from
+        // `span` for fidelity (a bare `@scope` has a zero-width span → `""`), like the
+        // sibling raw/condition branches.
+        internal::PreludeValue::Selectors { span, .. } => strip_css_comments(span.extract(source)),
         internal::PreludeValue::Supports { span, .. } => strip_css_comments(span.extract(source)),
         internal::PreludeValue::Container { span, .. } => strip_css_comments(span.extract(source)),
         internal::PreludeValue::Media { span, .. } => strip_css_comments(span.extract(source)),

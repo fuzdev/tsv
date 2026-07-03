@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 193,
+	"end": 230,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -44,9 +44,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " With blank line before comment",
+			"value": " Own-line comment before while (a blank above the comment is dropped)",
 			"start": 102,
-			"end": 135,
+			"end": 173,
 			"loc": {
 				"start": {
 					"line": 9,
@@ -54,22 +54,22 @@
 				},
 				"end": {
 					"line": 9,
-					"column": 34
+					"column": 72
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " blank before",
-			"start": 155,
-			"end": 170,
+			"start": 192,
+			"end": 207,
 			"loc": {
 				"start": {
-					"line": 14,
+					"line": 13,
 					"column": 1
 				},
 				"end": {
-					"line": 14,
+					"line": 13,
 					"column": 16
 				}
 			}
@@ -78,19 +78,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 192,
+		"end": 229,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 183,
+			"end": 220,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 16,
+					"line": 15,
 					"column": 9
 				}
 			},
@@ -209,22 +209,22 @@
 				},
 				{
 					"type": "DoWhileStatement",
-					"start": 137,
-					"end": 182,
+					"start": 175,
+					"end": 219,
 					"loc": {
 						"start": {
 							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 15,
+							"line": 14,
 							"column": 11
 						}
 					},
 					"body": {
 						"type": "BlockStatement",
-						"start": 140,
-						"end": 152,
+						"start": 178,
+						"end": 190,
 						"loc": {
 							"start": {
 								"line": 10,
@@ -238,8 +238,8 @@
 						"body": [
 							{
 								"type": "ExpressionStatement",
-								"start": 144,
-								"end": 149,
+								"start": 182,
+								"end": 187,
 								"loc": {
 									"start": {
 										"line": 11,
@@ -252,8 +252,8 @@
 								},
 								"expression": {
 									"type": "CallExpression",
-									"start": 144,
-									"end": 148,
+									"start": 182,
+									"end": 186,
 									"loc": {
 										"start": {
 											"line": 11,
@@ -266,8 +266,8 @@
 									},
 									"callee": {
 										"type": "Identifier",
-										"start": 144,
-										"end": 146,
+										"start": 182,
+										"end": 184,
 										"loc": {
 											"start": {
 												"line": 11,
@@ -288,15 +288,15 @@
 					},
 					"test": {
 						"type": "Identifier",
-						"start": 179,
-						"end": 180,
+						"start": 216,
+						"end": 217,
 						"loc": {
 							"start": {
-								"line": 15,
+								"line": 14,
 								"column": 8
 							},
 							"end": {
-								"line": 15,
+								"line": 14,
 								"column": 9
 							}
 						},
@@ -305,17 +305,17 @@
 							{
 								"type": "Line",
 								"value": " blank before",
-								"start": 155,
-								"end": 170
+								"start": 192,
+								"end": 207
 							}
 						]
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " With blank line before comment",
+							"value": " Own-line comment before while (a blank above the comment is dropped)",
 							"start": 102,
-							"end": 135
+							"end": 173
 						}
 					]
 				}

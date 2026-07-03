@@ -26,6 +26,12 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// time in `advance`), so this slot carries no `String`.
     peek: Option<Token>,
     base_offset: usize, // Offset in full source (when parsing embedded CSS)
+    /// True while parsing inside functional pseudo-class arguments (`:is(...)`,
+    /// `:not(...)`, an unknown `:foo(...)`), where a bare `<number>`/`<an+b>` token is
+    /// an `Nth` simple selector — Svelte's `read_selector` gates its Nth production on
+    /// `inside_pseudo_class` the same way, so top-level selectors keep rejecting bare
+    /// numbers. Saved/restored around the two selector-list arg arms in `pseudo.rs`.
+    pub(crate) in_pseudo_args: bool,
     pub(crate) comments: Vec<Comment>,
     /// Bump arena that owns every AST node this parser allocates. Supplied by
     /// the caller (caller-owns-`Bump`); the returned `CssStyleSheet<'arena>`
@@ -53,6 +59,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             current_decoded: decoded,
             peek: None,
             base_offset,
+            in_pseudo_args: false,
             comments: Vec::new(),
             arena,
         })
@@ -167,6 +174,15 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
     pub(crate) fn check(&self, kind: TokenKind) -> bool {
         self.current_kind == kind
+    }
+
+    /// True at the end of an at-rule prelude: a block `{`, a statement `;`, or EOF.
+    /// The shared stop condition for the prelude-consuming loops.
+    pub(crate) fn at_prelude_end(&self) -> bool {
+        matches!(
+            self.current_kind,
+            TokenKind::LeftBrace | TokenKind::Semicolon | TokenKind::Eof
+        )
     }
 
     pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {

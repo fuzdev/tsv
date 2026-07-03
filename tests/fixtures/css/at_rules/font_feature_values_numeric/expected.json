@@ -1,0 +1,89 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 138,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 129,
+				"name": "font-feature-values",
+				"prelude": "Font",
+				"block": {
+					"type": "Block",
+					"start": 35,
+					"end": 129,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 39,
+							"end": 85,
+							"name": "styleset",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 49,
+								"end": 85,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 54,
+										"end": 66,
+										"property": "multi",
+										"value": "1 3 5"
+									},
+									{
+										"type": "Declaration",
+										"start": 71,
+										"end": 80,
+										"property": "single",
+										"value": "2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Atrule",
+							"start": 88,
+							"end": 126,
+							"name": "character-variant",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 107,
+								"end": 126,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 112,
+										"end": 121,
+										"property": "pair",
+										"value": "2 4"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 130,
+			"styles": "\n\t@font-feature-values Font {\n\t\t@styleset {\n\t\t\tmulti: 1 3 5;\n\t\t\tsingle: 2;\n\t\t}\n\t\t@character-variant {\n\t\t\tpair: 2 4;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 139,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

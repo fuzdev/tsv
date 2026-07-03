@@ -397,6 +397,22 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.u32(ctx.pos(span.end));
             w.raw("}");
         }
+        internal::SimpleSelector::Nth { span } => {
+            // An An+B term inside pseudo-class args. parseCss stores the value
+            // verbatim (the raw source slice — never operator-normalized like the
+            // printer's output). For an `An+B of S` term the span folds in the
+            // ` of ` (`"2n of "`), matching Svelte, which reads `S` as sibling
+            // selectors rather than a nested list — so no `selector` is emitted
+            // here (only the dedicated `:nth-*()` path nests `S` under
+            // `Nth.selector`).
+            w.raw("{\"type\":\"Nth\",\"value\":");
+            w.string(span.extract(ctx.source));
+            w.raw(",\"start\":");
+            w.u32(ctx.pos(span.start));
+            w.raw(",\"end\":");
+            w.u32(ctx.pos(span.end));
+            w.raw("}");
+        }
         // Forgiving-list `Invalid`s are filtered before convert (see
         // `write_selector_list_filtered`); the non-filtering path (rule preludes)
         // never contains them.
@@ -437,15 +453,23 @@ fn write_pseudo_class_args(
             value,
             of_selector,
             span,
-            value_span: _,
+            value_span,
         } => {
-            write_wrap_single_selector(w, *span, ctx, |w, ctx| {
+            // Anchor the public span's START at the An+B token, not at `(`, so a
+            // leading comment (`:nth-child(/* c */ 2n)`) isn't absorbed into it —
+            // matching parseCss and tsv's own selector-list args (`:is(/* c */ .a)`,
+            // which already anchor past the comment). A no-op without a leading
+            // comment (`value_span.start == span.start`); the internal `span` is
+            // unchanged, so the printer still uses `[span.start, value_span.start)`
+            // to interleave the gap comment.
+            let public_span = Span::new(value_span.start, span.end);
+            write_wrap_single_selector(w, public_span, ctx, |w, ctx| {
                 w.raw("{\"type\":\"Nth\",\"value\":");
                 w.string(value);
                 w.raw(",\"start\":");
-                w.u32(ctx.pos(span.start));
+                w.u32(ctx.pos(public_span.start));
                 w.raw(",\"end\":");
-                w.u32(ctx.pos(span.end));
+                w.u32(ctx.pos(public_span.end));
                 if let Some(sel) = of_selector {
                     w.raw(",\"selector\":");
                     write_selector_list_filtered(w, sel, ctx);

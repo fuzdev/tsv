@@ -90,11 +90,17 @@ pub(crate) fn parse_atrule<'arena>(
         name
     };
 
+    // Raw source offset of the first prelude token — for the conditional-at-rule raw
+    // fallback after the dispatch. Captured before any prelude parsing consumes tokens.
+    let prelude_start_raw = parser.current_start;
+
     // Parse prelude based on at-rule type
     let prelude = if name_lc == "import" {
-        // Parse @import prelude structurally (url/string + layer/supports/media)
-        let (values, span) = parse_import_prelude(parser)?;
-        PreludeValue::Values { values, span }
+        // Parse @import prelude structurally (url/string + layer/supports/media). A
+        // prelude that doesn't lead with a `<url>`/`<string>` isn't a structurable
+        // @import; it falls back to a raw verbatim prelude internally (same CSS-Syntax
+        // rationale as the `@supports`/`@container` fallback below).
+        parse_import_prelude(parser)?
     } else if name_lc == "scope" {
         // Parse @scope prelude as structured selector lists
         let (root, limit, span) = parse_scope_prelude(parser)?;
@@ -116,7 +122,7 @@ pub(crate) fn parse_atrule<'arena>(
         // Wrapping is handled in the printer by finding and/or boundaries
         // Fully structuring preludes is a deferred design option — see
         // docs/architecture.md § "Red-Green Trees (Deferred)"
-        let (content, span) = parse_raw_prelude_content(parser, false, true)?;
+        let (content, span) = parse_raw_prelude_content(parser, false, true, false)?;
         PreludeValue::Media { content, span }
     } else {
         // Parse as raw string for other at-rules (@keyframes, @layer, @page, etc.).
@@ -124,12 +130,28 @@ pub(crate) fn parse_atrule<'arena>(
         // prelude verbatim (outer-trimmed; only `url()` inner whitespace is trimmed) —
         // preserve internal whitespace (`@layer a , b` must not become `a, b`).
         // `@namespace` is the exception: prettier re-parses its prelude as a value (see
-        // postcss `parser-postcss.js`), normalizing whitespace to single spaces, so it
-        // takes the normalizing path. The public AST stays source-verbatim either way
-        // (the printer-facing `content` is what differs); see `convert/mod.rs`.
-        let normalize_whitespace = name_lc == "namespace";
-        let (content, span) = parse_raw_prelude_content(parser, false, normalize_whitespace)?;
+        // postcss `parser-postcss.js`), normalizing whitespace to single spaces AND string /
+        // `url()` quotes to single quotes, so it takes the normalizing path. The public AST
+        // stays source-verbatim either way (the printer-facing `content` is what differs);
+        // see `convert/mod.rs`.
+        let is_namespace = name_lc == "namespace";
+        let (content, span) = parse_raw_prelude_content(parser, false, is_namespace, is_namespace)?;
         PreludeValue::Raw { content, span }
+    };
+
+    // Raw fallback for conditional at-rules (`@supports`/`@container`) whose prelude
+    // isn't a structurable condition. Per CSS Syntax 3 an at-rule prelude is always
+    // consumed as component values; a prelude that isn't a valid
+    // `<supports-condition>`/`<container-condition>` makes the rule evaluate false — it
+    // is NOT a parse error (parseCss stores it raw, prettier prints it verbatim).
+    // `parse_condition_query` breaks off at the first token it can't fold in, leaving
+    // those tokens unconsumed; re-emit the whole prelude verbatim instead of erroring at
+    // the block boundary below. (`@import` does the equivalent fallback internally, since
+    // its structured parse requires a leading `<url>`/`<string>` rather than trailing off.)
+    let prelude = if matches!(name_lc, "supports" | "container") && !parser.at_prelude_end() {
+        reconsume_prelude_as_raw(parser, prelude_start_raw)?
+    } else {
+        prelude
     };
 
     // Parse block (if present)
@@ -156,6 +178,40 @@ pub(crate) fn parse_atrule<'arena>(
         prelude,
         block,
         span: Span { start, end },
+    })
+}
+
+/// Re-emit an at-rule prelude that couldn't be structured (a non-condition
+/// `@supports`/`@container`, or a non-`<url>`/`<string>` `@import`) as a raw verbatim
+/// prelude.
+///
+/// Consumes the remaining prelude tokens up to the block boundary and rebuilds the
+/// **whole** prelude — from `prelude_start_raw`, the raw (base-offset-free) source
+/// offset of its first token — verbatim and outer-trimmed, as `PreludeValue::Raw`
+/// (whose printer emits it as-is and whose convert extracts it from `span`). This
+/// matches parseCss (which stores an unstructurable prelude raw) and prettier (which
+/// prints it verbatim); see the call sites for the CSS-Syntax rationale.
+pub(super) fn reconsume_prelude_as_raw<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    prelude_start_raw: usize,
+) -> Result<PreludeValue<'arena>, ParseError> {
+    while !parser.at_prelude_end() {
+        parser.advance()?;
+    }
+
+    // Verbatim prelude text runs from its first token to the boundary token; outer
+    // whitespace is trimmed so the public AST (from `span`) and printer `content` agree.
+    let raw = &parser.source()[prelude_start_raw..parser.current_start];
+    let content = raw.trim();
+    let content_start_raw = prelude_start_raw + (raw.len() - raw.trim_start().len());
+    let content_end_raw = content_start_raw + content.len();
+
+    Ok(PreludeValue::Raw {
+        content: parser.alloc_str_in(content),
+        span: Span {
+            start: parser.span_pos(content_start_raw),
+            end: parser.span_pos(content_end_raw),
+        },
     })
 }
 

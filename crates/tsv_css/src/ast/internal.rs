@@ -191,6 +191,17 @@ pub enum SimpleSelector<'arena> {
         value: f64,
         span: Span, // @keyframes percentage selectors (0%, 50%, 100%)
     },
+    /// `An+B` term (`2n`, `2n + 1`, `odd`, `123`) appearing as a simple selector
+    /// inside functional pseudo-class arguments (`:is(.a, 123)`, `:foo(2n + 1)`).
+    /// Matches Svelte's `read_selector` Nth production, which is active only inside
+    /// pseudo-class args (top-level `123 {}` still rejects). `span` covers the An+B
+    /// value text verbatim: the public `Nth` node's `value` is that source slice
+    /// (parseCss stores it raw) and the printer normalizes the spacing
+    /// (`2n+1` → `2n + 1`), like the dedicated `:nth-child` path. For an `An+B of S`
+    /// term the span folds in the ` of ` (`2n of `), matching Svelte's `\s+of\s+`
+    /// terminator; `S` follows as ordinary sibling selectors (NOT nested), unlike the
+    /// dedicated `:nth-*()` path which nests `S` under `Nth.selector`.
+    Nth { span: Span },
     /// Invalid selector - unparseable syntax preserved for forgiving parsing
     ///
     /// Used in :is() and :where() pseudo-classes which use forgiving selector lists.
@@ -218,6 +229,7 @@ impl SimpleSelector<'_> {
             | SimpleSelector::PseudoElement { span, .. }
             | SimpleSelector::Nesting { span }
             | SimpleSelector::Percentage { span, .. }
+            | SimpleSelector::Nth { span }
             | SimpleSelector::Invalid { span } => *span,
         }
     }
@@ -593,10 +605,13 @@ pub enum PreludeValue<'arena> {
     /// Example: `@layer` → `a , b`; `@keyframes` → `my-anim`.
     Raw { content: &'arena str, span: Span },
 
-    /// Selector lists (for @scope)
-    /// Example: `@scope (.card) to (.footer)` → root: [.card], limit: Some([.footer])
+    /// Selector lists (for @scope). Both clauses are independently optional per
+    /// css-cascade-6 (`@scope [(<scope-start>)]? [to (<scope-end>)]?`), so a bare
+    /// `@scope { … }` has `root: None, limit: None`, and `@scope to (.footer)` has
+    /// `root: None, limit: Some(…)`.
+    /// Example: `@scope (.card) to (.footer)` → root: Some([.card]), limit: Some([.footer])
     Selectors {
-        root: SelectorList<'arena>,
+        root: Option<SelectorList<'arena>>,
         limit: Option<SelectorList<'arena>>,
         span: Span,
     },
@@ -685,7 +700,9 @@ impl PreludeValue<'_> {
         match self {
             PreludeValue::Values { values, .. } => values.is_empty(),
             PreludeValue::Raw { content, .. } => content.is_empty(),
-            PreludeValue::Selectors { root, .. } => root.selectors.is_empty(),
+            PreludeValue::Selectors { root, limit, .. } => {
+                root.as_ref().is_none_or(|r| r.selectors.is_empty()) && limit.is_none()
+            }
             PreludeValue::Supports { condition, .. } => condition.parts.is_empty(),
             PreludeValue::Container {
                 name, condition, ..

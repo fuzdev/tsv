@@ -6,11 +6,10 @@
 	// comment before while
 	while (a);
 
-	// With blank line before comment
+	// Own-line comment before while (a blank above the comment is dropped)
 	do {
 		fn();
 	}
-
 	// blank before
 	while (a);
 </script>

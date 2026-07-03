@@ -1,0 +1,34 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 57,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 48,
+				"name": "namespace",
+				"prelude": "ns url(http://a.fuz.dev/*x)",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 49,
+			"styles": "\n\t@namespace ns url(http://a.fuz.dev/*x);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 58,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
