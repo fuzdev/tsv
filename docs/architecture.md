@@ -44,7 +44,7 @@ Each language crate separates these cleanly:
 - `ast/convert` — Emits the public wire JSON directly from `internal`, in one
   walk (the writer), matching the canonical parser's JSON exactly (file or directory)
 
-TypeScript uses directories (`internal/`, `public/`, `convert/`) due to complexity. CSS uses single files. Svelte uses files for AST types but a directory for conversion.
+TypeScript uses directories (`internal/`, `convert/`) due to complexity. CSS and Svelte use a single `internal.rs` for AST types and a directory for conversion.
 
 ### Model Fidelity Principle
 

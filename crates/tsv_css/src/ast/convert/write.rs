@@ -24,6 +24,13 @@
 //! `ByteToCharMap` (identity on ASCII). Dynamic strings delegate to
 //! `serde_json` (via `JsonWriter::string`); static structure/tokens are written
 //! verbatim; integers are hand-formatted.
+//!
+//! Node-header prefixes are single pre-fused `w.raw` literals per site,
+//! deliberately NOT extracted into a shared `open_node` helper: the helper —
+//! even `#[inline]` taking the pre-fused prefix — shifted fat-LTO inlining
+//! across the crate (`write_block`/`write_atrule` de-inlined) and measured
+//! +0.45% instructions on the CSS parse-JSON path. CSS nodes are small enough
+//! that per-node call structure is visible; keep the literals inline.
 
 use super::super::internal;
 use super::AstScope;
@@ -92,29 +99,13 @@ pub fn write_css_node(
     write_node(w, node, &ctx);
 }
 
-/// Emit the shared `{"type":"X","start":N,"end":N` node prefix — the object is
-/// left open, the caller appends its remaining fields and the closing `}`.
-/// Only for the nodes whose `start`/`end` immediately follow `type` (`Rule`,
-/// `Atrule`, and the selector kinds with a leading `name`/`combinator` field
-/// order their positions elsewhere).
-fn open_node(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"");
-    w.raw(node_type);
-    w.raw("\",\"start\":");
-    w.u32(ctx.pos(span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(span.end));
-}
-
 /// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
 /// length), `children`.
 fn write_stylesheet_file(w: &mut JsonWriter, nodes: &[internal::CssNode<'_>], ctx: &Ctx<'_>) {
-    open_node(
-        w,
-        "StyleSheetFile",
-        Span::new(0, ctx.source.len() as u32),
-        ctx,
-    );
+    w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
+    w.u32(ctx.pos(0));
+    w.raw(",\"end\":");
+    w.u32(ctx.pos(ctx.source.len() as u32));
     w.raw(",\"children\":");
     write_array(w, nodes, |w, n| write_node(w, n, ctx));
     w.raw("}");
@@ -171,7 +162,10 @@ fn write_block(
     children: &[internal::CssBlockChild<'_>],
     ctx: &Ctx<'_>,
 ) {
-    open_node(w, "Block", block_span, ctx);
+    w.raw("{\"type\":\"Block\",\"start\":");
+    w.u32(ctx.pos(block_span.start));
+    w.raw(",\"end\":");
+    w.u32(ctx.pos(block_span.end));
     w.raw(",\"children\":");
     write_array(
         w,
@@ -205,12 +199,10 @@ fn write_declaration(w: &mut JsonWriter, decl: &internal::CssDeclaration<'_>, ct
     let (property_source, value_source) = split_declaration_svelte_compat(decl_source);
     let value = strip_css_comments(value_source);
 
-    open_node(
-        w,
-        "Declaration",
-        Span::new(decl.span.start, end as u32),
-        ctx,
-    );
+    w.raw("{\"type\":\"Declaration\",\"start\":");
+    w.u32(ctx.pos(decl.span.start));
+    w.raw(",\"end\":");
+    w.u32(ctx.pos(end as u32));
     w.raw(",\"property\":");
     w.string(property_source.trim_end());
     w.raw(",\"value\":");
@@ -240,7 +232,10 @@ fn write_selector_list_inner(
     ctx: &Ctx<'_>,
     filter_invalid: bool,
 ) {
-    open_node(w, "SelectorList", sl.span, ctx);
+    w.raw("{\"type\":\"SelectorList\",\"start\":");
+    w.u32(ctx.pos(sl.span.start));
+    w.raw(",\"end\":");
+    w.u32(ctx.pos(sl.span.end));
     w.raw(",\"children\":");
     write_array(
         w,
@@ -254,7 +249,10 @@ fn write_selector_list_inner(
 
 /// Emits a `ComplexSelector` node.
 fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>, ctx: &Ctx<'_>) {
-    open_node(w, "ComplexSelector", c.span, ctx);
+    w.raw("{\"type\":\"ComplexSelector\",\"start\":");
+    w.u32(ctx.pos(c.span.start));
+    w.raw(",\"end\":");
+    w.u32(ctx.pos(c.span.end));
     w.raw(",\"children\":");
     write_array(w, c.children, |w, r| write_relative_selector(w, r, ctx));
     if ctx.scope.has_metadata() {
@@ -333,7 +331,10 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             let value = *value;
             let flags = *flags;
             let namespace = *namespace;
-            open_node(w, "AttributeSelector", *span, ctx);
+            w.raw("{\"type\":\"AttributeSelector\",\"start\":");
+            w.u32(ctx.pos(span.start));
+            w.raw(",\"end\":");
+            w.u32(ctx.pos(span.end));
             w.raw(",\"name\":");
             w.string(&name);
             w.raw(",\"matcher\":");
