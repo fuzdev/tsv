@@ -54,6 +54,8 @@ catalog entry.
 - No-namespace `|element` — Not supported — [no_namespace](../tests/fixtures/css/selectors/namespace/no_namespace_svelte_divergence/)
 - Forgiving :is()/:where() — Strict parsing (should be forgiving) — [forgiving_is_where](../tests/fixtures/css/selectors/forgiving_is_where_svelte_divergence/)
 - Empty-after-comment declarations — Rejected (`css_empty_declaration`) — [comment_empty_value](../tests/fixtures/css/tokens/comments/comment_empty_value_svelte_divergence/)
+- `;` inside a function value (`prop: fn(a; b)`) — Rejected (`css_empty_declaration`); the inner `;` is truncated as a declaration terminator, but per CSS Syntax 3 a `;` inside a `fn(…)` simple block is block content — tsv (and prettier) keep the declaration whole — [function_semicolon](../tests/fixtures/css/values/function_semicolon_svelte_divergence/)
+- `<general-enclosed>` `@supports` condition with `;` (`@supports (margin: 0;)`, `@supports foo(a; b)`) — Rejected (`css_empty_declaration`); per CSS Conditional 3 a `<general-enclosed>` = `(<any-value>)` / `fn(<any-value>)` admits any balanced token run incl. `;`, so it parses (evaluates false) — tsv (and prettier) keep it stable — [supports_general_enclosed](../tests/fixtures/css/at_rules/supports_general_enclosed_svelte_divergence/)
 - Block-valued custom properties — Rejected (`css_expected_identifier`) — [block_value](../tests/fixtures/css/values/variables/block_value_svelte_prettier_divergence/)
 
 ### CSS Parser Corrections (corpus-enforced)

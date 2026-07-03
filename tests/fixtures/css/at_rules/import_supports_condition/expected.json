@@ -1,0 +1,58 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 218,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 56,
+				"name": "import",
+				"prelude": "url('a.css') supports((display: grid))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 58,
+				"end": 109,
+				"name": "import",
+				"prelude": "url('b.css') supports(not (display: flex))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 111,
+				"end": 158,
+				"name": "import",
+				"prelude": "url('c.css') supports(selector(a > b))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 160,
+				"end": 209,
+				"name": "import",
+				"prelude": "url('d.css') supports((a: b) and (c: d))",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 210,
+			"styles": "\n\t@import url('a.css') supports((display: grid));\n\t@import url('b.css') supports(not (display: flex));\n\t@import url('c.css') supports(selector(a > b));\n\t@import url('d.css') supports((a: b) and (c: d));\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 219,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
