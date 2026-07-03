@@ -204,7 +204,6 @@
 										},
 										"name": "with"
 									},
-									"kind": "init",
 									"value": {
 										"type": "ObjectExpression",
 										"start": 86,
@@ -253,7 +252,6 @@
 													},
 													"name": "type"
 												},
-												"kind": "init",
 												"value": {
 													"type": "Literal",
 													"start": 94,
@@ -270,10 +268,12 @@
 													},
 													"value": "json",
 													"raw": "'json'"
-												}
+												},
+												"kind": "init"
 											}
 										]
-									}
+									},
+									"kind": "init"
 								}
 							]
 						},
@@ -412,7 +412,6 @@
 										},
 										"name": "with"
 									},
-									"kind": "init",
 									"value": {
 										"type": "ObjectExpression",
 										"start": 168,
@@ -461,7 +460,6 @@
 													},
 													"name": "type"
 												},
-												"kind": "init",
 												"value": {
 													"type": "Literal",
 													"start": 176,
@@ -478,10 +476,12 @@
 													},
 													"value": "json",
 													"raw": "'json'"
-												}
+												},
+												"kind": "init"
 											}
 										]
-									}
+									},
+									"kind": "init"
 								}
 							]
 						},
@@ -668,7 +668,6 @@
 										},
 										"name": "with"
 									},
-									"kind": "init",
 									"value": {
 										"type": "ObjectExpression",
 										"start": 250,
@@ -717,7 +716,6 @@
 													},
 													"name": "type"
 												},
-												"kind": "init",
 												"value": {
 													"type": "Literal",
 													"start": 258,
@@ -734,10 +732,12 @@
 													},
 													"value": "json",
 													"raw": "'json'"
-												}
+												},
+												"kind": "init"
 											}
 										]
-									}
+									},
+									"kind": "init"
 								}
 							]
 						},
@@ -922,7 +922,6 @@
 												},
 												"name": "with"
 											},
-											"kind": "init",
 											"value": {
 												"type": "ObjectExpression",
 												"start": 325,
@@ -971,7 +970,6 @@
 															},
 															"name": "type"
 														},
-														"kind": "init",
 														"value": {
 															"type": "Literal",
 															"start": 333,
@@ -988,10 +986,12 @@
 															},
 															"value": "json",
 															"raw": "'json'"
-														}
+														},
+														"kind": "init"
 													}
 												]
-											}
+											},
+											"kind": "init"
 										}
 									]
 								},

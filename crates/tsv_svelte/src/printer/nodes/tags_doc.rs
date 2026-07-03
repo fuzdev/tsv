@@ -82,7 +82,10 @@ impl<'a> Printer<'a> {
         span: Span,
     ) -> DocId {
         let d = self.d();
-        let id_doc = self.build_ts_expression_doc_no_comments(id);
+        // Comment-aware: a destructure id can carry comments inside
+        // (`{@const { b = /* c */ 1 } = expr}`); the comment-less builder
+        // silently dropped them.
+        let id_doc = self.build_ts_expression_doc(id);
         // Build init with LayoutMode::Standalone so binary chains use Grouped style
         // (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.

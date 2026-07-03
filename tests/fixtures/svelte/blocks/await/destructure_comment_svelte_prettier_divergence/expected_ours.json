@@ -88,7 +88,6 @@
 								},
 								"name": "a"
 							},
-							"kind": "init",
 							"value": {
 								"type": "AssignmentPattern",
 								"start": 102,
@@ -136,7 +135,8 @@
 									"value": 1,
 									"raw": "1"
 								}
-							}
+							},
+							"kind": "init"
 						}
 					]
 				},
@@ -296,7 +296,6 @@
 								},
 								"name": "b"
 							},
-							"kind": "init",
 							"value": {
 								"type": "Identifier",
 								"start": 254,
@@ -312,7 +311,8 @@
 									}
 								},
 								"name": "b"
-							}
+							},
+							"kind": "init"
 						}
 					]
 				},
@@ -579,7 +579,6 @@
 								},
 								"name": "d"
 							},
-							"kind": "init",
 							"value": {
 								"type": "AssignmentPattern",
 								"start": 522,
@@ -627,7 +626,8 @@
 									"value": 1,
 									"raw": "1"
 								}
-							}
+							},
+							"kind": "init"
 						}
 					]
 				},
@@ -711,11 +711,11 @@
 			"loc": {
 				"start": {
 					"line": 2,
-					"column": 27
+					"column": 28
 				},
 				"end": {
 					"line": 2,
-					"column": 34
+					"column": 35
 				}
 			}
 		},
@@ -727,11 +727,11 @@
 			"loc": {
 				"start": {
 					"line": 9,
-					"column": 11
+					"column": 12
 				},
 				"end": {
 					"line": 9,
-					"column": 18
+					"column": 19
 				}
 			}
 		},
@@ -743,11 +743,11 @@
 			"loc": {
 				"start": {
 					"line": 11,
-					"column": 12
+					"column": 13
 				},
 				"end": {
 					"line": 11,
-					"column": 19
+					"column": 20
 				}
 			}
 		},
@@ -759,11 +759,11 @@
 			"loc": {
 				"start": {
 					"line": 17,
-					"column": 27
+					"column": 28
 				},
 				"end": {
 					"line": 17,
-					"column": 31
+					"column": 32
 				}
 			}
 		}
