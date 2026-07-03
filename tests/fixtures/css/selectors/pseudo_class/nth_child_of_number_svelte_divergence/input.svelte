@@ -11,4 +11,9 @@
 	a:nth-last-child(3 of 7) {
 		color: green;
 	}
+
+	/* S is a complex selector ending in a descendant Nth (.a <descendant> 123) */
+	a:nth-child(2n of .a 123) {
+		color: teal;
+	}
 </style>

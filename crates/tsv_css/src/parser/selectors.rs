@@ -421,7 +421,8 @@ pub(crate) fn parse_combinator(
             // selectors — an adjacent selector token is part of the same compound
             // (handled by the is_simple_selector_chain loop) and must never fabricate a
             // zero-width combinator.
-            if (combinator_start > whitespace_start || had_gap_comment) && is_selector_start(parser)
+            if (combinator_start > whitespace_start || had_gap_comment)
+                && (is_selector_start(parser) || pseudo_arg_terminal_nth(parser))
             {
                 Some(Combinator::Descendant)
             } else {
@@ -491,6 +492,17 @@ fn is_explicit_combinator_kind(kind: TokenKind) -> bool {
 /// Check if current token could start a selector
 fn is_selector_start(parser: &CssParser<'_, '_>) -> bool {
     is_selector_start_kind(parser.current_kind)
+}
+
+/// Inside functional pseudo-class args, a bare `<number>`/`<an+b>` term terminated by
+/// `,`/`)` is a valid `Nth` simple selector — the same production `parse_simple_selector`
+/// recognizes in leading position (`:is(123)`), but in descendant position it must also
+/// count as a selector start so the preceding whitespace becomes a `Descendant` combinator
+/// (`:is(.a 123)`, `:not(.a 2n + 1)`), matching parseCss. Gated on `in_pseudo_args`; the
+/// `match_nth_value` terminator requirement keeps `:is(.a 123 .b)` rejected (parseCss
+/// rejects it too — the Nth must be the terminal simple selector).
+fn pseudo_arg_terminal_nth(parser: &CssParser<'_, '_>) -> bool {
+    parser.in_pseudo_args && match_nth_value(parser.source(), parser.current_start()).is_some()
 }
 
 /// After a compound, decide whether a `Comment` at the current position is an
