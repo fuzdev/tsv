@@ -137,7 +137,7 @@ with byte→UTF-16 offset translation fused into the walk via `LocationMapper`
 (final char-space positions emitted directly; ASCII sources are byte-space
 passthrough). The output is valid UTF-8 by construction, and returning bytes
 lets byte-oriented boundaries skip the O(output) UTF-8 validation a `String`
-requires (the wire is ~15× the source); `convert_ast_json_string` is the
+requires (the wire is ~20× the source); `convert_ast_json_string` is the
 same bytes plus that one validation, for `&str` boundaries (the WASM
 binding's `JSON.parse`, N-API strings), and `convert_ast_json` parses the
 bytes back into a `serde_json::Value` for the `Value` consumers (the CLI's

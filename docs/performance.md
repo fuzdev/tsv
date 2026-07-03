@@ -45,9 +45,9 @@ allocations) is a negligible absolute change.
 - **Representative real-world** — `~/dev/svelte/packages/svelte/src`,
   `~/dev/kit/packages/kit/src`, and `~/dev/svelte-docinfo/src`. Large, diverse
   sources at moderate comment density — the middle ground the two app corpora
-  bracket. svelte and kit are mostly `.js` (which `tsv format` / `profile`
-  skip), so kit's `.svelte` + `.ts` and svelte-docinfo's `.ts` are the
-  formattable slices.
+  bracket. svelte and kit are mostly `.js` (which `tsv format` skips, but
+  `profile`/`json_profile` still time, parsed as TypeScript), so kit's
+  `.svelte` + `.ts` and svelte-docinfo's `.ts` are the formattable slices.
 
 ## Tooling
 
@@ -149,7 +149,7 @@ perf record --call-graph=dwarf -- target/profiling/tsv_debug profile ~/dev/zzz/s
 perf report --stdio
 
 # Line-level hotspots within a specific function (exact demangled name from perf report)
-perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::will_break_inner'
+perf annotate --stdio -s 'tsv_lang::doc::arena::DocArena::will_break_deep_inner'
 
 # Collapsed stacks (greppable text, one line per unique stack; cargo install inferno)
 perf script | inferno-collapse-perf > stacks.txt
@@ -337,6 +337,10 @@ deno run --allow-read --allow-env --allow-net --allow-sys \
   benches/js/diagnostics/wasm_format_probe.ts
 ```
 
+The memory-axis sibling, `benches/js/diagnostics/wasm_memory_probe.ts`,
+measures WASM peak/high-water memory demand per file (documented in
+`benches/js/CLAUDE.md`).
+
 ### 7. `tsv_debug arena_stats` — doc-arena node population
 
 Formats a corpus into fresh `DocArena`s and walks `borrow_nodes()`, reporting the
@@ -385,7 +389,7 @@ cargo run -p tsv_debug arena_stats <paths> --list-errors   # list parse-skipped 
 
 1. **`tsv_debug profile`** — same workload, compare phase split
 2. **`deno task bench`** — measure overall corpus impact
-3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or `bench:node:run` for the Node runtime)
+3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or the `bench:node:run` / `bench:bun:run` siblings for the other runtimes)
 
 ## WASM bundle size
 
@@ -422,13 +426,14 @@ deno task build:wasm:all:deno     # full (executed by the bench) → pkg/all/den
 These aren't set up yet but may be useful for specific investigations:
 
 - **Criterion microbenchmarks** — statistical rigor for isolated hot functions
-- **Custom counters** — `fits()` call counts, doc node counts (when investigating algorithmic issues)
+- **Custom counters** — `fits()` call counts (when investigating algorithmic
+  issues; doc-node counts are already covered by `arena_stats`, §7)
 
 ## Baselines and tracking
 
 Methodology and tooling above are evergreen; corpus benchmark results land in
 the per-runtime `benches/js/results/report.<runtime>.{json,md}` siblings
-(`report.deno.*` / `report.node.*`).
+(`report.deno.*` / `report.node.*` / `report.bun.*`).
 
 Wall-clock readings vary several-fold with machine state (CPU frequency scaling
 and concurrent load) — trust only quiet-machine runs, and prefer per-byte rates
