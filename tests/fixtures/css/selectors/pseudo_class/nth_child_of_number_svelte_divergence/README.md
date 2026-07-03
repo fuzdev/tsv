@@ -7,6 +7,10 @@ where a bare number/An+B reads as an `Nth` simple selector rather than a type se
 previously hard-rejected these (`Unexpected token in selector: number`) because the of-list
 parse ran without `in_pseudo_args` set; both prettier and Svelte's `parseCss` accept them.
 
+`S` need not be a bare term — it is a full `<complex-real-selector-list>`, so `2n of .a 123` nests
+a two-hop complex selector (`.a` descendant a terminal `Nth "123"`; the descendant-position
+`Nth` is the same `in_pseudo_args` production, recognized after an implicit combinator).
+
 tsv nests `S` under `Nth.selector` (spec-compliant, the same structural correction as
 [nth_child_of](../nth_child_of_svelte_prettier_divergence/)); Svelte flattens ` of ` into
 `Nth.value` and reads `S` as a sibling `Nth`.
@@ -21,7 +25,7 @@ divergence (`_svelte_divergence`, no `output_prettier.svelte`).
 
 Same structural correction as [nth_child_of](../nth_child_of_svelte_prettier_divergence/):
 CSS Selectors 4 (`#the-nth-child-pseudo`) defines `:nth-child(An+B [of S]?)` where `S` is a
-nested `<complex-selector-list>`. Svelte's parser folds the `of` keyword into the An+B value
+nested `<complex-real-selector-list>`. Svelte's parser folds the `of` keyword into the An+B value
 and flattens `S` as siblings. `S` here is itself the `in_pseudo_args` bare-`<an+b>`
 over-acceptance (both parsers read `123`/`2n` as an `Nth`) — invalid as a real selector, but
 tsv matches Svelte's acceptance and applies its principled `of S` nesting uniformly.
