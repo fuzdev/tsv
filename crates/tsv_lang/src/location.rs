@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 /// A position in source code (line and column)
 ///
 /// Generic type without serialization - languages can wrap this in their own types
@@ -165,9 +167,29 @@ impl<'a> LocationMapper<'a> {
 #[derive(Debug)]
 pub struct LocationTracker {
     line_starts: Vec<usize>,
+    /// 1-entry line-range cache for `get_line_column` / `line_start_byte`.
+    /// Wire-JSON emission is a DFS with high line locality, so successive
+    /// offset lookups usually fall in the last-resolved line's `[line_start,
+    /// next_line_start)` range and skip the O(log n) binary search on
+    /// `line_starts`. Holds `(line_idx, line_start, next_line_start)`; the
+    /// initial `(0, 0, 0)` never matches (`offset < 0` is false), so the first
+    /// lookup fills it. Interior mutability behind `&self` (the tracker is
+    /// threaded by shared reference through the single-threaded convert path).
+    line_cache: Cell<(usize, usize, usize)>,
 }
 
 impl LocationTracker {
+    /// Build a tracker from precomputed line starts, seeding an empty
+    /// line-range cache. The single constructor helper every `new*` routes
+    /// through so the cache field stays in one place.
+    #[inline]
+    fn with_line_starts(line_starts: Vec<usize>) -> Self {
+        Self {
+            line_starts,
+            line_cache: Cell::new((0, 0, 0)),
+        }
+    }
+
     /// Line starts at LF only — Svelte's `locate-character` convention, used
     /// for Svelte template and CSS locations.
     ///
@@ -181,7 +203,7 @@ impl LocationTracker {
                 line_starts.push(i + 1);
             }
         }
-        Self { line_starts }
+        Self::with_line_starts(line_starts)
     }
 
     /// Line starts per the ECMAScript LineTerminator set (LF, CR, CRLF,
@@ -192,9 +214,7 @@ impl LocationTracker {
     /// survives as its differential test oracle.
     pub fn new_ecmascript(source: &str) -> Self {
         if source.is_ascii() {
-            return Self {
-                line_starts: ascii_ecmascript_line_starts(source.as_bytes()),
-            };
+            return Self::with_line_starts(ascii_ecmascript_line_starts(source.as_bytes()));
         }
         let mut line_starts = vec![0];
         let mut chars = source.char_indices().peekable();
@@ -213,7 +233,7 @@ impl LocationTracker {
                 _ => {}
             }
         }
-        Self { line_starts }
+        Self::with_line_starts(line_starts)
     }
 
     /// Build the ECMAScript-rule tracker and the byte→UTF-16 map in one
@@ -227,9 +247,7 @@ impl LocationTracker {
     pub fn new_ecmascript_with_map(source: &str) -> (Self, ByteToCharMap) {
         if source.is_ascii() {
             return (
-                Self {
-                    line_starts: ascii_ecmascript_line_starts(source.as_bytes()),
-                },
+                Self::with_line_starts(ascii_ecmascript_line_starts(source.as_bytes())),
                 ByteToCharMap::identity(),
             );
         }
@@ -267,7 +285,7 @@ impl LocationTracker {
         offsets[source.len()] = utf16_idx;
 
         (
-            Self { line_starts },
+            Self::with_line_starts(line_starts),
             ByteToCharMap {
                 offsets,
                 has_multibyte: true,
@@ -283,9 +301,7 @@ impl LocationTracker {
     pub fn new_with_map(source: &str) -> (Self, ByteToCharMap) {
         if source.is_ascii() {
             return (
-                Self {
-                    line_starts: ascii_lf_line_starts(source.as_bytes()),
-                },
+                Self::with_line_starts(ascii_lf_line_starts(source.as_bytes())),
                 ByteToCharMap::identity(),
             );
         }
@@ -308,7 +324,7 @@ impl LocationTracker {
         offsets[source.len()] = utf16_idx;
 
         (
-            Self { line_starts },
+            Self::with_line_starts(line_starts),
             ByteToCharMap {
                 offsets,
                 has_multibyte: true,
@@ -316,25 +332,42 @@ impl LocationTracker {
         )
     }
 
-    pub fn get_line_column(&self, offset: usize) -> (usize, usize) {
+    /// Resolve `offset` to `(line_idx, line_start)`, consulting the 1-entry
+    /// line-range cache first and filling it via binary search on a miss.
+    /// Byte-identical to the bare `binary_search` + `saturating_sub` both
+    /// callers used before — the cache is a pure memo keyed on the line's
+    /// half-open byte range.
+    #[inline]
+    fn resolve_line(&self, offset: usize) -> (usize, usize) {
+        let (line_idx, line_start, next_line_start) = self.line_cache.get();
+        if line_start <= offset && offset < next_line_start {
+            return (line_idx, line_start);
+        }
         let line_idx = match self.line_starts.binary_search(&offset) {
             Ok(idx) => idx, // Exact match - this offset is at the start of a line
             Err(idx) => idx.saturating_sub(1),
         };
+        let line_start = self.line_starts[line_idx];
+        // Last line has no upper bound; a sentinel keeps it a permanent hit.
+        let next_line_start = self
+            .line_starts
+            .get(line_idx + 1)
+            .copied()
+            .unwrap_or(usize::MAX);
+        self.line_cache.set((line_idx, line_start, next_line_start));
+        (line_idx, line_start)
+    }
 
-        let column = offset - self.line_starts[line_idx];
-        (line_idx + 1, column) // Lines are 1-indexed
+    pub fn get_line_column(&self, offset: usize) -> (usize, usize) {
+        let (line_idx, line_start) = self.resolve_line(offset);
+        (line_idx + 1, offset - line_start) // Lines are 1-indexed
     }
 
     /// Get the byte offset of the start of the line containing the given byte offset
     ///
     /// Used to compute character-based columns: `char_column = byte_to_char(offset) - byte_to_char(line_start)`.
     pub fn line_start_byte(&self, offset: usize) -> usize {
-        let line_idx = match self.line_starts.binary_search(&offset) {
-            Ok(idx) => idx,
-            Err(idx) => idx.saturating_sub(1),
-        };
-        self.line_starts[line_idx]
+        self.resolve_line(offset).1
     }
 }
 
@@ -431,6 +464,35 @@ mod tests {
         // \r followed by U+2028 is two terminators (only \r\n fuses)
         let tracker = LocationTracker::new_ecmascript("a\r\u{2028}b");
         assert_eq!(tracker.get_line_column(5), (3, 0)); // b
+    }
+
+    #[test]
+    fn test_line_range_cache_is_order_independent() {
+        // The 1-entry line-range cache must be a pure memo: the same offset
+        // resolves identically regardless of prior lookups. A fresh tracker per
+        // reference query keeps the cache permanently cold, so it is the pure
+        // binary-search oracle. Includes an empty line ("\n\n") and a final
+        // no-newline line to stress the boundary (`offset == next_line_start`
+        // must miss) and last-line (unbounded) cases.
+        let src = "ab\ncde\n\nfghi\nj";
+        let n = src.len();
+        let warm = LocationTracker::new_ecmascript(src);
+        let cold = |off: usize| LocationTracker::new_ecmascript(src).get_line_column(off);
+        let cold_lsb = |off: usize| LocationTracker::new_ecmascript(src).line_start_byte(off);
+
+        // Forward, then backward on the SAME warm tracker (the backward sweep is
+        // where the cache would go wrong if the range check were unsound), then
+        // worst-locality interleaved jumps.
+        for off in 0..=n {
+            assert_eq!(warm.get_line_column(off), cold(off), "forward @{off}");
+        }
+        for off in (0..=n).rev() {
+            assert_eq!(warm.get_line_column(off), cold(off), "backward @{off}");
+        }
+        for &off in &[n, 0, 3, 7, 0, n, 6, 8, 2, n, 13] {
+            assert_eq!(warm.get_line_column(off), cold(off), "jump @{off}");
+            assert_eq!(warm.line_start_byte(off), cold_lsb(off), "jump lsb @{off}");
+        }
     }
 
     #[test]
