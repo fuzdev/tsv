@@ -150,6 +150,16 @@ impl<'a> Printer<'a> {
     /// Value comments are comments that appear after the colon, e.g., `color: /* comment */ red;`
     /// Detected by scanning the source text directly (value comments are not stored in the Vec).
     pub(crate) fn has_value_comments_in_decl(&self, decl: &CssDeclaration<'_>) -> bool {
+        // Free O(1) negative gate: `has_block_comment` (recorded at parse time from the
+        // lexer's comment tokens) is false iff no `/* … */` appears anywhere in the
+        // declaration — property→colon gap or value/`!important`/trailing region. No block
+        // comment anywhere ⟹ no value comment, so skip the colon scan + `/*` substring check
+        // + value re-lex entirely on the common comment-free path (this fn runs up to 3× per
+        // declaration). When a comment is present the scan below runs unchanged, so the result
+        // is byte-identical.
+        if !decl.has_block_comment {
+            return false;
+        }
         let decl_source = decl.span.extract(self.source);
         let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) else {
             return false;
