@@ -408,7 +408,9 @@ pub(super) fn parse_scope_prelude<'arena>(
 /// - `url('narrow.css') supports(display: flex) screen`
 pub(super) fn parse_import_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<(&'arena [CssValue<'arena>], Span), ParseError> {
+) -> Result<PreludeValue<'arena>, ParseError> {
+    // Raw offset of the prelude's first token, for the raw fallback below.
+    let prelude_start_raw = parser.current_start;
     let start = parser.span_pos(parser.current_start);
     let mut values = parser.bvec();
 
@@ -441,7 +443,12 @@ pub(super) fn parse_import_prelude<'arena>(
         });
         parser.advance()?;
     } else {
-        return Err(parser.error_msg("@import expects url() or string"));
+        // Not a `<url>`/`<string>` first value, so this isn't a structurable @import.
+        // Per CSS Syntax 3 the prelude is still consumed as component values (an invalid
+        // `@import` is dropped at cascade, not a parse error); parseCss stores it raw and
+        // prettier prints it verbatim. Reconsume the whole prelude — including the empty
+        // `@import;` case (nothing to consume → a zero-width raw prelude → `""`).
+        return super::reconsume_prelude_as_raw(parser, prelude_start_raw);
     }
 
     parser.skip_whitespace_registering_comments()?;
@@ -507,7 +514,10 @@ pub(super) fn parse_import_prelude<'arena>(
 
     let end = values.last().map_or(start, |v| v.span().end);
 
-    Ok((values.into_bump_slice(), Span { start, end }))
+    Ok(PreludeValue::Values {
+        values: values.into_bump_slice(),
+        span: Span { start, end },
+    })
 }
 
 /// Parse a function value (e.g., url(), layer(), supports())
