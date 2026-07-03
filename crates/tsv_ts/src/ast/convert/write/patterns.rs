@@ -1,14 +1,11 @@
-// Object, array, template, and pattern writers — the writer twin of
-// `convert::patterns`.
+// Object, array, template, and pattern writers.
 
 use super::super::super::internal;
 use super::expressions::{write_expression, write_expressions};
 use super::{Ctx, JsonWriter, close_node, node_header, write_array, write_type_annotation_field};
 use tsv_lang::Span;
 
-/// Mirrors `convert_template_literal`. Field order: `expressions`, `quasis`
-/// (the public struct declares expressions first, unlike convert's build
-/// order).
+/// Emits a `TemplateLiteral` node. Field order: `expressions`, `quasis`.
 pub(super) fn write_template_literal(
     w: &mut JsonWriter,
     template: &internal::TemplateLiteral<'_>,
@@ -22,7 +19,7 @@ pub(super) fn write_template_literal(
     close_node(w, "TemplateLiteral", template.span, ctx);
 }
 
-/// Mirrors `convert_template_element`: acorn excludes the delimiters from the
+/// Emits a `TemplateElement` node: acorn excludes the delimiters from the
 /// span (`+1` past the opening `` ` `` or `}`, `-1`/`-2` before the closing
 /// `` ` `` or `${`). `cooked` is null for invalid escapes in tagged templates.
 pub(super) fn write_template_element(
@@ -51,7 +48,7 @@ pub(super) fn write_template_element(
     close_node(w, "TemplateElement", adjusted_span, ctx);
 }
 
-/// Mirrors `convert_object_pattern`. Field order: `properties`, `optional`
+/// Emits an `ObjectPattern` node. Field order: `properties`, `optional`
 /// (only when true), `typeAnnotation?`.
 pub(super) fn write_object_pattern(
     w: &mut JsonWriter,
@@ -71,7 +68,7 @@ pub(super) fn write_object_pattern(
     close_node(w, "ObjectPattern", obj.span, ctx);
 }
 
-/// Mirrors `convert_rest_element`.
+/// Emits a `RestElement` node.
 pub(super) fn write_rest_element(
     w: &mut JsonWriter,
     rest: &internal::RestElement<'_>,
@@ -84,7 +81,7 @@ pub(super) fn write_rest_element(
     close_node(w, "RestElement", rest.span, ctx);
 }
 
-/// Mirrors `convert_property`. Field order: `method`, `shorthand`, `computed`,
+/// Emits a `Property` node. Field order: `method`, `shorthand`, `computed`,
 /// `key`, `kind`, `value`.
 pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Property", prop.span, ctx);
@@ -103,9 +100,9 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
     close_node(w, "Property", prop.span, ctx);
 }
 
-/// Mirrors the `AssignmentPattern` arm of `convert_expression_inner`, with the
-/// span override the `TSParameterProperty` quirk needs (`span` is normally
-/// `pattern.span`; the quirk widens it to the whole parameter property).
+/// Emits an `AssignmentPattern` node, with the span override the
+/// `TSParameterProperty` quirk needs (`span` is normally `pattern.span`; the
+/// quirk widens it to the whole parameter property).
 pub(super) fn write_assignment_pattern(
     w: &mut JsonWriter,
     pattern: &internal::AssignmentPattern<'_>,

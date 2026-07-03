@@ -1,4 +1,4 @@
-// Expression dispatcher — the writer twin of `convert::expressions`.
+// Expression dispatcher: emit each `Expression` variant's wire JSON.
 
 use super::super::super::internal;
 use super::declarations::write_class_expression;
@@ -21,20 +21,18 @@ use tsv_lang::Span;
 
 /// Emission-time expression state.
 ///
-/// `in_chain` is convert's dispatcher parameter. The other two replace
-/// conversion-time mutations of already-converted children with pre-computed
-/// decisions:
+/// `in_chain` marks whether this node emits inside an optional chain. The other
+/// two are pre-computed decisions that adjust the `optional` field along a
+/// call/member spine:
 ///
 /// - `force_optional` — the acorn `?.<T>(...)` quirk: the callee node of an
-///   optional call with type arguments is itself marked optional
-///   (`convert_call_expression` sets it on the converted callee post-hoc).
+///   optional call with type arguments is itself marked optional.
 /// - `strip_optional` — the unparenthesized-decorator quirk: `optional` is
-///   omitted along the call/member spine (`strip_decorator_spine_optional`).
+///   omitted along the call/member spine.
 ///
-/// Both flags survive a `JsdocCast` unwrap (the post-hoc mutations act on the
-/// converted result, which is the cast's inner) and die on any arm other than
-/// call/member — including a `ChainExpression` wrap, which convert's mutation
-/// matches fall through without touching.
+/// Both flags survive a `JsdocCast` unwrap (they act on the unwrapped inner
+/// expression) and die on any arm other than call/member — including a
+/// `ChainExpression` wrap, which they fall through without touching.
 #[derive(Clone, Copy, Default)]
 pub(super) struct ExprFlags {
     pub(super) in_chain: bool,
@@ -42,7 +40,7 @@ pub(super) struct ExprFlags {
     pub(super) strip_optional: bool,
 }
 
-/// Mirrors `convert_expression` (fresh context: not inside a chain).
+/// Emit an expression's wire JSON in a fresh context (not inside a chain).
 pub(super) fn write_expression(w: &mut JsonWriter, expr: &internal::Expression<'_>, ctx: &Ctx<'_>) {
     write_expression_inner(w, expr, ctx, ExprFlags::default());
 }
@@ -70,7 +68,8 @@ fn write_expression_holes<'a, 'arena: 'a>(
     });
 }
 
-/// Mirrors `convert_expression_inner`.
+/// Emit an expression's wire JSON, dispatching on its variant (chain flags
+/// threaded via `ExprFlags`).
 pub(super) fn write_expression_inner(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
@@ -331,8 +330,8 @@ pub(super) fn write_expression_inner(
             maybe_wrap_chain(w, needs_chain, non_null_expr.span, ctx, |w| {
                 node_header(w, "TSNonNullExpression", non_null_expr.span, ctx);
                 w.raw(",\"expression\":");
-                // force/strip die here: TSNonNullExpression is not in
-                // convert's post-hoc mutation matches.
+                // force/strip die here: TSNonNullExpression is not a
+                // call/member spine node.
                 write_expression_inner(
                     w,
                     non_null_expr.expression,
@@ -361,8 +360,8 @@ pub(super) fn write_expression_inner(
                 w.raw("]");
             }
             // Svelte non-`lang="ts"` script quirk: vanilla acorn appends
-            // `options: null`; acorn-typescript omits it. Appended last, so it
-            // matches `inject_import_options_null`'s `entry().or_insert(Null)`.
+            // `options: null`; acorn-typescript omits it. Appended last (after
+            // `arguments`) so field order matches vanilla acorn.
             if ctx.import_options_null {
                 w.raw(",\"options\":null");
             }
@@ -415,15 +414,15 @@ pub(super) fn write_expression_inner(
 }
 
 /// Whether a member's object / a call's callee emits as part of the current
-/// optional chain — mirrors convert's `child_in_chain` (a parenthesized child
-/// seals its own chain; the span gap over the stripped `(` is the signal).
+/// optional chain: a parenthesized child seals its own chain (the span gap over
+/// the stripped `(` is the signal).
 fn child_in_chain(parent_start: u32, child_start: u32, needs_chain: bool, in_chain: bool) -> bool {
     let parenthesized = parent_start < child_start;
     !parenthesized && (needs_chain || in_chain)
 }
 
-/// Mirrors convert's `maybe_wrap_chain`: emit `inner` wrapped in a
-/// `ChainExpression` node when `needs_chain`, bare otherwise.
+/// Emit `inner` wrapped in a `ChainExpression` node when `needs_chain`, bare
+/// otherwise.
 fn maybe_wrap_chain(
     w: &mut JsonWriter,
     needs_chain: bool,
@@ -442,8 +441,7 @@ fn maybe_wrap_chain(
 }
 
 /// The force/strip flags a call/member node keeps for itself: a
-/// `ChainExpression` wrap kills both (convert's post-hoc mutation matches
-/// fall through the wrapper without touching anything inside).
+/// `ChainExpression` wrap kills both (the flags don't reach past the wrapper).
 fn flags_after_wrap(flags: ExprFlags, needs_chain: bool) -> (bool, bool) {
     if needs_chain {
         (false, false)
@@ -452,7 +450,7 @@ fn flags_after_wrap(flags: ExprFlags, needs_chain: bool) -> (bool, bool) {
     }
 }
 
-/// Mirrors `convert_object_property`.
+/// Emit an object-literal property (a `Property` or a `SpreadElement`).
 fn write_object_property(w: &mut JsonWriter, prop: &internal::ObjectProperty<'_>, ctx: &Ctx<'_>) {
     match prop {
         internal::ObjectProperty::Property(p) => write_property(w, p, ctx),

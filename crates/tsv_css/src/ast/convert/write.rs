@@ -7,18 +7,17 @@
 //! hot path behind `convert_ast_json_bytes` (FFI/CLI compact output) and the
 //! entry the Svelte writer composes for embedded `<style>` blocks.
 //!
-//! **Byte-identity contract**: the wire JSON is a faithful emission of the
-//! `parseCss()` quirk catalog — node field order (including the
-//! `AttributeSelector` `start`/`end`-before-`name` and `Rule`
+//! **Byte-identity**: the wire JSON is a faithful emission of the `parseCss()`
+//! quirk catalog — node field order (including the `AttributeSelector`
+//! `start`/`end`-before-`name` and `Rule`
 //! `prelude`/`block`-before-`start`/`end` quirks), the skip rules (`metadata` on
 //! standalone CSS only; `namespace`/`Nth.selector` skipped when absent), the
 //! `null`s for absent-but-present `Option`s (`combinator`, `matcher`/`value`/
 //! `flags`, `PseudoClass.args`), and scalar formatting all match `parseCss`'s
-//! JSON exactly. The gate is the canonical `parseCss` `expected.json` (fixture
-//! Phase 2b) plus `corpus:compare:parse --multibyte-only`. The writer **reuses
-//! the raw-source reconstruction helpers** in the sibling `mod.rs`
-//! (`strip_css_comments`, `split_declaration_svelte_compat`, `raw_selector_name`,
-//! …) so the Svelte scan semantics are defined once.
+//! JSON exactly — the shape the canonical `parseCss` `expected.json` records.
+//! The writer **reuses the raw-source reconstruction helpers** in the sibling
+//! `mod.rs` (`strip_css_comments`, `split_declaration_svelte_compat`,
+//! `raw_selector_name`, …) so the Svelte scan semantics are defined once.
 //!
 //! CSS public nodes carry only `start`/`end` (no `loc`/columns), so there is no
 //! `LocationTracker`: each position is translated independently via a
@@ -105,7 +104,7 @@ fn write_stylesheet_file(w: &mut JsonWriter, nodes: &[internal::CssNode<'_>], ct
     w.raw("}");
 }
 
-/// Mirrors `convert_node`.
+/// Emit a CSS node (a `Rule` or an `Atrule`).
 fn write_node(w: &mut JsonWriter, node: &internal::CssNode<'_>, ctx: &Ctx<'_>) {
     match node {
         internal::CssNode::Rule(rule) => write_rule(w, rule, ctx),
@@ -113,7 +112,7 @@ fn write_node(w: &mut JsonWriter, node: &internal::CssNode<'_>, ctx: &Ctx<'_>) {
     }
 }
 
-/// Mirrors `convert_rule`. Field order: `type`, `prelude`, `block`, `start`,
+/// Emits a `Rule` node. Field order: `type`, `prelude`, `block`, `start`,
 /// `end`, then `metadata` (standalone only).
 fn write_rule(w: &mut JsonWriter, rule: &internal::CssRule<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Rule\",\"prelude\":");
@@ -130,7 +129,7 @@ fn write_rule(w: &mut JsonWriter, rule: &internal::CssRule<'_>, ctx: &Ctx<'_>) {
     w.raw("}");
 }
 
-/// Mirrors `convert_atrule`. `Atrule` carries no `metadata`.
+/// Emits an `Atrule` node. `Atrule` carries no `metadata`.
 fn write_atrule(w: &mut JsonWriter, atrule: &internal::CssAtrule<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Atrule\",\"name\":");
     w.string(atrule.name);
@@ -149,8 +148,8 @@ fn write_atrule(w: &mut JsonWriter, atrule: &internal::CssAtrule<'_>, ctx: &Ctx<
     w.raw("}");
 }
 
-/// Mirrors the `public::Block` construction (comments dropped, like
-/// `convert_block_child`'s `None` on `Comment`).
+/// Emits a `Block` node. Comments are dropped (a `Comment` child produces no
+/// output).
 fn write_block(
     w: &mut JsonWriter,
     block_span: Span,
@@ -182,7 +181,7 @@ fn write_block_child(w: &mut JsonWriter, child: &internal::CssBlockChild<'_>, ct
     }
 }
 
-/// Mirrors `convert_declaration`: `end` is the `;`/`}` terminator, `property`
+/// Emits a `Declaration` node: `end` is the `;`/`}` terminator, `property`
 /// the trimmed pre-colon text, `value` the post-colon source with block
 /// comments stripped.
 fn write_declaration(w: &mut JsonWriter, decl: &internal::CssDeclaration<'_>, ctx: &Ctx<'_>) {
@@ -205,14 +204,14 @@ fn write_declaration(w: &mut JsonWriter, decl: &internal::CssDeclaration<'_>, ct
     w.raw("}");
 }
 
-/// Mirrors `convert_selector_list` (rule preludes — parsed non-forgivingly, no
+/// Emits a `SelectorList` node (rule preludes — parsed non-forgivingly, no
 /// `Invalid`).
 fn write_selector_list(w: &mut JsonWriter, sl: &internal::SelectorList<'_>, ctx: &Ctx<'_>) {
     write_selector_list_inner(w, sl, ctx, false);
 }
 
-/// Mirrors `convert_selector_list_filtered` (pseudo-class args — drops complex
-/// selectors containing a forgiving-parse `Invalid`).
+/// Emits a `SelectorList` node for pseudo-class args — drops complex selectors
+/// containing a forgiving-parse `Invalid`.
 fn write_selector_list_filtered(
     w: &mut JsonWriter,
     sl: &internal::SelectorList<'_>,
@@ -242,7 +241,7 @@ fn write_selector_list_inner(
     w.raw("}");
 }
 
-/// Mirrors `convert_complex_selector`.
+/// Emits a `ComplexSelector` node.
 fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ComplexSelector\",\"start\":");
     w.u32(ctx.pos(c.span.start));
@@ -256,7 +255,7 @@ fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>,
     w.raw("}");
 }
 
-/// Mirrors `convert_relative_selector`. `combinator` is `null` (no skip) when
+/// Emits a `RelativeSelector` node. `combinator` is `null` (no skip) when
 /// absent; field order is `combinator`, `selectors`, `start`, `end`, `metadata`.
 fn write_relative_selector(w: &mut JsonWriter, r: &internal::RelativeSelector<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"RelativeSelector\",\"combinator\":");
@@ -286,7 +285,7 @@ fn write_combinator(w: &mut JsonWriter, name: &'static str, span: Span, ctx: &Ct
     w.raw("}");
 }
 
-/// Mirrors `convert_simple_selector`.
+/// Emit a simple selector (type/universal/class/id/nesting/attribute/pseudo/percentage).
 fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'_>, ctx: &Ctx<'_>) {
     match simple {
         internal::SimpleSelector::Type { namespace, span } => {
@@ -433,7 +432,7 @@ fn write_named_selector(
     w.raw("}");
 }
 
-/// Mirrors `convert_pseudo_class_args`.
+/// Emit a pseudo-class's args (an `Nth` node or a nested `SelectorList`).
 fn write_pseudo_class_args(
     w: &mut JsonWriter,
     args: &internal::PseudoClassArgs<'_>,
@@ -470,9 +469,9 @@ fn write_pseudo_class_args(
     }
 }
 
-/// Mirrors `wrap_single_selector`: SelectorList → ComplexSelector →
-/// RelativeSelector → `[<simple>]`, all sharing `span`. The inner simple selector
-/// is emitted by `emit_simple`.
+/// Wrap a single simple selector in the full nesting `parseCss` emits:
+/// SelectorList → ComplexSelector → RelativeSelector → `[<simple>]`, all sharing
+/// `span`. The inner simple selector is emitted by `emit_simple`.
 fn write_wrap_single_selector(
     w: &mut JsonWriter,
     span: Span,

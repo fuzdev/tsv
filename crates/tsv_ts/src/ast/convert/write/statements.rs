@@ -1,5 +1,4 @@
-// Statement dispatcher and simple statements — the writer twin of
-// `convert::statements`.
+// Statement dispatcher and simple statements.
 
 use super::super::super::internal;
 use super::super::Schema;
@@ -50,9 +49,9 @@ fn export_start(source: &str, span_start: u32, class_is_decorated: bool) -> u32 
     }
 }
 
-/// Mirrors `convert_attributes` + the `attributes` field's skip rule: a `with`
-/// clause emits its attributes (possibly `[]`); no clause emits `[]` under the
-/// Svelte schema and omits the field under acorn.
+/// Emit the `attributes` field with its skip rule: a `with` clause emits its
+/// attributes (possibly `[]`); no clause emits `[]` under the Svelte schema and
+/// omits the field under acorn.
 fn write_attributes_field(
     w: &mut JsonWriter,
     attributes: Option<&[internal::ImportAttribute<'_>]>,
@@ -72,7 +71,7 @@ fn write_attributes_field(
     }
 }
 
-/// Mirrors `convert_statement`.
+/// Emit a `Statement`, dispatching on its variant.
 pub(super) fn write_statement(
     w: &mut JsonWriter,
     stmt: &internal::Statement<'_>,
@@ -294,7 +293,7 @@ pub(super) fn write_statement(
     }
 }
 
-/// Mirrors `convert_module_declaration`. Field order: `global` (only when
+/// Emits a `TSModuleDeclaration` node. Field order: `global` (only when
 /// true), `id`, `body?` (omitted for shorthand ambient modules), `declare`
 /// (only when true).
 pub(super) fn write_module_declaration(
@@ -334,7 +333,7 @@ pub(super) fn write_module_declaration(
     close_node(w, "TSModuleDeclaration", decl.span, ctx);
 }
 
-/// Mirrors `convert_block_statement` (always TypeScript context).
+/// Emits a `BlockStatement` node (always TypeScript context).
 pub(super) fn write_block_statement(
     w: &mut JsonWriter,
     block: &internal::BlockStatement<'_>,
@@ -348,7 +347,7 @@ pub(super) fn write_block_statement(
     close_node(w, "BlockStatement", block.span, ctx);
 }
 
-/// Mirrors `convert_variable_declaration` + `convert_variable_declarator`.
+/// Emits a `VariableDeclaration` node (each declarator a `VariableDeclarator`).
 /// Field order: `declarations` (each: `id`, `definite` only when true, `init`
 /// nullable), `kind`, `declare` (only when true).
 pub(super) fn write_variable_declaration(

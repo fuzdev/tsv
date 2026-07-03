@@ -158,8 +158,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
 /// Returns a `serde_json::Value` parsed from the wire bytes
 /// `convert_ast_json_bytes` emits — a thin wrapper over the sole emission
 /// path, not an independent conversion. Used where a `Value` is needed (the
-/// CLI's `--pretty` tab-serialization, the fixture gate's comparison against
-/// `expected.json`); byte-oriented consumers should call
+/// CLI's `--pretty`); byte-oriented consumers should call
 /// `convert_ast_json_bytes` directly.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]

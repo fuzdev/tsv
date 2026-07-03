@@ -145,20 +145,16 @@ pub fn convert_ast_json(stylesheet: &CssStyleSheet<'_>, source: &str) -> serde_j
         .expect("writer emits valid JSON")
 }
 
-/// Like `convert_ast_json`, serialized to compact JSON wire bytes
+/// Convert CSS AST to compact JSON wire bytes — the **sole emission path**
 ///
-/// Emits the wire JSON directly from the internal AST via the writer
-/// (`ast/convert/write.rs`), never materializing the typed public tree, and
-/// fuses the byte→char offset translation into that walk (each position through
-/// a `ByteToCharMap`; identity on ASCII). The writer is a third emission mode of
-/// the same `parseCss()` quirk catalog — every `write_*` mirrors its `convert_*`
-/// twin and reuses its raw-source reconstruction helpers, so they stay in
-/// lockstep (gated by the fixture suite's string-path identity check against the
-/// `Value` oracle and `corpus:compare:parse --multibyte-only`). Byte-identical
-/// to `serde_json::to_string(&convert_ast_json(...))`; the hot path for the FFI
-/// parse binding and the CLI's compact output — the bytes are valid UTF-8 by
-/// construction (source slices + ASCII fragments), and byte-oriented consumers
-/// skip the O(output) validation a `String` requires.
+/// The writer (`ast/convert/write.rs`) walks the internal AST once and emits the
+/// wire JSON directly, never materializing a typed public tree, fusing the
+/// byte→char offset translation into the walk (each position through a
+/// `ByteToCharMap`; identity on ASCII). The output is `parseCss()`'s JSON shape;
+/// `convert_ast_json` parses these bytes back into a `Value`. The hot path for
+/// the FFI parse binding and the CLI's compact output — the bytes are valid
+/// UTF-8 by construction (source slices + ASCII fragments), and byte-oriented
+/// consumers skip the O(output) validation a `String` requires.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> Vec<u8> {
     ast::convert::write_stylesheet_file_bytes(stylesheet.nodes, source)

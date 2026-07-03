@@ -109,9 +109,8 @@ pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
 /// emitted byte is a source slice or ASCII fragment), and byte-oriented
 /// consumers skip the O(output) validation a `String` requires.
 ///
-/// Output is byte-identical to serializing `convert_ast_json`'s `Value` (the
-/// independent oracle), gated by the fixture suite's string-path identity check
-/// and its synthesized-multibyte and synthesized-template-comment probes.
+/// The output is the Svelte parser's JSON shape; `convert_ast_json` parses these
+/// bytes back into a `Value`.
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
     ast::convert::write_root_bytes(root, source)

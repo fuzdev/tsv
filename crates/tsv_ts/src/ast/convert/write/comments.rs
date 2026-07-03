@@ -1,11 +1,11 @@
 //! Per-node comment injection for the writer's Svelte comment-attach paths.
 //!
-//! The `Value`-oracle path attaches acorn's leading/trailing comments to nodes
-//! by mutating the serialized JSON (`tsv_svelte`'s `comment_attachment`), then
-//! splices the whole tree. The writer instead consults a precomputed
-//! `WriterComments` map at each node's close and emits the assigned comments
-//! *fused* (final char space) — so a comment-bearing `<script>` `Program` or
-//! template expression serializes directly, no intermediate `serde_json::Value`.
+//! `tsv_svelte`'s comment attachment (`comment_attachment`) inserts acorn's
+//! leading/trailing comments into a byte-space skeleton `Value`. The writer
+//! consults a precomputed `WriterComments` map (built from that skeleton) at
+//! each node's close and emits the assigned comments *fused* (final char space)
+//! — so a comment-bearing `<script>` `Program` or template expression
+//! serializes directly, with no whole-tree `serde_json::Value` output.
 //!
 //! **Why this works regardless of child-visit order.** acorn's attach inserts
 //! `leadingComments`/`trailingComments` as *appended* object keys (after a

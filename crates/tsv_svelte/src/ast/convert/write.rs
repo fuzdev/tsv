@@ -52,11 +52,9 @@
 //! attached comments serialize *last* within a node exactly as `preserve_order`
 //! places acorn's appended keys, regardless of child-visit order.
 //!
-//! **Byte-identity contract**: the wire JSON is a faithful emission of the
-//! Svelte parser's JSON (its acorn `<script>` shape plus `parseCss` `<style>`
-//! shape). The gate is the canonical Svelte parser's `expected.json` (fixture
-//! Phase 2b), including the multibyte and template-comment fixtures that
-//! exercise the fused offset translation and island-scoped comment attach.
+//! **Byte-identity**: the wire JSON is a faithful emission of the Svelte
+//! parser's JSON (its acorn `<script>` shape plus `parseCss` `<style>` shape) —
+//! the shape the canonical Svelte parser's `expected.json` records.
 
 use crate::ast::internal;
 use string_interner::DefaultStringInterner;
@@ -125,7 +123,7 @@ struct Ctx<'a> {
     /// expression writer.
     loc: LocationMapper<'a>,
     interner: &'a DefaultStringInterner,
-    /// Byte-space tracker for the `Value`-island builders (paired with
+    /// Byte-space tracker for the comment-island skeleton builders (paired with
     /// `LocationMapper::identity`) and the per-island translation walk.
     tracker: &'a LocationTracker,
     map: &'a ByteToCharMap,
@@ -143,9 +141,7 @@ impl<'a> Ctx<'a> {
 
     /// A copy of this context with no template comments — for subtrees the
     /// template attach passes never visit (`<script>`/`<style>`/`<svelte:options>`
-    /// tag attributes), so their embedded expressions always fuse comment-free,
-    /// exactly as the `Value` oracle (whose attach walk never recurses into
-    /// `css`/`instance`/`module`/`options`) leaves them.
+    /// tag attributes), so their embedded expressions always fuse comment-free.
     #[inline]
     fn without_comments(&self) -> Ctx<'a> {
         Ctx {
@@ -274,14 +270,14 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     w.raw("}}}");
 }
 
-/// Mirrors `convert_fragment`.
+/// Emits a `Fragment` node.
 fn write_fragment(w: &mut JsonWriter, fragment: &internal::Fragment<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Fragment\",\"nodes\":");
     write_array(w, fragment.nodes, |w, n| write_fragment_node(w, n, ctx));
     w.raw("}");
 }
 
-/// Mirrors `convert_fragment_node`.
+/// Emit a fragment node, dispatching on its variant.
 fn write_fragment_node(w: &mut JsonWriter, node: &internal::FragmentNode<'_>, ctx: &Ctx<'_>) {
     match node {
         internal::FragmentNode::Element(elem) => write_element(w, elem, ctx),
@@ -348,7 +344,7 @@ fn write_name_loc(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
     w.raw("}}");
 }
 
-/// Mirrors `convert_element`: `RegularElement` (HTML) or `Component`.
+/// Emits a `RegularElement` (HTML) or `Component` node.
 fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>) {
     let node_type = match elem.kind {
         internal::ElementKind::Component => "Component",
@@ -372,7 +368,8 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     w.raw("}");
 }
 
-/// Mirrors `convert_special_element`. `tag`/`expression` are skip-if-none.
+/// Emits a special-element node (`svelte:element`, `svelte:component`, …).
+/// `tag`/`expression` are skip-if-none.
 fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"");
     w.raw(elem.kind.node_type());
@@ -388,7 +385,7 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
     w.raw(",\"fragment\":");
     write_fragment(w, &elem.fragment, ctx);
-    // `<svelte:element this={…}>` tag — the `Value` attach dispatcher keys
+    // `<svelte:element this={…}>` tag — the comment-attach dispatcher keys
     // `SvelteElement` on `tag`. A plain-string `this="x"` is a Svelte-style
     // `Literal` (no `loc`, single-quoted `raw`) that carries no expression parse,
     // so no template comment can attach — emit it fused. Every other `this={…}`
@@ -405,11 +402,10 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     w.raw("}");
 }
 
-/// A `<svelte:element this={…}>` tag. Mirrors `convert_special_tag_value`:
-/// a plain-string value is a Svelte-style `Literal` (`{type, value, raw, start,
-/// end}` — no `loc`, single-quoted `raw`) fused directly; everything else is a
-/// generic island keyed on the element's span (matching the `Value` dispatcher's
-/// `SvelteElement` arm).
+/// A `<svelte:element this={…}>` tag. A plain-string value is a Svelte-style
+/// `Literal` (`{type, value, raw, start, end}` — no `loc`, single-quoted `raw`)
+/// fused directly; everything else is a generic island keyed on the element's
+/// span (matching the comment-attach dispatcher's `SvelteElement` arm).
 fn write_special_tag(
     w: &mut JsonWriter,
     tag_expr: &tsv_ts::ast::internal::Expression<'_>,
@@ -436,7 +432,7 @@ fn write_special_tag(
     }
 }
 
-/// Mirrors `convert_expression_tag` (fragment `{expr}`).
+/// Emits an `ExpressionTag` node (fragment `{expr}`).
 fn write_expression_tag(w: &mut JsonWriter, tag: &internal::ExpressionTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ExpressionTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -471,7 +467,7 @@ fn write_shorthand_expression_tag(
     w.raw("}");
 }
 
-/// Mirrors `convert_text` (fragment context: `type, start, end, raw, data`).
+/// Emits a `Text` node (fragment context: `type, start, end, raw, data`).
 fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Text\",\"start\":");
     w.u32(ctx.pos(text.span.start));
@@ -485,7 +481,7 @@ fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     w.raw("}");
 }
 
-/// Mirrors `convert_comment` (HTML `<!-- … -->`).
+/// Emits a `Comment` node (HTML `<!-- … -->`).
 fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Comment\",\"start\":");
     w.u32(ctx.pos(comment.span.start));
@@ -500,7 +496,7 @@ fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: 
 // Blocks
 //
 
-/// Mirrors `convert_if_block`. Field order: `type, elseif, start, end, test,
+/// Emits an `IfBlock` node. Field order: `type, elseif, start, end, test,
 /// consequent, alternate`.
 fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"IfBlock\",\"elseif\":");
@@ -522,7 +518,7 @@ fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'
     w.raw("}");
 }
 
-/// Mirrors `convert_each_block`. `context` is a pattern `Value` (patterns never
+/// Emits an `EachBlock` node. `context` is a pattern island (patterns never
 /// collect comments); `index`/`key`/`fallback` are skip-if-none.
 fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"EachBlock\",\"start\":");
@@ -554,8 +550,8 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
     w.raw("}");
 }
 
-/// Mirrors `convert_await_block`. `value`/`error` are pattern `Value`s;
-/// everything Option → `null` when absent (no skip).
+/// Emits an `AwaitBlock` node. `value`/`error` are pattern islands; every
+/// `Option` → `null` when absent (no skip).
 fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AwaitBlock\",\"start\":");
     w.u32(ctx.pos(block.span.start));
@@ -592,7 +588,7 @@ fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: 
     w.raw("}");
 }
 
-/// Mirrors `convert_key_block`.
+/// Emits a `KeyBlock` node.
 fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"KeyBlock\",\"start\":");
     w.u32(ctx.pos(block.span.start));
@@ -606,7 +602,7 @@ fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx
     w.raw("}");
 }
 
-/// Mirrors `convert_snippet_block`. The snippet name carries `character` (like a
+/// Emits a `SnippetBlock` node. The snippet name carries `character` (like a
 /// shorthand attribute); `typeParams` is skip-if-none.
 fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SnippetBlock\",\"start\":");
@@ -629,8 +625,8 @@ fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, c
 
 /// The snippet name identifier — Svelte injects `character` into its `loc`. A
 /// leading comment (`{#snippet /* c */ name(…)}`) can attach, so the
-/// comment-bearing case materializes a `Value` island (inject + attach +
-/// translate + splice); the comment-free common case fuses.
+/// comment-bearing case precomputes a `WriterComments` map (skeleton + attach)
+/// and fuse-emits with it; the comment-free common case fuses directly.
 fn write_snippet_name(
     w: &mut JsonWriter,
     expr: &tsv_ts::ast::internal::Expression<'_>,
@@ -664,9 +660,10 @@ fn write_snippet_name(
     }
 }
 
-/// Snippet parameters. Comment-free (the common case): each fuses. Otherwise the
-/// whole list materializes as `Value`s so `attach_snippet_parameters`' shared
-/// cursor can claim each inter-parameter comment once.
+/// Snippet parameters. Comment-free (the common case): each fuses. Otherwise a
+/// `WriterComments` map is precomputed off a byte-space skeleton so
+/// `attach_snippet_parameters`' shared cursor can claim each inter-parameter
+/// comment once, then each parameter fuse-emits with it.
 fn write_snippet_parameters(
     w: &mut JsonWriter,
     parameters: &[tsv_ts::ast::internal::Expression<'_>],
@@ -698,7 +695,7 @@ fn write_snippet_parameters(
 // Tags
 //
 
-/// Mirrors `convert_html_tag` (`{@html expr}`).
+/// Emits an `HtmlTag` node (`{@html expr}`).
 fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"HtmlTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -709,7 +706,7 @@ fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>
     w.raw("}");
 }
 
-/// Mirrors `convert_render_tag` (`{@render expr}`).
+/// Emits a `RenderTag` node (`{@render expr}`).
 fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"RenderTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -720,7 +717,7 @@ fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx
     w.raw("}");
 }
 
-/// Mirrors `convert_debug_tag` (`{@debug a, b}`).
+/// Emits a `DebugTag` node (`{@debug a, b}`).
 fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"DebugTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -733,15 +730,16 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
     w.raw("}");
 }
 
-/// Mirrors `convert_const_tag` (`{@const id = init}`).
+/// Emits a `ConstTag` node (`{@const id = init}`).
 ///
 /// The `declaration` `VariableDeclaration` is hand-built (single declarator,
 /// `start = tag.span.start + 2` past `{@`, `end = init.end`). The template attach
 /// pass (`attach_const_tag_declaration`) — which runs iff the document has any
 /// template comment — attaches comments to the `init` subtree *and* rewrites the
 /// declaration `end` to `tag.span.end - 1` (the byte before the closing `}`). So
-/// the comment-free document fuses; a document with template comments takes the
-/// `Value` island (structure + attach + the `end` rewrite).
+/// the comment-free document fuses; a document with template comments precomputes
+/// a `WriterComments` map (structure + attach + the `end` rewrite) and fuse-emits
+/// with it.
 fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -807,7 +805,7 @@ fn write_const_declaration(
     w.raw("}");
 }
 
-/// Mirrors `convert_declaration_tag` (`{const …}` / `{let …}`).
+/// Emits a `DeclarationTag` node (`{const …}` / `{let …}`).
 ///
 /// The `declaration` is a real TS `VariableDeclaration`. As with `{@const}`, the
 /// template attach pass (`attach_declaration_tag_declaration`) — active iff the
@@ -848,7 +846,8 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
 // Attributes
 //
 
-/// Mirrors `convert_attribute_node`.
+/// Emit an attribute node, dispatching on its variant (attribute / spread /
+/// attach / directive).
 fn write_attribute_node(w: &mut JsonWriter, node: &internal::AttributeNode<'_>, ctx: &Ctx<'_>) {
     match node {
         internal::AttributeNode::Attribute(a) => write_attribute(w, a, ctx),
@@ -865,7 +864,7 @@ fn write_attribute_node(w: &mut JsonWriter, node: &internal::AttributeNode<'_>, 
     }
 }
 
-/// Mirrors `convert_attribute`.
+/// Emits an `Attribute` node.
 fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"Attribute\",\"start\":");
     w.u32(ctx.pos(attr.span.start));
@@ -881,8 +880,8 @@ fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx
     w.raw("}");
 }
 
-/// Mirrors `convert_attribute`'s value dispatch: boolean (`true`), a bare
-/// `{expr}` (plain object), or a text/quoted sequence (array).
+/// Emit an attribute's `value` field: boolean (`true`), a bare `{expr}` (plain
+/// object), or a text/quoted sequence (array).
 fn write_attribute_value_field(
     w: &mut JsonWriter,
     value: Option<&[internal::AttributeValue<'_>]>,
@@ -926,7 +925,7 @@ fn write_attribute_value(w: &mut JsonWriter, value: &internal::AttributeValue<'_
     }
 }
 
-/// Mirrors `convert_attribute_text` (attribute context: `start, end, type, raw, data`).
+/// Emits a `Text` node in attribute context (`start, end, type, raw, data`).
 fn write_attribute_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
     w.raw("{\"start\":");
     w.u32(ctx.pos(text.span.start));
@@ -940,7 +939,7 @@ fn write_attribute_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>
     w.raw("}");
 }
 
-/// Mirrors `convert_spread_attribute` (`{...expr}`).
+/// Emits a `SpreadAttribute` node (`{...expr}`).
 fn write_spread_attribute(
     w: &mut JsonWriter,
     spread: &internal::SpreadAttribute<'_>,
@@ -961,7 +960,7 @@ fn write_spread_attribute(
     w.raw("}");
 }
 
-/// Mirrors `convert_attach_tag` (`{@attach expr}`).
+/// Emits an `AttachTag` node (`{@attach expr}`).
 fn write_attach_tag(w: &mut JsonWriter, tag: &internal::AttachTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"AttachTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -1077,7 +1076,7 @@ fn write_transition_directive(
 }
 
 /// `bind:`/`class:` share an expression: the explicit form (`bind:x={e}`) is a
-/// generic island keyed on the directive span (the `Value` dispatcher's
+/// generic island keyed on the directive span (the comment-attach dispatcher's
 /// `is_object` guard admits comment attach there); the shorthand form (`bind:x`)
 /// is a synthetic loc-free `Identifier` with Svelte field order (`start, end,
 /// type, name`) that never carries a comment, emitted fused.
@@ -1136,7 +1135,7 @@ fn write_class_directive(w: &mut JsonWriter, d: &internal::ClassDirective<'_>, c
     w.raw("}");
 }
 
-/// Mirrors `convert_style_directive`. Field order: `start, end, type, name,
+/// Emits a `StyleDirective` node. Field order: `start, end, type, name,
 /// name_loc, modifiers, value`.
 fn write_style_directive(w: &mut JsonWriter, d: &internal::StyleDirective<'_>, ctx: &Ctx<'_>) {
     write_directive_head(w, "StyleDirective", d.span, d.name_span, d.head_span, ctx);
@@ -1167,8 +1166,8 @@ fn write_style_directive(w: &mut JsonWriter, d: &internal::StyleDirective<'_>, c
 //
 
 /// A `<style>` `StyleSheet`. `children` fuse via `tsv_css`'s `write_css_node`;
-/// `attributes` and the preceding-comment splice as translated `Value`s (the
-/// `<style>` envelope is never visited by the template attach passes).
+/// `attributes` and the preceding comment fuse too (the `<style>` envelope is
+/// never visited by the template attach passes).
 fn write_style_sheet(
     w: &mut JsonWriter,
     style: &internal::Style<'_>,
@@ -1263,9 +1262,9 @@ fn write_script(
 /// 0}` and `{line: <`</script>` line>, column: <its byte column>}`, then the
 /// offset-translation walk rewrites those columns against the `Program`'s own
 /// `start`/`end` byte offsets (the content span). `translate_column` is exactly
-/// that walk's column math, so applying it here yields the same char-space
-/// columns the `Value` oracle emits (on ASCII it collapses to the raw override —
-/// `0` and the byte column).
+/// that walk's column math, so applying it here yields the final char-space
+/// columns directly (on ASCII it collapses to the raw override — `0` and the
+/// byte column).
 #[allow(clippy::cast_possible_truncation)]
 fn write_script_program_fused(
     w: &mut JsonWriter,
@@ -1306,10 +1305,9 @@ fn write_script_program_fused(
     );
 }
 
-/// A `<svelte:options>`: everything fuses. Field order mirrors
-/// `convert_svelte_options` — `start, end, attributes` then the skip-if-none
-/// `runes, immutable, accessors, preserveWhitespace, css, namespace,
-/// customElement` (no `type`).
+/// A `<svelte:options>`: everything fuses. Field order: `start, end,
+/// attributes` then the skip-if-none `runes, immutable, accessors,
+/// preserveWhitespace, css, namespace, customElement` (no `type`).
 fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_>, ctx: &Ctx<'_>) {
     let attrs = options.attributes;
     let interner = ctx.interner;
@@ -1351,19 +1349,19 @@ fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_
     w.raw("}");
 }
 
-/// A slot in a `customElement={…}` object — a `String` or `Boolean` literal,
-/// mirroring the `Value` builder's `serde_json::Map` entries.
+/// A slot in a `customElement={…}` object — a `String` or `Boolean` literal
+/// (one entry of Svelte's `customElement` object).
 enum CustomElementValue<'a> {
     Str(std::borrow::Cow<'a, str>),
     Bool(bool),
 }
 
-/// Emit the skip-if-none `customElement` option, fused. Mirrors
-/// `convert_svelte_options`'s `custom_element` builder: the first attribute value
-/// that is an object expression (`{tag, shadow, …}` of string/boolean props) or a
-/// plain string (`"tag-name"` → `{tag}`) produces the field; the object's `Map`
-/// insertion semantics (first position, last value on a duplicate key) are
-/// reproduced by an in-order dedup. No positions, so no translation.
+/// Emit the skip-if-none `customElement` option, fused. The first attribute
+/// value that is an object expression (`{tag, shadow, …}` of string/boolean
+/// props) or a plain string (`"tag-name"` → `{tag}`) produces the field; the
+/// object's `Map` insertion semantics (first position, last value on a
+/// duplicate key) are reproduced by an in-order dedup. No positions, so no
+/// translation.
 fn write_custom_element_field(
     w: &mut JsonWriter,
     attrs: &[internal::AttributeNode<'_>],
@@ -1442,8 +1440,7 @@ fn write_custom_element_field(
 /// Attributes outside the fragment tree (`<script>`/`<style>`/`<svelte:options>`
 /// tags): the template attach passes never visit them, so each fuses through the
 /// same attribute writer the fragment path uses but with a comment-free context —
-/// no expression-tag value can pick up a template comment, exactly as the `Value`
-/// oracle (whose attach walk never recurses into these subtrees) leaves them.
+/// no expression-tag value can pick up a template comment.
 fn write_value_attributes(
     w: &mut JsonWriter,
     attributes: &[internal::AttributeNode<'_>],

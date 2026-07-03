@@ -1,4 +1,4 @@
-// Import and export specifier writers — the writer twin of `convert::modules`.
+// Import and export specifier writers.
 
 use super::super::super::internal;
 use super::super::Schema;
@@ -9,7 +9,8 @@ use super::{
     Ctx, JsonWriter, close_node, kind_token, node_header, write_identifier_plain, write_literal,
 };
 
-/// Mirrors `convert_import_specifier`.
+/// Emit an import specifier (`ImportDefaultSpecifier` / `ImportSpecifier` /
+/// `ImportNamespaceSpecifier`).
 pub(super) fn write_import_specifier(
     w: &mut JsonWriter,
     spec: &internal::ImportSpecifier<'_>,
@@ -48,7 +49,7 @@ pub(super) fn write_import_specifier(
     }
 }
 
-/// Mirrors `convert_import_attribute`.
+/// Emits an `ImportAttribute` node.
 pub(super) fn write_import_attribute(
     w: &mut JsonWriter,
     attr: &internal::ImportAttribute<'_>,
@@ -65,7 +66,7 @@ pub(super) fn write_import_attribute(
     close_node(w, "ImportAttribute", attr.span, ctx);
 }
 
-/// Mirrors `convert_export_specifier`. Field order: `local`, `exported`,
+/// Emits an `ExportSpecifier` node. Field order: `local`, `exported`,
 /// `exportKind?`.
 pub(super) fn write_export_specifier(
     w: &mut JsonWriter,
@@ -89,8 +90,8 @@ pub(super) fn write_export_specifier(
     close_node(w, "ExportSpecifier", spec.span, ctx);
 }
 
-/// Mirrors `convert_module_export_name`: an identifier emits an `Identifier`
-/// node, a string a `Literal` node.
+/// Emit a module export name: an identifier emits an `Identifier` node, a
+/// string a `Literal` node.
 pub(super) fn write_module_export_name(
     w: &mut JsonWriter,
     name: &internal::ModuleExportName<'_>,
@@ -102,7 +103,8 @@ pub(super) fn write_module_export_name(
     }
 }
 
-/// Mirrors `convert_export_default_value`.
+/// Emit an `export default` value (an expression or a function/class/interface
+/// declaration).
 pub(super) fn write_export_default_value(
     w: &mut JsonWriter,
     value: &internal::ExportDefaultValue<'_>,

@@ -1,4 +1,4 @@
-// Control flow statement writers — the writer twin of `convert::control_flow`.
+// Control flow statement writers.
 
 use super::super::super::internal;
 use super::super::Schema;
@@ -9,10 +9,10 @@ use super::{
 };
 
 /// Control flow bodies never contain import/export declarations, so the schema
-/// doesn't matter; `Acorn` for simplicity (mirrors convert's `SCHEMA`).
+/// doesn't matter; `Acorn` for simplicity.
 const SCHEMA: Schema = Schema::Acorn;
 
-/// Mirrors `convert_if_statement`.
+/// Emits an `IfStatement` node.
 pub(super) fn write_if_statement(
     w: &mut JsonWriter,
     if_stmt: &internal::IfStatement<'_>,
@@ -30,7 +30,7 @@ pub(super) fn write_if_statement(
     close_node(w, "IfStatement", if_stmt.span, ctx);
 }
 
-/// Mirrors `convert_for_statement`. `init`/`test`/`update` are nullable.
+/// Emits a `ForStatement` node. `init`/`test`/`update` are nullable.
 pub(super) fn write_for_statement(
     w: &mut JsonWriter,
     for_stmt: &internal::ForStatement<'_>,
@@ -58,7 +58,7 @@ pub(super) fn write_for_statement(
     close_node(w, "ForStatement", for_stmt.span, ctx);
 }
 
-/// Mirrors `convert_for_in_of_left` (an untagged declaration-or-pattern).
+/// Emit a `for`-`in`/`for`-`of` `left` (an untagged declaration-or-pattern).
 fn write_for_in_of_left(w: &mut JsonWriter, left: &internal::ForInOfLeft<'_>, ctx: &Ctx<'_>) {
     match left {
         internal::ForInOfLeft::VariableDeclaration(decl) => {
@@ -68,7 +68,7 @@ fn write_for_in_of_left(w: &mut JsonWriter, left: &internal::ForInOfLeft<'_>, ct
     }
 }
 
-/// Mirrors `convert_for_in_statement`.
+/// Emits a `ForInStatement` node.
 pub(super) fn write_for_in_statement(
     w: &mut JsonWriter,
     for_in: &internal::ForInStatement<'_>,
@@ -84,9 +84,8 @@ pub(super) fn write_for_in_statement(
     close_node(w, "ForInStatement", for_in.span, ctx);
 }
 
-/// Mirrors `convert_for_of_statement`. Field order: `await`, `left`, `right`,
-/// `body` (the public struct declares `await` first, unlike convert's build
-/// order).
+/// Emits a `ForOfStatement` node. Field order: `await`, `left`, `right`,
+/// `body`.
 pub(super) fn write_for_of_statement(
     w: &mut JsonWriter,
     for_of: &internal::ForOfStatement<'_>,
@@ -104,7 +103,7 @@ pub(super) fn write_for_of_statement(
     close_node(w, "ForOfStatement", for_of.span, ctx);
 }
 
-/// Mirrors `convert_while_statement`.
+/// Emits a `WhileStatement` node.
 pub(super) fn write_while_statement(
     w: &mut JsonWriter,
     while_stmt: &internal::WhileStatement<'_>,
@@ -118,7 +117,7 @@ pub(super) fn write_while_statement(
     close_node(w, "WhileStatement", while_stmt.span, ctx);
 }
 
-/// Mirrors `convert_do_while_statement`. Field order: `body`, `test`.
+/// Emits a `DoWhileStatement` node. Field order: `body`, `test`.
 pub(super) fn write_do_while_statement(
     w: &mut JsonWriter,
     do_while: &internal::DoWhileStatement<'_>,
@@ -132,7 +131,7 @@ pub(super) fn write_do_while_statement(
     close_node(w, "DoWhileStatement", do_while.span, ctx);
 }
 
-/// Mirrors `convert_switch_statement` + `convert_switch_case`.
+/// Emits a `SwitchStatement` node (each case a `SwitchCase`).
 pub(super) fn write_switch_statement(
     w: &mut JsonWriter,
     switch_stmt: &internal::SwitchStatement<'_>,
@@ -155,7 +154,7 @@ pub(super) fn write_switch_statement(
     close_node(w, "SwitchStatement", switch_stmt.span, ctx);
 }
 
-/// Mirrors `convert_try_statement` + `convert_catch_clause`. `handler` and
+/// Emits a `TryStatement` node (its `handler` a `CatchClause`). `handler` and
 /// `finalizer` are nullable, as is the catch clause's `param`.
 pub(super) fn write_try_statement(
     w: &mut JsonWriter,
@@ -181,7 +180,7 @@ pub(super) fn write_try_statement(
     close_node(w, "TryStatement", try_stmt.span, ctx);
 }
 
-/// Mirrors `convert_throw_statement`.
+/// Emits a `ThrowStatement` node.
 pub(super) fn write_throw_statement(
     w: &mut JsonWriter,
     throw_stmt: &internal::ThrowStatement<'_>,
@@ -193,7 +192,7 @@ pub(super) fn write_throw_statement(
     close_node(w, "ThrowStatement", throw_stmt.span, ctx);
 }
 
-/// Mirrors `convert_break_statement`. `label` is nullable.
+/// Emits a `BreakStatement` node. `label` is nullable.
 pub(super) fn write_break_statement(
     w: &mut JsonWriter,
     break_stmt: &internal::BreakStatement<'_>,
@@ -207,7 +206,7 @@ pub(super) fn write_break_statement(
     close_node(w, "BreakStatement", break_stmt.span, ctx);
 }
 
-/// Mirrors `convert_continue_statement`. `label` is nullable.
+/// Emits a `ContinueStatement` node. `label` is nullable.
 pub(super) fn write_continue_statement(
     w: &mut JsonWriter,
     continue_stmt: &internal::ContinueStatement<'_>,
@@ -221,7 +220,7 @@ pub(super) fn write_continue_statement(
     close_node(w, "ContinueStatement", continue_stmt.span, ctx);
 }
 
-/// Mirrors `convert_labeled_statement`.
+/// Emits a `LabeledStatement` node.
 pub(super) fn write_labeled_statement(
     w: &mut JsonWriter,
     labeled: &internal::LabeledStatement<'_>,
