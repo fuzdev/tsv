@@ -277,13 +277,16 @@ pub enum PseudoClassArgs<'arena> {
     ///
     /// Examples: `label`, `tab`, `tab active`, `button primary`
     ///
-    /// `span` covers the argument content (inside the parentheses); `value_span`
-    /// covers just the identifier run, so the printer can find the comments in the
-    /// gaps around it (before the first ident, after the last), mirroring `Nth`.
+    /// `span` covers the argument content (inside the parentheses). `ident_spans`
+    /// is parallel to `idents` (one span per part name), so the printer can find
+    /// the comments in every gap — around the run (before the first name, after
+    /// the last) and *between* names — and derive the whole-run span (first
+    /// name's start .. last name's end). Always non-empty (the parser rejects an
+    /// empty `::part()`).
     Part {
         idents: &'arena [&'arena str], // Space-separated part names
+        ident_spans: &'arena [Span],   // Per-ident spans, parallel to `idents`
         span: Span,
-        value_span: Span,
     },
 }
 

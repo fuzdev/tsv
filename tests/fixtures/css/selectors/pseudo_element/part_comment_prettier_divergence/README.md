@@ -2,9 +2,11 @@
 
 Comments inside `::part()` arguments are preserved on both sides of the
 identifier list — before it (`::part(/* c */ name1)`) and after it
-(`::part(name2 /* c */)`). Only the edge positions are valid: a comment
-*between* two identifiers (`::part(a /* c */ b)`) is rejected by parseCss (a
-comment reads as whitespace, splitting the identifier run).
+(`::part(name2 /* c */)`). These edge positions are accepted by parseCss. A
+comment *between* two identifiers (`::part(a /* c */ b)`) is instead rejected by
+parseCss (it reads as whitespace, splitting the identifier run); tsv preserves
+that one too, normalized the same way, as a `_svelte_prettier_divergence` — see
+[part_interior_comment](../part_interior_comment_svelte_prettier_divergence/).
 
 ## Prettier divergence
 

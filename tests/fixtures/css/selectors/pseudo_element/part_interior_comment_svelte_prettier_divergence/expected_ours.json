@@ -1,0 +1,214 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 427,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 53,
+					"end": 81,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 53,
+							"end": 81,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 53,
+											"end": 59
+										}
+									],
+									"start": 53,
+									"end": 81
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 82,
+					"end": 100,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 86,
+							"end": 96,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 53,
+				"end": 100
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 160,
+					"end": 194,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 160,
+							"end": 194,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 160,
+											"end": 166
+										}
+									],
+									"start": 160,
+									"end": 194
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 195,
+					"end": 214,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 199,
+							"end": 210,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 160,
+				"end": 214
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 248,
+					"end": 285,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 248,
+							"end": 285,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 248,
+											"end": 254
+										}
+									],
+									"start": 248,
+									"end": 285
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 286,
+					"end": 306,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 290,
+							"end": 302,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				},
+				"start": 248,
+				"end": 306
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 352,
+					"end": 398,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 352,
+							"end": 398,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoElementSelector",
+											"name": "part",
+											"start": 352,
+											"end": 358
+										}
+									],
+									"start": 352,
+									"end": 398
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 399,
+					"end": 418,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 403,
+							"end": 414,
+							"property": "color",
+							"value": "teal"
+						}
+					]
+				},
+				"start": 352,
+				"end": 418
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 419,
+			"styles": "\n\t/* comment between two part identifiers */\n\t::part(name1 /* c1 */ name2) {\n\t\tcolor: red;\n\t}\n\n\t/* comment between the last two of three identifiers */\n\t::part(name1 name2 /* c2 */ name3) {\n\t\tcolor: blue;\n\t}\n\n\t/* two comments in one gap */\n\t::part(name1 /* c3 */ /* c4 */ name2) {\n\t\tcolor: green;\n\t}\n\n\t/* edge and interior comments together */\n\t::part(/* c5 */ name1 /* c6 */ name2 /* c7 */) {\n\t\tcolor: teal;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 428,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
