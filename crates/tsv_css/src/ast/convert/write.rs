@@ -31,7 +31,7 @@ use super::{
     convert_prelude_to_string, pseudo_name_end, raw_selector_name, scan_to_terminator,
     selector_contains_invalid, split_declaration_svelte_compat, strip_css_comments,
 };
-use tsv_lang::{ByteToCharMap, JsonWriter, Span, write_array};
+use tsv_lang::{ByteToCharMap, JsonWriter, Span, write_array, write_or_null};
 
 /// `parseCss()` constant metadata payloads — always the `Default` (all-`false`,
 /// `null` unit) shapes, emitted only on standalone CSS (`AstScope::Standalone`).
@@ -92,13 +92,29 @@ pub fn write_css_node(
     write_node(w, node, &ctx);
 }
 
+/// Emit the shared `{"type":"X","start":N,"end":N` node prefix — the object is
+/// left open, the caller appends its remaining fields and the closing `}`.
+/// Only for the nodes whose `start`/`end` immediately follow `type` (`Rule`,
+/// `Atrule`, and the selector kinds with a leading `name`/`combinator` field
+/// order their positions elsewhere).
+fn open_node(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
+    w.raw("{\"type\":\"");
+    w.raw(node_type);
+    w.raw("\",\"start\":");
+    w.u32(ctx.pos(span.start));
+    w.raw(",\"end\":");
+    w.u32(ctx.pos(span.end));
+}
+
 /// The standalone `StyleSheetFile` root: `type`, `start` (0), `end` (source
 /// length), `children`.
 fn write_stylesheet_file(w: &mut JsonWriter, nodes: &[internal::CssNode<'_>], ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"StyleSheetFile\",\"start\":");
-    w.u32(ctx.pos(0));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(ctx.source.len() as u32));
+    open_node(
+        w,
+        "StyleSheetFile",
+        Span::new(0, ctx.source.len() as u32),
+        ctx,
+    );
     w.raw(",\"children\":");
     write_array(w, nodes, |w, n| write_node(w, n, ctx));
     w.raw("}");
@@ -137,10 +153,9 @@ fn write_atrule(w: &mut JsonWriter, atrule: &internal::CssAtrule<'_>, ctx: &Ctx<
     let prelude = convert_prelude_to_string(&atrule.prelude, ctx.source);
     w.string(&prelude);
     w.raw(",\"block\":");
-    match &atrule.block {
-        Some(b) => write_block(w, b.span, b.children, ctx),
-        None => w.null(),
-    }
+    write_or_null(w, atrule.block.as_ref(), |w, b| {
+        write_block(w, b.span, b.children, ctx);
+    });
     w.raw(",\"start\":");
     w.u32(ctx.pos(atrule.span.start));
     w.raw(",\"end\":");
@@ -156,10 +171,7 @@ fn write_block(
     children: &[internal::CssBlockChild<'_>],
     ctx: &Ctx<'_>,
 ) {
-    w.raw("{\"type\":\"Block\",\"start\":");
-    w.u32(ctx.pos(block_span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(block_span.end));
+    open_node(w, "Block", block_span, ctx);
     w.raw(",\"children\":");
     write_array(
         w,
@@ -193,10 +205,12 @@ fn write_declaration(w: &mut JsonWriter, decl: &internal::CssDeclaration<'_>, ct
     let (property_source, value_source) = split_declaration_svelte_compat(decl_source);
     let value = strip_css_comments(value_source);
 
-    w.raw("{\"type\":\"Declaration\",\"start\":");
-    w.u32(ctx.pos(decl.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(end as u32));
+    open_node(
+        w,
+        "Declaration",
+        Span::new(decl.span.start, end as u32),
+        ctx,
+    );
     w.raw(",\"property\":");
     w.string(property_source.trim_end());
     w.raw(",\"value\":");
@@ -226,10 +240,7 @@ fn write_selector_list_inner(
     ctx: &Ctx<'_>,
     filter_invalid: bool,
 ) {
-    w.raw("{\"type\":\"SelectorList\",\"start\":");
-    w.u32(ctx.pos(sl.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(sl.span.end));
+    open_node(w, "SelectorList", sl.span, ctx);
     w.raw(",\"children\":");
     write_array(
         w,
@@ -243,10 +254,7 @@ fn write_selector_list_inner(
 
 /// Emits a `ComplexSelector` node.
 fn write_complex_selector(w: &mut JsonWriter, c: &internal::ComplexSelector<'_>, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"ComplexSelector\",\"start\":");
-    w.u32(ctx.pos(c.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(c.span.end));
+    open_node(w, "ComplexSelector", c.span, ctx);
     w.raw(",\"children\":");
     write_array(w, c.children, |w, r| write_relative_selector(w, r, ctx));
     if ctx.scope.has_metadata() {
@@ -325,27 +333,15 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             let value = *value;
             let flags = *flags;
             let namespace = *namespace;
-            w.raw("{\"type\":\"AttributeSelector\",\"start\":");
-            w.u32(ctx.pos(span.start));
-            w.raw(",\"end\":");
-            w.u32(ctx.pos(span.end));
+            open_node(w, "AttributeSelector", *span, ctx);
             w.raw(",\"name\":");
             w.string(&name);
             w.raw(",\"matcher\":");
-            match matcher {
-                Some(m) => w.string(m.as_str()),
-                None => w.null(),
-            }
+            write_or_null(w, matcher.as_ref(), |w, m| w.string(m.as_str()));
             w.raw(",\"value\":");
-            match value {
-                Some(v) => w.string(v),
-                None => w.null(),
-            }
+            write_or_null(w, value.as_ref(), |w, v| w.string(v));
             w.raw(",\"flags\":");
-            match flags {
-                Some(f) => w.string(f),
-                None => w.null(),
-            }
+            write_or_null(w, flags.as_ref(), |w, f| w.string(f));
             if let Some(ns) = namespace {
                 w.raw(",\"namespace\":");
                 w.string(ns);
@@ -361,10 +357,7 @@ fn write_simple_selector(w: &mut JsonWriter, simple: &internal::SimpleSelector<'
             w.raw("{\"type\":\"PseudoClassSelector\",\"name\":");
             w.string(&name);
             w.raw(",\"args\":");
-            match args {
-                Some(a) => write_pseudo_class_args(w, a, ctx),
-                None => w.null(),
-            }
+            write_or_null(w, args.as_ref(), |w, a| write_pseudo_class_args(w, a, ctx));
             w.raw(",\"start\":");
             w.u32(ctx.pos(span.start));
             w.raw(",\"end\":");

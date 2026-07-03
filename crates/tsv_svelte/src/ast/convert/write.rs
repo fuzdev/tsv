@@ -61,8 +61,8 @@ use crate::ast::internal;
 use string_interner::DefaultStringInterner;
 use tsv_css::ast::convert::write_css_node;
 use tsv_lang::{
-    ByteToCharMap, Comment, InfallibleResolve, JsonWriter, LocationMapper, LocationTracker,
-    Position, Span, estimated_json_capacity, write_array,
+    Comment, InfallibleResolve, JsonWriter, LocationMapper, LocationTracker, Position, Span,
+    estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
     Schema, translate_column, write_expression_embedded, write_expression_embedded_with_comments,
@@ -105,8 +105,6 @@ pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u
             map: &map,
         },
         interner: &interner,
-        tracker: &tracker,
-        map: &map,
         comments: &template_comments,
     };
 
@@ -120,13 +118,12 @@ pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u
 struct Ctx<'a> {
     source: &'a str,
     /// Real-map mapper for fused char-space spine emission and the embedded TS
-    /// expression writer.
+    /// expression writer. Its `tracker` also serves byte-space uses alone (the
+    /// comment-island skeleton builders, paired with `LocationMapper::identity`,
+    /// and the `<script>` tag-line lookups); its `map`, the `<style>` CSS
+    /// children.
     loc: LocationMapper<'a>,
     interner: &'a DefaultStringInterner,
-    /// Byte-space tracker for the comment-island skeleton builders (paired with
-    /// `LocationMapper::identity`) and the per-island translation walk.
-    tracker: &'a LocationTracker,
-    map: &'a ByteToCharMap,
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
@@ -201,13 +198,10 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
     };
 
     w.raw("{\"css\":");
-    match root.css {
-        Some(style) => {
-            let style_comment = find_preceding_comment(style.span.start);
-            write_style_sheet(w, style, style_comment, ctx);
-        }
-        None => w.null(),
-    }
+    write_or_null(w, root.css.as_ref(), |w, style| {
+        let style_comment = find_preceding_comment(style.span.start);
+        write_style_sheet(w, style, style_comment, ctx);
+    });
     w.raw(",\"js\":[],\"start\":");
     w.u32(ctx.pos(0));
     w.raw(",\"end\":");
@@ -215,10 +209,9 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
     w.raw(",\"type\":\"Root\",\"fragment\":");
     write_fragment(w, &root.fragment, ctx);
     w.raw(",\"options\":");
-    match &root.options {
-        Some(opts) => write_svelte_options(w, opts, ctx),
-        None => w.null(),
-    }
+    write_or_null(w, root.options.as_ref(), |w, opts| {
+        write_svelte_options(w, opts, ctx);
+    });
     w.raw(",\"comments\":");
     write_array(w, root.comments.iter(), |w, c| {
         write_root_comment(w, c, ctx);
@@ -313,7 +306,7 @@ fn write_generic_island(
             expr,
             ctx.comments,
             ctx.source,
-            ctx.tracker,
+            ctx.loc.tracker,
             ctx.interner,
             container_start,
             range_end,
@@ -510,10 +503,7 @@ fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'
     w.raw(",\"consequent\":");
     write_fragment(w, &block.consequent, ctx);
     w.raw(",\"alternate\":");
-    match &block.alternate {
-        Some(f) => write_fragment(w, f, ctx),
-        None => w.null(),
-    }
+    write_optional_fragment(w, block.alternate.as_ref(), ctx);
     w.raw("}");
 }
 
@@ -530,10 +520,9 @@ fn write_each_block(w: &mut JsonWriter, block: &internal::EachBlock<'_>, ctx: &C
     w.raw(",\"body\":");
     write_fragment(w, &block.body, ctx);
     w.raw(",\"context\":");
-    match &block.context {
-        Some(c) => write_pattern_island(w, c, ctx),
-        None => w.null(),
-    }
+    write_or_null(w, block.context.as_ref(), |w, c| {
+        write_pattern_island(w, c, ctx);
+    });
     if let Some(index) = block.index {
         w.raw(",\"index\":");
         w.string(index);
@@ -569,15 +558,13 @@ fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: 
     w.raw(",\"expression\":");
     write_generic_island(w, &block.expression, block.span.start, range_end, ctx);
     w.raw(",\"value\":");
-    match &block.value {
-        Some(v) => write_pattern_island(w, v, ctx),
-        None => w.null(),
-    }
+    write_or_null(w, block.value.as_ref(), |w, v| {
+        write_pattern_island(w, v, ctx);
+    });
     w.raw(",\"error\":");
-    match &block.error {
-        Some(e) => write_pattern_island(w, e, ctx),
-        None => w.null(),
-    }
+    write_or_null(w, block.error.as_ref(), |w, e| {
+        write_pattern_island(w, e, ctx);
+    });
     w.raw(",\"pending\":");
     write_optional_fragment(w, block.pending.as_ref(), ctx);
     w.raw(",\"then\":");
@@ -641,7 +628,7 @@ fn write_snippet_name(
             expr,
             ctx.comments,
             ctx.source,
-            ctx.tracker,
+            ctx.loc.tracker,
             ctx.interner,
             container_start,
             range_end,
@@ -678,7 +665,7 @@ fn write_snippet_parameters(
             parameters,
             ctx.comments,
             ctx.source,
-            ctx.tracker,
+            ctx.loc.tracker,
             ctx.interner,
             container_start,
             range_end,
@@ -739,7 +726,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
             tag.identifiers,
             ctx.comments,
             ctx.source,
-            ctx.tracker,
+            ctx.loc.tracker,
             ctx.interner,
             tag.span.start,
             tag.span.end,
@@ -784,7 +771,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
             tag,
             ctx.comments,
             ctx.source,
-            ctx.tracker,
+            ctx.loc.tracker,
             ctx.interner,
         );
         write_const_declaration(w, tag, decl_end, Some(&wc), ctx);
@@ -853,7 +840,7 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             &tag.declaration,
             ctx.comments,
             ctx.source,
-            ctx.tracker,
+            ctx.loc.tracker,
             ctx.interner,
             tag.span.start,
             tag.span.end,
@@ -1037,47 +1024,31 @@ fn write_optional_directive_expression(
     span: Span,
     ctx: &Ctx<'_>,
 ) {
-    match expression {
-        Some(e) => write_generic_island(w, e, span.start, span.end, ctx),
-        None => w.null(),
-    }
+    write_or_null(w, expression, |w, e| {
+        write_generic_island(w, e, span.start, span.end, ctx);
+    });
 }
 
-fn write_on_directive(w: &mut JsonWriter, d: &internal::OnDirective<'_>, ctx: &Ctx<'_>) {
-    write_directive_head(w, "OnDirective", d.span, d.name_span, d.head_span, ctx);
-    w.raw(",\"expression\":");
-    write_optional_directive_expression(w, d.expression.as_ref(), d.span, ctx);
-    w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers);
-    w.raw("}");
+/// `on:`/`use:`/`animate:`/`let:` share one wire shape — head, optional
+/// expression island, `modifiers` — over four field-identical internal types
+/// differing only in node type name. One body, stamped per directive.
+macro_rules! expression_directive_writer {
+    ($fn_name:ident, $ty:ident) => {
+        fn $fn_name(w: &mut JsonWriter, d: &internal::$ty<'_>, ctx: &Ctx<'_>) {
+            write_directive_head(w, stringify!($ty), d.span, d.name_span, d.head_span, ctx);
+            w.raw(",\"expression\":");
+            write_optional_directive_expression(w, d.expression.as_ref(), d.span, ctx);
+            w.raw(",\"modifiers\":");
+            write_modifiers(w, d.modifiers);
+            w.raw("}");
+        }
+    };
 }
 
-fn write_use_directive(w: &mut JsonWriter, d: &internal::UseDirective<'_>, ctx: &Ctx<'_>) {
-    write_directive_head(w, "UseDirective", d.span, d.name_span, d.head_span, ctx);
-    w.raw(",\"expression\":");
-    write_optional_directive_expression(w, d.expression.as_ref(), d.span, ctx);
-    w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers);
-    w.raw("}");
-}
-
-fn write_animate_directive(w: &mut JsonWriter, d: &internal::AnimateDirective<'_>, ctx: &Ctx<'_>) {
-    write_directive_head(w, "AnimateDirective", d.span, d.name_span, d.head_span, ctx);
-    w.raw(",\"expression\":");
-    write_optional_directive_expression(w, d.expression.as_ref(), d.span, ctx);
-    w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers);
-    w.raw("}");
-}
-
-fn write_let_directive(w: &mut JsonWriter, d: &internal::LetDirective<'_>, ctx: &Ctx<'_>) {
-    write_directive_head(w, "LetDirective", d.span, d.name_span, d.head_span, ctx);
-    w.raw(",\"expression\":");
-    write_optional_directive_expression(w, d.expression.as_ref(), d.span, ctx);
-    w.raw(",\"modifiers\":");
-    write_modifiers(w, d.modifiers);
-    w.raw("}");
-}
+expression_directive_writer!(write_on_directive, OnDirective);
+expression_directive_writer!(write_use_directive, UseDirective);
+expression_directive_writer!(write_animate_directive, AnimateDirective);
+expression_directive_writer!(write_let_directive, LetDirective);
 
 fn write_transition_directive(
     w: &mut JsonWriter,
@@ -1210,7 +1181,7 @@ fn write_style_sheet(
     write_value_attributes(w, style.attributes, ctx);
     w.raw(",\"children\":");
     write_array(w, style.css_stylesheet.nodes, |w, node| {
-        write_css_node(w, node, ctx.source, ctx.map);
+        write_css_node(w, node, ctx.source, ctx.loc.map);
     });
     w.raw(",\"content\":{\"start\":");
     w.u32(ctx.pos(style.content_span.start));
@@ -1220,10 +1191,7 @@ fn write_style_sheet(
     w.string(style.content_span.extract(ctx.source));
     w.raw(",\"comment\":");
     // Same `{type:"Comment", start, end, data}` shape as a fragment HTML comment.
-    match preceding_comment {
-        Some(c) => write_html_comment(w, c, ctx),
-        None => w.null(),
-    }
+    write_or_null(w, preceding_comment, |w, c| write_html_comment(w, c, ctx));
     w.raw("}}");
 }
 
@@ -1271,7 +1239,7 @@ fn write_script(
         Some(build_script_writer_comments(
             script,
             ctx.source,
-            ctx.tracker,
+            ctx.loc.tracker,
             ctx.interner,
             html_leading_comment,
             schema,
@@ -1290,12 +1258,12 @@ fn write_script(
 /// final char space (threading the schema and optional per-node comment map).
 ///
 /// Svelte overrides the byte-space `Program.loc` to `{line: <tag line>, column:
-/// 0}` and `{line: <`</script>` line>, column: <its byte column>}`, then the
-/// offset-translation walk rewrites those columns against the `Program`'s own
-/// `start`/`end` byte offsets (the content span). `translate_column` is exactly
-/// that walk's column math, so applying it here yields the final char-space
-/// columns directly (on ASCII it collapses to the raw override — `0` and the
-/// byte column).
+/// 0}` and `{line: <`</script>` line>, column: <its byte column>}`; the final
+/// char-space columns rewrite those against the `Program`'s own `start`/`end`
+/// byte offsets (the content span). `translate_column` is exactly that
+/// delta-preserving column math, so applying it here yields the final
+/// char-space columns directly (on ASCII it collapses to the raw override —
+/// `0` and the byte column).
 #[allow(clippy::cast_possible_truncation)]
 fn write_script_program_fused(
     w: &mut JsonWriter,
@@ -1305,14 +1273,19 @@ fn write_script_program_fused(
     comments: Option<&tsv_ts::ast::convert::WriterComments>,
 ) {
     let program = &script.content;
-    let start_line = ctx.tracker.get_line_column(script.span.start as usize).0;
-    let start_column = translate_column(program.span.start, 0, ctx.map, ctx.tracker) as usize;
-    let (end_line, end_byte_column) = ctx.tracker.get_line_column(script.span.end as usize);
+    let start_line = ctx
+        .loc
+        .tracker
+        .get_line_column(script.span.start as usize)
+        .0;
+    let start_column =
+        translate_column(program.span.start, 0, ctx.loc.map, ctx.loc.tracker) as usize;
+    let (end_line, end_byte_column) = ctx.loc.tracker.get_line_column(script.span.end as usize);
     let end_column = translate_column(
         program.span.end,
         end_byte_column as u64,
-        ctx.map,
-        ctx.tracker,
+        ctx.loc.map,
+        ctx.loc.tracker,
     ) as usize;
     let loc_override = (
         Position {
@@ -1493,16 +1466,14 @@ fn write_pattern_island(
     write_pattern_embedded(w, expr, ctx.source, ctx.loc, ctx.interner);
 }
 
-/// A fragment or `null` (the `AwaitBlock` branch fields, no skip).
+/// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s
+/// `alternate`, no skip).
 fn write_optional_fragment(
     w: &mut JsonWriter,
     fragment: Option<&internal::Fragment<'_>>,
     ctx: &Ctx<'_>,
 ) {
-    match fragment {
-        Some(f) => write_fragment(w, f, ctx),
-        None => w.null(),
-    }
+    write_or_null(w, fragment, |w, f| write_fragment(w, f, ctx));
 }
 
 #[cfg(test)]

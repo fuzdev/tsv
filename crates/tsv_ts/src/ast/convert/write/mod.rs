@@ -413,7 +413,35 @@ pub(super) fn write_bare_node(w: &mut JsonWriter, node_type: &str, span: Span, c
 /// line/column form); TS emits no `Position.character`, so it is always
 /// omitted. Static fragments are pre-fused into the fewest buffer writes —
 /// this runs once per node.
+#[inline]
 pub(super) fn node_header(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
+    node_header_impl::<false>(w, node_type, span, ctx);
+}
+
+/// The `node_header` variant that injects `character` into `loc.start`/`loc.end`
+/// (byte offset in final char space) — the fused `inject_loc_character`. Used
+/// only for the top-level `Identifier` of a simple block pattern, so the pattern
+/// `+1`-column adjustment is applied here too for uniformity (it never actually
+/// co-occurs with character injection — destructure has no character).
+#[inline]
+pub(super) fn node_header_with_character(
+    w: &mut JsonWriter,
+    node_type: &str,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
+    node_header_impl::<true>(w, node_type, span, ctx);
+}
+
+/// Shared body of `node_header`/`node_header_with_character`; `CHARACTER` is a
+/// compile-time constant, so each wrapper monomorphizes to its own straight-line
+/// emission (no runtime branch on the per-node hot path).
+fn node_header_impl<const CHARACTER: bool>(
+    w: &mut JsonWriter,
+    node_type: &str,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
     debug_assert!(
         node_type
             .bytes()
@@ -432,44 +460,18 @@ pub(super) fn node_header(w: &mut JsonWriter, node_type: &str, span: Span, ctx: 
     w.usize(start.line);
     w.raw(",\"column\":");
     w.usize(adjusted_column(ctx, start.line, start.column));
+    if CHARACTER {
+        w.raw(",\"character\":");
+        w.u32(start_pos);
+    }
     w.raw("},\"end\":{\"line\":");
     w.usize(end.line);
     w.raw(",\"column\":");
     w.usize(adjusted_column(ctx, end.line, end.column));
-    w.raw("}}");
-}
-
-/// The `node_header` variant that injects `character` into `loc.start`/`loc.end`
-/// (byte offset in final char space) — the fused `inject_loc_character`. Used
-/// only for the top-level `Identifier` of a simple block pattern, so the pattern
-/// `+1`-column adjustment is applied here too for uniformity (it never actually
-/// co-occurs with character injection — destructure has no character).
-pub(super) fn node_header_with_character(
-    w: &mut JsonWriter,
-    node_type: &str,
-    span: Span,
-    ctx: &Ctx<'_>,
-) {
-    let (start_pos, start) = ctx.loc.pos_and_position(span.start);
-    let (end_pos, end) = ctx.loc.pos_and_position(span.end);
-    w.raw("{\"type\":\"");
-    w.raw(node_type);
-    w.raw("\",\"start\":");
-    w.u32(start_pos);
-    w.raw(",\"end\":");
-    w.u32(end_pos);
-    w.raw(",\"loc\":{\"start\":{\"line\":");
-    w.usize(start.line);
-    w.raw(",\"column\":");
-    w.usize(adjusted_column(ctx, start.line, start.column));
-    w.raw(",\"character\":");
-    w.u32(start_pos);
-    w.raw("},\"end\":{\"line\":");
-    w.usize(end.line);
-    w.raw(",\"column\":");
-    w.usize(adjusted_column(ctx, end.line, end.column));
-    w.raw(",\"character\":");
-    w.u32(end_pos);
+    if CHARACTER {
+        w.raw(",\"character\":");
+        w.u32(end_pos);
+    }
     w.raw("}}");
 }
 

@@ -176,6 +176,24 @@ independent divergence — prettier's forced `<T,>` trailing comma on single-unc
 arrow type params (hence the `_svelte_prettier_divergence` suffix). See
 [conformance_prettier.md](./conformance_prettier.md) §TypeScript.
 
+**Type assertion vs. generic arrow**: at a `<` in expression position,
+acorn-typescript tries the generic-arrow reading first, and its Babel-ported
+"abort on a parenthesized arrow" check is dead code (acorn never sets
+`extra.parenthesized`), so `<T>` followed by *any* arrow parses as the arrow's
+type parameters. TypeScript (and Babel) instead read a type assertion in
+JSX-free `.ts`. tsv follows TypeScript, in three forms: `<any>(() => {})` is a
+`TSTypeAssertion` over the parenthesized arrow
+([type_assertion_paren_arrow](../tests/fixtures/typescript/expressions/type_assertion_paren_arrow_svelte_divergence/);
+also corpus-enforced via the `type_assertion_paren_arrow` matcher — the
+divergent reading shows up in real code, e.g. prettier's own test corpus);
+`<T>x => x` and `<T,>(() => {})` are parse errors tsv rejects while acorn
+accepts (pinned in `tests/type_assertion_arrow.rs` — a rejection can't be an
+`input_invalid_*` fixture when the canonical parser accepts). The ordinary
+generic-arrow forms (`<T>(x: T) => x`) and assertion forms whose type can't
+parse as type parameters (`<any[]>(() => {})`) agree in both parsers.
+**Upstream candidate**: @sveltejs/acorn-typescript — the dead
+`extra.parenthesized` abort in `parseMaybeAssign`'s arrow `tryParse`.
+
 **Member access on a parenthesized decorator expression** (`@(f()).g a;`):
 acorn-typescript only accepts a call after a parenthesized decorator
 expression — member access is a parse error. tsc parses it (decorators accept
@@ -356,6 +374,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - Import type options — `import()` type assertion options
 - Anonymous class-expression `id` — omitted for implements-first heritage
 - `export default class implements I {}` — anonymous default class with implements-first heritage rejected (`implements` read as a reserved-word name)
+- Type assertion vs. generic arrow — `<T>` before any arrow (even a parenthesized one) reads as type parameters; the parenthesized-arrow abort check is dead code
 
 **acorn** — fix in acorn core:
 

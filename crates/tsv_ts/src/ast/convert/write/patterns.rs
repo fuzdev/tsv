@@ -111,7 +111,12 @@ pub(super) fn write_assignment_pattern(
 ) {
     node_header(w, "AssignmentPattern", span, ctx);
     w.raw(",\"left\":");
-    write_expression(w, pattern.left, ctx);
+    // acorn's `=` conversion (`toAssignable`, return value used) peels a
+    // type-assertion/paren wrapper off a default's target, so the wire `left`
+    // is the bare target (`{ a: (b as T) = 1 }` → `Identifier` `b`); the cast
+    // stays in the internal AST for the formatter — same unwrap as the simple
+    // `=` left in `write_expression`'s `AssignmentExpression` arm.
+    write_expression(w, pattern.left.skip_type_assertions(), ctx);
     w.raw(",\"right\":");
     write_expression(w, pattern.right, ctx);
     close_node(w, "AssignmentPattern", span, ctx);

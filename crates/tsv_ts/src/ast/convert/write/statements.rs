@@ -147,11 +147,7 @@ pub(super) fn write_statement(
             close_node(w, "ExportNamedDeclaration", export_span, ctx);
         }
         internal::Statement::ExportDefaultDeclaration(export_decl) => {
-            let export_kind = if schema.is_svelte_script() {
-                None
-            } else {
-                Some("value")
-            };
+            let export_kind = kind_token(false, schema);
             let start = export_start(
                 ctx.source,
                 export_decl.span.start,
