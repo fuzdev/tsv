@@ -32,7 +32,7 @@ serde_json.workspace = true
 
 [features]
 # Mirrors tsv_ffi / tsv_wasm: `format` exports the formatters, `parse` exports
-# the parsers plus the public-AST/JSON convert layer they serialize through. The
+# the parsers plus the wire-JSON convert layer they emit through. The
 # default both-features build is what the Node bench loads.
 default = ["format", "parse"]
 # Pulls the reusable doc arena (`tsv_arena::with_doc_arena`, which pulls tsv_lang).

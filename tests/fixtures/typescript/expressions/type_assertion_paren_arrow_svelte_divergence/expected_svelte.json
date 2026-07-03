@@ -1,0 +1,282 @@
+{
+	"type": "Program",
+	"start": 0,
+	"end": 313,
+	"loc": {
+		"start": {
+			"line": 1,
+			"column": 0
+		},
+		"end": {
+			"line": 10,
+			"column": 0
+		}
+	},
+	"body": [
+		{
+			"type": "ExpressionStatement",
+			"start": 169,
+			"end": 185,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 16
+				}
+			},
+			"expression": {
+				"type": "ArrowFunctionExpression",
+				"start": 169,
+				"end": 183,
+				"loc": {
+					"start": {
+						"line": 4,
+						"column": 0
+					},
+					"end": {
+						"line": 4,
+						"column": 14
+					}
+				},
+				"id": null,
+				"expression": false,
+				"generator": false,
+				"async": false,
+				"params": [],
+				"body": {
+					"type": "BlockStatement",
+					"start": 181,
+					"end": 183,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 12
+						},
+						"end": {
+							"line": 4,
+							"column": 14
+						}
+					},
+					"body": []
+				},
+				"typeParameters": {
+					"type": "TSTypeParameterDeclaration",
+					"start": 169,
+					"end": 174,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 0
+						},
+						"end": {
+							"line": 4,
+							"column": 5
+						}
+					},
+					"params": [
+						{
+							"type": "TSTypeParameter",
+							"start": 170,
+							"end": 173,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 4
+								}
+							},
+							"name": "any"
+						}
+					]
+				}
+			}
+		},
+		{
+			"type": "ExpressionStatement",
+			"start": 186,
+			"end": 200,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 14
+				}
+			},
+			"expression": {
+				"type": "ArrowFunctionExpression",
+				"start": 186,
+				"end": 198,
+				"loc": {
+					"start": {
+						"line": 5,
+						"column": 0
+					},
+					"end": {
+						"line": 5,
+						"column": 12
+					}
+				},
+				"id": null,
+				"expression": false,
+				"generator": false,
+				"async": false,
+				"params": [],
+				"body": {
+					"type": "BlockStatement",
+					"start": 196,
+					"end": 198,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 10
+						},
+						"end": {
+							"line": 5,
+							"column": 12
+						}
+					},
+					"body": []
+				},
+				"typeParameters": {
+					"type": "TSTypeParameterDeclaration",
+					"start": 186,
+					"end": 189,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 0
+						},
+						"end": {
+							"line": 5,
+							"column": 3
+						}
+					},
+					"params": [
+						{
+							"type": "TSTypeParameter",
+							"start": 187,
+							"end": 188,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 2
+								}
+							},
+							"name": "T"
+						}
+					]
+				}
+			}
+		},
+		{
+			"type": "ExpressionStatement",
+			"start": 294,
+			"end": 312,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 18
+				}
+			},
+			"expression": {
+				"type": "TSTypeAssertion",
+				"start": 294,
+				"end": 311,
+				"loc": {
+					"start": {
+						"line": 9,
+						"column": 0
+					},
+					"end": {
+						"line": 9,
+						"column": 17
+					}
+				},
+				"typeAnnotation": {
+					"type": "TSArrayType",
+					"start": 295,
+					"end": 300,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 6
+						}
+					},
+					"elementType": {
+						"type": "TSAnyKeyword",
+						"start": 295,
+						"end": 298,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 4
+							}
+						}
+					}
+				},
+				"expression": {
+					"type": "ArrowFunctionExpression",
+					"start": 302,
+					"end": 310,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 8
+						},
+						"end": {
+							"line": 9,
+							"column": 16
+						}
+					},
+					"id": null,
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 308,
+						"end": 310,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 14
+							},
+							"end": {
+								"line": 9,
+								"column": 16
+							}
+						},
+						"body": []
+					}
+				}
+			}
+		}
+	],
+	"sourceType": "module"
+}

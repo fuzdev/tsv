@@ -204,9 +204,9 @@ rides the same Rust wire (`convert_ast_json_string`), differing only at the
 boundary, and is already exercised per-file by the bench preflight and
 `deno task smoke`. This is the external
 oracle the internal identity gates can't provide: fixtures cover curated
-cases, and P4/P5/`json_profile` only prove tsv's two materialization paths
-agree with each other, so a bug shared by both walks (e.g. an untranslated
-position field) is invisible to all of them.
+cases and the wire-JSON writer is the sole emission path, so a writer bug
+(e.g. an untranslated position field) on an uncurated shape is invisible
+without a canonical-parser comparison at corpus scale.
 
 ```bash
 deno task corpus:compare:parse --all                    # full corpus
@@ -854,15 +854,15 @@ Implementation: `lib/binary_sizes.ts`
 - **Parse benchmark overhead**: JSON materialization, not parsing, dominates
   the `-json` rows (see `results/report.<runtime>.md` for the current per-language
   ratios). Use `tsv-internal` for raw parse speed. Both the native and WASM rows go through
-  `convert_ast_json_string`, which serializes the typed public AST directly,
-  skipping the intermediate `serde_json::Value` (per-language pipeline shapes:
+  `convert_ast_json_string` — the wire-JSON writer emitting directly from the
+  internal AST in one walk, no intermediate `serde_json::Value` or typed public
+  tree (per-language pipeline shapes:
   [docs/architecture.md §Closed Scope, Open Convention](../../docs/architecture.md#closed-scope-open-convention)).
   They differ only at the boundary: native crosses via FFI copy +
   `JSON.parse` in JS; WASM decodes the string across the boundary and runs
   the engine's `JSON.parse` from Rust via `js_sys` (measurably faster than a
-  `serde_wasm_bindgen`-built object graph). The Rust-side sub-step split (convert / to_value /
-  translate / to_string) plus whole-call value-baseline-vs-shipped timings are
-  measured by `cargo run --release -p tsv_debug -- json_profile <paths>` —
+  `serde_wasm_bindgen`-built object graph). The Rust-side parse-vs-write timing
+  is measured by `cargo run --release -p tsv_debug -- json_profile <paths>` —
   `wasm_json_probe.ts` covers the end-to-end view including the JS boundary.
 - **TypeScript canonical parser**: acorn-typescript fails on some modern syntax
   (files skipped) — and the reverse, files tsv fails that acorn accepts, is a

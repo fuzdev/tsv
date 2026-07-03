@@ -90,7 +90,7 @@ arena_print_doc*()           — render doc tree to formatted string
 ```rust
 // Language parsers use:
 use tsv_lang::{ParseError, Result, Span};
-use tsv_lang::location::LocationTracker;  // For convert_ast()
+use tsv_lang::location::LocationTracker;  // For wire-JSON emission
 use tsv_lang::comment::Comment;           // Collected during parsing
 // Lookahead is each parser's own `peek: Option<Token>` over its lexer's token POD.
 
@@ -111,12 +111,12 @@ let output = printer.into_string();
 ### AST Conversion
 
 ```rust
-// Internal AST → Public JSON AST (byte-space; the Value pipeline translates after):
-let tracker = LocationTracker::new(source);
-let public = convert_program(&program, source, LocationMapper::identity(&tracker), Schema::Acorn);
-// The wire hot path passes a real map instead — LocationMapper { tracker, map } —
-// so conversion emits final UTF-16 positions directly (no translation walk).
-// Use Schema::SvelteScript when converting a Svelte non-lang="ts" <script>
+// Internal AST → wire JSON, emitted directly by the writer in one walk:
+let (tracker, map) = LocationTracker::new_ecmascript_with_map(source);
+let bytes = write_program_json(&program, source, LocationMapper { tracker: &tracker, map: &map }, Schema::Acorn);
+// The LocationMapper carries the ByteToCharMap so the writer emits final UTF-16
+// positions directly (identity/byte-space passthrough on ASCII). Pass
+// Schema::SvelteScript when writing a Svelte non-lang="ts" <script>
 // (Svelte's parser omits importKind/exportKind=value and always emits
 // `attributes` on import/export declarations).
 ```

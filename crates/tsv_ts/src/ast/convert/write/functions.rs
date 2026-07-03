@@ -1,14 +1,14 @@
-// Function-related expression writers — the writer twin of `convert::functions`.
+// Function-related expression writers.
 
 use super::super::super::internal;
 use super::expressions::{ExprFlags, write_expression, write_expression_inner, write_expressions};
 use super::statements::write_block_statement;
 use super::{
-    Ctx, JsonWriter, node_header, write_identifier_with_optional, write_or_null,
+    Ctx, JsonWriter, close_node, node_header, write_identifier_with_optional, write_or_null,
     write_return_type_field, write_type_arguments_field, write_type_parameters_field,
 };
 
-/// Mirrors `convert_arrow_function_expression`. Field order:
+/// Emits an `ArrowFunctionExpression` node. Field order:
 /// `id` (always null), `expression`, `generator` (always false), `async`,
 /// `params`, `body`, `typeParameters?`, `returnType?`.
 pub(super) fn write_arrow_function_expression(
@@ -30,10 +30,10 @@ pub(super) fn write_arrow_function_expression(
     }
     write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
     write_return_type_field(w, arrow.return_type.as_ref(), ctx);
-    w.raw("}");
+    close_node(w, "ArrowFunctionExpression", arrow.span, ctx);
 }
 
-/// Mirrors `convert_function_expression`. Field order:
+/// Emits a `FunctionExpression` node. Field order:
 /// `id` (nullable), `expression`, `generator`, `async`, `typeParameters?`,
 /// `params`, `returnType?`, `body`.
 pub(super) fn write_function_expression(
@@ -56,10 +56,10 @@ pub(super) fn write_function_expression(
     write_return_type_field(w, func.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func.body, ctx);
-    w.raw("}");
+    close_node(w, "FunctionExpression", func.span, ctx);
 }
 
-/// Mirrors `convert_new_expression`. Field order: `callee`, `arguments`,
+/// Emits a `NewExpression` node. Field order: `callee`, `arguments`,
 /// `typeArguments?`.
 pub(super) fn write_new_expression(
     w: &mut JsonWriter,
@@ -72,16 +72,15 @@ pub(super) fn write_new_expression(
     w.raw(",\"arguments\":");
     write_expressions(w, new_expr.arguments, ctx);
     write_type_arguments_field(w, new_expr.type_arguments.as_ref(), ctx);
-    w.raw("}");
+    close_node(w, "NewExpression", new_expr.span, ctx);
 }
 
-/// Mirrors `convert_call_expression` (chain-aware). Field order: `callee`,
+/// Emits a `CallExpression` node (chain-aware). Field order: `callee`,
 /// `arguments`, `typeArguments?`, `optional?`.
 ///
-/// `force_optional` / `strip_optional` are this node's own post-hoc overrides
+/// `force_optional` / `strip_optional` are this node's own `optional` overrides
 /// (see `ExprFlags`): strip omits `optional` entirely (decorator spine) and
-/// wins over force (`true`), which wins over the computed value — matching
-/// convert's mutate-after-convert order.
+/// wins over force (`true`), which wins over the computed value.
 pub(super) fn write_call_expression(
     w: &mut JsonWriter,
     call: &internal::CallExpression<'_>,
@@ -123,10 +122,10 @@ pub(super) fn write_call_expression(
             w.bool(call.optional);
         }
     }
-    w.raw("}");
+    close_node(w, "CallExpression", call.span, ctx);
 }
 
-/// Mirrors `convert_member_expression` (chain-aware). Field order: `object`,
+/// Emits a `MemberExpression` node (chain-aware). Field order: `object`,
 /// `property`, `computed`, `optional?`. Same strip/force precedence as
 /// `write_call_expression`; the strip walks member → object.
 pub(super) fn write_member_expression(
@@ -159,10 +158,10 @@ pub(super) fn write_member_expression(
         w.raw(",\"optional\":");
         w.bool(force_optional || member.optional);
     }
-    w.raw("}");
+    close_node(w, "MemberExpression", member.span, ctx);
 }
 
-/// Mirrors `convert_conditional_expression`.
+/// Emits a `ConditionalExpression` node.
 pub(super) fn write_conditional_expression(
     w: &mut JsonWriter,
     cond: &internal::ConditionalExpression<'_>,
@@ -175,10 +174,10 @@ pub(super) fn write_conditional_expression(
     write_expression(w, cond.consequent, ctx);
     w.raw(",\"alternate\":");
     write_expression(w, cond.alternate, ctx);
-    w.raw("}");
+    close_node(w, "ConditionalExpression", cond.span, ctx);
 }
 
-/// Mirrors `convert_await_expression`.
+/// Emits an `AwaitExpression` node.
 pub(super) fn write_await_expression(
     w: &mut JsonWriter,
     await_expr: &internal::AwaitExpression<'_>,
@@ -187,10 +186,10 @@ pub(super) fn write_await_expression(
     node_header(w, "AwaitExpression", await_expr.span, ctx);
     w.raw(",\"argument\":");
     write_expression(w, await_expr.argument, ctx);
-    w.raw("}");
+    close_node(w, "AwaitExpression", await_expr.span, ctx);
 }
 
-/// Mirrors `convert_yield_expression`. Field order: `delegate`, `argument`
+/// Emits a `YieldExpression` node. Field order: `delegate`, `argument`
 /// (nullable).
 pub(super) fn write_yield_expression(
     w: &mut JsonWriter,
@@ -204,5 +203,5 @@ pub(super) fn write_yield_expression(
     write_or_null(w, yield_expr.argument.as_ref(), |w, e| {
         write_expression(w, e, ctx);
     });
-    w.raw("}");
+    close_node(w, "YieldExpression", yield_expr.span, ctx);
 }

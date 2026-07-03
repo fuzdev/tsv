@@ -11,6 +11,10 @@ description = "Language-agnostic foundation primitives for tsv"
 # no `DocArena` side-set field, no render-loop hook. `tsv_debug` forwards this
 # feature (off by default there too) to drive `swallow_audit`. See src/doc/swallow.rs.
 swallow_check = []
+# Shared wire-JSON writer substrate (`json_writer`), pulled in transitively by
+# each language crate's `convert` feature. Off in the format-only
+# @fuzdev/tsv_format_wasm build, so `serde_json` never enters that graph.
+json = ["dep:serde_json"]
 
 [dependencies]
 smallvec.workspace = true
@@ -18,6 +22,10 @@ string-interner.workspace = true
 thiserror.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
+# Only for the `json` feature's wire-JSON writer, whose `string`/`f64` emitters
+# delegate to `serde_json::to_writer` for exact escape/ryu parity with the typed
+# serialization. Optional so format-only builds stay serde-free.
+serde_json = { workspace = true, optional = true }
 
 [lints]
 workspace = true

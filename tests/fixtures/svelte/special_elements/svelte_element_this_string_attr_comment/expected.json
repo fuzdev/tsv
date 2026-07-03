@@ -1,0 +1,109 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 52,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteElement",
+				"start": 0,
+				"end": 51,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 15,
+						"character": 15
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 27,
+						"end": 48,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 27,
+								"character": 27
+							},
+							"end": {
+								"line": 1,
+								"column": 36,
+								"character": 36
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 37,
+							"end": 48,
+							"expression": {
+								"type": "Identifier",
+								"start": 46,
+								"end": 47,
+								"loc": {
+									"start": {
+										"line": 1,
+										"column": 46
+									},
+									"end": {
+										"line": 1,
+										"column": 47
+									}
+								},
+								"name": "a",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 38,
+										"end": 45
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Literal",
+					"value": "div",
+					"raw": "'div'",
+					"start": 22,
+					"end": 25
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 38,
+			"end": 45,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 38
+				},
+				"end": {
+					"line": 1,
+					"column": 45
+				}
+			}
+		}
+	]
+}

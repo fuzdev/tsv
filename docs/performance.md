@@ -101,21 +101,14 @@ median of N iterations to reduce noise from OS scheduling.
 The same aggregates (including the per-language breakdown under `langs`) are in
 the `--json` output as `*_us_per_kb` / `*_us_per_file` fields.
 
-### 2. `tsv_debug json_profile` — parse→JSON materialization sub-steps
+### 2. `tsv_debug json_profile` — parse→JSON emission timing
 
-Splits the FFI parse path (`parse` + `convert_ast_json_string`) into the
-`Value` pipeline's per-language sub-steps (convert / to_value / attach /
-translate / to_string), times the direct typed pipeline (Svelte's
-island-scoped comment attach + typed offset translation +
-`serde_json::to_string(&public_ast)`, skipping the intermediate `Value`;
-the per-language pipeline shapes:
-[architecture.md §Closed Scope, Open Convention](./architecture.md#closed-scope-open-convention)),
-and times the `Value` pipeline and the shipped `convert_ast_json_string` as
-whole calls. The shipped function's
-output is byte-identity-checked against the `Value` pipeline's on every
-file; the direct path is identity-checked on every file too (multibyte and
-template-comment files included — each language's typed walks run before
-`direct` is captured, so any mismatch is a typed-vs-`Value` parity bug).
+Times the two phases of the FFI parse path (`parse` +
+`convert_ast_json_bytes`) per file across a corpus. The writer
+(`convert_ast_json_bytes`) is the sole emission path — it walks the internal
+AST once and emits the final char-space wire JSON directly, so there are no
+sub-steps to decompose (per-language pipeline shapes:
+[architecture.md §Closed Scope, Open Convention](./architecture.md#closed-scope-open-convention)).
 Pure Rust, no external dependencies.
 
 ```bash
@@ -126,23 +119,8 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib --json
 ```
 
-Output shows, per language: parse vs materialization, the sub-step shares,
-the typed pipeline's sub-step sum ("typed pipeline" — for TS a single fused
-char-space conversion through `LocationMapper` + direct, the tree-building
-baseline the JSON writer replaced; for Svelte/CSS convert + typed attach
-(Svelte only) + typed translate + direct, still those languages' shipped
-shape), for TS a "write" row mirroring the shipped pipeline (tracker + map
-build + `write_program_json`, the writer that emits wire JSON straight from
-the internal AST), and the whole-call "value baseline" vs "shipped" pair,
-plus both identity-check counts.
-
-**Sub-step timings exclude drop costs** — each intermediate outlives its
-timed region, and recursively freeing a large tree/`Value` is a
-substantial share of a whole call (visible as the gap between the
-sub-step sum and the whole-call rows). The whole-call "value baseline" /
-"shipped" rows include the drops and are the apples-to-apples comparison
-for what the FFI boundary pays; ratio the sub-steps only against each
-other.
+Output shows, per language: file/byte/wire-byte/multibyte counts and the
+`parse` and `write` medians (sums of per-file medians).
 
 ### 3. `[profile.profiling]` — cargo profile for perf
 
@@ -425,7 +403,7 @@ report (`benches/js/results/report.<runtime>.md`).
 
 Gzipped numbers come from `gzip -c` (system default level 6), matching
 npm-tarball wire reality and `scripts/patch_npm_package.ts`. The parse feature
-adds the parser convert+serde path and the typed offset-translation walk; the
+adds the wire-JSON writer (which fuses in the byte→char offset translation); the
 format feature adds the printers (which the parse-only build drops at link
 time); the AST crosses the JS boundary as a JSON string handed to the engine's
 native `JSON.parse` (no `serde_wasm_bindgen`). All builds run wasm-opt with

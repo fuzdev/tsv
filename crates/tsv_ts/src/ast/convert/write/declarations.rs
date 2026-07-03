@@ -1,5 +1,4 @@
-// Type alias, function, and class declaration writers — the writer twin of
-// `convert::declarations`.
+// Type alias, function, and class declaration writers.
 
 use super::super::super::internal;
 use super::super::Schema;
@@ -7,16 +6,16 @@ use super::expressions::{ExprFlags, write_expression, write_expression_inner, wr
 use super::statements::{write_block_statement, write_statement};
 use super::types::{write_index_signature, write_type, write_type_parameter_instantiation};
 use super::{
-    Ctx, JsonWriter, node_header, write_array, write_identifier_plain,
+    Ctx, JsonWriter, close_node, node_header, write_array, write_identifier_plain,
     write_identifier_with_optional, write_name, write_or_null, write_return_type_field,
     write_type_annotation_field, write_type_parameters_field,
 };
 use tsv_lang::Span;
 
-/// Mirrors `convert_decorator`: an unparenthesized decorator's call/member
-/// spine omits `optional` (`strip_decorator_spine_optional`); a parenthesized
-/// `@(expr)` rides the full expression parser and keeps it. Parens are
-/// stripped from the expression, so the only signal is the span gap.
+/// Emits a `Decorator` node: an unparenthesized decorator's call/member
+/// spine omits `optional`; a parenthesized `@(expr)` rides the full expression
+/// parser and keeps it. Parens are stripped from the expression, so the only
+/// signal is the span gap.
 pub(super) fn write_decorator(
     w: &mut JsonWriter,
     decorator: &internal::Decorator<'_>,
@@ -35,7 +34,7 @@ pub(super) fn write_decorator(
             strip_optional: !parenthesized,
         },
     );
-    w.raw("}");
+    close_node(w, "Decorator", decorator.span, ctx);
 }
 
 /// Emit a `decorators` field when the internal node carries decorators
@@ -51,7 +50,7 @@ fn write_decorators_field(
     }
 }
 
-/// Mirrors `convert_type_alias_declaration`. Field order: `id`,
+/// Emits a `TSTypeAliasDeclaration` node. Field order: `id`,
 /// `typeParameters?`, `typeAnnotation`, `declare` (only when true).
 pub(super) fn write_type_alias_declaration(
     w: &mut JsonWriter,
@@ -67,10 +66,10 @@ pub(super) fn write_type_alias_declaration(
     if type_alias.declare {
         w.raw(",\"declare\":true");
     }
-    w.raw("}");
+    close_node(w, "TSTypeAliasDeclaration", type_alias.span, ctx);
 }
 
-/// Mirrors `convert_function_declaration`. Field order: `id` (nullable),
+/// Emits a `FunctionDeclaration` node. Field order: `id` (nullable),
 /// `expression` (always false), `generator`, `async`, `typeParameters?`,
 /// `params`, `returnType?`, `body`.
 pub(super) fn write_function_declaration(
@@ -93,10 +92,10 @@ pub(super) fn write_function_declaration(
     write_return_type_field(w, func_decl.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func_decl.body, ctx);
-    w.raw("}");
+    close_node(w, "FunctionDeclaration", func_decl.span, ctx);
 }
 
-/// The super-class wrap decision (mirrors `maybe_wrap_super_class`): when
+/// The super-class wrap decision: when
 /// `extends Base<T>` sits on a different line from the closing `>` of the type
 /// parameters, acorn-typescript emits `superClass` as a
 /// `TSInstantiationExpression` consuming `superTypeParameters`. Returns the
@@ -110,7 +109,7 @@ fn super_class_wrap_span(
 ) -> Option<Span> {
     let tp_span = type_params_span?;
     // The public super-class node starts at the JsdocCast-unwrapped inner
-    // expression (mirrors `converted_start`).
+    // expression.
     let sc_start = super_class.map(|e| e.unwrap_jsdoc_casts().span().start)?;
     let stp_end = super_type_parameters_end?;
     if tsv_lang::printing::is_same_line(source, tp_span.end, sc_start) {
@@ -142,7 +141,7 @@ fn write_super_class_fields(
         write_expression(w, e, ctx);
         w.raw(",\"typeArguments\":");
         write_type_parameter_instantiation(w, stp, ctx);
-        w.raw("}");
+        close_node(w, "TSInstantiationExpression", ws, ctx);
     } else {
         write_or_null(w, super_class, |w, e| write_expression(w, e, ctx));
         if let Some(stp) = super_type_parameters {
@@ -152,7 +151,7 @@ fn write_super_class_fields(
     }
 }
 
-/// Mirrors `convert_class_declaration`. Field order: `decorators?`,
+/// Emits a `ClassDeclaration` node. Field order: `decorators?`,
 /// `declare?`, `abstract?`, `id` (nullable), `typeParameters?`, `superClass`
 /// (nullable), `superTypeParameters?`, `implements?`, `body`.
 pub(super) fn write_class_declaration(
@@ -183,10 +182,10 @@ pub(super) fn write_class_declaration(
     write_implements_field(w, class_decl.implements, ctx);
     w.raw(",\"body\":");
     write_class_body(w, &class_decl.body, ctx);
-    w.raw("}");
+    close_node(w, "ClassDeclaration", class_decl.span, ctx);
 }
 
-/// Mirrors `convert_class_expression` (no `declare` field).
+/// Emits a `ClassExpression` node (no `declare` field).
 pub(super) fn write_class_expression(
     w: &mut JsonWriter,
     class_expr: &internal::ClassExpression<'_>,
@@ -212,11 +211,11 @@ pub(super) fn write_class_expression(
     write_implements_field(w, class_expr.implements, ctx);
     w.raw(",\"body\":");
     write_class_body(w, &class_expr.body, ctx);
-    w.raw("}");
+    close_node(w, "ClassExpression", class_expr.span, ctx);
 }
 
-/// `implements` is `Option<Vec>` skipped when convert leaves it `None` (an
-/// empty internal list).
+/// The `implements` field is skip-if-empty — an empty internal list emits no
+/// field.
 fn write_implements_field(
     w: &mut JsonWriter,
     implements: &[internal::TSInterfaceHeritage<'_>],
@@ -231,7 +230,7 @@ fn write_implements_field(
     });
 }
 
-/// Mirrors `convert_class_body` + `convert_class_member`.
+/// Emits a `ClassBody` node (dispatching each `ClassMember`).
 fn write_class_body(w: &mut JsonWriter, body: &internal::ClassBody<'_>, ctx: &Ctx<'_>) {
     node_header(w, "ClassBody", body.span, ctx);
     w.raw(",\"body\":");
@@ -249,16 +248,16 @@ fn write_class_body(w: &mut JsonWriter, body: &internal::ClassBody<'_>, ctx: &Ct
             write_array(w, block.body, |w, s| {
                 write_statement(w, s, ctx, Schema::Acorn);
             });
-            w.raw("}");
+            close_node(w, "StaticBlock", block.span, ctx);
         }
         internal::ClassMember::IndexSignature(sig) => {
             write_index_signature(w, sig, ctx);
         }
     });
-    w.raw("}");
+    close_node(w, "ClassBody", body.span, ctx);
 }
 
-/// Mirrors `convert_method_definition`. Field order: `decorators?`,
+/// Emits a `MethodDefinition` node. Field order: `decorators?`,
 /// `accessibility?`, `abstract?`, `static`, `override` (only when true),
 /// `optional?`, `computed`, `key`, `kind`, `typeParameters?` (moved here from
 /// the FunctionExpression, acorn convention), `value`.
@@ -305,12 +304,8 @@ fn write_method_definition(
         ("FunctionExpression", Some(&func.body))
     };
     w.raw(",\"value\":");
-    node_header(
-        w,
-        value_type,
-        Span::new(func.params_start, func.span.end),
-        ctx,
-    );
+    let value_span = Span::new(func.params_start, func.span.end);
+    node_header(w, value_type, value_span, ctx);
     w.raw(",\"id\":");
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
@@ -326,10 +321,12 @@ fn write_method_definition(
         w.raw(",\"body\":");
         write_block_statement(w, body, ctx);
     }
-    w.raw("}}");
+    // Close the `value` function node, then the `MethodDefinition`.
+    close_node(w, value_type, value_span, ctx);
+    close_node(w, "MethodDefinition", method.span, ctx);
 }
 
-/// Mirrors `convert_property_definition`. Field order: `decorators?`,
+/// Emits a `PropertyDefinition` node. Field order: `decorators?`,
 /// `abstract?`, `accessor?`, `accessibility?`, `readonly?`, `override?`,
 /// `declare?`, `static`, `computed`, `key`, `optional?`, `definite?`,
 /// `typeAnnotation?`, `value` (nullable).
@@ -374,13 +371,12 @@ fn write_property_definition(
     write_type_annotation_field(w, prop.type_annotation.as_ref(), ctx);
     w.raw(",\"value\":");
     write_or_null(w, prop.value.as_ref(), |w, v| write_expression(w, v, ctx));
-    w.raw("}");
+    close_node(w, "PropertyDefinition", prop.span, ctx);
 }
 
-/// Mirrors `convert_type_parameter_declaration` (and its byte-identical
-/// `_simple` sibling — one writer serves both call-site families). Field
-/// order: `params`, `extra?` (`{"trailingComma":N}`, emitted like
-/// `start`/`end` in the mapper's output space).
+/// Emits a `TSTypeParameterDeclaration` node. Field order: `params`, `extra?`
+/// (`{"trailingComma":N}`, emitted like `start`/`end` in the mapper's output
+/// space).
 pub(super) fn write_type_parameter_declaration(
     w: &mut JsonWriter,
     params: &internal::TSTypeParameterDeclaration<'_>,
@@ -394,10 +390,10 @@ pub(super) fn write_type_parameter_declaration(
         w.u32(ctx.loc.pos(pos));
         w.raw("}");
     }
-    w.raw("}");
+    close_node(w, "TSTypeParameterDeclaration", params.span, ctx);
 }
 
-/// Mirrors `convert_type_parameter`. Field order: `const`/`in`/`out` (each
+/// Emits a `TSTypeParameter` node. Field order: `const`/`in`/`out` (each
 /// only when true), `name`, `constraint?`, `default?`.
 pub(super) fn write_type_parameter(
     w: &mut JsonWriter,
@@ -415,7 +411,7 @@ pub(super) fn write_type_parameter(
         w.raw(",\"out\":true");
     }
     w.raw(",\"name\":");
-    write_name(w, param.name.span, param.name.name, ctx);
+    write_name(w, param.name.name, ctx);
     if let Some(c) = &param.constraint {
         w.raw(",\"constraint\":");
         write_type(w, c, ctx);
@@ -424,11 +420,12 @@ pub(super) fn write_type_parameter(
         w.raw(",\"default\":");
         write_type(w, d, ctx);
     }
-    w.raw("}");
+    close_node(w, "TSTypeParameter", param.span, ctx);
 }
 
-/// Mirrors `convert_expression_with_type_arguments` (implements clause) +
-/// `convert_entity_name_to_expression`.
+/// Emits a `TSExpressionWithTypeArguments` node (an implements clause): the
+/// `expression` is the heritage entity name rendered as an expression, plus
+/// `typeParameters?`.
 fn write_expression_with_type_arguments(
     w: &mut JsonWriter,
     heritage: &internal::TSInterfaceHeritage<'_>,
@@ -441,10 +438,10 @@ fn write_expression_with_type_arguments(
         w.raw(",\"typeParameters\":");
         write_type_parameter_instantiation(w, ta, ctx);
     }
-    w.raw("}");
+    close_node(w, "TSExpressionWithTypeArguments", heritage.span, ctx);
 }
 
-/// Mirrors `convert_entity_name_to_expression`: `Foo` emits an `Identifier`
+/// Renders an entity name as an expression: `Foo` emits an `Identifier`
 /// (carrying the binding's `optional` flag), `Foo.Bar` a `MemberExpression`
 /// with `computed:false, optional:false`.
 fn write_entity_name_to_expression(
@@ -460,7 +457,8 @@ fn write_entity_name_to_expression(
             write_entity_name_to_expression(w, &qn.left, ctx);
             w.raw(",\"property\":");
             write_identifier_with_optional(w, &qn.right, ctx);
-            w.raw(",\"computed\":false,\"optional\":false}");
+            w.raw(",\"computed\":false,\"optional\":false");
+            close_node(w, "MemberExpression", qn.span, ctx);
         }
     }
 }

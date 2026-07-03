@@ -1,0 +1,298 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 211,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 49,
+				"data": " comment leading a param, after the comma "
+			},
+			{
+				"type": "Text",
+				"start": 49,
+				"end": 50,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 50,
+				"end": 102,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn1",
+					"start": 60,
+					"end": 63,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 10,
+							"character": 60
+						},
+						"end": {
+							"line": 2,
+							"column": 13,
+							"character": 63
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 64,
+						"end": 65,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 14
+							},
+							"end": {
+								"line": 2,
+								"column": 15
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 67,
+								"end": 74
+							}
+						]
+					},
+					{
+						"type": "Identifier",
+						"start": 75,
+						"end": 76,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 25
+							},
+							"end": {
+								"line": 2,
+								"column": 26
+							}
+						},
+						"name": "b"
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 78,
+							"end": 92,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 29,
+									"character": 79
+								},
+								"end": {
+									"line": 2,
+									"column": 33,
+									"character": 83
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 84,
+										"end": 85,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 102,
+				"end": 104,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 104,
+				"end": 154,
+				"data": " comment after the comma of a middle param "
+			},
+			{
+				"type": "Text",
+				"start": 154,
+				"end": 155,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SnippetBlock",
+				"start": 155,
+				"end": 210,
+				"expression": {
+					"type": "Identifier",
+					"name": "fn2",
+					"start": 165,
+					"end": 168,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 10,
+							"character": 165
+						},
+						"end": {
+							"line": 5,
+							"column": 13,
+							"character": 168
+						}
+					}
+				},
+				"parameters": [
+					{
+						"type": "Identifier",
+						"start": 169,
+						"end": 170,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 14
+							},
+							"end": {
+								"line": 5,
+								"column": 15
+							}
+						},
+						"name": "a",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 172,
+								"end": 179
+							}
+						]
+					},
+					{
+						"type": "Identifier",
+						"start": 180,
+						"end": 181,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 25
+							},
+							"end": {
+								"line": 5,
+								"column": 26
+							}
+						},
+						"name": "b"
+					},
+					{
+						"type": "Identifier",
+						"start": 183,
+						"end": 184,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 28
+							},
+							"end": {
+								"line": 5,
+								"column": 29
+							}
+						},
+						"name": "c"
+					}
+				],
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 186,
+							"end": 200,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 5,
+									"column": 32,
+									"character": 187
+								},
+								"end": {
+									"line": 5,
+									"column": 36,
+									"character": 191
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 192,
+										"end": 193,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 67,
+			"end": 74,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 17
+				},
+				"end": {
+					"line": 2,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 172,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 17
+				},
+				"end": {
+					"line": 5,
+					"column": 24
+				}
+			}
+		}
+	]
+}

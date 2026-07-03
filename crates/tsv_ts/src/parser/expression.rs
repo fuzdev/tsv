@@ -1544,6 +1544,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse the expression - use high binding power since type assertion is prefix
         let parsed = self.parse_expression_bp(BP_UNARY)?;
+
+        // Reject an unparenthesized arrow operand (`<T>x => x`): the assertion
+        // operand is a UnaryExpression, which an arrow is not — TypeScript
+        // errors here. acorn-typescript instead backtracks and reads `<T>` as
+        // the arrow's type parameters (a deliberate, cataloged divergence —
+        // conformance_svelte.md §Type assertion vs. generic arrow). A
+        // *parenthesized* arrow (`<T>(() => {})`) stays a valid operand — same
+        // span-gap test the prefix layer uses to seal parenthesized arrows.
+        if matches!(parsed.expr, Expression::ArrowFunctionExpression(_))
+            && parsed.actual_start == parsed.expr.span().start
+        {
+            return Err(
+                self.error_msg("An arrow function cannot be the operand of a type assertion")
+            );
+        }
         let end = parsed.actual_end;
 
         Ok(Expression::TSTypeAssertion(TSTypeAssertion {

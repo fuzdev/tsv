@@ -30,7 +30,7 @@ use phases::{
     validate_formatter_idempotent, validate_formatter_prettier, validate_invalid_syntax,
     validate_normalization_ours, validate_normalization_prettier, validate_parser_external,
     validate_parser_ours, validate_parser_ours_matches_expected, validate_prettier_nonconvergent,
-    validate_prettier_rejects, validate_typed_walk_parity,
+    validate_prettier_rejects,
 };
 
 /// Result of validating a single fixture
@@ -177,9 +177,9 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
 
     // Phases 2-4: Our parser/formatter validation (skip in prettier_only mode)
     if !prettier_only {
-        // Phases 2/2b/2c/2d share one parse of the input (and one
-        // convert_ast_json materialization for 2/2b/2c). The arena owns the
-        // internal AST and must outlive `parsed` (caller-owns-`Bump`).
+        // Phases 2/2b share one parse of the input (and one convert_ast_json
+        // materialization). The arena owns the internal AST and must outlive
+        // `parsed` (caller-owns-`Bump`).
         let arena = bumpalo::Bump::new();
         match parse_input(&input, input_type, fixture.goal(), &arena) {
             Ok(parsed) => {
@@ -188,23 +188,13 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
                         // Phase 2: Our Parser validation - P2 (pure Rust)
                         validate_parser_ours(&mut result, fixture, &paths);
 
-                        // Phase 2b: Our parser matches expected.json
-                        // (non-divergence only, pure Rust)
+                        // Phase 2b: Our parser (the writer's wire JSON, via
+                        // `convert_ast_json`) matches expected.json — the gate
+                        // on the emission path. (non-divergence only, pure Rust)
                         validate_parser_ours_matches_expected(&mut result, fixture, &paths);
-
-                        // Phase 2c: Compact wire path matches the Value path (pure Rust)
-                        if paths.wire_path_matches {
-                            result.add_success(ValidationSuccess::ParserJsonStringPathMatches);
-                        } else {
-                            result.add_error(ValidationError::ParserJsonStringPathDiverges);
-                        }
                     }
                     Err(e) => result.add_error(ValidationError::ParserError(e)),
                 }
-
-                // Phase 2d: Typed-walk parity probes — synthesized multibyte
-                // variants and extracted <script> contents (pure Rust)
-                validate_typed_walk_parity(&mut result, &input, &parsed, fixture.goal());
             }
             Err(e) => {
                 // One parse failure, one error — svelte_divergence fixtures

@@ -1,13 +1,16 @@
-// Import and export specifier writers — the writer twin of `convert::modules`.
+// Import and export specifier writers.
 
 use super::super::super::internal;
 use super::super::Schema;
 use super::declarations::{write_class_declaration, write_function_declaration};
 use super::expressions::write_expression;
 use super::types::{write_declare_function, write_interface_declaration};
-use super::{Ctx, JsonWriter, kind_token, node_header, write_identifier_plain, write_literal};
+use super::{
+    Ctx, JsonWriter, close_node, kind_token, node_header, write_identifier_plain, write_literal,
+};
 
-/// Mirrors `convert_import_specifier`.
+/// Emit an import specifier (`ImportDefaultSpecifier` / `ImportSpecifier` /
+/// `ImportNamespaceSpecifier`).
 pub(super) fn write_import_specifier(
     w: &mut JsonWriter,
     spec: &internal::ImportSpecifier<'_>,
@@ -19,7 +22,7 @@ pub(super) fn write_import_specifier(
             node_header(w, "ImportDefaultSpecifier", default_spec.span, ctx);
             w.raw(",\"local\":");
             write_identifier_plain(w, &default_spec.local, ctx);
-            w.raw("}");
+            close_node(w, "ImportDefaultSpecifier", default_spec.span, ctx);
         }
         internal::ImportSpecifier::Named(named_spec) => {
             let import_kind = kind_token(
@@ -35,18 +38,18 @@ pub(super) fn write_import_specifier(
                 w.raw(",\"importKind\":");
                 w.token(kind);
             }
-            w.raw("}");
+            close_node(w, "ImportSpecifier", named_spec.span, ctx);
         }
         internal::ImportSpecifier::Namespace(ns_spec) => {
             node_header(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
             w.raw(",\"local\":");
             write_identifier_plain(w, &ns_spec.local, ctx);
-            w.raw("}");
+            close_node(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
         }
     }
 }
 
-/// Mirrors `convert_import_attribute`.
+/// Emits an `ImportAttribute` node.
 pub(super) fn write_import_attribute(
     w: &mut JsonWriter,
     attr: &internal::ImportAttribute<'_>,
@@ -60,10 +63,10 @@ pub(super) fn write_import_attribute(
     }
     w.raw(",\"value\":");
     write_literal(w, &attr.value, ctx);
-    w.raw("}");
+    close_node(w, "ImportAttribute", attr.span, ctx);
 }
 
-/// Mirrors `convert_export_specifier`. Field order: `local`, `exported`,
+/// Emits an `ExportSpecifier` node. Field order: `local`, `exported`,
 /// `exportKind?`.
 pub(super) fn write_export_specifier(
     w: &mut JsonWriter,
@@ -84,11 +87,11 @@ pub(super) fn write_export_specifier(
         w.raw(",\"exportKind\":");
         w.token(kind);
     }
-    w.raw("}");
+    close_node(w, "ExportSpecifier", spec.span, ctx);
 }
 
-/// Mirrors `convert_module_export_name`: an identifier emits an `Identifier`
-/// node, a string a `Literal` node.
+/// Emit a module export name: an identifier emits an `Identifier` node, a
+/// string a `Literal` node.
 pub(super) fn write_module_export_name(
     w: &mut JsonWriter,
     name: &internal::ModuleExportName<'_>,
@@ -100,7 +103,8 @@ pub(super) fn write_module_export_name(
     }
 }
 
-/// Mirrors `convert_export_default_value`.
+/// Emit an `export default` value (an expression or a function/class/interface
+/// declaration).
 pub(super) fn write_export_default_value(
     w: &mut JsonWriter,
     value: &internal::ExportDefaultValue<'_>,

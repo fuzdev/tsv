@@ -28,8 +28,8 @@ serde_json.workspace = true
 default = ["format", "parse"]
 # tsv_format_<lang> exports. Pulls the reusable `DocArena` (tsv_arena/format → tsv_lang).
 format = ["tsv_arena/format"]
-# tsv_parse_<lang> + tsv_parse_internal_<lang> exports plus the public-AST/JSON
-# convert layer they serialize through.
+# tsv_parse_<lang> + tsv_parse_internal_<lang> exports plus the wire-JSON
+# convert layer they emit through.
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
 
 # FFI requires unsafe code. Cargo replaces the whole [lints] table on

@@ -1,14 +1,12 @@
 // Svelte AST module
 //
-// Two-AST architecture:
-// - internal: Optimized for manipulation (string interning, compact representation)
-// - public: JSON-compatible (matches Svelte parser output, serde support)
+// - internal: the parsed AST (string interning, compact representation)
+// - convert: emits the public JSON-compatible wire format (matches Svelte
+//   parser output) directly from `internal` via the writer
 
 #[cfg(feature = "convert")]
 pub mod convert;
 pub mod internal;
-#[cfg(feature = "convert")]
-pub mod public;
 
 // Re-export commonly used types
 pub use internal::{

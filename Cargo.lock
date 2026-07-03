@@ -617,7 +617,6 @@ version = "0.1.0"
 dependencies = [
  "bumpalo",
  "futures-util",
- "serde",
  "serde_json",
  "tokio",
  "tsv_cli",
@@ -658,7 +657,6 @@ version = "0.1.0"
 dependencies = [
  "bumpalo",
  "phf",
- "serde",
  "serde_json",
  "tsv_lang",
 ]
@@ -718,6 +716,7 @@ version = "0.1.0"
 name = "tsv_lang"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "smallvec",
  "string-interner",
  "thiserror",
@@ -744,7 +743,6 @@ name = "tsv_svelte"
 version = "0.1.0"
 dependencies = [
  "bumpalo",
- "serde",
  "serde_json",
  "smallvec",
  "string-interner",
@@ -759,7 +757,6 @@ name = "tsv_ts"
 version = "0.1.0"
 dependencies = [
  "bumpalo",
- "serde",
  "serde_json",
  "smallvec",
  "string-interner",
@@ -776,7 +773,6 @@ dependencies = [
  "tsv_css",
  "tsv_discover",
  "tsv_ignore",
- "tsv_lang",
  "tsv_svelte",
  "tsv_ts",
  "wasm-bindgen",
