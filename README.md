@@ -139,7 +139,7 @@ tsv currently supports:
 
 Future features (unknown order):
 
-- type stripper (easy, probably soon)
+- ts->js conversion (easy, probably soon)
 - module lexer (easy, probably soon)
 - minifier
 - JSON support
