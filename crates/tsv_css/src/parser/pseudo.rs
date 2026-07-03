@@ -388,7 +388,9 @@ fn parse_nth_args<'arena>(
     // selector rather than an unexpected `<number>`/`<dimension>` token.
     let of_selector = if found_of {
         parser.skip_whitespace_registering_comments()?;
-        Some(with_pseudo_args(parser, |p| parse_complex_selector_list(p))?)
+        Some(with_pseudo_args(parser, |p| {
+            parse_complex_selector_list(p)
+        })?)
     } else {
         None
     };
