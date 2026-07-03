@@ -11,6 +11,7 @@
 // template island is skeletonized to byte-space wire JSON, attached here, and
 // read back into a `WriterComments` map the fused writer consults at emit time.
 
+use std::borrow::Cow;
 use std::collections::VecDeque;
 
 use tsv_lang::{Comment, printing, source_scan::skip_comment};
@@ -394,12 +395,20 @@ fn recurse_children(node: &mut serde_json::Value, ctx: &mut CommentAttachmentCon
 ///
 /// `pub(super)` so the wire-JSON writer emits the `value` field directly (no
 /// intermediate `comment_to_json` `Value`).
-pub(super) fn get_comment_value(comment: &Comment, source: &str) -> String {
+///
+/// Returns `Cow` so the common single-line / non-dedented case borrows its
+/// content slice verbatim — only the multi-line block dedent path (rare)
+/// allocates.
+pub(super) fn get_comment_value<'s>(comment: &Comment, source: &'s str) -> Cow<'s, str> {
     let content = comment.content(source);
     if comment.is_block && comment.multiline {
-        printing::strip_comment_indentation(source, content, comment.span.start)
+        Cow::Owned(printing::strip_comment_indentation(
+            source,
+            content,
+            comment.span.start,
+        ))
     } else {
-        content.to_string()
+        Cow::Borrowed(content)
     }
 }
 
@@ -410,7 +419,7 @@ pub(super) fn comment_to_json(comment: &Comment, source: &str) -> serde_json::Va
 
     serde_json::json!({
         "type": comment_type,
-        "value": value,
+        "value": value.as_ref(),
         "start": comment.span.start,
         "end": comment.span.end,
     })
