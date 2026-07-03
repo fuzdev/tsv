@@ -483,8 +483,8 @@ fn write_pseudo_class_args(
             write_selector_list_filtered(w, selectors, ctx);
         }
         #[allow(clippy::unreachable)]
-        internal::PseudoClassArgs::Slotted { .. } | internal::PseudoClassArgs::Part { .. } => {
-            unreachable!("Pseudo-element args (Slotted/Part) never attach to a pseudo-class")
+        internal::PseudoClassArgs::Part { .. } => {
+            unreachable!("The ::part() ident arg never attaches to a pseudo-class")
         }
     }
 }

@@ -68,12 +68,17 @@ pub(crate) fn parse_pseudo_selector<'arena>(
 /// argument isn't a selector list.
 ///
 /// `is_pseudo_element` distinguishes `::slotted`/`::part` (the real pseudo-elements,
-/// which build the dedicated `Slotted`/`Part` args dropped from the public AST) from
-/// a single-colon `:slotted(.x)`/`:part(foo)`, which Svelte accepts as an ordinary
-/// pseudo-class with a selector-list argument. Gating on the flag keeps the
-/// `Slotted`/`Part` args off pseudo-classes, so they fall through to the generic
-/// selector-list path and convert to a `PseudoClassSelector` matching Svelte —
-/// rather than reaching the convert layer, which exposes no pseudo-element args.
+/// whose args are dropped from the public AST) from a single-colon `:slotted(.x)`/
+/// `:part(foo)`, which Svelte accepts as an ordinary pseudo-class with a selector-list
+/// argument. `::slotted` shares the strict complex-selector-list grammar with
+/// `:not()` — parseCss models its arg as a `<complex-selector-list>` (accepting
+/// `::slotted(0)`, `::slotted(.a > .b)`, `::slotted(.a, .b)`, rejecting garbage/empty)
+/// and drops it from the wire AST, so tsv reuses the same production and drops it at
+/// the pseudo-element convert boundary. `::part` builds the dedicated `Part` arg.
+/// Gating on the flag keeps these off pseudo-classes, so the single-colon forms fall
+/// through to the generic selector-list path and convert to a `PseudoClassSelector`
+/// matching Svelte — rather than reaching the convert layer, which exposes no
+/// pseudo-element args.
 ///
 /// Every helper takes `args_start` — the source position just after `(`, where each
 /// family's `span` begins — and owns its own `)` capture.
@@ -104,9 +109,10 @@ fn parse_pseudo_args<'arena>(
 
     // Dispatch by pseudo family.
     //
-    // `::slotted`/`::part` build their dedicated pseudo-element args only for the `::`
-    // form; a single-colon `:slotted`/`:part` has no guard match and falls to
-    // `parse_unknown_args`' selector-list path (matching Svelte's PseudoClassSelector).
+    // `::slotted` (strict complex-selector-list, like `:not()`) and `::part`
+    // (dedicated ident list) match only the `::` form; a single-colon `:slotted`/
+    // `:part` has no guard match and falls to `parse_unknown_args`' selector-list path
+    // (matching Svelte's PseudoClassSelector).
     //
     // `:dir()`/`:lang()`/`::highlight()` take a single identifier per CSS spec, but
     // Svelte parses their argument as an ordinary selector list (a comma-separated
@@ -121,10 +127,13 @@ fn parse_pseudo_args<'arena>(
     // simple selector (Svelte's `inside_pseudo_class` gate). `nth-*` scans its own An+B
     // grammar (`parse_nth_args`), so its leading term needs no flag — but its optional
     // `of S` selector list sets `in_pseudo_args` locally (a bare `<an+b>` term in `S`
-    // reads as an `Nth`, matching `:not()`'s strict list). `::slotted`/`::part` take a
-    // compound/ident list and never need it.
+    // reads as an `Nth`, matching `:not()`'s strict list). `::slotted` runs with
+    // `in_pseudo_args` set too (so `::slotted(0)`/`::slotted(2n+1)` read as `Nth`);
+    // `::part` takes a bare ident list and never needs it.
     match pseudo_name {
-        "slotted" if is_pseudo_element => parse_slotted_args(parser, args_start),
+        "slotted" if is_pseudo_element => with_pseudo_args(parser, |p| {
+            parse_selector_list_args(p, args_start, pseudo_name)
+        }),
         "part" if is_pseudo_element => parse_part_args(parser, args_start),
         "is" | "not" | "where" | "has" | "global" | "dir" | "lang" | "highlight" => {
             with_pseudo_args(parser, |p| {
@@ -149,69 +158,6 @@ fn with_pseudo_args<'arena, R>(
     let result = f(parser);
     parser.in_pseudo_args = saved;
     result
-}
-
-/// `::slotted( <compound-selector> )` — a sequence of simple selectors without
-/// combinators (CSS Scoping 1). Leading/trailing gap comments are registered so the
-/// printer interleaves them via `comment_blocks_in_range`; only the edge positions
-/// are valid — a comment between compound parts reads as whitespace, which a
-/// compound selector forbids (parseCss rejects it too).
-fn parse_slotted_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    args_start: usize,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
-    parser.skip_whitespace_registering_comments()?;
-
-    // Parse compound selector (sequence of simple selectors, no combinators)
-    let compound_start = parser.current_start;
-    let mut compound_selectors = parser.bvec();
-
-    // Parse simple selectors until we hit a combinator or closing paren
-    while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
-        parser.skip_whitespace_registering_comments()?;
-
-        if parser.check(TokenKind::RightParen) {
-            break;
-        }
-
-        // Check for combinators (not allowed in compound selectors)
-        if parser.check(TokenKind::GreaterThan)
-            || parser.check(TokenKind::Plus)
-            || parser.check(TokenKind::Tilde)
-            || parser.check(TokenKind::ColumnCombinator)
-        {
-            return Err(
-                parser.error_msg("Combinators not allowed in ::slotted() compound selector")
-            );
-        }
-
-        // Try to parse one simple selector
-        // This will fail if we hit something invalid (like a descendant combinator)
-        let selector = super::selectors::parse_simple_selector(parser)?;
-        compound_selectors.push(selector);
-
-        parser.skip_whitespace_registering_comments()?;
-    }
-
-    if compound_selectors.is_empty() {
-        return Err(parser.error_msg_at(
-            "::slotted() requires a compound selector argument",
-            parser.base_offset() + compound_start,
-        ));
-    }
-
-    let end = parser.expect_and_capture(TokenKind::RightParen)?;
-
-    Ok((
-        Some(PseudoClassArgs::Slotted {
-            selectors: compound_selectors.into_bump_slice(),
-            span: Span {
-                start: parser.span_pos(args_start),
-                end,
-            },
-        }),
-        end,
-    ))
 }
 
 /// `::part( <ident>+ )` — one or more space-separated identifiers, NOT selectors
@@ -274,11 +220,14 @@ fn parse_part_args<'arena>(
 /// - `:has()` → relative selector list (can start with combinators: `:has(> img)`)
 /// - `:is()`, `:where()` → forgiving selector list (invalid selectors kept as
 ///   `Invalid`, never fails)
-/// - `:not()`, `:global()`, `:dir()`, `:lang()`, `::highlight()` → complex real
-///   selector list (strict). The identifier-arg pseudos live here because Svelte
-///   parses their argument as a selector list too — `:lang(en, fr)` is two
+/// - `:not()`, `:global()`, `:dir()`, `:lang()`, `::highlight()`, `::slotted()` →
+///   complex real selector list (strict). The identifier-arg pseudos live here because
+///   Svelte parses their argument as a selector list too — `:lang(en, fr)` is two
 ///   `TypeSelector`s, and a non-selector arg like `:lang("en")` is a parse error
-///   (which the strict grammar reproduces).
+///   (which the strict grammar reproduces). `::slotted()` shares this grammar because
+///   parseCss models its arg as a `<complex-selector-list>` (spec says compound-only,
+///   but parseCss is lenient and drops the arg from the wire AST — see the
+///   `is_pseudo_element` dispatch note).
 ///
 /// Leading/trailing gap comments are registered so the printer interleaves them.
 fn parse_selector_list_args<'arena>(
@@ -299,15 +248,15 @@ fn parse_selector_list_args<'arena>(
             // Invalid selectors wrapped as SimpleSelector::Invalid (never fails)
             parse_forgiving_selector_list(parser)?
         }
-        "not" | "global" | "dir" | "lang" | "highlight" => {
-            // :not()/:global() and the identifier-arg pseudos use complex selectors
-            // (strict parsing)
+        "not" | "global" | "dir" | "lang" | "highlight" | "slotted" => {
+            // :not()/:global(), the identifier-arg pseudos, and ::slotted() use
+            // complex selectors (strict parsing)
             parse_complex_selector_list(parser)?
         }
-        // The dispatcher restricts `pseudo_name` to exactly these eight.
+        // The dispatcher restricts `pseudo_name` to exactly these nine.
         #[allow(clippy::unreachable)] // guarded by the dispatch matches!
         _ => unreachable!(
-            "pseudo_name is is/not/where/has/global/dir/lang/highlight per the dispatch guard"
+            "pseudo_name is is/not/where/has/global/dir/lang/highlight/slotted per the dispatch guard"
         ),
     };
 
