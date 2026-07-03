@@ -102,20 +102,19 @@ parse-only). The wasm-bindgen-generated `tsv_wasm.d.ts` declares the class, so n
 
 ## TS Type Maintenance
 
-`types/tsv_ast.d.ts` is **hand-maintained**. Any change to `pub` fields,
-enums, or `#[serde(rename/skip/...)]` attributes in
-`crates/tsv_*/src/ast/public*` must also update the `.d.ts`. Reviewers
-(human or agent) flag drift at PR time.
+`types/tsv_ast.d.ts` is **hand-maintained**. Any change to the wire JSON a
+writer emits — a field, its key name, when it's omitted, or a discriminator
+`type` string — in `crates/tsv_*/src/ast/convert/write*` must also update the
+`.d.ts`. Reviewers (human or agent) flag drift at PR time.
 
-Maintenance checklist when modifying a public AST struct or enum:
+Maintenance checklist when a writer's emitted shape changes:
 
-1. Update the Rust struct/enum.
+1. Update the `write_*` function (the emitted field / key / skip condition).
 2. Locate the matching `interface` / `type` in `types/tsv_ast.d.ts`.
-3. Apply the same change. Field names follow `#[serde(rename = "...")]`
-   when present, otherwise the Rust field name verbatim.
-4. Check `#[serde(skip_serializing*)]` rules — fields with
-   `skip_serializing_if = "Option::is_none"` become `T?`;
-   `skip_serializing` fields are omitted from the TS interface.
+3. Apply the same change. The JSON key is exactly what the writer emits
+   (e.g. `w.raw(",\"typeParameters\":")` → `typeParameters`).
+4. A field the writer emits only conditionally (`if let Some(..)` / `if flag`)
+   is optional in TS (`T?`); one it never emits is absent from the interface.
 5. If the field carries positions (`start`/`end`/`loc`/`character`), make sure
    the writer (`ast/convert/write*`) emits them through the `LocationMapper`
    (`ctx.pos(...)` / the `loc` helpers) — a raw byte offset means silently
@@ -130,7 +129,7 @@ missing/added fields and discriminator-string mismatches. Extend
 `scripts/check_ast_types.ts`'s `samples` array when a previously
 uncovered AST node regresses.
 
-`Schema::Acorn` vs `Schema::SvelteScript` deltas in the convert layer
+`Schema::Acorn` vs `Schema::SvelteScript` deltas the writer emits
 require dual updates.
 
 ## Files

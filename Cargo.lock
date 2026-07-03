@@ -658,7 +658,6 @@ version = "0.1.0"
 dependencies = [
  "bumpalo",
  "phf",
- "serde",
  "serde_json",
  "tsv_lang",
 ]
@@ -745,7 +744,6 @@ name = "tsv_svelte"
 version = "0.1.0"
 dependencies = [
  "bumpalo",
- "serde",
  "serde_json",
  "smallvec",
  "string-interner",
@@ -760,7 +758,6 @@ name = "tsv_ts"
 version = "0.1.0"
 dependencies = [
  "bumpalo",
- "serde",
  "serde_json",
  "smallvec",
  "string-interner",

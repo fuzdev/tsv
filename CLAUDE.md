@@ -246,7 +246,7 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 
 `scripts/validate_artifacts.ts` holds deliberately tight (~±8%) size bounds — a legitimate binary size change fails the publish until the constants are updated, keeping size moves visible and intentional.
 
-**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained. Any PR that changes a `pub` field in `crates/tsv_*/src/ast/public*` must also update the `.d.ts`. Drift is caught by `deno task check:ast-types` (part of `deno task check`) and reviewed at PR time.
+**TS type maintenance**: `crates/tsv_wasm/types/tsv_ast.d.ts` is hand-maintained. Any PR that changes the wire JSON a writer emits (`crates/tsv_*/src/ast/convert/write*`) must also update the `.d.ts`. Drift is caught by `deno task check:ast-types` (part of `deno task check`) and reviewed at PR time.
 
 See ./crates/tsv_wasm/CLAUDE.md §TS type maintenance for the per-field checklist.
 
@@ -336,7 +336,7 @@ cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib        # profile a
 cargo run --release -p tsv_debug -- profile file.ts --iterations 20  # more iterations
 # Also: --json (machine-readable)
 
-cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib   # parse→JSON materialization sub-steps
+cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib   # parse vs wire-JSON write timing
 ```
 
 For function-level hotspots, use `perf` with the `profiling` cargo profile:
@@ -711,9 +711,9 @@ cargo run -p tsv_debug profile ~/dev/zzz/src/lib      # profile a directory
 cargo run -p tsv_debug profile file1.ts file2.svelte  # profile specific files
 # Options: --iterations <n> (default: 10), --json
 
-# json_profile - split the FFI parse path (parse + convert_ast_json_string)
-# into materialization sub-steps with per-file byte-identity checks (pure
-# Rust, no Deno; run with --release). See ./docs/performance.md.
+# json_profile - time the FFI parse path (parse + convert_ast_json_bytes) per
+# file: parse vs the wire-JSON write (the sole emission path — one internal-AST
+# walk, no sub-steps to split). Pure Rust, no Deno; run with --release. See ./docs/performance.md.
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 # Options: --iterations <n> (default: 5), --json (adds per-file data)
 
@@ -905,12 +905,20 @@ and tool-specific adapters (`tsv_svelte/src/printer/classification/`):
 
 Enables reuse across all planned tools (formatter, linter, compiler, LSP).
 
-### AST Architecture: Internal vs Public
+### AST Architecture: Internal AST vs Wire JSON
 
-Drop-in replacement for Svelte's **public JSON AST**, NOT its internal implementation.
+Drop-in replacement for the canonical parsers' **public JSON AST** (acorn /
+acorn-typescript / Svelte / `parseCss`), NOT their internal implementation.
 
-- **Internal AST**: Clean, semantic representation (decoded strings, normalized values) for all tools
-- **Public AST**: Conversion layer matching Svelte's exact JSON output, quirks applied at boundary only
+- **Internal AST**: Clean, semantic representation (decoded strings, normalized
+  values) — what every tool (formatter, linter, …) builds on.
+- **Wire JSON**: the parse product. The per-language writers (`ast/convert/write/`)
+  emit it **directly from the internal AST** in a single walk — applying each
+  acorn/`parseCss`/Svelte quirk at emission time — never materializing a typed
+  public-AST Rust layer. The wire shape *is* the contract, documented by the
+  hand-maintained `crates/tsv_wasm/types/tsv_ast.d.ts`; consumers that want a tree
+  parse the bytes (`convert_ast_json` is a thin `serde_json::from_slice(&bytes)`
+  wrapper over the writer).
 
 **Example**:
 
@@ -921,19 +929,23 @@ struct Literal {
     span: Span,
 }
 
-// Public conversion - applies Svelte quirks
-fn to_json(lit: &Literal, source: &str) -> Value {
-    json!({
-        "value": lit.value,
-        "raw": &source[lit.span.range()],  // Reconstruct from source
-    })
+// The writer emits the wire JSON straight from the internal node, applying the
+// quirks (here, `raw` reconstructed from source) — no intermediate typed tree:
+fn write_literal(w: &mut JsonWriter, lit: &Literal, ctx: &Ctx) {
+    node_header(w, "Literal", lit.span, ctx);   // "type"/"start"/"end"/"loc"
+    // … "value" emitted from lit.value …
+    w.raw(",\"raw\":");
+    w.string(lit.span.extract(ctx.source));      // reconstruct from source
+    w.raw("}");
 }
 ```
 
 **Key Rules**:
 
-- Raw strings NEVER duplicated in AST (extract via `source[span.range()]`)
-- Internal ASTs NEVER serialized (no `serde::Serialize`; only public types use serde)
+- Raw strings NEVER duplicated in the internal AST (extract via `source[span.range()]`)
+- The internal AST is NEVER the wire output — the wire JSON is hand-emitted by the
+  writer; `serde_json` is used only for exact string-escape / `f64` parity and to
+  parse the bytes back into a `Value` (CLI `--pretty`, tests)
 
 ### Position Types: u32 vs usize
 
@@ -977,7 +989,7 @@ Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/
 
 ### Rust Crates (minimal deps)
 
-- `serde`, `serde_json` — Public AST serialization
+- `serde_json` — wire-JSON emission: the writer's exact string-escape / `f64` formatting, and reparsing bytes to a `Value` (CLI `--pretty`, tests). The language crates no longer depend on `serde` directly (only transitively, without its `derive`); `serde`'s derive is dev-tooling only (`tsv_debug` / `tsv_cli`)
 - `smallvec` — Stack-allocated vectors
 - `string-interner` — String interning for AST symbols
 - `thiserror` — Error type derivation

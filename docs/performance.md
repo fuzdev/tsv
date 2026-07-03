@@ -403,7 +403,7 @@ report (`benches/js/results/report.<runtime>.md`).
 
 Gzipped numbers come from `gzip -c` (system default level 6), matching
 npm-tarball wire reality and `scripts/patch_npm_package.ts`. The parse feature
-adds the parser convert+serde path and the typed offset-translation walk; the
+adds the wire-JSON writer (which fuses in the byte→char offset translation); the
 format feature adds the printers (which the parse-only build drops at link
 time); the AST crosses the JS boundary as a JSON string handed to the engine's
 native `JSON.parse` (no `serde_wasm_bindgen`). All builds run wasm-opt with

@@ -193,9 +193,11 @@ This shape gives both:
 **Closing the platform at the Rust level** would mean adding any of:
 
 - A `Language` trait with `dyn` dispatch — costs inlining, adds vtables.
-- A central `tsv_ast` crate owning the public AST types — inverts
+- A central `tsv_ast` crate owning shared public/wire types — inverts
   per-language ownership; every language crate becomes a dependent of
-  the central crate.
+  the central crate. (The wire shape is the hand-maintained
+  `tsv_ast.d.ts`, not a Rust type layer; a future typed-as-reader crate
+  would be the same inversion to avoid.)
 - A `tsv_languages` enum in some core crate — forces editing a central
   place to add a language.
 
@@ -232,7 +234,7 @@ Rust consumers that only need parse/format can follow the same pattern:
 # Minimal: parse + format only
 tsv_ts = { version = "0.1", default-features = false }
 
-# Full: also build the public AST + JSON serialization layer
+# Full: also build the wire-JSON parse output (`convert_ast_json*`)
 tsv_ts = { version = "0.1", features = ["convert"] }
 ```
 
@@ -808,7 +810,7 @@ Share parser and AST across tools; let each tool add its own layers:
 │  - Lexer (tsv_*/lexer/)                            │
 │  - Parser (tsv_*/parser/)                          │
 │  - Internal AST (tsv_*/ast/internal/)              │
-│  - Public AST conversion (tsv_*/ast/convert/)      │
+│  - Wire-JSON writer (tsv_*/ast/convert/write/)     │
 │  - Comment helpers (tsv_lang/comment)              │
 └─────────────────────────────────────────────────────┘
                          │
