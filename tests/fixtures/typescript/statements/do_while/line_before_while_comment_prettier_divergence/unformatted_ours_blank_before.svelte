@@ -10,6 +10,7 @@
 	do {
 		fn();
 	}
+
 	// blank before
 	while (a);
 </script>
