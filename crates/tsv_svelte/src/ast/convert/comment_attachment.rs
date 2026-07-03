@@ -518,26 +518,6 @@ pub(super) fn attach_expression_list(
     }
 }
 
-/// Attach comments to a `{@const id = init}` declaration `Value`.
-///
-/// Svelte hand-builds the VariableDeclaration and runs `add_comments(init)` on
-/// the **init expression directly**, so comments attach to the init's subtree,
-/// not the whole declaration.
-pub(super) fn attach_const_tag_declaration(
-    decl: &mut serde_json::Value,
-    template_comments: &[&Comment],
-    source: &str,
-    c_start: u32,
-    c_end: u32,
-) {
-    if let Some(declarations) = decl.get_mut("declarations").and_then(|d| d.as_array_mut())
-        && let Some(declarator) = declarations.first_mut()
-        && let Some(init) = declarator.get_mut("init")
-    {
-        try_attach_comments_to_node(init, template_comments, source, c_start, c_end);
-    }
-}
-
 /// Attach comments to a `{const id = init}` / `{let …}` declaration `Value`.
 ///
 /// These are acorn-parsed, so comments attach across the **whole

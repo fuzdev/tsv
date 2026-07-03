@@ -259,7 +259,6 @@
 									]
 								},
 								"optional": true,
-								"kind": "method",
 								"parameters": [
 									{
 										"type": "Identifier",
@@ -338,6 +337,7 @@
 										}
 									}
 								},
+								"kind": "method",
 								"leadingComments": [
 									{
 										"type": "Line",

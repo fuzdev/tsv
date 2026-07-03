@@ -4,6 +4,7 @@ use crate::printing;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)] // independent flags + serializer hints, not a state machine
 pub struct Comment {
     /// Byte span of the comment's content (delimiters excluded), into the
     /// source. The text is recovered on demand via [`Comment::content`] rather
@@ -29,6 +30,15 @@ pub struct Comment {
     // (a parallel comment collection on the language root, or per-element
     // attachment if a richer model is needed).
     pub emit_character_field: bool,
+    /// Public-AST serializer hint (Svelte): bump this comment's JSON `loc`
+    /// columns by one. Set for a comment collected inside a Svelte block
+    /// pattern (`read_pattern`'s synthetic `(pattern = 1)` parse) on the
+    /// pattern's start line when that line is `> 1` — the inserted `(` shifts
+    /// the line's columns right by one, the comment sibling of the
+    /// block-pattern node-`loc` quirk. The `end` column bumps only when the
+    /// comment is single-line (a multiline block comment ends on an unshifted
+    /// later line).
+    pub bump_pattern_columns: bool,
 }
 
 impl Comment {
@@ -335,6 +345,7 @@ mod tests {
             multiline: content.contains('\n'),
             span: Span::new(start, end),
             emit_character_field: false,
+            bump_pattern_columns: false,
         }
     }
 

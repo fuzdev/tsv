@@ -380,7 +380,11 @@ All fixtures use `input.svelte` as canonical source.
 
 The writer (`convert_ast_json_bytes`) is the sole emission path, so P2/P2b
 compare the *writer's* wire JSON against the canonical parsers' `expected.json`
-(P1/P3 pin those to the canonical parsers). The multibyte and `<script>`/
+(P1/P3 pin those to the canonical parsers). Every P comparison is
+**byte-strict** on the tabbed serialization — `preserve_order` keeps real key
+order on both sides, so wire *field-order* divergences fail too; a P2b
+mismatch that is semantically equal as a `Value` reports a self-identifying
+field-order error. The multibyte and `<script>`/
 template-comment fixtures make P2/P2b exercise the writer's fused byte→char
 offset translation and island-scoped comment attach against the canonical
 oracle. A bug shared by the writer and the fixture's own `expected.json` is

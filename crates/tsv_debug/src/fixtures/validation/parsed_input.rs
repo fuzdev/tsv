@@ -42,11 +42,13 @@ pub(super) fn parse_input<'arena>(
 
 /// Both JSON-AST outputs derived from one `convert_ast_json` call.
 pub(super) struct InputAstPaths {
-    /// `convert_ast_json`'s `Value` (for semantic comparison against
-    /// `expected.json`, ignoring key-order differences).
+    /// `convert_ast_json`'s `Value` — used to classify a byte mismatch against
+    /// `expected.json` as field-order-only (key-order-insensitive `Value`
+    /// equality) vs semantic.
     pub ast_json: serde_json::Value,
     /// The same `Value` serialized with tabs + trailing newline — the exact
-    /// bytes `expected*.json` files store (matches `fixtures_update_parsed`).
+    /// bytes `expected*.json` files store (matches `fixtures_update_parsed`);
+    /// the byte-strict comparison the parser phases gate on.
     pub ast_json_tabs: String,
 }
 

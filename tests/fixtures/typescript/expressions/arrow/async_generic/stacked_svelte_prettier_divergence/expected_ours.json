@@ -138,10 +138,39 @@
 										"column": 43
 									}
 								},
-								"id": null,
-								"expression": true,
-								"generator": false,
-								"async": true,
+								"typeParameters": {
+									"type": "TSTypeParameterDeclaration",
+									"start": 310,
+									"end": 313,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 17
+										},
+										"end": {
+											"line": 5,
+											"column": 20
+										}
+									},
+									"params": [
+										{
+											"type": "TSTypeParameter",
+											"start": 311,
+											"end": 312,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 18
+												},
+												"end": {
+													"line": 5,
+													"column": 19
+												}
+											},
+											"name": "T"
+										}
+									]
+								},
 								"params": [
 									{
 										"type": "Identifier",
@@ -206,55 +235,6 @@
 										}
 									}
 								],
-								"body": {
-									"type": "Identifier",
-									"start": 335,
-									"end": 336,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 42
-										},
-										"end": {
-											"line": 5,
-											"column": 43
-										}
-									},
-									"name": "x"
-								},
-								"typeParameters": {
-									"type": "TSTypeParameterDeclaration",
-									"start": 310,
-									"end": 313,
-									"loc": {
-										"start": {
-											"line": 5,
-											"column": 17
-										},
-										"end": {
-											"line": 5,
-											"column": 20
-										}
-									},
-									"params": [
-										{
-											"type": "TSTypeParameter",
-											"start": 311,
-											"end": 312,
-											"loc": {
-												"start": {
-													"line": 5,
-													"column": 18
-												},
-												"end": {
-													"line": 5,
-													"column": 19
-												}
-											},
-											"name": "T"
-										}
-									]
-								},
 								"returnType": {
 									"type": "TSTypeAnnotation",
 									"start": 319,
@@ -348,6 +328,26 @@
 											]
 										}
 									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": true,
+								"body": {
+									"type": "Identifier",
+									"start": 335,
+									"end": 336,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 42
+										},
+										"end": {
+											"line": 5,
+											"column": 43
+										}
+									},
+									"name": "x"
 								}
 							}
 						}

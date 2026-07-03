@@ -56,6 +56,7 @@ fn comment_from_token(
             (token_end + base_offset) as u32,
         ),
         emit_character_field: false,
+        bump_pattern_columns: false,
     };
     (comment, has_line_terminator)
 }

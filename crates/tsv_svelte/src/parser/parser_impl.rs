@@ -27,6 +27,7 @@ fn expression_comment(
         multiline: content.contains('\n'),
         span,
         emit_character_field,
+        bump_pattern_columns: false,
     }
 }
 
@@ -511,7 +512,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Rc::clone(&self.interner),
             self.arena,
         )?;
-        self.expression_comments.extend(comments);
+        // Canonical reads a destructure via a synthetic `(pattern = 1)` acorn
+        // parse whose inserted `(` shifts the pattern's start line one column
+        // right when that line is `> 1` — the same quirk the pattern nodes get
+        // (`adjust_read_pattern_columns`) also lands on comments collected on
+        // that line, and the wire serializes them with the shifted columns.
+        let pattern_on_first_line = !self.source[..base_offset].contains('\n');
+        self.expression_comments
+            .extend(comments.into_iter().map(|mut c| {
+                if !pattern_on_first_line
+                    && !self.source[base_offset..c.span.start as usize].contains('\n')
+                {
+                    c.bump_pattern_columns = true;
+                }
+                c
+            }));
         Ok(pattern)
     }
 

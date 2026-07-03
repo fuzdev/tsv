@@ -267,7 +267,6 @@
 									},
 									"name": "a1"
 								},
-								"kind": "method",
 								"parameters": [],
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
@@ -306,7 +305,8 @@
 											"end": 83
 										}
 									]
-								}
+								},
+								"kind": "method"
 							}
 						]
 					},
@@ -395,7 +395,6 @@
 									},
 									"name": "a2"
 								},
-								"kind": "method",
 								"parameters": [],
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
@@ -434,7 +433,8 @@
 											"end": 153
 										}
 									]
-								}
+								},
+								"kind": "method"
 							}
 						]
 					},

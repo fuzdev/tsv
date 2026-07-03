@@ -136,9 +136,15 @@ fn write_rule(w: &mut JsonWriter, rule: &internal::CssRule<'_>, ctx: &Ctx<'_>) {
     w.raw("}");
 }
 
-/// Emits an `Atrule` node. `Atrule` carries no `metadata`.
+/// Emits an `Atrule` node. Field order: `type`, `start`, `end`, `name`,
+/// `prelude`, `block` (unlike `Rule`, whose positions trail — parseCss
+/// constructs the two literals differently). `Atrule` carries no `metadata`.
 fn write_atrule(w: &mut JsonWriter, atrule: &internal::CssAtrule<'_>, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"Atrule\",\"name\":");
+    w.raw("{\"type\":\"Atrule\",\"start\":");
+    w.u32(ctx.pos(atrule.span.start));
+    w.raw(",\"end\":");
+    w.u32(ctx.pos(atrule.span.end));
+    w.raw(",\"name\":");
     w.string(atrule.name);
     w.raw(",\"prelude\":");
     let prelude = convert_prelude_to_string(&atrule.prelude, ctx.source);
@@ -147,10 +153,6 @@ fn write_atrule(w: &mut JsonWriter, atrule: &internal::CssAtrule<'_>, ctx: &Ctx<
     write_or_null(w, atrule.block.as_ref(), |w, b| {
         write_block(w, b.span, b.children, ctx);
     });
-    w.raw(",\"start\":");
-    w.u32(ctx.pos(atrule.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(atrule.span.end));
     w.raw("}");
 }
 

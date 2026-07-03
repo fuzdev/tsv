@@ -68,8 +68,8 @@ use tsv_ts::ast::convert::{
     Schema, translate_column, write_expression_embedded, write_expression_embedded_with_comments,
     write_identifier_expression_with_character,
     write_identifier_expression_with_character_and_comments, write_pattern_embedded,
-    write_program_embedded, write_variable_declaration_embedded,
-    write_variable_declaration_embedded_with_comments,
+    write_pattern_embedded_with_comments, write_program_embedded,
+    write_variable_declaration_embedded, write_variable_declaration_embedded_with_comments,
 };
 
 use super::comment_attachment::{get_comment_value, is_template_comment};
@@ -216,37 +216,54 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
     write_array(w, root.comments.iter(), |w, c| {
         write_root_comment(w, c, ctx);
     });
-    if let Some(script) = root.instance {
-        let comment = find_preceding_comment(script.span.start);
-        w.raw(",\"instance\":");
-        write_script(w, script, comment, ctx);
-    }
+    // Svelte assigns `module` before `instance` on the root.
     if let Some(script) = root.module {
         let comment = find_preceding_comment(script.span.start);
         w.raw(",\"module\":");
         write_script(w, script, comment, ctx);
     }
+    if let Some(script) = root.instance {
+        let comment = find_preceding_comment(script.span.start);
+        w.raw(",\"instance\":");
+        write_script(w, script, comment, ctx);
+    }
     w.raw("}");
 }
 
-/// A root-level comment: `{type, value, start, end, loc}` — emitted fused in
-/// final char space. `character` appears in `loc` only when the comment carries
-/// it (`emit_character_field`).
+/// A root-level comment, emitted fused in final char space. Svelte's two
+/// comment collectors build different literals: a `<script>` comment (acorn's
+/// `onComment` wrapper) is `{type, value, start, end, loc}`, a
+/// template-expression comment `{type, start, end, value, loc}` with
+/// `character` in its `loc` — the `emit_character_field` axis keys both
+/// differences.
 fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     let (start_char, start_pos) = ctx.loc.pos_and_position(comment.span.start);
     let (end_char, end_pos) = ctx.loc.pos_and_position(comment.span.end);
+    // The block-pattern synthetic-`(` column shift (`bump_pattern_columns`);
+    // a multiline block comment's `end` sits on an unshifted later line.
+    let bump = usize::from(comment.bump_pattern_columns);
+    let bump_end = usize::from(comment.bump_pattern_columns && !comment.multiline);
     w.raw("{\"type\":\"");
     w.raw(if comment.is_block { "Block" } else { "Line" });
-    w.raw("\",\"value\":");
-    w.string(&get_comment_value(comment, ctx.source));
-    w.raw(",\"start\":");
-    w.u32(start_char);
-    w.raw(",\"end\":");
-    w.u32(end_char);
+    if comment.emit_character_field {
+        w.raw("\",\"start\":");
+        w.u32(start_char);
+        w.raw(",\"end\":");
+        w.u32(end_char);
+        w.raw(",\"value\":");
+        w.string(&get_comment_value(comment, ctx.source));
+    } else {
+        w.raw("\",\"value\":");
+        w.string(&get_comment_value(comment, ctx.source));
+        w.raw(",\"start\":");
+        w.u32(start_char);
+        w.raw(",\"end\":");
+        w.u32(end_char);
+    }
     w.raw(",\"loc\":{\"start\":{\"line\":");
     w.usize(start_pos.line);
     w.raw(",\"column\":");
-    w.usize(start_pos.column);
+    w.usize(start_pos.column + bump);
     if comment.emit_character_field {
         w.raw(",\"character\":");
         w.u32(start_char);
@@ -254,7 +271,7 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
     w.raw("},\"end\":{\"line\":");
     w.usize(end_pos.line);
     w.raw(",\"column\":");
-    w.usize(end_pos.column);
+    w.usize(end_pos.column + bump_end);
     if comment.emit_character_field {
         w.raw(",\"character\":");
         w.u32(end_char);
@@ -357,7 +374,19 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     w.raw(",\"attributes\":");
     write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
     w.raw(",\"fragment\":");
-    write_fragment(w, &elem.fragment, ctx);
+    // A `<textarea>`'s content is read with the attribute-value sequence
+    // machinery in the canonical parser, whose `Text` literal leads with the
+    // positions (`{start, end, type, raw, data}`).
+    if ctx.interner.resolve_infallible(elem.name) == "textarea" {
+        w.raw("{\"type\":\"Fragment\",\"nodes\":");
+        write_array(w, elem.fragment.nodes, |w, n| match n {
+            internal::FragmentNode::Text(text) => write_text_sequence(w, text, ctx),
+            _ => write_fragment_node(w, n, ctx),
+        });
+        w.raw("}");
+    } else {
+        write_fragment(w, &elem.fragment, ctx);
+    }
     w.raw("}");
 }
 
@@ -460,12 +489,44 @@ fn write_shorthand_expression_tag(
 }
 
 /// Emits a `Text` node (fragment context: `type, start, end, raw, data`).
+/// Raw-content element text (`TextDecoding::Raw` — a nested `<script>`/
+/// `<style>`) comes from a different canonical construction site whose
+/// literal leads with the positions and puts `data` first:
+/// `{start, end, type, data, raw}`.
 fn write_text(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+    if matches!(text.decoding, internal::TextDecoding::Raw) {
+        w.raw("{\"start\":");
+        w.u32(ctx.pos(text.span.start));
+        w.raw(",\"end\":");
+        w.u32(ctx.pos(text.span.end));
+        w.raw(",\"type\":\"Text\",\"data\":");
+        let data = text.data(ctx.source);
+        w.string(&data);
+        w.raw(",\"raw\":");
+        w.string(text.raw(ctx.source));
+        w.raw("}");
+        return;
+    }
     w.raw("{\"type\":\"Text\",\"start\":");
     w.u32(ctx.pos(text.span.start));
     w.raw(",\"end\":");
     w.u32(ctx.pos(text.span.end));
     w.raw(",\"raw\":");
+    w.string(text.raw(ctx.source));
+    w.raw(",\"data\":");
+    let data = text.data(ctx.source);
+    w.string(&data);
+    w.raw("}");
+}
+
+/// A sequence-context `Text` (a `<textarea>`'s content): the canonical
+/// attribute-value sequence literal, `{start, end, type, raw, data}`.
+fn write_text_sequence(w: &mut JsonWriter, text: &internal::Text, ctx: &Ctx<'_>) {
+    w.raw("{\"start\":");
+    w.u32(ctx.pos(text.span.start));
+    w.raw(",\"end\":");
+    w.u32(ctx.pos(text.span.end));
+    w.raw(",\"type\":\"Text\",\"raw\":");
     w.string(text.raw(ctx.source));
     w.raw(",\"data\":");
     let data = text.data(ctx.source);
@@ -488,15 +549,23 @@ fn write_html_comment(w: &mut JsonWriter, comment: &internal::HtmlComment, ctx: 
 // Blocks
 //
 
-/// Emits an `IfBlock` node. Field order: `type, elseif, start, end, test,
-/// consequent, alternate`.
+/// Emits an `IfBlock` node. Svelte constructs a root `{#if}` as
+/// `{type, elseif, start, end, …}` but an `{:else if}` block as
+/// `{start, end, type, elseif, …}` — two construction sites with different
+/// literal orders, keyed exactly by `elseif`.
 fn write_if_block(w: &mut JsonWriter, block: &internal::IfBlock<'_>, ctx: &Ctx<'_>) {
-    w.raw("{\"type\":\"IfBlock\",\"elseif\":");
-    w.bool(block.elseif);
-    w.raw(",\"start\":");
-    w.u32(ctx.pos(block.span.start));
-    w.raw(",\"end\":");
-    w.u32(ctx.pos(block.span.end));
+    if block.elseif {
+        w.raw("{\"start\":");
+        w.u32(ctx.pos(block.span.start));
+        w.raw(",\"end\":");
+        w.u32(ctx.pos(block.span.end));
+        w.raw(",\"type\":\"IfBlock\",\"elseif\":true");
+    } else {
+        w.raw("{\"type\":\"IfBlock\",\"elseif\":false,\"start\":");
+        w.u32(ctx.pos(block.span.start));
+        w.raw(",\"end\":");
+        w.u32(ctx.pos(block.span.end));
+    }
     let range_end = fragment_first_start(&block.consequent).unwrap_or(block.span.end);
     w.raw(",\"test\":");
     write_generic_island(w, &block.test, block.span.start, range_end, ctx);
@@ -589,7 +658,8 @@ fn write_key_block(w: &mut JsonWriter, block: &internal::KeyBlock<'_>, ctx: &Ctx
 }
 
 /// Emits a `SnippetBlock` node. The snippet name carries `character` (like a
-/// shorthand attribute); `typeParams` is skip-if-none.
+/// shorthand attribute); `typeParams` is skip-if-none, right after
+/// `expression` (Svelte assigns it before reading the parameters).
 fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"SnippetBlock\",\"start\":");
     w.u32(ctx.pos(block.span.start));
@@ -598,14 +668,14 @@ fn write_snippet_block(w: &mut JsonWriter, block: &internal::SnippetBlock<'_>, c
     let range_end = fragment_first_start(&block.body).unwrap_or(block.span.end);
     w.raw(",\"expression\":");
     write_snippet_name(w, &block.expression, block.span.start, range_end, ctx);
-    w.raw(",\"parameters\":");
-    write_snippet_parameters(w, block.parameters, block.span.start, range_end, ctx);
-    w.raw(",\"body\":");
-    write_fragment(w, &block.body, ctx);
     if let Some(type_params) = block.type_params_raw {
         w.raw(",\"typeParams\":");
         w.string(type_params);
     }
+    w.raw(",\"parameters\":");
+    write_snippet_parameters(w, block.parameters, block.span.start, range_end, ctx);
+    w.raw(",\"body\":");
+    write_fragment(w, &block.body, ctx);
     w.raw("}");
 }
 
@@ -751,8 +821,9 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
 /// `{@`), declarator `end = init.end`, declaration `end = tag.span.end - 1`
 /// (`parser.index - 1`, the byte before the closing `}`). The comment-free
 /// document fuses directly; a document with template comments precomputes a
-/// `WriterComments` map off an init-only skeleton (Svelte runs `add_comments`
-/// on the init expression alone) and fuse-emits with it.
+/// `WriterComments` map covering both the id pattern and the init (canonical
+/// runs a comment attach per acorn parse — `read_pattern`'s synthetic
+/// `(pattern = 1)` and `read_expression`'s init) and fuse-emits with it.
 fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) {
     w.raw("{\"type\":\"ConstTag\",\"start\":");
     w.u32(ctx.pos(tag.span.start));
@@ -793,7 +864,12 @@ fn write_const_declaration(
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(w, &tag.id, ctx.source, ctx.loc, ctx.interner);
+    match comments {
+        Some(wc) => {
+            write_pattern_embedded_with_comments(w, &tag.id, ctx.source, ctx.loc, ctx.interner, wc);
+        }
+        None => write_pattern_embedded(w, &tag.id, ctx.source, ctx.loc, ctx.interner),
+    }
     w.raw(",\"init\":");
     match comments {
         Some(wc) => {
@@ -1310,8 +1386,8 @@ fn write_script_program_fused(
 }
 
 /// A `<svelte:options>`: everything fuses. Field order: `start, end,
-/// attributes` then the skip-if-none `runes, immutable, accessors,
-/// preserveWhitespace, css, namespace, customElement` (no `type`).
+/// attributes` then the skip-if-none `runes, immutable, css, accessors,
+/// preserveWhitespace, namespace, customElement` (no `type`).
 fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_>, ctx: &Ctx<'_>) {
     let attrs = options.attributes;
     let interner = ctx.interner;
@@ -1329,6 +1405,12 @@ fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_
         w.raw(",\"immutable\":");
         w.bool(immutable);
     }
+    if let Some(css) =
+        find_option_values(attrs, "css", interner).and_then(|v| text_value(v, ctx.source))
+    {
+        w.raw(",\"css\":");
+        w.string(&css);
+    }
     if let Some(accessors) = bool_option(attrs, "accessors", interner) {
         w.raw(",\"accessors\":");
         w.bool(accessors);
@@ -1336,12 +1418,6 @@ fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_
     if let Some(preserve_whitespace) = bool_option(attrs, "preserveWhitespace", interner) {
         w.raw(",\"preserveWhitespace\":");
         w.bool(preserve_whitespace);
-    }
-    if let Some(css) =
-        find_option_values(attrs, "css", interner).and_then(|v| text_value(v, ctx.source))
-    {
-        w.raw(",\"css\":");
-        w.string(&css);
     }
     if let Some(namespace) =
         find_option_values(attrs, "namespace", interner).and_then(|v| text_value(v, ctx.source))

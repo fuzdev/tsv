@@ -8,38 +8,72 @@ use super::{
     write_return_type_field, write_type_arguments_field, write_type_parameters_field,
 };
 
-/// Emits an `ArrowFunctionExpression` node. Field order:
-/// `id` (always null), `expression`, `generator` (always false), `async`,
-/// `params`, `body`, `typeParameters?`, `returnType?`.
+/// Emits an `ArrowFunctionExpression` node.
+///
+/// acorn-typescript's arrow paths assign fields in different orders, so the
+/// wire order is shape-dependent:
+///
+/// - `async <T>(…)` (`tsTryParseGenericAsyncArrowFunction`): `typeParameters`,
+///   `params`, `returnType?`, then the `parseArrowExpression` tail (`id`,
+///   `expression`, `generator`, `async`, `body`). Detected as an async arrow
+///   whose type parameters start after the arrow itself (`async` keyword
+///   first); a `<T>async (…)` graft starts at the `<`.
+/// - everything else (`parseParenArrowList` / `parseSubscriptAsyncArrow`):
+///   `returnType?` first (stamped on the fresh node), then `id`, `expression`,
+///   `generator`, `async`, `params`, `body`, with `typeParameters?` last (the
+///   `<T>(…) => …` reading grafts them onto the finished arrow).
 pub(super) fn write_arrow_function_expression(
     w: &mut JsonWriter,
     arrow: &internal::ArrowFunctionExpression<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "ArrowFunctionExpression", arrow.span, ctx);
-    w.raw(",\"id\":null,\"expression\":");
-    w.bool(arrow.body.is_expression());
-    w.raw(",\"generator\":false,\"async\":");
-    w.bool(arrow.r#async);
-    w.raw(",\"params\":");
-    write_expressions(w, arrow.params, ctx);
-    w.raw(",\"body\":");
-    match &arrow.body {
+    let generic_async = arrow.r#async
+        && arrow
+            .type_parameters
+            .as_ref()
+            .is_some_and(|tp| tp.span.start > arrow.span.start);
+    if generic_async {
+        write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
+        w.raw(",\"params\":");
+        write_expressions(w, arrow.params, ctx);
+        write_return_type_field(w, arrow.return_type.as_ref(), ctx);
+        w.raw(",\"id\":null,\"expression\":");
+        w.bool(arrow.body.is_expression());
+        w.raw(",\"generator\":false,\"async\":true,\"body\":");
+        write_arrow_body(w, &arrow.body, ctx);
+    } else {
+        write_return_type_field(w, arrow.return_type.as_ref(), ctx);
+        w.raw(",\"id\":null,\"expression\":");
+        w.bool(arrow.body.is_expression());
+        w.raw(",\"generator\":false,\"async\":");
+        w.bool(arrow.r#async);
+        w.raw(",\"params\":");
+        write_expressions(w, arrow.params, ctx);
+        w.raw(",\"body\":");
+        write_arrow_body(w, &arrow.body, ctx);
+        write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
+    }
+    close_node(w, "ArrowFunctionExpression", arrow.span, ctx);
+}
+
+fn write_arrow_body(w: &mut JsonWriter, body: &internal::ArrowFunctionBody<'_>, ctx: &Ctx<'_>) {
+    match body {
         internal::ArrowFunctionBody::Expression(expr) => write_expression(w, expr, ctx),
         internal::ArrowFunctionBody::BlockStatement(block) => write_block_statement(w, block, ctx),
     }
-    write_type_parameters_field(w, arrow.type_parameters.as_ref(), ctx);
-    write_return_type_field(w, arrow.return_type.as_ref(), ctx);
-    close_node(w, "ArrowFunctionExpression", arrow.span, ctx);
 }
 
 /// Emits a `FunctionExpression` node. Field order:
 /// `id` (nullable), `expression`, `generator`, `async`, `typeParameters?`,
-/// `params`, `returnType?`, `body`.
+/// `params`, `returnType?`, `body` — except an object-literal method value
+/// (`type_params_last`), where acorn-typescript grafts `typeParameters` onto
+/// the finished `parseMethod` node, so it serializes after `body`.
 pub(super) fn write_function_expression(
     w: &mut JsonWriter,
     func: &internal::FunctionExpression<'_>,
     ctx: &Ctx<'_>,
+    type_params_last: bool,
 ) {
     node_header(w, "FunctionExpression", func.span, ctx);
     w.raw(",\"id\":");
@@ -50,17 +84,23 @@ pub(super) fn write_function_expression(
     w.bool(func.generator);
     w.raw(",\"async\":");
     w.bool(func.r#async);
-    write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
+    if !type_params_last {
+        write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
+    }
     w.raw(",\"params\":");
     write_expressions(w, func.params, ctx);
     write_return_type_field(w, func.return_type.as_ref(), ctx);
     w.raw(",\"body\":");
     write_block_statement(w, &func.body, ctx);
+    if type_params_last {
+        write_type_parameters_field(w, func.type_parameters.as_ref(), ctx);
+    }
     close_node(w, "FunctionExpression", func.span, ctx);
 }
 
-/// Emits a `NewExpression` node. Field order: `callee`, `arguments`,
-/// `typeArguments?`.
+/// Emits a `NewExpression` node. Field order: `callee`, `typeArguments?`,
+/// `arguments` — acorn-typescript hoists `typeArguments` off the callee in
+/// `parseNewCallee` before the argument list is parsed.
 pub(super) fn write_new_expression(
     w: &mut JsonWriter,
     new_expr: &internal::NewExpression<'_>,
@@ -69,9 +109,9 @@ pub(super) fn write_new_expression(
     node_header(w, "NewExpression", new_expr.span, ctx);
     w.raw(",\"callee\":");
     write_expression(w, new_expr.callee, ctx);
+    write_type_arguments_field(w, new_expr.type_arguments.as_ref(), ctx);
     w.raw(",\"arguments\":");
     write_expressions(w, new_expr.arguments, ctx);
-    write_type_arguments_field(w, new_expr.type_arguments.as_ref(), ctx);
     close_node(w, "NewExpression", new_expr.span, ctx);
 }
 

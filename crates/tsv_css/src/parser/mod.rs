@@ -108,6 +108,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
                 end: self.span_pos(self.current_end),
             },
             emit_character_field: false,
+            bump_pattern_columns: false,
         }
     }
 

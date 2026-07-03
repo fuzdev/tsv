@@ -163,7 +163,6 @@
 										}
 									]
 								},
-								"kind": "method",
 								"parameters": [],
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
@@ -194,7 +193,8 @@
 											}
 										}
 									}
-								}
+								},
+								"kind": "method"
 							},
 							{
 								"type": "TSMethodSignature",

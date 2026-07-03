@@ -968,6 +968,7 @@ pub struct Comment {
     pub multiline: bool,           // content contains '\n' (precomputed; block-only in practice)
     pub span: Span,                // full comment span, delimiters included
     pub emit_character_field: bool, // Serializer hint: include `character` in JSON loc
+    pub bump_pattern_columns: bool, // Serializer hint: +1 loc columns (Svelte block-pattern parse)
 }
 ```
 

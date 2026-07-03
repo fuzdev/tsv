@@ -11,6 +11,7 @@ use super::{
     write_type_annotation_field, write_type_parameters_field,
 };
 use tsv_lang::Span;
+use tsv_lang::source_scan::{self, TriviaProfile};
 
 /// Emits a `Decorator` node: an unparenthesized decorator's call/member
 /// spine omits `optional`; a parenthesized `@(expr)` rides the full expression
@@ -151,22 +152,30 @@ fn write_super_class_fields(
     }
 }
 
-/// Emits a `ClassDeclaration` node. Field order: `decorators?`,
-/// `declare?`, `abstract?`, `id` (nullable), `typeParameters?`, `superClass`
-/// (nullable), `superTypeParameters?`, `implements?`, `body`.
+/// Emits a `ClassDeclaration` node. Field order: `declare?` (statement
+/// position), `abstract?`, `decorators?`, `id` (nullable), `typeParameters?`,
+/// `superClass` (nullable), `superTypeParameters?`, `implements?`, `body`,
+/// `declare?` (post-hoc position) — acorn-typescript's statement-level
+/// `declare class` stamps `declare` before parsing the class
+/// (`tsTryParseDeclare`), but `declare abstract class` (the
+/// `tsParseAbstractDeclaration` route) and every `export declare` form stamp
+/// the finished node, so the field's position depends on `exported`/`abstract`.
+/// `abstract` itself is assigned at its keyword, decorators attach after it.
 pub(super) fn write_class_declaration(
     w: &mut JsonWriter,
     class_decl: &internal::ClassDeclaration<'_>,
     ctx: &Ctx<'_>,
+    exported: bool,
 ) {
     node_header(w, "ClassDeclaration", class_decl.span, ctx);
-    write_decorators_field(w, class_decl.decorators, ctx);
-    if class_decl.declare {
+    let declare_last = exported || class_decl.r#abstract;
+    if class_decl.declare && !declare_last {
         w.raw(",\"declare\":true");
     }
     if class_decl.r#abstract {
         w.raw(",\"abstract\":true");
     }
+    write_decorators_field(w, class_decl.decorators, ctx);
     w.raw(",\"id\":");
     write_or_null(w, class_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
@@ -182,6 +191,9 @@ pub(super) fn write_class_declaration(
     write_implements_field(w, class_decl.implements, ctx);
     w.raw(",\"body\":");
     write_class_body(w, &class_decl.body, ctx);
+    if class_decl.declare && declare_last {
+        w.raw(",\"declare\":true");
+    }
     close_node(w, "ClassDeclaration", class_decl.span, ctx);
 }
 
@@ -257,36 +269,142 @@ fn write_class_body(w: &mut JsonWriter, body: &internal::ClassBody<'_>, ctx: &Ct
     close_node(w, "ClassBody", body.span, ctx);
 }
 
-/// Emits a `MethodDefinition` node. Field order: `decorators?`,
-/// `accessibility?`, `abstract?`, `static`, `override` (only when true),
-/// `optional?`, `computed`, `key`, `kind`, `typeParameters?` (moved here from
-/// the FunctionExpression, acorn convention), `value`.
+/// A present class-member modifier: its source keyword and the exact field
+/// fragment to emit. See `write_modifiers_in_source_order`.
+struct MemberModifier {
+    keyword: &'static str,
+    fragment: &'static str,
+}
+
+const fn accessibility_modifier(acc: internal::Accessibility) -> MemberModifier {
+    MemberModifier {
+        keyword: acc.as_str(),
+        fragment: match acc {
+            internal::Accessibility::Public => ",\"accessibility\":\"public\"",
+            internal::Accessibility::Private => ",\"accessibility\":\"private\"",
+            internal::Accessibility::Protected => ",\"accessibility\":\"protected\"",
+        },
+    }
+}
+
+/// Emits a class member's modifier fields (everything before `computed`) in
+/// source order, `static` always included.
+///
+/// acorn-typescript's `tsParseModifiers` assigns each modifier field as it
+/// parses the keyword, so the wire order follows the member's source order;
+/// `static` is (re-)assigned right after the loop, so when absent from source
+/// it still emits (`false`) after the source modifiers. With at most one
+/// keyword present there is nothing to order and no scan runs; otherwise the
+/// keywords are re-read from the scan window (member start past any
+/// decorators, up to the key) with the trivia-aware cursor — comments legally
+/// separate modifiers from names (`static /* c */ a = 1`). Every present
+/// modifier's keyword precedes the key, so the pending set empties before the
+/// walk can reach it; anything unmatched (malformed input) still emits after
+/// the walk, in declaration order, so output stays deterministic.
+fn write_modifiers_in_source_order(
+    w: &mut JsonWriter,
+    mods: &mut [Option<MemberModifier>],
+    is_static: bool,
+    scan_start: u32,
+    scan_end: u32,
+    ctx: &Ctx<'_>,
+) {
+    let mut pending = mods.iter().flatten().count();
+    let mut static_pending = true;
+    if pending + usize::from(is_static) > 1 {
+        let bytes = ctx.source.as_bytes();
+        let mut i = scan_start as usize;
+        let end = (scan_end as usize).min(bytes.len());
+        while (pending > 0 || (is_static && static_pending)) && i < end {
+            if bytes[i].is_ascii_whitespace() {
+                i += 1;
+                continue;
+            }
+            if let Some(next) = source_scan::skip_trivia(bytes, i, end, TriviaProfile::JS) {
+                i = next;
+                continue;
+            }
+            let word_start = i;
+            while i < end
+                && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'$')
+            {
+                i += 1;
+            }
+            if i == word_start {
+                break; // non-word byte — the key or punctuation
+            }
+            let word = &ctx.source[word_start..i];
+            if is_static && static_pending && word == "static" {
+                w.raw(",\"static\":true");
+                static_pending = false;
+            } else if let Some(m) = mods.iter_mut().find_map(|slot| {
+                slot.as_ref()
+                    .is_some_and(|m| m.keyword == word)
+                    .then(|| slot.take())
+                    .flatten()
+            }) {
+                w.raw(m.fragment);
+                pending -= 1;
+            } else {
+                break; // not a pending modifier — `async`, `get`, the key, …
+            }
+        }
+    }
+    for m in mods.iter_mut().filter_map(Option::take) {
+        w.raw(m.fragment);
+    }
+    if static_pending {
+        w.raw(",\"static\":");
+        w.bool(is_static);
+    }
+}
+
+/// The modifier scan window's start: past the decorators when present (they
+/// precede the modifiers), else the member's own start.
+fn modifier_scan_start(decorators: Option<&[internal::Decorator<'_>]>, span: Span) -> u32 {
+    decorators
+        .and_then(<[_]>::last)
+        .map_or(span.start, |d| d.span.end)
+}
+
+/// Emits a `MethodDefinition` node. Field order: source-order modifiers
+/// (`abstract?`, `accessibility?`, `override?`, `static` — see
+/// `write_modifiers_in_source_order`), `computed`, `key`, `optional?`, `kind`,
+/// `typeParameters?` (moved here from the FunctionExpression, acorn
+/// convention), `value`, `decorators?` (attached to the finished member, so
+/// they serialize last).
 fn write_method_definition(
     w: &mut JsonWriter,
     method: &internal::MethodDefinition<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "MethodDefinition", method.span, ctx);
-    write_decorators_field(w, method.decorators, ctx);
-    if let Some(acc) = method.accessibility {
-        w.raw(",\"accessibility\":");
-        w.token(acc.as_str());
-    }
-    if method.r#abstract {
-        w.raw(",\"abstract\":true");
-    }
-    w.raw(",\"static\":");
-    w.bool(method.is_static);
-    if method.r#override {
-        w.raw(",\"override\":true");
-    }
-    if method.optional {
-        w.raw(",\"optional\":true");
-    }
+    let mut mods = [
+        method.r#abstract.then_some(MemberModifier {
+            keyword: "abstract",
+            fragment: ",\"abstract\":true",
+        }),
+        method.accessibility.map(accessibility_modifier),
+        method.r#override.then_some(MemberModifier {
+            keyword: "override",
+            fragment: ",\"override\":true",
+        }),
+    ];
+    write_modifiers_in_source_order(
+        w,
+        &mut mods,
+        method.is_static,
+        modifier_scan_start(method.decorators, method.span),
+        method.key.span().start,
+        ctx,
+    );
     w.raw(",\"computed\":");
     w.bool(method.computed);
     w.raw(",\"key\":");
     write_expression(w, &method.key, ctx);
+    if method.optional {
+        w.raw(",\"optional\":true");
+    }
     w.raw(",\"kind\":");
     w.token(method.kind.as_str());
     let func = &method.value;
@@ -323,41 +441,52 @@ fn write_method_definition(
     }
     // Close the `value` function node, then the `MethodDefinition`.
     close_node(w, value_type, value_span, ctx);
+    write_decorators_field(w, method.decorators, ctx);
     close_node(w, "MethodDefinition", method.span, ctx);
 }
 
-/// Emits a `PropertyDefinition` node. Field order: `decorators?`,
-/// `abstract?`, `accessor?`, `accessibility?`, `readonly?`, `override?`,
-/// `declare?`, `static`, `computed`, `key`, `optional?`, `definite?`,
-/// `typeAnnotation?`, `value` (nullable).
+/// Emits a `PropertyDefinition` node. Field order: source-order modifiers
+/// (`declare?`, `abstract?`, `accessor?`, `accessibility?`, `readonly?`,
+/// `override?`, `static` — see `write_modifiers_in_source_order`), `computed`,
+/// `key`, `optional?`, `definite?`, `typeAnnotation?`, `value` (nullable),
+/// `decorators?` (attached to the finished member, so they serialize last).
 fn write_property_definition(
     w: &mut JsonWriter,
     prop: &internal::PropertyDefinition<'_>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "PropertyDefinition", prop.span, ctx);
-    write_decorators_field(w, prop.decorators, ctx);
-    if prop.r#abstract {
-        w.raw(",\"abstract\":true");
-    }
-    if prop.accessor {
-        w.raw(",\"accessor\":true");
-    }
-    if let Some(acc) = prop.accessibility {
-        w.raw(",\"accessibility\":");
-        w.token(acc.as_str());
-    }
-    if prop.readonly {
-        w.raw(",\"readonly\":true");
-    }
-    if prop.r#override {
-        w.raw(",\"override\":true");
-    }
-    if prop.declare {
-        w.raw(",\"declare\":true");
-    }
-    w.raw(",\"static\":");
-    w.bool(prop.is_static);
+    let mut mods = [
+        prop.declare.then_some(MemberModifier {
+            keyword: "declare",
+            fragment: ",\"declare\":true",
+        }),
+        prop.r#abstract.then_some(MemberModifier {
+            keyword: "abstract",
+            fragment: ",\"abstract\":true",
+        }),
+        prop.accessor.then_some(MemberModifier {
+            keyword: "accessor",
+            fragment: ",\"accessor\":true",
+        }),
+        prop.accessibility.map(accessibility_modifier),
+        prop.readonly.then_some(MemberModifier {
+            keyword: "readonly",
+            fragment: ",\"readonly\":true",
+        }),
+        prop.r#override.then_some(MemberModifier {
+            keyword: "override",
+            fragment: ",\"override\":true",
+        }),
+    ];
+    write_modifiers_in_source_order(
+        w,
+        &mut mods,
+        prop.is_static,
+        modifier_scan_start(prop.decorators, prop.span),
+        prop.key.span().start,
+        ctx,
+    );
     w.raw(",\"computed\":");
     w.bool(prop.computed);
     w.raw(",\"key\":");
@@ -371,6 +500,7 @@ fn write_property_definition(
     write_type_annotation_field(w, prop.type_annotation.as_ref(), ctx);
     w.raw(",\"value\":");
     write_or_null(w, prop.value.as_ref(), |w, v| write_expression(w, v, ctx));
+    write_decorators_field(w, prop.decorators, ctx);
     close_node(w, "PropertyDefinition", prop.span, ctx);
 }
 

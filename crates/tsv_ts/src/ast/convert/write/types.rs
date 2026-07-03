@@ -112,20 +112,27 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
             } else {
                 write_identifier_plain(w, &p.parameter_name, ctx);
             }
-            // Nullable; the annotation node is synthesized around the type's
-            // own span (there is no `:` in `x is T`).
-            w.raw(",\"typeAnnotation\":");
+            // acorn-typescript's annotation-less forms (`asserts foo` /
+            // `asserts this`) assign `asserts` before the null annotation;
+            // the `is T` forms assign the annotation first and stamp
+            // `asserts` last. The annotation node is synthesized around the
+            // type's own span (there is no `:` in `x is T`).
             match &p.type_annotation {
                 Some(t) => {
+                    w.raw(",\"typeAnnotation\":");
                     node_header(w, "TSTypeAnnotation", t.span(), ctx);
                     w.raw(",\"typeAnnotation\":");
                     write_type(w, t, ctx);
                     close_node(w, "TSTypeAnnotation", t.span(), ctx);
+                    w.raw(",\"asserts\":");
+                    w.bool(p.asserts);
                 }
-                None => w.null(),
+                None => {
+                    w.raw(",\"asserts\":");
+                    w.bool(p.asserts);
+                    w.raw(",\"typeAnnotation\":null");
+                }
             }
-            w.raw(",\"asserts\":");
-            w.bool(p.asserts);
             close_node(w, "TSTypePredicate", p.span, ctx);
         }
         internal::TSType::Conditional(c) => {
@@ -395,27 +402,38 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             close_node(w, "TSPropertySignature", p.span, ctx);
         }
         internal::TSTypeElement::MethodSignature(m) => {
-            // Field order: `computed`, `key`, `optional` (only when true),
-            // `kind` (always present), `typeParameters?`, `parameters`,
+            // Field order: `computed`, `key`, then per kind — a get/set
+            // signature's `kind` is assigned between the two
+            // `parsePropertyName` calls (right after the key); a plain
+            // method's `kind` lands on the finished signature (last). Then
+            // `optional` (only when true), `typeParameters?`, `parameters`,
             // `typeAnnotation?` (the return type's wire name).
             node_header(w, "TSMethodSignature", m.span, ctx);
             w.raw(",\"computed\":");
             w.bool(m.computed);
             w.raw(",\"key\":");
             write_expression(w, &m.key, ctx);
+            let getset = matches!(
+                m.kind,
+                internal::MethodKind::Get | internal::MethodKind::Set
+            );
+            if getset {
+                w.raw(",\"kind\":");
+                w.token(match m.kind {
+                    internal::MethodKind::Get => "get",
+                    _ => "set",
+                });
+            }
             if m.optional {
                 w.raw(",\"optional\":true");
             }
-            w.raw(",\"kind\":");
-            w.token(match m.kind {
-                internal::MethodKind::Get => "get",
-                internal::MethodKind::Set => "set",
-                _ => "method",
-            });
             write_type_parameters_field(w, m.type_parameters.as_ref(), ctx);
             w.raw(",\"parameters\":");
             write_expressions(w, m.params, ctx);
             write_type_annotation_field(w, m.return_type.as_ref(), ctx);
+            if !getset {
+                w.raw(",\"kind\":\"method\"");
+            }
             close_node(w, "TSMethodSignature", m.span, ctx);
         }
         internal::TSTypeElement::CallSignature(c) => {
@@ -499,14 +517,21 @@ pub(super) fn write_index_signature(
 
 /// Emits a `TSInterfaceDeclaration` node (its `extends` clauses as
 /// `TSExpressionWithTypeArguments`, its body a `TSInterfaceBody`). Field order:
-/// `id`, `typeParameters?`, `extends` (only when non-empty), `body`, `declare`
-/// (only when true).
+/// `declare?` (statement position), `id`, `typeParameters?`, `extends` (only
+/// when non-empty), `body`, `declare?` (export position) — acorn-typescript's
+/// statement-level `declare interface` passes `declare` into the interface
+/// parse (assigned before `id`), while `export declare` stamps the finished
+/// node, so the field's position depends on `exported`.
 pub(super) fn write_interface_declaration(
     w: &mut JsonWriter,
     iface: &internal::TSInterfaceDeclaration<'_>,
     ctx: &Ctx<'_>,
+    exported: bool,
 ) {
     node_header(w, "TSInterfaceDeclaration", iface.span, ctx);
+    if iface.declare && !exported {
+        w.raw(",\"declare\":true");
+    }
     w.raw(",\"id\":");
     write_identifier_plain(w, &iface.id, ctx);
     write_type_parameters_field(w, iface.type_parameters.as_ref(), ctx);
@@ -530,22 +555,26 @@ pub(super) fn write_interface_declaration(
     w.raw(",\"body\":");
     write_array(w, iface.body.body, |w, m| write_type_element(w, m, ctx));
     close_node(w, "TSInterfaceBody", iface.body.span, ctx);
-    if iface.declare {
+    if iface.declare && exported {
         w.raw(",\"declare\":true");
     }
     close_node(w, "TSInterfaceDeclaration", iface.span, ctx);
 }
 
-/// Emits a `TSDeclareFunction` node. Field order: `declare` (only when
-/// true), `id`, `expression` (always false), `generator`, `async`,
-/// `typeParameters?`, `params`, `returnType?`.
+/// Emits a `TSDeclareFunction` node. Field order: `declare?` (statement
+/// position), `id`, `expression` (always false), `generator`, `async`,
+/// `typeParameters?`, `params`, `returnType?`, `declare?` (export position) —
+/// acorn-typescript's statement-level `declare function` stamps `declare`
+/// before the function parses (`tsTryParseDeclare`), while `export declare`
+/// stamps the finished node, so the field's position depends on `exported`.
 pub(super) fn write_declare_function(
     w: &mut JsonWriter,
     func: &internal::TSDeclareFunction<'_>,
     ctx: &Ctx<'_>,
+    exported: bool,
 ) {
     node_header(w, "TSDeclareFunction", func.span, ctx);
-    if func.declare {
+    if func.declare && !exported {
         w.raw(",\"declare\":true");
     }
     w.raw(",\"id\":");
@@ -558,6 +587,9 @@ pub(super) fn write_declare_function(
     w.raw(",\"params\":");
     write_expressions(w, func.params, ctx);
     super::write_return_type_field(w, func.return_type.as_ref(), ctx);
+    if func.declare && exported {
+        w.raw(",\"declare\":true");
+    }
     close_node(w, "TSDeclareFunction", func.span, ctx);
 }
 
