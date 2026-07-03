@@ -1,22 +1,20 @@
 # line_before_body_comment_prettier_divergence
 
-Line comments between a `while (…)` header's `)` and the body `{`.
+Line comments between a `while (…)` header's `)` and the body block `{`.
 
-A trailing comment (`while (a) // c`) and an own-line comment before `{`
-(`while (a)\n// c\n{`) stay where the author wrote them in both formatters. The
-divergence is the **blank line**: when the author leaves a blank line between `)`
-and an own-line comment, tsv preserves it while prettier drops it.
+A trailing comment after `)` (`while (a) // c`), an own-line comment before `{`
+(`while (a)\n// c\n{`), and a blank line *before* that own-line comment all
+normalize to the same form under **both** formatters: tsv drops the blank between
+the header `)` and a body-leading comment — matching prettier, and tsv's own
+behavior when `{` sits on the header line (`while (a) {\n\n// c` also collapses).
+The `unformatted_*` variants pin that shared normalization.
 
-## Reason
+## Divergence
 
-tsv treats the author's vertical spacing as intentional, preserving the blank
-line before the comment. Consistent with tsv's comment-position handling across
-control-flow statements.
-
-`divergent_variant_spaces.svelte` is prettier's stable form reached from the
-extra-whitespace `unformatted_ours_spaces.svelte` (it keeps a blank line *after*
-the comment instead). It is a divergent variant: prettier keeps it, but tsv drops
-the blank and settles on a distinct third stable form (neither prettier's nor the
-input). `unformatted_ours_*` variants normalize back to input under tsv only.
+The one difference is a blank line *after* the comment, before `{`
+(`while (a)\n// c\n\n{`): **prettier preserves** it, **tsv normalizes** it away
+(the body block always hugs the preceding comment). `prettier_variant_spaces.svelte`
+pins prettier's stable form; `unformatted_ours_spaces.svelte` is an extra-whitespace
+authoring only tsv normalizes back to input.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
