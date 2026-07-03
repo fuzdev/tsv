@@ -374,14 +374,17 @@ All fixtures use `input.svelte` as canonical source.
 **Parser validations (P)** - Expected ASTs match parser outputs:
 
 - **P1**: `expected.json` matches Svelte parser output
-- **P2**: `expected_ours.json` matches our parser output
+- **P2**: `expected_ours.json` matches our parser output (divergence fixtures)
+- **P2b**: our parser output (the writer's wire JSON, via `convert_ast_json`) matches `expected.json` — the gate on the emission path (non-divergence fixtures)
 - **P3**: `expected_svelte.json` matches Svelte parser output
-- **P4**: `convert_ast_json_string` output is byte-identical to the `Value` path (`to_string(convert_ast_json)`) on the input file — guards the compact-wire path's typed comment attach and typed offset translation, which expected.json comparisons (always via `convert_ast_json`) don't exercise
-- **P5**: typed-walk parity probes — the same byte-identity check on synthesized probe content, so the byte→char machinery (TS's fused char-space conversion via `LocationMapper`; the `translate_typed.rs` walks of `tsv_svelte`/`tsv_css` — plus `tsv_ts`'s, which Svelte's hybrid walk delegates typed islands to — each enumerating struct fields manually; and `tsv_svelte`'s `attach_typed.rs`, which mirrors the `Value` attach dispatcher's comment windows) is exercised on every fixture's AST shapes, not just the few inputs whose own content triggers them. `.ts`/`.svelte.ts`/`.css` inputs get a multibyte variant (prepended multibyte comment shifts all downstream offsets; byte-0 fixtures — hashbang, BOM — are skipped); `.svelte` inputs get a whole-file multibyte variant (prepended HTML comment), a template-comment variant (appended expression tag carrying multibyte comments, driving the island-scoped attach against the `Value` dispatcher), and their `<script>` contents extracted and run as standalone TS — as-is when multibyte plus a synthesized variant. A probe that fails to parse is an error, not a skip
 
-P1–P3 anchor fixtures to the canonical parsers; P4/P5 prove tsv's two
-materialization paths agree with each other. A bug shared by BOTH paths is
-invisible to all of them — the corpus-scale external oracle for that class is
+The writer (`convert_ast_json_bytes`) is the sole emission path, so P2/P2b
+compare the *writer's* wire JSON against the canonical parsers' `expected.json`
+(P1/P3 pin those to the canonical parsers). The multibyte and `<script>`/
+template-comment fixtures make P2/P2b exercise the writer's fused byte→char
+offset translation and island-scoped comment attach against the canonical
+oracle. A bug shared by the writer and the fixture's own `expected.json` is
+invisible here — the corpus-scale external oracle for that class is
 `deno task corpus:compare:parse` (../benches/js/CLAUDE.md §Parse
 Comparison), which deep-diffs the shipped wire against the canonical parsers
 on real codebases.
@@ -669,7 +672,7 @@ Key test files:
 
 - `tests/fixtures_tests.rs` - Unified fixture validation (parser + formatter)
 - `crates/tsv_debug/src/fixtures/` - Fixture data model (`model.rs`), discovery (`discovery.rs`), and variant discovery (`variants.rs`)
-- `crates/tsv_debug/src/fixtures/validation/` - Validation logic: structure rules (`structure.rs`), per-phase checks (`phases.rs`), typed errors (`errors.rs`), summary printing (`summary.rs`)
+- `crates/tsv_debug/src/fixtures/validation/` - Validation logic: structure rules (`structure.rs`), per-phase checks (`phases/`), typed errors (`errors.rs`), summary printing (`summary.rs`)
 - `crates/tsv_debug/src/cli/commands/fixtures_*.rs` - Fixture generation commands
 
 **See [fixture_workflow.md](./fixture_workflow.md#quick-reference) for command reference.**

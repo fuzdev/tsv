@@ -1,22 +1,15 @@
 // Comment attachment for converted JSON ASTs
 //
-// Two related passes live here:
-// - The acorn comment-attachment DFS (`CommentAttachmentContext`,
-//   `attach_comments_recursively`): attaches leading/trailing comments to
-//   script Program JSON, matching `add_comments` in
-//   svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js
-// - Template-expression comment attachment
-//   (`attach_template_expression_comments`): finds expression fields in the
-//   Svelte template JSON and runs the same DFS on each, matching Svelte's
-//   `parse_expression_at` → `add_comments`.
+// The acorn comment-attachment DFS (`CommentAttachmentContext`,
+// `attach_comments_recursively`) attaches leading/trailing comments to script
+// Program JSON, matching `add_comments` in
+// svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js.
 //
-// The `Value` dispatcher here (`walk_and_attach_expressions`) is the oracle
-// path's whole-document walk; `attach_typed.rs` re-expresses the same
-// dispatch over the typed public AST for the shipped direct-serialization
-// path. Both share the per-island machinery (`try_attach_comments_to_node`
-// and the `attach_*` helpers), and the fixture suite's wire-path identity
-// check cross-checks them byte-for-byte — a window or reachability change in
-// one dispatcher must land in the other.
+// The per-island machinery (`try_attach_comments_to_node` and the `attach_*`
+// helpers) is consumed by the wire-JSON writer's skeleton path
+// (`ast/convert/special.rs`'s `build_*_writer_comments`): each comment-bearing
+// template island is skeletonized to byte-space wire JSON, attached here, and
+// read back into a `WriterComments` map the fused writer consults at emit time.
 
 use std::collections::VecDeque;
 
@@ -398,7 +391,10 @@ fn recurse_children(node: &mut serde_json::Value, ctx: &mut CommentAttachmentCon
 ///
 /// For multi-line block comments, strips leading indentation to match Svelte's behavior.
 /// See: svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js:115-124
-fn get_comment_value(comment: &Comment, source: &str) -> String {
+///
+/// `pub(super)` so the wire-JSON writer emits the `value` field directly (no
+/// intermediate `comment_to_json` `Value`).
+pub(super) fn get_comment_value(comment: &Comment, source: &str) -> String {
     let content = comment.content(source);
     if comment.is_block && comment.multiline {
         printing::strip_comment_indentation(source, content, comment.span.start)
@@ -427,393 +423,6 @@ pub(super) fn is_template_comment(comment: &Comment, script_spans: &[(u32, u32)]
     !script_spans
         .iter()
         .any(|&(s, e)| comment.span.start >= s && comment.span.end <= e)
-}
-
-/// Attach comments to template expressions in a converted Root JSON AST
-///
-/// Template expression comments are those in `root.comments` that fall outside `<script>` tags.
-/// For each expression found in the Svelte template JSON, filters relevant comments and runs
-/// the DFS comment attachment algorithm (matching Svelte's `parse_expression_at` → `add_comments`).
-///
-/// Must be called BEFORE `translate_byte_to_char_offsets` since comment positions are byte-based.
-pub fn attach_template_expression_comments(
-    root_json: &mut serde_json::Value,
-    comments: &[Comment],
-    script_spans: &[(u32, u32)],
-    source: &str,
-) {
-    // Filter to comments outside script content spans (these are template expression comments)
-    let template_comments: Vec<&Comment> = comments
-        .iter()
-        .filter(|c| is_template_comment(c, script_spans))
-        .collect();
-
-    if template_comments.is_empty() {
-        return;
-    }
-
-    // Walk the Root JSON and find expression fields in Svelte template constructs
-    walk_and_attach_expressions(root_json, &template_comments, source);
-}
-
-/// Walk the Svelte Root JSON and attach comments to template expression fields
-///
-/// Identifies Svelte node types by their `type` field and processes their expression fields.
-/// Uses the parent Svelte node's span to filter comments (not the expression's own span),
-/// matching Svelte's `parse_expression_at` which filters comments to `start >= index`.
-///
-/// `attach_typed.rs` mirrors this dispatch over the typed public AST (and
-/// delegates its `Value` islands back here) — keep the two in sync.
-pub(super) fn walk_and_attach_expressions(
-    value: &mut serde_json::Value,
-    template_comments: &[&Comment],
-    source: &str,
-) {
-    match value {
-        serde_json::Value::Object(map) => {
-            let node_type = map
-                .get("type")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("")
-                .to_string();
-
-            // Get this node's span for use as comment filter boundary
-            let container_start = map
-                .get("start")
-                .and_then(serde_json::Value::as_u64)
-                .map(|v| v as u32);
-            let container_end = map
-                .get("end")
-                .and_then(serde_json::Value::as_u64)
-                .map(|v| v as u32);
-
-            // Process expression fields based on Svelte node type.
-            // Uses this Svelte node's span as the container boundary for comment filtering,
-            // since comments like `{/* c */ expr}` fall between the `{` and `}` but outside
-            // the inner expression's span.
-            //
-            // For blocks with child content (IfBlock, EachBlock, etc.), tighten the range
-            // end to the start of the first child content to avoid including comments from
-            // sibling expression contexts (e.g., {:else if /* c */ b} comments shouldn't
-            // bleed into the parent {#if a} test).
-            match node_type.as_str() {
-                // ExpressionTag: {expression}
-                // HtmlTag: {@html expression}
-                // RenderTag: {@render expression}
-                // AttachTag: [attach expression]
-                // SpreadAttribute: {...expression}
-                "ExpressionTag" | "HtmlTag" | "RenderTag" | "AttachTag" | "SpreadAttribute" => {
-                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
-                        && let Some(expr) = map.get_mut("expression")
-                    {
-                        try_attach_comments_to_node(
-                            expr,
-                            template_comments,
-                            source,
-                            c_start,
-                            c_end,
-                        );
-                    }
-                }
-
-                // IfBlock: {#if test}...{/if}
-                // Tighten range end to consequent start (expression is in the opening tag)
-                "IfBlock" => {
-                    if let Some(c_start) = container_start {
-                        let range_end = first_child_start(map, &["consequent"])
-                            .or(container_end)
-                            .unwrap_or(0);
-                        if let Some(test) = map.get_mut("test") {
-                            try_attach_comments_to_node(
-                                test,
-                                template_comments,
-                                source,
-                                c_start,
-                                range_end,
-                            );
-                        }
-                    }
-                }
-
-                // KeyBlock: {#key expression}...{/key}
-                "KeyBlock" => {
-                    if let Some(c_start) = container_start {
-                        let range_end = first_child_start(map, &["fragment"])
-                            .or(container_end)
-                            .unwrap_or(0);
-                        if let Some(expr) = map.get_mut("expression") {
-                            try_attach_comments_to_node(
-                                expr,
-                                template_comments,
-                                source,
-                                c_start,
-                                range_end,
-                            );
-                        }
-                    }
-                }
-
-                // EachBlock: {#each expression as context (key)}...{/each}
-                // - expression: comments from container start to body start
-                // - context: SKIP (parsed by read_pattern, no comment collection)
-                // - key: comments from container start to body start (parsed by
-                //   parse_expression_at within parentheses)
-                "EachBlock" => {
-                    if let Some(c_start) = container_start {
-                        let range_end = first_child_start(map, &["body"])
-                            .or(container_end)
-                            .unwrap_or(0);
-                        if let Some(expr) = map.get_mut("expression") {
-                            try_attach_comments_to_node(
-                                expr,
-                                template_comments,
-                                source,
-                                c_start,
-                                range_end,
-                            );
-                        }
-                        // context: skip (patterns don't collect comments)
-                        if let Some(key) = map.get_mut("key") {
-                            try_attach_comments_to_node(
-                                key,
-                                template_comments,
-                                source,
-                                c_start,
-                                range_end,
-                            );
-                        }
-                    }
-                }
-
-                // AwaitBlock: {#await expression then value catch error}
-                // - expression: comments from container start to pending/then/catch start
-                // - value: SKIP (parsed by read_pattern, no comment collection)
-                // - error: SKIP (parsed by read_pattern, no comment collection)
-                "AwaitBlock" => {
-                    if let Some(c_start) = container_start {
-                        let range_end = first_child_start(map, &["pending", "then", "catch"])
-                            .or(container_end)
-                            .unwrap_or(0);
-                        if let Some(expr) = map.get_mut("expression") {
-                            try_attach_comments_to_node(
-                                expr,
-                                template_comments,
-                                source,
-                                c_start,
-                                range_end,
-                            );
-                        }
-                        // value/error: skip (patterns don't collect comments)
-                    }
-                }
-
-                // SnippetBlock: {#snippet name(params)}
-                "SnippetBlock" => {
-                    if let Some(c_start) = container_start {
-                        let range_end = first_child_start(map, &["body"])
-                            .or(container_end)
-                            .unwrap_or(0);
-                        if let Some(expr) = map.get_mut("expression") {
-                            try_attach_comments_to_node(
-                                expr,
-                                template_comments,
-                                source,
-                                c_start,
-                                range_end,
-                            );
-                        }
-                        if let Some(serde_json::Value::Array(params)) = map.get_mut("parameters") {
-                            attach_snippet_parameters(
-                                params,
-                                template_comments,
-                                source,
-                                c_start,
-                                range_end,
-                            );
-                        }
-                    }
-                }
-
-                // `{@const id = init}` — Svelte hand-builds the VariableDeclaration and
-                // runs `add_comments(init)` on the **init expression directly**, so
-                // comments attach to the init's subtree, not the whole declaration.
-                // (Also update VariableDeclaration.end to Svelte's `parser.index - 1`.)
-                "ConstTag" => {
-                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
-                        && let Some(decl) = map.get_mut("declaration")
-                    {
-                        attach_const_tag_declaration(
-                            decl,
-                            template_comments,
-                            source,
-                            c_start,
-                            c_end,
-                        );
-                    }
-                }
-                "DeclarationTag" => {
-                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
-                        && let Some(decl) = map.get_mut("declaration")
-                    {
-                        attach_declaration_tag_declaration(
-                            decl,
-                            template_comments,
-                            source,
-                            c_start,
-                            c_end,
-                        );
-                    }
-                }
-
-                // DebugTag: {@debug identifiers}
-                "DebugTag" => {
-                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
-                        && let Some(serde_json::Value::Array(ids)) = map.get_mut("identifiers")
-                    {
-                        for id in ids.iter_mut() {
-                            try_attach_comments_to_node(
-                                id,
-                                template_comments,
-                                source,
-                                c_start,
-                                c_end,
-                            );
-                        }
-                    }
-                }
-
-                // Directives with expression fields
-                "OnDirective"
-                | "UseDirective"
-                | "TransitionDirective"
-                | "AnimateDirective"
-                | "LetDirective" => {
-                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
-                        && let Some(expr) = map.get_mut("expression")
-                        && !expr.is_null()
-                    {
-                        try_attach_comments_to_node(
-                            expr,
-                            template_comments,
-                            source,
-                            c_start,
-                            c_end,
-                        );
-                    }
-                }
-
-                // BindDirective, ClassDirective: expression is serde_json::Value
-                "BindDirective" | "ClassDirective" => {
-                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
-                        && let Some(expr) = map.get_mut("expression")
-                        && expr.is_object()
-                    {
-                        try_attach_comments_to_node(
-                            expr,
-                            template_comments,
-                            source,
-                            c_start,
-                            c_end,
-                        );
-                    }
-                }
-
-                // StyleDirective: value can be ExpressionTag or array
-                "StyleDirective" => {
-                    if let Some(val) = map.get_mut("value") {
-                        // value can be: true, ExpressionTag object, or array of parts
-                        walk_and_attach_expressions(val, template_comments, source);
-                    }
-                }
-
-                // SvelteElement/SvelteComponent: tag and expression
-                "SvelteElement" => {
-                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
-                        && let Some(tag) = map.get_mut("tag")
-                    {
-                        try_attach_comments_to_node(tag, template_comments, source, c_start, c_end);
-                    }
-                }
-
-                "SvelteComponent" => {
-                    if let (Some(c_start), Some(c_end)) = (container_start, container_end)
-                        && let Some(expr) = map.get_mut("expression")
-                    {
-                        try_attach_comments_to_node(
-                            expr,
-                            template_comments,
-                            source,
-                            c_start,
-                            c_end,
-                        );
-                    }
-                }
-
-                _ => {}
-            }
-
-            // Recurse into Attribute value (can contain ExpressionTag)
-            if node_type == "Attribute"
-                && let Some(val) = map.get_mut("value")
-            {
-                walk_and_attach_expressions(val, template_comments, source);
-            }
-
-            // Recurse into child Svelte structures (fragment, attributes, etc.)
-            // Skip "content" (script content) and expression fields we already handled
-            for key in &[
-                "fragment",
-                "nodes",
-                "attributes",
-                "consequent",
-                "alternate",
-                "body",
-                "pending",
-                "then",
-                "catch",
-                "fallback",
-                "children",
-            ] {
-                if let Some(child) = map.get_mut(*key) {
-                    walk_and_attach_expressions(child, template_comments, source);
-                }
-            }
-        }
-        serde_json::Value::Array(arr) => {
-            for item in arr.iter_mut() {
-                walk_and_attach_expressions(item, template_comments, source);
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Get the start position of the first available child content field
-///
-/// Used to tighten comment attachment range for block nodes (IfBlock, EachBlock, etc.)
-/// so that comments from sibling expression contexts (e.g., {:else if}) don't bleed
-/// into the parent block's expression.
-fn first_child_start(
-    map: &serde_json::Map<String, serde_json::Value>,
-    keys: &[&str],
-) -> Option<u32> {
-    let mut earliest: Option<u32> = None;
-    for &key in keys {
-        if let Some(child) = map.get(key) {
-            // The child could be a Fragment (object with nodes) or null
-            let start = child
-                .get("nodes")
-                .and_then(|n| n.as_array())
-                .and_then(|arr| arr.first())
-                .and_then(node_start)
-                // Or the child itself might have a start
-                .or_else(|| node_start(child));
-            if let Some(s) = start {
-                earliest = Some(earliest.map_or(s, |e: u32| e.min(s)));
-            }
-        }
-    }
-    earliest
 }
 
 /// Try to attach comments to a template expression JSON node
@@ -863,38 +472,49 @@ pub(super) fn try_attach_comments_to_node(
     attach_comments_recursively(node_json, &mut ctx);
 }
 
-/// Attach comments to a snippet block's parameter list.
+/// Attach comments across an expression list that canonical Svelte parses in
+/// ONE acorn parse — snippet parameters (a function-parameter context) and
+/// multi-identifier `{@debug}` (a `SequenceExpression`): one shared comment
+/// queue walked sequentially through each item, so an inter-item comment lands
+/// exactly where acorn's single-parse walk puts it — a same-line `[,) \t]*`
+/// gap trails the *preceding* item; anything else leads the *following* item.
 ///
-/// Walks the parameters in order, advancing a cursor past each param and its
-/// trailing comments so windows don't overlap — an inter-parameter comment is
-/// claimed once (as the preceding param's trailing) rather than attached to
-/// both adjacent params. Matches Svelte's single acorn parse of the list.
-pub(super) fn attach_snippet_parameters(
-    params: &mut [serde_json::Value],
+/// `wrapper_end` is the discarded parse wrapper's `end` for acorn's
+/// `node.end == parent.end` trailing suppression: the last identifier's end
+/// for `{@debug}`'s `SequenceExpression` (so its last item never claims a
+/// trailing comment), `None` for snippet params (the function wrapper ends
+/// past every param, so the guard never fires). Leftover comments belonged to
+/// the discarded wrapper and stay unattached — they still emit in the root
+/// `comments` array. (A single-identifier `{@debug}` has no wrapper — the
+/// identifier is the parse root itself — so it takes the
+/// `try_attach_comments_to_node` path with its root-fallback trailing, not
+/// this one.)
+pub(super) fn attach_expression_list(
+    items: &mut [serde_json::Value],
     template_comments: &[&Comment],
     source: &str,
     c_start: u32,
     range_end: u32,
+    wrapper_end: Option<u32>,
 ) {
-    let mut cursor = c_start;
-    for param in params.iter_mut() {
-        let p_end = node_end(param);
-        try_attach_comments_to_node(param, template_comments, source, cursor, range_end);
-        if let Some(e) = p_end {
-            cursor = scan_past_trailing_comments(source, e, range_end);
-        }
+    let comment_queue: VecDeque<serde_json::Value> = template_comments
+        .iter()
+        .filter(|c| c.span.start >= c_start && c.span.end <= range_end)
+        .map(|c| comment_to_json(c, source))
+        .collect();
+    if comment_queue.is_empty() {
+        return;
     }
-}
-
-/// Rewrite a `{@const}`/`{const}`/`{let}` VariableDeclaration's `end` to
-/// Svelte's `parser.index - 1` (the byte before the tag's closing `}`) —
-/// unconditionally, whenever the attachment pass runs.
-fn rewrite_declaration_end(decl: &mut serde_json::Value, c_end: u32) {
-    if let Some(obj) = decl.as_object_mut() {
-        obj.insert(
-            "end".to_string(),
-            serde_json::Value::Number((c_end - 1).into()),
-        );
+    let mut ctx = CommentAttachmentContext {
+        comments: comment_queue,
+        source,
+    };
+    let parent = wrapper_end.map(|end| ParentInfo {
+        end,
+        last_body_start: None,
+    });
+    for item in items.iter_mut() {
+        walk_node(item, parent.as_ref(), &mut ctx);
     }
 }
 
@@ -910,7 +530,6 @@ pub(super) fn attach_const_tag_declaration(
     c_start: u32,
     c_end: u32,
 ) {
-    rewrite_declaration_end(decl, c_end);
     if let Some(declarations) = decl.get_mut("declarations").and_then(|d| d.as_array_mut())
         && let Some(declarator) = declarations.first_mut()
         && let Some(init) = declarator.get_mut("init")
@@ -932,7 +551,6 @@ pub(super) fn attach_declaration_tag_declaration(
     c_start: u32,
     c_end: u32,
 ) {
-    rewrite_declaration_end(decl, c_end);
     try_attach_comments_to_node(decl, template_comments, source, c_start, c_end);
 }
 

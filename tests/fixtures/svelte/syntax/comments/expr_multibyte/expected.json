@@ -1,0 +1,112 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 73,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "ExpressionTag",
+				"start": 0,
+				"end": 42,
+				"expression": {
+					"type": "Identifier",
+					"start": 40,
+					"end": 41,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 0
+						},
+						"end": {
+							"line": 2,
+							"column": 1
+						}
+					},
+					"name": "a",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 中文😀 line comment before expression",
+							"start": 1,
+							"end": 39
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 42,
+				"end": 44,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "ExpressionTag",
+				"start": 44,
+				"end": 72,
+				"expression": {
+					"type": "Identifier",
+					"start": 70,
+					"end": 71,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 26
+						},
+						"end": {
+							"line": 4,
+							"column": 27
+						}
+					},
+					"name": "a",
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 中文😀 block comment ",
+							"start": 45,
+							"end": 69
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " 中文😀 line comment before expression",
+			"start": 1,
+			"end": 39,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 1
+				},
+				"end": {
+					"line": 1,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 中文😀 block comment ",
+			"start": 45,
+			"end": 69,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 25
+				}
+			}
+		}
+	]
+}

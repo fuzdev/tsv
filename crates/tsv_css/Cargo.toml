@@ -6,9 +6,10 @@ description = "CSS parsing and formatting library"
 
 [features]
 default = ["convert"]
-# Public AST + JSON serialization layer. Off in the @fuzdev/tsv_format_wasm
-# build; on for every other consumer.
-convert = ["dep:serde", "dep:serde_json"]
+# The wire-JSON conversion layer (`ast/convert/write.rs`). Off in the
+# @fuzdev/tsv_format_wasm build; on for every other consumer. Pulls in the
+# shared wire-JSON writer substrate (`tsv_lang/json`) the emitter builds on.
+convert = ["dep:serde_json", "tsv_lang/json"]
 # Exposes `debug_token_stream` for the differential lexer harness (`tsv_debug
 # lex_diff`). Off in production builds; enabled only by `tsv_debug`.
 debug_lex = []
@@ -18,7 +19,6 @@ tsv_lang.workspace = true
 # Bump arena that owns the internal AST (caller-owns-`Bump`); shared with the
 # host document's arena when CSS is embedded in a Svelte `<style>`.
 bumpalo.workspace = true
-serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 phf.workspace = true
 

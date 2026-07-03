@@ -100,7 +100,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
   keeping the model clean for the other planned tools
 
 Each language is a self-contained Rust crate exposing the same
-`parse`/`format`/`convert_ast` functions over its own concrete types - there's no
+`parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - there's no
 central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention").
 That means the builds tree-shake at the link level:
 the parse build excludes the printers, and the format build excludes the JSON-AST conversion layer.
@@ -226,7 +226,7 @@ Each language crate exports a consistent API:
 
 - `parse(source) -> Result<AST>`
 - `format(ast, source) -> String`
-- `convert_ast(ast, source) -> PublicAST` (default-on `convert` cargo feature; turn off for parse+format-only builds)
+- `convert_ast_json_bytes(ast, source) -> Vec<u8>` — the wire JSON, emitted directly from the internal AST (default-on `convert` cargo feature; turn off for parse+format-only builds)
 
 For more details see [CLAUDE.md](CLAUDE.md).
 

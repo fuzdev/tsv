@@ -67,43 +67,15 @@ pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::Do
     printer::format_svelte_in(root, source, arena)
 }
 
-/// Convert internal AST to public JSON-compatible AST
-///
-/// # Arguments
-///
-/// * `root` - The internal AST to convert
-/// * `source` - The original source code (for location tracking)
-///
-/// # Returns
-///
-/// A public AST that can be serialized to JSON
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let source = "<div>Hello</div>";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_svelte::parse(source, &arena)?;
-/// let public_ast = tsv_svelte::convert_ast(&ast, source);
-/// let json = serde_json::to_string_pretty(&public_ast)?;
-/// ```
-#[cfg(feature = "convert")]
-pub fn convert_ast<'src>(root: &Root<'_>, source: &'src str) -> ast::public::Root<'src> {
-    ast::convert::convert_root(root, source)
-}
-
 /// Convert internal AST to JSON with character-based positions
 ///
-/// Like `convert_ast`, but returns `serde_json::Value` with all byte-based
-/// positions (`start`, `end`, `loc.*.column`, `character`) translated to
-/// Unicode character offsets to match Svelte/acorn output.
-///
-/// This is the `Value` oracle path: every pass here is `Value`-based
-/// (whole-document attach + translate), independent of the typed walks, so
-/// `convert_ast_json_string`'s byte-identity gates cross-check two
-/// implementations. Use it when a `Value` is needed (pretty-printing,
-/// fixture comparison); the compact-wire hot path is
-/// `convert_ast_json_string`.
+/// Returns a `serde_json::Value` parsed from the wire bytes
+/// `convert_ast_json_bytes` emits — a thin wrapper over the sole emission
+/// path, not an independent conversion. All byte-based positions (`start`,
+/// `end`, `loc.*.column`, `character`) are already translated to Unicode
+/// character offsets by the writer. Used where a `Value` is needed (the CLI's
+/// `--pretty`, the fixture gate); byte-oriented consumers should call
+/// `convert_ast_json_bytes` directly.
 ///
 /// # Example
 ///
@@ -116,64 +88,32 @@ pub fn convert_ast<'src>(root: &Root<'_>, source: &'src str) -> ast::public::Roo
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json(root: &Root<'_>, source: &str) -> serde_json::Value {
-    // One tracker shared by conversion and translation (each build is a
-    // full-source line-index scan).
-    let tracker = tsv_lang::LocationTracker::new(source);
-    let public_ast = ast::convert::convert_root_with_tracker(root, source, &tracker);
-    let mut json = serde_json::to_value(&public_ast).expect("AST types derive Serialize correctly");
-
-    // Attach comments to template expressions (outside <script> tags)
-    // Must happen before byte→char translation since comment positions are byte-based
-    let script_spans = script_content_spans(root);
-    ast::convert::attach_template_expression_comments(
-        &mut json,
-        &root.comments,
-        &script_spans,
-        source,
-    );
-
-    let map = tsv_lang::ByteToCharMap::new(source);
-    tsv_ts::ast::convert::translate_byte_to_char_offsets(&mut json, &map, &tracker);
-    json
+    serde_json::from_slice(&convert_ast_json_bytes(root, source)).expect("writer emits valid JSON")
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
 ///
-/// Byte-identical to `serde_json::to_string(&convert_ast_json(...))`, but
-/// serializes the typed public AST directly — skipping the intermediate
-/// `serde_json::Value` — on every input. Comments outside `<script>` content
-/// spans go through the island-scoped attachment pass
-/// (`ast::convert::attach_template_expression_comments_typed`), which converts
-/// only the expressions they land on into `Value` islands (a no-op on the
-/// common comment-free template). ASCII sources then serialize as-is;
-/// multibyte sources get the typed offset-translation walk
-/// (`ast::convert::translate_byte_to_char_offsets_typed`) first. This is the
-/// hot path for the FFI parse binding and the CLI's compact output — the
-/// bytes are valid UTF-8 by construction (serde_json only emits UTF-8), and
-/// byte-oriented consumers skip the O(output) validation a `String` requires.
+/// Emits the wire JSON directly during a single walk of the *internal* Svelte
+/// AST — no typed public tree, no intermediate `serde_json::Value` for the
+/// output. A **writer-mode conversion** (`ast/convert/write.rs`) fuses
+/// byte→UTF-16 offset translation into the walk: the whole document — the
+/// Svelte spine (elements, blocks, tags, directives, attributes, `name_loc`),
+/// embedded template expressions and `<script>` content via `tsv_ts`'s
+/// embedded writers, `<style>` children via `tsv_css`'s `write_css_node` —
+/// emits final char-space positions directly. Comment-bearing islands
+/// (template expressions with comments, comment-carrying `<script>`s) first
+/// precompute a span-keyed `WriterComments` map off a byte-space skeleton
+/// (`ast/convert/special.rs`), which the fused emit consults at each node's
+/// close. This is the hot path for the FFI parse binding and the
+/// CLI's compact output — the bytes are valid UTF-8 by construction (every
+/// emitted byte is a source slice or ASCII fragment), and byte-oriented
+/// consumers skip the O(output) validation a `String` requires.
+///
+/// The output is the Svelte parser's JSON shape; `convert_ast_json` parses these
+/// bytes back into a `Value`.
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
 pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
-    let mut buf = Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
-    // One tracker shared by conversion and the multibyte translation walk
-    // (each build is a full-source line-index scan).
-    let tracker = tsv_lang::LocationTracker::new(source);
-    let mut public_ast = ast::convert::convert_root_with_tracker(root, source, &tracker);
-    // Attach before translation — comment positions are byte-based.
-    let script_spans = script_content_spans(root);
-    ast::convert::attach_template_expression_comments_typed(
-        &mut public_ast,
-        &root.comments,
-        &script_spans,
-        source,
-    );
-    // `ByteToCharMap::new` short-circuits to an empty map for ASCII sources.
-    let map = tsv_lang::ByteToCharMap::new(source);
-    if map.has_multibyte() {
-        ast::convert::translate_byte_to_char_offsets_typed(&mut public_ast, &map, &tracker);
-    }
-    serde_json::to_writer(&mut buf, &public_ast).expect("AST types derive Serialize correctly");
-    buf
+    ast::convert::write_root_bytes(root, source)
 }
 
 /// Convert internal AST to a compact JSON string with character-based positions

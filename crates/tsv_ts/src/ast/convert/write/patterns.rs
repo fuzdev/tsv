@@ -1,14 +1,11 @@
-// Object, array, template, and pattern writers — the writer twin of
-// `convert::patterns`.
+// Object, array, template, and pattern writers.
 
 use super::super::super::internal;
 use super::expressions::{write_expression, write_expressions};
-use super::{Ctx, JsonWriter, node_header, write_array, write_type_annotation_field};
+use super::{Ctx, JsonWriter, close_node, node_header, write_array, write_type_annotation_field};
 use tsv_lang::Span;
 
-/// Mirrors `convert_template_literal`. Field order: `expressions`, `quasis`
-/// (the public struct declares expressions first, unlike convert's build
-/// order).
+/// Emits a `TemplateLiteral` node. Field order: `expressions`, `quasis`.
 pub(super) fn write_template_literal(
     w: &mut JsonWriter,
     template: &internal::TemplateLiteral<'_>,
@@ -19,10 +16,10 @@ pub(super) fn write_template_literal(
     write_expressions(w, template.expressions, ctx);
     w.raw(",\"quasis\":");
     write_array(w, template.quasis, |w, q| write_template_element(w, q, ctx));
-    w.raw("}");
+    close_node(w, "TemplateLiteral", template.span, ctx);
 }
 
-/// Mirrors `convert_template_element`: acorn excludes the delimiters from the
+/// Emits a `TemplateElement` node: acorn excludes the delimiters from the
 /// span (`+1` past the opening `` ` `` or `}`, `-1`/`-2` before the closing
 /// `` ` `` or `${`). `cooked` is null for invalid escapes in tagged templates.
 pub(super) fn write_template_element(
@@ -48,10 +45,10 @@ pub(super) fn write_template_element(
     }
     w.raw("},\"tail\":");
     w.bool(element.tail);
-    w.raw("}");
+    close_node(w, "TemplateElement", adjusted_span, ctx);
 }
 
-/// Mirrors `convert_object_pattern`. Field order: `properties`, `optional`
+/// Emits an `ObjectPattern` node. Field order: `properties`, `optional`
 /// (only when true), `typeAnnotation?`.
 pub(super) fn write_object_pattern(
     w: &mut JsonWriter,
@@ -68,10 +65,10 @@ pub(super) fn write_object_pattern(
         w.raw(",\"optional\":true");
     }
     write_type_annotation_field(w, obj.type_annotation.as_ref(), ctx);
-    w.raw("}");
+    close_node(w, "ObjectPattern", obj.span, ctx);
 }
 
-/// Mirrors `convert_rest_element`.
+/// Emits a `RestElement` node.
 pub(super) fn write_rest_element(
     w: &mut JsonWriter,
     rest: &internal::RestElement<'_>,
@@ -81,10 +78,10 @@ pub(super) fn write_rest_element(
     w.raw(",\"argument\":");
     write_expression(w, rest.argument, ctx);
     write_type_annotation_field(w, rest.type_annotation.as_ref(), ctx);
-    w.raw("}");
+    close_node(w, "RestElement", rest.span, ctx);
 }
 
-/// Mirrors `convert_property`. Field order: `method`, `shorthand`, `computed`,
+/// Emits a `Property` node. Field order: `method`, `shorthand`, `computed`,
 /// `key`, `kind`, `value`.
 pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Property", prop.span, ctx);
@@ -100,12 +97,12 @@ pub(super) fn write_property(w: &mut JsonWriter, prop: &internal::Property<'_>, 
     w.raw(prop.kind.as_str());
     w.raw("\",\"value\":");
     write_expression(w, &prop.value, ctx);
-    w.raw("}");
+    close_node(w, "Property", prop.span, ctx);
 }
 
-/// Mirrors the `AssignmentPattern` arm of `convert_expression_inner`, with the
-/// span override the `TSParameterProperty` quirk needs (`span` is normally
-/// `pattern.span`; the quirk widens it to the whole parameter property).
+/// Emits an `AssignmentPattern` node, with the span override the
+/// `TSParameterProperty` quirk needs (`span` is normally `pattern.span`; the
+/// quirk widens it to the whole parameter property).
 pub(super) fn write_assignment_pattern(
     w: &mut JsonWriter,
     pattern: &internal::AssignmentPattern<'_>,
@@ -114,8 +111,13 @@ pub(super) fn write_assignment_pattern(
 ) {
     node_header(w, "AssignmentPattern", span, ctx);
     w.raw(",\"left\":");
-    write_expression(w, pattern.left, ctx);
+    // acorn's `=` conversion (`toAssignable`, return value used) peels a
+    // type-assertion/paren wrapper off a default's target, so the wire `left`
+    // is the bare target (`{ a: (b as T) = 1 }` → `Identifier` `b`); the cast
+    // stays in the internal AST for the formatter — same unwrap as the simple
+    // `=` left in `write_expression`'s `AssignmentExpression` arm.
+    write_expression(w, pattern.left.skip_type_assertions(), ctx);
     w.raw(",\"right\":");
     write_expression(w, pattern.right, ctx);
-    w.raw("}");
+    close_node(w, "AssignmentPattern", span, ctx);
 }

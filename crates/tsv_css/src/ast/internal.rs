@@ -1,7 +1,8 @@
 // Internal AST - CSS-specific types optimized for traversal and manipulation
 //
 // ARCHITECTURE: This is our internal AST representation, optimized for traversal,
-// manipulation, and formatting. It gets converted to public AST for JSON serialization.
+// manipulation, and formatting. The wire-JSON writer (`convert/write.rs`) emits
+// the public JSON directly from it.
 
 pub use tsv_lang::Comment;
 use tsv_lang::Span;

@@ -449,6 +449,35 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		},
 	},
 	{
+		// acorn-typescript reads `<T>(<parenthesized arrow>)` as a generic arrow —
+		// its Babel-ported abort on parenthesized arrows never fires (acorn sets no
+		// `extra.parenthesized`) — where TypeScript reads a type assertion over the
+		// arrow. tsv follows TypeScript (`TSTypeAssertion` wrapping the arrow), so
+		// every field of that expression diffs. Gate: some ancestor canonical node
+		// is an arrow with `typeParameters` whose source continues `( (` after the
+		// type-params `>` — a doubled paren cannot open a real generic arrow's
+		// param list, so genuine generic-arrow divergences stay unmasked.
+		name: 'type_assertion_paren_arrow',
+		conformance_section: 'TypeScript Corrections — Type assertion vs. generic arrow',
+		matches: (entry, _canonical_parent, ctx) => {
+			const parts = entry.path.split('.');
+			for (let i = parts.length - 1; i >= 1; i--) {
+				const node = get_at_path(ctx.canonical_root, parts.slice(0, i).join('.')) as {
+					type?: unknown;
+					typeParameters?: {end?: unknown} | null;
+				} | null;
+				if (
+					node?.type === 'ArrowFunctionExpression' &&
+					typeof node.typeParameters?.end === 'number' &&
+					/^\s*\(\s*\(/.test(ctx.source.slice(node.typeParameters.end))
+				) {
+					return true;
+				}
+			}
+			return false;
+		},
+	},
+	{
 		// Svelte's parseCss reads `:nth-child(An+B of S)` as `Nth.value = "2n of "`
 		// (the ` of ` leaks in from its REGEX_NTH_OF terminator) and flattens `S` as
 		// sibling simple selectors of the Nth. Per Selectors 4 the `S` is a nested

@@ -37,7 +37,6 @@ parse = [
 tsv_svelte.workspace = true
 tsv_ts.workspace = true
 tsv_css.workspace = true
-tsv_lang.workspace = true
 # Per-thread reusable AST/doc arenas (shared with the native bindings). The
 # workspace entry is default-features = false (AST-arena helper only); the
 # `format` feature adds `tsv_arena/format` for the reusable doc arena. WASM is

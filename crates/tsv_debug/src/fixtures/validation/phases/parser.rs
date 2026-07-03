@@ -6,7 +6,7 @@ use tsv_cli::json_utils::to_json_with_tabs;
 
 use super::super::FixtureValidation;
 use super::super::errors::{ValidationError, ValidationSuccess};
-use super::super::parsed_input::{InputAstPaths, ParsedInput, TypedWalkParityFailure};
+use super::super::parsed_input::InputAstPaths;
 
 /// P2: Validate expected_ours.json matches our parser output
 pub(in crate::fixtures::validation) fn validate_parser_ours(
@@ -81,37 +81,6 @@ pub(in crate::fixtures::validation) fn validate_parser_ours_matches_expected(
         result.add_success(ValidationSuccess::ParserOursMatchesExpected);
     } else {
         result.add_error(ValidationError::ParserOursDiffersFromExpected);
-    }
-}
-
-/// Validate typed-walk parity on synthesized and extracted probes
-///
-/// The fixture's own content only exercises the typed offset-translation
-/// walks when it's multibyte — a handful of files. These probes give every
-/// fixture's AST shapes typed-walk parity coverage: a synthesized multibyte
-/// variant for `.ts`/`.svelte.ts`/`.css`/`.svelte` inputs (the `.svelte` one
-/// exercises `tsv_svelte`'s hybrid typed walk), plus the extracted `<script>`
-/// contents (as-is when multibyte, plus a synthesized variant) for `.svelte`
-/// inputs. See `typed_walk_parity_probes` in parsed_input.rs.
-pub(in crate::fixtures::validation) fn validate_typed_walk_parity(
-    result: &mut FixtureValidation,
-    input: &str,
-    parsed: &ParsedInput<'_>,
-    goal: tsv_ts::Goal,
-) {
-    let parity = super::super::parsed_input::typed_walk_parity_probes(input, parsed, goal);
-    for (probe, failure) in parity.failures {
-        match failure {
-            TypedWalkParityFailure::Diverged => {
-                result.add_error(ValidationError::ParserTypedWalkParityDiverges(probe));
-            }
-            TypedWalkParityFailure::Parse(e) => {
-                result.add_error(ValidationError::ParserTypedWalkProbeUnparseable(probe, e));
-            }
-        }
-    }
-    if parity.checked > 0 {
-        result.add_success(ValidationSuccess::ParserTypedWalkParityOk(parity.checked));
     }
 }
 

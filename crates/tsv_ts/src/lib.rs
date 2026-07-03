@@ -5,17 +5,18 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use tsv_ts::{parse, format, convert_ast};
+//! use tsv_ts::{parse, format, convert_ast_json_bytes};
 //!
-//! // Parse TypeScript code
+//! // Parse TypeScript code (the caller owns the bump arena the AST borrows)
 //! let source = "const x: number = 42;";
-//! let ast = parse(source)?;
+//! let arena = bumpalo::Bump::new();
+//! let ast = parse(source, &arena)?;
 //!
 //! // Format TypeScript code
-//! let formatted = format(&ast);
+//! let formatted = format(&ast, source);
 //!
-//! // Convert to JSON AST
-//! let json_ast = convert_ast(&ast, source);
+//! // Emit the wire JSON AST
+//! let json_bytes = convert_ast_json_bytes(&ast, source);
 //! ```
 
 pub mod ast;
@@ -153,60 +154,18 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     printer.into_string()
 }
 
-/// Convert internal AST to public JSON-compatible AST
-///
-/// # Arguments
-///
-/// * `program` - The internal AST to convert
-/// * `source` - The original source code (for location tracking)
-///
-/// # Returns
-///
-/// A public AST that can be serialized to JSON
-///
-/// # Example
-///
-/// ```rust,ignore
-/// let source = "const x: number = 42;";
-/// let arena = bumpalo::Bump::new();
-/// let ast = tsv_ts::parse(source, &arena)?;
-/// let public_ast = tsv_ts::convert_ast(&ast, source);
-/// let json = serde_json::to_string_pretty(&public_ast)?;
-/// ```
-#[cfg(feature = "convert")]
-pub fn convert_ast<'src>(program: &Program<'_>, source: &'src str) -> ast::public::Program<'src> {
-    let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
-    ast::convert::convert_program(
-        program,
-        source,
-        tsv_lang::LocationMapper::identity(&tracker),
-        ast::convert::Schema::Acorn,
-    )
-}
-
 /// Convert internal AST to JSON with character-based positions
 ///
-/// Like `convert_ast`, but returns `serde_json::Value` with all byte-based
-/// positions (`start`, `end`, `loc.*.column`) translated to Unicode character
-/// offsets to match acorn output.
-///
-/// This is the preferred function for producing JSON AST output.
+/// Returns a `serde_json::Value` parsed from the wire bytes
+/// `convert_ast_json_bytes` emits — a thin wrapper over the sole emission
+/// path, not an independent conversion. Used where a `Value` is needed (the
+/// CLI's `--pretty`); byte-oriented consumers should call
+/// `convert_ast_json_bytes` directly.
 #[cfg(feature = "convert")]
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Value {
-    let tracker = tsv_lang::LocationTracker::new_ecmascript(source);
-    // Byte-space convert + `Value` translation walk: the independent oracle
-    // for the fused string path (`convert_ast_json_string`).
-    let public_ast = ast::convert::convert_program(
-        program,
-        source,
-        tsv_lang::LocationMapper::identity(&tracker),
-        ast::convert::Schema::Acorn,
-    );
-    let mut json = serde_json::to_value(&public_ast).expect("AST types derive Serialize correctly");
-    let map = tsv_lang::ByteToCharMap::new(source);
-    ast::convert::translate_byte_to_char_offsets(&mut json, &map, &tracker);
-    json
+    serde_json::from_slice(&convert_ast_json_bytes(program, source))
+        .expect("writer emits valid JSON")
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions

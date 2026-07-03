@@ -1,24 +1,19 @@
 //! Writer-mode conversion: emit compact wire JSON directly from the internal AST.
 //!
-//! This is the third emission mode of the acorn quirk catalog, next to the typed
-//! conversion (`convert_program`) and the `Value` translation walk
-//! (`convert_ast_json`). It walks the *internal* AST once and writes the final
-//! JSON bytes as it goes, never materializing the typed public tree — the hot
-//! path behind `convert_ast_json_string` (FFI/WASM parse bindings, CLI compact
-//! output).
+//! This is the **sole emission path** for the TS wire JSON: it walks the
+//! *internal* AST once and writes the final JSON bytes as it goes, never
+//! materializing a typed public tree — the hot path behind
+//! `convert_ast_json_bytes`/`_string` (FFI/WASM parse bindings, CLI compact
+//! output; `convert_ast_json` parses these bytes back into a `Value`).
 //!
-//! **Byte-identity contract**: every function here must emit exactly the bytes
-//! `serde_json::to_string` produces for the corresponding `convert_*` result —
-//! same field order (the public struct's declaration order), same
-//! `skip_serializing_if` behavior, same `null`s for non-skipped `Option`s, and
-//! the same scalar formatting. Each `write_*` function mirrors its `convert_*`
-//! twin in the sibling `convert` submodules; change them in lockstep. The
-//! fixture suite's string-path identity check (writer vs `Value` oracle, every
-//! fixture plus synthesized multibyte variants) enforces the lockstep.
+//! **Byte-identity**: the wire JSON is a faithful emission of the acorn quirk
+//! catalog — each node's field order, `skip_serializing_if` behavior, `null`s
+//! for non-skipped `Option`s, and scalar formatting match acorn-typescript's
+//! JSON exactly (the shape each fixture's `expected.json` records).
 //!
 //! Scalar formatting delegates to `serde_json` wherever its output is not
-//! trivially reproducible: dynamic strings (`to_writer` runs the exact escape
-//! logic the typed path uses) and non-integral `f64` (ryu). Static tokens
+//! trivially reproducible: dynamic strings (`to_writer` runs `serde_json`'s
+//! exact string-escape logic) and non-integral `f64` (ryu). Static tokens
 //! (node types, operators, kinds) are known escape-free and written verbatim;
 //! integers have a unique decimal form and are hand-formatted.
 //!
@@ -32,8 +27,13 @@
 use super::super::internal;
 use super::{Schema, bigint_to_decimal};
 use string_interner::DefaultStringInterner;
-use tsv_lang::{LocationMapper, Span};
+use tsv_lang::{LocationMapper, Position, Span};
+// The JSON-scalar substrate is shared across the three language writers (so the
+// Svelte writer can compose embedded TS/CSS emission into one buffer). Only the
+// TS-specific node emitters (`node_header`, field helpers, `Ctx`) live here.
+pub(super) use tsv_lang::{JsonWriter, write_array, write_or_null};
 
+mod comments;
 mod control_flow;
 mod declarations;
 mod expressions;
@@ -43,16 +43,16 @@ mod patterns;
 mod statements;
 mod types;
 
+pub use comments::WriterComments;
 use declarations::{write_decorator, write_type_parameter_declaration};
-use statements::write_statement;
+use statements::{write_statement, write_variable_declaration};
 use types::{write_type_annotation, write_type_parameter_instantiation};
 
 /// Convert an internal `Program` straight to its compact wire-JSON bytes.
 ///
-/// The writer twin of `convert_program` + `serde_json::to_string`: byte-identical
-/// output, one AST walk, no intermediate tree. The mapper decides the offset
-/// space exactly as it does for `convert_program` (identity → byte space, real
-/// map → UTF-16 code units).
+/// One AST walk, no intermediate tree. The mapper decides the offset space:
+/// identity → byte space (the embedded byte-space skeletons `tsv_svelte` builds),
+/// real map → UTF-16 code units (the shipped char-space wire).
 ///
 /// Returns `Vec<u8>` rather than `String`: every emitted byte comes from `&str`
 /// slices and ASCII fragments, so the output is valid UTF-8 by construction,
@@ -67,19 +67,200 @@ pub fn write_program_json(
     schema: Schema,
 ) -> Vec<u8> {
     let interner = program.interner.borrow();
-    let ctx = Ctx {
-        source,
-        loc,
-        interner: &interner,
-    };
-    let mut w = JsonWriter {
-        buf: Vec::with_capacity(tsv_lang::estimated_json_capacity(source.len())),
-    };
+    let mut ctx = Ctx::new(source, loc, &interner);
+    ctx.import_options_null = schema.is_svelte_script();
+    let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     write_program(&mut w, program, &ctx, schema);
-    w.buf
+    w.into_bytes()
 }
 
-/// Mirrors `convert_program`.
+/// Emit an embedded TS expression's wire JSON into a caller-owned writer, for
+/// `tsv_svelte` composing template `{expr}` / directive / block expression
+/// emission into its own buffer. Shares the host document's interner and
+/// `LocationMapper` (spans are host-file coordinates); with a real map it emits
+/// final char-space positions directly.
+pub fn write_expression_embedded(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+) {
+    let ctx = Ctx::new(source, loc, interner);
+    expressions::write_expression(w, expr, &ctx);
+}
+
+/// `write_expression_embedded` with a per-node comment map — the fused form of a
+/// comment-bearing template expression island (`{expr}`, block test, directive,
+/// `{@debug}` id, spread). Each node emits any attached leading/trailing comments
+/// at its close.
+pub fn write_expression_embedded_with_comments(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+    comments: &WriterComments,
+) {
+    let mut ctx = Ctx::new(source, loc, interner);
+    ctx.comments = Some(comments);
+    expressions::write_expression(w, expr, &ctx);
+}
+
+/// Emit an embedded standalone `VariableDeclaration`'s wire JSON, for
+/// `tsv_svelte`'s `{const …}` / `{let …}` declaration tag. Shares the host
+/// document's interner and
+/// `LocationMapper` (spans are host-file coordinates), emitting final char-space
+/// positions directly.
+pub fn write_variable_declaration_embedded(
+    w: &mut JsonWriter,
+    var_decl: &internal::VariableDeclaration<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+) {
+    let ctx = Ctx::new(source, loc, interner);
+    write_variable_declaration(w, var_decl, &ctx);
+}
+
+/// `write_variable_declaration_embedded` with a per-node comment map — the fused
+/// form of a comment-bearing `{@const}` / `{const}` / `{let}` declaration (the
+/// document has a template comment). Attached comments emit at each node's close.
+pub fn write_variable_declaration_embedded_with_comments(
+    w: &mut JsonWriter,
+    var_decl: &internal::VariableDeclaration<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+    comments: &WriterComments,
+) {
+    let mut ctx = Ctx::new(source, loc, interner);
+    ctx.comments = Some(comments);
+    write_variable_declaration(w, var_decl, &ctx);
+}
+
+/// Emit an embedded expression whose top-level `Identifier` carries an injected
+/// `character` in its `loc` (the fused `inject_loc_character`), for the Svelte
+/// shorthand attribute (`{name}`) and snippet name. The `character` is injected
+/// only on a top-level `Identifier`, so any other expression emits exactly as
+/// `write_expression_embedded` (character a no-op). No type-annotation-`loc`
+/// stripping (unlike a block pattern).
+pub fn write_identifier_expression_with_character(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+) {
+    let ctx = Ctx::new(source, loc, interner);
+    write_identifier_expression_with_character_in(w, expr, &ctx);
+}
+
+/// `write_identifier_expression_with_character` with a per-node comment map — the
+/// fused form of a comment-bearing snippet name (`{#snippet /* c */ name(…)}`),
+/// where a leading comment attaches to the `Identifier`.
+pub fn write_identifier_expression_with_character_and_comments(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+    comments: &WriterComments,
+) {
+    let mut ctx = Ctx::new(source, loc, interner);
+    ctx.comments = Some(comments);
+    write_identifier_expression_with_character_in(w, expr, &ctx);
+}
+
+/// The shared body of the shorthand/snippet-name identifier emission.
+fn write_identifier_expression_with_character_in(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    ctx: &Ctx<'_>,
+) {
+    if let internal::Expression::Identifier(id) = expr {
+        write_identifier_parts_with_character(
+            w,
+            id.span,
+            id.name,
+            id.optional,
+            id.type_annotation(),
+            id.decorators(),
+            ctx,
+        );
+    } else {
+        expressions::write_expression(w, expr, ctx);
+    }
+}
+
+/// Emit an embedded Svelte block pattern (`{#each … as ctx}`,
+/// `{:then value}`/`{:catch error}`, `{@const id = …}`) into a caller-owned
+/// writer.
+///
+/// Reproduces Svelte's three `read_pattern` quirks fused, in final char space:
+///
+/// - **Destructure** (`ObjectPattern`/`ArrayPattern`): every node's `loc` column
+///   is bumped `+1` on the pattern's start line when that line `> 1`
+///   (`adjust_read_pattern_columns` — the synthetic `(`-wrapper acorn parses the
+///   pattern under shifts that one line by a byte).
+/// - **Simple identifier**: `character` is injected into the top-level
+///   `Identifier`'s `loc` (`inject_loc_character`) — Svelte reports it on the
+///   identifiers `read_identifier` creates directly.
+/// - **Both**: `loc` is omitted on the pattern's **top-level** `TSTypeAnnotation`
+///   only — the one Svelte's `read_context` synthesizes itself (no `loc`);
+///   annotations nested inside it come from the acorn parse and keep `loc`.
+///
+/// Patterns never collect comments, so there is no attach pass.
+pub fn write_pattern_embedded(
+    w: &mut JsonWriter,
+    expr: &internal::Expression<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+) {
+    let mut ctx = Ctx::new(source, loc, interner);
+    // The pattern root's own annotation is the `read_context`-synthesized one
+    // whose `loc` is omitted (a block-pattern root is always an identifier or a
+    // destructure, so no other root shape can carry one).
+    let top_annotation = match expr {
+        internal::Expression::ObjectPattern(o) => o.type_annotation.as_ref(),
+        internal::Expression::ArrayPattern(a) => a.type_annotation.as_ref(),
+        internal::Expression::Identifier(id) => id.type_annotation(),
+        _ => None,
+    };
+    if let Some(ann) = top_annotation {
+        ctx.pattern_ann_span = ann.span;
+    }
+    match expr {
+        internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => {
+            // Destructure: `+1`-column adjustment on the start line (when `> 1`).
+            let line = loc.pos_and_position(expr.span().start).1.line;
+            if line > 1 {
+                ctx.pattern_line = line;
+            }
+            expressions::write_expression(w, expr, &ctx);
+        }
+        internal::Expression::Identifier(id) => {
+            // Simple identifier: inject `character` on its own `loc`.
+            write_identifier_parts_with_character(
+                w,
+                id.span,
+                id.name,
+                id.optional,
+                id.type_annotation(),
+                id.decorators(),
+                &ctx,
+            );
+        }
+        // Any other non-destructure pattern: `inject_loc_character` is a no-op
+        // (it only touches a top-level `Identifier`), and a block-pattern root
+        // is always an identifier or a destructure, so no top-level annotation
+        // can exist here.
+        _ => expressions::write_expression(w, expr, &ctx),
+    }
+}
+
+/// Emit the `Program` node.
 fn write_program(
     w: &mut JsonWriter,
     program: &internal::Program<'_>,
@@ -91,159 +272,128 @@ fn write_program(
     write_array(w, program.body, |w, s| write_statement(w, s, ctx, schema));
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
-    w.raw("}");
+    close_node(w, "Program", program.span, ctx);
 }
 
-/// The per-document environment every writer function shares (the writer's
-/// analogue of convert's `(source, loc, interner)` triple).
+/// Emit an embedded `<script>` `Program`'s wire JSON into a caller-owned writer —
+/// for `tsv_svelte` composing a
+/// `<script>` block's `content` into its own buffer. Shares the host document's
+/// interner and `LocationMapper` (spans are host-file coordinates), threads the
+/// `Schema`, and — unlike a standalone `Program` — emits the node's own `loc`
+/// from `loc_override` rather than deriving it from `program.span`.
+///
+/// Svelte reports the `Program` `loc` against the `<script>` **tag** (start line,
+/// column 0) and the tag's closing `</script>`, not the content span; the caller
+/// supplies those two final char-space `Position`s (the offset-translated form of
+/// Svelte's byte-space override). `start`/`end` offsets still come from
+/// `program.span` via `loc.pos`, and the body/`sourceType` are emitted exactly as
+/// the standalone program writer does — so an eligible (comment-free, `lang="ts"`,
+/// no preceding HTML comment) script's `content` matches the standalone
+/// `Program` emission.
+#[allow(clippy::too_many_arguments)]
+pub fn write_program_embedded(
+    w: &mut JsonWriter,
+    program: &internal::Program<'_>,
+    source: &str,
+    loc: LocationMapper<'_>,
+    interner: &DefaultStringInterner,
+    schema: Schema,
+    loc_override: (Position, Position),
+    comments: Option<&WriterComments>,
+) {
+    let mut ctx = Ctx::new(source, loc, interner);
+    ctx.import_options_null = schema.is_svelte_script();
+    ctx.comments = comments;
+    let (start_pos, end_pos) = loc_override;
+    w.raw("{\"type\":\"Program\",\"start\":");
+    w.u32(loc.pos(program.span.start));
+    w.raw(",\"end\":");
+    w.u32(loc.pos(program.span.end));
+    w.raw(",\"loc\":{\"start\":{\"line\":");
+    w.usize(start_pos.line);
+    w.raw(",\"column\":");
+    w.usize(start_pos.column);
+    w.raw("},\"end\":{\"line\":");
+    w.usize(end_pos.line);
+    w.raw(",\"column\":");
+    w.usize(end_pos.column);
+    w.raw("}},\"body\":");
+    write_array(w, program.body, |w, s| write_statement(w, s, &ctx, schema));
+    w.raw(",\"sourceType\":");
+    w.token(program.goal.source_type());
+    close_node(w, "Program", program.span, &ctx);
+}
+
+/// The per-document environment every writer function shares (`source`, the
+/// `LocationMapper`, and the interner).
+///
+/// `pattern_line` / `pattern_ann_span` are the two Svelte block-pattern quirks
+/// (`write_pattern_embedded`): they are inert (`0` / the empty span) for every
+/// ordinary emission, so the hot path pays only a never-taken compare per
+/// position (or per annotation).
 #[derive(Clone, Copy)]
 pub(super) struct Ctx<'a> {
     pub(super) source: &'a str,
     pub(super) loc: LocationMapper<'a>,
     pub(super) interner: &'a DefaultStringInterner,
+    /// Block-pattern `read_pattern` `+1`-column quirk: the (1-based) line on
+    /// which the pattern starts, or `0` when inactive. A node's `loc` column is
+    /// bumped `+1` on this line only, reproducing `adjust_read_pattern_columns`.
+    pub(super) pattern_line: usize,
+    /// Block-pattern quirk: the span of the pattern's **top-level**
+    /// `TSTypeAnnotation`, whose `loc` is omitted (Svelte's `read_context`
+    /// synthesizes that node itself, without `loc`; nested annotations keep
+    /// theirs). The empty span (never a real annotation) when inactive.
+    pub(super) pattern_ann_span: Span,
+    /// Per-node attached comments (Svelte comment-attach paths — a
+    /// comment-bearing `<script>` `Program` or template expression). `None` for
+    /// every ordinary emission, so the hot path pays only a never-taken compare
+    /// per node close.
+    pub(super) comments: Option<&'a WriterComments>,
+    /// Svelte non-`lang="ts"` `<script>` quirk: emit `,"options":null` on every
+    /// `ImportExpression` (vanilla acorn always does; acorn-typescript omits it).
+    /// Inactive (`false`) for standalone TS and every `lang="ts"` script.
+    pub(super) import_options_null: bool,
 }
 
-/// Compact-JSON output buffer.
-///
-/// All writes are infallible (`Vec<u8>` backing). The escape-sensitive entry
-/// points are `string` (full JSON escaping via `serde_json`) and `token`
-/// (quoted verbatim — static ASCII tokens only, debug-asserted).
-pub(super) struct JsonWriter {
-    buf: Vec<u8>,
-}
-
-impl JsonWriter {
-    /// Verbatim JSON structure fragment (`{"key":`, `,`, `]`…). No escaping.
+impl<'a> Ctx<'a> {
+    /// The base per-document context (no pattern quirks active).
     #[inline]
-    pub(super) fn raw(&mut self, s: &str) {
-        self.buf.extend_from_slice(s.as_bytes());
-    }
-
-    /// A quoted static token (node type, operator, kind, keyword). These are
-    /// compile-time ASCII strings that never contain `"`, `\`, or control
-    /// characters, so they skip the escape scan.
-    #[inline]
-    pub(super) fn token(&mut self, s: &str) {
-        debug_assert!(
-            s.bytes().all(|b| b != b'"' && b != b'\\' && b >= 0x20),
-            "token must be escape-free: {s:?}"
-        );
-        self.buf.push(b'"');
-        self.buf.extend_from_slice(s.as_bytes());
-        self.buf.push(b'"');
-    }
-
-    /// A dynamic string value, JSON-escaped and quoted. Delegates to
-    /// `serde_json` so the escape set matches the typed serialization exactly.
-    #[inline]
-    #[allow(clippy::expect_used)]
-    pub(super) fn string(&mut self, s: &str) {
-        serde_json::to_writer(&mut self.buf, s).expect("Vec<u8> write is infallible");
-    }
-
-    /// A non-integral `f64` (the rare literal tail) — `serde_json`'s ryu
-    /// formatting, matching `serde_json::Number` serialization.
-    #[inline]
-    #[allow(clippy::expect_used)]
-    pub(super) fn f64(&mut self, n: f64) {
-        serde_json::to_writer(&mut self.buf, &n).expect("Vec<u8> write is infallible");
-    }
-
-    #[inline]
-    pub(super) fn u64(&mut self, n: u64) {
-        // Two-digit-pair formatting (itoa's approach): halves the divisions.
-        // The writer emits six integers per node, so this is hot.
-        const DEC_PAIRS: [u8; 200] = {
-            let mut t = [0u8; 200];
-            let mut i = 0;
-            while i < 100 {
-                t[i * 2] = b'0' + (i / 10) as u8;
-                t[i * 2 + 1] = b'0' + (i % 10) as u8;
-                i += 1;
-            }
-            t
-        };
-        let mut tmp = [0u8; 20];
-        let mut i = tmp.len();
-        let mut n = n;
-        while n >= 100 {
-            let pair = (n % 100) as usize * 2;
-            n /= 100;
-            i -= 2;
-            tmp[i] = DEC_PAIRS[pair];
-            tmp[i + 1] = DEC_PAIRS[pair + 1];
+    fn new(source: &'a str, loc: LocationMapper<'a>, interner: &'a DefaultStringInterner) -> Self {
+        Ctx {
+            source,
+            loc,
+            interner,
+            pattern_line: 0,
+            pattern_ann_span: Span::new(0, 0),
+            comments: None,
+            import_options_null: false,
         }
-        if n >= 10 {
-            let pair = n as usize * 2;
-            i -= 2;
-            tmp[i] = DEC_PAIRS[pair];
-            tmp[i + 1] = DEC_PAIRS[pair + 1];
-        } else {
-            i -= 1;
-            tmp[i] = b'0' + n as u8;
-        }
-        self.buf.extend_from_slice(&tmp[i..]);
-    }
-
-    #[inline]
-    pub(super) fn i64(&mut self, n: i64) {
-        if n < 0 {
-            self.buf.push(b'-');
-        }
-        self.u64(n.unsigned_abs());
-    }
-
-    #[inline]
-    pub(super) fn u32(&mut self, n: u32) {
-        self.u64(u64::from(n));
-    }
-
-    #[inline]
-    pub(super) fn usize(&mut self, n: usize) {
-        self.u64(n as u64);
-    }
-
-    #[inline]
-    pub(super) fn bool(&mut self, b: bool) {
-        self.raw(if b { "true" } else { "false" });
-    }
-
-    #[inline]
-    pub(super) fn null(&mut self) {
-        self.raw("null");
     }
 }
 
-/// Emit a JSON array: `[` + comma-separated items + `]`.
+/// Close a node object: emit any attached `leadingComments`/`trailingComments`
+/// (fused) for this node's byte span + type, then the closing `}`. The type and
+/// span mirror the node's own `node_header` call. A `None` comment map (every
+/// ordinary emission) makes this exactly `w.raw("}")` after one never-taken
+/// branch.
 #[inline]
-pub(super) fn write_array<T>(
-    w: &mut JsonWriter,
-    items: impl IntoIterator<Item = T>,
-    mut f: impl FnMut(&mut JsonWriter, T),
-) {
-    w.raw("[");
-    let mut first = true;
-    for item in items {
-        if !first {
-            w.raw(",");
-        }
-        first = false;
-        f(w, item);
+pub(super) fn close_node(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
+    if let Some(wc) = ctx.comments {
+        wc.emit(w, node_type, span.start, span.end, ctx.loc);
     }
-    w.raw("]");
+    w.raw("}");
 }
 
-/// Emit a nullable node value: the item through `f`, or `null` — the writer's
-/// shape for every `Option` field *without* `skip_serializing_if`.
+/// Apply the block-pattern `+1`-column adjustment: a node's `loc` column is
+/// bumped by one on `ctx.pattern_line` only (inert when `pattern_line == 0`,
+/// which never equals a real 1-based line).
 #[inline]
-pub(super) fn write_or_null<T>(
-    w: &mut JsonWriter,
-    item: Option<&T>,
-    f: impl FnOnce(&mut JsonWriter, &T),
-) {
-    match item {
-        Some(v) => f(w, v),
-        None => w.null(),
+pub(super) fn adjusted_column(ctx: &Ctx<'_>, line: usize, column: usize) -> usize {
+    if line == ctx.pattern_line {
+        column + 1
+    } else {
+        column
     }
 }
 
@@ -252,19 +402,46 @@ pub(super) fn write_or_null<T>(
 #[inline]
 pub(super) fn write_bare_node(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
     node_header(w, node_type, span, ctx);
-    w.raw("}");
+    close_node(w, node_type, span, ctx);
 }
 
 /// Emit the universal node prefix: `{"type":"X","start":N,"end":N,"loc":{…}`.
 ///
 /// Leaves the object open — the caller appends its remaining fields and the
 /// closing `}`. `span` is the span every one of `start`/`end`/`loc` derives
-/// from (the invariant `create_location` relies on for fused translation);
-/// the `loc` body mirrors `create_location` + the `SourceLocation`/`Position`
-/// serialization (TS conversion never sets `Position.character`, so it is
-/// always omitted). Static fragments are pre-fused into the fewest buffer
-/// writes — this runs once per node.
+/// from (start/end are the fused char-space positions, `loc` their
+/// line/column form); TS emits no `Position.character`, so it is always
+/// omitted. Static fragments are pre-fused into the fewest buffer writes —
+/// this runs once per node.
+#[inline]
 pub(super) fn node_header(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
+    node_header_impl::<false>(w, node_type, span, ctx);
+}
+
+/// The `node_header` variant that injects `character` into `loc.start`/`loc.end`
+/// (byte offset in final char space) — the fused `inject_loc_character`. Used
+/// only for the top-level `Identifier` of a simple block pattern, so the pattern
+/// `+1`-column adjustment is applied here too for uniformity (it never actually
+/// co-occurs with character injection — destructure has no character).
+#[inline]
+pub(super) fn node_header_with_character(
+    w: &mut JsonWriter,
+    node_type: &str,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
+    node_header_impl::<true>(w, node_type, span, ctx);
+}
+
+/// Shared body of `node_header`/`node_header_with_character`; `CHARACTER` is a
+/// compile-time constant, so each wrapper monomorphizes to its own straight-line
+/// emission (no runtime branch on the per-node hot path).
+fn node_header_impl<const CHARACTER: bool>(
+    w: &mut JsonWriter,
+    node_type: &str,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
     debug_assert!(
         node_type
             .bytes()
@@ -282,11 +459,19 @@ pub(super) fn node_header(w: &mut JsonWriter, node_type: &str, span: Span, ctx: 
     w.raw(",\"loc\":{\"start\":{\"line\":");
     w.usize(start.line);
     w.raw(",\"column\":");
-    w.usize(start.column);
+    w.usize(adjusted_column(ctx, start.line, start.column));
+    if CHARACTER {
+        w.raw(",\"character\":");
+        w.u32(start_pos);
+    }
     w.raw("},\"end\":{\"line\":");
     w.usize(end.line);
     w.raw(",\"column\":");
-    w.usize(end.column);
+    w.usize(adjusted_column(ctx, end.line, end.column));
+    if CHARACTER {
+        w.raw(",\"character\":");
+        w.u32(end_pos);
+    }
     w.raw("}}");
 }
 
@@ -357,42 +542,42 @@ pub(super) fn kind_token(is_type: bool, schema: Schema) -> Option<&'static str> 
     }
 }
 
-/// Mirrors `public::name_cow`: borrow the source slice when it equals the
-/// resolved name, else the resolved name — the writer emits either directly
-/// (no `Cow`, no allocation on either branch).
+/// Emit an interned name. The resolved symbol *is* the wire value (decoded —
+/// an escaped identifier's `\u{78}` source form decodes to `x`), so it is
+/// written directly; no source-slice compare, no allocation.
 #[inline]
-pub(super) fn write_name(
-    w: &mut JsonWriter,
-    span: Span,
-    sym: string_interner::DefaultSymbol,
-    ctx: &Ctx<'_>,
-) {
+pub(super) fn write_name(w: &mut JsonWriter, sym: string_interner::DefaultSymbol, ctx: &Ctx<'_>) {
     use tsv_lang::InfallibleResolve;
-    let resolved = ctx.interner.resolve_infallible(sym);
-    let raw = span.extract(ctx.source);
-    w.string(if raw == resolved { raw } else { resolved });
+    w.string(ctx.interner.resolve_infallible(sym));
 }
 
-/// Mirrors `serialize_literal_value` over `json_number_from_f64(n)`: integral
-/// doubles emit as expanded shortest-round-trip integers (JS `JSON.stringify`
-/// semantics), non-finite collapses to `0`, everything else is ryu.
+/// Emit a numeric literal value the way acorn's JSON does: non-finite as
+/// `null` (JSON has no Infinity/NaN — an overflow literal like `1e999`),
+/// integral doubles as expanded shortest-round-trip integers (JS
+/// `JSON.stringify` semantics), everything else as ryu.
+///
+/// Known divergence (pre-existing, carried over from the typed converter):
+/// integral doubles in `(u64::MAX, 1e21)` — e.g. `1e20` — emit ryu's `1e+20`
+/// where JS prints expanded digits.
+/// TODO: emit JS-style expanded text for integral doubles beyond `u64` up to
+/// 1e21 (fixtures-first).
 pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
     if !n.is_finite() {
-        // `json_number_from_f64` maps NaN/±Inf to integer 0.
-        w.raw("0");
+        // ±Inf → null, matching JSON.stringify (a parsed literal is never NaN).
+        w.null();
         return;
     }
     if n.fract() == 0.0 {
         // Below 2^53 every integral f64 is exact, so the shortest round-trip
-        // representation *is* the integer's own digits — skip the format!/parse
-        // round trip the typed path pays.
+        // representation *is* the integer's own digits — write them directly,
+        // no format!/parse round trip.
         if n.abs() < 9_007_199_254_740_992.0 {
             w.i64(n as i64);
             return;
         }
         // Above 2^53 the shortest representation can denote the double with
         // fewer significant digits than the exact integer (JS prints that
-        // expanded form), so go through Display + parse like the typed path.
+        // expanded form), so go through Display + parse.
         let shortest = format!("{n}");
         if let Ok(v) = shortest.parse::<i64>() {
             w.i64(v);
@@ -406,7 +591,7 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
     w.f64(n);
 }
 
-/// Mirrors `convert_literal`.
+/// Emits a `Literal` node.
 pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx: &Ctx<'_>) {
     node_header(w, "Literal", lit.span, ctx);
     w.raw(",\"value\":");
@@ -432,12 +617,12 @@ pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx
         w.raw(",\"bigint\":");
         w.string(&decimal);
     }
-    w.raw("}");
+    close_node(w, "Literal", lit.span, ctx);
 }
 
-/// Shared `Identifier` node emission. Mirrors the `public::Identifier` field
-/// set: `name`, then `optional` (only when true), `typeAnnotation` (only when
-/// present), `decorators` (only when non-empty).
+/// Shared `Identifier` node emission. Emits the `Identifier` fields: `name`,
+/// then `optional` (only when true), `typeAnnotation` (only when present),
+/// `decorators` (only when non-empty).
 pub(super) fn write_identifier_parts(
     w: &mut JsonWriter,
     span: Span,
@@ -448,8 +633,39 @@ pub(super) fn write_identifier_parts(
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "Identifier", span, ctx);
+    write_identifier_fields(w, span, sym, optional, type_annotation, decorators, ctx);
+}
+
+/// `write_identifier_parts` with `character` injected into the node's `loc`
+/// (the fused `inject_loc_character`) — the top-level `Identifier` of a simple
+/// Svelte block pattern / shorthand.
+pub(super) fn write_identifier_parts_with_character(
+    w: &mut JsonWriter,
+    span: Span,
+    sym: string_interner::DefaultSymbol,
+    optional: bool,
+    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
+    decorators: Option<&[internal::Decorator<'_>]>,
+    ctx: &Ctx<'_>,
+) {
+    node_header_with_character(w, "Identifier", span, ctx);
+    write_identifier_fields(w, span, sym, optional, type_annotation, decorators, ctx);
+}
+
+/// The `Identifier` fields after the node header: `name`, then the skip-if-empty
+/// `optional` / `typeAnnotation` / `decorators`, then the closing `}`.
+#[inline]
+fn write_identifier_fields(
+    w: &mut JsonWriter,
+    span: Span,
+    sym: string_interner::DefaultSymbol,
+    optional: bool,
+    type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
+    decorators: Option<&[internal::Decorator<'_>]>,
+    ctx: &Ctx<'_>,
+) {
     w.raw(",\"name\":");
-    write_name(w, span, sym, ctx);
+    write_name(w, sym, ctx);
     if optional {
         w.raw(",\"optional\":true");
     }
@@ -460,11 +676,11 @@ pub(super) fn write_identifier_parts(
         w.raw(",\"decorators\":");
         write_array(w, decs, |w, d| write_decorator(w, d, ctx));
     }
-    w.raw("}");
+    close_node(w, "Identifier", span, ctx);
 }
 
-/// Mirrors `convert_identifier` (the plain form: no optional flag, no type
-/// annotation, no decorators — regardless of what the binding carries).
+/// Emits a plain `Identifier` node: no optional flag, no type annotation, no
+/// decorators — regardless of what the binding carries.
 #[inline]
 pub(super) fn write_identifier_plain(
     w: &mut JsonWriter,
@@ -475,8 +691,8 @@ pub(super) fn write_identifier_plain(
 }
 
 /// An `Identifier` carrying only the binding's `optional` flag (function and
-/// method ids, entity-name-as-expression nodes) — mirrors convert's inline
-/// constructions with no type annotation or decorators.
+/// method ids, entity-name-as-expression nodes) — no type annotation or
+/// decorators.
 #[inline]
 pub(super) fn write_identifier_with_optional(
     w: &mut JsonWriter,
