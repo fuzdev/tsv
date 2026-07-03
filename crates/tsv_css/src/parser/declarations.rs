@@ -196,8 +196,13 @@ pub(crate) fn parse_declaration<'arena>(
     let property = parser.alloc_str_in(property_ident);
     parser.advance()?;
 
-    parser.skip_whitespace_and_comments()?;
+    let property_gap_comment = parser.skip_whitespace_and_comments()?;
 
+    // Record the real `property : value` colon offset (host coordinates, like the
+    // declaration span) so the writer splits property/value without a re-scan. The
+    // parser sits on the colon here — whitespace and comments already skipped — and
+    // `expect` below guarantees it is one.
+    let colon_offset = (parser.base_offset() + parser.current_start) as u32;
     // Expect :
     parser.expect(TokenKind::Colon)?;
     // Only skip whitespace, NOT comments - comments in values need to be preserved
@@ -379,6 +384,11 @@ pub(crate) fn parse_declaration<'arena>(
         end: end as u32,
     };
 
+    // A block comment anywhere in the declaration extent (property→colon gap or the
+    // value/`!important`/trailing region, tracked by `has_value_comment`) routes the
+    // writer to the comment-aware split/strip; false takes its zero-scan fast path.
+    let has_block_comment = property_gap_comment || has_value_comment;
+
     // Span covers the entire declaration (property + value, not including semicolon)
     // The source value will be extracted on-demand during conversion using this span
     Ok(CssDeclaration {
@@ -386,5 +396,7 @@ pub(crate) fn parse_declaration<'arena>(
         value,
         important_end,
         span: decl_span,
+        colon_offset,
+        has_block_comment,
     })
 }

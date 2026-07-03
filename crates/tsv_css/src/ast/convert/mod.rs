@@ -26,31 +26,10 @@
 use super::internal;
 use std::borrow::Cow;
 use tsv_lang::Span;
-use tsv_lang::source_scan::{TriviaProfile, find_char};
 
 mod write;
 pub use write::write_css_node;
 pub(crate) use write::write_stylesheet_file_bytes;
-
-/// Whether the wire JSON is being built for a standalone `.css` file or an
-/// embedded `<style>` block. `parseCss()` attaches constant `metadata` to
-/// `Rule`/`ComplexSelector`/`RelativeSelector` for standalone CSS but never for
-/// embedded `<style>`; the writer threads this so one node pass produces both
-/// shapes — no separate metadata walk.
-#[derive(Debug, Clone, Copy)]
-pub(super) enum AstScope {
-    /// Standalone `.css` file (`parseCss()` shape, `metadata` attached).
-    Standalone,
-    /// Embedded `<style>` block in a `.svelte` file (no `metadata`).
-    Embedded,
-}
-
-impl AstScope {
-    /// Standalone CSS carries `parseCss()` metadata; embedded `<style>` doesn't.
-    pub(super) fn has_metadata(self) -> bool {
-        matches!(self, AstScope::Standalone)
-    }
-}
 
 /// Split a declaration source into property and value, matching Svelte's quirky behavior.
 ///
@@ -67,19 +46,14 @@ impl AstScope {
 /// Note: the writer runs `strip_css_comments` on the returned value, so the
 /// public AST for `color /* c */ : red` ends up as property=`color`, value=`": red"`
 /// (Svelte 5.55+ strips block comments from value strings post-split).
-pub(super) fn split_declaration_svelte_compat(decl_source: &str) -> (&str, &str) {
-    // The real `property : value` colon is the first one outside any comment or
-    // string — a property comment may itself contain a `:` (`color /* x:y */: red`).
-    let Some(colon_pos) = find_char(
-        decl_source.as_bytes(),
-        0,
-        decl_source.len(),
-        b':',
-        TriviaProfile::CSS,
-    ) else {
-        return (decl_source, "");
-    };
-
+///
+/// `colon_pos` is the declaration-relative byte offset of the real
+/// `property : value` colon, recorded at parse time (`CssDeclaration::colon_offset`
+/// minus the declaration start) — the writer only calls this on the comment-bearing
+/// path, so the no-comment common case never re-derives it. A property comment may
+/// itself contain a `:` (`color /* x:y */: red`), which is why the parser's colon is
+/// the authority rather than a naive `find(':')`.
+pub(super) fn split_declaration_svelte_compat(decl_source: &str, colon_pos: usize) -> (&str, &str) {
     let before_colon = &decl_source[..colon_pos];
 
     // Look for /* that appears after some property text
