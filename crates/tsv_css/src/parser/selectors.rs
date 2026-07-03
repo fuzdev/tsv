@@ -856,6 +856,13 @@ fn skip_digits(bytes: &[u8], mut i: usize) -> usize {
     i
 }
 
+/// A CSS name code point that would *continue* an identifier (so `of` glued to it is not
+/// the standalone `of` keyword): ASCII alphanumerics, `-`, `_`, and non-ASCII bytes.
+/// Used to tell the `of` keyword (`2n of.x`, `2n of )`) from a longer ident (`2n offset`).
+fn is_css_name_continue(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b >= 0x80
+}
+
 /// Match an `An+B` term inside pseudo-class args at byte offset `pos`, returning the
 /// offset just past the term's value text. A port of Svelte's `read_selector` Nth
 /// production, `REGEX_NTH_OF`, including both terminator branches:
@@ -872,7 +879,7 @@ fn skip_digits(bytes: &[u8], mut i: usize) -> usize {
 ///   nesting, while here (where Svelte merely over-accepts An+B) tsv matches Svelte.
 fn match_nth_value(source: &str, pos: usize) -> Option<usize> {
     let bytes = source.as_bytes();
-    let value_end = match_an_plus_b(bytes, pos)?;
+    let value_end = match_an_plus_b(bytes, pos, false)?;
     // `(?=\s*[,)])`: optional whitespace then `,`/`)`.
     let after = skip_anb_ws(bytes, value_end);
     if matches!(bytes.get(after), Some(b',' | b')')) {
@@ -891,12 +898,34 @@ fn match_nth_value(source: &str, pos: usize) -> Option<usize> {
     None
 }
 
-/// The An+B value grammar from `REGEX_NTH_OF`, without the terminator:
-/// `even | odd | \+?(\d+ | \d*n(\s*[+-]\s*\d+)?) | -\d*n(\s*\+\s*\d+)`. Returns the end
-/// offset of the value, or `None` if no An+B starts at `start`. Case-sensitive on the
-/// `even`/`odd`/`n` literals, matching Svelte's regex.
-fn match_an_plus_b(bytes: &[u8], start: usize) -> Option<usize> {
+/// The An+B value grammar, without the terminator. Two grammars share this scanner,
+/// selected by `spec`:
+///
+/// - `spec = false` — Svelte's `REGEX_NTH_OF`:
+///   `even | odd | \+?(\d+ | \d*n(\s*[+-]\s*\d+)?) | -\d*n(\s*\+\s*\d+)`. Used by
+///   `match_nth_value` for the bare-An+B terms Svelte over-accepts inside
+///   `:is()`/`:not()`/unknown pseudo-args (no spec basis there — An+B is not a
+///   selector, so tsv matches parseCss quirk-for-quirk, including its rejection of
+///   `-3`/`-2n`/`-n`).
+/// - `spec = true` — the full css-syntax-3 [`<an+b>` microsyntax][anb], which additionally
+///   accepts the negative forms `REGEX_NTH_OF` mishandles: a negative `<integer>`
+///   (`-3`, `-0`), a negative `<n-dimension>` (`-2n`), bare `-n`, and a negative
+///   coefficient with a `-` offset (`-2n-3`, `-n-3`, `-2n - 3`, `-n - 3`). Used for the
+///   dedicated `:nth-*()` An+B term, where the spec grammar is the oracle and tsv
+///   deliberately diverges from Svelte's buggy reader (`_svelte_divergence`). It also
+///   accepts an uppercase `n` *unit* in an `<n-dimension>` (`2N` → normalized to `2n`),
+///   but not a bare uppercase `N`/`EVEN`/`ODD` (those have a valid type-selector reading,
+///   so they defer to parseCss) — the `nth_case` rule.
+///
+/// Returns the end offset of the value, or `None` if no An+B starts at `start`.
+/// Case-sensitive on the `even`/`odd`/`n` literals, matching both grammars.
+///
+/// [anb]: https://drafts.csswg.org/css-syntax-3/#the-anb-type
+fn match_an_plus_b(bytes: &[u8], start: usize, spec: bool) -> Option<usize> {
     // `even` / `odd` keywords (the terminator check rejects `evens`/`oddball`).
+    // Case-sensitive in both grammars: an uppercase `EVEN`/`ODD`/`N` is a valid *type
+    // selector*, so it falls through to the selector-list path and reads as
+    // `TypeSelector`, matching parseCss (which never enters An+B for an uppercase ident).
     if bytes[start..].starts_with(b"even") {
         return Some(start + 4);
     }
@@ -914,20 +943,88 @@ fn match_an_plus_b(bytes: &[u8], start: usize) -> Option<usize> {
     let after_digits = skip_digits(bytes, after_sign);
     let had_digits = after_digits > after_sign;
 
-    if bytes.get(after_digits) == Some(&b'n') {
+    // The `n` unit is case-insensitive only under the spec grammar and only in an
+    // `<n-dimension>` (a coefficient precedes it, `2N`): the dimension has no
+    // type-selector fallback and prettier canonicalizes the unit to lowercase (the
+    // `nth_case` rule). A bare uppercase `N` is left to read as a type selector.
+    let is_n = matches!(bytes.get(after_digits), Some(&b'n'))
+        || (spec && had_digits && matches!(bytes.get(after_digits), Some(&b'N')));
+    if is_n {
         let after_n = after_digits + 1; // `\d*n`
-        // Optional `\s*[+-]\s*\d+` tail. A leading `-` requires it and permits only `+`
-        // (`-\d*n(\s*\+\s*\d+)`); otherwise it is optional and permits `+`/`-`.
-        match match_anb_tail(bytes, after_n, sign == Some(b'-')) {
+        // Optional `\s*[+-]\s*\d+` tail. Under `REGEX_NTH_OF` a leading `-` requires the
+        // tail and permits only `+` (`-\d*n(\s*\+\s*\d+)`); the spec grammar permits a
+        // `+`/`-` tail regardless of the leading sign (`-2n-3`, `-n-3`).
+        let plus_only = !spec && sign == Some(b'-');
+        match match_anb_tail(bytes, after_n, plus_only) {
             Some(end) => Some(end),
-            // `-n` / `-2n` alone (leading `-`, no tail) is not a valid An+B.
-            None => (sign != Some(b'-')).then_some(after_n),
+            // `-n` / `-2n` alone (leading `-`, no tail) is valid An+B per spec, but not
+            // under `REGEX_NTH_OF`.
+            None => (spec || sign != Some(b'-')).then_some(after_n),
         }
-    } else if had_digits && sign != Some(b'-') {
-        // `\+?\d+` — a plain integer `B` (no `n`); a leading `-` is not permitted.
+    } else if had_digits && (spec || sign != Some(b'-')) {
+        // `\+?\d+` — a plain integer `B` (no `n`). A leading `-` (`-3`) is a valid
+        // `<integer>` per spec, but not permitted by `REGEX_NTH_OF`.
         Some(after_digits)
     } else {
         None
+    }
+}
+
+/// Advance past An+B whitespace **and `/* */` comments** — inter-token trivia the spec
+/// ignores — from `i`, returning the first offset that is neither. Used only by the
+/// spec (`:nth-*()`) An+B terminator check: comments are trivia per css-syntax-3, so
+/// `:nth-child(2n /* c */)` is spec-valid even though parseCss's comment-blind reader
+/// rejects it (the `nth_comment` `_svelte_divergence`). `REGEX_NTH_OF`'s terminator
+/// (`skip_anb_ws`) stays comment-blind, matching parseCss for `:is()`/`:not()`.
+fn skip_anb_ws_and_comments(bytes: &[u8], mut i: usize) -> usize {
+    loop {
+        i = skip_anb_ws(bytes, i);
+        if bytes.get(i) == Some(&b'/') && bytes.get(i + 1) == Some(&b'*') {
+            i += 2;
+            while i < bytes.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
+                i += 1;
+            }
+            i = (i + 2).min(bytes.len()); // past the closing `*/` (or clamp at EOF)
+        } else {
+            return i;
+        }
+    }
+}
+
+/// Decide whether a `:nth-*()` argument starting at source offset `pos` is a clean
+/// `<an+b> [of S]?` (the dedicated `Nth` path) rather than an ordinary selector-list
+/// argument. The spec grammar (`:nth-child(<An+B> [of <complex-real-selector-list>]?)`,
+/// [selectors-4]) accepts *only* a leading An+B term, optionally followed by `of S`;
+/// anything else (`:nth-child(.a)`, `:nth-child(even odd)`, `:nth-child(2n, .foo)`) is
+/// spec-invalid, and tsv structures it like parseCss for drop-in parity by falling
+/// through to `parse_complex_selector_list`. Recognition is comment-tolerant (see
+/// `skip_anb_ws_and_comments`) and terminator-gated: the An+B term must be immediately
+/// followed by the closing `)` or a ` of ` clause — a trailing `,` (a list) or a bare
+/// selector demotes the whole argument to the selector-list path.
+///
+/// [selectors-4]: https://drafts.csswg.org/selectors-4/#the-nth-child-pseudo
+pub(crate) fn nth_arg_is_anb(source: &str, pos: usize) -> bool {
+    let bytes = source.as_bytes();
+    let Some(value_end) = match_an_plus_b(bytes, pos, true) else {
+        return false;
+    };
+    let after = skip_anb_ws_and_comments(bytes, value_end);
+    match bytes.get(after) {
+        // A bare `<an+b>` terminated by the closing paren.
+        Some(b')') => true,
+        // `<an+b> of S`: whitespace/comments before `of` (so `after > value_end`) then
+        // the standalone `of` keyword (not a longer ident like `offset`). `S` may be
+        // glued to `of` (`2n of.x`) — spec-valid, since whitespace between the `of` and
+        // `S` tokens is optional — so this does not require trailing whitespace (that
+        // is parseCss's comment-blind `\s+of\s+` bug; tsv diverges per spec).
+        _ => {
+            after > value_end
+                && bytes[after..].starts_with(b"of")
+                && !bytes
+                    .get(after + 2)
+                    .copied()
+                    .is_some_and(is_css_name_continue)
+        }
     }
 }
 
@@ -946,7 +1043,64 @@ fn match_anb_tail(bytes: &[u8], pos: usize, plus_only: bool) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::match_nth_value;
+    use super::{match_nth_value, nth_arg_is_anb};
+
+    /// `nth_arg_is_anb` decides whether a `:nth-*()` argument takes the dedicated `Nth`
+    /// path (a clean spec `<an+b> [of S]?`, comment-tolerant) or falls through to the
+    /// selector-list path. Each input is the argument text starting after the `(`,
+    /// terminated by the `)` (or a ` of ` clause). Broader than `REGEX_NTH_OF`: it
+    /// accepts the spec's negative forms and an uppercase `n` unit, and treats `of`
+    /// glued to `S` as valid.
+    #[test]
+    fn nth_arg_is_anb_spec_grammar() {
+        // Clean `<an+b> [of S]?` — the `Nth` path.
+        for input in [
+            "2n)",
+            "odd)",
+            "even)",
+            "0)",
+            "-3)", // negative <integer> (spec, not REGEX_NTH_OF)
+            "-0)",
+            "-2n)",     // negative <n-dimension>
+            "-n)",      // bare -n
+            "-2n-3)",   // <ndashdigit-dimension>, negative
+            "-n-3)",    // <dashndashdigit-ident>
+            "-2n - 3)", // <n-dimension> '-' <signless-integer>
+            "-n - 3)",  // -n '-' <signless-integer>
+            "2N)",      // uppercase n unit in an <n-dimension>
+            "2N+1)",
+            "2n of .x)",       // of S
+            "2n of.x)",        // of glued to S (spec-valid; parseCss's \s+of\s+ rejects)
+            "-n + 3 of li.a)", // negative An+B with of
+            "2n /* c */)",     // comment is inter-token trivia (spec); parseCss rejects
+            "3 /* c */ of .x)",
+        ] {
+            assert!(
+                nth_arg_is_anb(input, 0),
+                "expected {input:?} to take the Nth path"
+            );
+        }
+
+        // Not a clean `<an+b> [of S]?` — the selector-list fallback.
+        for input in [
+            ".a)",        // a bare selector
+            "div)",       // a type selector
+            "#id)",       // an id selector
+            "N)",         // bare uppercase N reads as a type selector
+            "EVEN)",      // bare uppercase keyword reads as a type selector
+            "even odd)",  // An+B keyword not terminated by `)`/`,`/` of `
+            "2n .foo)",   // An+B followed by a descendant selector (no terminator)
+            "2n, .a)",    // a comma makes it a selector list
+            "2n OF .x)",  // `of` is case-sensitive (uppercase is a type selector)
+            "2n offset)", // `of` prefix of a longer ident is not the keyword
+            ")",          // empty argument
+        ] {
+            assert!(
+                !nth_arg_is_anb(input, 0),
+                "expected {input:?} to take the selector-list path"
+            );
+        }
+    }
 
     /// `match_nth_value` recognizes the same An+B terms Svelte's `REGEX_NTH_OF` does,
     /// via both terminator branches: `(?=\s*[,)])` (a bare An+B) and `\s+of\s+` (an
