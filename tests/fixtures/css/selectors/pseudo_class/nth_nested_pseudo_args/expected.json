@@ -1,0 +1,253 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 250,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 88,
+					"end": 101,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 88,
+							"end": 101,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 92,
+												"end": 100,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 92,
+														"end": 100,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "PseudoClassSelector",
+																		"name": "not",
+																		"args": {
+																			"type": "SelectorList",
+																			"start": 97,
+																			"end": 99,
+																			"children": [
+																				{
+																					"type": "ComplexSelector",
+																					"start": 97,
+																					"end": 99,
+																					"children": [
+																						{
+																							"type": "RelativeSelector",
+																							"combinator": null,
+																							"selectors": [
+																								{
+																									"type": "Nth",
+																									"value": "2n",
+																									"start": 97,
+																									"end": 99
+																								}
+																							],
+																							"start": 97,
+																							"end": 99
+																						}
+																					]
+																				}
+																			]
+																		},
+																		"start": 92,
+																		"end": 100
+																	}
+																],
+																"start": 92,
+																"end": 100
+															}
+														]
+													}
+												]
+											},
+											"start": 88,
+											"end": 101
+										}
+									],
+									"start": 88,
+									"end": 101
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 102,
+					"end": 120,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 106,
+							"end": 116,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 88,
+				"end": 120
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 201,
+					"end": 221,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 201,
+							"end": 221,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "where",
+											"args": {
+												"type": "SelectorList",
+												"start": 208,
+												"end": 220,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 208,
+														"end": 216,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "PseudoClassSelector",
+																		"name": "is",
+																		"args": {
+																			"type": "SelectorList",
+																			"start": 212,
+																			"end": 215,
+																			"children": [
+																				{
+																					"type": "ComplexSelector",
+																					"start": 212,
+																					"end": 215,
+																					"children": [
+																						{
+																							"type": "RelativeSelector",
+																							"combinator": null,
+																							"selectors": [
+																								{
+																									"type": "Nth",
+																									"value": "odd",
+																									"start": 212,
+																									"end": 215
+																								}
+																							],
+																							"start": 212,
+																							"end": 215
+																						}
+																					]
+																				}
+																			]
+																		},
+																		"start": 208,
+																		"end": 216
+																	}
+																],
+																"start": 208,
+																"end": 216
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 218,
+														"end": 220,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "a",
+																		"start": 218,
+																		"end": 220
+																	}
+																],
+																"start": 218,
+																"end": 220
+															}
+														]
+													}
+												]
+											},
+											"start": 201,
+											"end": 221
+										}
+									],
+									"start": 201,
+									"end": 221
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 222,
+					"end": 241,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 226,
+							"end": 237,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 201,
+				"end": 241
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 242,
+			"styles": "\n\t/* An+B classification is active in nested pseudo-class args, and restores */\n\t:is(:not(2n)) {\n\t\tcolor: red;\n\t}\n\n\t/* the flag restores between siblings: .a stays a class after the odd Nth */\n\t:where(:is(odd), .a) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 251,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

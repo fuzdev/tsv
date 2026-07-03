@@ -28,4 +28,16 @@
 	section:where(.class5, .class6:unknown-pseudo, .class7) {
 		border: 1px solid black;
 	}
+
+	/* :is() with An+B in an invalid context - `of` is valid only in :nth-*(), so the
+	   whole arg is a contextually-invalid selector and the forgiving list is empty */
+	ul:is(2n of) {
+		list-style: none;
+	}
+
+	/* :where() with a contextually-invalid An+B among valid classes - only the An+B is
+	   skipped; the valid siblings are kept (the text is preserved verbatim on format) */
+	ol:where(.class8, 2n of, .class9) {
+		list-style: decimal;
+	}
 </style>

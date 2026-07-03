@@ -32,12 +32,12 @@
 											"name": "nth-child",
 											"args": {
 												"type": "SelectorList",
-												"start": 53,
+												"start": 62,
 												"end": 64,
 												"children": [
 													{
 														"type": "ComplexSelector",
-														"start": 53,
+														"start": 62,
 														"end": 64,
 														"children": [
 															{
@@ -47,11 +47,11 @@
 																	{
 																		"type": "Nth",
 																		"value": "2n",
-																		"start": 53,
+																		"start": 62,
 																		"end": 64
 																	}
 																],
-																"start": 53,
+																"start": 62,
 																"end": 64
 															}
 														]

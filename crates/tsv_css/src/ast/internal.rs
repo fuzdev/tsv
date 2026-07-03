@@ -190,6 +190,17 @@ pub enum SimpleSelector<'arena> {
         value: f64,
         span: Span, // @keyframes percentage selectors (0%, 50%, 100%)
     },
+    /// `An+B` term (`2n`, `2n + 1`, `odd`, `123`) appearing as a simple selector
+    /// inside functional pseudo-class arguments (`:is(.a, 123)`, `:foo(2n + 1)`).
+    /// Matches Svelte's `read_selector` Nth production, which is active only inside
+    /// pseudo-class args (top-level `123 {}` still rejects). `span` covers the An+B
+    /// value text verbatim: the public `Nth` node's `value` is that source slice
+    /// (parseCss stores it raw) and the printer normalizes the spacing
+    /// (`2n+1` → `2n + 1`), like the dedicated `:nth-child` path. For an `An+B of S`
+    /// term the span folds in the ` of ` (`2n of `), matching Svelte's `\s+of\s+`
+    /// terminator; `S` follows as ordinary sibling selectors (NOT nested), unlike the
+    /// dedicated `:nth-*()` path which nests `S` under `Nth.selector`.
+    Nth { span: Span },
     /// Invalid selector - unparseable syntax preserved for forgiving parsing
     ///
     /// Used in :is() and :where() pseudo-classes which use forgiving selector lists.
@@ -217,6 +228,7 @@ impl SimpleSelector<'_> {
             | SimpleSelector::PseudoElement { span, .. }
             | SimpleSelector::Nesting { span }
             | SimpleSelector::Percentage { span, .. }
+            | SimpleSelector::Nth { span }
             | SimpleSelector::Invalid { span } => *span,
         }
     }
