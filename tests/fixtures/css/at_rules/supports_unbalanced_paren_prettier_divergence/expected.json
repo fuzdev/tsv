@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 70,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 61,
+				"name": "supports",
+				"prelude": "(margin: 0))",
+				"block": {
+					"type": "Block",
+					"start": 32,
+					"end": 61,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 36,
+								"end": 37,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 36,
+										"end": 37,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 36,
+														"end": 37
+													}
+												],
+												"start": 36,
+												"end": 37
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 38,
+								"end": 58,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 43,
+										"end": 53,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 36,
+							"end": 58
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 62,
+			"styles": "\n\t@supports (margin: 0)) {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 71,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

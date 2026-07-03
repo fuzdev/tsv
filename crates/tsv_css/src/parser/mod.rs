@@ -169,6 +169,15 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.current_kind == kind
     }
 
+    /// True at the end of an at-rule prelude: a block `{`, a statement `;`, or EOF.
+    /// The shared stop condition for the prelude-consuming loops.
+    pub(crate) fn at_prelude_end(&self) -> bool {
+        matches!(
+            self.current_kind,
+            TokenKind::LeftBrace | TokenKind::Semicolon | TokenKind::Eof
+        )
+    }
+
     pub(crate) fn expect(&mut self, kind: TokenKind) -> Result<(), ParseError> {
         if !self.check(kind) {
             return Err(self.error_expected_found(&kind.to_string()));

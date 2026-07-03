@@ -1,0 +1,42 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 103,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 43,
+				"name": "namespace",
+				"prelude": "'http://example.com/a'",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 45,
+				"end": 94,
+				"name": "namespace",
+				"prelude": "svg url('http://www.w3.org/2000/svg')",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 95,
+			"styles": "\n\t@namespace 'http://example.com/a';\n\t@namespace svg url('http://www.w3.org/2000/svg');\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 104,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

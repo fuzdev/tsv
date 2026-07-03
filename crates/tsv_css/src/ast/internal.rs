@@ -592,10 +592,13 @@ pub enum PreludeValue<'arena> {
     /// Example: `@layer` → `a , b`; `@keyframes` → `my-anim`.
     Raw { content: &'arena str, span: Span },
 
-    /// Selector lists (for @scope)
-    /// Example: `@scope (.card) to (.footer)` → root: [.card], limit: Some([.footer])
+    /// Selector lists (for @scope). Both clauses are independently optional per
+    /// css-cascade-6 (`@scope [(<scope-start>)]? [to (<scope-end>)]?`), so a bare
+    /// `@scope { … }` has `root: None, limit: None`, and `@scope to (.footer)` has
+    /// `root: None, limit: Some(…)`.
+    /// Example: `@scope (.card) to (.footer)` → root: Some([.card]), limit: Some([.footer])
     Selectors {
-        root: SelectorList<'arena>,
+        root: Option<SelectorList<'arena>>,
         limit: Option<SelectorList<'arena>>,
         span: Span,
     },
@@ -684,7 +687,9 @@ impl PreludeValue<'_> {
         match self {
             PreludeValue::Values { values, .. } => values.is_empty(),
             PreludeValue::Raw { content, .. } => content.is_empty(),
-            PreludeValue::Selectors { root, .. } => root.selectors.is_empty(),
+            PreludeValue::Selectors { root, limit, .. } => {
+                root.as_ref().is_none_or(|r| r.selectors.is_empty()) && limit.is_none()
+            }
             PreludeValue::Supports { condition, .. } => condition.parts.is_empty(),
             PreludeValue::Container {
                 name, condition, ..

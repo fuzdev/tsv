@@ -1,0 +1,92 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 42,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 14,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 14,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								},
+								{
+									"type": "RelativeSelector",
+									"combinator": {
+										"type": "Combinator",
+										"name": " ",
+										"start": 12,
+										"end": 13
+									},
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "p",
+											"start": 13,
+											"end": 14
+										}
+									],
+									"start": 12,
+									"end": 14
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 15,
+					"end": 33,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 19,
+							"end": 29,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 9,
+				"end": 33
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 34,
+			"styles": "\n\tdiv p {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 43,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

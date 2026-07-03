@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 116,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 61,
+				"name": "container",
+				"prelude": "foo bar baz",
+				"block": {
+					"type": "Block",
+					"start": 32,
+					"end": 61,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 36,
+								"end": 37,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 36,
+										"end": 37,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 36,
+														"end": 37
+													}
+												],
+												"start": 36,
+												"end": 37
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 38,
+								"end": 58,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 43,
+										"end": 53,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 36,
+							"end": 58
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 63,
+				"end": 107,
+				"name": "container",
+				"prelude": "[x]",
+				"block": {
+					"type": "Block",
+					"start": 78,
+					"end": 107,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 82,
+								"end": 83,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 82,
+										"end": 83,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "a",
+														"start": 82,
+														"end": 83
+													}
+												],
+												"start": 82,
+												"end": 83
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 84,
+								"end": 104,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 89,
+										"end": 99,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 82,
+							"end": 104
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 108,
+			"styles": "\n\t@container foo bar baz {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\t@container [x] {\n\t\ta {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 117,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -174,11 +174,15 @@ impl<'a> Printer<'a> {
                 self.print_media_prelude(content, atrule.block.is_some());
             }
             internal::PreludeValue::Selectors { root, limit, .. } => {
-                // @scope selector lists: @scope (root) to (limit)
-                // These are nested context, so they don't wrap (same as :is(), :where())
-                self.write(" (");
-                self.print_selector_list_nested(root);
-                self.write(")");
+                // @scope selector lists: `@scope [(root)]? [to (limit)]?`. Both clauses
+                // are independently optional (css-cascade-6), so a bare `@scope { … }`
+                // writes no prelude and `@scope to (limit)` writes only the limit.
+                // These are nested context, so they don't wrap (same as :is(), :where()).
+                if let Some(root_selectors) = root {
+                    self.write(" (");
+                    self.print_selector_list_nested(root_selectors);
+                    self.write(")");
+                }
                 if let Some(limit_selectors) = limit {
                     self.write(" to (");
                     self.print_selector_list_nested(limit_selectors);
