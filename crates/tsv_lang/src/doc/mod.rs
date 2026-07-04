@@ -184,6 +184,38 @@ mod arena_tests {
     }
 
     #[test]
+    fn test_static_text_width_cached_via_static_width_cache() {
+        use super::arena::DocNode;
+        use super::types::CachedWidth;
+
+        let cached_static = |arena: &DocArena, s: &'static str| {
+            let id = arena.text(s);
+            let nodes = arena.borrow_nodes();
+            let DocNode::Text(t) = &nodes[id.index()] else {
+                panic!("expected text node");
+            };
+            t.cached_width()
+        };
+
+        let mut a = DocArena::new();
+        // Statics always carry a real cached width (never NOT_COMPUTED) —
+        // first sighting (cache miss) and repeat (cache hit) agree.
+        assert_eq!(cached_static(&a, ",="), CachedWidth::Width(2));
+        assert_eq!(cached_static(&a, ",="), CachedWidth::Width(2));
+        // A newline-bearing static routes to the sentinel through the same
+        // cache, exactly like pooled text.
+        assert_eq!(cached_static(&a, "a\nb"), CachedWidth::HasNewline);
+        // The cache survives reset() (entries key on 'static addresses):
+        // the next document still reads real widths, including the sentinel.
+        a.reset();
+        assert_eq!(cached_static(&a, ",="), CachedWidth::Width(2));
+        assert_eq!(cached_static(&a, "a\nb"), CachedWidth::HasNewline);
+        // The empty() fast path bypasses the cache with a constant width 0,
+        // which must agree with what the cache would compute.
+        assert_eq!(cached_static(&a, ""), CachedWidth::Width(0));
+    }
+
+    #[test]
     fn test_arena_simple_text() {
         let a = DocArena::new();
         let doc = a.text("hello");
@@ -932,11 +964,12 @@ mod arena_tests {
     #[test]
     fn test_fits_flat_newline_text_defers_to_walk() {
         let a = DocArena::new();
-        // Static newline text: resolved on demand, contains '\n' → walk returns true.
+        // Static newline text: cached as HAS_NEWLINE (via the static width
+        // cache), contains '\n' → walk returns true.
         assert!(fits_flat(&a, a.text("a\nb"), 0));
         // Pooled newline text: cached as HAS_NEWLINE → same early-true path.
-        // Both cases pin the eager pooled-width policy (never NOT_COMPUTED),
-        // which is what lets fits answer without borrowing the text pool.
+        // Both cases pin the eager width policy (never NOT_COMPUTED), which is
+        // what lets fits answer without borrowing the text pool.
         assert!(fits_flat(&a, a.text_pooled("café\nx"), 0));
         assert!(fits_flat(&a, a.text_pooled("a\nb"), 0));
     }
