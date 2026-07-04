@@ -60,6 +60,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Standard attributes (`name="value"`)
 - Empty string values (`attr=""`)
 - Boolean attributes (`disabled`, `checked`)
+- Names with non-identifier chars (`a%b`, directive `on:click%x`) — read up to `[\s=/>"']`, mirroring Svelte's `read_tag`
 
 ### Dynamic Attributes
 

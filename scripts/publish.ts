@@ -15,7 +15,7 @@
  * Usage:
  *   deno task publish                        # dry-run (validate everything)
  *   deno task publish --bump minor           # dry-run, preview the bump
- *   deno task publish --wetrun --bump patch  # bump + check + build + validate + publish + git
+ *   deno task publish --wetrun --bump patch  # bump + check + conformance + build + validate + publish + git
  *   deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
  *
  * Flags:
@@ -25,7 +25,7 @@
  *                    <level> -->` marker (also required). A fresh wetrun needs
  *                    both, plus a non-empty `## Unreleased` section; a sentinel
  *                    retry runs without either.
- *   --no-check       skip `deno task check` (faster retries)
+ *   --no-check       skip `deno task check` AND the Step 3b conformance gates (faster retries)
  *   --no-git         skip the git commit + tag + push finalization
  *
  * Retry: a failed wetrun leaves the bump in place plus a sentinel file; re-run
@@ -307,6 +307,46 @@ if (no_check) {
 	run('deno task check', 'deno', ['task', 'check']);
 }
 
+// Step 3b: Conformance gates
+//
+// The release-cadence correctness gates that run against EXTERNAL oracles and so
+// can't live in `deno task check`: the Svelte parser vs `svelte/compiler`
+// (conformance:svelte-fixtures), and all three languages' AST + formatter vs the
+// canonical parsers / prettier (corpus:compare:parse + :format, --all). Running
+// them here means a release can't ship a parse/format regression the in-repo gate
+// is structurally blind to. Skipped by --no-check alongside Step 3.
+//
+// Tolerant of a missing oracle: these need the ../svelte checkout + the
+// benches/js `node_modules` sidecar (`deno task bench:install`), which a clean
+// machine or a resumed wetrun may lack — warn + skip rather than block the
+// release. test262 (needs ../test262) and the CSS-WPT harvest stay manual.
+if (no_check) {
+	console.log('\n=== Step 3b: Conformance gates — SKIPPED (--no-check) ===');
+} else {
+	console.log('\n=== Step 3b: Conformance gates (deno task conformance) ===');
+	const missing = [
+		exists('../svelte/packages/svelte/tests') ? null : '../svelte checkout',
+		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)',
+	].filter((m): m is string => m !== null);
+	if (missing.length > 0) {
+		console.warn(
+			`  WARN: skipping — missing ${missing.join(' + ')}. ` +
+				'Run `deno task conformance` manually before release.',
+		);
+	} else {
+		run(
+			'deno task conformance',
+			'deno',
+			['task', 'conformance'],
+			undefined,
+			'  Conformance gate failed. If it was a corpus:compare:format SAFETY hit, re-run\n' +
+				'  `deno task corpus:compare:format ~/dev/<that-repo>` on the single repo to rule out\n' +
+				'  the known --all FFI heisenbug (benches/js/CLAUDE.md §Known Issues) before treating\n' +
+				'  it as a real regression.',
+		);
+	}
+}
+
 // Step 4: Build
 
 console.log('\n=== Step 4: Build WASM bundles (npm + deno) ===');
@@ -473,6 +513,16 @@ function capture(
 		stdout: dec.decode(result.stdout).trim(),
 		stderr: dec.decode(result.stderr).trim(),
 	};
+}
+
+function exists(path: string): boolean {
+	try {
+		Deno.statSync(path);
+		return true;
+	} catch (error) {
+		if (error instanceof Deno.errors.NotFound) return false;
+		throw error;
+	}
 }
 
 function run(label: string, cmd: string, args: string[], cwd?: string, fail_hint?: string): void {

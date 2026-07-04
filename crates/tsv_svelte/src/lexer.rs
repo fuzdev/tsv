@@ -315,7 +315,11 @@ impl<'a> Lexer<'a> {
                 Err(lex_err("Unterminated string literal in template", start))
             }
             Some(ch) if ch.is_alphabetic() || ch == '_' || ch == '$' || ch == '-' || ch == '!' => {
-                // Tag names and identifiers
+                // Tag names and identifiers.
+                // NOTE: for attribute/directive *names* this token is only the LEADING run —
+                // the parser's `attribute_name_run_end` extends it past special chars (`a%b`)
+                // to Svelte's `read_tag` terminator set (`[\s=/>"']`), which differs from the
+                // tag-name set. Widen attribute-name coverage there, not this char class.
                 // Also include - as a start character for CSS custom property attributes (--margin)
                 // and include : and | for directive syntax (on:click|preventDefault)
                 // and -- for CSS custom properties (style:--custom)

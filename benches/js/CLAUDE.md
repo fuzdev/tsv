@@ -284,6 +284,18 @@ Two comparisons per input:
   also shrinks the `corpus:compare:parse` count) or fixing it as a writer bug is a
   tracked campaign, so this half does **not** gate yet.
 
+**Pre-release aggregate — `deno task conformance`.** This gate, plus
+`corpus:compare:parse --all` and `corpus:compare:format --all`, are the
+release-cadence correctness gates that run against external oracles (and so can't
+live in `deno task check`). `deno task conformance` runs all three in one pass
+(building the corpus FFI once) and is wired into `scripts/publish.ts` **Step 3b**
+(skipped by `--no-check`; warn-and-skipped when `../svelte` or this dir's
+`node_modules` is absent). `corpus:compare:format` there gates only on **SAFETY**
+(data loss) — the ~8% intentional style divergences are non-blocking WARNs, and a
+`--all` SAFETY hit may be the known FFI heisenbug (§Known Issues), so confirm on
+the single repo before treating it as real. `test262` (needs `../test262`) and the
+CSS-WPT harvest stay manual, outside the automated step.
+
 ## Divergence Detection
 
 Automatically detects known divergence patterns from `conformance_prettier.md`:
