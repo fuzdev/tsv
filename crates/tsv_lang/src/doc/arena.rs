@@ -334,7 +334,9 @@ pub struct DocArena {
     /// indirection.
     static_cache: [Cell<StaticSlot>; STATIC_CACHE_SLOTS],
     /// The current document's format generation, keying the validity of the
-    /// interned node halves in `static_cache` and `empty_node`. Starts
+    /// interned node halves in `static_cache` and the singleton cells
+    /// (`empty_node`, `line_nodes`, `line_suffix_boundary_node`,
+    /// `break_parent_node`). Starts
     /// at 1 (0 marks a never-stamped slot) and is bumped by `reset()`, so a
     /// prior document's `node_id`s — invalidated by the reset — can never be
     /// returned for the new document.
@@ -344,6 +346,23 @@ pub struct DocArena {
     /// it gets a dedicated slot with no hash probe. Valid iff the generation
     /// matches `format_gen`.
     empty_node: Cell<(u32, DocId)>,
+    /// The interned [`DocNode::Line`] node per [`LineKind`] for the current
+    /// document (generation, id), direct-indexed by the kind's discriminant —
+    /// no hash probe, like `empty_node`. A `Line` node carries no per-use
+    /// state (mode and indent are supplied per visit by the enclosing render
+    /// command), so every `line()`/`softline()`/`hardline()`/`literalline()`
+    /// in a document can return one shared node — the layout analog of
+    /// "statics are position-free". Valid iff the generation matches
+    /// `format_gen`.
+    line_nodes: [Cell<(u32, DocId)>; 4],
+    /// The interned [`DocNode::LineSuffixBoundary`] node for the current
+    /// document (generation, id) — stateless like `Line`, same dedicated-cell
+    /// interning. Valid iff the generation matches `format_gen`.
+    line_suffix_boundary_node: Cell<(u32, DocId)>,
+    /// The interned [`DocNode::BreakParent`] node for the current document
+    /// (generation, id) — stateless like `Line`, same dedicated-cell
+    /// interning. Valid iff the generation matches `format_gen`.
+    break_parent_node: Cell<(u32, DocId)>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -412,6 +431,9 @@ impl DocArena {
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
             format_gen: Cell::new(1),
             empty_node: Cell::new((0, DocId(0))),
+            line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
+            line_suffix_boundary_node: Cell::new((0, DocId(0))),
+            break_parent_node: Cell::new((0, DocId(0))),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }
@@ -419,10 +441,11 @@ impl DocArena {
 
     /// Create an arena with pre-allocated capacity based on source size.
     ///
-    /// Heuristic: **~2 doc nodes per source byte**. Static-text node interning
-    /// cut real node density ~1/3 (measured on the anchor corpora: ~0.32
-    /// nodes/byte mean, p99 ~0.73, max ~1.5 — pre-interning p99 was ~1.0), so
-    /// 2/byte now clears the densest file outright. It is deliberately NOT
+    /// Heuristic: **~2 doc nodes per source byte**. Node interning (static
+    /// text, then the Line/boundary singletons) cut real node density to
+    /// roughly half the pre-interning level (measured on the anchor corpora:
+    /// ~0.25–0.26 nodes/byte mean, p99 ~0.6–1.0, max ~1.2), so 2/byte clears
+    /// the densest file outright. It is deliberately NOT
     /// lowered to match: `estimated_children = nodes/2` ⇒ ~1/byte, and the
     /// children population is untouched by interning (shared nodes still
     /// appear once per use in child lists — children/byte p99 ~0.90), so
@@ -453,6 +476,9 @@ impl DocArena {
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
             format_gen: Cell::new(1),
             empty_node: Cell::new((0, DocId(0))),
+            line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
+            line_suffix_boundary_node: Cell::new((0, DocId(0))),
+            break_parent_node: Cell::new((0, DocId(0))),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }
@@ -482,7 +508,8 @@ impl DocArena {
     /// The static cache's *width* halves are deliberately NOT cleared:
     /// they key on `'static` string addresses, so they stay valid for the
     /// arena's whole lifetime and the cache warms once across documents. The
-    /// interned *node* halves (and the `empty()` node) are invalidated in O(1)
+    /// interned *node* halves (and the `empty()`/line/boundary singleton
+    /// cells) are invalidated in O(1)
     /// by bumping `format_gen` — their `DocId`s point into the node store this
     /// method just cleared.
     pub fn reset(&mut self) {
@@ -498,6 +525,11 @@ impl DocArena {
                 slot.set(s);
             }
             self.empty_node.set((0, DocId(0)));
+            for cell in &self.line_nodes {
+                cell.set((0, DocId(0)));
+            }
+            self.line_suffix_boundary_node.set((0, DocId(0)));
+            self.break_parent_node.set((0, DocId(0)));
             self.format_gen.set(1);
         } else {
             self.format_gen.set(next);
@@ -746,6 +778,51 @@ impl DocArena {
         self.line_comment_ids.borrow().binary_search(&id.0).is_ok()
     }
 
+    /// Return the per-document interned node held in `cell`, allocating it on
+    /// first use within the current document.
+    ///
+    /// The shared engine behind the singleton builders — [`Self::empty`],
+    /// [`Self::line`] and its kind siblings, [`Self::line_suffix_boundary`],
+    /// and [`Self::break_parent`]: each is a node with no per-use state, so
+    /// one node per document serves every call site. Hot path: one cell load
+    /// plus a generation compare — no hash, cheaper than even the static
+    /// cache's slot probe. `reset()` invalidates every cell in O(1) via the
+    /// `format_gen` bump (plus the once-per-u32-wrap hard-clear). The node is
+    /// built behind a closure, NOT passed by value: a by-value `DocNode`
+    /// argument measured a consistent +0.26..+0.30% instructions (the
+    /// aggregate is materialized on the hot path; LLVM does not reliably sink
+    /// it into the cold branch), while the closure defers construction into
+    /// the per-call-site miss instantiation — hot-path codegen identical to a
+    /// hand-specialized pair.
+    #[inline]
+    fn interned_singleton(
+        &self,
+        cell: &Cell<(u32, DocId)>,
+        make: impl FnOnce() -> DocNode,
+    ) -> DocId {
+        let (node_gen, node_id) = cell.get();
+        if node_gen == self.format_gen.get() {
+            return node_id;
+        }
+        self.interned_singleton_miss(cell, make)
+    }
+
+    /// The cold half of [`Self::interned_singleton`]: alloc this document's
+    /// node and stamp the cell (once per cell per document). Monomorphized
+    /// per call site (one cold body per singleton kind — the same set of cold
+    /// fns the hand-specialized form had, written once).
+    #[cold]
+    #[inline(never)]
+    fn interned_singleton_miss(
+        &self,
+        cell: &Cell<(u32, DocId)>,
+        make: impl FnOnce() -> DocNode,
+    ) -> DocId {
+        let node_id = self.alloc(make());
+        cell.set((self.format_gen.get(), node_id));
+        node_id
+    }
+
     /// Create an empty doc that produces no output, interned per document.
     ///
     /// `empty()` is the single hottest static text (~1/3 of static allocs on
@@ -753,20 +830,7 @@ impl DocArena {
     /// — no hash probe — allocating once per document.
     #[inline]
     pub fn empty(&self) -> DocId {
-        let (node_gen, node_id) = self.empty_node.get();
-        if node_gen == self.format_gen.get() {
-            return node_id;
-        }
-        self.empty_miss()
-    }
-
-    /// The cold half of [`Self::empty`]: alloc this document's empty node.
-    #[cold]
-    #[inline(never)]
-    fn empty_miss(&self) -> DocId {
-        let node_id = self.alloc(DocNode::Text(DocText::Static("", 0)));
-        self.empty_node.set((self.format_gen.get(), node_id));
-        node_id
+        self.interned_singleton(&self.empty_node, || DocNode::Text(DocText::Static("", 0)))
     }
 
     /// Create a text doc from a symbol ID (deferred resolution).
@@ -775,28 +839,40 @@ impl DocArena {
         self.alloc(DocNode::Text(DocText::Symbol(id)))
     }
 
-    /// Create a normal line break (space if fits, newline if doesn't).
+    /// Create a normal line break (space if fits, newline if doesn't),
+    /// interned per document.
     #[inline]
     pub fn line(&self) -> DocId {
-        self.alloc(DocNode::Line(LineKind::Normal))
+        self.line_node(LineKind::Normal)
     }
 
-    /// Create a soft line that disappears in flat mode.
+    /// Create a soft line that disappears in flat mode, interned per document.
     #[inline]
     pub fn softline(&self) -> DocId {
-        self.alloc(DocNode::Line(LineKind::Soft))
+        self.line_node(LineKind::Soft)
     }
 
-    /// Create a hard line break (always breaks).
+    /// Create a hard line break (always breaks), interned per document.
     #[inline]
     pub fn hardline(&self) -> DocId {
-        self.alloc(DocNode::Line(LineKind::Hard))
+        self.line_node(LineKind::Hard)
     }
 
-    /// Create a literal line break (just newline, no indentation).
+    /// Create a literal line break (just newline, no indentation), interned
+    /// per document.
     #[inline]
     pub fn literalline(&self) -> DocId {
-        self.alloc(DocNode::Line(LineKind::Literal))
+        self.line_node(LineKind::Literal)
+    }
+
+    /// Shared interning path for the four [`LineKind`]s: a `Line` node
+    /// carries no per-use state (mode and indent are supplied per visit by
+    /// the enclosing render command), so every line of a kind within one
+    /// document shares one node — the layout analog of "statics are
+    /// position-free". Direct-indexed by the kind's discriminant.
+    #[inline]
+    fn line_node(&self, kind: LineKind) -> DocId {
+        self.interned_singleton(&self.line_nodes[kind as usize], || DocNode::Line(kind))
     }
 
     //
@@ -945,14 +1021,20 @@ impl DocArena {
         self.alloc(DocNode::LineSuffix(doc))
     }
 
-    /// Force pending LineSuffix content to be flushed.
+    /// Force pending LineSuffix content to be flushed, interned per document
+    /// (stateless, like [`Self::line`] — one shared node per document).
+    #[inline]
     pub fn line_suffix_boundary(&self) -> DocId {
-        self.alloc(DocNode::LineSuffixBoundary)
+        self.interned_singleton(&self.line_suffix_boundary_node, || {
+            DocNode::LineSuffixBoundary
+        })
     }
 
-    /// Force parent group to break.
+    /// Force parent group to break, interned per document (stateless, like
+    /// [`Self::line`] — one shared node per document).
+    #[inline]
     pub fn break_parent(&self) -> DocId {
-        self.alloc(DocNode::BreakParent)
+        self.interned_singleton(&self.break_parent_node, || DocNode::BreakParent)
     }
 
     /// Create an isolated group that prevents hardline propagation.
@@ -1475,11 +1557,15 @@ impl DocArena {
     ///
     /// The prior `nodes.len() / 4` was calibrated to the old 4-nodes/byte pre-size
     /// (then `nodes/4 ≈ source ≈ output`) and under-provisioned the real output
-    /// ~3.8× → every format reallocated 2–3 times. The multiplier moved 2 → 4
-    /// with static-text node interning: deduping `Static` nodes cut the node
-    /// count ~1/3 with output unchanged, shifting the measured per-file
-    /// output/node p50 from ~2.1 to ~3.1 (`arena_stats` calibration) — ×4
-    /// restores the old coverage with margin.
+    /// ~3.8× → every format reallocated 2–3 times. The multiplier tracks the
+    /// node-interning ratchet: each interning pass dedupes nodes with output
+    /// unchanged, raising output/node, so the multiplier moves in lockstep or
+    /// the reallocs it exists to prevent creep back in. It went 2 → 4 with
+    /// static-text node interning (per-file output/node p50 ~2.1 → ~3.1) and
+    /// 4 → 5 with the singleton Line/boundary interning (p50 ~3.4–3.7,
+    /// aggregate ~3.9–4.0×nodes — ×4 would have run at ~1.0× aggregate
+    /// clearance, i.e. zero headroom; ×5 restores the ~1.3× the ×4 tuning had,
+    /// `arena_stats` calibration).
     ///
     /// Floor: 256 bytes (tiny inputs). Ceiling: 1 GiB — a pure sanity backstop
     /// that no real format approaches (the estimate tracks the actual node count),
@@ -1487,7 +1573,7 @@ impl DocArena {
     /// and re-introduced reallocs on large files.
     #[inline]
     pub fn estimated_output_capacity(&self) -> usize {
-        (self.nodes.borrow().len() * 4).clamp(256, 1 << 30)
+        (self.nodes.borrow().len() * 5).clamp(256, 1 << 30)
     }
 }
 
