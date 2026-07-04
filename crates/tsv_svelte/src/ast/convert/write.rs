@@ -644,7 +644,15 @@ fn write_await_block(w: &mut JsonWriter, block: &internal::AwaitBlock<'_>, ctx: 
         write_pattern_island(w, e, ctx);
     });
     w.raw(",\"pending\":");
-    write_optional_fragment(w, block.pending.as_ref(), ctx);
+    // Svelte's block form always has a pending Fragment (empty or not); the inline
+    // `then`/`catch` shorthand has `null`. `pending` holds only non-empty content,
+    // so an empty block-form pending (`{#await x}{/await}`, `{#await x}{:then v}…`)
+    // is `None` here yet must still emit an (empty) Fragment — hence the flag.
+    match block.pending.as_ref() {
+        Some(fragment) => write_fragment(w, fragment, ctx),
+        None if block.pending_block => write_fragment(w, &internal::Fragment { nodes: &[] }, ctx),
+        None => w.raw("null"),
+    }
     w.raw(",\"then\":");
     write_optional_fragment(w, block.then.as_ref(), ctx);
     w.raw(",\"catch\":");
@@ -1358,13 +1366,14 @@ fn write_script(
 /// Fuse a script's `Program`, reproducing Svelte's tag-line `loc` override in
 /// final char space (threading the schema and optional per-node comment map).
 ///
-/// Svelte overrides the byte-space `Program.loc` to `{line: <tag line>, column:
-/// 0}` and `{line: <`</script>` line>, column: <its byte column>}`; the final
-/// char-space columns rewrite those against the `Program`'s own `start`/`end`
-/// byte offsets (the content span). `translate_column` is exactly that
-/// delta-preserving column math, so applying it here yields the final
-/// char-space columns directly (on ASCII it collapses to the raw override —
-/// `0` and the byte column).
+/// Svelte overrides the byte-space `Program.loc` to `locator(<script> tag
+/// start)` and `locator(</script> end)` — `{line, column}` of the tag's own
+/// `<`/`>` positions, not of the `Program`'s content span. The final char-space
+/// columns rewrite those against the `Program`'s own `start`/`end` byte offsets.
+/// `translate_column` is exactly that delta-preserving column math, so applying
+/// it here yields the final char-space columns directly (on ASCII it collapses to
+/// the raw override — the tag's byte column at each end, so an indented
+/// `\t<script>` reports the tag's column, not `0`).
 #[allow(clippy::cast_possible_truncation)]
 fn write_script_program_fused(
     w: &mut JsonWriter,
@@ -1374,29 +1383,25 @@ fn write_script_program_fused(
     comments: CommentMode<'_>,
 ) {
     let program = &script.content;
-    let start_line = ctx
-        .loc
-        .tracker
-        .get_line_column(script.span.start as usize)
-        .0;
-    let start_column =
-        translate_column(program.span.start, 0, ctx.loc.map, ctx.loc.tracker) as usize;
-    let (end_line, end_byte_column) = ctx.loc.tracker.get_line_column(script.span.end as usize);
-    let end_column = translate_column(
-        program.span.end,
-        end_byte_column as u64,
-        ctx.loc.map,
-        ctx.loc.tracker,
-    ) as usize;
+    // The line/column of a tag position (`<script>` `<` / `</script>` end),
+    // rewritten to char space against the Program's own content byte offset —
+    // `translate_column` is multibyte-correct and the identity (raw byte column) on
+    // ASCII. Start and end are the same computation.
+    let position_at = |tag_pos: u32, content_pos: u32| {
+        let (line, byte_column) = ctx.loc.tracker.get_line_column(tag_pos as usize);
+        Position {
+            line,
+            column: translate_column(
+                content_pos,
+                byte_column as u64,
+                ctx.loc.map,
+                ctx.loc.tracker,
+            ) as usize,
+        }
+    };
     let loc_override = (
-        Position {
-            line: start_line,
-            column: start_column,
-        },
-        Position {
-            line: end_line,
-            column: end_column,
-        },
+        position_at(script.span.start, program.span.start),
+        position_at(script.span.end, program.span.end),
     );
     write_program_embedded(
         w,

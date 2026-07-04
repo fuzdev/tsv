@@ -1,0 +1,43 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 25,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "AwaitBlock",
+				"start": 0,
+				"end": 24,
+				"expression": {
+					"type": "Identifier",
+					"start": 8,
+					"end": 15,
+					"loc": {
+						"start": {
+							"line": 1,
+							"column": 8
+						},
+						"end": {
+							"line": 1,
+							"column": 15
+						}
+					},
+					"name": "promise"
+				},
+				"value": null,
+				"error": null,
+				"pending": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"then": null,
+				"catch": null
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
