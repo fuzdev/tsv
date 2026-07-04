@@ -116,6 +116,23 @@ impl From<Box<ParseError>> for ParseError {
     }
 }
 
+/// Construct a boxed lexer error, the counterpart to the `From<Box<ParseError>>` above.
+/// The language lexers return `Result<_, Box<ParseError>>`: boxing keeps the hot
+/// `next_token` Ok path pointer-sized (an inline `ParseError` would bloat the `Result` and
+/// block inlining/SROA of the token pump). `#[cold]` / `#[inline(never)]` outlines the
+/// construction so it never bloats the inlined token-scan fast path. Shared by all three
+/// language lexers (`tsv_ts`, `tsv_css`, `tsv_svelte`).
+#[cold]
+#[inline(never)]
+#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
+pub fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
+    Box::new(ParseError::InvalidSyntax {
+        message: message.into(),
+        position,
+        context: None,
+    })
+}
+
 impl ParseError {
     /// Add source context to an error
     ///

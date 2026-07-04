@@ -925,11 +925,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .map_or(TokenKind::Eof, |t| t.kind.clone())
     }
 
-    #[expect(dead_code, reason = "Convenience wrapper for peek_kind() == kind")]
-    pub(super) fn peek_check(&mut self, kind: &TokenKind) -> bool {
-        &self.peek_kind() == kind
-    }
-
     /// Get the value of the peek token as a string slice
     pub(super) fn peek_value(&self) -> &str {
         self.peek

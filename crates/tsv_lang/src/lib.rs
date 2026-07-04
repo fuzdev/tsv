@@ -37,7 +37,7 @@ pub use comment::{
     is_format_ignore_range_end, is_format_ignore_range_start,
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
-pub use error::{ErrorContext, ParseError, Result};
+pub use error::{ErrorContext, ParseError, Result, lex_err};
 pub use interner::{InfallibleResolve, SharedInterner, SymbolResolver, SymbolToU32};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, write_array, write_or_null};
