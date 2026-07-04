@@ -472,17 +472,26 @@ fn write_pseudo_class_args(
         internal::PseudoClassArgs::Nth {
             value,
             of_selector,
-            span,
             value_span,
+            ..
         } => {
-            // Anchor the public span's START at the An+B token, not at `(`, so a
-            // leading comment (`:nth-child(/* c */ 2n)`) isn't absorbed into it —
-            // matching parseCss and tsv's own selector-list args (`:is(/* c */ .a)`,
-            // which already anchor past the comment). A no-op without a leading
-            // comment (`value_span.start == span.start`); the internal `span` is
-            // unchanged, so the printer still uses `[span.start, value_span.start)`
-            // to interleave the gap comment.
-            let public_span = Span::new(value_span.start, span.end);
+            // The public span is `[value_span.start, content_end)` — both ends
+            // pulled in from the internal `span`, which spans the whole `(…)` for
+            // the printer's benefit:
+            //  - START at the An+B token (not `(`), so a leading comment
+            //    (`:nth-child(/* c */ 2n)`) isn't absorbed — matching parseCss and
+            //    tsv's own selector-list args (`:is(/* c */ .a)`).
+            //  - END at the last content token — the `of S` selector list's end
+            //    when present, else the trimmed An+B value — not `span.end` (which
+            //    reaches `)`). Matches Svelte's `read_selector_list`, which captures
+            //    its end before `allow_comment_or_whitespace`.
+            // The internal `span` is untouched (it reaches `)` so the printer can
+            // find leading/trailing gap comments via `[span.start, value_span.start)`
+            // and `[content_end, span.end)`), so only the wire offsets move.
+            let content_end = of_selector
+                .as_ref()
+                .map_or(value_span.end, |sel| sel.span.end);
+            let public_span = Span::new(value_span.start, content_end);
             write_wrap_single_selector(w, public_span, ctx, |w, ctx| {
                 w.raw("{\"type\":\"Nth\",\"value\":");
                 w.string(value);

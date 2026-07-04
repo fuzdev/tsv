@@ -494,12 +494,12 @@
 											"args": {
 												"type": "SelectorList",
 												"start": 680,
-												"end": 710,
+												"end": 701,
 												"children": [
 													{
 														"type": "ComplexSelector",
 														"start": 680,
-														"end": 710,
+														"end": 701,
 														"children": [
 															{
 																"type": "RelativeSelector",
@@ -509,7 +509,7 @@
 																		"type": "Nth",
 																		"value": "3",
 																		"start": 680,
-																		"end": 710,
+																		"end": 701,
 																		"selector": {
 																			"type": "SelectorList",
 																			"start": 685,
@@ -562,7 +562,7 @@
 																	}
 																],
 																"start": 680,
-																"end": 710
+																"end": 701
 															}
 														]
 													}

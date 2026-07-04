@@ -377,7 +377,12 @@ fn parse_nth_args<'arena>(
     };
 
     parser.skip_whitespace_registering_comments()?;
-    let span_end = parser.span_pos(parser.current_start); // End before closing paren
+    // The internal span extends to `)` so the printer's `comments_in_range` lookup
+    // still finds a trailing gap comment (`:nth-child(2n /* c */)`). The wire `end`
+    // is trimmed to the last content token at convert time (`write_pseudo_class_args`),
+    // matching Svelte's `read_selector_list`, which captures its end before
+    // `allow_comment_or_whitespace`.
+    let span_end = parser.span_pos(parser.current_start); // `)` position
     let paren_end = parser.expect_and_capture(TokenKind::RightParen)?; // End after closing paren
 
     Ok((
