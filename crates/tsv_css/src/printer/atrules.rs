@@ -298,15 +298,15 @@ impl<'a> Printer<'a> {
         // Re-group atoms into segments split at `and`/`or` keyword atoms. The
         // connector rides the separator before the following segment.
         let mut fill_parts = DocBuf::new();
-        let mut segment = String::new();
+        let mut segment = d.pool_writer();
         let mut has_connector = false;
         for atom in atoms {
             // A `and`/`or` connector (case-insensitive) is the wrap break point;
             // its case is preserved (emit the original `atom`).
             if is_media_connector(atom) && !segment.is_empty() {
                 has_connector = true;
-                fill_parts.push(d.text_pooled(&segment));
-                segment.clear();
+                fill_parts.push(segment.finish_text());
+                segment = d.pool_writer();
                 fill_parts.push(d.concat(&[d.text(" "), d.text_pooled(atom), d.line()]));
             } else {
                 if !segment.is_empty() {
@@ -316,7 +316,7 @@ impl<'a> Printer<'a> {
             }
         }
         if !segment.is_empty() {
-            fill_parts.push(d.text_pooled(&segment));
+            fill_parts.push(segment.finish_text());
         }
 
         // No `and`/`or` boundary → no break point, emit verbatim.

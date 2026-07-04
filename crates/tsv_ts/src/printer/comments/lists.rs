@@ -547,18 +547,19 @@ impl<'a> Printer<'a> {
     /// patterns, enum bodies, type literals) use the
     /// `build_empty_*_inline_with_comments_doc` helpers instead.
     pub(crate) fn build_empty_body_with_comments_doc(&self, body_span: Span) -> DocId {
-        self.build_empty_delimited_with_comments_doc(body_span.start, body_span.end, "{", "}")
+        self.build_empty_delimited_with_comments_doc(body_span.start, body_span.end, "{}")
     }
 
     /// Build a Doc for an empty delimited container that may contain comments.
     ///
-    /// Generic helper for both `{}` and `[]` containers.
+    /// Generic helper for both `{}` and `[]` containers. `pair` is the closed
+    /// form (`"{}"` / `"[]"` — two single-byte delimiters), emitted whole on the
+    /// comment-free path and sliced into its halves around the comment body.
     fn build_empty_delimited_with_comments_doc(
         &self,
         span_start: u32,
         span_end: u32,
-        open: &'static str,
-        close: &'static str,
+        pair: &'static str,
     ) -> DocId {
         let d = self.d();
         let body_start = span_start + 1; // After opening delimiter
@@ -569,7 +570,7 @@ impl<'a> Printer<'a> {
         let mut comments = comments_in_range(self.comments, body_start, body_end).peekable();
 
         if comments.peek().is_none() {
-            return d.text_pooled(&format!("{open}{close}"));
+            return d.text(pair);
         }
         let mut comment_parts = DocBuf::new();
 
@@ -583,10 +584,10 @@ impl<'a> Printer<'a> {
         }
 
         d.concat(&[
-            d.text(open),
+            d.text(&pair[..1]),
             d.indent(d.concat(&[d.hardline(), d.concat(&comment_parts)])),
             d.hardline(),
-            d.text(close),
+            d.text(&pair[1..]),
         ])
     }
 
@@ -599,7 +600,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_empty_braces_inline_with_comments_doc(&self, body_span: Span) -> DocId {
         let d = self.d();
         let sep = d.softline();
-        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{", "}", sep)
+        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{}", sep)
     }
 
     /// Build a Doc for an empty type-literal `{}` body whose only content is a
@@ -615,7 +616,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let sep = d.line();
-        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{", "}", sep)
+        self.build_empty_inline_with_comments_doc(body_span.start, body_span.end, "{}", sep)
     }
 
     /// Build a Doc for an empty bracket `[]` body whose only content is a
@@ -637,7 +638,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let sep = d.softline();
-        self.build_empty_inline_with_comments_doc(body_start, body_end, "[", "]", sep)
+        self.build_empty_inline_with_comments_doc(body_start, body_end, "[]", sep)
     }
 
     /// Build a Doc for an empty delimited container whose only content is a
@@ -656,8 +657,7 @@ impl<'a> Printer<'a> {
         &self,
         span_start: u32,
         span_end: u32,
-        open: &'static str,
-        close: &'static str,
+        pair: &'static str,
         sep: DocId,
     ) -> DocId {
         let d = self.d();
@@ -672,7 +672,7 @@ impl<'a> Printer<'a> {
             .collect();
 
         if comments.is_empty() {
-            return d.text_pooled(&format!("{open}{close}"));
+            return d.text(pair);
         }
 
         // Dangling comments join with hardline (prettier `printDanglingComments`).
@@ -691,10 +691,10 @@ impl<'a> Printer<'a> {
         let close_sep = if has_line { d.hardline() } else { sep };
 
         d.group(d.concat(&[
-            d.text(open),
+            d.text(&pair[..1]),
             d.indent(d.concat(&[sep, d.concat(&comment_parts)])),
             close_sep,
-            d.text(close),
+            d.text(&pair[1..]),
         ]))
     }
 
@@ -846,7 +846,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
-                parts.push(d.text_pooled(&format!("/*{}*/ ", comment.content(self.source))));
+                // One text node (`/*content*/ `) — callers may pass `parts` as
+                // fill items, so the space can't split into its own node. The
+                // full span is the verbatim `/*content*/` (delimiters included).
+                let mut w = d.pool_writer();
+                w.push_str(comment.span.extract(self.source));
+                w.push(' ');
+                parts.push(w.finish_text());
             }
         }
     }
@@ -864,7 +870,13 @@ impl<'a> Printer<'a> {
         let d = self.d();
         for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
-                parts.push(d.text_pooled(&format!(" /*{}*/", comment.content(self.source))));
+                // One text node (` /*content*/`) — callers may pass `parts` as
+                // fill items, so the space can't split into its own node. The
+                // full span is the verbatim `/*content*/` (delimiters included).
+                let mut w = d.pool_writer();
+                w.push(' ');
+                w.push_str(comment.span.extract(self.source));
+                parts.push(w.finish_text());
             }
         }
     }

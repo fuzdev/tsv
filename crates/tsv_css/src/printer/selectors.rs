@@ -30,6 +30,7 @@
 // from a real combinator. See conformance_prettier.md §CSS: Selectors.
 
 use std::borrow::Cow;
+use std::fmt::Write;
 
 use super::Printer;
 use crate::ast::internal;
@@ -505,7 +506,12 @@ impl<'a> Printer<'a> {
                 self.span_leaf_doc(*span, is_last_in_compound)
             }
             internal::SimpleSelector::Universal { namespace, .. } => match namespace {
-                Some(ns) => d.text_pooled(&format!("{ns}|*")),
+                Some(ns) => {
+                    let mut w = d.pool_writer();
+                    w.push_str(ns);
+                    w.push_str("|*");
+                    w.finish_text()
+                }
                 None => d.text("*"),
             },
             internal::SimpleSelector::Class { span } => {
@@ -532,7 +538,11 @@ impl<'a> Printer<'a> {
             }
             internal::SimpleSelector::Nesting { .. } => d.text("&"),
             internal::SimpleSelector::Percentage { value, .. } => {
-                d.text_pooled(&format!("{value}%"))
+                let mut w = d.pool_writer();
+                // PoolTextWriter's write_str never errors; the Result exists
+                // only to satisfy `fmt::Write`.
+                let _ = write!(w, "{value}%");
+                w.finish_text()
             }
             internal::SimpleSelector::Nth { span } => {
                 // Normalize An+B operator spacing (`2n+1` → `2n + 1`) to match prettier,
@@ -543,7 +553,12 @@ impl<'a> Printer<'a> {
                 // in the glued compound.
                 let raw = span.extract(self.source);
                 match split_nth_of(raw) {
-                    Some(anb) => d.text_pooled(&format!("{} of ", Self::normalize_an_plus_b(anb))),
+                    Some(anb) => {
+                        let mut w = d.pool_writer();
+                        w.push_str(&Self::normalize_an_plus_b(anb));
+                        w.push_str(" of ");
+                        w.finish_text()
+                    }
                     None => d.text_pooled(&Self::normalize_an_plus_b(raw)),
                 }
             }

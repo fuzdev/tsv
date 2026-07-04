@@ -381,8 +381,12 @@ impl<'a> Printer<'a> {
             // Leading block comments before this item (after prev comma or `{`)
             for comment in comments_in_range(self.comments, prev_end, item_start) {
                 if comment.is_block {
-                    item_parts
-                        .push(d.text_pooled(&format!("/*{}*/ ", comment.content(self.source))));
+                    // One text node (`/*content*/ `; full span = the verbatim
+                    // comment, delimiters included), like the lists.rs twins.
+                    let mut w = d.pool_writer();
+                    w.push_str(comment.span.extract(self.source));
+                    w.push(' ');
+                    item_parts.push(w.finish_text());
                 }
             }
 

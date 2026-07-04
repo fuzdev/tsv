@@ -288,6 +288,14 @@ pub struct DocArena {
     /// Grows organically (pooled text is rare — no pre-size) and is rewound by
     /// `reset()` like every other store.
     text_pool: RefCell<String>,
+    /// Parked scratch buffer backing [`Self::pool_writer`]: taken (moved out)
+    /// by each writer and returned on finish with its capacity retained, so
+    /// streamed pooled-text assembly is allocation-free once warm — the same
+    /// amortization as the pool itself. Logically empty whenever parked; a
+    /// nested writer takes the `Cell`'s empty default and simply warms its own
+    /// buffer. Survives `reset()` (always empty between uses; only capacity
+    /// persists).
+    pool_scratch: Cell<String>,
     /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
@@ -361,6 +369,7 @@ impl DocArena {
             nodes: RefCell::new(Vec::new()),
             children: RefCell::new(Vec::new()),
             text_pool: RefCell::new(String::new()),
+            pool_scratch: Cell::new(String::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
             static_width_cache: [const { Cell::new(StaticWidthSlot::EMPTY) }; STATIC_CACHE_SLOTS],
@@ -394,6 +403,7 @@ impl DocArena {
             // arenas without inflating the reuse high-water (reset() retains
             // organic capacity, bounded by the largest file's demand).
             text_pool: RefCell::new(String::with_capacity(source_len / 8)),
+            pool_scratch: Cell::new(String::new()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -583,6 +593,25 @@ impl DocArena {
             self.line_comment_ids.borrow_mut().push(id.0);
         }
         id
+    }
+
+    /// Start a streaming pooled-text build: assemble a dynamic string piecewise
+    /// (no transient caller `String`), then finish into a doc node.
+    ///
+    /// The writer owns a scratch buffer parked on the arena (`pool_scratch`),
+    /// so no pool borrow is held while it is open — interleaved `text_pooled`/
+    /// `multiline_text`/nested `pool_writer` calls stay **correct by
+    /// construction** (the written bytes enter the shared pool only at
+    /// `finish_*`, atomically), not merely non-panicking. Finishing consumes
+    /// the writer (`finish_text` / `finish_multiline_text`) and returns the
+    /// scratch, capacity retained; a writer dropped unfinished emits nothing
+    /// (its buffer, and the capacity it grew, is simply discarded).
+    #[inline]
+    pub fn pool_writer(&self) -> PoolTextWriter<'_> {
+        PoolTextWriter {
+            arena: self,
+            scratch: self.pool_scratch.take(),
+        }
     }
 
     /// Create a text doc from a verbatim source slice, resolved at render time
@@ -1369,5 +1398,78 @@ impl DocArena {
 impl Default for DocArena {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Streaming builder for pooled text — see [`DocArena::pool_writer`].
+///
+/// Assembles a dynamic string piecewise in an arena-parked scratch buffer,
+/// replacing the `let s = format!(…); d.text_pooled(&s)` pattern (same copy
+/// count — assembly + one pool copy — minus the transient `String`
+/// alloc/dealloc pair per call). Implements [`fmt::Write`] (never errors) so
+/// `write!(w, …)` works for formatted pieces; plain pieces use the infallible
+/// [`Self::push_str`] / [`Self::push`].
+pub struct PoolTextWriter<'a> {
+    arena: &'a DocArena,
+    scratch: String,
+}
+
+impl PoolTextWriter<'_> {
+    /// Append a string piece.
+    #[inline]
+    pub fn push_str(&mut self, s: &str) {
+        self.scratch.push_str(s);
+    }
+
+    /// Append a single char.
+    #[inline]
+    pub fn push(&mut self, c: char) {
+        self.scratch.push(c);
+    }
+
+    /// Reserve for at least `additional` more bytes (optional — the scratch
+    /// capacity is retained across uses, so steady state never grows).
+    #[inline]
+    pub fn reserve(&mut self, additional: usize) {
+        self.scratch.reserve(additional);
+    }
+
+    /// Whether nothing has been written yet.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.scratch.is_empty()
+    }
+
+    /// Finish into a [`DocText::Pooled`] text doc — the streaming equivalent
+    /// of [`DocArena::text_pooled`] (same eager width policy).
+    #[inline]
+    pub fn finish_text(self) -> DocId {
+        let id = self.arena.text_pooled(&self.scratch);
+        self.park();
+        id
+    }
+
+    /// Finish into a [`DocNode::MultilineText`] doc — the streaming equivalent
+    /// of [`DocArena::multiline_text`] (body must be framed the same way).
+    #[inline]
+    pub fn finish_multiline_text(self) -> DocId {
+        let id = self.arena.multiline_text(&self.scratch);
+        self.park();
+        id
+    }
+
+    /// Return the (cleared) scratch to the arena, retaining capacity.
+    #[inline]
+    fn park(mut self) {
+        self.scratch.clear();
+        self.arena.pool_scratch.set(self.scratch);
+    }
+}
+
+impl std::fmt::Write for PoolTextWriter<'_> {
+    #[inline]
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        self.scratch.push_str(s);
+        Ok(())
     }
 }

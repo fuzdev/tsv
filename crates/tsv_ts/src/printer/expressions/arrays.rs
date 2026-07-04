@@ -130,12 +130,18 @@ impl<'a> Printer<'a> {
     /// - `leading: false` for comments after elements → space before: `elem /*c*/`
     fn format_inline_block_comment(&self, comment: &tsv_lang::Comment, leading: bool) -> DocId {
         let d = self.d();
-        let content = comment.content(self.source);
+        // One text node either way (the full span is the verbatim `/*content*/`,
+        // delimiters included) — array fill items must not gain a separate
+        // space node.
+        let mut w = d.pool_writer();
         if leading {
-            d.text_pooled(&format!("/*{content}*/ "))
+            w.push_str(comment.span.extract(self.source));
+            w.push(' ');
         } else {
-            d.text_pooled(&format!(" /*{content}*/"))
+            w.push(' ');
+            w.push_str(comment.span.extract(self.source));
         }
+        w.finish_text()
     }
 
     /// Build expression doc for array element, wrapping certain expressions in isolated_group

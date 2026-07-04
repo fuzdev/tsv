@@ -1340,14 +1340,17 @@ impl<'a> Printer<'a> {
         if words.len() == 1 && !leading_line {
             if trailing_line && has_trailing_ws {
                 let word = if !trim_leading && has_leading_ws {
-                    format!(" {}", words[0])
+                    let mut w = d.pool_writer();
+                    w.push(' ');
+                    w.push_str(words[0]);
+                    w.finish_text()
                 } else {
-                    words[0].to_string()
+                    d.text_pooled(words[0])
                 };
-                let parts = [d.text_pooled(&word), d.line()];
+                let parts = [word, d.line()];
                 return Some(d.fill(&parts));
             }
-            let mut result = String::new();
+            let mut result = d.pool_writer();
             if !trim_leading && has_leading_ws {
                 result.push(' ');
             }
@@ -1355,7 +1358,7 @@ impl<'a> Printer<'a> {
             if !trim_trailing && has_trailing_ws {
                 result.push(' ');
             }
-            return Some(d.text_pooled(&result));
+            return Some(result.finish_text());
         }
 
         // Multiple words (or leading_line): build fill parts
@@ -1375,15 +1378,15 @@ impl<'a> Printer<'a> {
                 parts.push(d.line());
             }
             if i == 0 && prepend_space {
-                let mut s = String::with_capacity(1 + word.len());
-                s.push(' ');
-                s.push_str(word);
-                parts.push(d.text_pooled(&s));
+                let mut w = d.pool_writer();
+                w.push(' ');
+                w.push_str(word);
+                parts.push(w.finish_text());
             } else if i == words.len() - 1 && append_space {
-                let mut s = String::with_capacity(word.len() + 1);
-                s.push_str(word);
-                s.push(' ');
-                parts.push(d.text_pooled(&s));
+                let mut w = d.pool_writer();
+                w.push_str(word);
+                w.push(' ');
+                parts.push(w.finish_text());
             } else {
                 parts.push(d.text_pooled(word));
             }

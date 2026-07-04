@@ -388,6 +388,9 @@ fn build_chain_args_empty(
     let ChainArgsContext {
         paren_open, prefix, ..
     } = ctx;
+    // `prefix` is `"("` or `"?.("` (the prologue's two literals), so the closed
+    // empty-args form is one of two statics — no transient `format!` String.
+    let empty_pair: &'static str = if prefix == "?.(" { "?.()" } else { "()" };
 
     // Separate pre-paren comments (between > and () from inside-paren comments
     let paren_close = call.span.end;
@@ -410,10 +413,10 @@ fn build_chain_args_empty(
                 parts.push(inner);
                 parts.push(d.text(")"));
             }
-            None => parts.push(d.text_pooled(&format!("{prefix})"))),
+            None => parts.push(d.text(empty_pair)),
         }
     } else {
-        parts.push(d.text_pooled(&format!("{prefix})")));
+        parts.push(d.text(empty_pair));
     }
     d.concat(&parts)
 }
