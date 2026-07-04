@@ -261,12 +261,8 @@ export type CorpusTier = 'real' | 'prettier_fixture' | 'suite';
 /** A named subset of `CORPUS_ENTRIES` — see the module doc for what each view is for. */
 export type CorpusView = 'perf' | 'gates' | 'conformance';
 
-/** A corpus entry: a directory to walk (or a harvest-produced file list) plus its tier. */
-interface CorpusEntry {
-	/** Directory to walk, relative to project root (cwd). Exactly one of `path`/`files_from`. */
-	path?: string;
-	/** JSON path-list file (harvest output), relative to project root. */
-	files_from?: string;
+/** Fields shared by every corpus entry, whatever its file source. */
+interface CorpusEntryBase {
 	tier: CorpusTier;
 	extensions?: string[];
 	skip?: SkipFn;
@@ -283,14 +279,32 @@ interface CorpusEntry {
 }
 
 /**
- * Skip for the Svelte test-suite entry — adopts the conformance gate's
- * in-scope definition (`diagnostics/svelte_fixtures_compare.ts`): `_`-prefixed
- * segments are runner config/snapshot artifacts (`_config.js` boilerplate is
- * the vast majority of the suite's `.js` files; `_expected` dirs are
- * snapshots), `migrate/` holds Svelte-4 migrator inputs that are not
- * modern-parse targets, and `output.svelte` files are expected-output
- * snapshots. Counting any of these against per-tool coverage would misstate
- * conformance with the modern parser.
+ * A corpus entry plus its tier, carrying exactly one file source: a directory to
+ * walk (`path`, relative to project root) or a harvest-produced JSON path list
+ * (`files_from`, also project-root-relative). The union enforces the
+ * "exactly one of" invariant the type used to only assert in a doc comment —
+ * so `entry_source` narrows to a plain `string` without a non-null assertion.
+ */
+type CorpusEntry =
+	| (CorpusEntryBase & { path: string; files_from?: never })
+	| (CorpusEntryBase & { files_from: string; path?: never });
+
+/** The entry's declared file source (directory or file-list path). */
+function entry_source(entry: CorpusEntry): string {
+	return entry.path !== undefined ? entry.path : entry.files_from;
+}
+
+/**
+ * Skip for the Svelte test-suite entry — shares the artifact *exclusions* of the
+ * conformance gate (`diagnostics/svelte_fixtures_compare.ts`), though the two
+ * scopes differ: that gate whitelists only the canonical `.svelte` inputs, while
+ * this bench entry keeps every non-artifact file across all languages (the
+ * per-tool parse-coverage surface). The shared exclusions: `_`-prefixed segments
+ * are runner config/snapshot artifacts (`_config.js` boilerplate is the vast
+ * majority of the suite's `.js` files; `_expected` dirs are snapshots),
+ * `migrate/` holds Svelte-4 migrator inputs that are not modern-parse targets,
+ * and `output.svelte` files are expected-output snapshots. Counting any of these
+ * against per-tool coverage would misstate conformance with the modern parser.
  */
 const svelte_tests_skip = (_path: string, relative: string): boolean => {
 	const segments = relative.split('/');
@@ -428,7 +442,7 @@ export class DevReposLoader {
 		const present: CorpusEntry[] = [];
 		const missing: string[] = [];
 		for (const entry of entries) {
-			const entry_path = entry.path ?? entry.files_from!;
+			const entry_path = entry_source(entry);
 			if (await fs_exists(resolve(entry_path))) {
 				present.push(entry);
 			} else if (entry.optional) {
@@ -455,7 +469,7 @@ export class DevReposLoader {
 		logger(`Loading ${present.length} corpus paths (${this.view} view)`);
 
 		for (const entry of present) {
-			const entry_path = entry.path ?? entry.files_from!;
+			const entry_path = entry_source(entry);
 			const resolved_path = resolve(entry_path);
 
 			let count = 0;
