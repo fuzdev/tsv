@@ -125,11 +125,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Both identifiers and keywords can be property keys: { foo: 1, object: 2, in: 3 }
                 TokenKind::Identifier => {
                     let (key_start, key_end) = self.current_pos();
-                    let symbol = self.intern_identifier();
+                    let name = self.current_ident_name();
                     self.advance()?;
                     (
                         Expression::Identifier(Identifier::simple(
-                            symbol,
+                            name,
                             Span::new(key_start as u32, key_end as u32),
                         )),
                         false,
@@ -138,7 +138,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 TokenKind::Keyword(kw) => {
                     let (key_start, key_end) = self.current_pos();
-                    let symbol = self.intern(kw.as_str());
+                    let name = self.current_raw_ident_name();
                     // Track if this keyword cannot be used as identifier reference
                     // in shorthand. `await` is allowed at Script `[~Await]` (a
                     // valid `IdentifierReference`), like any other identifier.
@@ -150,7 +150,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.advance()?;
                     (
                         Expression::Identifier(Identifier::simple(
-                            symbol,
+                            name,
                             Span::new(key_start as u32, key_end as u32),
                         )),
                         false,

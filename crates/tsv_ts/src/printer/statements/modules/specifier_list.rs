@@ -10,7 +10,7 @@ use crate::printer::CommentVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, SymbolToU32, comments_in_range};
+use tsv_lang::{Span, comments_in_range};
 
 impl<'a> Printer<'a> {
     /// Check if an import declaration has empty named braces `{}` in source.
@@ -295,7 +295,7 @@ impl<'a> Printer<'a> {
         name: &internal::ModuleExportName<'_>,
     ) -> DocId {
         match name {
-            internal::ModuleExportName::Identifier(id) => self.d().symbol(id.name.to_u32()),
+            internal::ModuleExportName::Identifier(id) => self.identifier_name_doc(id),
             internal::ModuleExportName::Literal(lit) => self.build_literal_doc(lit),
         }
     }

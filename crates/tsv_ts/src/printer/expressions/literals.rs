@@ -14,7 +14,6 @@ use crate::printer::analysis;
 use smallvec::{SmallVec, smallvec};
 use std::borrow::Cow;
 use tsv_lang::Span;
-use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::{format_string_literal, optimal_string_quote};
@@ -314,7 +313,10 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a private identifier
     pub(super) fn build_private_identifier_doc(&self, pid: &internal::PrivateIdentifier) -> DocId {
         let d = self.d();
-        d.concat(&[d.text("#"), d.symbol(pid.name.to_u32())])
+        d.concat(&[
+            d.text("#"),
+            self.ident_name_doc(pid.name, pid.name_span().start),
+        ])
     }
 
     /// Build a Doc for an identifier
@@ -347,7 +349,7 @@ impl<'a> Printer<'a> {
         // the name-end scan that only the modifier/annotation branches consume.
         // Returns the exact DocId the `parts.len() == 1` tail would.
         if id.decorators().is_none() && !id.optional && id.type_annotation().is_none() {
-            return d.symbol(id.name.to_u32());
+            return self.identifier_name_doc(id);
         }
 
         let mut parts = DocBuf::new();
@@ -362,7 +364,7 @@ impl<'a> Printer<'a> {
         }
 
         // Add identifier name
-        parts.push(d.symbol(id.name.to_u32()));
+        parts.push(self.identifier_name_doc(id));
 
         // Compute name_end for comment extraction (used by optional and type annotation)
         let search_end = id.type_annotation().map_or(id.span.end, |ta| ta.span.start);

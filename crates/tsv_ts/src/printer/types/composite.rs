@@ -26,7 +26,6 @@ use tsv_lang::INDENT;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{SymbolResolver, SymbolToU32};
 
 impl<'a> Printer<'a> {
     //
@@ -614,9 +613,10 @@ impl<'a> Printer<'a> {
             body_parts.push(d.text(" "));
         }
 
-        body_parts.push(d.symbol(m.type_parameter.name.to_u32()));
+        body_parts.push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
         // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
-        let name_len = self.with_resolved_symbol(m.type_parameter.name, str::len);
+        let name_len =
+            self.with_ident_name_at(m.type_parameter.name, m.type_parameter.span.start, str::len);
         let name_end = m.type_parameter.span.start + name_len as u32;
         let constraint_start = m.type_parameter.constraint.span().start;
         // Find `i` of `in` keyword, skipping comments before it

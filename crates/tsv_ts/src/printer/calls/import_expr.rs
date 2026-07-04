@@ -11,7 +11,6 @@ use super::arg_comments::{
 use super::arg_predicates::is_expandable_object;
 use crate::ast::internal;
 use smallvec::smallvec;
-use tsv_lang::SymbolResolver;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 
@@ -259,7 +258,9 @@ pub(super) fn build_meta_property_doc(
     meta: &internal::MetaProperty<'_>,
 ) -> DocId {
     let d = printer.d();
-    let meta_name = printer.resolve_symbol(meta.meta.name);
-    let prop_name = printer.resolve_symbol(meta.property.name);
-    d.text_owned(format!("{meta_name}.{prop_name}"))
+    d.concat(&[
+        printer.identifier_name_doc(&meta.meta),
+        d.text("."),
+        printer.identifier_name_doc(&meta.property),
+    ])
 }

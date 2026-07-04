@@ -183,10 +183,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             && self.peek_value() == "of"
         {
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern_identifier();
+            let name = self.current_ident_name();
             self.advance()?; // consume 'async'
             let async_ident = Expression::Identifier(Identifier::simple(
-                symbol,
+                name,
                 Span::new(id_start as u32, id_end as u32),
             ));
             self.advance()?; // consume 'of'
@@ -511,7 +511,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // `[~Await]` context (`at_await_identifier`).
                 k if matches!(k, TokenKind::Identifier) || self.at_await_identifier() => {
                     let (id_start, id_end) = self.current_pos();
-                    let symbol = self.intern_identifier_or_await();
+                    let name = self.current_ident_name_or_await();
                     self.advance()?;
 
                     // Check for type annotation: param: type
@@ -524,7 +524,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     };
 
                     Expression::Identifier(Identifier {
-                        name: symbol,
+                        escaped_name: name.escaped,
+                        name_len: name.raw_len,
                         optional: false,
                         extra,
                         span: Span::new(id_start as u32, param_end as u32),
@@ -603,10 +604,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (label_start, label_end) = self.current_pos();
             // Plain identifier, or `await` as a `LabelIdentifier` target at Script
             // `[~Await]` (`break await` / `continue await`); reserved at Module.
-            let symbol = self.intern_identifier_or_await();
+            let name = self.current_ident_name_or_await();
             self.advance()?;
             Some(Identifier::simple(
-                symbol,
+                name,
                 Span::new(label_start as u32, label_end as u32),
             ))
         } else {
@@ -640,10 +641,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (label_start, label_end) = self.current_pos();
             // Plain identifier, or `await` as a `LabelIdentifier` target at Script
             // `[~Await]` (`break await` / `continue await`); reserved at Module.
-            let symbol = self.intern_identifier_or_await();
+            let name = self.current_ident_name_or_await();
             self.advance()?;
             Some(Identifier::simple(
-                symbol,
+                name,
                 Span::new(label_start as u32, label_end as u32),
             ))
         } else {
@@ -682,12 +683,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse label identifier. Normally a plain identifier; also `await` at
         // Script `[~Await]` (a valid `LabelIdentifier`), which the statement
         // dispatcher routes here as a keyword token.
-        let symbol = self
-            .try_intern_identifier_or_keyword()
+        let name = self
+            .try_ident_or_keyword_name()
             .ok_or_else(|| self.error_expected("label"))?;
         self.advance()?;
 
-        let label = Identifier::simple(symbol, Span::new(start as u32, label_end as u32));
+        let label = Identifier::simple(name, Span::new(start as u32, label_end as u32));
 
         // Consume ':'
         self.expect(&TokenKind::Colon)?;

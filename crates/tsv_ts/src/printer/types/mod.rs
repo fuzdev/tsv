@@ -42,7 +42,6 @@ use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
 use helpers::type_needs_parens_for_prefix_operator;
 use smallvec::smallvec;
-use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -119,7 +118,7 @@ impl<'a> Printer<'a> {
                         CommentSpacing::Trailing,
                     ));
                 }
-                parts.push(d.symbol(p.parameter_name.name.to_u32()));
+                parts.push(self.identifier_name_doc(&p.parameter_name));
                 if let Some(type_ann) = &p.type_annotation {
                     // Comments between `is` keyword and the type
                     // Find `i` of `is` skipping comments (plain find("is") could match
@@ -386,7 +385,7 @@ impl<'a> Printer<'a> {
                 d.concat(&[inner, d.text("?")])
             }
             TSType::NamedTupleMember(n) => {
-                let mut parts = smallvec![d.symbol(n.label.name.to_u32())];
+                let mut parts = smallvec![self.identifier_name_doc(&n.label)];
                 let label_end = n.label.span.end;
                 let type_start = n.element_type.span().start;
                 // Comments between label and `?` (e.g., `[a /* c */?: T]`)

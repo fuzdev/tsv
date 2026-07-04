@@ -14,7 +14,6 @@ use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
-use tsv_lang::SymbolResolver;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -677,9 +676,7 @@ impl<'a> Printer<'a> {
 
         let base_width = match key {
             // Prettier: cleanDoc reduces identifier keys to their name string
-            Expression::Identifier(id) => {
-                self.with_resolved_symbol(id.name, |s| visual_width(s, TAB_WIDTH))
-            }
+            Expression::Identifier(id) => self.with_ident_name(id, |s| visual_width(s, TAB_WIDTH)),
             Expression::Literal(lit) => match &lit.value {
                 LiteralValue::String(cooked) => {
                     let content = cooked.resolve(lit.span, self.source);

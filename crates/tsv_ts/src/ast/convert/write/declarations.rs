@@ -541,7 +541,7 @@ pub(super) fn write_type_parameter(
         w.raw(",\"out\":true");
     }
     w.raw(",\"name\":");
-    write_name(w, param.name.name, ctx);
+    write_name(w, param.name.ident_name(), param.name.span.start, ctx);
     if let Some(c) = &param.constraint {
         w.raw(",\"constraint\":");
         write_type(w, c, ctx);

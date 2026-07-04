@@ -18,7 +18,7 @@ Each module's visibility (in parens) reflects `pub use`-only modules (private) v
 - `source_scan` (`source_scan.rs`, pub) — Trivia-aware source scanning: the `skip_trivia` cursor plus the `find_char` / `find_keyword` / `rfind_keyword` delimiter/keyword finders (skipping JS/CSS comments + strings) and the `is_regex_start` / `skip_regex_literal` regex helpers (the one piece of `/`-disambiguation `skip_trivia` deliberately leaves out, since it needs backward token lookback). The single chokepoint for re-scanning source between AST nodes — used by AST conversion, all three printers, the Svelte parser (binding/declaration scans + the `{…}` brace matcher), and the TS parser's arrow-vs-paren / type-args lookahead
 - `interner` (`interner.rs`, private) — String interning traits (`SymbolResolver`, `InfallibleResolve`); implements `doc::TextResolver`
 - `escapes` (`escapes.rs`, private) — Escape sequence handling (quote swapping) — used internally by `printing`
-- `sizing` (`sizing.rs`, private) — `estimated_json_capacity` / `estimated_ast_arena_capacity` — pre-size heuristics for the public-AST JSON serialization buffer and the parse-time bump arena
+- `sizing` (`sizing.rs`, private) — `estimated_json_capacity` / `estimated_ast_arena_capacity` — pre-size heuristics for the wire-JSON output buffer and the parse-time bump arena
 - `output` (`output.rs`, private) — `OutputBuffer` — string building with column tracking
 
 Each language parser keeps its own single-token lookahead as `peek: Option<Token>` (the lexer's own token POD), with any decoded escape value parked out-of-band — there is no shared lookahead type.
@@ -33,14 +33,14 @@ The doc builder is the core of the formatting architecture. Language printers bu
 - **`DocId`** (`u32`) — Lightweight, `Copy` handle into the arena. No cloning, no recursive Drop.
 - **`DocBuf`** (`SmallVec<[DocId; 8]>`) — Shared stack buffer for assembling a node's doc parts before `concat()` / `fill()`. Most nodes have only a handful of parts, so the common case stays off the heap; larger nodes spill. Used by all language printers (the TS chain / binary-operator printers, the Svelte template printer) as the single canonical doc-parts buffer type.
 - **`DocNode`** — Node variants: `Text`, `MultilineText` (a `\n`-separated body rendered with per-line context indent — one allocation for an indentable multi-line block comment), `Line`, `Indent`, `Dedent`, `Group`, `IfBreak`, `Concat`, `Fill`, etc.
-- **`DocText`** — Four variants: `Static(&'static str)` (punctuation/keywords), `Owned(String)` (dynamic), `SourceSpan(Span)` (verbatim source slice — resolved against `source` at print time, like `Symbol` but keyed on a span; zero allocation for unmodified text such as comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), and Svelte markup text, with no `DocArena` lifetime), `Symbol(u32)` (deferred resolution via interner).
+- **`DocText`** — Four variants: `Static(&'static str)` (punctuation/keywords), `Owned(String)` (dynamic), `SourceSpan(Span)` (verbatim source slice — resolved against `source` at print time, like `Symbol` but keyed on a span; zero allocation for unmodified text such as identifier names (via the width-deferring `source_span_ident` constructor), comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), and Svelte markup text, with no `DocArena` lifetime), `Symbol(u32)` (deferred resolution via interner).
 - **`LineKind`** — `Normal` (space in flat, newline in break), `Soft` (nothing in flat), `Hard` (always newline), `Literal` (newline without indent).
 
 ### Builder API Categories
 
 All methods take `&self` (interior mutability via `RefCell`):
 
-- Text — `text()`, `text_owned()`, `multiline_text()`, `source_span()` / `line_comment_source_span()` (verbatim source slice, no allocation), `empty()`, `symbol()`
+- Text — `text()`, `text_owned()`, `multiline_text()`, `source_span()` / `source_span_ident()` (newline-free, width-deferred — identifier names) / `line_comment_source_span()` (verbatim source slice, no allocation), `empty()`, `symbol()`
 - Lines — `line()`, `softline()`, `hardline()`, `literalline()`
 - Structure — `group()`, `group_break()`, `indent()`, `dedent()`, `align()`
 - Conditionals — `if_break()`, `indent_if_break()`, `conditional_group()`
@@ -145,7 +145,7 @@ See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md#comment-handling-detach
 
 ## Interner Traits
 
-String interning deduplicates identifiers across all languages in a file. Symbols flow from parser through doc builder to renderer:
+The interner is per-document, shared across all languages in a file — its tenants are Svelte element/attribute names and escaped identifiers (identifier names are span-identity; see the Pattern below). Symbols flow from parser through doc builder to renderer:
 
 - `TextResolver` — `resolve(id: u32) -> &str` — resolve symbol during rendering. Also `resolve_source_span(span) -> &str` (defaulted to panic) for `DocText::SourceSpan` nodes; the default-impl interner carries no source, so a printer emitting `SourceSpan` wraps its interner in `doc::SourceTextResolver { inner, source }` and passes that to the resolved render entry points (this is how `source` reaches render without a `DocArena` lifetime). A printer with **no interner** — the CSS printer, which emits source slices directly and never `DocText::Symbol` — instead supplies a bare source-only `TextResolver` (its `resolve` is unreachable, only `resolve_source_span` does work), the same source-awareness without a symbol table.
 - `SymbolResolver` — `resolve_symbol()`, `with_resolved_symbol()` — zero-allocation hot path
@@ -153,7 +153,7 @@ String interning deduplicates identifiers across all languages in a file. Symbol
 - `SymbolToU32` — Convert `DefaultSymbol` to `u32` for doc builder `Symbol` variant
 - `SharedInterner` — Type alias `Rc<RefCell<DefaultStringInterner>>` — shared interner handle
 
-**Pattern**: Parser interns identifiers → AST stores `DefaultSymbol` → printer calls `arena.symbol(sym.to_u32())` → renderer resolves via `TextResolver` at print time.
+**Pattern**: identifier names are span-identity — the AST stores a name channel (tsv_ts's `IdentName`: raw token length + an `Option<DefaultSymbol>` escape hatch) and printers emit `DocText::SourceSpan` name slices, so the common path never interns. The interner's remaining tenants are tsv_svelte's element/attribute names (parser interns → AST stores `DefaultSymbol` → printer calls `arena.symbol(sym.to_u32())` → renderer resolves via `TextResolver` at print time) and the rare unicode-escaped identifier, whose decoded name rides the same deferred-`Symbol` path.
 
 ## Config Types
 

@@ -7,7 +7,6 @@
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use string_interner::DefaultSymbol;
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
@@ -296,12 +295,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Treated as a type reference with name "const"
             TokenKind::Keyword(KeywordKind::Const) => {
                 let (start, end) = self.current_pos();
-                let symbol = self.intern("const");
+                let name = self.current_raw_ident_name();
                 self.advance()?;
 
                 Ok(TSType::TypeReference(TSTypeReference {
                     type_name: TSEntityName::Identifier(Identifier::simple(
-                        symbol,
+                        name,
                         Span::new(start as u32, end as u32),
                     )),
                     type_arguments: None,
@@ -446,10 +445,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
+        let ident_name = self.current_ident_name();
         self.advance()?;
 
-        let name = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+        let name = Identifier::simple(ident_name, Span::new(id_start as u32, id_end as u32));
 
         // Optional constraint: `infer U extends C`. The constraint is parsed
         // with conditionals disallowed and function types re-enabled (acorn
@@ -713,26 +712,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse entity name: `Foo` or `Foo.Bar.Baz`
     pub(crate) fn parse_entity_name(&mut self) -> Result<TSEntityName<'arena>, ParseError> {
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
+        let name = self.current_ident_name();
         self.advance()?;
 
         let mut result = TSEntityName::Identifier(Identifier::simple(
-            symbol,
+            name,
             Span::new(id_start as u32, id_end as u32),
         ));
 
         while self.eat(TokenKind::Dot) {
-            let right_symbol = self
-                .try_intern_identifier_or_keyword()
+            let right_name = self
+                .try_ident_or_keyword_name()
                 .ok_or_else(|| self.error_expected_after("identifier", "."))?;
 
             let (right_start, right_end) = self.current_pos();
             self.advance()?;
 
-            let right = Identifier::simple(
-                right_symbol,
-                Span::new(right_start as u32, right_end as u32),
-            );
+            let right =
+                Identifier::simple(right_name, Span::new(right_start as u32, right_end as u32));
 
             result = TSEntityName::QualifiedName(self.alloc(TSQualifiedName {
                 left: result,
@@ -887,7 +884,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             && id.type_annotation().is_none()
             && !id.optional
         {
-            let inner = if id.name == self.intern("this") {
+            let inner = if self.ident_name_is(id, "this") {
                 TSType::ThisType(TSThisType { span: id.span })
             } else {
                 TSType::TypeReference(TSTypeReference {
@@ -1142,8 +1139,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Accept identifiers and contextual keywords (e.g., `from`, `as`) as parameter
         // names, plus the `this` keyword (TypeScript `this` parameter: `(this: T) => U`).
-        let symbol = self
-            .try_intern_param_name()
+        let name = self
+            .try_param_name()
             .ok_or_else(|| self.error_expected("parameter name"))?;
         self.advance()?;
 
@@ -1160,7 +1157,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let extra = type_annotation.map(|ta| self.typed_extra(ta));
 
         Ok(Expression::Identifier(Identifier {
-            name: symbol,
+            escaped_name: name.escaped,
+            name_len: name.raw_len,
             optional,
             extra,
             span: Span::new(id_start as u32, end),
@@ -1206,13 +1204,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Expect `[`
         self.expect(&TokenKind::BracketOpen)?;
 
-        // Parse type parameter name: `K` — intern eagerly (the symbol is `Copy`)
-        // so no owned `String` is threaded through to `finish_mapped_type`.
+        // Parse type parameter name: `K` (identifier or contextual keyword; the
+        // `IdentName` is `Copy`, so no owned `String` is threaded through to
+        // `finish_mapped_type`).
         let param_start = self.current_pos().0;
         let param_name = self
-            .current_identifier_or_keyword_name()
+            .try_ident_or_keyword_name()
             .ok_or_else(|| self.error_expected("type parameter name in mapped type"))?;
-        let param_symbol = self.intern(param_name);
         self.advance()?;
 
         // Expect `in`
@@ -1221,7 +1219,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         self.advance()?; // consume 'in'
 
-        self.finish_mapped_type(start, param_start, param_symbol, readonly)
+        self.finish_mapped_type(start, param_start, param_name, readonly)
     }
 
     /// Shared tail for mapped type parsing after `[K in` has been consumed.
@@ -1230,7 +1228,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         param_start: usize,
-        param_symbol: DefaultSymbol,
+        param_name: IdentName,
         readonly: Option<TSMappedTypeModifier>,
     ) -> Result<TSType<'arena>, ParseError> {
         let arena = self.arena;
@@ -1269,7 +1267,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok(TSType::Mapped(TSMappedType {
             type_parameter: TSMappedTypeParameter {
-                name: param_symbol,
+                name: param_name,
                 constraint: self.alloc(constraint),
                 span: Span::new(param_start as u32, param_end),
             },
@@ -1394,7 +1392,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             && matches!(self.peek_kind(), TokenKind::Colon | TokenKind::Question)
         {
             let (label_start, label_end) = self.current_pos();
-            let label_symbol = self.intern_identifier();
+            let label_name = self.current_ident_name();
             self.advance()?; // consume identifier
 
             // Check for optional marker `?` followed by `:`
@@ -1411,7 +1409,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // and wrap it in optional
                     let type_ref = TSType::TypeReference(TSTypeReference {
                         type_name: TSEntityName::Identifier(Identifier::simple(
-                            label_symbol,
+                            label_name,
                             Span::new(label_start as u32, label_end as u32),
                         )),
                         type_arguments: None,
@@ -1433,7 +1431,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             return Ok(TSType::NamedTupleMember(TSNamedTupleMember {
                 label: Identifier::simple(
-                    label_symbol,
+                    label_name,
                     Span::new(label_start as u32, label_end as u32),
                 ),
                 element_type: self.alloc(element_type),
@@ -1710,9 +1708,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if !matches!(self.current_kind(), TokenKind::Identifier) {
             return Err(self.error_expected_found_at("type parameter name", id_start));
         }
-        let symbol = self.intern_identifier();
+        let ident_name = self.current_ident_name();
         self.advance()?;
-        let name = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+        let name = Identifier::simple(ident_name, Span::new(id_start as u32, id_end as u32));
 
         // Track the end position as we parse optional parts
         let mut end = id_end as u32;

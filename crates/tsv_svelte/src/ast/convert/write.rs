@@ -1177,7 +1177,7 @@ fn write_directive_value_expression(
         w.raw(",\"end\":");
         w.u32(ctx.pos(id.span.end));
         w.raw(",\"type\":\"Identifier\",\"name\":");
-        w.string(ctx.interner.resolve(id.name).unwrap_or(""));
+        w.string(id.name(ctx.source, ctx.interner));
         w.raw("}");
     }
 }
@@ -1465,7 +1465,7 @@ fn write_custom_element_field(
                     && let Expression::Identifier(key) = &p.key
                     && let Expression::Literal(lit) = &p.value
                 {
-                    let key_name = ctx.interner.resolve(key.name).unwrap_or("");
+                    let key_name = key.name(ctx.source, ctx.interner);
                     let value = match &lit.value {
                         LiteralValue::String(cooked) => CustomElementValue::Str(
                             std::borrow::Cow::Borrowed(cooked.resolve(lit.span, ctx.source)),

@@ -5,10 +5,10 @@
 use super::Printer;
 use crate::ast::internal;
 use smallvec::smallvec;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{SymbolToU32, comments_in_range};
 
 impl<'a> Printer<'a> {
     /// Append the `with { … }` import-attributes clause to `parts`, if any, and
@@ -128,7 +128,7 @@ impl<'a> Printer<'a> {
     /// (`'type'` → `type`), else kept and normalized (`'resolution-mode'`).
     fn build_import_attribute_key_doc(&self, key: &internal::ImportAttributeKey<'_>) -> DocId {
         match key {
-            internal::ImportAttributeKey::Identifier(id) => self.d().symbol(id.name.to_u32()),
+            internal::ImportAttributeKey::Identifier(id) => self.identifier_name_doc(id),
             internal::ImportAttributeKey::Literal(lit) => {
                 if let internal::LiteralValue::String(cooked) = &lit.value {
                     let content = cooked.resolve(lit.span, self.source);

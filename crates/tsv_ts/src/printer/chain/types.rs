@@ -5,9 +5,8 @@
 // - ChainNodeVec: Stack-friendly buffer for a linearized chain
 // - ChainGroup: Groups of nodes that stay together on the same line
 
-use crate::ast::internal::{self, LiteralValue};
+use crate::ast::internal::{self, IdentName, LiteralValue};
 use smallvec::SmallVec;
-use string_interner::DefaultSymbol;
 
 /// Buffer for a linearized chain — chains are measured-short, so small chains
 /// (the common case) stay on the stack. `ChainNode` is `Copy` and ~24 bytes.
@@ -51,19 +50,23 @@ pub enum ChainNode<'a> {
     },
     /// Member access: .prop
     /// `object_end` is where the object expression ends
-    /// `property_start` is where the property identifier starts (for comment detection)
+    /// `property_start` is where the property identifier starts (for comment
+    /// detection; also the name's span start for span-identity resolution)
     Member {
-        property: DefaultSymbol,
+        property: IdentName,
         optional: bool,
         object_end: u32,
         property_start: u32,
     },
     /// Private member access: .#prop
+    /// `property_start` is the `#` (comment detection); `name_start` is the
+    /// name token after it (span-identity resolution).
     PrivateMember {
-        property: DefaultSymbol,
+        property: IdentName,
         optional: bool,
         object_end: u32,
         property_start: u32,
+        name_start: u32,
     },
     /// Computed member access: [expr]
     /// `bracket_end` is the position just before the closing `]` (for trailing comment detection)
@@ -120,7 +123,7 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new member node
     pub fn member(
-        property: DefaultSymbol,
+        property: IdentName,
         optional: bool,
         object_end: u32,
         property_start: u32,
@@ -135,16 +138,18 @@ impl<'a> ChainNode<'a> {
 
     /// Create a new private member node: .#prop
     pub fn private_member(
-        property: DefaultSymbol,
+        property: IdentName,
         optional: bool,
         object_end: u32,
         property_start: u32,
+        name_start: u32,
     ) -> Self {
         Self::PrivateMember {
             property,
             optional,
             object_end,
             property_start,
+            name_start,
         }
     }
 
@@ -222,10 +227,14 @@ impl<'a> ChainNode<'a> {
         matches!(self, Self::ComputedMember { .. })
     }
 
-    /// Get property symbol for Member nodes
-    pub const fn property(&self) -> Option<DefaultSymbol> {
+    /// Get the property name channel (+ its span start) for Member nodes
+    pub const fn property(&self) -> Option<(IdentName, u32)> {
         match self {
-            Self::Member { property, .. } => Some(*property),
+            Self::Member {
+                property,
+                property_start,
+                ..
+            } => Some((*property, *property_start)),
             _ => None,
         }
     }

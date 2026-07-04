@@ -12,7 +12,6 @@ use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
-use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -741,7 +740,7 @@ impl<'a> Printer<'a> {
                 // function type group's breaking decision.
                 parts.push(d.text("("));
                 // Build identifier name + optional marker
-                parts.push(d.symbol(id.name.to_u32()));
+                parts.push(self.identifier_name_doc(id));
                 if id.optional {
                     parts.push(d.text("?"));
                 }

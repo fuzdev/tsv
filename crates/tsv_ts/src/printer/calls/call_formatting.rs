@@ -29,7 +29,6 @@ use super::test_patterns::{build_test_callee_flat_doc, is_test_call};
 use crate::ast::internal;
 use crate::printer::CommentVec;
 use smallvec::smallvec;
-use tsv_lang::SymbolResolver;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -172,7 +171,7 @@ pub(super) fn build_call_doc_with_wrapping(
         .filter(|_| !has_trailing_comments_on_args(call, printer))
     {
         let base_doc = printer.build_expression_doc(base_expr);
-        let method_str = printer.resolve_symbol(method_name.name);
+        let method_doc = printer.identifier_name_doc(method_name);
         let arg_doc = printer.build_expression_doc(&call.arguments[0]);
 
         // Format: base\n\t.method(arg)
@@ -180,7 +179,9 @@ pub(super) fn build_call_doc_with_wrapping(
         return d.group(d.concat(&[
             base_doc,
             d.indent_softline(d.concat(&[
-                d.text_owned(format!(".{method_str}(")),
+                d.text("."),
+                method_doc,
+                d.text("("),
                 arg_doc,
                 d.text(")"),
             ])),
