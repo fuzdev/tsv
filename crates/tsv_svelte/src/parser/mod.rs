@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
-use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
+use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
 // Module declarations
@@ -404,7 +404,9 @@ pub(crate) fn find_top_level_delim(
 /// (`{ }`/`[ ]` destructuring patterns, `< >` snippet generics, `( )` snippet
 /// params) — a `close` inside a comment or string can't end the match early, and
 /// the cursor's escape-correct string handling fixes the former `ends_with('\\')`
-/// escape bug.
+/// escape bug. Template literals (in a pattern default like `{ a = `…` }`) are
+/// intercepted and skipped interpolation-aware via `skip_template_literal`, since
+/// `skip_trivia`'s opaque `` ` ``-to-`` ` `` scan mis-pairs across a nested template.
 pub(crate) fn match_bracket(
     bytes: &[u8],
     open_pos: usize,
@@ -421,6 +423,16 @@ pub(crate) fn match_bracket(
     let mut depth: u32 = 1;
     let mut i = open_pos + 1;
     while i < end {
+        // Template literal — skip it whole, interpolation-aware. `skip_trivia`'s
+        // opaque quote-to-quote handling mis-pairs backticks across a nested
+        // template (`` `${`x`}` ``), so a pattern default like `{ a = `${`"`}` }`
+        // would swallow past the closing bracket. Gated on `profile.strings` (the
+        // JS binding-pattern callers), matching where `skip_trivia` treats `` ` ``
+        // as a string.
+        if profile.strings && bytes[i] == b'`' {
+            i = skip_template_literal(bytes, i, end);
+            continue;
+        }
         if let Some(past) = skip_trivia(bytes, i, end, profile) {
             i = past;
             continue;

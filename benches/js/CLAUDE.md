@@ -236,6 +236,54 @@ the canonical parser throw, so they land in the error buckets. When triage
 confirms a new group is intentional, add a matcher AND catalog it in
 docs/conformance_svelte.md.
 
+## Svelte-Fixtures Parse Conformance
+
+`deno task conformance:svelte-fixtures` runs tsv's Svelte parser against
+**Svelte's own compiler test suite** (`../svelte/packages/svelte/tests`) — the
+drop-in-parser analog of test262 (JS) and the WPT harness (CSS). It's a
+periodic (non-`check`) gate; `diagnostics/svelte_fixtures_compare.ts` is the
+entry.
+
+```bash
+deno task conformance:svelte-fixtures            # builds corpus FFI, then runs
+deno task conformance:svelte-fixtures:run        # skip rebuild (freshness-guarded)
+deno task conformance:svelte-fixtures:run -v     # + per-file known-gap / AST-group detail
+deno task conformance:svelte-fixtures:run --json 2>/dev/null > report.json
+deno task conformance:svelte-fixtures:run ../svelte/packages/svelte/tests/parser-modern  # a subtree
+```
+
+**Oracle = the LIVE modern Svelte parser** (`svelte/compiler` `parse(src,
+{modern:true})`), not the committed fixture artifacts — `parser-legacy`'s
+`output.json` is the *legacy* AST, `compiler-errors/_config.js` encodes
+*compiler* (analysis-stage) verdicts, and `css` ships compiled CSS, so none is a
+correct oracle for a drop-in *modern-parser* replacement. Using the live modern
+parser also makes the two trap partitions resolve for free: `loose-*` inputs
+throw under the non-loose oracle (→ parity), and analysis-stage `compiler-errors`
+parse fine on both sides (→ never miscounted as a tsv bug).
+
+**Scope**: the canonical `.svelte` INPUTs (`input.svelte`/`main.svelte`/
+`index.svelte`), skipping generated `_`-prefixed artifacts, `output.svelte`
+dups, and the `migrate/` tree (Svelte-4 migrator inputs, not modern-parse
+targets). `.svelte.js`/`.ts`/`.css` are out of scope (test262 / wpt cover those).
+
+Two comparisons per input:
+
+- **Verdict parity** (the enforced gate) — buckets over-rejections (tsv rejects
+  what Svelte accepts) into `SANCTIONED` (tsv correctly stricter; input is
+  invalid Svelte the parser is merely lenient about), `KNOWN_GAPS` (tsv wrong; a
+  tracked drop-in gap that must only shrink), and `unexpected` (a NEW gap —
+  **exits 1**). Both lists are reviewed in-file allowlists in
+  `svelte_fixtures_compare.ts`. `over_acceptance` (tsv accepts, Svelte rejects) is
+  a deferred early-error, reported not gated. Green at baseline = every gap is
+  sanctioned or tracked.
+- **AST-shape** (report-only) — for inputs both accept, deep-diffs tsv's wire AST
+  vs the Svelte AST via the SHARED `corpus_compare_parse.ts` engine (`diff_asts`
+  + `DOCUMENTED_MATCHERS`, imported — that module is now `import.meta.main`-guarded
+  so importing it doesn't run the CLI). The adversarial fixture tree exposes many
+  edge divergences; triaging each into the shared `DOCUMENTED_MATCHERS` (which
+  also shrinks the `corpus:compare:parse` count) or fixing it as a writer bug is a
+  tracked campaign, so this half does **not** gate yet.
+
 ## Divergence Detection
 
 Automatically detects known divergence patterns from `conformance_prettier.md`:
@@ -600,8 +648,9 @@ benches/js/
 ├── corpus_compare_format.ts  # Formatting comparison vs prettier (Deno-only entry point)
 ├── corpus_compare_parse.ts   # Parse/AST comparison vs canonical parsers (Deno-only entry point)
 ├── divergence_audit.ts    # Divergence audit entry point (Deno-only)
-├── diagnostics/           # ad-hoc diagnostic scripts (not wired into `deno task` — see §Diagnostic scripts)
+├── diagnostics/           # diagnostic scripts (most ad-hoc, not wired into `deno task` — see §Diagnostic scripts)
 │   ├── skip_triage.ts        # parse-parity gate (tsv vs canonical; allowlisted over-rejections)
+│   ├── svelte_fixtures_compare.ts  # Svelte-fixtures parse-conformance gate (task: conformance:svelte-fixtures; verdict parity + AST-shape)
 │   ├── test262_compare.ts    # test262 differential (tsv vs oxc-parser, from the Rust manifest)
 │   ├── wasm_json_probe.ts    # WASM-vs-native JSON parse penalty attribution
 │   ├── wasm_format_probe.ts  # WASM format wall-time A/B
@@ -619,6 +668,7 @@ benches/js/
 │   ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native, runtime-specific)
 │   ├── runtime.ts         # Tiny cross-runtime helpers: current_runtime / os / arch normalizers
 │   ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
+│   ├── parse_sanctions.ts # Shared parse-parity SANCTIONS (Svelte-fixture over-rejections tsv is correctly stricter on; used by skip_triage + svelte_fixtures_compare)
 │   ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
 │   ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime wasi entry)
 │   ├── report.ts          # Summary report generation
