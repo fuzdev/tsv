@@ -489,11 +489,19 @@ pub enum SpecialElementTag {
 }
 
 impl SpecialElementTag {
-    /// Try to parse a tag name into a special element tag
+    /// Try to parse a tag name into a special element tag.
     ///
-    /// Note: `title` is only TitleElement when inside `<svelte:head>`,
-    /// which must be checked by the caller.
-    pub fn from_tag_name(name: &str, in_svelte_head: bool) -> Option<Self> {
+    /// Two classifications are ancestor-context-dependent, so the caller supplies its parse
+    /// state (mirroring Svelte's stack walks in `1-parse/state/element.js`):
+    /// - `title` is `TitleElement` only inside `<svelte:head>` (`parent_is_head`).
+    /// - `slot` is `SlotElement` only when *not* inside a `<template shadowrootmode>`
+    ///   (`parent_is_shadowroot_template`); there it's an ordinary `RegularElement`, so this
+    ///   returns `None` and the caller parses it on the regular-element path.
+    pub fn from_tag_name(
+        name: &str,
+        in_svelte_head: bool,
+        in_shadowroot_template: bool,
+    ) -> Option<Self> {
         match name {
             "svelte:head" => Some(Self::SvelteHead),
             "svelte:window" => Some(Self::SvelteWindow),
@@ -502,7 +510,7 @@ impl SpecialElementTag {
             "svelte:element" => Some(Self::SvelteElement),
             "svelte:component" => Some(Self::SvelteComponent),
             "svelte:self" => Some(Self::SvelteSelf),
-            "slot" => Some(Self::SlotElement),
+            "slot" if !in_shadowroot_template => Some(Self::SlotElement),
             "svelte:fragment" => Some(Self::SvelteFragment),
             "svelte:boundary" => Some(Self::SvelteBoundary),
             "title" if in_svelte_head => Some(Self::TitleElement),
@@ -1002,27 +1010,33 @@ mod tests {
     fn special_element_tag_from_name() {
         use SpecialElementTag::*;
         assert_eq!(
-            SpecialElementTag::from_tag_name("svelte:head", false),
+            SpecialElementTag::from_tag_name("svelte:head", false, false),
             Some(SvelteHead)
         );
         assert_eq!(
-            SpecialElementTag::from_tag_name("slot", false),
-            Some(SlotElement)
-        );
-        assert_eq!(
-            SpecialElementTag::from_tag_name("svelte:boundary", false),
+            SpecialElementTag::from_tag_name("svelte:boundary", false, false),
             Some(SvelteBoundary)
         );
         // `title` is special only inside <svelte:head> — the flag gates both arms.
         assert_eq!(
-            SpecialElementTag::from_tag_name("title", true),
+            SpecialElementTag::from_tag_name("title", true, false),
             Some(TitleElement)
         );
-        assert_eq!(SpecialElementTag::from_tag_name("title", false), None);
-        // Unknown / regular tags are not special.
-        assert_eq!(SpecialElementTag::from_tag_name("div", true), None);
         assert_eq!(
-            SpecialElementTag::from_tag_name("svelte:unknown", false),
+            SpecialElementTag::from_tag_name("title", false, false),
+            None
+        );
+        // `slot` is SlotElement normally, but a plain RegularElement (→ None) inside a
+        // <template shadowrootmode>.
+        assert_eq!(
+            SpecialElementTag::from_tag_name("slot", false, false),
+            Some(SlotElement)
+        );
+        assert_eq!(SpecialElementTag::from_tag_name("slot", false, true), None);
+        // Unknown / regular tags are not special.
+        assert_eq!(SpecialElementTag::from_tag_name("div", true, false), None);
+        assert_eq!(
+            SpecialElementTag::from_tag_name("svelte:unknown", false, false),
             None
         );
     }

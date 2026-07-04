@@ -54,6 +54,16 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     pub(crate) base_offset: usize, // Offset of lexer's source in full source
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
     pub(crate) expression_comments: Vec<Comment>,
+    /// True while the nearest *element* ancestor is `<svelte:head>` — mirrors Svelte's
+    /// `parent_is_head` (`1-parse/state/element.js`): set entering a head's children, reset by a
+    /// nested RegularElement/Component, transparent through other special elements and blocks.
+    /// Gates `<title>` → `TitleElement`. Saved/restored around each element's children.
+    pub(crate) in_svelte_head: bool,
+    /// True while inside a `<template shadowrootmode>` — mirrors Svelte's
+    /// `parent_is_shadowroot_template` (any ancestor RegularElement carrying a `shadowrootmode`
+    /// attribute). Monotonic within a subtree (descendants inherit) but scoped to the template
+    /// (restored for siblings). Suppresses `<slot>` → `SlotElement` (it stays a `RegularElement`).
+    pub(crate) in_shadowroot_template: bool,
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -82,6 +92,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             interner,
             base_offset: 0,
             expression_comments: Vec::new(),
+            in_svelte_head: false,
+            in_shadowroot_template: false,
         })
     }
 

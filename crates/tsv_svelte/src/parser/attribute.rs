@@ -117,21 +117,30 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
             if self.check(TokenKind::Identifier) {
                 attributes.push(self.parse_attribute_or_directive(parse_expressions)?);
-            } else if self.check(TokenKind::TagOpen) {
-                // {@ token - check if it's @attach
-                attributes.push(AttributeNode::AttachTag(self.parse_attach_tag()?));
-            } else if self.check(TokenKind::LeftBrace) {
-                // { token - could be spread {...obj} or shorthand {name}
-                // Peek ahead to determine which
-                let next_char = self.peek_char_after_brace();
-                if next_char == Some('.') {
-                    // {...} - spread attribute
-                    attributes.push(AttributeNode::SpreadAttribute(
-                        self.parse_spread_attribute()?,
-                    ));
+            } else if self.check(TokenKind::TagOpen) || self.check(TokenKind::LeftBrace) {
+                if parse_expressions {
+                    // Element attribute reader: `{@attach}`, `{...spread}`, or `{shorthand}`.
+                    if self.check(TokenKind::TagOpen) {
+                        attributes.push(AttributeNode::AttachTag(self.parse_attach_tag()?));
+                    } else {
+                        // Peek ahead to distinguish spread `{...obj}` from shorthand `{name}`.
+                        let next_char = self.peek_char_after_brace();
+                        if next_char == Some('.') {
+                            attributes.push(AttributeNode::SpreadAttribute(
+                                self.parse_spread_attribute()?,
+                            ));
+                        } else {
+                            attributes
+                                .push(AttributeNode::Attribute(self.parse_shorthand_attribute()?));
+                        }
+                    }
                 } else {
-                    // {identifier} - shorthand attribute
-                    attributes.push(AttributeNode::Attribute(self.parse_shorthand_attribute()?));
+                    // Static/literal reader (top-level `<script>`/`<style>`): a leading `{` is
+                    // never a spread/shorthand/attach — Svelte's `read_static_attribute` reads the
+                    // raw run up to a token-ending char as a boolean-attribute *name*.
+                    attributes.push(AttributeNode::Attribute(
+                        self.parse_static_brace_attribute()?,
+                    ));
                 }
             } else {
                 return Err(self.error_expected_found("attribute name or '>'"));
@@ -689,6 +698,51 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 start: content_start as u32,
                 end: content_end as u32,
             },
+        })
+    }
+
+    /// Parse a leading `{` as a static (literal) boolean attribute — the top-level
+    /// `<script>`/`<style>` behavior. Svelte reads these tags' attributes with
+    /// `read_static_attribute` (`1-parse/state/element.js`), which never parses `{...spread}` /
+    /// `{shorthand}` / `{@attach}`: it reads the raw run up to a token-ending character
+    /// (`[\s=/>"']`, so the `}` is included) as the attribute *name* and leaves `value = true`.
+    /// So `<script {...wheee}>` → `Attribute { name: "{...wheee}", value: true }`, not a
+    /// `SpreadAttribute`. (`{name="value"}` never arises — the run stops at `=`; a name run is
+    /// followed by the normal `=`-value handling in `parse_attribute_or_directive`, but a `{`-led
+    /// name has no `=` in practice.)
+    fn parse_static_brace_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
+        let start = self.current_start;
+        let bytes = self.source.as_bytes();
+        // Svelte's `regex_token_ending_character = /[\s=/>"']/`.
+        let mut end = start;
+        while end < bytes.len()
+            && !matches!(
+                bytes[end],
+                b' ' | b'\t'
+                    | b'\n'
+                    | b'\r'
+                    | b'\x0b'
+                    | b'\x0c'
+                    | b'='
+                    | b'/'
+                    | b'>'
+                    | b'"'
+                    | b'\''
+            )
+        {
+            end += 1;
+        }
+        let name = self.intern(&self.source[start..end]);
+        let span = Span {
+            start: start as u32,
+            end: end as u32,
+        };
+        self.advance_to_position(end)?;
+        Ok(Attribute {
+            name,
+            value: None,
+            span,
+            name_span: span,
         })
     }
 

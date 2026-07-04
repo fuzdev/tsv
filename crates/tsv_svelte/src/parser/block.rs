@@ -1226,7 +1226,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 if self.is_next_token(TokenKind::Slash)? {
                     break;
                 }
-                match self.parse_element_or_special(false)? {
+                match self.parse_element_or_special()? {
                     ParsedElement::Element(elem) => {
                         last_end = elem.span.end_usize();
                         nodes.push(FragmentNode::Element(elem));

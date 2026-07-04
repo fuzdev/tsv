@@ -1,0 +1,97 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 31,
+		"end": 59,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 38,
+				"end": 49,
+				"name": "{shorthand}",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 7,
+						"character": 38
+					},
+					"end": {
+						"line": 3,
+						"column": 18,
+						"character": 49
+					}
+				},
+				"value": true
+			}
+		],
+		"children": [],
+		"content": {
+			"start": 50,
+			"end": 51,
+			"styles": "\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 60,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Text",
+				"start": 29,
+				"end": 31,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 29,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 20,
+			"end": 20,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 1,
+					"column": 29
+				}
+			},
+			"body": [],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 19,
+				"name": "{...spread}",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 19,
+						"character": 19
+					}
+				},
+				"value": true
+			}
+		]
+	}
+}

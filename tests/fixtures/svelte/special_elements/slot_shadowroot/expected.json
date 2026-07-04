@@ -1,0 +1,294 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 303,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 86,
+				"data": " slot in a shadowroot template → RegularElement (suppressed), even when nested "
+			},
+			{
+				"type": "Text",
+				"start": 86,
+				"end": 87,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 87,
+				"end": 172,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 88
+					},
+					"end": {
+						"line": 2,
+						"column": 9,
+						"character": 96
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 97,
+						"end": 118,
+						"name": "shadowrootmode",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 10,
+								"character": 97
+							},
+							"end": {
+								"line": 2,
+								"column": 24,
+								"character": 111
+							}
+						},
+						"value": [
+							{
+								"start": 113,
+								"end": 117,
+								"type": "Text",
+								"raw": "open",
+								"data": "open"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 119,
+							"end": 121,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 121,
+							"end": 134,
+							"name": "slot",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 122
+								},
+								"end": {
+									"line": 3,
+									"column": 6,
+									"character": 126
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 134,
+							"end": 136,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 136,
+							"end": 160,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 137
+								},
+								"end": {
+									"line": 4,
+									"column": 5,
+									"character": 140
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RegularElement",
+										"start": 141,
+										"end": 154,
+										"name": "slot",
+										"name_loc": {
+											"start": {
+												"line": 4,
+												"column": 7,
+												"character": 142
+											},
+											"end": {
+												"line": 4,
+												"column": 11,
+												"character": 146
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": []
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 160,
+							"end": 161,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 172,
+				"end": 174,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 174,
+				"end": 211,
+				"data": " plain template → SlotElement "
+			},
+			{
+				"type": "Text",
+				"start": 211,
+				"end": 212,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 212,
+				"end": 249,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 213
+					},
+					"end": {
+						"line": 8,
+						"column": 9,
+						"character": 221
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 222,
+							"end": 224,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "SlotElement",
+							"start": 224,
+							"end": 237,
+							"name": "slot",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 2,
+									"character": 225
+								},
+								"end": {
+									"line": 9,
+									"column": 6,
+									"character": 229
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 237,
+							"end": 238,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 249,
+				"end": 251,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 251,
+				"end": 288,
+				"data": " top-level slot → SlotElement "
+			},
+			{
+				"type": "Text",
+				"start": 288,
+				"end": 289,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SlotElement",
+				"start": 289,
+				"end": 302,
+				"name": "slot",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 290
+					},
+					"end": {
+						"line": 13,
+						"column": 5,
+						"character": 294
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

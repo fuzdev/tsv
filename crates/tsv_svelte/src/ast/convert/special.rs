@@ -272,20 +272,18 @@ pub(super) fn build_script_writer_comments(
     out
 }
 
-/// Detect if a script tag has `lang="ts"` attribute.
+/// A script tag's `lang` attribute value, if it carries one (`<script lang="ts">` → `Some("ts")`,
+/// plain `<script>` → `None`).
 ///
-/// When `lang="ts"` is present, the script is parsed by acorn-typescript (TypeScript context).
-/// Otherwise (plain `<script>`), it's parsed by Svelte's parser (Svelte context), which
-/// omits `importKind`/`exportKind` for "value" and always includes `attributes` on
-/// import/export declarations.
-///
-/// `pub(super)` so the wire-JSON writer reuses the exact `lang="ts"` test behind
-/// the fused-Program eligibility gate.
-pub(super) fn script_has_lang_ts(
+/// The value decides the wire schema: acorn-typescript context (`Some("ts")`) emits
+/// `importKind`/`exportKind = "value"` and omits `attributes`; the Svelte context (anything else)
+/// omits `importKind`/`exportKind` and always includes `attributes`. But the *choice* is
+/// component-global, not per-script — this only feeds [`component_is_typescript`].
+fn script_lang<'s>(
     script: &internal::Script<'_>,
-    source: &str,
-    interner: &DefaultStringInterner,
-) -> bool {
+    source: &'s str,
+    interner: &'s DefaultStringInterner,
+) -> Option<&'s str> {
     for attr_node in script.attributes {
         let internal::AttributeNode::Attribute(attr) = attr_node else {
             continue;
@@ -294,12 +292,37 @@ pub(super) fn script_has_lang_ts(
         if name == "lang"
             && let Some(values) = &attr.value
             && let Some(internal::AttributeValue::Text(text)) = values.first()
-            && text.data(source) == "ts"
         {
-            return true;
+            // `data()` borrows `source` when the value has no entities (the common case); a
+            // decoded value would not outlive this call, but a `lang` value never carries one.
+            return match text.data(source) {
+                Cow::Borrowed(s) => Some(s),
+                Cow::Owned(_) => Some(""),
+            };
         }
     }
-    false
+    None
+}
+
+/// Whether the component parses as TypeScript, matching Svelte's parser
+/// (`1-parse/index.js`): TS is determined **once for the whole component** from the first
+/// `<script>` tag (in source order) that carries a `lang` attribute — `lang="ts"` ⇒ every script
+/// (module *and* instance) emits the acorn-typescript wire shape. So a plain `<script>` alongside
+/// a `lang="ts"` sibling still emits `importKind`/`exportKind = "value"` and omits `attributes`.
+/// A `<script>` with no `lang` attribute doesn't decide; nor does `<style lang=…>`.
+pub(super) fn component_is_typescript(
+    root: &internal::Root<'_>,
+    source: &str,
+    interner: &DefaultStringInterner,
+) -> bool {
+    // The two top-level scripts in source order — the first one carrying a `lang` decides.
+    let mut scripts = [root.module, root.instance];
+    scripts.sort_by_key(|s| s.map_or(u32::MAX, |script| script.span.start));
+    scripts
+        .into_iter()
+        .flatten()
+        .find_map(|script| script_lang(script, source, interner))
+        .is_some_and(|lang| lang == "ts")
 }
 
 /// Find a named attribute's value in `<svelte:options>` attributes.
