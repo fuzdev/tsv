@@ -234,6 +234,26 @@ pub fn parse_with_interner<'arena>(
     parser.parse().map_err(|e| e.with_context(source))
 }
 
+/// Parse embedded TypeScript with grouping parens preserved.
+///
+/// Like [`parse_with_interner`] but keeps `(expr)` as an internal
+/// `ParenthesizedExpression` node instead of discarding it. Used for the
+/// `{#snippet}`-parameter sub-parse (`function f(PARAMS) {}`), where Svelte
+/// parses with acorn's `preserveParens: true` and — unlike every other template
+/// expression — skips `remove_parens`, so its public AST keeps the parens. All
+/// other embedded parses ([`parse_with_interner`], expression/pattern parses)
+/// stay paren-free, matching acorn/Svelte.
+pub fn parse_with_interner_preserve_parens<'arena>(
+    source: &str,
+    base_offset: usize,
+    interner: SharedInterner,
+    arena: &'arena bumpalo::Bump,
+) -> Result<Program<'arena>> {
+    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
+    parser.preserve_parens = true;
+    parser.parse().map_err(|e| e.with_context(source))
+}
+
 /// Parse a single TypeScript expression and return it with any comments.
 ///
 /// This is used when parsing expressions in contexts where comments need to be

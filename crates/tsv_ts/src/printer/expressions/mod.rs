@@ -153,6 +153,14 @@ impl<'a> Printer<'a> {
                 self.build_ts_parameter_property_doc(param_prop)
             }
             Expression::JsdocCast(cast) => self.build_jsdoc_cast_doc(cast),
+            // Preserved grouping parens are layout-transparent: render the inner,
+            // which re-derives whatever parens it needs (matching prettier, which
+            // strips redundant parens and re-adds required ones). Only the wire
+            // AST keeps the `ParenthesizedExpression`.
+            Expression::ParenthesizedExpression(paren) => {
+                self.is_expression_statement.set(was_expr_stmt);
+                self.build_expression_doc(paren.expression)
+            }
         }
     }
 

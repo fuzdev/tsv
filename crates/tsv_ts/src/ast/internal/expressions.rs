@@ -67,6 +67,10 @@ pub enum Expression<'arena> {
     MetaProperty(MetaProperty<'arena>),
     // JSDoc type cast: `/** @type {T} */ (inner)` — internal-only, never serialized
     JsdocCast(JsdocCast<'arena>),
+    // Preserved grouping parens: `(expr)` — only produced under the parser's
+    // `preserve_parens` mode (snippet parameters), serialized to match acorn's
+    // `preserveParens` output.
+    ParenthesizedExpression(ParenthesizedExpression<'arena>),
 }
 
 impl<'arena> Expression<'arena> {
@@ -110,6 +114,7 @@ impl<'arena> Expression<'arena> {
             Expression::ImportExpression(import) => import.span,
             Expression::MetaProperty(meta) => meta.span,
             Expression::JsdocCast(cast) => cast.span,
+            Expression::ParenthesizedExpression(paren) => paren.span,
         }
     }
 
@@ -197,6 +202,28 @@ impl<'arena> Expression<'arena> {
 #[derive(Debug, Clone)]
 pub struct JsdocCast<'arena> {
     pub inner: &'arena Expression<'arena>,
+    pub span: Span,
+}
+
+/// Preserved grouping parentheses: `(expr)`.
+///
+/// Ordinary grouping parens are discarded at parse time (acorn/Svelte carry no
+/// `ParenthesizedExpression`, so the public AST is paren-free). This wrapper is
+/// produced **only** under the parser's `preserve_parens` mode — active solely
+/// for `{#snippet}` parameters, where Svelte parses with acorn's
+/// `preserveParens: true` and, unlike every other template expression, skips
+/// `remove_parens` (`1-parse/state/tag.js`). The public AST then keeps the
+/// `ParenthesizedExpression` node, matching Svelte's output.
+///
+/// `span` covers the parentheses (`(`…`)`); `expression` keeps its own
+/// paren-free span. Unlike [`JsdocCast`], the parens are **not** semantically
+/// required — prettier re-derives them (`(b)`→`b`, but keeps `(2, 3)` because a
+/// sequence needs them), so the printer is **transparent**: it renders the
+/// inner, which re-derives whatever parens it needs. The wrapper only affects
+/// the serialized wire shape.
+#[derive(Debug, Clone)]
+pub struct ParenthesizedExpression<'arena> {
+    pub expression: &'arena Expression<'arena>,
     pub span: Span,
 }
 
