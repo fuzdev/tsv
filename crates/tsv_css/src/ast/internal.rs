@@ -25,10 +25,6 @@ pub struct CssStyleSheet<'arena> {
     ///
     /// Use `tsv_lang::comments_in_range()` for efficient range lookups.
     pub comments: Vec<Comment>,
-
-    /// Precomputed line break positions (byte offsets of newlines).
-    /// Used for O(log n) line boundary lookups during printing.
-    pub line_breaks: Vec<u32>,
 }
 
 impl<'arena> CssStyleSheet<'arena> {
@@ -37,7 +33,6 @@ impl<'arena> CssStyleSheet<'arena> {
         Self {
             nodes: &[],
             comments: Vec::new(),
-            line_breaks: Vec::new(),
         }
     }
 }

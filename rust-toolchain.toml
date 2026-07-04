@@ -1,0 +1,8 @@
+[toolchain]
+# Pinned, not `stable`: clippy::nursery at warn + `lint` denies
+# warnings, so a floating toolchain breaks on new nursery lints;
+# also keeps LLVM codegen fixed under the perf anchor series.
+# Matches .github/workflows/check.yml. Bump deliberately.
+channel = "1.94.1"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]
