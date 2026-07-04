@@ -84,7 +84,7 @@ const SANCTIONED: Sanction[] = [
 const corpus_path = Deno.args.find((a) => !a.startsWith('-'));
 
 const [files, impls] = await Promise.all([
-	(corpus_path ? new DirectoryLoader(corpus_path) : new DevReposLoader()).load((m) =>
+	(corpus_path ? new DirectoryLoader(corpus_path) : new DevReposLoader('gates')).load((m) =>
 		console.error(m)
 	),
 	init_implementations({ logger: (m) => console.error(m) }),

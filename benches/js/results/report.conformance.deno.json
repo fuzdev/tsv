@@ -1,0 +1,544 @@
+{
+	"version": 6,
+	"runtime": "deno",
+	"corpus_kind": "conformance",
+	"timestamp": "2026-07-04T22:56:52.134Z",
+	"git_commit": "34a14e63",
+	"corpus": {
+		"svelte": 50,
+		"typescript": 50,
+		"css": 50
+	},
+	"corpus_sources": [
+		{
+			"path": "../zzz/src",
+			"files": 325
+		},
+		{
+			"path": "../fuz_app/src",
+			"files": 664
+		},
+		{
+			"path": "../fuz_blog/src",
+			"files": 32
+		},
+		{
+			"path": "../fuz_code/src",
+			"files": 68
+		},
+		{
+			"path": "../fuz_css/src",
+			"files": 124
+		},
+		{
+			"path": "../fuz_docs/src",
+			"files": 64
+		},
+		{
+			"path": "../fuz_gitops/src",
+			"files": 203
+		},
+		{
+			"path": "../fuz_mastodon/src",
+			"files": 24
+		},
+		{
+			"path": "../fuz_template/src",
+			"files": 15
+		},
+		{
+			"path": "../fuz_ui/src",
+			"files": 215
+		},
+		{
+			"path": "../fuz_util/src",
+			"files": 144
+		},
+		{
+			"path": "../gro/src",
+			"files": 187
+		},
+		{
+			"path": "../svelte-docinfo/src",
+			"files": 297
+		},
+		{
+			"path": "../tsv.fuz.dev/src",
+			"files": 26
+		},
+		{
+			"path": "../kit/packages/kit/src",
+			"files": 380
+		},
+		{
+			"path": "../svelte/packages/svelte/src",
+			"files": 380
+		},
+		{
+			"path": "../svelte.dev/apps/svelte.dev/src",
+			"files": 138
+		},
+		{
+			"path": "../svelte.dev/packages/repl/src",
+			"files": 48
+		},
+		{
+			"path": "../svelte.dev/packages/site-kit/src",
+			"files": 65
+		},
+		{
+			"path": "../prettier-plugin-svelte/test",
+			"files": 325
+		},
+		{
+			"path": "../prettier/tests/format/typescript",
+			"files": 789
+		},
+		{
+			"path": "../prettier/tests/format/js",
+			"files": 1103
+		},
+		{
+			"path": "../prettier/tests/format/css",
+			"files": 228
+		},
+		{
+			"path": "../prettier/tests/format/html",
+			"files": 124
+		},
+		{
+			"path": "../svelte/packages/svelte/tests",
+			"files": 4543
+		},
+		{
+			"path": "benches/js/.cache/wpt_css",
+			"files": 22310
+		},
+		{
+			"path": "benches/js/.cache/test262_files.json",
+			"files": 42113
+		}
+	],
+	"versions": {
+		"tsv": "0.1.0",
+		"svelte": "5.56.1",
+		"acorn": "8.16.0",
+		"acorn_ts": "1.0.10",
+		"prettier": "3.9.0",
+		"prettier_svelte": "4.1.1",
+		"oxc_parser": "0.134.0",
+		"oxfmt": "0.53.0",
+		"biome": "2.4.16"
+	},
+	"binary_sizes": [
+		{
+			"label": "tsv (ffi)",
+			"bytes": 3324480,
+			"kind": "native",
+			"gzip_bytes": 1423272
+		},
+		{
+			"label": "tsv format (ffi)",
+			"bytes": 3070736,
+			"kind": "native",
+			"gzip_bytes": 1317789
+		},
+		{
+			"label": "tsv parse (ffi)",
+			"bytes": 1545168,
+			"kind": "native",
+			"gzip_bytes": 683595
+		},
+		{
+			"label": "tsv (napi)",
+			"bytes": 3846064,
+			"kind": "native",
+			"gzip_bytes": 1599496
+		},
+		{
+			"label": "tsv_format_wasm",
+			"bytes": 2312689,
+			"kind": "wasm",
+			"gzip_bytes": 784944
+		},
+		{
+			"label": "tsv_parse_wasm",
+			"bytes": 1126329,
+			"kind": "wasm",
+			"gzip_bytes": 401394
+		},
+		{
+			"label": "tsv_wasm",
+			"bytes": 2540357,
+			"kind": "wasm",
+			"gzip_bytes": 866096
+		},
+		{
+			"label": "biome (wasm)",
+			"bytes": 34430368,
+			"kind": "wasm",
+			"gzip_bytes": 8187702
+		},
+		{
+			"label": "oxc-parser (napi)",
+			"bytes": 2658008,
+			"kind": "native",
+			"gzip_bytes": 1032774
+		},
+		{
+			"label": "oxfmt (napi)",
+			"bytes": 8016464,
+			"kind": "native",
+			"gzip_bytes": 3224684
+		},
+		{
+			"label": "oxc-parser (wasm)",
+			"bytes": 1866798,
+			"kind": "wasm",
+			"gzip_bytes": 518682
+		}
+	],
+	"entries": [
+		{
+			"name": "svelte/compiler",
+			"group": "parse/svelte",
+			"mean_ns": 39965911.347826086,
+			"p50_ns": 40127589,
+			"p75_ns": 41239627,
+			"p90_ns": 44219918.800000004,
+			"p95_ns": 48178601.999999985,
+			"p99_ns": 55774605.039999984,
+			"min_ns": 36904006,
+			"max_ns": 57898732,
+			"std_dev_ns": 2081552.771188649,
+			"cv": 0.052083205436571973,
+			"ops_per_second": 25.021323579911165,
+			"sample_size": 23,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv-json",
+			"group": "parse/svelte",
+			"mean_ns": 15822300.46031746,
+			"p50_ns": 15681906,
+			"p75_ns": 16184006,
+			"p90_ns": 16653515.7,
+			"p95_ns": 16815043.45,
+			"p99_ns": 17178908.439999998,
+			"min_ns": 15115804,
+			"max_ns": 17415985,
+			"std_dev_ns": 503298.63017483504,
+			"cv": 0.03180944714310758,
+			"ops_per_second": 63.20193466860355,
+			"sample_size": 63,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv_wasm-json",
+			"group": "parse/svelte",
+			"mean_ns": 19672119.843137253,
+			"p50_ns": 19631253,
+			"p75_ns": 19827664.5,
+			"p90_ns": 20131508,
+			"p95_ns": 20458118.5,
+			"p99_ns": 20634792.5,
+			"min_ns": 19029348,
+			"max_ns": 20666918,
+			"std_dev_ns": 371862.6040419968,
+			"cv": 0.018903026567913244,
+			"ops_per_second": 50.83336254424337,
+			"sample_size": 51,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv-internal",
+			"group": "parse/svelte",
+			"mean_ns": 1788794.366088632,
+			"p50_ns": 1794456,
+			"p75_ns": 1831981.5,
+			"p90_ns": 1892913.8,
+			"p95_ns": 1975724.5999999999,
+			"p99_ns": 2511653.9200000046,
+			"min_ns": 1588307,
+			"max_ns": 11719374,
+			"std_dev_ns": 69422.65003905336,
+			"cv": 0.03880974322993456,
+			"ops_per_second": 559.0357499764461,
+			"sample_size": 519,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv_wasm-internal",
+			"group": "parse/svelte",
+			"mean_ns": 2628153.7972972975,
+			"p50_ns": 2619172,
+			"p75_ns": 2682331,
+			"p90_ns": 2760243.8,
+			"p95_ns": 2816873.4999999995,
+			"p99_ns": 3034608.76,
+			"min_ns": 2480370,
+			"max_ns": 3604481,
+			"std_dev_ns": 82917.4000467595,
+			"cv": 0.03154967571990227,
+			"ops_per_second": 380.4952362484895,
+			"sample_size": 370,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "acorn-typescript",
+			"group": "parse/typescript",
+			"mean_ns": 45416739.333333336,
+			"p50_ns": 45130303.5,
+			"p75_ns": 47045796.5,
+			"p90_ns": 48694710.5,
+			"p95_ns": 50058792.8,
+			"p99_ns": 58046807.29999999,
+			"min_ns": 42786606,
+			"max_ns": 60151442,
+			"std_dev_ns": 2119807.1839652383,
+			"cv": 0.04667457891256889,
+			"ops_per_second": 22.01831339455178,
+			"sample_size": 21,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv-json",
+			"group": "parse/typescript",
+			"mean_ns": 27799418.757575758,
+			"p50_ns": 27650881,
+			"p75_ns": 28436340.25,
+			"p90_ns": 29240430,
+			"p95_ns": 31592273.75,
+			"p99_ns": 32443351.6,
+			"min_ns": 26850937,
+			"max_ns": 32507130,
+			"std_dev_ns": 667810.9463939827,
+			"cv": 0.02402247875099886,
+			"ops_per_second": 35.971975123669985,
+			"sample_size": 33,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv_wasm-json",
+			"group": "parse/typescript",
+			"mean_ns": 32862353.29032258,
+			"p50_ns": 32742123,
+			"p75_ns": 33368279,
+			"p90_ns": 33773399,
+			"p95_ns": 33940233.5,
+			"p99_ns": 34252918,
+			"min_ns": 31830704,
+			"max_ns": 34362541,
+			"std_dev_ns": 690083.3507116945,
+			"cv": 0.020999206740161015,
+			"ops_per_second": 30.429957074756526,
+			"sample_size": 31,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv-internal",
+			"group": "parse/typescript",
+			"mean_ns": 2309255.318734793,
+			"p50_ns": 2309608,
+			"p75_ns": 2361607,
+			"p90_ns": 2428620.8000000003,
+			"p95_ns": 2489654.5999999996,
+			"p99_ns": 3460991.0799999973,
+			"min_ns": 2153393,
+			"max_ns": 9777890,
+			"std_dev_ns": 78148.68294012516,
+			"cv": 0.03384150825857648,
+			"ops_per_second": 433.0400332466855,
+			"sample_size": 411,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv_wasm-internal",
+			"group": "parse/typescript",
+			"mean_ns": 3509798.035335689,
+			"p50_ns": 3508431,
+			"p75_ns": 3552293,
+			"p90_ns": 3586676.2,
+			"p95_ns": 3628324.2,
+			"p99_ns": 3688691.1600000006,
+			"min_ns": 3365300,
+			"max_ns": 4076051,
+			"std_dev_ns": 62010.895923995624,
+			"cv": 0.017667938525147843,
+			"ops_per_second": 284.9166789462735,
+			"sample_size": 283,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "oxc-parser",
+			"group": "parse/typescript",
+			"mean_ns": 15434524.95,
+			"p50_ns": 15628761,
+			"p75_ns": 24593301.5,
+			"p90_ns": 25731185.4,
+			"p95_ns": 25945123.9,
+			"p99_ns": 27341891.18,
+			"min_ns": 14617503,
+			"max_ns": 27554264,
+			"std_dev_ns": 381669.440274478,
+			"cv": 0.024728292027833224,
+			"ops_per_second": 64.78981395536894,
+			"sample_size": 40,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "oxc-parser-wasm",
+			"group": "parse/typescript",
+			"mean_ns": 21002879.5,
+			"p50_ns": 20744208.5,
+			"p75_ns": 21474098.75,
+			"p90_ns": 22968501,
+			"p95_ns": 23361320.65,
+			"p99_ns": 26191658.410000004,
+			"min_ns": 19810683,
+			"max_ns": 27102611,
+			"std_dev_ns": 992164.7319384184,
+			"cv": 0.04723946218605017,
+			"ops_per_second": 47.61251903578269,
+			"sample_size": 46,
+			"files_processed": 50,
+			"files_total": 50,
+			"files_iterated": 50,
+			"runtime": "deno"
+		},
+		{
+			"name": "svelte/compiler",
+			"group": "parse/css",
+			"mean_ns": 3516794.1705069123,
+			"p50_ns": 3516215,
+			"p75_ns": 3769203,
+			"p90_ns": 4111809.2,
+			"p95_ns": 4174895.6,
+			"p99_ns": 4569181.079999998,
+			"min_ns": 3351945,
+			"max_ns": 7324321,
+			"std_dev_ns": 125568.81636220454,
+			"cv": 0.03570547785118314,
+			"ops_per_second": 284.3498798952626,
+			"sample_size": 217,
+			"files_processed": 48,
+			"files_total": 50,
+			"files_iterated": 48,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv-json",
+			"group": "parse/css",
+			"mean_ns": 6254175.602836879,
+			"p50_ns": 6236728,
+			"p75_ns": 6481731,
+			"p90_ns": 7015324.799999999,
+			"p95_ns": 7927790.3,
+			"p99_ns": 9534758.06,
+			"min_ns": 5848947,
+			"max_ns": 11792121,
+			"std_dev_ns": 254439.51037499993,
+			"cv": 0.04068314139749878,
+			"ops_per_second": 159.89317593615414,
+			"sample_size": 141,
+			"files_processed": 48,
+			"files_total": 50,
+			"files_iterated": 48,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv_wasm-json",
+			"group": "parse/css",
+			"mean_ns": 8174981.405172414,
+			"p50_ns": 8176879,
+			"p75_ns": 8295044.5,
+			"p90_ns": 8524608.8,
+			"p95_ns": 8792060.5,
+			"p99_ns": 9619333.02,
+			"min_ns": 7864229,
+			"max_ns": 10791733,
+			"std_dev_ns": 184539.93755800583,
+			"cv": 0.02257374401380841,
+			"ops_per_second": 122.32443726016152,
+			"sample_size": 116,
+			"files_processed": 48,
+			"files_total": 50,
+			"files_iterated": 48,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv-internal",
+			"group": "parse/css",
+			"mean_ns": 2459719.7218045113,
+			"p50_ns": 2456626,
+			"p75_ns": 2491578.25,
+			"p90_ns": 2538185,
+			"p95_ns": 2562089,
+			"p99_ns": 2693731.15,
+			"min_ns": 2359873,
+			"max_ns": 2925931,
+			"std_dev_ns": 51901.52896025667,
+			"cv": 0.021100586583165836,
+			"ops_per_second": 406.5503850440225,
+			"sample_size": 399,
+			"files_processed": 48,
+			"files_total": 50,
+			"files_iterated": 48,
+			"runtime": "deno"
+		},
+		{
+			"name": "tsv_wasm-internal",
+			"group": "parse/css",
+			"mean_ns": 3917556.155378486,
+			"p50_ns": 3916721,
+			"p75_ns": 3960227.5,
+			"p90_ns": 3998100.8,
+			"p95_ns": 4041129.2,
+			"p99_ns": 4198583.04,
+			"min_ns": 3786244,
+			"max_ns": 4279656,
+			"std_dev_ns": 64572.483797200795,
+			"cv": 0.01648284829524346,
+			"ops_per_second": 255.2611782289531,
+			"sample_size": 251,
+			"files_processed": 48,
+			"files_total": 50,
+			"files_iterated": 48,
+			"runtime": "deno"
+		}
+	],
+	"suppressed_noise": {}
+}

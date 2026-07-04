@@ -23,14 +23,24 @@
  *   --verbose           Include per-file skip detail (paths + errors + failure sets)
  *
  * Results are always saved to benches/js/results/<timestamp>_<commit>.<runtime>.{json,md}.
- * Latest results are also written to benches/js/results/report.<runtime>.{json,md} (committed to git).
+ * Latest results are also written to benches/js/results/report.<runtime>.{json,md} (committed
+ * to git). Conformance runs (BENCH_CORPUS=conformance) tag both filenames with `conformance.`
+ * before the runtime (report.conformance.<runtime>.{json,md}).
  *
  * Environment variables:
  *   BENCH_LIMIT         Limit files per language (default: all)
  *   BENCH_FILTER        Filter files by path pattern (default: none)
- *   BENCH_DURATION      Duration per benchmark in ms (default: 5000)
+ *   BENCH_DURATION      Duration per benchmark in ms (default: 5000; 15000 in
+ *                       conformance mode — full-corpus sweeps per iteration)
  *   BENCH_WARMUP        Warmup iterations (default: 3)
  *   BENCH_MODE          'intersection' (default) | 'union' — iteration corpus mode
+ *   BENCH_CORPUS        'perf' (default) | 'conformance' — corpus + surface selector:
+ *                       perf = real-world corpus view, parse + format groups;
+ *                       conformance = full fixtures-included view, parse groups only
+ *                       (see benches/js/CLAUDE.md §Corpus)
+ *   BENCH_ALLOW_MISSING Set to 1 to tolerate missing corpus repos (default: off —
+ *                       a missing required entry fails fast, since numbers from a
+ *                       partial corpus aren't comparable to the committed reports)
  *   BENCH_GC            Set to 1 to force a major GC between every iteration
  *                       (default: off; see Fairness Caveats for the trade-off)
  *   BENCH_STALE_OK      Set to 1 to run despite stale artifacts (default: off;
@@ -57,7 +67,7 @@ import { spawn_out } from '@fuzdev/fuz_util/process.ts';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { DevReposLoader, group_by_language } from './lib/corpus.ts';
+import { type CorpusSource, DevReposLoader, group_by_language } from './lib/corpus.ts';
 import {
 	canonical_parser_label,
 	get_alternative_versions,
@@ -214,9 +224,6 @@ const MAX_FILES_PER_LANGUAGE = env_int('BENCH_LIMIT');
 /** Filter files by path pattern (default: none) */
 const FILE_FILTER = env.BENCH_FILTER;
 
-/** Duration per benchmark in ms (default: 5000) */
-const BENCH_DURATION = env_int('BENCH_DURATION') ?? 5000;
-
 /** Number of warmup iterations (default: 3) */
 const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
 
@@ -258,6 +265,59 @@ if (BENCH_MODE !== undefined && BENCH_MODE !== 'intersection' && BENCH_MODE !== 
 }
 const USE_INTERSECTION = BENCH_MODE !== 'union';
 
+/** Which corpus/surface a report was produced from — see `BENCH_CORPUS`. */
+type CorpusKind = 'perf' | 'conformance';
+
+/**
+ * Corpus + surface selector. Default `perf`: the real-world corpus view, parse
+ * + format groups, writing `report.<runtime>.*` — the throughput headline.
+ * `BENCH_CORPUS=conformance`: the full fixtures-included corpus view (real
+ * repos + prettier suites + the parse-conformance suites), parse groups ONLY,
+ * writing `report.conformance.<runtime>.*` — the per-tool parse
+ * coverage/throughput surface. Format impls are deliberately excluded there:
+ * grading formatter behavior on the fixture suites is the correctness gates'
+ * job (`corpus:compare:format`), and timing it would put prettier/oxfmt/biome
+ * through tens of thousands of fixture files for numbers nothing consumes.
+ */
+const BENCH_CORPUS = env.BENCH_CORPUS;
+if (BENCH_CORPUS !== undefined && BENCH_CORPUS !== 'perf' && BENCH_CORPUS !== 'conformance') {
+	console.error(`Invalid BENCH_CORPUS: ${BENCH_CORPUS}. Expected 'perf' or 'conformance'.`);
+	exit(1);
+}
+const CORPUS_MODE: CorpusKind = BENCH_CORPUS === 'conformance' ? 'conformance' : 'perf';
+const IS_CONFORMANCE = CORPUS_MODE === 'conformance';
+
+// Baselines are a perf-surface tool (Welch-t regression detection on
+// throughput, one corpus-blind baseline.json). Conformance-mode changes are
+// coverage moves, reviewed via the committed report diff — sharing the
+// baseline file would cross-contaminate the perf history.
+if (IS_CONFORMANCE && (args.save_baseline || args.compare_baseline)) {
+	console.error(
+		'Baseline flags are perf-corpus only — drop --save-baseline/--compare-baseline ' +
+			'or run without BENCH_CORPUS=conformance.',
+	);
+	exit(1);
+}
+
+/** Operations measured this run — conformance is a parse-only surface. */
+const OPERATIONS: ('parse' | 'format')[] = IS_CONFORMANCE ? ['parse'] : ['parse', 'format'];
+
+/**
+ * Report filename tag: `report.<tag>.{json,md}` and
+ * `<timestamp>_<commit>.<tag>.{json,md}`. The conformance surface writes
+ * sibling files rather than clobbering the perf reports (and stays invisible
+ * to `compose_reports.ts`, which globs the exact perf filenames).
+ */
+const REPORT_TAG = IS_CONFORMANCE ? `conformance.${RUNTIME}` : RUNTIME;
+
+/**
+ * Duration per benchmark in ms. The default is surface-dependent: 5000 for
+ * perf, 15000 in conformance mode — there each iteration is a full sweep of
+ * the much larger fixtures-included corpus, so the slow rows need the longer
+ * window for a usable sample count. `BENCH_DURATION` overrides either.
+ */
+const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5000);
+
 /** Maximum length of error message to display (longer messages are truncated) */
 const MAX_ERROR_MESSAGE_LENGTH = 200;
 
@@ -280,7 +340,9 @@ const RESULTS_DIR = './benches/js/results';
 //
 
 log('Loading corpus...\n');
-const corpus_loader = new DevReposLoader();
+const corpus_loader = new DevReposLoader(IS_CONFORMANCE ? 'conformance' : 'perf', {
+	allow_missing: env.BENCH_ALLOW_MISSING === '1',
+});
 // Drain `stream()` directly instead of `load()` so we skip the loader's
 // own corpus summary — bench.ts prints its own tighter one below that
 // includes byte counts and (when applicable) limit annotations.
@@ -335,7 +397,7 @@ const fmt_count = (
 	total: number,
 ) => (is_limited && n !== total ? `${n} of ${total}` : `${n}`);
 const fmt_bytes = (b: number) => `${(b / 1_000_000).toFixed(1)} MB`;
-log(`Corpus:`);
+log(`Corpus (${CORPUS_MODE} view):`);
 log(
 	`  Svelte:      ${fmt_count(svelte_files.length, total_file_counts.svelte).padEnd(11)} files (${
 		fmt_bytes(bytes_by_language.svelte)
@@ -710,14 +772,16 @@ async function run_benchmark_group(
 // lands before any 5s+ timed run starts), then time every group.
 log('Pre-flight (discover coverage + exclude failing files before timing):');
 for (const lang of LANGUAGES) {
-	await run_preflight_group('parse', lang);
-	await run_preflight_group('format', lang);
+	for (const operation of OPERATIONS) {
+		await run_preflight_group(operation, lang);
+	}
 }
 
 log('\nRunning benchmarks:');
 for (const lang of LANGUAGES) {
-	await run_benchmark_group('parse', lang);
-	await run_benchmark_group('format', lang);
+	for (const operation of OPERATIONS) {
+		await run_benchmark_group(operation, lang);
+	}
 }
 
 //
@@ -787,6 +851,13 @@ interface Baseline {
 	/** The JS runtime that produced this report (`deno` | `node` | `bun`). Mirrors
 	 * the per-row `runtime` and matches the `report.<runtime>.{json,md}` filename. */
 	runtime: Runtime;
+	/**
+	 * Which corpus/surface produced this report: `perf` (real-world corpus,
+	 * parse + format groups — `report.<runtime>.*`) or `conformance` (full
+	 * fixtures-included corpus, parse groups only —
+	 * `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
+	 */
+	corpus_kind: CorpusKind;
 	timestamp: string;
 	git_commit: string | null;
 	corpus: {
@@ -794,6 +865,13 @@ interface Baseline {
 		typescript: number;
 		css: number;
 	};
+	/**
+	 * Per-entry corpus composition (entry path + loaded file count). Missing
+	 * entries (an absent `../wpt` or `../test262` checkout, an unbuilt harvest
+	 * cache) are silently skipped by the loader, so without this a report
+	 * produced on a partial machine would be indistinguishable from a full one.
+	 */
+	corpus_sources: CorpusSource[];
 	versions: BaselineVersions;
 	binary_sizes: BinarySize[];
 	entries: BaselineEntry[];
@@ -881,12 +959,15 @@ async function build_results_data(
 	}
 
 	return {
-		// Bumped 4 → 5 for the added `runtime` field (top-level + per row).
-		version: 5,
+		// Bumped 5 → 6 for the added `corpus_kind` + `corpus_sources` fields
+		// (4 → 5 added the `runtime` field, top-level + per row).
+		version: 6,
 		runtime: RUNTIME,
+		corpus_kind: CORPUS_MODE,
 		timestamp: new Date().toISOString(),
 		git_commit: await get_git_commit(),
 		corpus,
+		corpus_sources: corpus_loader.sources,
 		versions,
 		binary_sizes: binary_sizes,
 		entries,
@@ -915,9 +996,20 @@ function generate_markdown_report(
 	skipped: Map<string, Map<string, string>>,
 ): string {
 	const lines: string[] = [];
-	lines.push('# tsv benchmark results\n');
+	lines.push(
+		IS_CONFORMANCE
+			? '# tsv conformance benchmark results (parse)\n'
+			: '# tsv benchmark results\n',
+	);
 	const commit_str = git_commit ? ` (${git_commit})` : '';
 	lines.push(`**Runtime:** ${RUNTIME}\n`);
+	lines.push(
+		`**Corpus kind:** ${
+			IS_CONFORMANCE
+				? 'conformance — full fixtures-included corpus, parse groups only; the headline is the per-tool Coverage lines (parse success over the full set), with throughput measured on the all-tools-pass intersection'
+				: 'perf — real-world code only (fixture suites excluded)'
+		}\n`,
+	);
 	lines.push(`**Date:** ${timestamp} — tsv ${versions.tsv}${commit_str}\n`);
 
 	const total_files = corpus.svelte + corpus.typescript + corpus.css;
@@ -928,6 +1020,11 @@ function generate_markdown_report(
 			`${corpus.css} CSS (${format_mb(corpus_bytes.css)}) — ` +
 			`${total_files} files, ${format_mb(total_bytes)} total\n`,
 	);
+	if (corpus_loader.sources.length > 0) {
+		lines.push(
+			`**Sources:** ${corpus_loader.sources.map((s) => `${s.path} (${s.files})`).join(', ')}\n`,
+		);
+	}
 
 	// Versions
 	const version_parts = [
@@ -1031,11 +1128,12 @@ function generate_markdown_report(
  * Save results to the results directory.
  *
  * Always writes a timestamped pair. Only overwrites the canonical
- * `report.<runtime>.{json,md}` when `write_report` is true — gated by the caller
+ * `report.<tag>.{json,md}` when `write_report` is true — gated by the caller
  * so that partial runs (BENCH_LIMIT, BENCH_FILTER) don't clobber the committed
- * canonical report. Every filename is runtime-suffixed so a Deno run and a Node
- * run write sibling files (`report.deno.*` / `report.node.*`) instead of one
- * clobbering the other.
+ * canonical report. Every filename carries `REPORT_TAG` — runtime-suffixed
+ * (`report.deno.*` / `report.node.*`), with conformance runs adding a
+ * `conformance.` prefix to the tag — so sibling surfaces never clobber each
+ * other.
  */
 async function save_results(
 	data: Baseline,
@@ -1046,7 +1144,7 @@ async function save_results(
 	await mkdir(RESULTS_DIR, { recursive: true });
 	const timestamp = data.timestamp.replace(/[:.]/g, '-').slice(0, 19);
 	const commit = data.git_commit ?? 'unknown';
-	const base_path = `${RESULTS_DIR}/${timestamp}_${commit}.${RUNTIME}`;
+	const base_path = `${RESULTS_DIR}/${timestamp}_${commit}.${REPORT_TAG}`;
 
 	const markdown = generate_markdown_report(
 		groups,
@@ -1070,8 +1168,8 @@ async function save_results(
 	];
 	if (write_report) {
 		writes.push(
-			writeFile(`${RESULTS_DIR}/report.${RUNTIME}.json`, json),
-			writeFile(`${RESULTS_DIR}/report.${RUNTIME}.md`, markdown),
+			writeFile(`${RESULTS_DIR}/report.${REPORT_TAG}.json`, json),
+			writeFile(`${RESULTS_DIR}/report.${REPORT_TAG}.md`, markdown),
 		);
 	}
 	await Promise.all(writes);
@@ -1303,8 +1401,8 @@ log(`  ${results_path}.json`);
 log(`  ${results_path}.md`);
 if (write_report) {
 	log(`Canonical report updated:`);
-	log(`  ${RESULTS_DIR}/report.${RUNTIME}.json`);
-	log(`  ${RESULTS_DIR}/report.${RUNTIME}.md`);
+	log(`  ${RESULTS_DIR}/report.${REPORT_TAG}.json`);
+	log(`  ${RESULTS_DIR}/report.${REPORT_TAG}.md`);
 } else {
 	log(`Skipped canonical report (limited run — pass --save-report to override)`);
 }

@@ -70,12 +70,16 @@ export function emit_json_stdout(report: Record<string, unknown>): void {
 	Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(report, null, '\t') + '\n'));
 }
 
-/** Create the corpus loader: every default repo under --all, else one directory. */
+/**
+ * Create the corpus loader: the `gates` view under --all (the pre-split
+ * corpus the sanction lists and divergence coverage were reviewed against —
+ * see `corpus.ts`), else one directory.
+ */
 export function create_compare_loader(
 	use_all: boolean,
 	base_path: string,
 ): DevReposLoader | DirectoryLoader {
-	return use_all ? new DevReposLoader() : new DirectoryLoader(base_path);
+	return use_all ? new DevReposLoader('gates') : new DirectoryLoader(base_path);
 }
 
 /**

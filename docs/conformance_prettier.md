@@ -939,7 +939,7 @@ See [directives.md](./directives.md) for the user-facing reference.
 **Corpus comparison** validates formatting against Prettier on real codebases:
 
 ```bash
-deno task corpus:compare:format --all --explain           # All default corpus repos (~5600 files)
+deno task corpus:compare:format --all --explain           # The gates corpus view (~6,000 files: real repos + prettier suites)
 deno task corpus:compare:format ~/dev/project --explain  # Single project (scans all files recursively)
 ```
 
