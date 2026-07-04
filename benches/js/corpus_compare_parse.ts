@@ -3,13 +3,11 @@
  * canonical parsers (acorn-typescript / svelte / parseCss) on real codebases.
  *
  * Why this exists: the fixture suite's expected.json files are
- * canonical-derived but cover only curated cases, and the internal identity
- * gates (P4/P5 in fixtures_validate, json_profile's corpus checks) prove tsv's
- * two materialization paths agree WITH EACH OTHER — a bug shared by both walks
- * (e.g. the untranslated `extra.trailingComma` byte offset) is invisible to
- * all of them. This script is the external oracle at corpus scale: the
- * parser-side sibling of corpus_compare_format.ts (which diffs formatting
- * against prettier).
+ * canonical-derived but cover only curated cases, and the wire-JSON writer is
+ * the sole emission path — so a writer bug on an uncurated shape (e.g. an
+ * untranslated position field) has no internal gate to trip. This script is
+ * the external oracle at corpus scale: the parser-side sibling of
+ * corpus_compare_format.ts (which diffs formatting against prettier).
  *
  * Method: ASTs are raw-diffed with NO normalization applied before diffing;
  * diffs are classified against the documented divergences

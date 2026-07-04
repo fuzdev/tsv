@@ -40,11 +40,13 @@ mod expressions;
 mod functions;
 mod modules;
 mod patterns;
+mod skeleton;
 mod statements;
 mod types;
 
-pub use comments::WriterComments;
+pub use comments::{AttachedComment, WriterComments};
 use declarations::{write_decorator, write_type_parameter_declaration};
+pub use skeleton::{SkeletonRecorder, SkeletonTree};
 use statements::{write_statement, write_variable_declaration};
 use types::{write_type_annotation, write_type_parameter_instantiation};
 
@@ -79,31 +81,21 @@ pub fn write_program_json(
 /// emission into its own buffer. Shares the host document's interner and
 /// `LocationMapper` (spans are host-file coordinates); with a real map it emits
 /// final char-space positions directly.
+///
+/// `comments` is the pass's comment role: `Emit` for the fused form of a
+/// comment-bearing template expression island (each node emits its attached
+/// leading/trailing comments at its close), `Record` for the byte-space
+/// skeleton pass that builds an island's comment map.
 pub fn write_expression_embedded(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-) {
-    let ctx = Ctx::new(source, loc, interner);
-    expressions::write_expression(w, expr, &ctx);
-}
-
-/// `write_expression_embedded` with a per-node comment map — the fused form of a
-/// comment-bearing template expression island (`{expr}`, block test, directive,
-/// `{@debug}` id, spread). Each node emits any attached leading/trailing comments
-/// at its close.
-pub fn write_expression_embedded_with_comments(
-    w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
-    comments: &WriterComments,
+    comments: CommentMode<'_>,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
-    ctx.comments = Some(comments);
+    ctx.comments = comments;
     expressions::write_expression(w, expr, &ctx);
 }
 
@@ -111,31 +103,17 @@ pub fn write_expression_embedded_with_comments(
 /// `tsv_svelte`'s `{const …}` / `{let …}` declaration tag. Shares the host
 /// document's interner and
 /// `LocationMapper` (spans are host-file coordinates), emitting final char-space
-/// positions directly.
+/// positions directly. `comments` as in `write_expression_embedded`.
 pub fn write_variable_declaration_embedded(
     w: &mut JsonWriter,
     var_decl: &internal::VariableDeclaration<'_>,
     source: &str,
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-) {
-    let ctx = Ctx::new(source, loc, interner);
-    write_variable_declaration(w, var_decl, &ctx, false);
-}
-
-/// `write_variable_declaration_embedded` with a per-node comment map — the fused
-/// form of a comment-bearing `{@const}` / `{const}` / `{let}` declaration (the
-/// document has a template comment). Attached comments emit at each node's close.
-pub fn write_variable_declaration_embedded_with_comments(
-    w: &mut JsonWriter,
-    var_decl: &internal::VariableDeclaration<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
-    comments: &WriterComments,
+    comments: CommentMode<'_>,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
-    ctx.comments = Some(comments);
+    ctx.comments = comments;
     write_variable_declaration(w, var_decl, &ctx, false);
 }
 
@@ -144,31 +122,19 @@ pub fn write_variable_declaration_embedded_with_comments(
 /// shorthand attribute (`{name}`) and snippet name. The `character` is injected
 /// only on a top-level `Identifier`, so any other expression emits exactly as
 /// `write_expression_embedded` (character a no-op). No type-annotation-`loc`
-/// stripping (unlike a block pattern).
+/// stripping (unlike a block pattern). `comments` is `Emit` for the fused form
+/// of a comment-bearing snippet name (`{#snippet /* c */ name(…)}`), where a
+/// leading comment attaches to the `Identifier`.
 pub fn write_identifier_expression_with_character(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-) {
-    let ctx = Ctx::new(source, loc, interner);
-    write_identifier_expression_with_character_in(w, expr, &ctx);
-}
-
-/// `write_identifier_expression_with_character` with a per-node comment map — the
-/// fused form of a comment-bearing snippet name (`{#snippet /* c */ name(…)}`),
-/// where a leading comment attaches to the `Identifier`.
-pub fn write_identifier_expression_with_character_and_comments(
-    w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
-    comments: &WriterComments,
+    comments: CommentMode<'_>,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
-    ctx.comments = Some(comments);
+    ctx.comments = comments;
     write_identifier_expression_with_character_in(w, expr, &ctx);
 }
 
@@ -209,39 +175,18 @@ fn write_identifier_expression_with_character_in(
 /// - **Both**: `loc` is omitted on the pattern's **top-level** `TSTypeAnnotation`
 ///   only — the one Svelte's `read_context` synthesizes itself (no `loc`);
 ///   annotations nested inside it come from the acorn parse and keep `loc`.
+///
+/// `comments` is `Emit` for the fused form of a comment-carrying destructure
+/// pattern (`{@const { b = /* c */ 1 } = expr}`): canonical parses it as a
+/// synthetic `(pattern = 1)` acorn expression whose comment attach covers the
+/// pattern subtree, and attached comments emit at each node's close.
 pub fn write_pattern_embedded(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
     source: &str,
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
-) {
-    write_pattern_embedded_impl(w, expr, source, loc, interner, None);
-}
-
-/// `write_pattern_embedded` with a per-node comment map — a destructure
-/// pattern *can* carry comments (`{@const { b = /* c */ 1 } = expr}`):
-/// canonical parses it as a synthetic `(pattern = 1)` acorn expression whose
-/// comment attach covers the pattern subtree. Attached comments emit at each
-/// node's close.
-pub fn write_pattern_embedded_with_comments(
-    w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
-    comments: &WriterComments,
-) {
-    write_pattern_embedded_impl(w, expr, source, loc, interner, Some(comments));
-}
-
-fn write_pattern_embedded_impl(
-    w: &mut JsonWriter,
-    expr: &internal::Expression<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    interner: &DefaultStringInterner,
-    comments: Option<&WriterComments>,
+    comments: CommentMode<'_>,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
     ctx.comments = comments;
@@ -325,12 +270,13 @@ pub fn write_program_embedded(
     interner: &DefaultStringInterner,
     schema: Schema,
     loc_override: (Position, Position),
-    comments: Option<&WriterComments>,
+    comments: CommentMode<'_>,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
     ctx.vanilla_acorn = schema.is_svelte_script();
     ctx.comments = comments;
     let (start_pos, end_pos) = loc_override;
+    record_open("Program", program.span, &ctx);
     w.raw("{\"type\":\"Program\",\"start\":");
     w.u32(loc.pos(program.span.start));
     w.raw(",\"end\":");
@@ -348,6 +294,22 @@ pub fn write_program_embedded(
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
     close_node(w, "Program", program.span, &ctx);
+}
+
+/// The comment role of one emission pass (Svelte comment-attach paths).
+///
+/// `Off` for every ordinary emission — the hot path pays one never-taken
+/// discriminant compare per node open and close. `Emit` is the fused pass of a
+/// comment-bearing island: each node close consults the precomputed
+/// `WriterComments` map. `Record` is the byte-space skeleton pass that
+/// *builds* that map's input: each node open/close is reported to the
+/// `SkeletonRecorder`, which reconstructs the wire tree for the comment-attach
+/// walk (no re-parse of the emitted bytes).
+#[derive(Clone, Copy)]
+pub enum CommentMode<'a> {
+    Off,
+    Emit(&'a WriterComments),
+    Record(&'a SkeletonRecorder),
 }
 
 /// The per-document environment every writer function shares (`source`, the
@@ -371,11 +333,10 @@ pub(super) struct Ctx<'a> {
     /// synthesizes that node itself, without `loc`; nested annotations keep
     /// theirs). The empty span (never a real annotation) when inactive.
     pub(super) pattern_ann_span: Span,
-    /// Per-node attached comments (Svelte comment-attach paths — a
-    /// comment-bearing `<script>` `Program` or template expression). `None` for
-    /// every ordinary emission, so the hot path pays only a never-taken compare
-    /// per node close.
-    pub(super) comments: Option<&'a WriterComments>,
+    /// This pass's comment role (Svelte comment-attach paths). `Off` for every
+    /// ordinary emission, so the hot path pays only a never-taken compare per
+    /// node open and close.
+    pub(super) comments: CommentMode<'a>,
     /// The canonical parser for this document is **vanilla acorn** (a Svelte
     /// non-`lang="ts"` component), not acorn-typescript. Drives the
     /// vanilla-only wire quirks: `,"options":null` on every `ImportExpression`
@@ -396,7 +357,7 @@ impl<'a> Ctx<'a> {
             interner,
             pattern_line: 0,
             pattern_ann_span: Span::new(0, 0),
-            comments: None,
+            comments: CommentMode::Off,
             vanilla_acorn: false,
         }
     }
@@ -404,13 +365,15 @@ impl<'a> Ctx<'a> {
 
 /// Close a node object: emit any attached `leadingComments`/`trailingComments`
 /// (fused) for this node's byte span + type, then the closing `}`. The type and
-/// span mirror the node's own `node_header` call. A `None` comment map (every
+/// span mirror the node's own `node_header` call. `CommentMode::Off` (every
 /// ordinary emission) makes this exactly `w.raw("}")` after one never-taken
 /// branch.
 #[inline]
-pub(super) fn close_node(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
-    if let Some(wc) = ctx.comments {
-        wc.emit(w, node_type, span.start, span.end, ctx.loc);
+pub(super) fn close_node(w: &mut JsonWriter, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
+    match ctx.comments {
+        CommentMode::Off => {}
+        CommentMode::Emit(wc) => wc.emit(w, node_type, span.start, span.end, ctx.loc),
+        CommentMode::Record(rec) => rec.close(node_type, span),
     }
     w.raw("}");
 }
@@ -430,9 +393,26 @@ pub(super) fn adjusted_column(ctx: &Ctx<'_>, line: usize, column: usize) -> usiz
 /// Emit a node with no fields beyond the universal prefix (`ThisExpression`,
 /// `Super`, keyword types, …).
 #[inline]
-pub(super) fn write_bare_node(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
+pub(super) fn write_bare_node(
+    w: &mut JsonWriter,
+    node_type: &'static str,
+    span: Span,
+    ctx: &Ctx<'_>,
+) {
     node_header(w, node_type, span, ctx);
     close_node(w, node_type, span, ctx);
+}
+
+/// Report a node open to the skeleton recorder (`CommentMode::Record` only —
+/// one never-taken compare for every ordinary emission). `node_header` calls
+/// this; the hand-written header sites (the embedded `Program`, the
+/// name-first identifier, the `loc`-less block-pattern `TSTypeAnnotation`)
+/// call it directly so every wire node reaches the recorder.
+#[inline]
+pub(super) fn record_open(node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
+    if let CommentMode::Record(rec) = ctx.comments {
+        rec.open(node_type, span);
+    }
 }
 
 /// Emit the universal node prefix: `{"type":"X","start":N,"end":N,"loc":{…}`.
@@ -444,7 +424,7 @@ pub(super) fn write_bare_node(w: &mut JsonWriter, node_type: &str, span: Span, c
 /// omitted. Static fragments are pre-fused into the fewest buffer writes —
 /// this runs once per node.
 #[inline]
-pub(super) fn node_header(w: &mut JsonWriter, node_type: &str, span: Span, ctx: &Ctx<'_>) {
+pub(super) fn node_header(w: &mut JsonWriter, node_type: &'static str, span: Span, ctx: &Ctx<'_>) {
     node_header_impl::<false>(w, node_type, span, ctx);
 }
 
@@ -458,7 +438,7 @@ pub(super) fn node_header(w: &mut JsonWriter, node_type: &str, span: Span, ctx: 
 /// no character).
 fn node_header_impl<const CHARACTER: bool>(
     w: &mut JsonWriter,
-    node_type: &str,
+    node_type: &'static str,
     span: Span,
     ctx: &Ctx<'_>,
 ) {
@@ -468,6 +448,7 @@ fn node_header_impl<const CHARACTER: bool>(
             .all(|b| b != b'"' && b != b'\\' && b >= 0x20),
         "node type must be escape-free: {node_type:?}"
     );
+    record_open(node_type, span, ctx);
     w.raw("{\"type\":\"");
     w.raw(node_type);
     w.raw("\"");
@@ -691,6 +672,7 @@ pub(super) fn write_identifier_parts_with_character(
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
+    record_open("Identifier", span, ctx);
     w.raw("{\"type\":\"Identifier\",\"name\":");
     write_name(w, name, span.start, ctx);
     position_fields::<true>(w, span, ctx);
