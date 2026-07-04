@@ -258,7 +258,7 @@ Compare formatting against Prettier, and parse output against the canonical
 parsers, on real codebases:
 
 ```bash
-deno task corpus:compare:format ~/dev/some-project  # single project (or --all for default corpus repos in ~/dev)
+deno task corpus:compare:format ~/dev/some-project  # single project (or --all for the gates corpus view: real repos + prettier suites)
 # Options: --explain (show patterns matched), --summary (compact, no diffs),
 #          --json (single JSON report to stdout: stats + safety/partial/unknown/error lists; logs → stderr)
 
@@ -292,6 +292,18 @@ cross-runtime view tsv.fuz.dev consumes). The native row differs by runtime: Den
 `process.dlopen`. Everything else (corpus, registry, timing, report) is runtime-neutral
 shared code using `node:` builtins.
 
+**Perf vs conformance surfaces.** The perf surface (`deno task bench:perf`) measures a
+**real-world-only** corpus (app + framework source; fixture suites excluded) — the
+throughput headline. The conformance surface (`deno task bench:conformance`, or
+`BENCH_CORPUS=conformance`) measures per-tool **parse** coverage/throughput over the full
+fixtures-included corpus (prettier suites + svelte compiler tests + the wpt-css/test262
+harvests), writing sibling `report.conformance.<runtime>.{json,md}` files.
+`deno task bench` is the full publish-cadence refresh: perf across all three runtimes +
+compose, then the **node** conformance report (node-only because coverage — the
+conformance headline — is runtime-invariant; the site consumes the node sibling). The
+correctness gates (`deno task conformance`, corpus:compare) keep their own unchanged
+corpus scope. See ./benches/js/CLAUDE.md §Corpus for the three views.
+
 ```bash
 # One-time: install the harness's npm deps (package.json is the source of truth;
 # both runtimes consume the same node_modules). Re-run after a dep bump or a plain
@@ -304,7 +316,8 @@ deno task smoke
 # Run benchmarks (builds the runtime's bench artifacts automatically).
 # `bench` runs ALL three and FAILS FAST if node or bun is missing — Deno is the
 # only hard dep, so without node/bun run the per-runtime tasks you have instead.
-deno task bench         # ALL three + compose (needs node AND bun installed)
+deno task bench         # full refresh: perf ×3 + compose + node conformance (needs node AND bun)
+deno task bench:perf    # perf surface only: all three runtimes + compose
 deno task bench:deno    # Deno only (no node/bun needed)
 deno task bench:node    # Node only (needs node)
 deno task bench:bun     # Bun only (needs bun; reuses the Node artifacts)
@@ -315,15 +328,22 @@ deno task bench:deno:run
 deno task bench:node:run
 deno task bench:bun:run
 
+# Conformance surface: per-tool parse coverage/throughput, full fixtures-included
+# corpus (parse groups only) → report.conformance.<runtime>.{json,md}
+deno task bench:conformance        # all three runtimes
+deno task bench:conformance:deno   # per-runtime (harvest + build + run); also :node / :bun
+deno task bench:harvest            # regenerate the wpt-css + test262 suite caches
+
 # Per-file skip detail (off by default — counts always shown, paths/errors opt-in)
 deno task bench:deno:run -- --verbose
 
 # Environment variables (apply to any runtime)
 BENCH_LIMIT=10 deno task bench:deno:run        # Limit files per language (default: all)
 BENCH_FILTER=zzz deno task bench:deno:run      # Filter by path pattern (default: none)
-BENCH_DURATION=10000 deno task bench:deno:run  # Duration per benchmark in ms (default: 5000)
+BENCH_DURATION=10000 deno task bench:deno:run  # Duration per benchmark in ms (default: 5000; conformance mode: 15000)
 BENCH_WARMUP=10 deno task bench:deno:run       # Set warmup iterations (default: 3)
 BENCH_MODE=union deno task bench:deno:run      # Per-impl iteration (default: intersection)
+BENCH_CORPUS=conformance deno task bench:deno:run  # Corpus/surface selector (default: perf)
 BENCH_STALE_OK=1 deno task bench:deno:run      # Run despite stale artifacts (default: off)
 BENCH_FORCED_ASYNC=1 deno task bench:deno:run  # Add tsv-forced-async control row (diagnostic; default: off)
 ```

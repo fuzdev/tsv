@@ -22,20 +22,38 @@
  *
  * Stats JSON to stdout, progress to stderr.
  *
+ * Flags: `--if-present` tolerates a missing wpt checkout (warn + exit 0) — for
+ * the `bench:conformance` task chain, where an absent `../wpt` should produce
+ * a smaller corpus (disclosed via the report's `corpus_sources`), not a failed
+ * bench.
+ *
  * Run from the repo root:
  *   deno run --allow-read --allow-write benches/js/diagnostics/wpt_css_harvest.ts
  *   deno run --allow-read --allow-write benches/js/diagnostics/wpt_css_harvest.ts ../wpt/css --out benches/js/.cache/wpt_css
  */
 
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative } from 'node:path';
 
 const OUT_DEFAULT = 'benches/js/.cache/wpt_css';
 
 const out_flag_index = Deno.args.indexOf('--out');
 const out_dir = out_flag_index === -1 ? OUT_DEFAULT : Deno.args[out_flag_index + 1];
-const source_root =
-	Deno.args.find((a, i) => !a.startsWith('-') && i !== out_flag_index + 1) ?? '../wpt/css';
+const if_present = Deno.args.includes('--if-present');
+const source_root = Deno.args.find(
+	(a, i) => !a.startsWith('-') && (out_flag_index === -1 || i !== out_flag_index + 1),
+) ?? '../wpt/css';
+
+try {
+	await stat(source_root);
+} catch {
+	if (if_present) {
+		console.error(`wpt source root not found at ${source_root} — skipping harvest (--if-present)`);
+		Deno.exit(0);
+	}
+	console.error(`wpt source root not found: ${source_root}`);
+	Deno.exit(1);
+}
 
 const STYLE_BLOCK_RE = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
 const TYPE_ATTR_RE = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;

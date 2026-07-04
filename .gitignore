@@ -24,7 +24,8 @@ node_modules
 # benches/js/diagnostics/wpt_css_harvest.ts)
 /benches/js/.cache
 
-# Benchmark results (the per-runtime report.<runtime>.{json,md} siblings and the
+# Benchmark results (the per-runtime report.<runtime>.{json,md} siblings, their
+# conformance-surface siblings report.conformance.<runtime>.{json,md}, and the
 # combined report.{json,md} are committed; timestamped runs + baseline.json are
 # gitignored)
 /benches/js/results/*.json
@@ -35,6 +36,12 @@ node_modules
 !/benches/js/results/report.node.md
 !/benches/js/results/report.bun.json
 !/benches/js/results/report.bun.md
+!/benches/js/results/report.conformance.deno.json
+!/benches/js/results/report.conformance.deno.md
+!/benches/js/results/report.conformance.node.json
+!/benches/js/results/report.conformance.node.md
+!/benches/js/results/report.conformance.bun.json
+!/benches/js/results/report.conformance.bun.md
 !/benches/js/results/report.json
 !/benches/js/results/report.md
 
