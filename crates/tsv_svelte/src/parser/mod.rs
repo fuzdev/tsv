@@ -118,7 +118,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     last_end = comment.span.end_usize();
                     fragment_nodes.push(FragmentNode::Comment(comment));
                 } else if self.check(TokenKind::LeftAngle) {
-                    match self.parse_element_or_special(false)? {
+                    match self.parse_element_or_special()? {
                         ParsedElement::Element(elem) => {
                             last_end = elem.span.end_usize();
                             fragment_nodes.push(FragmentNode::Element(elem));

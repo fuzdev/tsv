@@ -75,7 +75,7 @@ use super::comment_attachment::{get_comment_value, is_template_comment};
 use super::special::{
     bool_option, build_const_tag_writer_comments, build_declaration_tag_writer_comments,
     build_expression_list_writer_comments, build_expression_writer_comments,
-    build_script_writer_comments, find_option_values, script_has_lang_ts, text_value,
+    build_script_writer_comments, component_is_typescript, find_option_values, text_value,
 };
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
@@ -105,6 +105,9 @@ pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u
         },
         interner: &interner,
         comments: &template_comments,
+        // Component-global: `lang="ts"` on any script makes *every* script emit the
+        // acorn-typescript wire shape (Svelte's single `this.ts` flag).
+        component_is_ts: component_is_typescript(root, source, &interner),
     };
 
     let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len()));
@@ -126,6 +129,11 @@ struct Ctx<'a> {
     /// Template comments, sorted by position (empty on the common no-comment
     /// template — the whole spine then fuses).
     comments: &'a [&'a Comment],
+    /// Whether the component parses as TypeScript (component-global, from the first
+    /// lang-bearing `<script>` — see `component_is_typescript`). Selects every `<script>`'s
+    /// wire schema (`Schema::Acorn` vs `Schema::SvelteScript`), so a plain `<script>` beside a
+    /// `lang="ts"` sibling still emits the acorn-typescript import/export shape.
+    component_is_ts: bool,
 }
 
 impl<'a> Ctx<'a> {
@@ -1326,10 +1334,10 @@ fn write_script(
     // Escape-free `&'static str` (`default` / `module`) → skip the serde scan.
     w.token(script.context.as_str());
     w.raw(",\"content\":");
-    // `lang="ts"` scripts follow acorn's schema; a plain `<script>` follows
-    // Svelte's (omit `importKind`/`exportKind="value"`, always emit `attributes`,
-    // and — at emit time — append `options: null` on `ImportExpression`).
-    let schema = if script_has_lang_ts(script, ctx.source, ctx.interner) {
+    // The schema is component-global (Svelte's single `this.ts`): a TS component uses acorn's
+    // schema for *every* script, a non-TS one uses Svelte's (omit `importKind`/`exportKind="value"`,
+    // always emit `attributes`, and — at emit time — append `options: null` on `ImportExpression`).
+    let schema = if ctx.component_is_ts {
         Schema::Acorn
     } else {
         Schema::SvelteScript
@@ -1459,19 +1467,79 @@ fn write_svelte_options(w: &mut JsonWriter, options: &internal::SvelteOptions<'_
     w.raw("}");
 }
 
-/// A slot in a `customElement={…}` object — a `String` or `Boolean` literal
-/// (one entry of Svelte's `customElement` object).
-enum CustomElementValue<'a> {
-    Str(std::borrow::Cow<'a, str>),
-    Bool(bool),
+/// Emit a leading comma before the second and later members of a JSON object/array being
+/// hand-assembled: no-op on the first member, `,` thereafter (flips `first` to `false`).
+fn json_comma(w: &mut JsonWriter, first: &mut bool) {
+    if *first {
+        *first = false;
+    } else {
+        w.raw(",");
+    }
 }
 
-/// Emit the skip-if-none `customElement` option, fused. The first attribute
-/// value that is an object expression (`{tag, shadow, …}` of string/boolean
-/// props) or a plain string (`"tag-name"` → `{tag}`) produces the field; the
-/// object's `Map` insertion semantics (first position, last value on a
-/// duplicate key) are reproduced by an in-order dedup. No positions, so no
-/// translation.
+/// Emit `customElement.props` as Svelte's statically-*evaluated* plain object
+/// (`read_options`, `1-parse/read/options.js`): `{ [name]: { reflect?, type?, attribute? } }`,
+/// reading each nested string/boolean literal's value in source order. Not an AST node — no
+/// positions.
+fn write_custom_element_props(
+    w: &mut JsonWriter,
+    props_obj: &tsv_ts::ast::internal::ObjectExpression<'_>,
+    ctx: &Ctx<'_>,
+) {
+    use tsv_ts::ast::internal::{Expression, LiteralValue, ObjectProperty};
+    w.raw("{");
+    let mut first_prop = true;
+    for prop in props_obj.properties {
+        let ObjectProperty::Property(p) = prop else {
+            continue;
+        };
+        let (Expression::Identifier(key), Expression::ObjectExpression(inner)) = (&p.key, &p.value)
+        else {
+            continue;
+        };
+        json_comma(w, &mut first_prop);
+        w.string(key.name(ctx.source, ctx.interner));
+        w.raw(":{");
+        let mut first_attr = true;
+        for inner_prop in inner.properties {
+            let ObjectProperty::Property(ip) = inner_prop else {
+                continue;
+            };
+            let (Expression::Identifier(ikey), Expression::Literal(lit)) = (&ip.key, &ip.value)
+            else {
+                continue;
+            };
+            let key_name = ikey.name(ctx.source, ctx.interner);
+            match &lit.value {
+                LiteralValue::String(cooked) => {
+                    json_comma(w, &mut first_attr);
+                    w.string(key_name);
+                    w.raw(":");
+                    w.string(cooked.resolve(lit.span, ctx.source));
+                }
+                LiteralValue::Boolean(b) => {
+                    json_comma(w, &mut first_attr);
+                    w.string(key_name);
+                    w.raw(":");
+                    w.bool(*b);
+                }
+                _ => {}
+            }
+        }
+        w.raw("}");
+    }
+    w.raw("}");
+}
+
+/// Emit the skip-if-none `customElement` option, mirroring Svelte's `read_options`
+/// (`1-parse/read/options.js`). The first attribute value that is an object expression
+/// (`{ tag, props, shadow, extend }`) or a plain string (`"tag-name"` → `{tag}`) produces the
+/// field. Only those four recognized keys are extracted (first-wins on a duplicate, like Svelte's
+/// `properties.find`), emitted in the fixed order `tag, props, shadow, extend` regardless of
+/// source order — Svelte assembles `ce` in that order. `tag` is a string, `props` a
+/// statically-evaluated plain object, `shadow` either the string `'open'`/`'none'` or the raw
+/// `ObjectExpression` AST, and `extend` the raw expression AST (both via the shared expression
+/// writer, so their offsets translate like any template `{expr}`).
 fn write_custom_element_field(
     w: &mut JsonWriter,
     attrs: &[internal::AttributeNode<'_>],
@@ -1482,43 +1550,82 @@ fn write_custom_element_field(
         return;
     };
     for v in values {
-        // `customElement={{ tag: '…', shadow: '…' }}`
+        // `customElement={{ tag: '…', props: {…}, shadow: …, extend: … }}`
         if let internal::AttributeValue::ExpressionTag(expr) = v
             && let Expression::ObjectExpression(obj) = &expr.expression
         {
-            let mut props: Vec<(&str, CustomElementValue<'_>)> = Vec::new();
+            let mut tag: Option<&Expression<'_>> = None;
+            let mut props: Option<&Expression<'_>> = None;
+            let mut shadow: Option<&Expression<'_>> = None;
+            let mut extend: Option<&Expression<'_>> = None;
             for prop in obj.properties {
                 if let ObjectProperty::Property(p) = prop
                     && let Expression::Identifier(key) = &p.key
-                    && let Expression::Literal(lit) = &p.value
                 {
-                    let key_name = key.name(ctx.source, ctx.interner);
-                    let value = match &lit.value {
-                        LiteralValue::String(cooked) => CustomElementValue::Str(
-                            std::borrow::Cow::Borrowed(cooked.resolve(lit.span, ctx.source)),
-                        ),
-                        LiteralValue::Boolean(b) => CustomElementValue::Bool(*b),
+                    let slot = match key.name(ctx.source, ctx.interner) {
+                        "tag" => &mut tag,
+                        "props" => &mut props,
+                        "shadow" => &mut shadow,
+                        "extend" => &mut extend,
                         _ => continue,
                     };
-                    // `Map::insert` semantics: overwrite in place, keep position.
-                    if let Some(slot) = props.iter_mut().find(|(k, _)| *k == key_name) {
-                        slot.1 = value;
-                    } else {
-                        props.push((key_name, value));
+                    if slot.is_none() {
+                        *slot = Some(&p.value);
                     }
                 }
             }
+
             w.raw(",\"customElement\":{");
-            for (i, (key, value)) in props.iter().enumerate() {
-                if i > 0 {
-                    w.raw(",");
+            let mut first = true;
+            // `tag`: the string-literal value.
+            if let Some(Expression::Literal(lit)) = tag
+                && let LiteralValue::String(cooked) = &lit.value
+            {
+                json_comma(w, &mut first);
+                w.raw("\"tag\":");
+                w.string(cooked.resolve(lit.span, ctx.source));
+            }
+            // `props`: statically-evaluated plain object.
+            if let Some(Expression::ObjectExpression(props_obj)) = props {
+                json_comma(w, &mut first);
+                w.raw("\"props\":");
+                write_custom_element_props(w, props_obj, ctx);
+            }
+            // `shadow`: the string `'open'`/`'none'`, or the raw `ObjectExpression` AST.
+            match shadow {
+                Some(Expression::Literal(lit)) => {
+                    if let LiteralValue::String(cooked) = &lit.value {
+                        json_comma(w, &mut first);
+                        w.raw("\"shadow\":");
+                        w.string(cooked.resolve(lit.span, ctx.source));
+                    }
                 }
-                w.string(key);
-                w.raw(":");
-                match value {
-                    CustomElementValue::Str(s) => w.string(s),
-                    CustomElementValue::Bool(b) => w.bool(*b),
+                Some(shadow_expr @ Expression::ObjectExpression(_)) => {
+                    json_comma(w, &mut first);
+                    w.raw("\"shadow\":");
+                    write_expression_embedded(
+                        w,
+                        shadow_expr,
+                        ctx.source,
+                        ctx.loc,
+                        ctx.interner,
+                        CommentMode::Off,
+                    );
                 }
+                _ => {}
+            }
+            // `extend`: the raw expression AST.
+            if let Some(extend_expr) = extend {
+                json_comma(w, &mut first);
+                w.raw("\"extend\":");
+                write_expression_embedded(
+                    w,
+                    extend_expr,
+                    ctx.source,
+                    ctx.loc,
+                    ctx.interner,
+                    CommentMode::Off,
+                );
             }
             w.raw("}");
             return;
