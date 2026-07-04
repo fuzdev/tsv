@@ -349,7 +349,7 @@ fn collect_file(path: &Path, parser: ParserType, stats: &mut Stats) -> Result<()
 fn classify_node(n: &DocNode) -> &'static str {
     match n {
         DocNode::Text(_) => "Text",
-        DocNode::MultilineText(_) => "MultilineText",
+        DocNode::MultilineText { .. } => "MultilineText",
         DocNode::Line(_) => "Line",
         DocNode::Indent(_) => "Indent",
         DocNode::Dedent(_) => "Dedent",
@@ -370,7 +370,7 @@ fn classify_node(n: &DocNode) -> &'static str {
 fn classify_text(t: &DocText) -> &'static str {
     match t {
         DocText::Static(..) => "Static",
-        DocText::Owned(..) => "Owned",
+        DocText::Pooled(..) => "Pooled",
         DocText::SourceSpan(..) => "SourceSpan",
         DocText::Symbol(..) => "Symbol",
     }

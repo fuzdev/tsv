@@ -734,7 +734,7 @@ cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
 # used); the pre-size audit of the output String (estimated_output_capacity) and
 # AST bump (estimated_ast_arena_capacity) — flags under/over-provisioning; the
 # DocNode variant histogram (which node kind dominates the Vec the render/fits/build
-# loops scan); the DocText sub-histogram (Static/Owned/SourceSpan/Symbol); and
+# loops scan); the DocText sub-histogram (Static/Pooled/SourceSpan/Symbol); and
 # container degeneracy (empty/single/nested Concat/Fill + group-of-group — the
 # node-count lever, collapsible at build with no output change). --reuse instead
 # measures the reset()-reuse high-water (peak retained capacity across one shared

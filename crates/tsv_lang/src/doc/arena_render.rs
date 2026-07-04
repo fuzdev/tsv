@@ -85,8 +85,9 @@ fn render_text<R: TextResolver + ?Sized>(
     output: &mut String,
     pos: &mut usize,
     resolver: Option<&R>,
+    pool: &str,
 ) {
-    let s = resolve_text(text, resolver);
+    let s = resolve_text(text, resolver, pool);
     output.push_str(s);
     match text.cached_width() {
         CachedWidth::Width(w) => *pos += w as usize, // Common path: no visual_width call
@@ -665,27 +666,29 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
     // avoids the per-iteration dynamic borrow-check cost.
     let nodes_outer = arena.borrow_nodes();
     let children_outer = arena.borrow_children();
+    let pool_outer = arena.borrow_text_pool();
     let nodes: &[DocNode] = &nodes_outer;
     let children_vec: &[DocId] = &children_outer;
+    let pool: &str = &pool_outer;
 
     loop {
         match &nodes[cmd.doc.index()] {
             DocNode::Text(t) => {
                 #[cfg(feature = "swallow_check")]
                 if policy.swallow_enabled() {
-                    let s = resolve_text(t, resolver);
+                    let s = resolve_text(t, resolver, pool);
                     policy.swallow_on_text(arena.is_line_comment(cmd.doc), s, output);
                 }
-                render_text(t, output, pos, resolver);
+                render_text(t, output, pos, resolver, pool);
             }
 
-            DocNode::MultilineText(s) => {
+            DocNode::MultilineText { span, .. } => {
                 // Render `[text(line0), hardline, text(line1), hardline, …]` from
-                // one owned string: the first line at the current column, each
+                // one pool-stored body: the first line at the current column, each
                 // subsequent line preceded by the hardline path (flush pending
                 // line suffix, trim, newline, context indent). Byte- and
                 // position-identical to the per-line concat it replaces.
-                let mut lines = s.split('\n');
+                let mut lines = span.slice(pool).split('\n');
                 if let Some(first) = lines.next() {
                     #[cfg(feature = "swallow_check")]
                     if policy.swallow_enabled() {

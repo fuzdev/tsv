@@ -6,7 +6,9 @@
 //! referenced by `ChildRange { start, len }`.
 //!
 //! Benefits:
-//! - No recursive drop (dropping the arena = dropping two Vecs)
+//! - No recursive drop, no per-node destructors — `DocNode` carries no drop
+//!   glue (dynamic text lives in the arena text pool), so clearing or dropping
+//!   the arena never walks the node store
 //! - No deep cloning (DocId is Copy)
 //! - Cache-friendly contiguous storage
 //! - Bulk deallocation
@@ -21,7 +23,8 @@ use super::DocBuf;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
-    DocContext, DocText, GroupId, LineKind, Mode, TEXT_WIDTH_HAS_NEWLINE, TEXT_WIDTH_NOT_COMPUTED,
+    DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, TEXT_WIDTH_HAS_NEWLINE,
+    TEXT_WIDTH_NOT_COMPUTED,
 };
 
 /// Index into `DocArena.nodes`.
@@ -65,24 +68,28 @@ impl ChildRange {
 /// Stores children as `DocId` indices and child lists as `ChildRange` ranges.
 #[derive(Debug, Clone)]
 pub enum DocNode {
-    /// Text content to output (static, owned, or symbol)
+    /// Text content to output (static, pooled, source-span, or symbol)
     Text(DocText),
 
     /// Multi-line text rendered with per-line context indent.
     ///
-    /// Holds a body whose lines are `\n`-separated in one owned `String`. The
+    /// Holds a body whose lines are `\n`-separated in the arena text pool. The
     /// first line renders at the current column; every subsequent line is
     /// preceded by a context-indented hardline (trim trailing whitespace,
     /// newline, write indentation). Output- and position-identical to
     /// `concat([text(line0), hardline, text(line1), hardline, …])`, but stores
-    /// the whole body in one allocation instead of one node (and one `String`)
-    /// per line.
+    /// the whole body contiguously instead of one node (and one text
+    /// allocation) per line.
+    ///
+    /// `first_width` is the precomputed visual width of the first line
+    /// (clamped like every cached text width — see [`precompute_text_width`]),
+    /// so the fits walk measures the node without touching the pool.
     ///
     /// Used for indentable (JSDoc / `*`-aligned) multi-line block comments,
     /// whose continuation lines all use the uniform hardline (context-indent)
     /// layout. Always contains a newline, so it forces enclosing groups to break
     /// (`will_break` is true) exactly like the hardlines it replaces.
-    MultilineText(String),
+    MultilineText { span: PoolSpan, first_width: u16 },
 
     /// Line break - behavior depends on kind and mode
     Line(LineKind),
@@ -148,6 +155,16 @@ pub enum DocNode {
     /// A group that prevents hardline propagation to parent groups
     IsolatedGroup { contents: DocId },
 }
+
+// `DocNode` must stay free of drop glue: dynamically-built text lives in the
+// arena text pool ([`DocText::Pooled`], `MultilineText`), never in per-node
+// owned `String`s, so `DocArena::reset()`'s `clear()` and the arena's drop
+// free the node store without walking every node to run destructors on the
+// <1% that used to own heap payloads. A new heap-owning variant would silently
+// reintroduce that walk on every reset across all surfaces (CLI workers,
+// FFI/N-API/WASM thread-local reuse) — this guard makes it a compile error;
+// route the payload through the pool instead.
+const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 
 /// A command in the printer's command stack.
 ///
@@ -219,10 +236,11 @@ impl ArenaCommand {
 pub(super) const FLAT_WIDTH_UNKNOWN: u32 = u32::MAX;
 pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 
-/// The width-cache policy shared by [`DocArena::text_owned`] and
-/// [`DocArena::source_span`]: skip ASCII (the byte-count fast path measures on
-/// demand for less than caching costs), flag newline-bearing text, else take
-/// the grapheme path once (it may be re-measured many times in fits).
+/// The width-cache policy for [`DocArena::source_span`] (verbatim source
+/// slices): skip ASCII (the byte-count fast path measures on demand for less
+/// than caching costs), flag newline-bearing text, else take the grapheme path
+/// once (it may be re-measured many times in fits). Pool-stored text uses
+/// [`pooled_text_width`] instead — always eager, so fits never needs the pool.
 ///
 /// The measured width is clamped below the sentinels. Unlike the `u32`
 /// flat-width cache above (where aliasing needs a ~4 GB subtree and is benign
@@ -246,6 +264,23 @@ fn precompute_text_width(s: &str) -> u16 {
     }
 }
 
+/// The eager width policy for pool-stored text ([`DocText::Pooled`]): unlike
+/// [`precompute_text_width`]'s ASCII skip (measure on demand), pooled text
+/// **always** caches a real width or the newline sentinel at build — so every
+/// width query (the fits walk, `render_text`'s column advance) answers from
+/// the node alone and the fits path never borrows the pool. Pooled text is
+/// rare (~1.4% of Text nodes on real corpora), so the eager measure is off the
+/// hot path; the clamp reasoning on [`precompute_text_width`] applies
+/// unchanged.
+#[inline]
+fn pooled_text_width(s: &str) -> u16 {
+    if s.contains('\n') {
+        TEXT_WIDTH_HAS_NEWLINE
+    } else {
+        visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
+    }
+}
+
 /// Arena allocator for document nodes.
 ///
 /// All doc nodes are stored contiguously in `nodes`. Multi-child nodes
@@ -257,6 +292,13 @@ fn precompute_text_width(s: &str) -> u16 {
 pub struct DocArena {
     nodes: RefCell<Vec<DocNode>>,
     children: RefCell<Vec<DocId>>,
+    /// Backing store for dynamically-built text ([`DocText::Pooled`] and
+    /// [`DocNode::MultilineText`] bodies), referenced by [`PoolSpan`]. Keeping
+    /// the bytes here instead of per-node `String`s leaves `DocNode` with no
+    /// drop glue, so `reset()`/drop clear the node store without walking it.
+    /// Grows organically (pooled text is rare — no pre-size) and is rewound by
+    /// `reset()` like every other store.
+    text_pool: RefCell<String>,
     /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
@@ -282,6 +324,7 @@ impl DocArena {
         Self {
             nodes: RefCell::new(Vec::new()),
             children: RefCell::new(Vec::new()),
+            text_pool: RefCell::new(String::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
@@ -307,6 +350,9 @@ impl DocArena {
         Self {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
             children: RefCell::new(Vec::with_capacity(estimated_children)),
+            // Pooled text is rare (~1.4% of Text nodes), so the pool grows
+            // organically — no pre-size.
+            text_pool: RefCell::new(String::new()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -340,6 +386,7 @@ impl DocArena {
     pub fn reset(&mut self) {
         self.nodes.get_mut().clear();
         self.children.get_mut().clear();
+        self.text_pool.get_mut().clear();
         self.will_break_cache.get_mut().clear();
         self.flat_width_cache.get_mut().clear();
         #[cfg(feature = "swallow_check")]
@@ -357,6 +404,18 @@ impl DocArena {
         let id = DocId(nodes.len() as u32);
         nodes.push(node);
         id
+    }
+
+    /// Append `s` to the arena text pool and return its span.
+    #[inline]
+    fn pool_push(&self, s: &str) -> PoolSpan {
+        let mut pool = self.text_pool.borrow_mut();
+        let start = pool.len() as u32;
+        pool.push_str(s);
+        PoolSpan {
+            start,
+            len: s.len() as u32,
+        }
     }
 
     /// Allocate a child range from a slice of DocIds.
@@ -386,13 +445,18 @@ impl DocArena {
         self.alloc(DocNode::Text(DocText::Static(s, TEXT_WIDTH_NOT_COMPUTED)))
     }
 
-    /// Create a text doc from an owned string.
+    /// Create a text doc from an owned string, stored in the arena text pool.
     ///
-    /// Width-cache policy: see [`precompute_text_width`].
+    /// Width-cache policy: see [`pooled_text_width`] (always eager, so the
+    /// fits walk never touches the pool).
+    // TODO: now that the body is copied into the pool rather than moved, the
+    // signature could take `&str` and spare the callers that build a `String`
+    // purely to satisfy it — sweep call sites when next touching them.
     #[inline]
     pub fn text_owned(&self, s: String) -> DocId {
-        let w = precompute_text_width(&s);
-        self.alloc(DocNode::Text(DocText::Owned(s, w)))
+        let w = pooled_text_width(&s);
+        let span = self.pool_push(&s);
+        self.alloc(DocNode::Text(DocText::Pooled(span, w)))
     }
 
     /// Create a multi-line text doc rendered with per-line context indent.
@@ -401,13 +465,22 @@ impl DocArena {
     /// column, each subsequent one after a context-indented hardline. See
     /// [`DocNode::MultilineText`]. Use for indentable multi-line block comments;
     /// the body must already be framed (delimiters + per-line spacing baked in).
+    ///
+    /// The first line's visual width is precomputed here (clamped like every
+    /// cached text width — the fits verdict only compares against print widths
+    /// orders of magnitude below the clamp), so fits measures the node without
+    /// borrowing the pool.
     #[inline]
     pub fn multiline_text(&self, s: String) -> DocId {
-        self.alloc(DocNode::MultilineText(s))
+        let first = s.split('\n').next().unwrap_or("");
+        let first_width =
+            visual_width(first, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16;
+        let span = self.pool_push(&s);
+        self.alloc(DocNode::MultilineText { span, first_width })
     }
 
-    /// Create an owned-text doc for a *line comment* (`// …` or hashbang) — text
-    /// whose content runs to end-of-line.
+    /// Create a pooled-text doc (via [`Self::text_owned`]) for a *line comment*
+    /// (`// …` or hashbang) — text whose content runs to end-of-line.
     ///
     /// Identical to [`Self::text_owned`] for output. Under the `swallow_check`
     /// feature, while the check is enabled ([`super::swallow`]) it additionally
@@ -819,7 +892,7 @@ impl DocArena {
         let result = match &nodes[id.index()] {
             DocNode::Text(_) => false,
             // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
-            DocNode::MultilineText(_) => true,
+            DocNode::MultilineText { .. } => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 Self::will_break_memo(*inner, nodes, children, cache)
@@ -864,7 +937,7 @@ impl DocArena {
         match &nodes[id.index()] {
             DocNode::IsolatedGroup { contents, .. } => self.will_break_deep_inner(*contents, nodes),
             DocNode::Text(_) => false,
-            DocNode::MultilineText(_) => true,
+            DocNode::MultilineText { .. } => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.will_break_deep_inner(*inner, nodes)
@@ -899,7 +972,7 @@ impl DocArena {
     fn has_forced_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
         match &nodes[id.index()] {
             DocNode::Text(_) => false,
-            DocNode::MultilineText(_) => true,
+            DocNode::MultilineText { .. } => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.has_forced_break_inner(*inner, nodes)
@@ -966,7 +1039,7 @@ impl DocArena {
             DocNode::WithContext { doc, .. } => self.can_break_inner(*doc, nodes),
             DocNode::IsolatedGroup { contents, .. } => self.can_break_inner(*contents, nodes),
             DocNode::LineSuffix(inner) => self.can_break_inner(*inner, nodes),
-            DocNode::MultilineText(_) => true,
+            DocNode::MultilineText { .. } => true,
             DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
         }
@@ -1007,7 +1080,10 @@ impl DocArena {
                 // Flatten: drop the internal hardlines (→ empty) and join the
                 // lines with no separator — identical to remove_lines over the
                 // per-line `concat([text, hardline, text, …])` this replaces.
-                DocNode::MultilineText(s) => Info::MultilineText(s.replace('\n', "")),
+                DocNode::MultilineText { span, .. } => {
+                    let pool = self.text_pool.borrow();
+                    Info::MultilineText(span.slice(&pool).replace('\n', ""))
+                }
                 DocNode::Line(kind) => Info::Line(*kind),
                 DocNode::Indent(inner) => Info::Indent(*inner),
                 DocNode::Dedent(inner) => Info::Dedent(*inner),
@@ -1156,6 +1232,15 @@ impl DocArena {
     #[inline]
     pub fn borrow_children(&self) -> std::cell::Ref<'_, Vec<DocId>> {
         self.children.borrow()
+    }
+
+    /// Borrow the arena text pool for rendering — the backing store the
+    /// [`DocText::Pooled`] / [`DocNode::MultilineText`] spans index into.
+    /// Hoisted once per render alongside `borrow_nodes`; the fits walk never
+    /// needs it (pooled widths are always precomputed on the node).
+    #[inline]
+    pub(super) fn borrow_text_pool(&self) -> std::cell::Ref<'_, String> {
+        self.text_pool.borrow()
     }
 
     /// Mutably borrow the flat-width cache for the `arena_fits` fast-path.

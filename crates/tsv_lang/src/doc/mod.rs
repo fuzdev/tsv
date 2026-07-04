@@ -31,7 +31,8 @@ mod types;
 
 // Types
 pub use types::{
-    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, SourceTextResolver, TextResolver,
+    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, SourceTextResolver,
+    TextResolver,
 };
 
 /// Stack buffer for assembling a node's doc parts before handing them to
@@ -821,7 +822,7 @@ mod arena_tests {
     // rather than silently producing wrong layout.
 
     /// Fit `doc` in `width` columns in Flat mode, with no resolver (the docs here
-    /// use only `Static`/`Owned` text, never `Symbol`).
+    /// use only `Static`/`Pooled` text, never `Symbol`).
     fn fits_flat(a: &DocArena, doc: DocId, width: usize) -> bool {
         arena_fits(a, doc, width, Mode::Flat, None::<&dyn TextResolver>)
     }
@@ -936,7 +937,10 @@ mod arena_tests {
         let a = DocArena::new();
         // Static newline text: resolved on demand, contains '\n' → walk returns true.
         assert!(fits_flat(&a, a.text("a\nb"), 0));
-        // Owned non-ASCII newline text: cached as HAS_NEWLINE → same early-true path.
+        // Pooled newline text: cached as HAS_NEWLINE → same early-true path.
+        // Both cases pin the eager pooled-width policy (never NOT_COMPUTED),
+        // which is what lets fits answer without borrowing the text pool.
         assert!(fits_flat(&a, a.text_owned("café\nx".to_string()), 0));
+        assert!(fits_flat(&a, a.text_owned("a\nb".to_string()), 0));
     }
 }
