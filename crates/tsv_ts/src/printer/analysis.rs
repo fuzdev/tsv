@@ -376,6 +376,10 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression<'_>, source: &st
         // A JSDoc cast is transparent for multiline-content detection: the wrapped
         // expression's content still forces expansion of containing structures.
         internal::Expression::JsdocCast(cast) => has_multiline_content(cast.inner, source),
+        // Preserved grouping parens are likewise transparent.
+        internal::Expression::ParenthesizedExpression(paren) => {
+            has_multiline_content(paren.expression, source)
+        }
         internal::Expression::ArrowFunctionExpression(arrow) => match &arrow.body {
             internal::ArrowFunctionBody::Expression(expr) => has_multiline_content(expr, source),
             internal::ArrowFunctionBody::BlockStatement(_) => false,

@@ -67,6 +67,9 @@ impl<'a> Printer<'a> {
             Expression::AssignmentExpression(_) => true,
             // Wrapping expressions: check inner
             Expression::JsdocCast(cast) => Self::expression_has_break_points(cast.inner),
+            Expression::ParenthesizedExpression(paren) => {
+                Self::expression_has_break_points(paren.expression)
+            }
             Expression::TSAsExpression(e) => Self::expression_has_break_points(e.expression),
             Expression::TSSatisfiesExpression(e) => Self::expression_has_break_points(e.expression),
             Expression::TSNonNullExpression(e) => Self::expression_has_break_points(e.expression),

@@ -107,6 +107,13 @@ pub struct Parser<'a, 'arena> {
     /// - `in`: always a binary operator when depth > 0, even when `allow_in` is
     ///   false (for-loop header parsing)
     grouping_depth: u32,
+    /// When `true`, grouping parens `(expr)` are preserved as an internal
+    /// `ParenthesizedExpression` node instead of being discarded. Off by default
+    /// (matching acorn/Svelte, whose public AST is paren-free); enabled only for
+    /// the `{#snippet}`-parameter sub-parse, where Svelte parses with acorn's
+    /// `preserveParens: true` and skips `remove_parens`. Set via
+    /// [`crate::parse_with_interner_preserve_parens`].
+    pub(crate) preserve_parens: bool,
     /// True when parsing inside `declare namespace` or `declare module`.
     /// Functions inside ambient contexts don't have bodies (end with `;`).
     in_ambient_context: bool,
@@ -293,6 +300,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             prev_end: 0,
             allow_ts_type_assertions: true, // Enable by default (TypeScript context)
             grouping_depth: 0,              // Not inside any grouping delimiters
+            preserve_parens: false,         // Discard grouping parens (paren-free public AST)
             in_ambient_context: false,      // Not in declare namespace/module
             lexer_error: None,              // No stored lexer error
             peek_had_line_terminator: false, // No peek cached yet

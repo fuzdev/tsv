@@ -91,6 +91,15 @@ pub(super) fn write_expression_inner(
                 },
             );
         }
+        // Preserved grouping parens (snippet parameters): emit the wrapper with
+        // its paren-covering span, then the inner expression. Only produced under
+        // the parser's `preserve_parens` mode, so it never appears elsewhere.
+        internal::Expression::ParenthesizedExpression(paren) => {
+            node_header(w, "ParenthesizedExpression", paren.span, ctx);
+            w.raw(",\"expression\":");
+            write_expression(w, paren.expression, ctx);
+            close_node(w, "ParenthesizedExpression", paren.span, ctx);
+        }
         internal::Expression::Literal(lit) => write_literal(w, lit, ctx),
         internal::Expression::Identifier(id) => {
             write_identifier_parts(

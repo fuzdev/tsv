@@ -390,6 +390,7 @@ export type Expression =
 	| ImportExpression
 	| MetaProperty
 	| TSParameterProperty
+	| ParenthesizedExpression
 	| ChainExpression;
 
 export interface ObjectExpression {
@@ -601,6 +602,21 @@ export interface SequenceExpression {
 	end: number;
 	loc: SourceLocation;
 	expressions: Expression[];
+}
+
+/**
+ * Parenthesized expression: `(expr)`. Only emitted for `{#snippet}` parameters,
+ * where Svelte parses with acorn's `preserveParens` and skips `remove_parens`,
+ * so the parens survive in the AST (e.g. a default `c = (2, 3)`). Every other
+ * grouping paren is discarded (the public AST is otherwise paren-free). `start`
+ * and `end` cover the parentheses; `expression` keeps its own paren-free span.
+ */
+export interface ParenthesizedExpression {
+	type: 'ParenthesizedExpression';
+	start: number;
+	end: number;
+	loc: SourceLocation;
+	expression: Expression;
 }
 
 /** Regex literal: `/pat/flags`. Serializes with `type: "Literal"` to match acorn. */
