@@ -55,28 +55,29 @@ function file_size(path: URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-07-03 (retiring the typed public AST: the wire-JSON writer is
-// now the sole emission path, so the `parse` feature drops the `ast::public`
-// structs and their `serde` derives + typed converters — a large shrink):
-// parse 1,217,075 B; all 2,625,338 B (npm == deno, identical `.wasm`). format
-// is unchanged by that work (no convert layer). The parse-only build shows the
-// removed convert/serde layer undiluted. Bounds recentered ±8% on the new
-// parse/all sizes; format's bound is unchanged (2,312,791 B, still in range).
+// Measured 2026-07-03 (the Svelte comment-island attach no longer re-parses
+// its emitted bytes into a `serde_json::Value` — the skeleton recorder walks
+// the wire tree structurally — so the last production `from_slice::<Value>`
+// left the convert path and serde_json's `Value` deserializer tree-shakes out
+// of the `parse` feature entirely): parse 1,120,110 B (−97 KB); all
+// 2,529,672 B (npm == deno, identical `.wasm`). format 2,302,533 B — ≈flat
+// (−10 KB from span-identity identifier emission + printer gates), since the
+// deleted machinery was convert-only. Bounds recentered ±8%.
 const BOUNDS = {
-	format: { min: 2_030_000, max: 2_390_000 },
-	parse: { min: 1_120_000, max: 1_315_000 },
-	all: { min: 2_415_000, max: 2_835_000 },
+	format: { min: 2_115_000, max: 2_490_000 },
+	parse: { min: 1_030_000, max: 1_210_000 },
+	all: { min: 2_325_000, max: 2_735_000 },
 };
 
 // all = format + parse. `all − format` is the parse feature (parser convert
-// path; measured 312,547 B — down from ~685,640 B when it carried the typed
-// public AST + serde derives, now retired for the wire-JSON writer); `all −
+// path; measured 227,139 B — down from 312,547 B when it still carried the
+// comment-island round-trip's `Value` deserialization machinery); `all −
 // parse` is the format feature (printers + doc builder, dropped from the
-// parse-only build at link time; measured 1,408,263 B). A delta near zero
-// means a feature gate broke.
+// parse-only build at link time; measured 1,409,562 B, ≈unchanged — the
+// gate-health signal). A delta near zero means a feature gate broke.
 const DELTAS = {
-	format: { min: 285_000, max: 340_000 }, // all − format
-	parse: { min: 1_050_000, max: 1_445_000 }, // all − parse
+	format: { min: 209_000, max: 245_000 }, // all − format
+	parse: { min: 1_295_000, max: 1_525_000 }, // all − parse
 };
 
 console.log('=== WASM binary sizes ===');

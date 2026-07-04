@@ -50,13 +50,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Check for spread: { ...obj }
             if self.eat(TokenKind::DotDotDot) {
                 // Use assignment_expression because comma separates properties
-                let argument = self.parse_assignment_expression()?;
+                let argument = self.parse_assignment_expression_ref()?;
                 // Use prev_token_end() to include the closing paren when the argument
                 // is parenthesized (`{...(a && b)}`), matching the array-spread and
                 // object-value paths (acorn includes the `)` in the SpreadElement span).
                 let prop_end = self.prev_token_end();
                 properties.push(ObjectProperty::SpreadElement(SpreadElement {
-                    argument: arena.alloc(argument),
+                    argument,
                     span: Span::new(prop_start as u32, prop_end as u32),
                 }));
 

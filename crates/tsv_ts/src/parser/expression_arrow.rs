@@ -115,8 +115,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // A concise body is `AssignmentExpression[?In]` — it inherits the
             // outer In context, so `for (a = () => x in y;;)` still rejects.
             // Use assignment_expression so comma doesn't consume next object property
-            let expr = self.parse_assignment_expression()?;
-            Ok(ArrowFunctionBody::Expression(self.alloc(expr)))
+            Ok(ArrowFunctionBody::Expression(
+                self.parse_assignment_expression_ref()?,
+            ))
         }
     }
 
