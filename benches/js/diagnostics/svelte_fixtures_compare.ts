@@ -91,38 +91,14 @@ const SANCTIONED = SVELTE_FIXTURE_SANCTIONS;
  * (TODO_PARSE_COVERAGE.md §"Svelte parse over-rejections vs `svelte/tests`").
  */
 const KNOWN_GAPS: { pattern: string; category: string; reason: string }[] = [
-	// HTML5 implicit / auto tag-closing — Svelte auto-closes `<li>`/`<p>`/… at a
-	// sibling/parent/EOF boundary; tsv requires an explicit close. The largest gap
-	// cluster; implementing element auto-close rules closes all of these at once.
-	{
-		pattern: 'parser-legacy/samples/implicitly-closed-li/',
-		category: 'html5-implicit-close',
-		reason: '`<li>` auto-closed by sibling/parent `</ul>`',
-	},
+	// `<textarea>` RCDATA — its content is raw text with live `{expr}` interpolation
+	// (the inner `<p>` is text, not an element) read up to a whitespace-tolerant
+	// `</textarea…>`. A sibling of the `<script>`/`<style>` raw-text path, tracked
+	// separately from the (now-closed) implicit-tag-closing cluster; deferred.
 	{
 		pattern: 'parser-legacy/samples/textarea-end-tag/',
-		category: 'html5-implicit-close',
-		reason: '`<p>`/`<textarea>` implicit-close / raw-text boundary',
-	},
-	{
-		pattern: 'runtime-xhtml/samples/autoclosed-tags/',
-		category: 'html5-implicit-close',
-		reason: '`<li>` auto-closed by sibling/parent',
-	},
-	{
-		pattern: 'validator/samples/implicitly-closed-by-parent/',
-		category: 'html5-implicit-close',
-		reason: '`<div>` implicitly closed by parent `<main>`',
-	},
-	{
-		pattern: 'validator/samples/implicitly-closed-by-sibling/',
-		category: 'html5-implicit-close',
-		reason: '`<p>` implicitly closed by sibling `<div>`',
-	},
-	{
-		pattern: 'runtime-legacy/samples/binding-this-multiple/',
-		category: 'html5-implicit-close',
-		reason: 'unclosed `<duiv>` auto-closed at end of parent (auto-close-at-EOF)',
+		category: 'textarea-rcdata',
+		reason: '`<textarea>` raw-text content + `{expr}` + whitespace-tolerant close',
 	},
 	// Attribute-name lexer over-strict on characters HTML permits in attr names.
 	{

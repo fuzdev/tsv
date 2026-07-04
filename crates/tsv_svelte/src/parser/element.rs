@@ -142,11 +142,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }));
         }
 
-        // Parse children
-        let child_nodes = self.parse_children(tag_name, opening_tag_end, start, in_svelte_head)?;
-
-        // Parse closing tag: </tag>
-        let end = self.parse_closing_tag(tag_name)?;
+        // Parse children. Only HTML elements participate in HTML5 implicit tag
+        // closing (Svelte gates auto-close on `parent.type === 'RegularElement'`);
+        // components and `svelte:*` keep the strict explicit-close requirement.
+        // `parse_children` resolves `end` — past this element's `</tag>` (explicit
+        // close) or at the `<` that implicitly closed it.
+        let is_html = matches!(kind, ElementKind::Html);
+        let (child_nodes, end) =
+            self.parse_children(tag_name, opening_tag_end, start, in_svelte_head, is_html)?;
 
         Ok(ParsedElement::Element(Element {
             name: tag_symbol,
@@ -205,11 +208,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             }));
         }
 
-        // Parse children
-        let child_nodes = self.parse_children(tag_name, opening_tag_end, start, in_svelte_head)?;
-
-        // Parse closing tag
-        let end = self.parse_closing_tag(tag_name)?;
+        // Parse children. Special elements (`svelte:*`, `slot`, …) are not HTML
+        // RegularElements, so they never auto-close (`is_html = false`) — a
+        // mismatched close falls to `parse_closing_tag`'s strict error.
+        let (child_nodes, end) =
+            self.parse_children(tag_name, opening_tag_end, start, in_svelte_head, false)?;
 
         Ok(ParsedElement::SpecialElement(SpecialElement {
             kind,
@@ -338,14 +341,22 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok((attributes, tag_expr, component_expr))
     }
 
-    /// Parse children until closing tag
+    /// Parse children until this element's end is resolved, returning the child
+    /// nodes and the element's end byte offset. The end is either past this
+    /// element's own `</tag>` (consumed here via `parse_closing_tag`) or, under
+    /// HTML5 implicit tag closing, the offset of the `<` that triggered the implicit
+    /// close (an ancestor's `</other>` or an auto-closing sibling `<next>`, left
+    /// unconsumed for the caller's caller to re-read — matching Svelte's
+    /// `parent.end = start`). `is_html` enables the auto-close rules: only HTML
+    /// `RegularElement`s participate (see the callers).
     fn parse_children(
         &mut self,
         tag_name: &str,
         opening_tag_end: usize,
         start: usize,
         in_svelte_head: bool,
-    ) -> Result<BumpVec<'arena, FragmentNode<'arena>>, ParseError> {
+        is_html: bool,
+    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
         let mut child_nodes = self.bvec();
         let mut last_end = opening_tag_end;
 
@@ -364,8 +375,30 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 last_end = tag.span().end_usize();
                 child_nodes.push(tag);
             } else if self.check(TokenKind::LeftAngle) {
+                // A `<…>` may end this element rather than nest inside it. Both
+                // auto-close paths leave the triggering `<` unconsumed for the
+                // caller's caller and end this element at its offset.
+                // TODO: a diagnostics layer would record the implicit close at these
+                // two points (Svelte's `element_implicitly_closed` warning).
                 if self.is_next_token(TokenKind::Slash)? {
-                    break;
+                    // A closing tag `</name>`. Our own close → consume it. An HTML
+                    // element's mismatched close is an ancestor's → leave it, so it
+                    // unwinds to the matching ancestor (or errors at the root if none
+                    // matches). A non-HTML parent takes the strict mismatch error.
+                    let end = if is_html && !self.is_closing_tag_for(tag_name) {
+                        self.current_start as u32
+                    } else {
+                        self.parse_closing_tag(tag_name)?
+                    };
+                    return Ok((child_nodes, end));
+                }
+                // An opening tag `<next>` that the optional-end-tag table says closes
+                // this element — leave it for the parent to adopt as a sibling.
+                if is_html
+                    && let Some(next_name) = self.peek_open_tag_name()?
+                    && tsv_html::closing_tag_omitted(tag_name, Some(next_name))
+                {
+                    return Ok((child_nodes, self.current_start as u32));
                 }
                 // Parse child element (may be special or regular)
                 let child = self.parse_element_or_special(in_svelte_head)?;
@@ -395,8 +428,46 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 ));
             }
         }
+    }
 
-        Ok(child_nodes)
+    /// Whether the `</…>` closing tag at the current `<` names `tag_name`.
+    ///
+    /// The parser is positioned at the `<` of a closing tag (current token
+    /// `LeftAngle`, next `Slash`); this reads the name straight from source
+    /// without consuming tokens, so a non-matching (ancestor's) close can be left
+    /// in place for the caller to re-read. The name must be exactly `tag_name`
+    /// followed by a tag-name terminator (whitespace, `/`, `>`, or EOF), so `</li>`
+    /// matches `li` but `</link>` does not.
+    fn is_closing_tag_for(&self, tag_name: &str) -> bool {
+        let name_start = self.current_start + 2; // past `</`
+        if !self
+            .source
+            .get(name_start..)
+            .is_some_and(|rest| rest.starts_with(tag_name))
+        {
+            return false;
+        }
+        match self.source.as_bytes().get(name_start + tag_name.len()) {
+            None => true,
+            Some(b) => b.is_ascii_whitespace() || *b == b'/' || *b == b'>',
+        }
+    }
+
+    /// The tag name of the opening tag at the current `<` (peeked, not consumed).
+    ///
+    /// Returns `None` when the token after `<` is not an identifier (e.g. `<!…`,
+    /// `<>`), in which case there is no name to test against the auto-close table.
+    /// The returned `&'a str` borrows the immutable source, so it survives the
+    /// `&mut self` borrow (same pattern as `current_value`).
+    fn peek_open_tag_name(&mut self) -> Result<Option<&'a str>, ParseError> {
+        if self.peek.is_none() {
+            self.peek = Some(self.lexer.next_token()?);
+        }
+        Ok(self.peek.as_ref().and_then(|p| {
+            (p.kind == TokenKind::Identifier).then(|| {
+                &self.source[self.base_offset + p.start as usize..self.base_offset + p.end as usize]
+            })
+        }))
     }
 
     /// Consume a `</name>` closing tag (lexer positioned at `<`) and return the byte
