@@ -2,12 +2,12 @@
 
 use crate::ast::internal::{
     AssignmentExpression, AwaitExpression, BinaryExpression, BinaryOperator, BlockStatement,
-    CallExpression, ConditionalExpression, Expression, Identifier, ImportExpression, ImportPhase,
-    JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression, RegexLiteral,
-    SequenceExpression, SpreadElement, Statement, Super, TSAsExpression, TSInstantiationExpression,
-    TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion, TaggedTemplateExpression,
-    ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
-    YieldExpression,
+    CallExpression, ConditionalExpression, Expression, IdentName, Identifier, ImportExpression,
+    ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression,
+    RegexLiteral, SequenceExpression, SpreadElement, Statement, Super, TSAsExpression,
+    TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion,
+    TaggedTemplateExpression, ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression,
+    UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
@@ -794,7 +794,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Ok((Expression::PrivateIdentifier(private_id), end))
         } else if self.current_is_identifier_or_keyword() {
             let (prop_start, prop_end) = self.current_pos();
-            let name = self.intern(self.current_property_name());
+            // Property names deliberately use the raw token text (`current_property_name`).
+            let name = self.current_raw_ident_name();
             self.advance()?;
             Ok((
                 Expression::Identifier(Identifier::simple(
@@ -1237,11 +1238,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::Identifier => {
                 let (start, end) = self.current_pos();
-                let symbol = self.intern_identifier();
+                let name = self.current_ident_name();
                 self.advance()?;
                 Ok(ParsedExpr::with_end(self.arena,
                     Expression::Identifier(Identifier::simple(
-                        symbol,
+                        name,
                         Span::new(start as u32, end as u32),
                     )),
                     end,
@@ -1409,11 +1410,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | TokenKind::Keyword(KeywordKind::As)
             | TokenKind::Keyword(KeywordKind::Satisfies) => {
                 let (start, end) = self.current_pos();
-                let symbol = self.intern(self.current_value());
+                let name = self.current_raw_ident_name();
                 self.advance()?;
                 Ok(ParsedExpr::with_end(self.arena,
                     Expression::Identifier(Identifier::simple(
-                        symbol,
+                        name,
                         Span::new(start as u32, end as u32),
                     )),
                     end,
@@ -1680,12 +1681,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// — used for a primary reference and a `new` callee (`new await()`).
     fn parse_await_identifier_reference(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
         let (start, end) = self.current_pos();
-        let symbol = self.intern("await");
+        let name = self.current_raw_ident_name();
         self.advance()?;
         Ok(ParsedExpr::with_end(
             self.arena,
             Expression::Identifier(Identifier::simple(
-                symbol,
+                name,
                 Span::new(start as u32, end as u32),
             )),
             end,
@@ -1836,15 +1837,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if *self.current_kind() == TokenKind::Identifier && self.current_value() == "target" {
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'target'
+                // Both tokens are already consumed; their spans cover exactly
+                // `new` / `target`, so the names are the verbatim spans.
+                let meta_span = Span::new(start as u32, new_end as u32);
+                let prop_span = Span::new(prop_start as u32, prop_end as u32);
                 return Ok(Expression::MetaProperty(MetaProperty {
-                    meta: Identifier::simple(
-                        self.intern("new"),
-                        Span::new(start as u32, new_end as u32),
-                    ),
-                    property: Identifier::simple(
-                        self.intern("target"),
-                        Span::new(prop_start as u32, prop_end as u32),
-                    ),
+                    meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
+                    property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
                     span: Span::new(start as u32, prop_end as u32),
                 }));
             }
@@ -1909,7 +1908,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         return Err(self.error_expected_after("property name", "."));
                     }
                     let (prop_start, prop_end) = self.current_pos();
-                    let name = self.intern(self.current_property_name());
+                    // Property names deliberately use the raw token text.
+                    let name = self.current_raw_ident_name();
                     self.advance()?;
 
                     // actual_start covers a parenthesized callee's `(` (`new (a()).b`)
@@ -2045,15 +2045,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 let (prop_start, prop_end) = self.current_pos();
                 self.advance()?; // consume 'meta'
+                // Both tokens are already consumed; their spans cover exactly
+                // `import` / `meta`, so the names are the verbatim spans.
+                let meta_span = Span::new(start as u32, import_end as u32);
+                let prop_span = Span::new(prop_start as u32, prop_end as u32);
                 return Ok(Expression::MetaProperty(MetaProperty {
-                    meta: Identifier::simple(
-                        self.intern("import"),
-                        Span::new(start as u32, import_end as u32),
-                    ),
-                    property: Identifier::simple(
-                        self.intern("meta"),
-                        Span::new(prop_start as u32, prop_end as u32),
-                    ),
+                    meta: Identifier::simple(IdentName::from_span(meta_span), meta_span),
+                    property: Identifier::simple(IdentName::from_span(prop_span), prop_span),
                     span: Span::new(start as u32, prop_end as u32),
                 }));
             }

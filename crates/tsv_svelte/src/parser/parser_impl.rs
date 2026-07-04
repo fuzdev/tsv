@@ -64,12 +64,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let token = lexer.next_token()?;
             (token.kind, token.start as usize, token.end as usize)
         };
-        // Pre-size the per-document interner from the source length (one up-front
-        // allocation instead of the from-empty doubling reallocs). The Svelte parser
-        // owns the single interner shared with every embedded `<script>`/`{expr}`.
-        let interner = Rc::new(RefCell::new(DefaultStringInterner::with_capacity(
-            tsv_lang::estimated_interner_capacity(source.len()),
-        )));
+        // The Svelte parser owns the single interner shared with every embedded
+        // `<script>`/`{expr}`. Its tenants are element/attribute names plus the
+        // rare escaped TS identifier — tens of short strings, not the
+        // per-identifier population the retired source-proportional pre-size was
+        // tuned for. A small fixed capacity covers a typical component's distinct
+        // names in one up-front allocation instead of ~9 from-empty growth steps.
+        let interner = Rc::new(RefCell::new(DefaultStringInterner::with_capacity(32)));
         Ok(Self {
             arena,
             source,

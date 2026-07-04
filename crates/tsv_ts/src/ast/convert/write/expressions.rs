@@ -96,7 +96,7 @@ pub(super) fn write_expression_inner(
             write_identifier_parts(
                 w,
                 id.span,
-                id.name,
+                id.ident_name(),
                 id.optional || flags.force_optional,
                 id.type_annotation(),
                 id.decorators(),
@@ -106,8 +106,9 @@ pub(super) fn write_expression_inner(
         internal::Expression::PrivateIdentifier(pid) => {
             node_header(w, "PrivateIdentifier", pid.span, ctx);
             w.raw(",\"name\":");
-            // The interned name excludes the leading `#` (the public shape).
-            write_name(w, pid.name, ctx);
+            // The name excludes the leading `#` (the public shape): the
+            // trailing `raw_len` bytes of the span.
+            write_name(w, pid.name, pid.span.end - pid.name.raw_len as u32, ctx);
             close_node(w, "PrivateIdentifier", pid.span, ctx);
         }
         internal::Expression::ObjectExpression(obj) => {

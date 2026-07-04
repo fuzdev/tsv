@@ -19,7 +19,6 @@ pub(super) use super::{Printer, build_entity_name_doc};
 use crate::ast::internal;
 use smallvec::SmallVec;
 use smallvec::smallvec;
-use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -395,7 +394,11 @@ impl<'a> Printer<'a> {
         let mut has_default = false;
         // Inline up to 8 named specifiers (covers the common import) before spilling.
         let mut named_specs: SmallVec<[&internal::ImportNamedSpecifier<'_>; 8]> = SmallVec::new();
-        let mut default_sym = 0u32;
+        let mut default_name = internal::IdentName {
+            escaped: None,
+            raw_len: 0,
+        };
+        let mut default_name_start = 0u32;
         let mut default_spec_start = 0u32;
         let mut default_spec_end = 0u32;
         let mut namespace_spec: Option<&internal::ImportNamespaceSpecifier<'_>> = None;
@@ -404,7 +407,8 @@ impl<'a> Printer<'a> {
             match spec {
                 internal::ImportSpecifier::Default(default_spec) => {
                     has_default = true;
-                    default_sym = default_spec.local.name.to_u32();
+                    default_name = default_spec.local.ident_name();
+                    default_name_start = default_spec.local.span.start;
                     default_spec_start = default_spec.span.start;
                     default_spec_end = default_spec.span.end;
                 }
@@ -463,7 +467,7 @@ impl<'a> Printer<'a> {
             parts.push(self.gap_comment_continuation_tail(
                 header_end,
                 default_spec_start,
-                d.symbol(default_sym),
+                self.ident_name_doc(default_name, default_name_start),
             ));
             from_content_end = Some(default_spec_end);
         }
@@ -634,7 +638,7 @@ impl<'a> Printer<'a> {
         }
 
         // identifier
-        parts.push(d.symbol(decl.id.name.to_u32()));
+        parts.push(self.identifier_name_doc(&decl.id));
 
         // = sign
         parts.push(d.text(" = "));
@@ -687,7 +691,7 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::TSModuleReference::EntityName(entity_name) => {
-                parts.push(build_entity_name_doc(d, entity_name));
+                parts.push(build_entity_name_doc(self, entity_name));
             }
         }
 
@@ -715,7 +719,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
         parts.push(d.text("export as namespace "));
-        parts.push(d.symbol(decl.id.name.to_u32()));
+        parts.push(self.identifier_name_doc(&decl.id));
         // Trailing comment between the name and `;` (mirrors `export =` / import-equals):
         // a same-line block comment stays before `;`, a line comment floats after it.
         let semicolon_pos = decl.span.end.saturating_sub(1);

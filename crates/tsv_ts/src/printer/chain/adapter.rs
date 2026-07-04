@@ -7,20 +7,33 @@
 use super::{ChainPrinter, SymbolLookup};
 use crate::ast::internal;
 use crate::printer::{CommentSpacing, Printer, comments_in_range};
-use string_interner::DefaultSymbol;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment, Span};
 
 impl<'a> SymbolLookup for Printer<'a> {
-    fn with_name<R>(&self, symbol: DefaultSymbol, f: impl FnOnce(&str) -> R) -> Option<R> {
-        self.interner.borrow().resolve(symbol).map(f)
+    fn with_name<R>(
+        &self,
+        name: internal::IdentName,
+        name_start: u32,
+        f: impl FnOnce(&str) -> R,
+    ) -> Option<R> {
+        match name.escaped {
+            Some(sym) => self.interner.borrow().resolve(sym).map(f),
+            None => Some(f(
+                &self.source[name_start as usize..name_start as usize + name.raw_len as usize]
+            )),
+        }
     }
 }
 
 impl<'a> ChainPrinter for Printer<'a> {
     fn arena(&self) -> &DocArena {
         self.arena
+    }
+
+    fn ident_doc(&self, name: internal::IdentName, name_start: u32) -> DocId {
+        self.ident_name_doc(name, name_start)
     }
 
     fn print_expression(&self, expr: &internal::Expression<'_>) -> DocId {

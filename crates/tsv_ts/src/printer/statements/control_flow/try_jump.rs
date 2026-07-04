@@ -4,7 +4,6 @@ use crate::ast::internal::{self, Statement};
 use crate::printer::{CommentVec, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
-use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -186,7 +185,7 @@ impl<'a> Printer<'a> {
                 parts.push(comment_doc);
             }
             parts.push(d.text(" "));
-            parts.push(d.symbol(label.name.to_u32()));
+            parts.push(self.identifier_name_doc(label));
             // Comments between label and `;`: a same-line block trails *after* the `;`
             // (`break loop; /* c */`, prettier 3.9), a same-line line via `line_suffix`,
             // an own-line comment on its own line after. See `split_separator_gap_comments`.
@@ -272,10 +271,10 @@ impl<'a> Printer<'a> {
                     _ => parts.push(d.hardline()),
                 }
             }
-            parts.push(d.symbol(stmt.label.name.to_u32()));
+            parts.push(self.identifier_name_doc(&stmt.label));
             parts.push(tail);
         } else {
-            parts.push(d.symbol(stmt.label.name.to_u32()));
+            parts.push(self.identifier_name_doc(&stmt.label));
             parts.push(self.build_inline_comments_between_doc(label_end, colon_pos as u32));
             parts.push(tail);
         }

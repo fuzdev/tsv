@@ -14,8 +14,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Does NOT handle parameter property modifiers (`public`, `private`, `readonly`).
     fn parse_simple_param(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (param_start, param_end) = self.current_pos();
-        let symbol = self
-            .try_intern_param_name()
+        let name = self
+            .try_param_name()
             .ok_or_else(|| self.error_expected("parameter name or destructuring pattern"))?;
         self.advance()?;
 
@@ -36,7 +36,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let extra = type_annotation.map(|ta| self.typed_extra(ta));
 
         let mut param = Expression::Identifier(Identifier {
-            name: symbol,
+            escaped_name: name.escaped,
+            name_len: name.raw_len,
             optional,
             extra,
             span: Span::new(param_start as u32, id_end as u32),
@@ -326,7 +327,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         } else {
                             // ...args or ...args: type
                             let (id_start, id_end) = self.current_pos();
-                            let symbol = self.intern_identifier();
+                            let name = self.current_ident_name();
                             self.expect(&TokenKind::Identifier)?;
 
                             // Check for type annotation: ...args: type
@@ -339,7 +340,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             };
 
                             let argument = Expression::Identifier(Identifier::simple(
-                                symbol,
+                                name,
                                 Span::new(id_start as u32, id_end as u32),
                             ));
 

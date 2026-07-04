@@ -175,12 +175,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             matches!(self.current_kind(), TokenKind::Identifier) || self.at_await_identifier()
         );
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier_or_await();
+        let name = self.current_ident_name_or_await();
         self.advance()?;
 
         let mut params = self.bvec();
         params.push(Expression::Identifier(Identifier::simple(
-            symbol,
+            name,
             Span::new(id_start as u32, id_end as u32),
         )));
         let params = params.into_bump_slice();
@@ -229,11 +229,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Single parameter without parens: `async x => ...`
             // (Not allowed with type parameters)
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern_identifier();
+            let name = self.current_ident_name();
             self.advance()?;
             let mut params = self.bvec();
             params.push(Expression::Identifier(Identifier::simple(
-                symbol,
+                name,
                 Span::new(id_start as u32, id_end as u32),
             )));
             (params.into_bump_slice(), None)

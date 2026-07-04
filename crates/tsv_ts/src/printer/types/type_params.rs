@@ -8,7 +8,6 @@ use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::fluid_after_operator;
 use smallvec::smallvec;
-use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
@@ -274,7 +273,7 @@ impl<'a> Printer<'a> {
             CommentSpacing::Trailing,
         ));
 
-        parts.push(d.symbol(param.name.name.to_u32()));
+        parts.push(self.identifier_name_doc(&param.name));
 
         // Track where we are for finding comments after the name
         let mut prev_end = param.name.span.end;

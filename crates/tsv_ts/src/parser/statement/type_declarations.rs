@@ -65,10 +65,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
+        let name = self.current_ident_name();
         self.advance()?;
 
-        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -136,10 +136,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
+        let name = self.current_ident_name();
         self.advance()?;
 
-        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -350,10 +350,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
+        let name = self.current_ident_name();
         self.advance()?;
 
-        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
 
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -416,15 +416,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let asserts = self.eat_contextual_keyword("asserts");
 
         // Check if current token is an identifier or `this` (for type predicates and asserts)
-        let param_symbol = self.try_intern_identifier_or_keyword().or_else(|| {
+        let param_name = self.try_ident_or_keyword_name().or_else(|| {
             // `this` keyword is also valid in type predicates: `this is T`, `asserts this`
             if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
-                Some(self.intern("this"))
+                Some(self.current_raw_ident_name())
             } else {
                 None
             }
         });
-        if let Some(param_symbol) = param_symbol {
+        if let Some(param_name) = param_name {
             // Type predicate: `identifier is Type` or `asserts identifier is Type`.
             // The `is` must not be preceded by a line terminator (TS
             // `parameterName [no LineTerminator here] is Type`): a newline before it
@@ -436,7 +436,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
 
                 let parameter_name =
-                    Identifier::simple(param_symbol, Span::new(id_start as u32, id_end as u32));
+                    Identifier::simple(param_name, Span::new(id_start as u32, id_end as u32));
 
                 // Consume 'is' keyword
                 self.advance()?;
@@ -464,7 +464,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
 
                 let parameter_name =
-                    Identifier::simple(param_symbol, Span::new(id_start as u32, id_end as u32));
+                    Identifier::simple(param_name, Span::new(id_start as u32, id_end as u32));
 
                 let predicate = TSTypePredicate {
                     parameter_name,
@@ -550,10 +550,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         let (id_start, id_end) = self.current_pos();
-        let symbol = self.intern_identifier();
+        let name = self.current_ident_name();
         self.advance()?;
 
-        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
 
         // Parse enum body: { members }
         self.expect(&TokenKind::BraceOpen)?;
@@ -591,10 +591,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let id = match self.current_kind() {
             TokenKind::Identifier => {
                 let (id_start, id_end) = self.current_pos();
-                let symbol = self.intern_identifier();
+                let name = self.current_ident_name();
                 self.advance()?;
                 TSEnumMemberId::Identifier(Identifier::simple(
-                    symbol,
+                    name,
                     Span::new(id_start as u32, id_end as u32),
                 ))
             }
@@ -671,7 +671,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TSModuleName::Literal(lit)
         } else if matches!(self.current_kind(), TokenKind::Identifier) {
             let (id_start, id_end) = self.current_pos();
-            let name = self.intern_identifier();
+            let name = self.current_ident_name();
             let ident = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
             self.advance()?;
 
@@ -726,7 +726,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Consume 'global' keyword
         debug_assert!(self.current_value() == "global");
         let (global_start, global_end) = self.current_pos();
-        let name = self.intern_identifier();
+        let name = self.current_ident_name();
         self.advance()?;
 
         let id = TSModuleName::Identifier(Identifier::simple(
@@ -786,7 +786,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_expected("identifier for namespace name"));
         }
         let (id_start, id_end) = self.current_pos();
-        let name = self.intern_identifier();
+        let name = self.current_ident_name();
         let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
         self.advance()?;
 

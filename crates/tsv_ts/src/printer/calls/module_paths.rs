@@ -11,7 +11,6 @@
 
 use super::super::{Printer, is_string_literal};
 use crate::ast::internal;
-use tsv_lang::SymbolResolver;
 
 /// Check if this is a `Boolean(...)` call
 ///
@@ -19,7 +18,7 @@ use tsv_lang::SymbolResolver;
 /// This appears to be a specific quirk, treating Boolean() like !!() for type coercion.
 pub(super) fn is_boolean_call(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
     if let internal::Expression::Identifier(id) = call.callee {
-        return printer.with_resolved_symbol(id.name, |s| s == "Boolean");
+        return printer.with_ident_name(id, |s| s == "Boolean");
     }
     false
 }
@@ -42,9 +41,9 @@ pub(super) fn is_module_path_no_break(
         && !member.computed
         && !member.optional
         && let internal::Expression::Identifier(resolve_id) = member.property
-        && printer.with_resolved_symbol(resolve_id.name, |s| s == "resolve")
+        && printer.with_ident_name(resolve_id, |s| s == "resolve")
         && let internal::Expression::Identifier(require_id) = member.object
-        && printer.with_resolved_symbol(require_id.name, |s| s == "require")
+        && printer.with_ident_name(require_id, |s| s == "require")
     {
         return true;
     }
@@ -81,7 +80,7 @@ pub(super) fn get_module_path_chain_break<'a>(
     };
 
     let (is_paths, is_resolve) =
-        printer.with_resolved_symbol(method_name.name, |m| (m == "paths", m == "resolve"));
+        printer.with_ident_name(method_name, |m| (m == "paths", m == "resolve"));
 
     // Check for `require.resolve.paths()`
     if is_paths {
@@ -90,9 +89,9 @@ pub(super) fn get_module_path_chain_break<'a>(
             && !obj_member.computed
             && !obj_member.optional
             && let internal::Expression::Identifier(resolve_id) = obj_member.property
-            && printer.with_resolved_symbol(resolve_id.name, |s| s == "resolve")
+            && printer.with_ident_name(resolve_id, |s| s == "resolve")
             && let internal::Expression::Identifier(require_id) = obj_member.object
-            && printer.with_resolved_symbol(require_id.name, |s| s == "require")
+            && printer.with_ident_name(require_id, |s| s == "require")
         {
             return Some((member.object, method_name));
         }
@@ -100,8 +99,8 @@ pub(super) fn get_module_path_chain_break<'a>(
 
     // Check for `import.meta.resolve()`
     if is_resolve && let internal::Expression::MetaProperty(meta) = member.object {
-        let is_import_meta = printer.with_resolved_symbol(meta.meta.name, |m| m == "import")
-            && printer.with_resolved_symbol(meta.property.name, |p| p == "meta");
+        let is_import_meta = printer.with_ident_name(&meta.meta, |m| m == "import")
+            && printer.with_ident_name(&meta.property, |p| p == "meta");
         if is_import_meta {
             return Some((member.object, method_name));
         }

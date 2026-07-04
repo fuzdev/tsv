@@ -4,10 +4,10 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::{CommentSpacing, CommentVec};
 use smallvec::smallvec;
+use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{SymbolToU32, comments_in_range};
 
 /// Printed keyword (with trailing space) for an accessibility modifier.
 fn accessibility_keyword(accessibility: &str) -> &'static str {
@@ -166,7 +166,7 @@ impl<'a> Printer<'a> {
             // continuation so a *line* comment in the `class`→name gap indents the
             // whole declaration one level (uniform declaration-header rule). Block
             // and no-comment cases stay inline.
-            let mut header_parts = smallvec![d.symbol(id.name.to_u32())];
+            let mut header_parts = smallvec![self.identifier_name_doc(id)];
             // Comments between name and type params: `class A/* c */ <T> {}`
             // Line comments get a hardline to prevent absorbing type params as comment text
             if let Some(type_params) = &decl.type_parameters {

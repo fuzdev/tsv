@@ -263,11 +263,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         {
             let (id_start, id_end) = self.current_pos();
             // `await` (Script `[~Await]`) is a valid class-name `BindingIdentifier`.
-            let symbol = self.intern_identifier_or_await();
+            let name = self.current_ident_name_or_await();
             self.advance()?;
 
             Some(Identifier::simple(
-                symbol,
+                name,
                 Span::new(id_start as u32, id_end as u32),
             ))
         } else {
@@ -349,11 +349,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         {
             let (id_start, id_end) = self.current_pos();
             // `await` (Script `[~Await]`) is a valid class-name `BindingIdentifier`.
-            let symbol = self.intern_identifier_or_await();
+            let name = self.current_ident_name_or_await();
             self.advance()?;
 
             Some(Identifier::simple(
-                symbol,
+                name,
                 Span::new(id_start as u32, id_end as u32),
             ))
         } else if name_required {
@@ -618,12 +618,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let name = self.current_property_name();
                 let name_is_constructor = name == "constructor";
                 let (key_start, key_end) = self.current_pos();
-                let symbol = self.intern(name);
+                // Property keys deliberately use the raw token text.
+                let key_name = self.current_raw_ident_name();
                 self.advance()?;
                 (
                     false,
                     Expression::Identifier(Identifier::simple(
-                        symbol,
+                        key_name,
                         Span::new(key_start as u32, key_end as u32),
                     )),
                     name_is_constructor,
@@ -900,7 +901,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if !matches!(self.current_kind(), TokenKind::Identifier) {
             return Err(self.error_expected("index signature parameter name"));
         }
-        let param_name = self.intern_identifier();
+        let param_name = self.current_ident_name();
         self.advance()?;
 
         // Parse type annotation on parameter: `: KeyType`
@@ -913,7 +914,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let param_end = param_type.as_ref().map_or(id_end, |t| t.span.end as usize);
         let extra = param_type.map(|ta| self.typed_extra(ta));
         let parameter = Identifier {
-            name: param_name,
+            escaped_name: param_name.escaped,
+            name_len: param_name.raw_len,
             optional: false,
             extra,
             span: Span::new(id_start as u32, param_end as u32),

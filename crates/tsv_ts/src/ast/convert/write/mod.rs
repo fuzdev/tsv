@@ -182,7 +182,7 @@ fn write_identifier_expression_with_character_in(
         write_identifier_parts_with_character(
             w,
             id.span,
-            id.name,
+            id.ident_name(),
             id.optional,
             id.type_annotation(),
             id.decorators(),
@@ -271,7 +271,7 @@ fn write_pattern_embedded_impl(
             write_identifier_parts_with_character(
                 w,
                 id.span,
-                id.name,
+                id.ident_name(),
                 id.optional,
                 id.type_annotation(),
                 id.decorators(),
@@ -570,13 +570,26 @@ pub(super) fn kind_token(is_type: bool, schema: Schema) -> Option<&'static str> 
     }
 }
 
-/// Emit an interned name. The resolved symbol *is* the wire value (decoded —
-/// an escaped identifier's `\u{78}` source form decodes to `x`), so it is
-/// written directly; no source-slice compare, no allocation.
+/// Emit an identifier name — the single name-emission funnel. Span-identity
+/// names are the raw source slice (the leading `raw_len` bytes at
+/// `name_start`); escaped names resolve the interned decoded form (an escaped
+/// identifier's `\u{78}` source form decodes to `x`). Both arms write the wire
+/// value directly; no allocation.
 #[inline]
-pub(super) fn write_name(w: &mut JsonWriter, sym: string_interner::DefaultSymbol, ctx: &Ctx<'_>) {
+pub(super) fn write_name(
+    w: &mut JsonWriter,
+    name: internal::IdentName,
+    name_start: u32,
+    ctx: &Ctx<'_>,
+) {
     use tsv_lang::InfallibleResolve;
-    w.string(ctx.interner.resolve_infallible(sym));
+    match name.escaped {
+        Some(sym) => w.string(ctx.interner.resolve_infallible(sym)),
+        None => {
+            let start = name_start as usize;
+            w.string(&ctx.source[start..start + name.raw_len as usize]);
+        }
+    }
 }
 
 /// Emit a numeric literal value the way acorn's JSON does: non-finite as
@@ -654,14 +667,14 @@ pub(super) fn write_literal(w: &mut JsonWriter, lit: &internal::Literal<'_>, ctx
 pub(super) fn write_identifier_parts(
     w: &mut JsonWriter,
     span: Span,
-    sym: string_interner::DefaultSymbol,
+    name: internal::IdentName,
     optional: bool,
     type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     node_header(w, "Identifier", span, ctx);
-    write_identifier_fields(w, span, sym, optional, type_annotation, decorators, ctx);
+    write_identifier_fields(w, span, name, optional, type_annotation, decorators, ctx);
 }
 
 /// `write_identifier_parts` with `character` injected into the node's `loc`
@@ -672,14 +685,14 @@ pub(super) fn write_identifier_parts(
 pub(super) fn write_identifier_parts_with_character(
     w: &mut JsonWriter,
     span: Span,
-    sym: string_interner::DefaultSymbol,
+    name: internal::IdentName,
     optional: bool,
     type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     w.raw("{\"type\":\"Identifier\",\"name\":");
-    write_name(w, sym, ctx);
+    write_name(w, name, span.start, ctx);
     position_fields::<true>(w, span, ctx);
     write_identifier_tail(w, span, optional, type_annotation, decorators, ctx);
 }
@@ -689,14 +702,14 @@ pub(super) fn write_identifier_parts_with_character(
 fn write_identifier_fields(
     w: &mut JsonWriter,
     span: Span,
-    sym: string_interner::DefaultSymbol,
+    name: internal::IdentName,
     optional: bool,
     type_annotation: Option<&internal::TSTypeAnnotation<'_>>,
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,
 ) {
     w.raw(",\"name\":");
-    write_name(w, sym, ctx);
+    write_name(w, name, span.start, ctx);
     write_identifier_tail(w, span, optional, type_annotation, decorators, ctx);
 }
 
@@ -732,7 +745,7 @@ pub(super) fn write_identifier_plain(
     id: &internal::Identifier<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_identifier_parts(w, id.span, id.name, false, None, None, ctx);
+    write_identifier_parts(w, id.span, id.ident_name(), false, None, None, ctx);
 }
 
 /// An `Identifier` carrying only the binding's `optional` flag (function and
@@ -744,5 +757,5 @@ pub(super) fn write_identifier_with_optional(
     id: &internal::Identifier<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_identifier_parts(w, id.span, id.name, id.optional, None, None, ctx);
+    write_identifier_parts(w, id.span, id.ident_name(), id.optional, None, None, ctx);
 }

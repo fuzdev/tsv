@@ -13,7 +13,6 @@ use crate::printer::{
     should_inline_logical_expression,
 };
 use smallvec::smallvec;
-use tsv_lang::SymbolToU32;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
@@ -100,7 +99,7 @@ impl<'a> Printer<'a> {
         wrap_type: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = smallvec![d.symbol(ident.name.to_u32())];
+        let mut parts = smallvec![self.identifier_name_doc(ident)];
 
         // Compute name_end for comment extraction
         let search_end = ident
@@ -458,12 +457,18 @@ impl<'a> Printer<'a> {
                 // Matches Prettier's shouldBreakAfterOperator: poorly breakable chains,
                 // string literals, etc. These don't break well internally, so the
                 // assignment breaks at `=` with group(indent([line, rightDoc])).
-                let should_break_after_op_rhs = (is_module_path_fluid_call(init, &interner)
-                    || is_pure_property_chain(init)
-                    || is_poorly_breakable_chain(init, self.source, PRINT_WIDTH, self.comments)
-                    || is_string_literal(init)
-                    || matches!(init, Expression::RegexLiteral(_)))
-                    && is_layout_eligible;
+                let should_break_after_op_rhs =
+                    (is_module_path_fluid_call(init, self.source, &interner)
+                        || is_pure_property_chain(init)
+                        || is_poorly_breakable_chain(
+                            init,
+                            self.source,
+                            PRINT_WIDTH,
+                            self.comments,
+                        )
+                        || is_string_literal(init)
+                        || matches!(init, Expression::RegexLiteral(_)))
+                        && is_layout_eligible;
 
                 // Decorated class expression → break after operator, each decorator
                 // on its own line (`const C =\n\t@dec\n\tclass {}`).

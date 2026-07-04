@@ -887,14 +887,21 @@ impl<'a> Printer<'a> {
             return false;
         };
 
-        // The identifier name must match the attribute name
-        ident.name == attr_name
+        // The identifier name must match the attribute name. TS identifiers are
+        // span-identity (no shared symbol space with the Svelte attribute-name
+        // interner), so compare the resolved names.
+        let interner = self.interner.borrow();
+        let Some(attr_str) = interner.resolve(attr_name) else {
+            return false;
+        };
+        ident.name(self.source, &interner) == attr_str
     }
 
     /// Check if expression is an identifier with the given name
     fn is_identifier_with_name(&self, expr: &Expression<'_>, name: &str) -> bool {
         if let Expression::Identifier(id) = expr {
-            self.with_resolved_symbol(id.name, |s| s == name)
+            let interner = self.interner.borrow();
+            id.name(self.source, &interner) == name
         } else {
             false
         }

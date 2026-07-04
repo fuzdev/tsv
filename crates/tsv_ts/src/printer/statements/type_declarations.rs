@@ -9,7 +9,7 @@ use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, SymbolToU32, comments_in_range};
+use tsv_lang::{Span, comments_in_range};
 
 /// Check if a type is "generic" - i.e., has type parameters.
 /// This matches prettier's `isGeneric` function in assignment.js.
@@ -86,7 +86,7 @@ impl<'a> Printer<'a> {
                 decl.id.span.start,
             ),
         );
-        parts.push(d.symbol(decl.id.name.to_u32()));
+        parts.push(self.identifier_name_doc(&decl.id));
 
         // Check if type parameters are complex (>1 param with constraints/defaults)
         // Complex type params use break-lhs layout: params break, not the RHS
@@ -425,7 +425,7 @@ impl<'a> Printer<'a> {
                 decl.id.span.start,
             ),
         );
-        header_parts.push(d.symbol(decl.id.name.to_u32()));
+        header_parts.push(self.identifier_name_doc(&decl.id));
 
         // Comments between name and type params: `interface A/* c */ <T> {}`
         // Line comments get a hardline to prevent absorbing type params as comment text
@@ -582,7 +582,7 @@ impl<'a> Printer<'a> {
         // Everything after the `function`→name gap is collected into `tail` (the
         // continuation), so a *line* comment in that gap indents the whole
         // signature one level (uniform declaration-header rule).
-        let mut tail = smallvec![d.symbol(decl.id.name.to_u32())];
+        let mut tail = smallvec![self.identifier_name_doc(&decl.id)];
 
         // Comments between name and type params/parens: `declare function fn1/* c */ <T>()` or `fn1 /* c */()`
         // Line comments get a hardline to prevent absorbing type params as comment text
@@ -637,7 +637,7 @@ impl<'a> Printer<'a> {
     /// Build doc for entity name
     pub(crate) fn build_entity_name_doc(&self, name: &internal::TSEntityName<'_>) -> DocId {
         // Delegate to standalone function - doesn't need printer state
-        build_entity_name_doc(self.d(), name)
+        build_entity_name_doc(self, name)
     }
 
     /// Build doc for type elements with comment handling
@@ -823,7 +823,7 @@ impl<'a> Printer<'a> {
         // Everything after the `enum`→name gap is collected into `parts` (the
         // continuation), so a *line* comment in that gap indents the whole
         // declaration one level (uniform declaration-header rule).
-        let mut parts: DocBuf = smallvec![d.symbol(decl.id.name.to_u32())];
+        let mut parts: DocBuf = smallvec![self.identifier_name_doc(&decl.id)];
 
         // Handle comments between name and body: enum C /* comment */ {
         // Use comment-aware search to skip `{` inside comments.
@@ -974,7 +974,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Member id (identifier or string literal)
         let id_doc = match &member.id {
-            internal::TSEnumMemberId::Identifier(id) => d.symbol(id.name.to_u32()),
+            internal::TSEnumMemberId::Identifier(id) => self.identifier_name_doc(id),
             internal::TSEnumMemberId::String(lit) => {
                 // String literal member name: `"hello"` in `enum { "hello" = 1 }`
                 self.build_literal_doc(lit)
@@ -1111,7 +1111,7 @@ impl<'a> Printer<'a> {
             }
             match &decl.id {
                 internal::TSModuleName::Identifier(id) => {
-                    parts.push(d.symbol(id.name.to_u32()));
+                    parts.push(self.identifier_name_doc(id));
                 }
                 internal::TSModuleName::Literal(lit) => {
                     parts.push(self.build_literal_doc(lit));

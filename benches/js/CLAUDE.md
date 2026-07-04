@@ -66,11 +66,13 @@ any non-wasm host and reconciles away a `--no-save` add. `install_deps.ts` runs
 bindings in lockstep). After a bump or a stray `npm install`, re-run
 `bench:install`.
 
-**oxc-parser-wasm runs under all three.** Its binding ships two entries — a
+**oxc-parser-wasm runs under Deno and Node.** Its binding ships two entries — a
 fetch-based browser entry (`parser.wasi-browser.js`) that Deno needs, and the
-default `node:wasi` entry that Node/Bun need — so `oxc_wasm.ts` picks the right
-one per runtime (`current_runtime()`). (Node also has oxc-parser **native**, the
-more relevant Node number, regardless.)
+default `node:wasi` entry that Node needs — so `oxc_wasm.ts` picks the right
+one per runtime (`current_runtime()`). Under Bun the `node:wasi` entry fails to
+load, so the Bun report has no oxc-parser-wasm row (same class as the biome-wasm
+Bun-load issue). (Node also has oxc-parser **native**, the more relevant Node
+number, regardless.)
 
 ## Corpus Comparison
 
@@ -475,10 +477,10 @@ Things the published numbers measure that aren't quite what they look like:
   are discarded uniformly for all impls; the FFI/WASM/async boundaries block
   dead-code elimination, so no impl's work is optimized away.
 - **`tsv_wasm` is measured on the full build.** The WASM bench loads
-  `pkg/all/deno` (the default both-features artifact, ~2.8 MB — what
+  `pkg/all/deno` (the default both-features artifact, ~2.6 MB — what
   `@fuzdev/tsv_wasm` ships) for _both_ parse and format, while subset
-  consumers ship the smaller `@fuzdev/tsv_format_wasm` (~2.2 MB, no convert
-  layer) or `@fuzdev/tsv_parse_wasm` (~1.7 MB, no printers). The Binary
+  consumers ship the smaller `@fuzdev/tsv_format_wasm` (~2.3 MB, no convert
+  layer) or `@fuzdev/tsv_parse_wasm` (~1.2 MB, no printers). The Binary
   Sizes table lists all three; the throughput rows reflect the full build.
   The native `tsv` row is the same story: the perf row loads the full
   `libtsv_ffi`, while the Binary Sizes table also lists `tsv format (ffi)`

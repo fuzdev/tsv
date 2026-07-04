@@ -176,12 +176,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The standalone `parse`/`parse_with_goal` paths use this; embedders go
     /// through [`Parser::with_interner`] (always `Module`).
     fn new_with_goal(source: &'a str, goal: Goal, arena: &'arena Bump) -> Result<Self, ParseError> {
+        // Span-identity identifiers intern nothing on the common path — the
+        // interner holds only the rare escaped/oversized names, so it starts
+        // empty (`new()` allocates nothing) instead of pre-sized.
         Self::with_interner_and_goal(
             source,
             0,
-            Rc::new(RefCell::new(DefaultStringInterner::with_capacity(
-                tsv_lang::estimated_interner_capacity(source.len()),
-            ))),
+            Rc::new(RefCell::new(DefaultStringInterner::new())),
             goal,
             arena,
         )
@@ -510,97 +511,116 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.current_decoded.as_deref()
     }
 
-    /// Get the identifier name from the current token.
-    ///
-    /// For identifiers with unicode escapes, returns the decoded name.
-    /// For regular identifiers, returns the raw source text.
-    ///
-    /// Example: `\u0066oo` returns "foo", `bar` returns "bar"
-    pub(super) fn current_identifier_name(&self) -> &str {
-        self.current_decoded
-            .as_deref()
-            .unwrap_or_else(|| self.current_value())
-    }
-
-    /// Intern the current identifier, using decoded name if available.
-    ///
-    /// This is the canonical way to intern identifiers. For identifiers with
-    /// unicode escapes (e.g., `\u0066oo`), returns the decoded symbol (`foo`).
-    /// For regular identifiers, returns the raw source text.
-    ///
-    /// Use this instead of `self.intern(self.current_value())` for all identifier
-    /// interning to ensure escaped identifiers are handled correctly.
-    pub(super) fn intern_identifier(&self) -> DefaultSymbol {
-        self.intern(self.current_identifier_name())
-    }
-
-    /// Intern the current token, which the caller has already verified is either
-    /// a plain `Identifier` or `await` used as an identifier (`at_await_identifier`
-    /// — e.g. a class name, single-param arrow param, or `break`/`continue` label
-    /// at Script `[~Await]`). A plain identifier decodes unicode escapes; `await`
-    /// interns verbatim.
-    pub(super) fn intern_identifier_or_await(&self) -> DefaultSymbol {
-        if matches!(self.current_kind(), TokenKind::Identifier) {
-            self.intern_identifier()
+    /// The current identifier token's name channel — the canonical identifier
+    /// name constructor. Span-identity (`escaped: None`, name = the raw token
+    /// bytes) unless the token carries a decoded unicode escape
+    /// (`\u0066oo` → `foo`) or is too long for `raw_len` — only those rare
+    /// cases intern.
+    pub(super) fn current_ident_name(&self) -> IdentName {
+        if let Some(decoded) = self.current_decoded.as_deref() {
+            IdentName {
+                escaped: Some(self.intern(decoded)),
+                raw_len: 0,
+            }
         } else {
-            self.intern("await")
+            self.current_raw_ident_name()
         }
     }
 
-    /// Get the string value of the current identifier or contextual keyword.
-    ///
-    /// Returns the decoded name for identifiers with unicode escapes,
-    /// or the keyword string for contextual keywords. Returns `None`
-    /// if the current token is not identifier-like.
-    pub(super) fn current_identifier_or_keyword_name(&self) -> Option<&str> {
-        match self.current_kind() {
-            TokenKind::Identifier => Some(self.current_identifier_name()),
-            TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(kw.as_str()),
-            _ => None,
+    /// The current token's name channel from its RAW source text, ignoring any
+    /// decoded escape value. For keyword tokens (never escaped — the lexer
+    /// re-classifies escaped keywords as `Identifier`) and for property names,
+    /// which deliberately use the raw text (`current_property_name`).
+    pub(super) fn current_raw_ident_name(&self) -> IdentName {
+        let len = self.current.end - self.current.start;
+        if len > u16::MAX as u32 {
+            IdentName {
+                escaped: Some(self.intern(self.current_value())),
+                raw_len: 0,
+            }
+        } else {
+            IdentName {
+                escaped: None,
+                raw_len: len as u16,
+            }
         }
     }
 
-    /// Intern the current token as an identifier, accepting contextual keywords.
+    /// Name channel for the current token, which the caller has already verified
+    /// is either a plain `Identifier` or `await` used as an identifier
+    /// (`at_await_identifier` — e.g. a class name, single-param arrow param, or
+    /// `break`/`continue` label at Script `[~Await]`). A plain identifier decodes
+    /// unicode escapes; `await` is a keyword token, verbatim by construction.
+    pub(super) fn current_ident_name_or_await(&self) -> IdentName {
+        if matches!(self.current_kind(), TokenKind::Identifier) {
+            self.current_ident_name()
+        } else {
+            self.current_raw_ident_name()
+        }
+    }
+
+    /// Whether `id`'s name equals `expected` (an ASCII name like `"this"`).
+    /// Span-identity names compare against the raw source slice (shifted back
+    /// to local coordinates); escaped names resolve through the interner, so an
+    /// escaped `this` still matches `"this"` exactly as symbol identity did.
+    pub(super) fn ident_name_is(&self, id: &Identifier<'_>, expected: &str) -> bool {
+        match id.escaped_name {
+            Some(sym) => self.interner.borrow().resolve(sym) == Some(expected),
+            None => {
+                let start = id.span.start as usize - self.base_offset;
+                self.source
+                    .as_bytes()
+                    .get(start..start + id.name_len as usize)
+                    == Some(expected.as_bytes())
+            }
+        }
+    }
+
+    /// Name channel for the current token as an identifier, accepting contextual
+    /// keywords.
     ///
     /// Handles `TokenKind::Identifier` (with unicode escape decoding) and
     /// contextual keywords like `from`, `as`, `satisfies`. Returns `None`
     /// if the current token is not identifier-like.
-    pub(super) fn try_intern_identifier_or_keyword(&self) -> Option<DefaultSymbol> {
+    pub(super) fn try_ident_or_keyword_name(&self) -> Option<IdentName> {
         match self.current_kind() {
-            TokenKind::Identifier => Some(self.intern_identifier()),
-            TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(self.intern(kw.as_str())),
+            TokenKind::Identifier => Some(self.current_ident_name()),
+            TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(self.current_raw_ident_name()),
             _ => None,
         }
     }
 
-    /// Intern the current token as a function declaration name. Like
-    /// [`Parser::try_intern_identifier_or_keyword`], but `await` is accepted only
+    /// Name channel for the current token as a function declaration name. Like
+    /// [`Parser::try_ident_or_keyword_name`], but `await` is accepted only
     /// where it is a valid identifier (Script `[~Await]`): at `Module` / `[+Await]`
     /// it is a reserved `BindingIdentifier` (the goal-level and `[Await]` early
     /// errors), so `function await(){}` / `export function await(){}` reject there,
     /// matching acorn-as-module and the function-expression name path. Other
     /// contextual keywords (`async`, `from`, type keywords) stay valid names.
-    pub(super) fn try_intern_function_name(&self) -> Option<DefaultSymbol> {
+    pub(super) fn try_function_name(&self) -> Option<IdentName> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
             && !self.await_is_identifier()
         {
             return None;
         }
-        self.try_intern_identifier_or_keyword()
+        self.try_ident_or_keyword_name()
     }
 
-    /// Intern the current token as a binding name, accepting contextual keywords.
+    /// Name channel for the current token as a binding name, accepting contextual
+    /// keywords.
     ///
-    /// Like `try_intern_identifier_or_keyword` but uses `can_be_binding_name()`,
+    /// Like `try_ident_or_keyword_name` but uses `can_be_binding_name()`,
     /// which excludes `await`, `yield`, and `let` (not valid as parameter/variable names).
-    pub(super) fn try_intern_binding_name(&self) -> Option<DefaultSymbol> {
+    pub(super) fn try_binding_name(&self) -> Option<IdentName> {
         match self.current_kind() {
-            TokenKind::Identifier => Some(self.intern_identifier()),
-            TokenKind::Keyword(kw) if kw.can_be_binding_name() => Some(self.intern(kw.as_str())),
+            TokenKind::Identifier => Some(self.current_ident_name()),
+            TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
+                Some(self.current_raw_ident_name())
+            }
             // `await` is a valid `BindingIdentifier` only at Script goal in a
             // `[~Await]` context (the two independent goal/`[Await]` early errors).
             TokenKind::Keyword(KeywordKind::Await) if self.await_is_identifier() => {
-                Some(self.intern("await"))
+                Some(self.current_raw_ident_name())
             }
             _ => None,
         }
@@ -690,28 +710,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.with_fn_type_disallowed(false, |p| p.with_conditional_type_disallowed(false, f))
     }
 
-    /// Like `try_intern_binding_name`, but also accepts the `this` keyword as the
+    /// Like `try_binding_name`, but also accepts the `this` keyword as the
     /// TypeScript `this` parameter (`function f(this: T)`, `(this: T) => U`).
-    pub(super) fn try_intern_param_name(&self) -> Option<DefaultSymbol> {
-        self.try_intern_binding_name().or_else(|| {
+    pub(super) fn try_param_name(&self) -> Option<IdentName> {
+        self.try_binding_name().or_else(|| {
             if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
-                Some(self.intern("this"))
+                Some(self.current_raw_ident_name())
             } else {
                 None
             }
         })
     }
 
-    /// Intern the current token as the `IdentifierName` half of a module export
-    /// name, accepting ANY keyword (e.g. `export { x as if }`).
+    /// Name channel for the current token as the `IdentifierName` half of a
+    /// module export name, accepting ANY keyword (e.g. `export { x as if }`).
     ///
     /// ES spec: `ModuleExportName : IdentifierName | StringLiteral`. This handles
     /// only the `IdentifierName` arm; callers test for `TokenKind::String` first
     /// and build a `ModuleExportName::Literal` for the `StringLiteral` arm.
-    pub(super) fn try_intern_identifier_name(&self) -> Option<DefaultSymbol> {
+    pub(super) fn try_identifier_name(&self) -> Option<IdentName> {
         match self.current_kind() {
-            TokenKind::Identifier => Some(self.intern_identifier()),
-            TokenKind::Keyword(kw) => Some(self.intern(kw.as_str())),
+            TokenKind::Identifier => Some(self.current_ident_name()),
+            TokenKind::Keyword(_) => Some(self.current_raw_ident_name()),
             _ => None,
         }
     }
@@ -1133,7 +1153,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Must be followed by an identifier (keywords like `async` are valid: `#async`)
         let (_, end) = self.current_pos();
-        let Some(name) = self.try_intern_identifier_or_keyword() else {
+        let Some(name) = self.try_ident_or_keyword_name() else {
             return Err(self.error_expected_after("identifier", "#"));
         };
         self.advance()?;

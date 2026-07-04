@@ -2,7 +2,6 @@
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use string_interner::DefaultSymbol;
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
@@ -64,7 +63,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     return Err(self.error_expected_after("an identifier", "export import"));
                 }
                 let (id_start, id_end) = self.current_pos();
-                let symbol = self.intern_identifier();
+                let name = self.current_ident_name();
                 self.advance()?;
                 if !matches!(self.current_kind(), TokenKind::Equals) {
                     return Err(self.error_expected("'=' in import-equals declaration"));
@@ -73,7 +72,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     start,
                     id_start,
                     id_end,
-                    symbol,
+                    name,
                     ImportKind::Value,
                     true, // is_export
                 )
@@ -91,9 +90,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     return Err(self.error_expected_after("an identifier", "export as namespace"));
                 }
                 let (id_start, id_end) = self.current_pos();
-                let symbol = self.intern_identifier();
+                let name = self.current_ident_name();
                 self.advance()?;
-                let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+                let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
                 let end = self.semicolon_end()?;
                 Ok(Statement::TSNamespaceExportDeclaration(
                     TSNamespaceExportDeclaration {
@@ -329,7 +328,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Ok(ModuleExportName::Literal(self.parse_string_literal()?))
         } else {
             let (start, end) = self.current_pos();
-            let Some(name) = self.try_intern_identifier_name() else {
+            let Some(name) = self.try_identifier_name() else {
                 return Err(self.error_expected_after("identifier", "as"));
             };
             self.advance()?;
@@ -490,10 +489,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.current_kind(),
                 TokenKind::Keyword(KeywordKind::Default)
             ) {
-                self.intern(KeywordKind::Default.as_str())
+                self.current_raw_ident_name()
             } else {
-                match self.try_intern_identifier_or_keyword() {
-                    Some(sym) => sym,
+                match self.try_ident_or_keyword_name() {
+                    Some(name) => name,
                     None => {
                         return Err(self.error_expected("identifier in export specifier"));
                     }
@@ -621,7 +620,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Also check for `import x = require("y")` or `import x = A.B`
         if matches!(self.current_kind(), TokenKind::Identifier) {
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern_identifier();
+            let name = self.current_ident_name();
             self.advance()?;
 
             // Check for `import x = ...` (TSImportEqualsDeclaration)
@@ -639,14 +638,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     start,
                     id_start,
                     id_end,
-                    symbol,
+                    name,
                     import_kind,
                     false, // is_export
                 );
             }
 
             specifiers.push(ImportSpecifier::Default(ImportDefaultSpecifier {
-                local: Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32)),
+                local: Identifier::simple(name, Span::new(id_start as u32, id_end as u32)),
                 span: Span::new(id_start as u32, id_end as u32),
             }));
 
@@ -681,11 +680,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return Err(self.error_expected_after("identifier", "as"));
             }
             let (id_start, id_end) = self.current_pos();
-            let symbol = self.intern_identifier();
+            let name = self.current_ident_name();
             self.advance()?;
 
             specifiers.push(ImportSpecifier::Namespace(ImportNamespaceSpecifier {
-                local: Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32)),
+                local: Identifier::simple(name, Span::new(id_start as u32, id_end as u32)),
                 span: Span::new(ns_start as u32, id_end as u32),
             }));
         }
@@ -732,18 +731,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let imported = if matches!(self.current_kind(), TokenKind::String) {
                     ModuleExportName::Literal(self.parse_string_literal()?)
                 } else {
-                    let imported_symbol = if self.peek_kind() == TokenKind::Keyword(KeywordKind::As)
-                    {
-                        self.try_intern_identifier_name()
+                    let imported_name = if self.peek_kind() == TokenKind::Keyword(KeywordKind::As) {
+                        self.try_identifier_name()
                     } else {
-                        self.try_intern_identifier_or_keyword()
+                        self.try_ident_or_keyword_name()
                     };
-                    let Some(imported_symbol) = imported_symbol else {
+                    let Some(imported_name) = imported_name else {
                         return Err(self.error_expected("identifier in import specifier"));
                     };
                     self.advance()?;
                     ModuleExportName::Identifier(Identifier::simple(
-                        imported_symbol,
+                        imported_name,
                         Span::new(imp_start as u32, imp_end as u32),
                     ))
                 };
@@ -754,14 +752,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.advance()?;
 
                         let (local_start, local_end) = self.current_pos();
-                        let Some(local_symbol) = self.try_intern_binding_name() else {
+                        let Some(local_name) = self.try_binding_name() else {
                             return Err(self.error_expected_after("identifier", "as"));
                         };
                         self.advance()?;
 
                         (
                             Identifier::simple(
-                                local_symbol,
+                                local_name,
                                 Span::new(local_start as u32, local_end as u32),
                             ),
                             local_end,
@@ -869,11 +867,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Per ecma262 `AttributeKey : IdentifierName | StringLiteral`.
             let key = if matches!(self.current_kind(), TokenKind::String) {
                 ImportAttributeKey::Literal(self.parse_string_literal()?)
-            } else if let Some(key_symbol) = self.try_intern_identifier_name() {
+            } else if let Some(key_name) = self.try_identifier_name() {
                 let (key_start, key_end) = self.current_pos();
                 self.advance()?;
                 ImportAttributeKey::Identifier(Identifier::simple(
-                    key_symbol,
+                    key_name,
                     Span::new(key_start as u32, key_end as u32),
                 ))
             } else {
@@ -927,12 +925,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// content. Used to detect duplicate keys, where `type` and `'type'` collide.
     fn attribute_key_string(&self, key: &ImportAttributeKey<'_>) -> String {
         match key {
-            ImportAttributeKey::Identifier(id) => self
-                .interner
-                .borrow()
-                .resolve(id.name)
-                .unwrap_or("")
-                .to_string(),
+            ImportAttributeKey::Identifier(id) => match id.escaped_name {
+                Some(sym) => self
+                    .interner
+                    .borrow()
+                    .resolve(sym)
+                    .unwrap_or("")
+                    .to_string(),
+                None => {
+                    let start = id.span.start as usize - self.base_offset;
+                    self.source[start..start + id.name_len as usize].to_string()
+                }
+            },
             ImportAttributeKey::Literal(
                 lit @ Literal {
                     value: LiteralValue::String(cooked),
@@ -950,7 +954,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
         id_start: usize,
         id_end: usize,
-        symbol: DefaultSymbol,
+        name: IdentName,
         import_kind: ImportKind,
         is_export: bool,
     ) -> Result<Statement<'arena>, ParseError> {
@@ -958,7 +962,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Current token is `=`
         self.advance()?; // consume `=`
 
-        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
 
         let module_reference = if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "require"

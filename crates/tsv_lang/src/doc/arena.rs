@@ -439,6 +439,21 @@ impl DocArena {
         self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
     }
 
+    /// [`Self::source_span`] for a slice the caller guarantees is newline-free
+    /// (identifier names): skips the width precompute entirely — no source read
+    /// at build. Width is measured on demand at the first `fits()` touch
+    /// (memoized), exactly like [`Self::text`]'s never-precompute policy; a
+    /// non-ASCII name measures the same value lazily as eagerly, so output is
+    /// unaffected. Do NOT use for text that can contain `\n` — the newline
+    /// sentinel would be missed.
+    #[inline]
+    pub fn source_span_ident(&self, span: Span) -> DocId {
+        self.alloc(DocNode::Text(DocText::SourceSpan(
+            span,
+            TEXT_WIDTH_NOT_COMPUTED,
+        )))
+    }
+
     /// Verbatim-source-slice form of [`Self::line_comment_text_owned`]: emits a
     /// [`DocText::SourceSpan`] (no allocation) and, under the `swallow_check`
     /// feature while enabled, records the node so the renderer can flag content
