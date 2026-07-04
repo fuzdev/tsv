@@ -91,15 +91,6 @@ const SANCTIONED = SVELTE_FIXTURE_SANCTIONS;
  * (TODO_PARSE_COVERAGE.md §"Svelte parse over-rejections vs `svelte/tests`").
  */
 const KNOWN_GAPS: { pattern: string; category: string; reason: string }[] = [
-	// `<textarea>` RCDATA — its content is raw text with live `{expr}` interpolation
-	// (the inner `<p>` is text, not an element) read up to a whitespace-tolerant
-	// `</textarea…>`. A sibling of the `<script>`/`<style>` raw-text path, tracked
-	// separately from the (now-closed) implicit-tag-closing cluster; deferred.
-	{
-		pattern: 'parser-legacy/samples/textarea-end-tag/',
-		category: 'textarea-rcdata',
-		reason: '`<textarea>` raw-text content + `{expr}` + whitespace-tolerant close',
-	},
 	// Attribute-name lexer over-strict on characters HTML permits in attr names.
 	{
 		pattern: 'runtime-runes/samples/props-alias-weird/',

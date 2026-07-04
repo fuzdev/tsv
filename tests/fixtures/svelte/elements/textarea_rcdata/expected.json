@@ -1,0 +1,202 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 302,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 86,
+				"data": " RCDATA: nested tags are literal text, not elements; {expr} still interpolates "
+			},
+			{
+				"type": "Text",
+				"start": 86,
+				"end": 87,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 87,
+				"end": 130,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 88
+					},
+					"end": {
+						"line": 2,
+						"column": 9,
+						"character": 96
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 97,
+							"end": 108,
+							"type": "Text",
+							"raw": "\n\t<p>text1 ",
+							"data": "\n\t<p>text1 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 108,
+							"end": 114,
+							"expression": {
+								"type": "Identifier",
+								"start": 109,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 15
+									}
+								},
+								"name": "expr"
+							}
+						},
+						{
+							"start": 114,
+							"end": 119,
+							"type": "Text",
+							"raw": "</p>\n",
+							"data": "</p>\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 130,
+				"end": 132,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 132,
+				"end": 177,
+				"data": " Raw angle brackets stay literal text "
+			},
+			{
+				"type": "Text",
+				"start": 177,
+				"end": 178,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 178,
+				"end": 210,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 179
+					},
+					"end": {
+						"line": 7,
+						"column": 9,
+						"character": 187
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 188,
+							"end": 199,
+							"type": "Text",
+							"raw": "<span>text2",
+							"data": "<span>text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 210,
+				"end": 212,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 212,
+				"end": 272,
+				"data": " Expression-only content (no surrounding text nodes) "
+			},
+			{
+				"type": "Text",
+				"start": 272,
+				"end": 273,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 273,
+				"end": 301,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 274
+					},
+					"end": {
+						"line": 10,
+						"column": 9,
+						"character": 282
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "ExpressionTag",
+							"start": 283,
+							"end": 290,
+							"expression": {
+								"type": "Identifier",
+								"start": 284,
+								"end": 289,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 16
+									}
+								},
+								"name": "value"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

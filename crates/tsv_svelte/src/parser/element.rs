@@ -6,8 +6,8 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
-use super::find_exact_tag_close;
 use super::parser_impl::SvelteParser;
+use super::{find_exact_tag_close, rcdata_close_at};
 
 /// Check if a tag name is a component.
 ///
@@ -114,71 +114,56 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let opening_tag_end = self.current_end;
         self.expect(TokenKind::RightAngle)?;
 
-        // Void and self-closing elements have no children or closing tag
-        // (classification lives in tsv_html, shared with the printer).
-        if tsv_html::is_void_element(tag_name) || self_closing {
-            return Ok(ParsedElement::Element(Element {
-                name: tag_symbol,
-                kind,
-                attributes: attributes.into_bump_slice(),
-                fragment: Fragment { nodes: &[] },
-                span: Span {
-                    start: start as u32,
-                    end: opening_tag_end as u32,
-                },
-                name_span,
-                open_tag_end: open_tag_gt,
-            }));
-        }
-
-        // Nested <style> and <script> elements have raw text content (not parsed as Svelte template)
-        // Per Svelte docs: "the <style> tag will be inserted as-is into the DOM"
-        if tag_name == "style" || tag_name == "script" {
-            let child_nodes = self.parse_raw_text_content(tag_name, opening_tag_end, start)?;
-            let end = self.parse_closing_tag(tag_name)?;
-            return Ok(ParsedElement::Element(Element {
-                name: tag_symbol,
-                kind,
-                attributes: attributes.into_bump_slice(),
-                fragment: Fragment {
-                    nodes: child_nodes.into_bump_slice(),
-                },
-                span: Span {
-                    start: start as u32,
-                    end,
-                },
-                name_span,
-                open_tag_end: open_tag_gt,
-            }));
-        }
-
-        // Parse children. Only HTML elements participate in HTML5 implicit tag
-        // closing (Svelte gates auto-close on `parent.type === 'RegularElement'`);
-        // components and `svelte:*` keep the strict explicit-close requirement.
-        // `parse_children` resolves `end` — past this element's `</tag>` (explicit
-        // close) or at the `<` that implicitly closed it.
-        let is_html = matches!(kind, ElementKind::Html);
-        // Enter this element's ancestor context: a RegularElement/Component resets head context
-        // (mirrors Svelte's `parent_is_head`), and a RegularElement carrying `shadowrootmode`
-        // turns on shadow-root-template context for its subtree (`parent_is_shadowroot_template`).
-        let in_shadow =
-            self.in_shadowroot_template || (is_html && self.attrs_have_shadowrootmode(&attributes));
-        let (child_nodes, end) = self.parse_children_in_context(
-            false,
-            in_shadow,
-            tag_name,
-            opening_tag_end,
-            start,
-            is_html,
-        )?;
+        // Resolve this element's children and end offset. The four content regimes differ
+        // only in how they produce `(nodes, end)`; the element is assembled once below.
+        let (nodes, end): (&'arena [FragmentNode<'arena>], u32) =
+            if tsv_html::is_void_element(tag_name) || self_closing {
+                // Void and self-closing elements have no children or closing tag
+                // (classification lives in tsv_html, shared with the printer).
+                (&[], opening_tag_end as u32)
+            } else if tag_name == "style" || tag_name == "script" {
+                // Nested <style>/<script> are raw text (not parsed as Svelte template) —
+                // per Svelte docs, "the <style> tag will be inserted as-is into the DOM".
+                let child_nodes = self.parse_raw_text_content(tag_name, opening_tag_end, start)?;
+                let end = self.parse_closing_tag(tag_name)?;
+                (child_nodes.into_bump_slice(), end)
+            } else if tag_name == "textarea" {
+                // <textarea> is RCDATA: raw text with live {expr} interpolation up to a
+                // whitespace/attribute-tolerant </textarea…>, where `<` is literal text
+                // (never a nested element). Svelte's sole RCDATA element — a sibling of the
+                // <script>/<style> raw-text branch above, but interleaving Text +
+                // ExpressionTag chunks.
+                let (child_nodes, end) = self.parse_rcdata_content(opening_tag_end, start)?;
+                (child_nodes.into_bump_slice(), end)
+            } else {
+                // Parse children. Only HTML elements participate in HTML5 implicit tag
+                // closing (Svelte gates auto-close on `parent.type === 'RegularElement'`);
+                // components and `svelte:*` keep the strict explicit-close requirement.
+                // `parse_children` resolves `end` — past this element's `</tag>` (explicit
+                // close) or at the `<` that implicitly closed it.
+                let is_html = matches!(kind, ElementKind::Html);
+                // Enter this element's ancestor context: a RegularElement/Component resets head
+                // context (mirrors Svelte's `parent_is_head`), and a RegularElement carrying
+                // `shadowrootmode` turns on shadow-root-template context for its subtree
+                // (`parent_is_shadowroot_template`).
+                let in_shadow = self.in_shadowroot_template
+                    || (is_html && self.attrs_have_shadowrootmode(&attributes));
+                let (child_nodes, end) = self.parse_children_in_context(
+                    false,
+                    in_shadow,
+                    tag_name,
+                    opening_tag_end,
+                    start,
+                    is_html,
+                )?;
+                (child_nodes.into_bump_slice(), end)
+            };
 
         Ok(ParsedElement::Element(Element {
             name: tag_symbol,
             kind,
             attributes: attributes.into_bump_slice(),
-            fragment: Fragment {
-                nodes: child_nodes.into_bump_slice(),
-            },
+            fragment: Fragment { nodes },
             span: Span {
                 start: start as u32,
                 end,
@@ -587,6 +572,85 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             self.source,
         )));
         Ok(nodes)
+    }
+
+    /// Parse RCDATA content for `<textarea>` — Svelte's sole RCDATA element (verified
+    /// against the oracle: `<title>` is *not* RCDATA in Svelte; its children parse as a
+    /// normal fragment). RCDATA (HTML §13.2.5.2) is raw text with live `{expr}`
+    /// interpolation but no nested elements: `<` is literal text, read up to a
+    /// whitespace/attribute-tolerant `</textarea…>`. Ports Svelte's `read_sequence`
+    /// (`1-parse/state/element.js`): scan the content bytes, flushing `Text` chunks and,
+    /// at each `{`, parsing an `ExpressionTag`.
+    ///
+    /// Returns the child nodes and the element end (byte offset past the close tag's `>`),
+    /// and repositions the lexer there. Not routed through `parse_closing_tag` — the close
+    /// tag may carry whitespace/attributes (`</textarea data-x >`) that its exact
+    /// tokenization rejects.
+    fn parse_rcdata_content(
+        &mut self,
+        content_start: usize,
+        element_start: usize,
+    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
+        // `&'a [u8]` borrowed from the immutable source, so it survives the `&mut self`
+        // expression-tag parse below (its lifetime is the source's, not this borrow's).
+        let bytes = self.source.as_bytes();
+        let mut nodes = self.bvec();
+        let mut chunk_start = content_start;
+        let mut i = content_start;
+
+        let close_gt = loop {
+            // A `</textarea…>` at `i` ends the RCDATA (checked first, like `read_sequence`'s
+            // `done()`); flush the pending text and stop.
+            if let Some((close_lt, close_gt)) = rcdata_close_at(bytes, i, b"textarea") {
+                self.push_rcdata_text(&mut nodes, chunk_start, close_lt);
+                break close_gt;
+            }
+            match bytes.get(i) {
+                // EOF before any close — Svelte's `unexpected_eof` (both parsers reject).
+                None => {
+                    return Err(self.error_unclosed_at("<textarea> element", element_start));
+                }
+                // `{expr}` — flush the text before it, parse the tag off the byte position
+                // (no lexer), resume after the `}`. A `{` with no matching `}` errors in
+                // `parse_expression_tag_at`, matching Svelte's reject.
+                Some(b'{') => {
+                    self.push_rcdata_text(&mut nodes, chunk_start, i);
+                    let tag = self.parse_expression_tag_at(i)?;
+                    i = tag.span.end as usize;
+                    chunk_start = i;
+                    nodes.push(FragmentNode::ExpressionTag(tag));
+                }
+                // Any other byte (including `<`) is literal RCDATA text.
+                Some(_) => i += 1,
+            }
+        };
+
+        let end = close_gt + 1;
+        self.advance_to_position(end)?;
+        Ok((nodes, end as u32))
+    }
+
+    /// Push a `Text` chunk covering `[start, end)`, skipping it when empty (Svelte's
+    /// `flush`: an empty chunk emits no node). RCDATA text decodes with attribute-value
+    /// rules — Svelte hardcodes `decode_character_references(raw, true)` in `read_sequence`.
+    fn push_rcdata_text(
+        &self,
+        nodes: &mut BumpVec<'arena, FragmentNode<'arena>>,
+        start: usize,
+        end: usize,
+    ) {
+        if end > start {
+            let span = Span {
+                start: start as u32,
+                end: end as u32,
+            };
+            nodes.push(FragmentNode::Text(Text::new(
+                span,
+                TextDecoding::AttributeValue,
+                span,
+                self.source,
+            )));
+        }
     }
 }
 
