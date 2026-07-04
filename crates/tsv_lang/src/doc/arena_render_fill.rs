@@ -27,6 +27,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
     context: &DocContext,
     rest_commands: &[ArenaCommand],
     resolver: Option<&R>,
+    should_remeasure: &mut bool,
 ) {
     let mut offset = 0;
 
@@ -88,6 +89,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     resolver,
+                    should_remeasure,
                 );
                 render_single_doc(
                     arena,
@@ -99,6 +101,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     resolver,
+                    should_remeasure,
                 );
                 offset += 2;
                 continue;
@@ -115,6 +118,10 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     write_indentation(output, indent_level, render, embed);
                     *pos = line_start_pos;
                 }
+                // Unmeasured flat render (tsv shape: prettier uses Break mode
+                // here) — the nested groups must measure for themselves, so
+                // poison the fits-skip flag for this subtree.
+                *should_remeasure = true;
             }
             render_single_doc(
                 arena,
@@ -126,6 +133,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
+                should_remeasure,
             );
             break;
         }
@@ -134,6 +142,10 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
 
         // Case 2: Only content + separator left
         if offset + 2 >= parts.len() {
+            if !content_fits {
+                // Unmeasured flat render (see Case 1) — poison the fits-skip.
+                *should_remeasure = true;
+            }
             render_single_doc(
                 arena,
                 content,
@@ -144,6 +156,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
+                should_remeasure,
             );
             // The separator (the last fill item) is rendered between `content` and whatever
             // follows the fill (`rest_commands`). The generic `content_fits` above measures
@@ -213,6 +226,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
+                should_remeasure,
             );
             break;
         }
@@ -239,6 +253,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
+                should_remeasure,
             );
             render_single_doc(
                 arena,
@@ -250,6 +265,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
+                should_remeasure,
             );
         } else if content_fits {
             render_single_doc(
@@ -262,6 +278,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
+                should_remeasure,
             );
             render_single_doc(
                 arena,
@@ -273,6 +290,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                 render,
                 embed,
                 resolver,
+                should_remeasure,
             );
         } else {
             let line_start_pos = line_start_column(indent_level, render, embed);
@@ -311,6 +329,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
+                        should_remeasure,
                     );
                     render_single_doc(
                         arena,
@@ -322,6 +341,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
+                        should_remeasure,
                     );
                     offset += 2;
                     continue;
@@ -343,6 +363,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
+                        should_remeasure,
                     );
                     render_single_doc(
                         arena,
@@ -354,6 +375,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
+                        should_remeasure,
                     );
                 } else {
                     render_single_doc(
@@ -366,6 +388,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
+                        should_remeasure,
                     );
                     render_single_doc(
                         arena,
@@ -377,6 +400,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                         render,
                         embed,
                         resolver,
+                        should_remeasure,
                     );
                 }
             } else {
@@ -395,6 +419,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     resolver,
+                    should_remeasure,
                 );
                 // Exception (Svelte after-element fold, terminal trailing text): choose the
                 // separator by the *actual resulting column* after the wrapped element. If the next
@@ -426,6 +451,7 @@ pub(super) fn render_fill_iterative<R: TextResolver + ?Sized>(
                     render,
                     embed,
                     resolver,
+                    should_remeasure,
                 );
             }
         }
