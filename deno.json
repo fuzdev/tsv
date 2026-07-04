@@ -62,6 +62,7 @@
 		"corpus:compare:parse:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/corpus_compare_parse.ts",
 		"conformance:svelte-fixtures": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task conformance:svelte-fixtures:run",
 		"conformance:svelte-fixtures:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/svelte_fixtures_compare.ts",
+		"conformance": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task conformance:svelte-fixtures:run && TSV_FFI_PROFILE=corpus deno task corpus:compare:parse:run --all && TSV_FFI_PROFILE=corpus deno task corpus:compare:format:run --all",
 		"divergence:audit": "deno run --allow-read benches/js/divergence_audit.ts",
 		"test:deno": "deno test --allow-read benches/js/lib/divergence/",
 		"test:deno:canonical": "deno test --config benches/js/deno.json --allow-read --allow-env --allow-sys benches/js/lib/canonical_test.ts",
