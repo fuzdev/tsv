@@ -22,7 +22,7 @@ use tsv_lang::estimated_ast_arena_capacity;
 /// - **DocNode variant histogram** — which node kinds dominate the arena `Vec`
 ///   the render/`fits`/build loops linearly scan (so shrinking the dominant
 ///   variant's size is what would move cache density).
-/// - **DocText sub-histogram** — for `Text` nodes, the `Static` / `Owned` /
+/// - **DocText sub-histogram** — for `Text` nodes, the `Static` / `Pooled` /
 ///   `SourceSpan` / `Symbol` split (which text representation to target).
 ///
 /// Covers `.ts` / `.svelte.ts` / `.svelte` / `.css` (each formatted by its own
@@ -70,7 +70,7 @@ const NODE_KINDS: &[&str] = &[
     "IsolatedGroup",
     "Align",
 ];
-const TEXT_KINDS: &[&str] = &["Static", "Owned", "SourceSpan", "Symbol"];
+const TEXT_KINDS: &[&str] = &["Static", "Pooled", "SourceSpan", "Symbol"];
 
 #[derive(Default)]
 struct Stats {

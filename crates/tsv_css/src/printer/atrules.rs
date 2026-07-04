@@ -275,7 +275,7 @@ impl<'a> Printer<'a> {
                 }
                 // Connector case is preserved (matching prettier), so the query is
                 // emitted verbatim — no atom rewriting in the comma-list branch.
-                parts.push(d.text_owned((*query).to_string()));
+                parts.push(d.text_pooled(query));
             }
             return d.group(d.indent(d.concat(&parts)));
         }
@@ -305,8 +305,9 @@ impl<'a> Printer<'a> {
             // its case is preserved (emit the original `atom`).
             if is_media_connector(atom) && !segment.is_empty() {
                 has_connector = true;
-                fill_parts.push(d.text_owned(std::mem::take(&mut segment)));
-                fill_parts.push(d.concat(&[d.text(" "), d.text_owned(atom.to_string()), d.line()]));
+                fill_parts.push(d.text_pooled(&segment));
+                segment.clear();
+                fill_parts.push(d.concat(&[d.text(" "), d.text_pooled(atom), d.line()]));
             } else {
                 if !segment.is_empty() {
                     segment.push(' ');
@@ -315,12 +316,12 @@ impl<'a> Printer<'a> {
             }
         }
         if !segment.is_empty() {
-            fill_parts.push(d.text_owned(segment));
+            fill_parts.push(d.text_pooled(&segment));
         }
 
         // No `and`/`or` boundary → no break point, emit verbatim.
         if !has_connector {
-            return d.text_owned(query.to_string());
+            return d.text_pooled(query);
         }
 
         let fill = d.fill(&fill_parts);
@@ -403,9 +404,9 @@ impl<'a> Printer<'a> {
         // is emitted verbatim, both matching prettier.
         let content_doc = |part: &internal::ConditionPart<'_>| {
             if kind.normalizes() {
-                d.text_owned(value_normalization::normalize_value_text(part.content))
+                d.text_pooled(&value_normalization::normalize_value_text(part.content))
             } else {
-                d.text_owned(part.content.to_string())
+                d.text_pooled(part.content)
             }
         };
 
@@ -417,7 +418,7 @@ impl<'a> Printer<'a> {
             if leading.is_empty() {
                 content_doc(part)
             } else {
-                d.concat(&[d.text_owned(leading), d.text(" "), content_doc(part)])
+                d.concat(&[d.text_pooled(&leading), d.text(" "), content_doc(part)])
             }
         };
 
@@ -432,7 +433,7 @@ impl<'a> Printer<'a> {
                 let trailing = self.comment_blocks_in_range(first.span.end, span.end);
                 if !trailing.is_empty() {
                     chunk.push(d.text(" "));
-                    chunk.push(d.text_owned(trailing));
+                    chunk.push(d.text_pooled(&trailing));
                 }
             }
             return d.concat(&chunk);
@@ -456,20 +457,20 @@ impl<'a> Printer<'a> {
             let mut sep = DocBuf::new();
             if !before.is_empty() {
                 sep.push(d.text(" "));
-                sep.push(d.text_owned(before));
+                sep.push(d.text_pooled(&before));
             }
             // Emit the connector's source case (`AND` stays `AND`), preserved like
             // prettier. `connector_raw` is `Some` whenever `connector` is.
             if let Some(conn_raw) = part.connector_raw {
                 sep.push(d.text(" "));
-                sep.push(d.text_owned(conn_raw.to_string()));
+                sep.push(d.text_pooled(conn_raw));
             }
             sep.push(d.line());
             fill_parts.push(d.concat(&sep));
 
             let mut chunk = DocBuf::new();
             if !after.is_empty() {
-                chunk.push(d.text_owned(after));
+                chunk.push(d.text_pooled(&after));
                 chunk.push(d.text(" "));
             }
             chunk.push(content_doc(part));
@@ -482,7 +483,7 @@ impl<'a> Printer<'a> {
             if !trailing.is_empty()
                 && let Some(last_chunk) = fill_parts.pop()
             {
-                fill_parts.push(d.concat(&[last_chunk, d.text(" "), d.text_owned(trailing)]));
+                fill_parts.push(d.concat(&[last_chunk, d.text(" "), d.text_pooled(&trailing)]));
             }
         }
 

@@ -152,7 +152,7 @@ impl<'a> Printer<'a> {
                         d.concat(&[
                             d.text("${"),
                             comments_doc,
-                            d.text_owned(flat_str),
+                            d.text_pooled(&flat_str),
                             d.text("}"),
                         ]),
                         d.concat(&[

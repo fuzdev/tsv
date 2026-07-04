@@ -151,9 +151,9 @@ mod arena_tests {
         use super::arena::DocNode;
         use super::types::CachedWidth;
 
-        let cached = |s: String| {
+        let cached = |s: &str| {
             let arena = DocArena::new();
-            let id = arena.text_owned(s);
+            let id = arena.text_pooled(s);
             let nodes = arena.borrow_nodes();
             let DocNode::Text(t) = &nodes[id.index()] else {
                 panic!("expected text node");
@@ -165,22 +165,22 @@ mod arena_tests {
 
         // Width 65,533 (32,766 CJK × 2 + 1): the widest exactly-cacheable text.
         assert_eq!(
-            cached("中".repeat(32_766) + "x"),
+            cached(&("中".repeat(32_766) + "x")),
             CachedWidth::Width(MAX_CACHEABLE)
         );
         // Width 65,534 would alias TEXT_WIDTH_NOT_COMPUTED; must clamp.
         assert_eq!(
-            cached("中".repeat(32_767)),
+            cached(&"中".repeat(32_767)),
             CachedWidth::Width(MAX_CACHEABLE)
         );
         // Width 65,536+ would wrap under a bare `as u16` (→ "always fits");
         // must clamp instead.
         assert_eq!(
-            cached("中".repeat(40_000)),
+            cached(&"中".repeat(40_000)),
             CachedWidth::Width(MAX_CACHEABLE)
         );
         // Newline-bearing text is flagged, never measured.
-        assert_eq!(cached("中\n中".to_string()), CachedWidth::HasNewline);
+        assert_eq!(cached("中\n中"), CachedWidth::HasNewline);
     }
 
     #[test]
@@ -283,7 +283,7 @@ mod arena_tests {
     fn test_arena_multiline_text() {
         // Renders each `\n` as a hardline: first line in place, the rest broken.
         let a = DocArena::new();
-        let doc = a.multiline_text("L0\nL1\nL2".to_string());
+        let doc = a.multiline_text("L0\nL1\nL2");
         assert_eq!(render_pw_tab(&a, doc, 100), "L0\nL1\nL2");
 
         // Output-identical to the per-line `concat([text, hardline, …])` it replaces.
@@ -304,10 +304,7 @@ mod arena_tests {
         // content in place, every continuation line picks up the enclosing
         // indent level via its hardline.
         let a = DocArena::new();
-        let doc = a.concat(&[
-            a.text("parent"),
-            a.indent(a.multiline_text("a\nb\nc".to_string())),
-        ]);
+        let doc = a.concat(&[a.text("parent"), a.indent(a.multiline_text("a\nb\nc"))]);
         assert_eq!(render_pw_tab(&a, doc, 80), "parenta\n\tb\n\tc");
     }
 
@@ -316,7 +313,7 @@ mod arena_tests {
         // Contains hardlines ⇒ `will_break`, so an enclosing group breaks without
         // a fits check — even at a width where the flat form would fit.
         let a = DocArena::new();
-        let ml = a.multiline_text("a\nb".to_string());
+        let ml = a.multiline_text("a\nb");
         assert!(a.will_break(ml));
         let doc = a.group(a.concat(&[a.text("x"), a.line(), ml]));
         // Broke: the `line` is a newline ("x\na\nb"), not a space ("x a\nb").
@@ -328,7 +325,7 @@ mod arena_tests {
         // Flattening drops the internal hardlines (→ empty) and joins the lines
         // with no separator — matches `remove_lines` over the per-line concat.
         let a = DocArena::new();
-        let flat = a.remove_lines(a.multiline_text("/*a\n b\n c*/".to_string()));
+        let flat = a.remove_lines(a.multiline_text("/*a\n b\n c*/"));
         assert_eq!(render_default(&a, flat), "/*a b c*/");
     }
 
@@ -898,7 +895,7 @@ mod arena_tests {
         let a = DocArena::new();
         // "café" is non-ASCII, so its width is precomputed (cached_width = Some(4));
         // this exercises the cached-`Some(w)` arm rather than the resolve fallback.
-        assert_flat_width(&a, a.text_owned("café".to_string()), 4);
+        assert_flat_width(&a, a.text_pooled("café"), 4);
     }
 
     #[test]
@@ -940,7 +937,7 @@ mod arena_tests {
         // Pooled newline text: cached as HAS_NEWLINE → same early-true path.
         // Both cases pin the eager pooled-width policy (never NOT_COMPUTED),
         // which is what lets fits answer without borrowing the text pool.
-        assert!(fits_flat(&a, a.text_owned("café\nx".to_string()), 0));
-        assert!(fits_flat(&a, a.text_owned("a\nb".to_string()), 0));
+        assert!(fits_flat(&a, a.text_pooled("café\nx"), 0));
+        assert!(fits_flat(&a, a.text_pooled("a\nb"), 0));
     }
 }

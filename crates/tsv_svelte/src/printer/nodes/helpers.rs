@@ -172,11 +172,6 @@ pub(super) fn indent_body(printer: &Printer<'_>, body_doc: DocId, has_leading_ws
 }
 
 impl<'a> Printer<'a> {
-    /// Extract source range as string slice
-    pub(super) fn extract_source_range(&self, start: usize, end: usize) -> &str {
-        &self.source[start..end]
-    }
-
     /// Emit every comment in `[start, end)` in **leading** style: a block comment as
     /// `/* … */ ` (inline, trailing space); a line comment as `// …` + `hardline` (a `//`
     /// runs to end of line, so the following token drops to the next line to avoid

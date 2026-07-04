@@ -132,9 +132,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let content = comment.content(self.source);
         if leading {
-            d.text_owned(format!("/*{content}*/ "))
+            d.text_pooled(&format!("/*{content}*/ "))
         } else {
-            d.text_owned(format!(" /*{content}*/"))
+            d.text_pooled(&format!(" /*{content}*/"))
         }
     }
 

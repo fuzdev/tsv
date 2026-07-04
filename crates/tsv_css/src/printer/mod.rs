@@ -42,7 +42,7 @@ use tsv_lang::{
 /// Render-time text resolver for the CSS printer.
 ///
 /// CSS doc trees carry no interned identifiers — the printer emits source slices
-/// directly (`self.write`, `text_owned`), never `DocText::Symbol`. The only thing
+/// directly (`self.write`, `text_pooled`), never `DocText::Symbol`. The only thing
 /// to resolve at render is a [`DocText::SourceSpan`](tsv_lang::doc::DocText::SourceSpan):
 /// a verbatim source slice emitted with no allocation (see
 /// [`values`]'s `build_dimension_doc`). So `resolve` (symbol lookup) is

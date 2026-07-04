@@ -103,7 +103,7 @@ mod tests {
 
         let render = |word: &str| {
             with_doc_arena(|arena| {
-                let id = arena.text_owned(word.to_owned());
+                let id = arena.text_pooled(word);
                 arena_print_doc(arena, id, &EmbedContext::default())
             })
         };
