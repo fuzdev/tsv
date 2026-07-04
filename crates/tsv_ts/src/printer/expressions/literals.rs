@@ -399,11 +399,12 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a regex literal
     /// Flags are sorted alphabetically to match prettier's output.
     pub(super) fn build_regex_doc(&self, regex: &internal::RegexLiteral) -> DocId {
-        self.d().text_pooled(&format!(
-            "/{}/{}",
-            regex.pattern(self.source),
-            sort_regex_flags(regex.flags(self.source))
-        ))
+        let mut w = self.d().pool_writer();
+        w.push('/');
+        w.push_str(regex.pattern(self.source));
+        w.push('/');
+        w.push_str(&sort_regex_flags(regex.flags(self.source)));
+        w.finish_text()
     }
 
     /// Build a Doc for a spread element

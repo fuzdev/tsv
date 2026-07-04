@@ -366,7 +366,12 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let (attr_indent, has_multiline) = self.build_indented_attrs_doc(attributes);
         let softline = d.softline();
-        let tag_text = d.text_pooled(&format!("<{tag_name}"));
+        let tag_text = {
+            let mut w = d.pool_writer();
+            w.push('<');
+            w.push_str(tag_name);
+            w.finish_text()
+        };
         let inner = d.concat(&[tag_text, attr_indent, softline, d.text(">")]);
 
         let group = if has_multiline {

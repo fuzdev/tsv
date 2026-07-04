@@ -441,7 +441,11 @@ impl<'a> Printer<'a> {
             let first_byte = self.source.as_bytes().get(lit.span.start as usize).copied();
             if first_byte != Some(b'"') && first_byte != Some(b'\'') {
                 let content = cooked.resolve(lit.span, self.source);
-                return d.text_pooled(&format!("this=\"{content}\""));
+                let mut w = d.pool_writer();
+                w.push_str("this=\"");
+                w.push_str(content);
+                w.push('"');
+                return w.finish_text();
             }
         }
 

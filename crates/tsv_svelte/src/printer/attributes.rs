@@ -24,6 +24,17 @@ use tsv_ts::ast::internal::Expression;
 const SPREAD_OPEN: &str = "{...";
 const ATTACH_TAG_OPEN: &str = "{@attach ";
 
+/// Whether `raw` is trivially already-normalized, so [`normalize_class_text`]
+/// would return it unchanged: single-line, no tabs, no collapsible space runs,
+/// no trailing space. Conservative — a `false` only means the `String` path
+/// runs (and decides for itself), so this can never change output; it only
+/// lets the common `class="a b c"` case skip the transient allocation.
+fn class_text_is_normalized(raw: &str) -> bool {
+    !raw.ends_with(' ')
+        && !raw.as_bytes().windows(2).any(|w| w == b"  ")
+        && !raw.contains(['\n', '\t'])
+}
+
 /// Normalize whitespace in a class attribute text value.
 ///
 /// Matches prettier-plugin-svelte behavior for `class` attributes on HTML elements:
@@ -249,8 +260,13 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         match value {
             internal::AttributeValue::Text(text) => {
-                let normalized = normalize_class_text(text.raw(self.source), is_last_part);
-                self.build_attribute_text_doc(&normalized)
+                let raw = text.raw(self.source);
+                if class_text_is_normalized(raw) {
+                    self.build_attribute_text_doc(raw)
+                } else {
+                    let normalized = normalize_class_text(raw, is_last_part);
+                    self.build_attribute_text_doc(&normalized)
+                }
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 self.build_attribute_expression_doc(expr_tag)
