@@ -89,7 +89,7 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                return d.text_owned(normalized);
+                return d.text_pooled(&normalized);
             }
         }
         // Empty / whitespace-only span (the empty-identifier sentinel) or an
@@ -107,7 +107,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut fill_parts = DocBuf::with_capacity(tokens.len() * 2);
         for (i, token) in tokens.iter().enumerate() {
-            fill_parts.push(d.text_owned(token.to_string()));
+            fill_parts.push(d.text_pooled(token));
             if i < tokens.len() - 1 {
                 fill_parts.push(d.line());
             }
@@ -146,7 +146,7 @@ impl<'a> Printer<'a> {
                 let inner = &raw[1..raw.len() - 1];
                 return self
                     .d()
-                    .text_owned(value_normalization::format_string_value(inner, quote));
+                    .text_pooled(&value_normalization::format_string_value(inner, quote));
             }
         }
         // Fallback: span unavailable (never in practice — spans index the printer's
@@ -155,7 +155,7 @@ impl<'a> Printer<'a> {
         match content {
             StringCooked::Decoded(s) => self
                 .d()
-                .text_owned(value_normalization::format_string_value(s, '\'')),
+                .text_pooled(&value_normalization::format_string_value(s, '\'')),
             StringCooked::Verbatim => self.d().text(""),
         }
     }
@@ -171,7 +171,7 @@ impl<'a> Printer<'a> {
         let raw = span.extract(self.source);
         match value_normalization::normalize_dimension_from_source(raw) {
             Cow::Borrowed(_) => self.d().source_span(span, self.source),
-            Cow::Owned(s) => self.d().text_owned(s),
+            Cow::Owned(s) => self.d().text_pooled(&s),
         }
     }
 
@@ -180,7 +180,7 @@ impl<'a> Printer<'a> {
     /// Preserves color syntax (hex, rgb, hsl, etc.) from source.
     fn build_color_doc(&self, color: &crate::ast::internal::Color, span: Span) -> DocId {
         let formatted = value_normalization::format_color_from_source(color, self.source, span);
-        self.d().text_owned(formatted)
+        self.d().text_pooled(&formatted)
     }
 
     /// Build a flat (non-wrapping) `name(args_doc)` function doc.
@@ -192,12 +192,7 @@ impl<'a> Printer<'a> {
     /// break when it exceeds width.
     fn flat_function_doc(&self, name: &str, args_doc: DocId) -> DocId {
         let d = self.d();
-        d.concat(&[
-            d.text_owned(name.to_string()),
-            d.text("("),
-            args_doc,
-            d.text(")"),
-        ])
+        d.concat(&[d.text_pooled(name), d.text("("), args_doc, d.text(")")])
     }
 
     /// Build a doc for a function value with automatic wrapping
@@ -231,9 +226,13 @@ impl<'a> Printer<'a> {
             if name.eq_ignore_ascii_case("url")
                 && let Some(trimmed) = crate::url::trim_url_raw(raw)
             {
-                return d.text_owned(trimmed);
+                return d.text_pooled(&trimmed);
             }
-            return d.text_owned(raw.to_string());
+            // Deliberately pooled, not `source_span`: this arm is hot on CSS
+            // corpora (every unparsed `url(...)`/empty-args function) and the
+            // span form's render-time resolver hop measured +0.07% instructions
+            // there for no allocation win (the pool is amortized).
+            return d.text_pooled(raw);
         }
 
         // `url` is matched ASCII-case-insensitively (css-syntax): `URL(…)` is a url too, so
@@ -254,7 +253,7 @@ impl<'a> Printer<'a> {
             if span.end_usize() <= self.source.len()
                 && let Some(raw) = crate::url::trim_url_raw(span.extract(self.source))
             {
-                return d.text_owned(raw);
+                return d.text_pooled(&raw);
             }
             // Fallback (span unavailable): rejoin args with no space after commas.
             let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ",");
@@ -297,7 +296,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        let name_doc = d.text_owned(name.to_string());
+        let name_doc = d.text_pooled(name);
         let inner = d.concat(&inner_parts);
         d.group(d.concat(&[
             name_doc,

@@ -674,7 +674,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut doc_parts = DocBuf::with_capacity(parts.len() * 2);
         for (i, part) in parts.iter().enumerate() {
-            doc_parts.push(d.text_owned((*part).to_string()));
+            doc_parts.push(d.text_pooled(part));
             if i < parts.len() - 1 {
                 doc_parts.push(d.line());
             }

@@ -94,7 +94,7 @@ impl<'a> Printer<'a> {
             // Prettier's `printDirective` (swap the outer quote to single only when
             // the content has no quote, else verbatim). Never parenthesized.
             let raw = stmt.expression.span().extract(self.source);
-            parts.push(d.text_owned(format_directive(raw)));
+            parts.push(d.text_pooled(&format_directive(raw)));
         } else {
             // Parens required for correctness (object expressions, object pattern assignments)
             // OR preserved from source for string literals (matches Prettier behavior)

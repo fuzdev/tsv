@@ -891,7 +891,7 @@ impl<'a> Printer<'a> {
             clause_parts.push(self.build_pattern_doc(context));
             if let Some(index) = block.index {
                 clause_parts.push(d.text(", "));
-                clause_parts.push(d.text_owned(index.to_string()));
+                clause_parts.push(d.text_pooled(index));
             }
             if let Some(kd) = key_doc {
                 clause_parts.push(d.text(" ("));
@@ -904,7 +904,7 @@ impl<'a> Printer<'a> {
             let mut e: DocBuf = smallvec![expr_doc];
             if let Some(index) = block.index {
                 e.push(d.text(", "));
-                e.push(d.text_owned(index.to_string()));
+                e.push(d.text_pooled(index));
             }
             if let Some(kd) = key_doc {
                 e.push(d.text(" ("));
@@ -1419,12 +1419,6 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let allow_wrapping = !has_preceding_breakable;
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        // Extract snippet name from the identifier expression
-        let name = self.extract_source_range(
-            block.expression.span().start_usize(),
-            block.expression.span().end_usize(),
-        );
-
         // Check leading/trailing whitespace, considering space-only patterns.
         // Space-only whitespace (no newlines) also triggers expansion to match prettier.
         let (has_leading, has_trailing) = self.fragment_ws_status(&block.body, false);
@@ -1439,7 +1433,7 @@ impl<'a> Printer<'a> {
         let type_params_part = if let Some(decl) = &block.type_parameters {
             tsv_ts::build_type_parameters_doc_with_comments(d, decl, &self.ts_inputs(), &self.embed)
         } else if let Some(raw) = block.type_params_raw {
-            d.concat(&[d.text("<"), d.text_owned(raw.to_string()), d.text(">")])
+            d.concat(&[d.text("<"), d.text_pooled(raw), d.text(">")])
         } else {
             d.empty()
         };
@@ -1452,7 +1446,7 @@ impl<'a> Printer<'a> {
             // verbatim), split at top-level commas so a long list still wraps one-per-line.
             let params_docs: DocBuf = split_raw_params_at_commas(raw)
                 .iter()
-                .map(|s| d.text_owned(s.to_string()))
+                .map(|s| d.text_pooled(s))
                 .collect();
             let mut parts: DocBuf = DocBuf::with_capacity(params_docs.len() * 2);
             for (i, param_doc) in params_docs.into_iter().enumerate() {
@@ -1501,7 +1495,8 @@ impl<'a> Printer<'a> {
         let opening_doc = d.group_with_id(
             d.concat(&[
                 d.text("{#snippet "),
-                d.text_owned(name.to_string()),
+                // The snippet name, verbatim from the identifier expression's span.
+                d.source_span(block.expression.span(), self.source),
                 type_params_part,
                 params_doc,
                 d.text("}"),
