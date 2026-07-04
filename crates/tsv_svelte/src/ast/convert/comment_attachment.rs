@@ -5,64 +5,154 @@
 // Program JSON, matching `add_comments` in
 // svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js.
 //
-// The per-island machinery (`try_attach_comments_to_node` and the `attach_*`
-// helpers) is consumed by the wire-JSON writer's skeleton path
-// (`ast/convert/special.rs`'s `build_*_writer_comments`): each comment-bearing
-// template island is skeletonized to byte-space wire JSON, attached here, and
-// read back into a `WriterComments` map the fused writer consults at emit time.
+// The walk runs over the `SkeletonTree` the writer records during an island's
+// byte-space skeleton emit (`ast/convert/special.rs`'s
+// `build_*_writer_comments`) — the exact wire node tree, synthetic wrappers
+// included — and its assignments feed the span-keyed `WriterComments` map the
+// fused writer consults at emit time. No `serde_json::Value` is materialized
+// anywhere on this path (the retired emit→`from_slice`→mutate→collect
+// round-trip cost O(script wire size) per comment-bearing island).
 
 use std::borrow::Cow;
 use std::collections::VecDeque;
 
 use tsv_lang::{Comment, printing, source_scan::skip_comment};
+use tsv_ts::ast::convert::{AttachedComment, SkeletonTree, WriterComments};
 
-/// Context for comment attachment process
+/// Context for the comment attachment process.
 ///
 /// Holds a mutable queue of comments (sorted by position) that gets consumed
 /// during the DFS walk, matching acorn's algorithm from:
-/// svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js
-pub(super) struct CommentAttachmentContext<'a> {
-    /// Comment queue sorted by start position. Comments are shifted from the front
-    /// as they get attached to nodes during the DFS walk.
-    pub comments: VecDeque<serde_json::Value>,
+/// svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js — plus the
+/// per-node assignments the walk produces, in first-touch order.
+pub(super) struct CommentAttachmentContext<'a, 's> {
+    /// Comment queue sorted by start position. Comments are shifted from the
+    /// front as they get attached to nodes during the DFS walk.
+    comments: VecDeque<&'a Comment>,
     /// Full source string for slice checks (trailing comment whitespace detection)
-    pub source: &'a str,
+    source: &'s str,
+    /// Per-node assignments, in first-touch order (which, for two nodes
+    /// sharing a span and type, matches their close order — the consume-once
+    /// contract of `WriterComments`).
+    nodes: Vec<NodeAssignments<'a>>,
 }
 
-/// Get the `start` field from a comment JSON value
-fn comment_start(c: &serde_json::Value) -> u32 {
-    c.get("start")
-        .and_then(serde_json::Value::as_u64)
-        .unwrap_or(0) as u32
+/// One node's accumulated comment assignments.
+struct NodeAssignments<'a> {
+    node: u32,
+    leading: Vec<&'a Comment>,
+    trailing: Vec<&'a Comment>,
+    /// The node's first assignment was trailing, so its `trailingComments`
+    /// key precedes `leadingComments` in the wire (acorn appends object keys
+    /// on first touch — a root that gets fallback trailing comments and then
+    /// the preceding-HTML leading comment serializes trailing first).
+    trailing_first: bool,
 }
 
-/// Get the `start` field from an AST node JSON value
-fn node_start(node: &serde_json::Value) -> Option<u32> {
-    node.get("start")
-        .and_then(serde_json::Value::as_u64)
-        .map(|v| v as u32)
+impl<'a, 's> CommentAttachmentContext<'a, 's> {
+    pub(super) fn new(comments: VecDeque<&'a Comment>, source: &'s str) -> Self {
+        Self {
+            comments,
+            source,
+            nodes: Vec::new(),
+        }
+    }
+
+    /// Record one comment assignment (matching the `Value` walk's
+    /// `leadingComments`/`trailingComments` key insertion).
+    fn assign(&mut self, node: u32, trailing: bool, comment: &'a Comment) {
+        let idx = match self.nodes.iter().position(|n| n.node == node) {
+            Some(idx) => idx,
+            None => {
+                self.nodes.push(NodeAssignments {
+                    node,
+                    leading: Vec::new(),
+                    trailing: Vec::new(),
+                    trailing_first: trailing,
+                });
+                self.nodes.len() - 1
+            }
+        };
+        let entry = &mut self.nodes[idx];
+        if trailing {
+            entry.trailing.push(comment);
+        } else {
+            entry.leading.push(comment);
+        }
+    }
+
+    /// Fold the assignments into a `WriterComments` map. `html_leading`
+    /// prepends the preceding-HTML `Line` comment (Svelte's positionless
+    /// `{type: "Line", value}`) to the given node's `leadingComments` — in
+    /// front of any attached leading comments, after the fact, so a node
+    /// whose first attach touch was trailing keeps `trailingComments` first.
+    pub(super) fn into_writer_comments(
+        self,
+        tree: &SkeletonTree,
+        html_leading: Option<(u32, &str)>,
+        out: &mut WriterComments,
+    ) {
+        let mut html_leading = html_leading;
+        for entry in &self.nodes {
+            let mut leading: Vec<AttachedComment> = entry
+                .leading
+                .iter()
+                .map(|c| attached_comment(c, self.source))
+                .collect();
+            if let Some((node, value)) = html_leading
+                && node == entry.node
+            {
+                leading.insert(0, html_attached_comment(value));
+                html_leading = None;
+            }
+            out.insert_node(
+                tree.node_type(entry.node),
+                tree.start(entry.node),
+                tree.end(entry.node),
+                leading,
+                entry
+                    .trailing
+                    .iter()
+                    .map(|c| attached_comment(c, self.source))
+                    .collect(),
+                entry.trailing_first,
+            );
+        }
+        // The HTML comment's node received no attached comments — it still
+        // carries the synthetic leading comment.
+        if let Some((node, value)) = html_leading {
+            out.insert_node(
+                tree.node_type(node),
+                tree.start(node),
+                tree.end(node),
+                vec![html_attached_comment(value)],
+                Vec::new(),
+                false,
+            );
+        }
+    }
 }
 
-/// Get the `end` field from an AST node JSON value
-fn node_end(node: &serde_json::Value) -> Option<u32> {
-    node.get("end")
-        .and_then(serde_json::Value::as_u64)
-        .map(|v| v as u32)
+/// An ordinary attached comment (byte positions; value via `get_comment_value`).
+fn attached_comment(comment: &Comment, source: &str) -> AttachedComment {
+    AttachedComment {
+        is_block: comment.is_block,
+        value: get_comment_value(comment, source).into_owned(),
+        span: Some((comment.span.start, comment.span.end)),
+    }
 }
 
-/// Get the `type` field from an AST node JSON value
-fn node_type(node: &serde_json::Value) -> Option<&str> {
-    node.get("type").and_then(serde_json::Value::as_str)
+/// The synthetic preceding-HTML `Line` comment (no positions).
+fn html_attached_comment(value: &str) -> AttachedComment {
+    AttachedComment {
+        is_block: false,
+        value: value.to_string(),
+        span: None,
+    }
 }
 
-/// Check if a JSON value is an AST node (object with `type` field)
-fn is_ast_node(value: &serde_json::Value) -> bool {
-    value
-        .as_object()
-        .is_some_and(|obj| obj.contains_key("type"))
-}
-
-/// Attach comments to all nodes in a JSON AST using acorn's DFS queue algorithm
+/// Attach comments to all nodes in a skeleton tree using acorn's DFS queue
+/// algorithm.
 ///
 /// Matches the behavior of `add_comments` in:
 /// svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js
@@ -75,70 +165,61 @@ fn is_ast_node(value: &serde_json::Value) -> bool {
 /// 5. After recursion: check for trailing comments based on context
 /// 6. Remaining comments after full walk → trailing on root
 pub(super) fn attach_comments_recursively(
-    root: &mut serde_json::Value,
-    ctx: &mut CommentAttachmentContext<'_>,
+    tree: &SkeletonTree,
+    root: u32,
+    ctx: &mut CommentAttachmentContext<'_, '_>,
 ) {
     if ctx.comments.is_empty() {
         return;
     }
 
     // DFS walk with parent tracking
-    walk_node(root, None, ctx);
+    walk_node(tree, root, None, ctx);
 
     // Special case: Trailing comments after the root node
     // See acorn.js: "Special case: Trailing comments after the root node"
-    if !ctx.comments.is_empty() {
-        let root_end = node_end(root).unwrap_or(0);
-        let root_type = node_type(root).unwrap_or("");
-
-        if comment_start(&ctx.comments[0]) >= root_end || root_type == "Program" {
-            let remaining: Vec<serde_json::Value> = ctx.comments.drain(..).collect();
-            if let Some(obj) = root.as_object_mut() {
-                let trailing = obj
-                    .entry("trailingComments")
-                    .or_insert_with(|| serde_json::Value::Array(Vec::new()));
-                if let serde_json::Value::Array(arr) = trailing {
-                    arr.extend(remaining);
-                }
-            }
+    if !ctx.comments.is_empty()
+        && (ctx.comments[0].span.start >= tree.end(root) || tree.node_type(root) == "Program")
+    {
+        while let Some(comment) = ctx.comments.pop_front() {
+            ctx.assign(root, true, comment);
         }
     }
 }
 
 /// Extracted parent context for comment attachment decisions.
 ///
-/// Avoids cloning the entire parent node — only stores what `walk_node` needs:
+/// Only what `walk_node` needs from its parent:
 /// - `end`: for the `node.end != parent.end` guard
 /// - `last_body_start`: start position of the last element in body/elements/properties
-///   (None if parent isn't BlockStatement/Program/ArrayExpression/ObjectExpression,
-///   or if the relevant array is empty)
+///   (None if the parent isn't BlockStatement/Program/ArrayExpression/ObjectExpression,
+///   or if the relevant array is empty — or ends in an `ArrayExpression` hole)
 struct ParentInfo {
     end: u32,
     last_body_start: Option<u32>,
 }
 
-/// Extract parent info from a JSON AST node
-fn extract_parent_info(parent: &serde_json::Value) -> ParentInfo {
-    let p_end = node_end(parent).unwrap_or(0);
-
-    let parent_type = node_type(parent).unwrap_or("");
-    let array_key = match parent_type {
-        "BlockStatement" | "Program" => Some("body"),
-        "ArrayExpression" => Some("elements"),
-        "ObjectExpression" => Some("properties"),
+/// Extract parent info from a skeleton node.
+///
+/// The four container types' body/elements/properties array is each type's
+/// only node-valued key, so its last element is the node's last recorded
+/// child — except an `ArrayExpression` whose trailing element is a hole
+/// (`[a,,]`): the `Value` walk read the array's last entry (`null`, no
+/// `start`), which the recorder captures as the `last_elem_hole` flag.
+fn extract_parent_info(tree: &SkeletonTree, node: u32) -> ParentInfo {
+    let last_body_start = match tree.node_type(node) {
+        "BlockStatement" | "Program" | "ObjectExpression" => tree.last_child_start(node),
+        "ArrayExpression" => {
+            if tree.last_elem_hole(node) {
+                None
+            } else {
+                tree.last_child_start(node)
+            }
+        }
         _ => None,
     };
-
-    let last_body_start = array_key.and_then(|key| {
-        parent
-            .get(key)
-            .and_then(|v| v.as_array())
-            .and_then(|arr| arr.last())
-            .and_then(node_start)
-    });
-
     ParentInfo {
-        end: p_end,
+        end: tree.end(node),
         last_body_start,
     }
 }
@@ -147,54 +228,33 @@ fn extract_parent_info(parent: &serde_json::Value) -> ParentInfo {
 ///
 /// This is the core of acorn's `_` handler in the walk.
 /// `parent_info` provides extracted parent context for trailing comment decisions.
+///
+/// Two of the `Value` walk's per-node guards are structural here: the skeleton
+/// tree contains no `Block`/`Line` comment objects (a `Record` pass never
+/// emits comments), and every recorded node carries `start`/`end`.
 fn walk_node(
-    node: &mut serde_json::Value,
+    tree: &SkeletonTree,
+    node: u32,
     parent_info: Option<&ParentInfo>,
-    ctx: &mut CommentAttachmentContext<'_>,
+    ctx: &mut CommentAttachmentContext<'_, '_>,
 ) {
-    let Some(obj) = node.as_object() else {
-        return;
-    };
-
-    // Skip Comment objects (type "Block" or "Line")
-    if let Some(t) = obj.get("type").and_then(|v| v.as_str())
-        && (t == "Block" || t == "Line")
-    {
-        return;
-    }
-
-    // Must have start/end to be a valid AST node for comment attachment
-    let Some(n_start) = node_start(node) else {
-        return;
-    };
-    let Some(n_end) = node_end(node) else {
-        return;
-    };
+    let n_start = tree.start(node);
+    let n_end = tree.end(node);
 
     // --- Leading comments: consume from queue while comment.start < node.start ---
-    let mut leading: Vec<serde_json::Value> = Vec::new();
     while ctx
         .comments
         .front()
-        .is_some_and(|front| comment_start(front) < n_start)
+        .is_some_and(|front| front.span.start < n_start)
     {
         let Some(comment) = ctx.comments.pop_front() else {
             break;
         };
-        leading.push(comment);
-    }
-
-    if !leading.is_empty()
-        && let Some(obj) = node.as_object_mut()
-    {
-        obj.insert(
-            "leadingComments".to_string(),
-            serde_json::Value::Array(leading),
-        );
+        ctx.assign(node, false, comment);
     }
 
     // --- Recurse into children (next()) ---
-    recurse_children(node, ctx);
+    recurse_children(tree, node, ctx);
 
     // --- Trailing comments: check after recursion ---
     if ctx.comments.is_empty() {
@@ -210,7 +270,7 @@ fn walk_node(
         return;
     }
 
-    let first_comment_start = comment_start(&ctx.comments[0]);
+    let first_comment_start = ctx.comments[0].span.start;
 
     // Check is_last_in_body: node is last element in parent's body/elements/properties
     // See acorn.js lines 162-168
@@ -221,9 +281,7 @@ fn walk_node(
     if is_last_in_body {
         // Last node in body: attach multiple trailing comments (can span newlines)
         // Stop at parent boundary
-        let mut trailing: Vec<serde_json::Value> = Vec::new();
-
-        while let Some(c_start) = ctx.comments.front().map(comment_start) {
+        while let Some(c_start) = ctx.comments.front().map(|c| c.span.start) {
             if let Some(p_end) = parent_end_val
                 && c_start >= p_end
             {
@@ -232,18 +290,7 @@ fn walk_node(
             let Some(comment) = ctx.comments.pop_front() else {
                 break;
             };
-            trailing.push(comment);
-        }
-
-        if !trailing.is_empty()
-            && let Some(obj) = node.as_object_mut()
-        {
-            let existing = obj
-                .entry("trailingComments")
-                .or_insert_with(|| serde_json::Value::Array(Vec::new()));
-            if let serde_json::Value::Array(arr) = existing {
-                arr.extend(trailing);
-            }
+            ctx.assign(node, true, comment);
         }
     } else if n_end <= first_comment_start {
         // Not last in body: attach at most ONE trailing comment on same line
@@ -251,139 +298,63 @@ fn walk_node(
         let slice = &ctx.source[n_end as usize..first_comment_start as usize];
         if slice.chars().all(|c| matches!(c, ',' | ')' | ' ' | '\t'))
             && let Some(comment) = ctx.comments.pop_front()
-            && let Some(obj) = node.as_object_mut()
         {
-            obj.insert(
-                "trailingComments".to_string(),
-                serde_json::Value::Array(vec![comment]),
-            );
+            ctx.assign(node, true, comment);
         }
     }
 }
 
-/// Get the child key visit order for a node type, matching acorn/acorn-typescript.
+/// Recurse into all child nodes of a given node, in acorn's property
+/// iteration order (zimmerframe's `for key in node` — JS property insertion
+/// order).
 ///
-/// zimmerframe's walk iterates `for (const key in node)`, which uses JS property
-/// insertion order. acorn-typescript inserts properties in a specific order that
-/// can differ from our serde serialization order.
-///
-/// Returns None for node types where our default Map insertion order matches.
-fn acorn_child_key_order(node_type: &str) -> Option<&'static [&'static str]> {
-    match node_type {
-        // acorn-typescript inserts returnType BEFORE params for arrow functions
-        // (the TS plugin adds returnType to the node before acorn's base parser adds params)
-        "ArrowFunctionExpression" => Some(&["returnType", "id", "params", "body"]),
-        // acorn inserts consequent before test in SwitchCase nodes
-        // (affects comment attachment: comments between test and colon become
-        // leadingComments on the first consequent, not trailingComments on test)
-        "SwitchCase" => Some(&["consequent", "test"]),
-        // acorn inserts body before label in LabeledStatement nodes
-        // (affects comment attachment: comments between label and colon become
-        // leadingComments on the body, not trailingComments on the label)
-        "LabeledStatement" => Some(&["body", "label"]),
-        // acorn inserts key before decorators in class members
-        // (affects comment attachment: comments between decorators and the member key
-        // become leadingComments on the key, not trailingComments on decorators)
-        // typeAnnotation is inserted by acorn-typescript before value, so comments
-        // between type annotation and `=` attach as typeAnnotation.trailingComments
-        "PropertyDefinition" => Some(&["key", "typeAnnotation", "value", "decorators"]),
-        // acorn-typescript sets a method's typeParameters between key and value, so a
-        // comment trailing the method type-param `<` walks onto the first type parameter
-        // (not the `value` FunctionExpression, whose span starts after the comment).
-        "MethodDefinition" => Some(&["key", "typeParameters", "value", "decorators"]),
-        // acorn-typescript `parseNew` sets callee, then typeArguments, then arguments,
-        // so a comment trailing the type-arg `<` walks onto the first type argument
-        // (not the call argument). CallExpression needs no entry: `parseSubscript`
-        // keeps arguments before typeArguments, which matches our default Map order.
-        "NewExpression" => Some(&["callee", "typeArguments", "arguments"]),
-        _ => None,
-    }
-}
+/// The recorded child order — the wire field order — already *is* acorn's
+/// insertion order for every construct the writer emits (the writer's field
+/// order reproduces each parser path's assignment order: SwitchCase
+/// `consequent` before `test`, LabeledStatement `body` before `label`,
+/// MethodDefinition/PropertyDefinition `key` → `typeParameters`/
+/// `typeAnnotation` → `value` → `decorators`, NewExpression `callee` →
+/// `typeArguments` → `arguments`, CallExpression `arguments` before
+/// `typeArguments`), with ONE exception: the generic-async arrow
+/// (`async <T>(…) => …`), whose wire order puts `typeParameters` first and
+/// `returnType` after `params` — but acorn's arrow paths insert `returnType`
+/// before `params`, and `tsTryParseGenericAsyncArrowFunction`'s
+/// `typeParameters` walk last (the plain-arrow `<T>(…)` graft already emits
+/// last, needing no reorder). So the walk visits
+/// `[returnType?, params…, body, typeParameters]` for that shape.
+fn recurse_children(tree: &SkeletonTree, node: u32, ctx: &mut CommentAttachmentContext<'_, '_>) {
+    // Extract parent info BEFORE walking children (the Value walk computed it
+    // before mutating the node).
+    let parent_info = extract_parent_info(tree, node);
 
-/// Recurse into all child AST nodes of a given node
-///
-/// Visits children matching acorn's property iteration order (zimmerframe behavior).
-/// For each property value that is an AST node or array of AST nodes, calls walk_node.
-fn recurse_children(node: &mut serde_json::Value, ctx: &mut CommentAttachmentContext<'_>) {
-    let Some(obj) = node.as_object() else {
-        return;
-    };
+    let generic_async_arrow = tree.node_type(node) == "ArrowFunctionExpression"
+        && tree
+            .children(node)
+            .next()
+            .is_some_and(|first| tree.node_type(first) == "TSTypeParameterDeclaration");
 
-    let n_type = obj.get("type").and_then(|v| v.as_str()).unwrap_or("");
-
-    // Collect keys that have child AST nodes
-    // Skip: "comments", "leadingComments"/"trailingComments" (comment-related)
-    let is_child_key = |k: &str, obj: &serde_json::Map<String, serde_json::Value>| -> bool {
-        if matches!(k, "comments" | "leadingComments" | "trailingComments") {
-            return false;
+    if generic_async_arrow {
+        // Wire order [typeParameters, params…, returnType?, body] → visit
+        // order [returnType?, params…, body, typeParameters]. The returnType
+        // is the arrow's unique direct TSTypeAnnotation child (a param's own
+        // annotation nests inside the param).
+        let children: Vec<u32> = tree.children(node).collect();
+        let return_type = children[1..]
+            .iter()
+            .copied()
+            .find(|&c| tree.node_type(c) == "TSTypeAnnotation");
+        if let Some(rt) = return_type {
+            walk_node(tree, rt, Some(&parent_info), ctx);
         }
-        if let Some(val) = obj.get(k) {
-            match val {
-                serde_json::Value::Object(_) => is_ast_node(val),
-                serde_json::Value::Array(arr) => arr.iter().any(is_ast_node),
-                _ => false,
-            }
-        } else {
-            false
-        }
-    };
-
-    // Build ordered key list matching acorn's property iteration order
-    let child_keys: Vec<String> = if let Some(order) = acorn_child_key_order(n_type) {
-        // Use acorn's known order, then append any remaining keys in Map order
-        let mut keys: Vec<String> = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-
-        // First: keys from the acorn order (if they exist and have child AST nodes)
-        for &key in order {
-            if is_child_key(key, obj) {
-                keys.push(key.to_string());
-                seen.insert(key.to_string());
+        for &child in &children[1..] {
+            if Some(child) != return_type {
+                walk_node(tree, child, Some(&parent_info), ctx);
             }
         }
-
-        // Then: remaining keys in Map insertion order
-        for key in obj.keys() {
-            if !seen.contains(key.as_str()) && is_child_key(key, obj) {
-                keys.push(key.clone());
-            }
-        }
-
-        keys
+        walk_node(tree, children[0], Some(&parent_info), ctx);
     } else {
-        // Default: Map insertion order (matches acorn for most node types)
-        obj.keys()
-            .filter(|k| is_child_key(k, obj))
-            .cloned()
-            .collect()
-    };
-
-    // Extract parent info BEFORE mutating the node (avoids full clone)
-    let parent_info = extract_parent_info(node);
-
-    let Some(obj) = node.as_object_mut() else {
-        return;
-    };
-
-    for key in child_keys {
-        let Some(value) = obj.get_mut(&key) else {
-            continue;
-        };
-
-        match value {
-            serde_json::Value::Array(arr) => {
-                for item in arr.iter_mut() {
-                    if is_ast_node(item) {
-                        walk_node(item, Some(&parent_info), ctx);
-                    }
-                }
-            }
-            serde_json::Value::Object(_) => {
-                if is_ast_node(value) {
-                    walk_node(value, Some(&parent_info), ctx);
-                }
-            }
-            _ => {}
+        for child in tree.children(node) {
+            walk_node(tree, child, Some(&parent_info), ctx);
         }
     }
 }
@@ -394,7 +365,7 @@ fn recurse_children(node: &mut serde_json::Value, ctx: &mut CommentAttachmentCon
 /// See: svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js:115-124
 ///
 /// `pub(super)` so the wire-JSON writer emits the `value` field directly (no
-/// intermediate `comment_to_json` `Value`).
+/// intermediate allocation).
 ///
 /// Returns `Cow` so the common single-line / non-dedented case borrows its
 /// content slice verbatim — only the multi-line block dedent path (rare)
@@ -412,19 +383,6 @@ pub(super) fn get_comment_value<'s>(comment: &Comment, source: &'s str) -> Cow<'
     }
 }
 
-/// Convert Comment to JSON format (without loc - simplified for attachment)
-pub(super) fn comment_to_json(comment: &Comment, source: &str) -> serde_json::Value {
-    let comment_type = if comment.is_block { "Block" } else { "Line" };
-    let value = get_comment_value(comment, source);
-
-    serde_json::json!({
-        "type": comment_type,
-        "value": value.as_ref(),
-        "start": comment.span.start,
-        "end": comment.span.end,
-    })
-}
-
 /// Whether a comment lies outside every `<script>` content span — i.e., it's a
 /// template expression comment that the attachment passes may move into the
 /// JSON tree.
@@ -434,7 +392,22 @@ pub(super) fn is_template_comment(comment: &Comment, script_spans: &[(u32, u32)]
         .any(|&(s, e)| comment.span.start >= s && comment.span.end <= e)
 }
 
-/// Try to attach comments to a template expression JSON node
+/// The template comments inside an attach window `[start, end]`, as the
+/// position-ordered queue the DFS consumes.
+fn window_queue<'a>(
+    template_comments: &[&'a Comment],
+    start: u32,
+    end: u32,
+) -> VecDeque<&'a Comment> {
+    template_comments
+        .iter()
+        .copied()
+        .filter(|c| c.span.start >= start && c.span.end <= end)
+        .collect()
+}
+
+/// Try to attach comments to a template expression skeleton, folding the
+/// assignments into `out`.
 ///
 /// Filters template comments to those that would be collected during acorn's
 /// `parse_expression_at`. This includes:
@@ -445,15 +418,15 @@ pub(super) fn is_template_comment(comment: &Comment, script_spans: &[(u32, u32)]
 /// The `container_start` is the Svelte node's start (e.g., ExpressionTag start).
 /// The `container_end` bounds the maximum extent for trailing comment scanning.
 pub(super) fn try_attach_comments_to_node(
-    node_json: &mut serde_json::Value,
+    tree: &SkeletonTree,
+    root: u32,
     template_comments: &[&Comment],
     source: &str,
     container_start: u32,
     container_end: u32,
+    out: &mut WriterComments,
 ) {
-    let Some(expr_end) = node_end(node_json) else {
-        return;
-    };
+    let expr_end = tree.end(root);
 
     // Compute the effective end of the expression's parsing window.
     // Acorn scans ahead after the expression looking for the next token,
@@ -463,30 +436,23 @@ pub(super) fn try_attach_comments_to_node(
     let effective_end = scan_past_trailing_comments(source, expr_end, container_end);
 
     // Filter comments within [container_start, effective_end)
-    let comment_queue: VecDeque<serde_json::Value> = template_comments
-        .iter()
-        .filter(|c| c.span.start >= container_start && c.span.end <= effective_end)
-        .map(|c| comment_to_json(c, source))
-        .collect();
-
+    let comment_queue = window_queue(template_comments, container_start, effective_end);
     if comment_queue.is_empty() {
         return;
     }
 
-    let mut ctx = CommentAttachmentContext {
-        comments: comment_queue,
-        source,
-    };
-
-    attach_comments_recursively(node_json, &mut ctx);
+    let mut ctx = CommentAttachmentContext::new(comment_queue, source);
+    attach_comments_recursively(tree, root, &mut ctx);
+    ctx.into_writer_comments(tree, None, out);
 }
 
 /// Attach comments across an expression list that canonical Svelte parses in
 /// ONE acorn parse — snippet parameters (a function-parameter context) and
 /// multi-identifier `{@debug}` (a `SequenceExpression`): one shared comment
-/// queue walked sequentially through each item, so an inter-item comment lands
-/// exactly where acorn's single-parse walk puts it — a same-line `[,) \t]*`
-/// gap trails the *preceding* item; anything else leads the *following* item.
+/// queue walked sequentially through each item (the tree's roots), so an
+/// inter-item comment lands exactly where acorn's single-parse walk puts it —
+/// a same-line `[,) \t]*` gap trails the *preceding* item; anything else leads
+/// the *following* item.
 ///
 /// `wrapper_end` is the discarded parse wrapper's `end` for acorn's
 /// `node.end == parent.end` trailing suppression: the last identifier's end
@@ -499,48 +465,27 @@ pub(super) fn try_attach_comments_to_node(
 /// `try_attach_comments_to_node` path with its root-fallback trailing, not
 /// this one.)
 pub(super) fn attach_expression_list(
-    items: &mut [serde_json::Value],
+    tree: &SkeletonTree,
     template_comments: &[&Comment],
     source: &str,
     c_start: u32,
     range_end: u32,
     wrapper_end: Option<u32>,
+    out: &mut WriterComments,
 ) {
-    let comment_queue: VecDeque<serde_json::Value> = template_comments
-        .iter()
-        .filter(|c| c.span.start >= c_start && c.span.end <= range_end)
-        .map(|c| comment_to_json(c, source))
-        .collect();
+    let comment_queue = window_queue(template_comments, c_start, range_end);
     if comment_queue.is_empty() {
         return;
     }
-    let mut ctx = CommentAttachmentContext {
-        comments: comment_queue,
-        source,
-    };
+    let mut ctx = CommentAttachmentContext::new(comment_queue, source);
     let parent = wrapper_end.map(|end| ParentInfo {
         end,
         last_body_start: None,
     });
-    for item in items.iter_mut() {
-        walk_node(item, parent.as_ref(), &mut ctx);
+    for &root in tree.roots() {
+        walk_node(tree, root, parent.as_ref(), &mut ctx);
     }
-}
-
-/// Attach comments to a `{const id = init}` / `{let …}` declaration `Value`.
-///
-/// These are acorn-parsed, so comments attach across the **whole
-/// VariableDeclaration tree** (every declarator and its id/init) per acorn's
-/// recursive attachment — attaching only to the first init left a comment
-/// leading a later declarator (`{let a = 1, /* c */ b}`) unattached.
-pub(super) fn attach_declaration_tag_declaration(
-    decl: &mut serde_json::Value,
-    template_comments: &[&Comment],
-    source: &str,
-    c_start: u32,
-    c_end: u32,
-) {
-    try_attach_comments_to_node(decl, template_comments, source, c_start, c_end);
+    ctx.into_writer_comments(tree, None, out);
 }
 
 /// Scan source after an expression's end to find the effective end of comment collection

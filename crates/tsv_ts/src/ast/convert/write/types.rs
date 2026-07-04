@@ -24,6 +24,7 @@ pub(super) fn write_type_annotation(
     if type_annotation.span == ctx.pattern_ann_span {
         // `{type, start, end, typeAnnotation}` — no `loc` (the block-pattern quirk).
         let span = type_annotation.span;
+        super::record_open("TSTypeAnnotation", span, ctx);
         w.raw("{\"type\":\"TSTypeAnnotation\",\"start\":");
         w.u32(ctx.loc.pos(span.start));
         w.raw(",\"end\":");
@@ -466,7 +467,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
 /// `typeAnnotation?` (the return type's wire name).
 fn write_signature_declaration(
     w: &mut JsonWriter,
-    node_type: &str,
+    node_type: &'static str,
     span: tsv_lang::Span,
     type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
     params: &[internal::Expression<'_>],

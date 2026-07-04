@@ -1,21 +1,22 @@
 //! Per-node comment injection for the writer's Svelte comment-attach paths.
 //!
-//! `tsv_svelte`'s comment attachment (`comment_attachment`) inserts acorn's
-//! leading/trailing comments into a byte-space skeleton `Value`. The writer
-//! consults a precomputed `WriterComments` map (built from that skeleton) at
-//! each node's close and emits the assigned comments *fused* (final char space)
-//! — so a comment-bearing `<script>` `Program` or template expression
-//! serializes directly, with no whole-tree `serde_json::Value` output.
+//! `tsv_svelte`'s comment attachment (`comment_attachment`) runs acorn's
+//! leading/trailing attach DFS over a byte-space skeleton tree the writer
+//! records while emitting (`SkeletonRecorder`). The writer consults the
+//! resulting `WriterComments` map at each node's close and emits the assigned
+//! comments *fused* (final char space) — so a comment-bearing `<script>`
+//! `Program` or template expression serializes directly, with no intermediate
+//! `serde_json::Value` anywhere on the path.
 //!
 //! **Why this works regardless of child-visit order.** acorn's attach inserts
 //! `leadingComments`/`trailingComments` as *appended* object keys (after a
-//! node's own declaration-order fields, via `preserve_order`), so they always
-//! serialize last within a node. The DFS's child-visit order (which diverges
-//! from field-emission order for a handful of TS node types) only decides
-//! *which* node a comment lands on — not where within that node it emits. So a
-//! per-node-span map, consulted at each close, reproduces the byte layout
-//! exactly. The map is keyed by the node's byte `(start, end)` plus its type,
-//! the type disambiguating the one same-span wrapper (`ChainExpression` vs the
+//! node's own declaration-order fields), so they always serialize last within
+//! a node. The DFS's child-visit order (which diverges from field-emission
+//! order for a handful of TS node types) only decides *which* node a comment
+//! lands on — not where within that node it emits. So a per-node-span map,
+//! consulted at each close, reproduces the byte layout exactly. The map is
+//! keyed by the node's byte `(start, end)` plus its type, the type
+//! disambiguating the one same-span wrapper (`ChainExpression` vs the
 //! call/member it wraps — acorn assigns the comments to the wrapper).
 
 use std::cell::Cell;
@@ -25,34 +26,36 @@ use tsv_lang::{JsonWriter, LocationMapper};
 /// A single comment to emit inline as a `leadingComments`/`trailingComments`
 /// element: `{type, value}` for the synthetic preceding-HTML `Line` comment,
 /// `{type, value, start, end}` for an ordinary attached comment (byte positions,
-/// translated to final char space at emit).
-struct WireComment {
+/// translated to final char space at emit). The attach walk in `tsv_svelte`
+/// constructs these for `WriterComments::insert_node`.
+pub struct AttachedComment {
     /// `true` → `"Block"`, `false` → `"Line"`.
-    is_block: bool,
+    pub is_block: bool,
     /// The comment text (delimiters stripped, block indentation normalized —
     /// `get_comment_value`).
-    value: String,
+    pub value: String,
     /// Byte `(start, end)`, or `None` for the preceding-HTML `Line` comment
     /// (which Svelte emits without positions).
-    span: Option<(u32, u32)>,
+    pub span: Option<(u32, u32)>,
 }
 
 /// The comments attached to one node.
 struct NodeComments {
-    node_type: Box<str>,
+    node_type: &'static str,
     /// Claimed by the first type-matching close, so two distinct nodes sharing a
     /// byte span and type (a shorthand destructuring default's `key` and
     /// `value.left`; a `ChainExpression` wrapper vs its inner call/member) each
     /// take at most one entry — the one the DFS actually attached to, which
-    /// always closes first among such siblings.
+    /// always closes first among such siblings (the attach walk inserts nodes
+    /// in visit order, which matches close order for same-span siblings).
     consumed: Cell<bool>,
-    leading: Vec<WireComment>,
-    trailing: Vec<WireComment>,
+    leading: Vec<AttachedComment>,
+    trailing: Vec<AttachedComment>,
     /// Emit `trailingComments` before `leadingComments`. Normally leading comes
-    /// first (attach inserts it pre-recursion, trailing post), but the `Program`
+    /// first (attach assigns it pre-recursion, trailing post), but the `Program`
     /// with a preceding HTML comment gets its `trailingComments` from the DFS
-    /// first, then `leadingComments` appended by the HTML-comment prepend — so
-    /// the appended key serializes last.
+    /// first, then `leadingComments` prepended by the HTML-comment step — the
+    /// later-touched kind serializes last, matching acorn's appended-key order.
     trailing_first: bool,
 }
 
@@ -66,70 +69,17 @@ pub struct WriterComments {
 }
 
 impl WriterComments {
-    /// Build the map from an attach-mutated skeleton `Value` — the (byte-space)
-    /// JSON the writer emits, run through the acorn comment-attach DFS. For every
-    /// node carrying `leadingComments`/`trailingComments`, records its byte span +
-    /// type. The comment positions stay in byte space (translated to final char
-    /// space at emit).
-    #[must_use]
-    pub fn from_attached_skeleton(value: &serde_json::Value) -> Self {
-        let mut wc = Self::default();
-        wc.collect(value);
-        wc
-    }
-
-    fn collect(&mut self, value: &serde_json::Value) {
-        match value {
-            serde_json::Value::Object(map) => {
-                if let (Some(node_type), Some(start), Some(end)) = (
-                    map.get("type").and_then(serde_json::Value::as_str),
-                    map.get("start").and_then(serde_json::Value::as_u64),
-                    map.get("end").and_then(serde_json::Value::as_u64),
-                ) {
-                    let leading = map.get("leadingComments").map(wire_comments_from_value);
-                    let trailing = map.get("trailingComments").map(wire_comments_from_value);
-                    if leading.is_some() || trailing.is_some() {
-                        // Preserve the skeleton's key order (`preserve_order`):
-                        // trailing serializes first only when its key precedes
-                        // `leadingComments` in the object.
-                        let trailing_first = map
-                            .keys()
-                            .find(|k| *k == "leadingComments" || *k == "trailingComments")
-                            .is_some_and(|k| k == "trailingComments");
-                        #[allow(clippy::cast_possible_truncation)]
-                        self.insert(
-                            node_type,
-                            start as u32,
-                            end as u32,
-                            leading.unwrap_or_default(),
-                            trailing.unwrap_or_default(),
-                            trailing_first,
-                        );
-                    }
-                }
-                for (key, child) in map {
-                    if key != "leadingComments" && key != "trailingComments" {
-                        self.collect(child);
-                    }
-                }
-            }
-            serde_json::Value::Array(arr) => {
-                for child in arr {
-                    self.collect(child);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// Record a node's leading/trailing comments.
-    fn insert(
+    /// Record one node's attached comments (the attach walk's output). Nodes
+    /// must be inserted in visit order — for two nodes sharing a span *and*
+    /// type, the consume-once lookup at emit relies on insertion order
+    /// matching close order. No-op when both lists are empty.
+    pub fn insert_node(
         &mut self,
-        node_type: &str,
+        node_type: &'static str,
         start: u32,
         end: u32,
-        leading: Vec<WireComment>,
-        trailing: Vec<WireComment>,
+        leading: Vec<AttachedComment>,
+        trailing: Vec<AttachedComment>,
         trailing_first: bool,
     ) {
         if leading.is_empty() && trailing.is_empty() {
@@ -139,7 +89,7 @@ impl WriterComments {
             .entry((start, end))
             .or_default()
             .push(NodeComments {
-                node_type: node_type.into(),
+                node_type,
                 consumed: Cell::new(false),
                 leading,
                 trailing,
@@ -162,7 +112,7 @@ impl WriterComments {
         };
         let Some(node) = entries
             .iter()
-            .find(|e| !e.consumed.get() && &*e.node_type == node_type)
+            .find(|e| !e.consumed.get() && e.node_type == node_type)
         else {
             return;
         };
@@ -205,40 +155,12 @@ impl WriterComments {
     }
 }
 
-/// Convert a `leadingComments`/`trailingComments` JSON array to `WireComment`s.
-fn wire_comments_from_value(value: &serde_json::Value) -> Vec<WireComment> {
-    let Some(arr) = value.as_array() else {
-        return Vec::new();
-    };
-    arr.iter().filter_map(wire_comment_from_value).collect()
-}
-
-/// Convert one comment JSON object (`{type, value[, start, end]}`) to a
-/// `WireComment`. The preceding-HTML `Line` comment carries no positions.
-#[allow(clippy::cast_possible_truncation)]
-fn wire_comment_from_value(value: &serde_json::Value) -> Option<WireComment> {
-    let obj = value.as_object()?;
-    let is_block = obj.get("type").and_then(serde_json::Value::as_str) == Some("Block");
-    let value = obj
-        .get("value")
-        .and_then(serde_json::Value::as_str)?
-        .to_string();
-    let span = match (
-        obj.get("start").and_then(serde_json::Value::as_u64),
-        obj.get("end").and_then(serde_json::Value::as_u64),
-    ) {
-        (Some(start), Some(end)) => Some((start as u32, end as u32)),
-        _ => None,
-    };
-    Some(WireComment {
-        is_block,
-        value,
-        span,
-    })
-}
-
 /// Emit a `[{…},{…}]` array of wire comments.
-fn write_wire_comment_array(w: &mut JsonWriter, comments: &[WireComment], loc: LocationMapper<'_>) {
+fn write_wire_comment_array(
+    w: &mut JsonWriter,
+    comments: &[AttachedComment],
+    loc: LocationMapper<'_>,
+) {
     w.raw("[");
     for (i, comment) in comments.iter().enumerate() {
         if i > 0 {
@@ -250,7 +172,7 @@ fn write_wire_comment_array(w: &mut JsonWriter, comments: &[WireComment], loc: L
 }
 
 /// Emit one wire comment: `{type, value[, start, end]}`.
-fn write_wire_comment(w: &mut JsonWriter, comment: &WireComment, loc: LocationMapper<'_>) {
+fn write_wire_comment(w: &mut JsonWriter, comment: &AttachedComment, loc: LocationMapper<'_>) {
     w.raw("{\"type\":\"");
     w.raw(if comment.is_block { "Block" } else { "Line" });
     w.raw("\",\"value\":");

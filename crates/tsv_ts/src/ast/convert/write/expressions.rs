@@ -121,6 +121,13 @@ pub(super) fn write_expression_inner(
             node_header(w, "ArrayExpression", arr.span, ctx);
             w.raw(",\"elements\":");
             write_expression_holes(w, arr.elements, ctx);
+            // A trailing hole (`[a,,]`) means acorn's last-in-body trailing
+            // window never fires for the elements — flag it for the skeleton.
+            if let super::CommentMode::Record(rec) = ctx.comments
+                && matches!(arr.elements.last(), Some(None))
+            {
+                rec.flag_last_elem_hole();
+            }
             close_node(w, "ArrayExpression", arr.span, ctx);
         }
         internal::Expression::UnaryExpression(unary) => {

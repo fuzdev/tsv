@@ -28,7 +28,7 @@
 //!   a template comment lands inside the expression's window (the
 //!   `any_comment_in` pre-check), the comment
 //!   assignments are precomputed into a per-node `WriterComments` map and the
-//!   expression fuses via `write_expression_embedded_with_comments`, emitting each
+//!   expression fuses with `CommentMode::Emit`, emitting each
 //!   node's `leadingComments`/`trailingComments` at its close.
 //! - **Snippet names / parameters** fuse the same way (with `character`
 //!   injection / the shared one-queue list attach, matching canonical's single
@@ -47,11 +47,12 @@
 //!
 //! **The comment map** (`ast/convert/special.rs`'s `build_*_writer_comments`,
 //! `tsv_ts`'s `WriterComments`): the comment-attach paths never build a
-//! whole-document `serde_json::Value`. Each island emits its own byte-space
-//! skeleton, runs the shared acorn attach DFS over it, and reads the assignments
-//! into a span-keyed map the fused writer consults at each node's close — so
-//! attached comments serialize *last* within a node exactly as `preserve_order`
-//! places acorn's appended keys, regardless of child-visit order.
+//! `serde_json::Value` at all. Each island records its wire tree during its own
+//! byte-space skeleton emit (`SkeletonRecorder`), runs the shared acorn attach
+//! DFS over the recorded tree, and folds the assignments into a span-keyed map
+//! the fused writer consults at each node's close — so attached comments
+//! serialize *last* within a node exactly as acorn's appended keys place them,
+//! regardless of child-visit order.
 //!
 //! **Byte-identity**: the wire JSON is a faithful emission of the Svelte
 //! parser's JSON (its acorn `<script>` shape plus `parseCss` `<style>` shape) —
@@ -65,11 +66,9 @@ use tsv_lang::{
     estimated_json_capacity, write_array, write_or_null,
 };
 use tsv_ts::ast::convert::{
-    Schema, translate_column, write_expression_embedded, write_expression_embedded_with_comments,
-    write_identifier_expression_with_character,
-    write_identifier_expression_with_character_and_comments, write_pattern_embedded,
-    write_pattern_embedded_with_comments, write_program_embedded,
-    write_variable_declaration_embedded, write_variable_declaration_embedded_with_comments,
+    CommentMode, Schema, translate_column, write_expression_embedded,
+    write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
+    write_variable_declaration_embedded,
 };
 
 use super::comment_attachment::{get_comment_value, is_template_comment};
@@ -328,10 +327,17 @@ fn write_generic_island(
             container_start,
             range_end,
         );
-        write_expression_embedded_with_comments(w, expr, ctx.source, ctx.loc, ctx.interner, &wc);
+        write_expression_embedded(
+            w,
+            expr,
+            ctx.source,
+            ctx.loc,
+            ctx.interner,
+            CommentMode::Emit(&wc),
+        );
         wc.debug_assert_consumed();
     } else {
-        write_expression_embedded(w, expr, ctx.source, ctx.loc, ctx.interner);
+        write_expression_embedded(w, expr, ctx.source, ctx.loc, ctx.interner, CommentMode::Off);
     }
 }
 
@@ -486,6 +492,7 @@ fn write_shorthand_expression_tag(
         ctx.source,
         ctx.loc,
         ctx.interner,
+        CommentMode::Off,
     );
     w.raw("}");
 }
@@ -705,17 +712,24 @@ fn write_snippet_name(
             container_start,
             range_end,
         );
-        write_identifier_expression_with_character_and_comments(
+        write_identifier_expression_with_character(
             w,
             expr,
             ctx.source,
             ctx.loc,
             ctx.interner,
-            &wc,
+            CommentMode::Emit(&wc),
         );
         wc.debug_assert_consumed();
     } else {
-        write_identifier_expression_with_character(w, expr, ctx.source, ctx.loc, ctx.interner);
+        write_identifier_expression_with_character(
+            w,
+            expr,
+            ctx.source,
+            ctx.loc,
+            ctx.interner,
+            CommentMode::Off,
+        );
     }
 }
 
@@ -744,12 +758,19 @@ fn write_snippet_parameters(
             None,
         );
         write_array(w, parameters, |w, p| {
-            write_expression_embedded_with_comments(w, p, ctx.source, ctx.loc, ctx.interner, &wc);
+            write_expression_embedded(
+                w,
+                p,
+                ctx.source,
+                ctx.loc,
+                ctx.interner,
+                CommentMode::Emit(&wc),
+            );
         });
         wc.debug_assert_consumed();
     } else {
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(w, p, ctx.source, ctx.loc, ctx.interner);
+            write_expression_embedded(w, p, ctx.source, ctx.loc, ctx.interner, CommentMode::Off);
         });
     }
 }
@@ -805,7 +826,14 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
             tag.identifiers.last().map(|id| id.span().end),
         );
         write_array(w, tag.identifiers, |w, id| {
-            write_expression_embedded_with_comments(w, id, ctx.source, ctx.loc, ctx.interner, &wc);
+            write_expression_embedded(
+                w,
+                id,
+                ctx.source,
+                ctx.loc,
+                ctx.interner,
+                CommentMode::Emit(&wc),
+            );
         });
         wc.debug_assert_consumed();
     } else {
@@ -836,7 +864,7 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
     // hard-codes `parser.index - 1` (the byte before the closing `}`).
     let decl_end = ctx.pos(tag.span.end - 1);
     if ctx.comments.is_empty() {
-        write_const_declaration(w, tag, decl_end, None, ctx);
+        write_const_declaration(w, tag, decl_end, CommentMode::Off, ctx);
     } else {
         // The document has template comments: precompute the init-subtree
         // attach map (comments attach to the init only).
@@ -847,45 +875,28 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
             ctx.loc.tracker,
             ctx.interner,
         );
-        write_const_declaration(w, tag, decl_end, Some(&wc), ctx);
+        write_const_declaration(w, tag, decl_end, CommentMode::Emit(&wc), ctx);
         wc.debug_assert_consumed();
     }
     w.raw("}");
 }
 
 /// Emit a `{@const}`'s hand-built `VariableDeclaration`. `decl_end` is the
-/// already-mapped declaration `end` (`tag.span.end - 1`); `comments`, when
-/// present, feeds the init's fused per-node attach.
+/// already-mapped declaration `end` (`tag.span.end - 1`); an `Emit` mode
+/// feeds the id/init subtrees' fused per-node attach.
 fn write_const_declaration(
     w: &mut JsonWriter,
     tag: &internal::ConstTag<'_>,
     decl_end: u32,
-    comments: Option<&tsv_ts::ast::convert::WriterComments>,
+    mode: CommentMode<'_>,
     ctx: &Ctx<'_>,
 ) {
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    match comments {
-        Some(wc) => {
-            write_pattern_embedded_with_comments(w, &tag.id, ctx.source, ctx.loc, ctx.interner, wc);
-        }
-        None => write_pattern_embedded(w, &tag.id, ctx.source, ctx.loc, ctx.interner),
-    }
+    write_pattern_embedded(w, &tag.id, ctx.source, ctx.loc, ctx.interner, mode);
     w.raw(",\"init\":");
-    match comments {
-        Some(wc) => {
-            write_expression_embedded_with_comments(
-                w,
-                &tag.init,
-                ctx.source,
-                ctx.loc,
-                ctx.interner,
-                wc,
-            );
-        }
-        None => write_expression_embedded(w, &tag.init, ctx.source, ctx.loc, ctx.interner),
-    }
+    write_expression_embedded(w, &tag.init, ctx.source, ctx.loc, ctx.interner, mode);
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
@@ -912,7 +923,14 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"declaration\":");
     if ctx.comments.is_empty() {
-        write_variable_declaration_embedded(w, &tag.declaration, ctx.source, ctx.loc, ctx.interner);
+        write_variable_declaration_embedded(
+            w,
+            &tag.declaration,
+            ctx.source,
+            ctx.loc,
+            ctx.interner,
+            CommentMode::Off,
+        );
     } else {
         let wc = build_declaration_tag_writer_comments(
             &tag.declaration,
@@ -923,13 +941,13 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             tag.span.start,
             tag.span.end,
         );
-        write_variable_declaration_embedded_with_comments(
+        write_variable_declaration_embedded(
             w,
             &tag.declaration,
             ctx.source,
             ctx.loc,
             ctx.interner,
-            &wc,
+            CommentMode::Emit(&wc),
         );
         wc.debug_assert_consumed();
     }
@@ -1324,7 +1342,11 @@ fn write_script(
             schema,
         ))
     };
-    write_script_program_fused(w, script, ctx, schema, writer_comments.as_ref());
+    let mode = match &writer_comments {
+        Some(wc) => CommentMode::Emit(wc),
+        None => CommentMode::Off,
+    };
+    write_script_program_fused(w, script, ctx, schema, mode);
     if let Some(wc) = &writer_comments {
         wc.debug_assert_consumed();
     }
@@ -1349,7 +1371,7 @@ fn write_script_program_fused(
     script: &internal::Script<'_>,
     ctx: &Ctx<'_>,
     schema: Schema,
-    comments: Option<&tsv_ts::ast::convert::WriterComments>,
+    comments: CommentMode<'_>,
 ) {
     let program = &script.content;
     let start_line = ctx
@@ -1542,7 +1564,7 @@ fn write_pattern_island(
     expr: &tsv_ts::ast::internal::Expression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_pattern_embedded(w, expr, ctx.source, ctx.loc, ctx.interner);
+    write_pattern_embedded(w, expr, ctx.source, ctx.loc, ctx.interner, CommentMode::Off);
 }
 
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s
