@@ -206,6 +206,7 @@ fn render_line_break(
 }
 
 /// Flush pending line suffix content.
+#[allow(clippy::too_many_arguments)]
 fn flush_line_suffix<R: TextResolver + ?Sized>(
     arena: &DocArena,
     line_suffix: &mut LineSuffixBuf,
@@ -214,6 +215,7 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
     render: &RenderConfig,
     embed: &EmbedContext,
     resolver: Option<&R>,
+    should_remeasure: &mut bool,
 ) {
     if line_suffix.is_empty() {
         return;
@@ -230,6 +232,7 @@ fn flush_line_suffix<R: TextResolver + ?Sized>(
             embed,
             resolver,
             None,
+            should_remeasure,
         );
     }
 }
@@ -590,6 +593,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         swallow: SwallowTracker::new(),
     };
     let mut line_suffix: LineSuffixBuf = SmallVec::new();
+    let mut should_remeasure = false;
 
     render_doc_core(
         arena,
@@ -603,6 +607,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         resolver,
         &mut policy,
         &mut line_suffix,
+        &mut should_remeasure,
     );
 
     flush_line_suffix(
@@ -613,6 +618,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         render,
         embed,
         resolver,
+        &mut should_remeasure,
     );
 }
 
@@ -645,6 +651,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
     resolver: Option<&R>,
     policy: &mut P,
     line_suffix: &mut LineSuffixBuf,
+    should_remeasure: &mut bool,
 ) {
     let mut commands: CmdStack = SmallVec::new();
     let mut cmd = ArenaCommand {
@@ -690,8 +697,22 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                 }
                 for line in lines {
                     // Hardline (breaks in either mode): flush suffix, then break.
+                    // Forced out in flat mode, it invalidates the enclosing fits
+                    // approval — arm the remeasure flag (see the `Line` arm).
+                    if cmd.mode == Mode::Flat {
+                        *should_remeasure = true;
+                    }
                     if policy.tracking_suffix() {
-                        flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
+                        flush_line_suffix(
+                            arena,
+                            line_suffix,
+                            output,
+                            pos,
+                            render,
+                            embed,
+                            resolver,
+                            should_remeasure,
+                        );
                     }
                     render_line_break(
                         LineKind::Hard,
@@ -716,11 +737,26 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
 
             DocNode::Line(kind) => {
                 let kind = *kind;
-                if policy.tracking_suffix() {
-                    let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
-                    if cmd.mode == Mode::Break || is_hard {
-                        flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
-                    }
+                let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
+                // A hard line forced out in flat mode: the enclosing fits
+                // approval measured only up to here (a hard line ends a fits
+                // walk early), so positions beyond it are unmeasured — the next
+                // group must remeasure no matter what (Prettier's
+                // `shouldRemeasure`, printer.js `DOC_TYPE_LINE` flat arm).
+                if is_hard && cmd.mode == Mode::Flat {
+                    *should_remeasure = true;
+                }
+                if policy.tracking_suffix() && (cmd.mode == Mode::Break || is_hard) {
+                    flush_line_suffix(
+                        arena,
+                        line_suffix,
+                        output,
+                        pos,
+                        render,
+                        embed,
+                        resolver,
+                        should_remeasure,
+                    );
                 }
                 // A real newline ends the comment's line → clears the pending swallow.
                 let emitted_newline =
@@ -773,6 +809,11 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                     // Prettier: only use most expanded when group's OWN should_break is true.
                     // Parent mode being Break does NOT skip the fits check — conditional
                     // groups always try flat first, even inside a MODE_BREAK parent.
+                    // (Deliberately outside the flat-mode fits-skip below: Prettier's
+                    // pass-through would render `contents` — the least-expanded state —
+                    // where tsv's measured ladder can pick a later state; conditional
+                    // groups are rare enough that skipping their re-measure isn't worth
+                    // that divergence risk.)
                     if P::CONDITIONAL_GROUP_HONORS_SHOULD_BREAK && should_break {
                         // Prettier: if (doc.break) → use most expanded in break mode
                         let states = expanded_states.resolve(children_vec);
@@ -792,6 +833,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                         );
 
                         if contents_fit {
+                            *should_remeasure = false;
                             (Mode::Flat, contents)
                         } else {
                             // Try each earlier state flat, in order; the final
@@ -811,6 +853,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                                     resolver,
                                 );
                                 if state_fits {
+                                    *should_remeasure = false;
                                     chosen = (Mode::Flat, state);
                                     break;
                                 }
@@ -820,6 +863,19 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                     }
                 } else if should_break || arena.will_break(contents) {
                     (Mode::Break, contents)
+                } else if cmd.mode == Mode::Flat && !*should_remeasure {
+                    // Prettier's printGroup flat pass-through (printer.js
+                    // `mode === MODE_FLAT && !shouldRemeasure`): a group reached in
+                    // flat mode sits inside a subtree some enclosing fits approval
+                    // already measured flat — with look-ahead through the same
+                    // pending commands — so re-measuring here returns true by
+                    // construction and the fits walk is skipped. The approval's
+                    // accounting holds until a hard line is forced out in flat mode
+                    // (a fits walk ends at a hard line, leaving everything beyond
+                    // it unmeasured): that arms `should_remeasure` (the `Line` /
+                    // `MultilineText` arms, plus the fill renderer's unmeasured
+                    // flat entries), and the next measured fits-true clears it.
+                    (Mode::Flat, contents)
                 } else {
                     let fits = arena_fits_with_lookahead(
                         arena,
@@ -830,6 +886,9 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                         embed,
                         resolver,
                     );
+                    if fits {
+                        *should_remeasure = false;
+                    }
                     (if fits { Mode::Flat } else { Mode::Break }, contents)
                 };
 
@@ -926,6 +985,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                     &DocContext::default(),
                     &commands,
                     resolver,
+                    should_remeasure,
                 );
             }
 
@@ -947,6 +1007,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                             &context,
                             policy.with_context_fill_rest(&commands),
                             resolver,
+                            should_remeasure,
                         );
                     } else {
                         cmd = cmd.with_doc(inner_doc);
@@ -972,7 +1033,16 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
 
             DocNode::LineSuffixBoundary => {
                 if policy.tracking_suffix() {
-                    flush_line_suffix(arena, line_suffix, output, pos, render, embed, resolver);
+                    flush_line_suffix(
+                        arena,
+                        line_suffix,
+                        output,
+                        pos,
+                        render,
+                        embed,
+                        resolver,
+                        should_remeasure,
+                    );
                 }
             }
 
@@ -1001,6 +1071,7 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
     render: &RenderConfig,
     embed: &EmbedContext,
     resolver: Option<&R>,
+    should_remeasure: &mut bool,
 ) {
     let mut line_suffix: LineSuffixBuf = SmallVec::new();
     render_single_doc_inner(
@@ -1014,6 +1085,7 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
         embed,
         resolver,
         Some(&mut line_suffix),
+        should_remeasure,
     );
     flush_line_suffix(
         arena,
@@ -1023,6 +1095,7 @@ pub(super) fn render_single_doc<R: TextResolver + ?Sized>(
         render,
         embed,
         resolver,
+        should_remeasure,
     );
 }
 
@@ -1050,6 +1123,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     embed: &EmbedContext,
     resolver: Option<&R>,
     suffix_buffer: Option<&mut LineSuffixBuf>,
+    should_remeasure: &mut bool,
 ) {
     let mut policy = SingleDocPolicy {
         tracking_suffix: suffix_buffer.is_some(),
@@ -1069,6 +1143,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
         resolver,
         &mut policy,
         line_suffix,
+        should_remeasure,
     );
 }
 
