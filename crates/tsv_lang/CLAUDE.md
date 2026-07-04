@@ -40,7 +40,7 @@ The doc builder is the core of the formatting architecture. Language printers bu
 
 All methods take `&self` (interior mutability via `RefCell`):
 
-- Text — `text()`, `text_pooled(&str)` (dynamic text, copied into the pool), `multiline_text(&str)`, `source_span()` / `source_span_ident()` (newline-free, width-deferred — identifier names) / `line_comment_source_span()` (verbatim source slice, no allocation), `empty()`, `symbol()`
+- Text — `text()`, `text_pooled(&str)` (dynamic text, copied into the pool), `multiline_text(&str)`, `pool_writer()` (streaming pooled-text assembly: a `PoolTextWriter` owning an arena-parked scratch buffer — no transient `String`, no pool borrow held open, so interleaved arena calls stay correct; consume-on-finish `finish_text()` / `finish_multiline_text()`; implements `fmt::Write`), `source_span()` / `source_span_ident()` (newline-free, width-deferred — identifier names) / `line_comment_source_span()` (verbatim source slice, no allocation), `empty()`, `symbol()`
 - Lines — `line()`, `softline()`, `hardline()`, `literalline()`
 - Structure — `group()`, `group_break()`, `indent()`, `dedent()`, `align()`
 - Conditionals — `if_break()`, `indent_if_break()`, `conditional_group()`

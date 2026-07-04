@@ -75,13 +75,14 @@ impl<'a> Printer<'a> {
         // the `*/` closer — and emit it as a single `MultilineText` node, which
         // renders each `\n` as a context-indented hardline. Byte- and
         // position-identical to the former `concat([text, hardline, text, …])`,
-        // but one string allocation instead of one per line.
+        // streamed through the arena's pool writer (no transient `String`).
         //
-        // Capacity is an exact upper bound, so the push sequence never reallocs:
-        // `content` already holds every line's text and the interior `\n`s;
-        // framing adds `/*` + `*/` (4) and at most one leading space per line
-        // (`lines.len()`), and the per-line trims only ever remove bytes.
-        let mut body = String::with_capacity(content.len() + lines.len() + 4);
+        // The reserve is an exact upper bound, so the push sequence never
+        // reallocs: `content` already holds every line's text and the interior
+        // `\n`s; framing adds `/*` + `*/` (4) and at most one leading space per
+        // line (`lines.len()`), and the per-line trims only ever remove bytes.
+        let mut body = d.pool_writer();
+        body.reserve(content.len() + lines.len() + 4);
         body.push_str("/*");
         body.push_str(first.trim_end());
         for line in middle {
@@ -95,7 +96,7 @@ impl<'a> Printer<'a> {
         body.push_str(last.trim_start());
         body.push_str("*/");
 
-        d.multiline_text(&body)
+        body.finish_multiline_text()
     }
 
     /// Build a multi-line *non-indentable* block comment (at least one line does
@@ -129,7 +130,10 @@ impl<'a> Printer<'a> {
         // Unlike the indentable path this mixes line kinds, so it stays a
         // per-line `concat` rather than a `MultilineText`.
         let mut docs = DocBuf::with_capacity((middle.len() + 1) * 2 + 2);
-        docs.push(d.text_pooled(&format!("/*{}", first.trim_end())));
+        let mut opener = d.pool_writer();
+        opener.push_str("/*");
+        opener.push_str(first.trim_end());
+        docs.push(opener.finish_text());
         for line in middle {
             // Blank lines stay truly empty (column 0); otherwise apply context
             // indent. Trailing whitespace is trimmed (matches prettier).
