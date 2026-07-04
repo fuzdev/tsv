@@ -246,6 +246,44 @@ mod arena_tests {
     }
 
     #[test]
+    fn test_singleton_nodes_interned_per_document() {
+        let mut a = DocArena::new();
+
+        // Each Line kind shares one node per document; kinds stay distinct.
+        let normal = a.line();
+        assert_eq!(a.line(), normal);
+        let soft = a.softline();
+        let hard = a.hardline();
+        let literal = a.literalline();
+        assert_ne!(normal, soft);
+        assert_ne!(soft, hard);
+        assert_ne!(hard, literal);
+        assert_eq!(a.softline(), soft);
+        assert_eq!(a.hardline(), hard);
+        assert_eq!(a.literalline(), literal);
+        // LineSuffixBoundary and BreakParent intern through their own cells.
+        let lsb = a.line_suffix_boundary();
+        assert_eq!(a.line_suffix_boundary(), lsb);
+        let bp = a.break_parent();
+        assert_eq!(a.break_parent(), bp);
+        assert_eq!(a.borrow_nodes().len(), 6); // 4 line kinds + LSB + BreakParent
+
+        // reset() invalidates every interned singleton (ids restart at 0):
+        // the next document re-allocs rather than returning a prior
+        // document's id, and interning resumes within it.
+        a.reset();
+        let normal_2 = a.line();
+        let lsb_2 = a.line_suffix_boundary();
+        let bp_2 = a.break_parent();
+        assert_eq!(normal_2.index(), 0);
+        assert_eq!(lsb_2.index(), 1);
+        assert_eq!(bp_2.index(), 2);
+        assert_eq!(a.line(), normal_2);
+        assert_eq!(a.line_suffix_boundary(), lsb_2);
+        assert_eq!(a.break_parent(), bp_2);
+    }
+
+    #[test]
     fn test_arena_simple_text() {
         let a = DocArena::new();
         let doc = a.text("hello");

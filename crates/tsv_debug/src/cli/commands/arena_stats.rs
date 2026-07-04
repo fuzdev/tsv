@@ -433,7 +433,7 @@ fn print_report(s: &Stats, parse_errors: usize) {
     );
     density_line("per-file children/byte", &s.children_density);
     eprintln!(
-        "  output:   {:>9} B  ({:.2}×source, {:.2}×nodes)  reserved {} (est_output=nodes*4)  → fill {:.1}%",
+        "  output:   {:>9} B  ({:.2}×source, {:.2}×nodes)  reserved {} (est_output=nodes*5)  → fill {:.1}%",
         s.output_bytes,
         s.output_bytes as f64 / s.bytes.max(1) as f64,
         s.output_bytes as f64 / s.nodes.max(1) as f64,
