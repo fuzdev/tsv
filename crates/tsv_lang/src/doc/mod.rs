@@ -184,7 +184,7 @@ mod arena_tests {
     }
 
     #[test]
-    fn test_static_text_width_cached_via_static_width_cache() {
+    fn test_static_text_width_cached_via_static_cache() {
         use super::arena::DocNode;
         use super::types::CachedWidth;
 
@@ -213,6 +213,36 @@ mod arena_tests {
         // The empty() fast path bypasses the cache with a constant width 0,
         // which must agree with what the cache would compute.
         assert_eq!(cached_static(&a, ""), CachedWidth::Width(0));
+    }
+
+    #[test]
+    fn test_static_text_node_interned_per_document() {
+        let mut a = DocArena::new();
+
+        // Repeated statics within one document share one node.
+        let comma_1 = a.text(",");
+        let comma_2 = a.text(",");
+        assert_eq!(comma_1, comma_2);
+        // A different static gets its own node.
+        let semi = a.text(";");
+        assert_ne!(comma_1, semi);
+        // empty() interns through its dedicated cell.
+        let empty_1 = a.empty();
+        let empty_2 = a.empty();
+        assert_eq!(empty_1, empty_2);
+        let node_count = a.borrow_nodes().len();
+        assert_eq!(node_count, 3); // ",", ";", ""
+
+        // reset() invalidates every interned node (ids restart at 0): the next
+        // document re-allocs rather than returning a prior document's id, and
+        // interning resumes within it.
+        a.reset();
+        let comma_3 = a.text(",");
+        let empty_3 = a.empty();
+        assert_eq!(comma_3.index(), 0);
+        assert_eq!(empty_3.index(), 1);
+        assert_eq!(a.text(","), comma_3);
+        assert_eq!(a.empty(), empty_3);
     }
 
     #[test]

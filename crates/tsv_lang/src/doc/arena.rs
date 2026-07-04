@@ -239,7 +239,7 @@ pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 /// The eager width-cache policy for doc text: pool-stored text
 /// ([`DocText::Pooled`], `MultilineText` first lines), verbatim source slices
 /// ([`DocArena::source_span`]), and `text()` statics (amortized through the
-/// arena's static width cache — measured once per unique string, not per
+/// arena's static cache — measured once per unique string, not per
 /// node) **always** cache a real width or the newline sentinel at build — so
 /// every width query (the fits walk, `render_text`'s column advance) answers
 /// from the node alone, the fits path never borrows the pool, and render's
@@ -305,20 +305,45 @@ pub struct DocArena {
     /// (depends only on the fixed `TAB_WIDTH` + the interner, both fixed for a
     /// render).
     flat_width_cache: RefCell<Vec<u32>>,
-    /// Direct-mapped width cache for [`Self::text`] statics: maps a static
-    /// string's address to its precomputed visual width, so `Static` nodes
-    /// carry a real cached width (fits answers from the node, `render_text`
-    /// skips its column byte-scan) while the width is *measured* only once
-    /// per unique string per arena — never per node (the per-node eager
-    /// measure was a measured loss). The address is a link-time constant, so
-    /// the slot hash folds per call site; a collision evict just re-measures
-    /// (rare — slots comfortably exceed the unique-static population). Entries
-    /// are `'static`-valid, so the cache survives `reset()` and warms once per
-    /// arena lifetime. `Cell` (no borrow flag) — probes never alias the
-    /// `RefCell` stores. Inline by design: the arena lives on the stack or in
-    /// a thread-local and is only ever borrowed, never moved after
-    /// construction, so the array adds no per-use indirection.
-    static_width_cache: [Cell<StaticWidthSlot>; STATIC_CACHE_SLOTS],
+    /// Direct-mapped cache for [`Self::text`] statics, carrying two halves per
+    /// slot with different lifetimes:
+    ///
+    /// - **Width half** (`ptr`/`len` → `width`): a static string's precomputed
+    ///   visual width, so `Static` nodes carry a real cached width (fits
+    ///   answers from the node, `render_text` skips its column byte-scan)
+    ///   while the width is *measured* only once per unique string per arena —
+    ///   never per node (the per-node eager measure was a measured loss).
+    ///   Entries are `'static`-valid, so this half survives `reset()` and
+    ///   warms once per arena lifetime.
+    /// - **Node half** (`node_gen` → `node_id`): the interned `Static` node
+    ///   for the *current document*, valid only while `node_gen` matches
+    ///   [`Self::format_gen`] — repeated `text(",")` calls within one format
+    ///   return one shared node instead of allocating per call (statics are
+    ///   position-free at render and nodes are append-only/immutable, so
+    ///   sharing is output-identical; `join_doc` shares separator ids the same
+    ///   way). `reset()` invalidates every node half in O(1) by bumping the
+    ///   generation; the width half deliberately survives.
+    ///
+    /// The address is a link-time constant, so the slot hash folds per call
+    /// site; a collision evict just re-measures and re-allocs (measured rare —
+    /// the unique-static population is ~180 on real corpora, ≪ the slot count,
+    /// and evicts are ≤0.7% of `text()` calls). `Cell` (no borrow flag) —
+    /// probes never alias the `RefCell` stores. Inline by design: the arena
+    /// lives on the stack or in a thread-local and is only ever borrowed,
+    /// never moved after construction, so the array adds no per-use
+    /// indirection.
+    static_cache: [Cell<StaticSlot>; STATIC_CACHE_SLOTS],
+    /// The current document's format generation, keying the validity of the
+    /// interned node halves in `static_cache` and `empty_node`. Starts
+    /// at 1 (0 marks a never-stamped slot) and is bumped by `reset()`, so a
+    /// prior document's `node_id`s — invalidated by the reset — can never be
+    /// returned for the new document.
+    format_gen: Cell<u32>,
+    /// The interned [`Self::empty`] node for the current document (generation,
+    /// id) — `empty()` is the single hottest static (~1/3 of static allocs), so
+    /// it gets a dedicated slot with no hash probe. Valid iff the generation
+    /// matches `format_gen`.
+    empty_node: Cell<(u32, DocId)>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -329,31 +354,43 @@ pub struct DocArena {
     line_comment_ids: RefCell<Vec<u32>>,
 }
 
-/// One `static_width_cache` slot: a static string's identity (`ptr`+`len`)
-/// mapped to its precomputed width. The `len` compare is load-bearing, not
-/// belt-and-braces: linker constant-merging can make one static share
-/// another's *start* pointer (prefix overlap), so `ptr` alone is not identity —
-/// `ptr`+`len` is (same address + same length ⇒ same bytes).
+/// One `static_cache` slot: a static string's identity (`ptr`+`len`)
+/// mapped to its precomputed width, plus the per-document interned node
+/// (`node_id`, valid iff `node_gen` matches the arena's `format_gen`). The
+/// `len` compare is load-bearing, not belt-and-braces: linker
+/// constant-merging can make one static share another's *start* pointer
+/// (prefix overlap), so `ptr` alone is not identity — `ptr`+`len` is (same
+/// address + same length ⇒ same bytes). That same identity argument covers
+/// the node half: identical `ptr`+`len` ⇒ the same `&'static str`, so the
+/// interned node's stored text is indistinguishable from the caller's.
 #[derive(Clone, Copy, Debug)]
-struct StaticWidthSlot {
+struct StaticSlot {
     ptr: usize,
     len: u32,
     width: u16,
+    /// Format generation that stamped `node_id`; 0 = never stamped.
+    node_gen: u32,
+    /// The interned node for the generation in `node_gen`.
+    node_id: DocId,
 }
 
-impl StaticWidthSlot {
+impl StaticSlot {
     /// An empty slot: `ptr == 0` is never a real entry (references are never
     /// null — even `""` has a non-null dangling address).
     const EMPTY: Self = Self {
         ptr: 0,
         len: 0,
         width: 0,
+        node_gen: 0,
+        node_id: DocId(0),
     };
 }
 
-/// 512 slots (× 16 B on 64-bit = 8 KB inline). Kept in lockstep with the
+/// 512 slots (× 24 B on 64-bit = 12 KB inline). Kept in lockstep with the
 /// slot-hash shift — see the assert below; comfortably above the unique-static
-/// population, so steady-state collisions are rare.
+/// population (measured ~165–190 distinct statics across real corpora), so
+/// steady-state collisions are rare (evicts ≤0.7% of `text()` calls; a 1024-slot
+/// A/B only halved the colliding-slot count, not worth doubling the array).
 const STATIC_CACHE_SLOTS: usize = 512;
 
 // The slot index is the TOP 9 BITS of the 64-bit multiplicative hash
@@ -372,7 +409,9 @@ impl DocArena {
             pool_scratch: Cell::new(String::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
-            static_width_cache: [const { Cell::new(StaticWidthSlot::EMPTY) }; STATIC_CACHE_SLOTS],
+            static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
+            format_gen: Cell::new(1),
+            empty_node: Cell::new((0, DocId(0))),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }
@@ -380,16 +419,18 @@ impl DocArena {
 
     /// Create an arena with pre-allocated capacity based on source size.
     ///
-    /// Heuristic: **~2 doc nodes per source byte**. Measured across the
-    /// representative corpus (`tsv_debug arena_stats`, 11.3 K files) the real
-    /// density is ~0.57 nodes/byte mean with a p99 of ~1.6 and a max of ~3.5; 2/byte
-    /// clears p99 with margin, so only the sub-1% densest files pay an (amortized)
-    /// realloc, while the typical file no longer over-reserves ~7× (the prior
-    /// 4/byte was pinned to the *max* file). `estimated_children = nodes/2` ⇒
-    /// ~1/byte, which clears the children p95 (~0.97). The pre-size only ever sets
-    /// `Vec` capacity — never output — so lowering it is byte-identical; the win is
-    /// the fresh-arena / first-file / WASM reservation, and the multi-file
-    /// `reset()` reuse high-water is bounded by actual usage, so it can only drop.
+    /// Heuristic: **~2 doc nodes per source byte**. Static-text node interning
+    /// cut real node density ~1/3 (measured on the anchor corpora: ~0.32
+    /// nodes/byte mean, p99 ~0.73, max ~1.5 — pre-interning p99 was ~1.0), so
+    /// 2/byte now clears the densest file outright. It is deliberately NOT
+    /// lowered to match: `estimated_children = nodes/2` ⇒ ~1/byte, and the
+    /// children population is untouched by interning (shared nodes still
+    /// appear once per use in child lists — children/byte p99 ~0.90), so
+    /// halving the node hint would drag the children hint below real demand.
+    /// The pre-size only ever sets `Vec` capacity — never output — so tuning it
+    /// is byte-identical; the win is the fresh-arena / first-file / WASM
+    /// reservation, and the multi-file `reset()` reuse high-water is bounded by
+    /// actual usage, so it can only drop.
     pub fn with_source_size_hint(source_len: usize) -> Self {
         let estimated_nodes = source_len * 2;
         let estimated_children = estimated_nodes / 2;
@@ -409,7 +450,9 @@ impl DocArena {
             // to absorb those reallocs. Only capacity changes — never values.
             will_break_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
             flat_width_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
-            static_width_cache: [const { Cell::new(StaticWidthSlot::EMPTY) }; STATIC_CACHE_SLOTS],
+            static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
+            format_gen: Cell::new(1),
+            empty_node: Cell::new((0, DocId(0))),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }
@@ -436,10 +479,29 @@ impl DocArena {
     /// prior render may be read after a reset. `&mut self` enforces this — no
     /// borrow of the arena's contents can be live across the call.
     ///
-    /// The static width cache is deliberately NOT cleared: its entries key on
-    /// `'static` string addresses, so they stay valid for the arena's whole
-    /// lifetime and the cache warms once across documents.
+    /// The static cache's *width* halves are deliberately NOT cleared:
+    /// they key on `'static` string addresses, so they stay valid for the
+    /// arena's whole lifetime and the cache warms once across documents. The
+    /// interned *node* halves (and the `empty()` node) are invalidated in O(1)
+    /// by bumping `format_gen` — their `DocId`s point into the node store this
+    /// method just cleared.
     pub fn reset(&mut self) {
+        let next = self.format_gen.get().wrapping_add(1);
+        if next == 0 {
+            // u32 generation wrap (~4.3 B resets in one process): a slot last
+            // stamped in the ancient generation with this same value would
+            // false-hit and return a dangling id, so hard-clear every node
+            // half once per wrap. The width halves stay valid ('static-keyed).
+            for slot in &self.static_cache {
+                let mut s = slot.get();
+                s.node_gen = 0;
+                slot.set(s);
+            }
+            self.empty_node.set((0, DocId(0)));
+            self.format_gen.set(1);
+        } else {
+            self.format_gen.set(next);
+        }
         self.nodes.get_mut().clear();
         self.children.get_mut().clear();
         self.text_pool.get_mut().clear();
@@ -491,52 +553,65 @@ impl DocArena {
     // Primitive builders
     //
 
-    /// Create a text doc from a static string (zero allocation).
+    /// Create a text doc from a static string (zero allocation), interned
+    /// per document.
     ///
-    /// Carries a real cached width, amortized through the arena's static
-    /// width cache (one direct-mapped slot probe per call; the width is
-    /// measured once per unique string per arena — the *per-node* eager
-    /// measure was a measured loss). Fits queries answer from the node alone
-    /// and `render_text`'s column advance skips its byte scan.
+    /// Repeated calls with the same static within one format return one
+    /// shared node (`text(",")` ×10 K → 1 node): the direct-mapped slot
+    /// carries the interned `DocId` alongside the cached width, gated by the
+    /// arena's `format_gen` so a `reset()` invalidates every interned node in
+    /// O(1). Sharing is output-identical — statics are position-free at
+    /// render, nodes are append-only and immutable, and no consumer compares
+    /// `DocId` identity (`join_doc` has always shared separator ids). The
+    /// width half is amortized the same way as before (measured once per
+    /// unique string per arena *lifetime* — the *per-node* eager measure was
+    /// a measured loss); fits queries answer from the node alone and
+    /// `render_text`'s column advance skips its byte scan.
+    ///
+    /// Hot path (92–95% of calls on real corpora): one slot load + ptr/len/gen
+    /// compare (the address is a link-time constant, so the slot hash folds
+    /// per call site). The miss path — first use this document, first
+    /// sighting ever, or collision evict — allocs and restamps in the cold
+    /// helper.
     #[inline]
     pub fn text(&self, s: &'static str) -> DocId {
-        let w = self.static_width(s);
-        self.alloc(DocNode::Text(DocText::Static(s, w)))
-    }
-
-    /// Look up (or compute-and-cache) the visual width of a static string via
-    /// the direct-mapped `static_width_cache`.
-    ///
-    /// Hot path: one slot load + pointer/len compare (the address is a
-    /// link-time constant, so the slot hash folds per call site). Miss (first
-    /// sighting or collision evict) measures and refills in the cold helper.
-    #[inline]
-    fn static_width(&self, s: &'static str) -> u16 {
         let ptr = s.as_ptr() as usize;
         // Hash in u64: usize is 32-bit on wasm32, where the Fibonacci constant
         // and the top-9-bit shift would overflow. The `>> 55` keeps the top 9
         // bits ⇒ index < 512, locked to `STATIC_CACHE_SLOTS` by the assert at
         // its definition (and eliding the bounds check below).
         let slot_i = ((ptr as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 55) as usize;
-        let slot = self.static_width_cache[slot_i].get();
-        if slot.ptr == ptr && slot.len as usize == s.len() {
-            return slot.width;
+        let slot = self.static_cache[slot_i].get();
+        if slot.ptr == ptr && slot.len as usize == s.len() && slot.node_gen == self.format_gen.get()
+        {
+            return slot.node_id;
         }
-        self.static_width_miss(s, slot_i)
+        self.text_miss(s, slot_i, slot)
     }
 
-    /// The cold half of [`Self::static_width`]: measure the width and refill
-    /// the slot.
+    /// The cold half of [`Self::text`]: alloc the node and (re)stamp the slot.
+    ///
+    /// Reuses the slot's cached width when only the node half is stale (the
+    /// once-per-static-per-document case); measures it on a true width miss
+    /// (first sighting or collision evict).
     #[cold]
     #[inline(never)]
-    fn static_width_miss(&self, s: &'static str, slot_i: usize) -> u16 {
-        let width = pooled_text_width(s);
-        self.static_width_cache[slot_i].set(StaticWidthSlot {
-            ptr: s.as_ptr() as usize,
+    fn text_miss(&self, s: &'static str, slot_i: usize, slot: StaticSlot) -> DocId {
+        let ptr = s.as_ptr() as usize;
+        let width = if slot.ptr == ptr && slot.len as usize == s.len() {
+            slot.width
+        } else {
+            pooled_text_width(s)
+        };
+        let node_id = self.alloc(DocNode::Text(DocText::Static(s, width)));
+        self.static_cache[slot_i].set(StaticSlot {
+            ptr,
             len: s.len() as u32,
             width,
+            node_gen: self.format_gen.get(),
+            node_id,
         });
-        width
+        node_id
     }
 
     /// Create a text doc from a dynamically-built string, copied into the
@@ -671,10 +746,27 @@ impl DocArena {
         self.line_comment_ids.borrow().binary_search(&id.0).is_ok()
     }
 
-    /// Create an empty doc that produces no output.
+    /// Create an empty doc that produces no output, interned per document.
+    ///
+    /// `empty()` is the single hottest static text (~1/3 of static allocs on
+    /// real corpora), so it interns through a dedicated generation-gated cell
+    /// — no hash probe — allocating once per document.
     #[inline]
     pub fn empty(&self) -> DocId {
-        self.alloc(DocNode::Text(DocText::Static("", 0)))
+        let (node_gen, node_id) = self.empty_node.get();
+        if node_gen == self.format_gen.get() {
+            return node_id;
+        }
+        self.empty_miss()
+    }
+
+    /// The cold half of [`Self::empty`]: alloc this document's empty node.
+    #[cold]
+    #[inline(never)]
+    fn empty_miss(&self) -> DocId {
+        let node_id = self.alloc(DocNode::Text(DocText::Static("", 0)));
+        self.empty_node.set((self.format_gen.get(), node_id));
+        node_id
     }
 
     /// Create a text doc from a symbol ID (deferred resolution).
@@ -873,22 +965,13 @@ impl DocArena {
     //
 
     /// Build a doc from items with a static string separator between them.
+    ///
+    /// Delegates to [`Self::join_doc`]: `text()` interns per document, so one
+    /// upfront call yields the same shared separator node a per-gap `text()`
+    /// would (a 0/1-item list "wastes" only the intern probe — the node
+    /// almost always already exists for hot separators like `","`).
     pub fn join(&self, docs: impl IntoIterator<Item = DocId>, separator: &'static str) -> DocId {
-        let iter = docs.into_iter();
-        let (lower, _) = iter.size_hint();
-        // Shared inline buffer (N=8), matching `join_doc`: the joined parts (2n-1
-        // for n items) stay off the heap for the common small list. Call sites join
-        // arg/param/specifier/value lists (≥1 item), so this is never the
-        // always-empty no-op the SmallVec sweep warns about.
-        let mut parts = DocBuf::with_capacity(lower.saturating_mul(2).saturating_sub(1));
-        for (i, doc) in iter.enumerate() {
-            if i > 0 {
-                parts.push(self.text(separator));
-            }
-            parts.push(doc);
-        }
-        // `concat` short-circuits empty → `empty()` and single → the element.
-        self.concat(&parts)
+        self.join_doc(docs, self.text(separator))
     }
 
     /// Build a doc from items with a Doc separator between them.
@@ -1368,22 +1451,35 @@ impl DocArena {
         self.flat_width_cache.borrow_mut()
     }
 
-    /// Estimate output buffer capacity (bytes) for the rendered string.
+    /// Estimate output buffer capacity (bytes) for a rendered string.
     ///
-    /// Called on the fully-built arena, so `nodes.len()` is the final node count.
-    /// Measured across the representative corpus (`tsv_debug arena_stats`, 11.3 K
-    /// files) the rendered output is **~1.9 bytes per doc node** (aggregate
-    /// 1.888×nodes = 1.00×source), so `nodes.len() * 2` reserves the output with a
-    /// few-percent headroom — big files (which dominate the `realloc` memcpy cost)
-    /// carry the aggregate ratio and so fit in one reservation, while only small,
-    /// high-ratio files pay an (amortized, cheap) realloc. This pre-sizes the
-    /// render `String` and avoids the geometric `realloc`+memcpy chain a small
-    /// default capacity pays (~2–3 grows per format); output writes are ~8% of the
-    /// format profile, so eliminating those memcpys is a native + WASM wall lever.
+    /// Consumer shape: this sizes the **per-render-call** `String` created by the
+    /// `arena_print_doc*` entry points — on the TS path that is per-statement
+    /// scratch (`write_arena_doc` renders each statement into its own `String`,
+    /// pushed into the file-level `OutputBuffer` and freed). The file-level
+    /// buffer is sized from **source length** (`Printer::with_context`'s
+    /// `buffer_capacity`), not this estimate. Mid-build, `nodes.len()` is the
+    /// *cumulative* count at that point — an over-estimate for later statements'
+    /// scratch, which is fine: the scratch is transient (freed before the next
+    /// statement) and the reservation only needs to clear the statement's output
+    /// to avoid mid-render reallocs.
+    ///
+    /// Pre-interning calibration: rendered output measured **~1.9 bytes per doc
+    /// node** (aggregate 1.888×nodes = 1.00×source), so `nodes.len() * 2` reserved
+    /// with a few-percent headroom — big files (which dominate the `realloc`
+    /// memcpy cost) carry the aggregate ratio and so fit in one reservation, while
+    /// only small, high-ratio files pay an (amortized, cheap) realloc. This
+    /// avoids the geometric `realloc`+memcpy chain a small default capacity pays
+    /// (~2–3 grows per format); output writes are ~8% of the format profile, so
+    /// eliminating those memcpys is a native + WASM wall lever.
     ///
     /// The prior `nodes.len() / 4` was calibrated to the old 4-nodes/byte pre-size
     /// (then `nodes/4 ≈ source ≈ output`) and under-provisioned the real output
-    /// ~3.8× → every format reallocated 2–3 times.
+    /// ~3.8× → every format reallocated 2–3 times. The multiplier moved 2 → 4
+    /// with static-text node interning: deduping `Static` nodes cut the node
+    /// count ~1/3 with output unchanged, shifting the measured per-file
+    /// output/node p50 from ~2.1 to ~3.1 (`arena_stats` calibration) — ×4
+    /// restores the old coverage with margin.
     ///
     /// Floor: 256 bytes (tiny inputs). Ceiling: 1 GiB — a pure sanity backstop
     /// that no real format approaches (the estimate tracks the actual node count),
@@ -1391,7 +1487,7 @@ impl DocArena {
     /// and re-introduced reallocs on large files.
     #[inline]
     pub fn estimated_output_capacity(&self) -> usize {
-        (self.nodes.borrow().len() * 2).clamp(256, 1 << 30)
+        (self.nodes.borrow().len() * 4).clamp(256, 1 << 30)
     }
 }
 
