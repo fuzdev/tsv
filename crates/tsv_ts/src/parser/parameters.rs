@@ -45,12 +45,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for default value: param = default
         if self.eat(TokenKind::Equals) {
-            let default_value = self.parse_assignment_expression()?;
+            let default_value = self.parse_assignment_expression_ref()?;
             // prev_token_end covers a parenthesized default's closing `)`
             let assign_end = self.prev_token_end() as u32;
             param = Expression::AssignmentPattern(AssignmentPattern {
                 left: self.alloc(param),
-                right: self.alloc(default_value),
+                right: default_value,
                 span: Span::new(param_start as u32, assign_end),
             });
         }
@@ -281,12 +281,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         // Check for default value
                         if self.eat(TokenKind::Equals) {
                             let pattern_start = pattern.span().start;
-                            let default_value = self.parse_assignment_expression()?;
+                            let default_value = self.parse_assignment_expression_ref()?;
                             // prev_token_end covers a parenthesized default's closing `)`
                             let assign_end = self.prev_token_end() as u32;
                             Expression::AssignmentPattern(AssignmentPattern {
                                 left: self.alloc(pattern),
-                                right: self.alloc(default_value),
+                                right: default_value,
                                 span: Span::new(pattern_start, assign_end),
                             })
                         } else {

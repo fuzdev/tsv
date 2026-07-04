@@ -224,10 +224,18 @@ impl<'a> Printer<'a> {
 
         // Check for comments that force expansion: line comments (can't be inline),
         // multi-line block comments (contain hardlines that must propagate),
-        // or own-line single-line block comments (on a separate line from adjacent tokens)
-        let has_expanding_comments = self.has_line_comments_between(arr.span.start, arr.span.end)
-            || has_multiline_block_comments_in_range(self.comments, arr.span.start, arr.span.end)
-            || self.has_own_line_block_comments_in_array(arr);
+        // or own-line single-line block comments (on a separate line from adjacent tokens).
+        // One whole-window existence gate (idiom 8) skips all three sub-queries — and
+        // sub-query 3's eager element collect — on the comment-free common case; each
+        // sub-query's range lies within [span.start, span.end], so a false gate is exact.
+        let has_expanding_comments = self.has_comments_between(arr.span.start, arr.span.end)
+            && (self.has_line_comments_between(arr.span.start, arr.span.end)
+                || has_multiline_block_comments_in_range(
+                    self.comments,
+                    arr.span.start,
+                    arr.span.end,
+                )
+                || self.has_own_line_block_comments_in_array(arr));
 
         if has_expanding_comments {
             return self.build_array_doc_with_expanding_comments(arr);

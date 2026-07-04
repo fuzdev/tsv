@@ -637,8 +637,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Optional options object: `import('module', {with: {type: 'json'}})`
         let options: Option<&'arena Expression<'arena>> = if self.eat(TokenKind::Comma) {
-            let expr = self.parse_expression()?;
-            Some(self.alloc(expr))
+            Some(self.parse_expression_ref()?)
         } else {
             None
         };

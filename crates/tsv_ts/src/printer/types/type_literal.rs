@@ -41,10 +41,17 @@ impl<'a> Printer<'a> {
         member_start: u32,
         is_first: bool,
         delimiter_pull_pos: Option<u32>,
+        comments_present: bool,
     ) -> DocBuf {
         let d = self.d();
-        let all_comments: CommentVec<'_> =
-            comments_in_range(self.comments, prev_end, member_start).collect();
+        // `comments_present` is the caller's whole-construct existence gate
+        // (idiom 8): when false, `[prev_end, member_start]` is provably empty,
+        // so skip the collect/filter machinery.
+        let all_comments: CommentVec<'_> = if comments_present {
+            comments_in_range(self.comments, prev_end, member_start).collect()
+        } else {
+            CommentVec::new()
+        };
         let leading_comments: CommentVec<'_> = if !is_first {
             all_comments
                 .iter()
@@ -111,6 +118,13 @@ impl<'a> Printer<'a> {
         upper_bound: u32,
     ) -> DocBuf {
         let d = self.d();
+        // Comment-free gap (the common case): no separator scan needed — the
+        // partition below reduces to the bare `;`.
+        if comments.is_empty() {
+            let mut docs = DocBuf::with_capacity(1);
+            docs.push(d.text(";"));
+            return docs;
+        }
         // Find the source member separator — `;` OR `,` (both are valid type-member
         // separators; tsv normalizes either to `;`). Comment-aware so a separator
         // glyph inside a comment in this gap isn't mistaken for the real one. Taking
@@ -338,6 +352,7 @@ impl<'a> Printer<'a> {
         &self,
         t: &TSTypeLiteral<'_>,
         force_multiline: bool,
+        comments_present: bool,
     ) -> DocId {
         let d = self.d();
         if t.members.is_empty() {
@@ -357,7 +372,7 @@ impl<'a> Printer<'a> {
         // `build_type_literal_doc_inner`.
         if !force_multiline {
             member_parts.push(d.line());
-            if let Some(first) = t.members.first() {
+            if comments_present && let Some(first) = t.members.first() {
                 member_parts.extend(
                     self.build_type_literal_leading_comments_inline(
                         t.span.start,
@@ -382,6 +397,7 @@ impl<'a> Printer<'a> {
                     m.span().start,
                     is_first,
                     None,
+                    comments_present,
                 ));
                 member_parts.push(self.build_type_member_doc_inner(m));
 
@@ -390,10 +406,13 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: CommentVec<'_> =
+                let trailing: CommentVec<'_> = if comments_present {
                     comments_in_range(self.comments, member_content_end, upper_bound)
                         .filter(|c| self.is_same_line(member_content_end, c.span.start))
-                        .collect();
+                        .collect()
+                } else {
+                    CommentVec::new()
+                };
                 member_parts.extend(self.build_comments_around_semicolon_doc(
                     &trailing,
                     member_content_end,
@@ -414,8 +433,11 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: CommentVec<'_> =
-                    comments_in_range(self.comments, member_content_end, upper_bound).collect();
+                let trailing: CommentVec<'_> = if comments_present {
+                    comments_in_range(self.comments, member_content_end, upper_bound).collect()
+                } else {
+                    CommentVec::new()
+                };
 
                 if is_last {
                     // Last member: semicolon only when broken
@@ -440,7 +462,7 @@ impl<'a> Printer<'a> {
             prev_end = m.span().end;
         }
 
-        if force_multiline {
+        if force_multiline && comments_present {
             // Trailing comments after last member
             let body_end = t.span.end.saturating_sub(1);
             member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
@@ -455,7 +477,11 @@ impl<'a> Printer<'a> {
     /// - Source has newline immediately after opening brace
     /// - Contains line comments or multi-line block comments
     /// - Contains block comments on their own line
-    pub(super) fn type_literal_force_multiline(&self, obj: &TSTypeLiteral<'_>) -> bool {
+    pub(super) fn type_literal_force_multiline(
+        &self,
+        obj: &TSTypeLiteral<'_>,
+        comments_present: bool,
+    ) -> bool {
         let source_is_multiline = super::super::is_brace_block_multiline(self.source, obj.span);
         // Prettier breaks an object type when its first member starts on a line
         // below the opening brace. `is_brace_block_multiline` only sees a newline
@@ -465,19 +491,20 @@ impl<'a> Printer<'a> {
         let first_member_on_new_line = obj.members.first().is_some_and(|m| {
             self.source[obj.span.start as usize..m.span().start as usize].contains('\n')
         });
-        let has_line_or_multiline_block =
-            comments_in_range(self.comments, obj.span.start, obj.span.end)
+        let has_line_or_multiline_block = comments_present
+            && comments_in_range(self.comments, obj.span.start, obj.span.end)
                 .any(|c| !c.is_block || c.multiline);
         source_is_multiline
             || first_member_on_new_line
             || has_line_or_multiline_block
             // Lazy: the per-member span collection only runs when the cheaper checks
-            // above didn't already force multiline.
-            || {
+            // above didn't already force multiline (and only when the construct has
+            // comments at all).
+            || (comments_present && {
                 let member_spans: SmallVec<[_; 8]> =
                     obj.members.iter().map(TSTypeElement::span).collect();
                 self.has_standalone_block_comment(obj.span.start, obj.span.end, &member_spans)
-            }
+            })
     }
 
     /// Build aligned object literal doc with custom opening/closing.
@@ -494,9 +521,15 @@ impl<'a> Printer<'a> {
         closing: &'static str,
     ) -> DocId {
         let d = self.d();
-        let force_multiline = self.type_literal_force_multiline(obj);
-        let members_doc =
-            self.build_type_literal_members_only_doc_for_alignment(obj, force_multiline);
+        // Idiom-8 whole-construct gate: one existence check over the literal's
+        // span; every comment sub-query below is bounded within it.
+        let comments_present = self.has_comments_between(obj.span.start, obj.span.end);
+        let force_multiline = self.type_literal_force_multiline(obj, comments_present);
+        let members_doc = self.build_type_literal_members_only_doc_for_alignment(
+            obj,
+            force_multiline,
+            comments_present,
+        );
 
         // Closing inner boundary: a hardline when forced multiline, else the
         // bracketSpacing boundary (a space when flat `{ a }`, a newline when the
@@ -550,7 +583,11 @@ impl<'a> Printer<'a> {
     fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral<'_>, mode: TypeLiteralMode) -> DocId {
         let d = self.d();
         let wrap_in_group = matches!(mode, TypeLiteralMode::Standard);
-        let force_multiline = self.type_literal_force_multiline(t);
+        // Idiom-8 whole-construct gate: one existence check over the literal's
+        // span skips every per-member comment query below on the comment-free
+        // common case — each sub-range lies within [span.start, span.end].
+        let comments_present = self.has_comments_between(t.span.start, t.span.end);
+        let force_multiline = self.type_literal_force_multiline(t, comments_present);
 
         if t.members.is_empty() {
             // Empty type literal - handle comments inside. The helper already
@@ -567,8 +604,11 @@ impl<'a> Printer<'a> {
             // comment is itself what forces this multiline branch. See
             // conformance_prettier.md §Comment relocation (Type literal `{`).
             let first_member_start = t.members[0].span().start;
-            let (brace_line_prefix, delimiter_pull_pos) =
-                self.delimiter_line_comment_prefix(t.span.start, first_member_start);
+            let (brace_line_prefix, delimiter_pull_pos) = if comments_present {
+                self.delimiter_line_comment_prefix(t.span.start, first_member_start)
+            } else {
+                (DocBuf::new(), None)
+            };
             parts.push(d.concat(&brace_line_prefix));
 
             // Multi-line format (same for both modes)
@@ -584,11 +624,15 @@ impl<'a> Printer<'a> {
                     m.span().start,
                     is_first,
                     delimiter_pull_pos,
+                    comments_present,
                 ));
                 // A preceding format-ignore directive keeps the member's source
                 // verbatim. Use the content span (no trailing
                 // `;`); the loop's semicolon handling below re-adds the `;`.
-                let member_doc = if self.has_format_ignore_in_range(prev_end, m.span().start) {
+                // (A directive is itself a comment, so the gate is exact.)
+                let member_doc = if comments_present
+                    && self.has_format_ignore_in_range(prev_end, m.span().start)
+                {
                     self.raw_source_range(m.span().start, member_content_end)
                 } else {
                     self.build_type_member_doc_inner(m)
@@ -600,10 +644,13 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: CommentVec<'_> =
+                let trailing: CommentVec<'_> = if comments_present {
                     comments_in_range(self.comments, member_content_end, upper_bound)
                         .filter(|c| self.is_same_line(member_content_end, c.span.start))
-                        .collect();
+                        .collect()
+                } else {
+                    CommentVec::new()
+                };
                 member_parts.extend(self.build_comments_around_semicolon_doc(
                     &trailing,
                     member_content_end,
@@ -614,7 +661,9 @@ impl<'a> Printer<'a> {
             }
 
             let body_end = t.span.end.saturating_sub(1);
-            member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+            if comments_present {
+                member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+            }
 
             parts.push(d.indent(d.concat(&member_parts)));
             parts.push(d.hardline());
@@ -624,7 +673,7 @@ impl<'a> Printer<'a> {
             // a newline when broken), THEN any interior leading comments, so the
             // padding sits before the comment (`{ /* c */ a }`, not `{/* c */ a }`).
             let mut member_parts: DocBuf = smallvec![d.line()];
-            if let Some(first) = t.members.first() {
+            if comments_present && let Some(first) = t.members.first() {
                 member_parts.extend(
                     self.build_type_literal_leading_comments_inline(
                         t.span.start,
@@ -650,8 +699,11 @@ impl<'a> Printer<'a> {
                     .members
                     .get(i + 1)
                     .map_or(t.span.end, |next| next.span().start);
-                let trailing: CommentVec<'_> =
-                    comments_in_range(self.comments, member_content_end, upper_bound).collect();
+                let trailing: CommentVec<'_> = if comments_present {
+                    comments_in_range(self.comments, member_content_end, upper_bound).collect()
+                } else {
+                    CommentVec::new()
+                };
 
                 if is_last {
                     // Last member: semicolon only when broken, comments after

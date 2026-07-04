@@ -232,7 +232,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.advance()?; // consume 'extends'
         let expr = self.parse_heritage_expression()?;
         let type_args = self.parse_optional_type_arguments()?;
-        Ok((Some(self.alloc(expr)), type_args))
+        Ok((Some(expr), type_args))
     }
 
     /// Parse a class expression: `class { }` or `class Foo<T> extends Bar { }`

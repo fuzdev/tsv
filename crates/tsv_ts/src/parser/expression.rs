@@ -248,6 +248,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(self.parse_expression_bp(BP_ASSIGNMENT)?.expr.clone())
     }
 
+    /// `parse_expression`'s ref-returning sibling: hands back the spine's arena
+    /// ref directly, for consumers whose AST field is `&'arena Expression` —
+    /// skipping the owned boundary's shallow clone + re-alloc round trip.
+    pub(super) fn parse_expression_ref(
+        &mut self,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
+        Ok(self.parse_expression_bp(BP_COMMA)?.expr)
+    }
+
+    /// `parse_assignment_expression`'s ref-returning sibling (see
+    /// `parse_expression_ref`).
+    pub(super) fn parse_assignment_expression_ref(
+        &mut self,
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
+        Ok(self.parse_expression_bp(BP_ASSIGNMENT)?.expr)
+    }
+
     /// Parse an expression without allowing `in` as a binary operator.
     ///
     /// Used in for-loop headers to distinguish `for (x in y)` from expressions.
@@ -872,7 +889,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             self.advance()?; // consume '['
                             self.grouping_depth += 1;
 
-                            let index = self.parse_expression()?;
+                            let index = self.parse_expression_ref()?;
 
                             let (_, bracket_end) = self.current_pos();
                             self.expect(&TokenKind::BracketClose)?; // consume ']'
@@ -883,7 +900,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 self.arena,
                                 Expression::MemberExpression(MemberExpression {
                                     object: left.expr,
-                                    property: arena.alloc(index),
+                                    property: index,
                                     computed: true,
                                     optional: true,
                                     span,
@@ -951,7 +968,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.advance()?; // consume '['
                     self.grouping_depth += 1;
 
-                    let index = self.parse_expression()?;
+                    let index = self.parse_expression_ref()?;
 
                     let (_, bracket_end) = self.current_pos();
                     self.expect(&TokenKind::BracketClose)?; // consume ']'
@@ -962,7 +979,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.arena,
                         Expression::MemberExpression(MemberExpression {
                             object: left.expr,
-                            property: arena.alloc(index),
+                            property: index,
                             computed: true,
                             optional: false,
                             span,
@@ -1103,10 +1120,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `super_type_parameters` split via `SubscriptMode::ClassHeritage`.
     pub(in crate::parser) fn parse_heritage_expression(
         &mut self,
-    ) -> Result<Expression<'arena>, ParseError> {
+    ) -> Result<&'arena Expression<'arena>, ParseError> {
         let atom = self.parse_heritage_atom()?;
         let parsed = self.parse_postfix_expression(atom, SubscriptMode::ClassHeritage)?;
-        Ok(parsed.expr.clone())
+        Ok(parsed.expr)
     }
 
     /// Parse the primary atom of an `extends` clause (acorn's `parseExprAtom` with
@@ -1931,7 +1948,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
                 TokenKind::BracketOpen => {
                     self.advance()?; // consume '['
-                    let index = self.parse_expression()?;
+                    let index = self.parse_expression_ref()?;
                     let (_, bracket_end) = self.current_pos();
                     self.expect(&TokenKind::BracketClose)?;
 
@@ -1940,7 +1957,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.arena,
                         Expression::MemberExpression(MemberExpression {
                             object: callee.expr,
-                            property: arena.alloc(index),
+                            property: index,
                             computed: true,
                             optional: false,
                             span,
@@ -2029,7 +2046,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///   import (Stage-3 source-phase-imports / import-defer proposals)
     /// - `import.meta` - meta property
     fn parse_import_or_meta_property(&mut self) -> Result<Expression<'arena>, ParseError> {
-        let arena = self.arena;
         let (start, import_end) = self.current_pos();
         self.advance()?; // consume 'import'
 
@@ -2083,7 +2099,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.reject_import_call_spread()?;
 
         // Parse the source expression (usually a string literal)
-        let source = self.parse_assignment_expression()?;
+        let source = self.parse_assignment_expression_ref()?;
 
         // The `ImportCall` grammar allows an optional trailing comma after the
         // source (1-arg form) and after the options (2-arg form):
@@ -2097,7 +2113,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut options: Option<&'arena Expression<'arena>> = None;
         if self.eat(TokenKind::Comma) && !self.check(&TokenKind::ParenClose) {
             self.reject_import_call_spread()?; // the options arg is likewise no spread
-            options = Some(arena.alloc(self.parse_assignment_expression()?));
+            options = Some(self.parse_assignment_expression_ref()?);
             self.eat(TokenKind::Comma); // optional trailing comma after the options
         }
 
@@ -2107,7 +2123,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.grouping_depth -= 1;
 
         Ok(Expression::ImportExpression(ImportExpression {
-            source: arena.alloc(source),
+            source,
             options,
             phase,
             span: Span::new(start as u32, paren_end as u32),
@@ -2172,12 +2188,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::DotDotDot)?; // consume '...'
 
         // Use assignment_expression because comma separates array elements/object properties
-        let argument = self.parse_assignment_expression()?;
+        let argument = self.parse_assignment_expression_ref()?;
         // Use prev_token_end() to include closing paren when argument is parenthesized
         let end = self.prev_token_end() as u32;
 
         Ok(Expression::SpreadElement(SpreadElement {
-            argument: self.alloc(argument),
+            argument,
             span: Span::new(start as u32, end),
         }))
     }
