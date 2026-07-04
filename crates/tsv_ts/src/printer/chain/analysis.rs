@@ -8,23 +8,28 @@
 
 use super::printing::ChainPrinter;
 use super::types::{ChainGroup, ChainGroupVec, ChainNode, ChainNodeVec};
-use crate::ast::internal::{self, Expression};
+use crate::ast::internal::{self, Expression, IdentName};
 use crate::printer::{ParenContext, needs_parens};
-use string_interner::DefaultSymbol;
 use tsv_lang::TAB_WIDTH;
 
 //
 // Symbol Lookup Trait
 //
 
-/// Trait for looking up symbols (abstraction over interner)
+/// Trait for looking up identifier names (abstraction over source + interner)
 pub trait SymbolLookup {
-    /// Resolve `symbol` and apply `f` to the name without materializing a `String`.
+    /// Resolve the name channel (span-identity slice at `name_start`, or the
+    /// interned escaped form) and apply `f` without materializing a `String`.
     ///
     /// Callback style keeps the interner borrow inside the call, so implementations
     /// backed by `Rc<RefCell<…>>` don't need an owned copy to outlive the borrow.
-    /// Returns `None` when the symbol is unknown to the interner.
-    fn with_name<R>(&self, symbol: DefaultSymbol, f: impl FnOnce(&str) -> R) -> Option<R>;
+    /// Returns `None` when an escaped symbol is unknown to the interner.
+    fn with_name<R>(
+        &self,
+        name: IdentName,
+        name_start: u32,
+        f: impl FnOnce(&str) -> R,
+    ) -> Option<R>;
 }
 
 //
@@ -357,7 +362,7 @@ fn linearize_member_node<'a>(
         ));
     } else if let Expression::Identifier(id) = member.property {
         nodes.push(ChainNode::member(
-            id.name,
+            id.ident_name(),
             member.optional,
             object_end,
             property_start,
@@ -368,6 +373,7 @@ fn linearize_member_node<'a>(
             member.optional,
             object_end,
             property_start,
+            pid.name_span().start,
         ));
     } else {
         // Non-identifier property (shouldn't happen for non-computed)
@@ -513,17 +519,18 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
             // Object.keys() → merge (capital letter = factory)
             // d3.scale() → merge (short name ≤ tabWidth in expression statement context only)
             Expression::Identifier(id) => {
-                is_factory_name(id.name, printer)
+                is_factory_name(id.ident_name(), id.span.start, printer)
                     || has_computed
-                    || (printer.is_expression_statement() && is_short_name(id.name, printer))
+                    || (printer.is_expression_statement()
+                        && is_short_name(id.ident_name(), id.span.start, printer))
             }
 
             _ => has_computed,
         }
     } else {
         // Multiple nodes in first group: check if last is member with factory property
-        if let Some(prop) = first.nodes.last().and_then(ChainNode::property) {
-            return is_factory_name(prop, printer) || has_computed;
+        if let Some((prop, prop_start)) = first.nodes.last().and_then(ChainNode::property) {
+            return is_factory_name(prop, prop_start, printer) || has_computed;
         }
         false
     }
@@ -536,9 +543,9 @@ pub fn should_not_wrap<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: 
 ///
 /// Prettier ref: `isShort` in print/member-chain.js:284
 /// Uses `name.length <= options.tabWidth` (JS .length, ASCII-only in practice)
-fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
+fn is_short_name(name: IdentName, name_start: u32, interner: &impl SymbolLookup) -> bool {
     interner
-        .with_name(symbol, |name| name.len() <= TAB_WIDTH)
+        .with_name(name, name_start, |name| name.len() <= TAB_WIDTH)
         .unwrap_or(false)
 }
 
@@ -548,10 +555,11 @@ fn is_short_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
 /// Matches Prettier's `isFactory`: `/^[A-Z]|^[$_]+$/u` (member-chain.js:273)
 /// - Starts with uppercase: `Object`, `React`, `Observable`
 /// - Pure `$`/`_` identifiers: `$`, `_`, `$_`, `$__` (lodash-style)
-fn is_factory_name(symbol: DefaultSymbol, interner: &impl SymbolLookup) -> bool {
+fn is_factory_name(name: IdentName, name_start: u32, interner: &impl SymbolLookup) -> bool {
     interner
         .with_name(
-            symbol,
+            name,
+            name_start,
             crate::printer::expressions::literals::is_factory_identifier_name,
         )
         .unwrap_or(false)
@@ -565,13 +573,19 @@ mod tests {
     use string_interner::DefaultStringInterner;
     use tsv_lang::Span;
 
-    /// Helper to create an identifier expression
+    /// Helper to create an identifier expression. Tests fabricate spans with no
+    /// backing source, so the name rides the escaped/interned channel (resolved
+    /// through the interner regardless of span).
     fn make_identifier<'arena>(
         interner: &mut DefaultStringInterner,
         name: &str,
     ) -> Expression<'arena> {
-        let symbol = interner.get_or_intern(name);
-        Expression::Identifier(Identifier::simple(symbol, Span::new(0, name.len() as u32)))
+        let len = name.len() as u32;
+        let name = IdentName {
+            escaped: Some(interner.get_or_intern(name)),
+            raw_len: 0,
+        };
+        Expression::Identifier(Identifier::simple(name, Span::new(0, len)))
     }
 
     /// Helper to create a member expression: object.property
@@ -582,13 +596,16 @@ mod tests {
         property_name: &str,
         object_end: u32,
     ) -> Expression<'arena> {
-        let prop_symbol = interner.get_or_intern(property_name);
+        let prop_name = IdentName {
+            escaped: Some(interner.get_or_intern(property_name)),
+            raw_len: 0,
+        };
         let property_start = object_end + 1; // after the dot
         let span_end = property_start + property_name.len() as u32;
         Expression::MemberExpression(MemberExpression {
             object: arena.alloc(object),
             property: arena.alloc(Expression::Identifier(Identifier::simple(
-                prop_symbol,
+                prop_name,
                 Span::new(property_start, span_end),
             ))),
             computed: false,

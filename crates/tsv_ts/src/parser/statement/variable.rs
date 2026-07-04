@@ -2,7 +2,6 @@
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use string_interner::DefaultSymbol;
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
@@ -59,8 +58,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse binding pattern: identifier, array pattern [a, b], or object pattern {a, b}
         // Note: Some keywords can be used as identifiers in variable declarations (e.g., `async`)
         // For simple identifiers, also handles definite assignment assertion (`!`)
-        let (id, definite) = if let Some(symbol) = self.try_intern_binding_name() {
-            self.parse_simple_binding(symbol)?
+        let (id, definite) = if let Some(name) = self.try_binding_name() {
+            self.parse_simple_binding(name)?
         } else if matches!(
             self.current_kind(),
             TokenKind::BracketOpen | TokenKind::BraceOpen
@@ -212,7 +211,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Returns `(expression, definite)` where `definite` is true if `!` was present.
     fn parse_simple_binding(
         &mut self,
-        symbol: DefaultSymbol,
+        name: IdentName,
     ) -> Result<(Expression<'arena>, bool), ParseError> {
         let (start, end) = self.current_pos();
         self.advance()?;
@@ -234,7 +233,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         Ok((
             Expression::Identifier(Identifier {
-                name: symbol,
+                escaped_name: name.escaped,
+                name_len: name.raw_len,
                 optional: false,
                 extra,
                 span: Span::new(start as u32, id_end as u32),

@@ -4,13 +4,13 @@ use super::super::super::internal;
 use super::declarations::write_type_parameter;
 use super::expressions::{write_expression, write_expressions};
 use super::patterns::write_template_element;
+use super::write_name;
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_array, write_bare_node, write_identifier_parts,
     write_identifier_plain, write_literal, write_or_null, write_type_annotation_field,
     write_type_arguments_field, write_type_parameters_field,
 };
 use internal::TSKeywordKind;
-use tsv_lang::InfallibleResolve;
 
 /// Emits a `TSTypeAnnotation` node. A Svelte block pattern's top-level
 /// annotation (`ctx.pattern_ann_span`) omits the `loc` field — Svelte's
@@ -107,7 +107,7 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
         internal::TSType::TypePredicate(p) => {
             node_header(w, "TSTypePredicate", p.span, ctx);
             w.raw(",\"parameterName\":");
-            if ctx.interner.resolve_infallible(p.parameter_name.name) == "this" {
+            if p.parameter_name.name(ctx.source, ctx.interner) == "this" {
                 write_bare_node(w, "TSThisType", p.parameter_name.span, ctx);
             } else {
                 write_identifier_plain(w, &p.parameter_name, ctx);
@@ -153,13 +153,13 @@ pub(super) fn write_type(w: &mut JsonWriter, ts_type: &internal::TSType<'_>, ctx
                 w.raw(",\"readonly\":");
                 write_mapped_type_modifier(w, modifier);
             }
-            // The `TSMappedTypeParameter`: the parameter name is a bare symbol
-            // with no name-only span (the struct span covers `K in C`), so it
-            // resolves from the interner.
+            // The `TSMappedTypeParameter`: the parameter name is a bare name
+            // channel; the name token is the leading `raw_len` bytes of the
+            // struct span (which covers `K in C`).
             w.raw(",\"typeParameter\":");
             node_header(w, "TSTypeParameter", m.type_parameter.span, ctx);
             w.raw(",\"name\":");
-            w.string(ctx.interner.resolve_infallible(m.type_parameter.name));
+            write_name(w, m.type_parameter.name, m.type_parameter.span.start, ctx);
             w.raw(",\"constraint\":");
             write_type(w, m.type_parameter.constraint, ctx);
             close_node(w, "TSTypeParameter", m.type_parameter.span, ctx);
@@ -388,7 +388,7 @@ fn write_type_element(w: &mut JsonWriter, elem: &internal::TSTypeElement<'_>, ct
             // acorn quirk: omits `computed` when the key is the `new` keyword
             // and the signature is neither computed nor readonly.
             let is_new_key = matches!(&p.key, internal::Expression::Identifier(id)
-                if ctx.interner.resolve_infallible(id.name) == "new");
+                if id.name(ctx.source, ctx.interner) == "new");
             if !(!p.computed && !p.readonly && is_new_key) {
                 w.raw(",\"computed\":");
                 w.bool(p.computed);
@@ -503,7 +503,7 @@ pub(super) fn write_index_signature(
         write_identifier_parts(
             w,
             p.span,
-            p.name,
+            p.ident_name(),
             p.optional,
             p.type_annotation(),
             None,

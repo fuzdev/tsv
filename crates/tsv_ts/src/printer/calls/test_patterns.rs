@@ -4,12 +4,11 @@
 // Jest, Mocha, Jasmine, Playwright, Vitest patterns
 
 use super::super::Printer;
-use crate::ast::internal;
+use crate::ast::internal::{self, IdentName};
 use smallvec::SmallVec;
-use string_interner::DefaultSymbol;
+use tsv_lang::SymbolResolver;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::{InfallibleResolve, SymbolResolver, SymbolToU32};
 
 /// Test function patterns that Prettier keeps on a single line
 /// Includes: Jest, Mocha, Jasmine, Playwright, Vitest patterns
@@ -45,10 +44,10 @@ pub(super) const TEST_CALL_PATTERNS: &[&str] = &[
     "ftest",
 ];
 
-/// Get the name of an identifier if it's a simple identifier
-fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<DefaultSymbol> {
+/// Get the name channel (+ span start) of an identifier if it's a simple identifier
+fn get_identifier_name(expr: &internal::Expression<'_>) -> Option<(IdentName, u32)> {
     if let internal::Expression::Identifier(id) = expr {
-        Some(id.name)
+        Some((id.ident_name(), id.span.start))
     } else {
         None
     }
@@ -75,11 +74,11 @@ pub(super) fn build_test_callee_flat_doc(
     let d = printer.d();
     // Parts come out leaf→root; reverse to root→leaf (`test.describe.only`).
     let mut doc_parts = DocBuf::new();
-    for (i, sym) in parts.iter().rev().enumerate() {
+    for (i, (name, name_start)) in parts.iter().rev().enumerate() {
         if i > 0 {
             doc_parts.push(d.text("."));
         }
-        doc_parts.push(d.symbol(sym.to_u32()));
+        doc_parts.push(printer.ident_name_doc(*name, *name_start));
     }
     // `concat` short-circuits a single-part callee (`it`) to the bare symbol.
     Some(d.concat(&doc_parts))
@@ -87,12 +86,14 @@ pub(super) fn build_test_callee_flat_doc(
 
 /// Get the member chain parts from an expression
 /// Returns parts reversed, e.g. `["skip", "test"]` for `test.skip`.
-fn get_member_chain_parts(expr: &internal::Expression<'_>) -> Option<SmallVec<[DefaultSymbol; 8]>> {
-    let mut parts: SmallVec<[DefaultSymbol; 8]> = SmallVec::new();
+fn get_member_chain_parts(
+    expr: &internal::Expression<'_>,
+) -> Option<SmallVec<[(IdentName, u32); 8]>> {
+    let mut parts: SmallVec<[(IdentName, u32); 8]> = SmallVec::new();
 
     match expr {
         internal::Expression::Identifier(id) => {
-            parts.push(id.name);
+            parts.push((id.ident_name(), id.span.start));
             Some(parts)
         }
         internal::Expression::MemberExpression(member) => {
@@ -181,7 +182,7 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
     let names: SmallVec<[&str; 8]> = parts
         .iter()
         .rev()
-        .map(|&sym| interner.resolve_infallible(sym))
+        .map(|&(name, name_start)| name.resolve(name_start, printer.source, &interner))
         .collect();
     TEST_CALL_PATTERNS
         .iter()

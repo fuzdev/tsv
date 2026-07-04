@@ -5,7 +5,7 @@ use bumpalo::collections::Vec as BumpVec;
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
-use tsv_ts::ast::internal::{Expression, Identifier};
+use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
 
 use super::expression_tag::scan_to_matching_brace;
 use super::parser_impl::SvelteParser;
@@ -375,14 +375,33 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         start: usize,
         end: usize,
     ) -> Expression<'arena> {
-        let symbol = self.interner.borrow_mut().get_or_intern(name);
+        let span = Span {
+            start: start as u32,
+            end: end as u32,
+        };
         Expression::Identifier(Identifier::simple(
-            symbol,
-            Span {
-                start: start as u32,
-                end: end as u32,
-            },
+            self.synthesized_ident_name(name, span),
+            span,
         ))
+    }
+
+    /// Name channel for a synthesized TS `Identifier` covering `span`:
+    /// span-identity when the name is exactly the source slice (the common
+    /// case), else interned — e.g. a `{ name }` shorthand attribute whose
+    /// braces content was trimmed, so the span includes the padding.
+    fn synthesized_ident_name(&self, name: &str, span: Span) -> IdentName {
+        let slice = &self.source[span.start as usize..span.end as usize];
+        if slice == name && u16::try_from(name.len()).is_ok() {
+            IdentName {
+                escaped: None,
+                raw_len: name.len() as u16,
+            }
+        } else {
+            IdentName {
+                escaped: Some(self.interner.borrow_mut().get_or_intern(name)),
+                raw_len: 0,
+            }
+        }
     }
 
     /// Parse a style directive (style:property={value} or style:property="value")
@@ -629,17 +648,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             ));
         }
 
-        // Intern the name
-        let name = self.intern(name_str);
-
         // Create the value as an ExpressionTag containing an Identifier
         // The identifier has the same name as the attribute
+        let ident_span = Span {
+            start: content_start as u32,
+            end: content_end as u32,
+        };
         let identifier = Identifier::simple(
-            name,
-            Span {
-                start: content_start as u32,
-                end: content_end as u32,
-            },
+            self.synthesized_ident_name(name_str, ident_span),
+            ident_span,
         );
 
         let expression_tag = ExpressionTag {
@@ -655,6 +672,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         let mut value_vec = self.bvec();
         value_vec.push(AttributeValue::ExpressionTag(expression_tag));
+
+        // The Svelte-side attribute name stays interned (element/attr names are
+        // the interner's remaining tenants); only the TS identifier above is
+        // span-identity.
+        let name = self.intern(name_str);
 
         Ok(Attribute {
             name,

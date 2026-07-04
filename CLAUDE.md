@@ -978,7 +978,9 @@ sub-slice of source (no decoding for JS/TS/CSS comments), so `Comment` holds a
 (`source` must be the host document the spans were recorded against). This avoids a
 `String` allocation per comment in the lexer and the parser's collect-clone; every
 field is `Copy`. `multiline` is precomputed so the multi-line-block expansion checks
-(`has_multiline_block_comments_in_range` and the printers) stay O(1) and source-free.
+(`has_multiline_block_comments_in_range` and the printers) read a flag instead of
+re-scanning content — the range lookup itself stays a binary search plus a scan of the
+comments in the window, but each comment's multiline test is O(1) and source-free.
 The full comment span includes its delimiters (`//` / `/* */` / a `#!` hashbang,
 whose content includes the `#!`); the lexer is the single owner of those widths.
 
@@ -992,7 +994,7 @@ Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/
 
 - `serde_json` — wire-JSON emission: the writer's exact string-escape / `f64` formatting, and reparsing bytes to a `Value` (CLI `--pretty`, tests). The language crates no longer depend on `serde` directly (only transitively, without its `derive`); `serde`'s derive is dev-tooling only (`tsv_debug` / `tsv_cli`)
 - `smallvec` — Stack-allocated vectors
-- `string-interner` — String interning for AST symbols
+- `string-interner` — String interning for the residual symbol tenants (Svelte element/attribute names, escaped identifiers); identifier names are span-identity (`IdentName`)
 - `thiserror` — Error type derivation
 - `phf` — Compile-time perfect hash maps (keywords, entities)
 - `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers

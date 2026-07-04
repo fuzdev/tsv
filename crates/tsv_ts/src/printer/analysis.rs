@@ -5,10 +5,10 @@
 // special handling, wrapping, or expansion.
 
 use crate::ast::internal;
+use crate::printer::Printer;
 use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
-use tsv_lang::SymbolToU32;
-use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::doc::arena::DocId;
 
 /// Skip past identifier characters (alphanumeric, `_`, `$`, non-ASCII) starting at `pos`.
 ///
@@ -35,6 +35,7 @@ pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize 
 /// - `await import(stringLiteral)`
 pub(crate) fn is_module_path_fluid_call(
     expr: &internal::Expression<'_>,
+    source: &str,
     interner: &DefaultStringInterner,
 ) -> bool {
     // Check for `await import(string)` — single-arg only (no options)
@@ -59,9 +60,9 @@ pub(crate) fn is_module_path_fluid_call(
         && !member.computed
         && !member.optional
         && let internal::Expression::Identifier(resolve_id) = member.property
-        && interner.resolve(resolve_id.name) == Some("resolve")
+        && resolve_id.name(source, interner) == "resolve"
         && let internal::Expression::Identifier(require_id) = member.object
-        && interner.resolve(require_id.name) == Some("require")
+        && require_id.name(source, interner) == "require"
     {
         return true;
     }
@@ -475,15 +476,19 @@ pub(crate) fn has_multiline_content(expr: &internal::Expression<'_>, source: &st
 
 /// Build doc for TSEntityName (qualified names like `A.B.C`)
 ///
-/// This is a standalone function since it doesn't need printer state -
-/// it only uses `d.symbol()` for deferred symbol resolution.
-pub(crate) fn build_entity_name_doc(d: &DocArena, name: &internal::TSEntityName<'_>) -> DocId {
+/// Needs the printer for the name-emission seam (span-identity source slices,
+/// interner-deferred escaped names).
+pub(crate) fn build_entity_name_doc(
+    printer: &Printer<'_>,
+    name: &internal::TSEntityName<'_>,
+) -> DocId {
+    let d = printer.d();
     match name {
-        internal::TSEntityName::Identifier(id) => d.symbol(id.name.to_u32()),
+        internal::TSEntityName::Identifier(id) => printer.identifier_name_doc(id),
         internal::TSEntityName::QualifiedName(qn) => d.concat(&[
-            build_entity_name_doc(d, &qn.left),
+            build_entity_name_doc(printer, &qn.left),
             d.text("."),
-            d.symbol(qn.right.name.to_u32()),
+            printer.identifier_name_doc(&qn.right),
         ]),
     }
 }

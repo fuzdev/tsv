@@ -8,13 +8,12 @@
 use super::analysis::SymbolLookup;
 use super::types::{ChainGroup, ChainNode};
 use crate::ast::internal::{self, Expression};
-use string_interner::DefaultSymbol;
 use tsv_lang::doc::{
     DocBuf,
     arena::{DocArena, DocId},
 };
 use tsv_lang::printing::has_blank_line_between_strict;
-use tsv_lang::{ClassifiedComments, Comment, Span, SymbolToU32};
+use tsv_lang::{ClassifiedComments, Comment, Span};
 
 //
 // Trait Definition
@@ -24,6 +23,10 @@ use tsv_lang::{ClassifiedComments, Comment, Span, SymbolToU32};
 pub trait ChainPrinter: SymbolLookup {
     /// Get a reference to the doc arena
     fn arena(&self) -> &DocArena;
+
+    /// Emit an identifier-name doc node (span-identity source slice, or the
+    /// interner-deferred escaped form)
+    fn ident_doc(&self, name: internal::IdentName, name_start: u32) -> DocId;
 
     /// Print an expression as a DocId
     fn print_expression(&self, expr: &Expression<'_>) -> DocId;
@@ -270,6 +273,7 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
         } => print_member_access(
             printer,
             *property,
+            *property_start,
             *optional,
             *object_end,
             *property_start,
@@ -282,9 +286,11 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
             optional,
             object_end,
             property_start,
+            name_start,
         } => print_member_access(
             printer,
             *property,
+            *name_start,
             *optional,
             *object_end,
             *property_start,
@@ -472,9 +478,11 @@ fn print_group_inner<'a, P: ChainPrinter>(
 ///
 /// The `skip_comments` flag is used by the expanded path where `add_comments_and_break`
 /// already handles comments for the first member of rest groups.
+#[allow(clippy::too_many_arguments)]
 fn print_member_access<P: ChainPrinter>(
     printer: &P,
-    property: DefaultSymbol,
+    property: internal::IdentName,
+    name_start: u32,
     optional: bool,
     object_end: u32,
     property_start: u32,
@@ -482,13 +490,14 @@ fn print_member_access<P: ChainPrinter>(
     skip_comments: bool,
 ) -> DocId {
     let d = printer.arena();
-    // Build member doc without format! allocation - use doc::symbol for deferred resolution
-    let prop_id = property.to_u32();
+    // Build member doc without format! allocation — span-identity (or deferred
+    // interner resolution for escaped names)
+    let prop_doc = printer.ident_doc(property, name_start);
     let member_doc = match (optional, is_private) {
-        (false, false) => d.concat(&[d.text("."), d.symbol(prop_id)]),
-        (true, false) => d.concat(&[d.text("?."), d.symbol(prop_id)]),
-        (false, true) => d.concat(&[d.text(".#"), d.symbol(prop_id)]),
-        (true, true) => d.concat(&[d.text("?.#"), d.symbol(prop_id)]),
+        (false, false) => d.concat(&[d.text("."), prop_doc]),
+        (true, false) => d.concat(&[d.text("?."), prop_doc]),
+        (false, true) => d.concat(&[d.text(".#"), prop_doc]),
+        (true, true) => d.concat(&[d.text("?.#"), prop_doc]),
     };
 
     if skip_comments {

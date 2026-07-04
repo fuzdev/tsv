@@ -4,10 +4,11 @@
 //! type literals, type operators, and related constructs.
 
 use crate::lexer::KeywordKind;
-use string_interner::DefaultSymbol;
 use tsv_lang::Span;
 
-use super::{Expression, Identifier, Literal, MethodKind, TemplateElement, UnaryExpression};
+use super::{
+    Expression, IdentName, Identifier, Literal, MethodKind, TemplateElement, UnaryExpression,
+};
 
 /// TypeScript type annotation node (e.g., `: number` in `const a: number = 5`)
 ///
@@ -656,10 +657,11 @@ pub struct TSMappedType<'arena> {
 /// Type parameter in a mapped type: `K in keyof T`
 #[derive(Debug, Clone)]
 pub struct TSMappedTypeParameter<'arena> {
-    /// The parameter name (just the string, not an Identifier). Interned like
-    /// every other identifier name (`DefaultSymbol`) — bounded vocabulary, O(1)
-    /// equality, dedup across the document; resolve via the interner.
-    pub name: DefaultSymbol,
+    /// The parameter name (just the string, not an `Identifier`) — span-identity
+    /// with the escaped-interned fallback, like every identifier name. `span`
+    /// covers exactly the name token (`K`; the constraint is a sibling field),
+    /// so the verbatim name is the leading `raw_len` bytes at `span.start`.
+    pub name: IdentName,
     /// The constraint type (e.g., `keyof T`)
     pub constraint: &'arena TSType<'arena>,
     pub span: Span,

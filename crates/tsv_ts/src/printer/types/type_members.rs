@@ -13,7 +13,6 @@ use super::Printer;
 use crate::ast::internal::{self, TSTypeElement};
 use crate::printer::analysis::skip_identifier_at;
 use smallvec::smallvec;
-use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -422,7 +421,7 @@ impl<'a> Printer<'a> {
             .parameters
             .iter()
             .map(|param| {
-                let mut param_parts: DocBuf = smallvec![d.symbol(param.name.to_u32())];
+                let mut param_parts: DocBuf = smallvec![self.identifier_name_doc(param)];
                 if let Some(type_ann) = param.type_annotation() {
                     // The `: keyType` annotation, handling a before-`:` comment between
                     // the key name and `:` — line → indented continuation (the hardline

@@ -42,12 +42,23 @@ allocations) is a negligible absolute change.
   library code; the extreme for comment-path and allocation changes (zzz's
   comment density is a fraction of fuz_app's, so zzz alone under-represents
   these paths).
+- **Svelte-component-dense** — `~/dev/fuz_ui/src/lib`. Mostly `.svelte`
+  components with a thin `.ts` slice — the markup-heavy complement to
+  fuz_app's TSDoc-dense TS, and a stable in-ecosystem stand-in for the
+  external `.svelte` slices below.
 - **Representative real-world** — `~/dev/svelte/packages/svelte/src`,
   `~/dev/kit/packages/kit/src`, and `~/dev/svelte-docinfo/src`. Large, diverse
   sources at moderate comment density — the middle ground the two app corpora
   bracket. svelte and kit are mostly `.js` (which `tsv format` skips, but
   `profile`/`json_profile` still time, parsed as TypeScript), so kit's
   `.svelte` + `.ts` and svelte-docinfo's `.ts` are the formattable slices.
+
+**Measuring one language in isolation:** because `profile`/`json_profile` route
+every non-`.svelte`/`.css` file to the TypeScript parser, a directory that
+co-locates other files with the language under test pollutes that language's
+rate — e.g. `../prettier/tests/format/css` holds per-directory `.js` test
+drivers beside its `.css` fixtures. Copy only the target extension into a
+scratch directory and profile that.
 
 ## Tooling
 
@@ -136,6 +147,11 @@ strip = false
 
 Build with: `cargo build --profile profiling -p tsv_debug`
 
+Because `profiling` inherits `release` (only `debug`/`strip` differ), codegen
+is identical — wall rates and `perf stat` instruction counts read the same on
+either build; only the symbol-attributing tools (`perf report`/`annotate`,
+heaptrack) need the `profiling` build's retained symbols.
+
 ### 4. `perf` — function-level and line-level hotspots
 
 Once phase timing identifies _which_ phase to optimize, `perf` identifies _which functions_ within that phase.
@@ -183,6 +199,13 @@ artifact, not a real cost — added code (a new monomorphization, more inlining)
 shifted hot functions across cache lines. For a printer-only edit, **parse is a
 built-in control**: its code is unchanged, so any instruction movement there is pure
 layout. A real algorithmic change instead shows up as more *instructions*.
+
+Anchor instruction counts on an **in-process corpus run** — `profile`
+(parse+format) or `json_profile` (parse + wire-JSON write) over a directory
+with `--iterations N`. A per-file `tsv parse` spawn loop (the CLI is
+single-file) is a different anchor: it measures the whole CLI path including
+process startup, dynamic linking, and allocator warmup per file — useful for
+CLI-boundary changes, but never comparable to the in-process numbers.
 
 For visual flamegraphs (useful for humans, not Claude):
 

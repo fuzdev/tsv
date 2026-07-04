@@ -5,7 +5,6 @@
 
 use crate::ast::internal::*;
 use crate::lexer::{KeywordKind, TokenKind};
-use string_interner::DefaultSymbol;
 use tsv_lang::{ParseError, Span};
 
 use super::Parser;
@@ -17,7 +16,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_index_signature_body(
         &mut self,
         sig_start: usize,
-        param_symbol: DefaultSymbol,
+        param_name: IdentName,
         id_start: usize,
         readonly: bool,
     ) -> Result<TSTypeElement<'arena>, ParseError> {
@@ -34,7 +33,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             decorators: None,
         });
         let param = Identifier {
-            name: param_symbol,
+            escaped_name: param_name.escaped,
+            name_len: param_name.raw_len,
             optional: false,
             extra: Some(extra),
             span: Span::new(id_start as u32, param_type_end),
@@ -159,10 +159,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?; // consume '['
 
                 let (param_start, _) = self.current_pos();
-                let param_symbol = self.intern_identifier();
+                let param_name = self.current_ident_name();
                 self.advance()?;
 
-                return self.parse_index_signature_body(start, param_symbol, param_start, readonly);
+                return self.parse_index_signature_body(start, param_name, param_start, readonly);
             }
             // If not an index signature, fall through to computed property handling below
         }
@@ -196,12 +196,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (true, expr)
         } else if self.current_is_identifier_or_keyword() {
             let (key_start, key_end) = self.current_pos();
-            let symbol = self.intern(self.current_property_name());
+            // Property keys deliberately use the raw token text.
+            let key_name = self.current_raw_ident_name();
             self.advance()?;
             (
                 false,
                 Expression::Identifier(Identifier::simple(
-                    symbol,
+                    key_name,
                     Span::new(key_start as u32, key_end as u32),
                 )),
             )

@@ -4,7 +4,6 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::CommentSpacing;
 use smallvec::smallvec;
-use tsv_lang::SymbolToU32;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -160,7 +159,7 @@ impl<'a> Printer<'a> {
         // (uniform declaration-header rule). Block/no-comment cases stay inline.
         let mut tail: DocBuf = DocBuf::new();
         let name_start = if let Some(id) = &decl.id {
-            tail.push(d.symbol(id.name.to_u32()));
+            tail.push(self.identifier_name_doc(id));
 
             // Comments between name and type params/parens: `function fn1/* c */ <T>()` or `fn1 /* c */()`
             // Line comments get a hardline to prevent absorbing type params as comment text

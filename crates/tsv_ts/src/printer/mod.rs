@@ -68,7 +68,8 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, TAB_WIDTH, comments_in_range,
+    EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, SymbolToU32, TAB_WIDTH,
+    comments_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -1038,6 +1039,56 @@ impl<'a> Printer<'a> {
                 .trim_end()
                 .to_string(),
         )
+    }
+
+    /// Emit an identifier-name doc node — the doc-side name-emission seam.
+    /// Span-identity names render as verbatim source (`DocText::SourceSpan`
+    /// with deferred width — identifier names are newline-free, and the lazy
+    /// measure matches `Symbol`'s zero build-time cost); escaped names defer
+    /// to the interner (`DocText::Symbol`), resolved at render exactly as
+    /// before.
+    pub(in crate::printer) fn ident_name_doc(
+        &self,
+        name: internal::IdentName,
+        name_start: u32,
+    ) -> DocId {
+        let d = self.d();
+        match name.escaped {
+            Some(sym) => d.symbol(sym.to_u32()),
+            None => d.source_span_ident(Span::new(name_start, name_start + name.raw_len as u32)),
+        }
+    }
+
+    /// [`Self::ident_name_doc`] for an `Identifier` node (the name is the
+    /// leading token of the node span).
+    pub(in crate::printer) fn identifier_name_doc(&self, id: &internal::Identifier<'_>) -> DocId {
+        self.ident_name_doc(id.ident_name(), id.span.start)
+    }
+
+    /// Run `f` over a name channel resolved at `name_start` — the compare/width
+    /// seam. Span-identity names borrow the source slice; escaped names resolve
+    /// the interned decoded form (so an escaped name still compares decoded).
+    pub(in crate::printer) fn with_ident_name_at<R>(
+        &self,
+        name: internal::IdentName,
+        name_start: u32,
+        f: impl FnOnce(&str) -> R,
+    ) -> R {
+        match name.escaped {
+            Some(sym) => self.with_resolved_symbol(sym, f),
+            None => {
+                f(&self.source[name_start as usize..name_start as usize + name.raw_len as usize])
+            }
+        }
+    }
+
+    /// [`Self::with_ident_name_at`] for an `Identifier` node.
+    pub(in crate::printer) fn with_ident_name<R>(
+        &self,
+        id: &internal::Identifier<'_>,
+        f: impl FnOnce(&str) -> R,
+    ) -> R {
+        self.with_ident_name_at(id.ident_name(), id.span.start, f)
     }
 }
 

@@ -75,12 +75,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Keywords like `object` and `async` can be function names; `await` is a
         // valid name only at Script `[~Await]` (reserved at Module / `[+Await]`).
         let (id_start, id_end) = self.current_pos();
-        let Some(symbol) = self.try_intern_function_name() else {
+        let Some(name) = self.try_function_name() else {
             return Err(self.error_expected_after("function name", "function"));
         };
         self.advance()?;
 
-        let id = Identifier::simple(symbol, Span::new(id_start as u32, id_end as u32));
+        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
 
         // Parse type parameters (TypeScript generics): function foo<T>()
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -188,12 +188,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse function name (required for declarations, optional for export default)
         // Keywords like `object` and `async` can be function names; `await` is a
         // valid name only at Script `[~Await]` (reserved at Module / `[+Await]`).
-        let id = if let Some(symbol) = self.try_intern_function_name() {
+        let id = if let Some(name) = self.try_function_name() {
             let (id_start, id_end) = self.current_pos();
             self.advance()?;
 
             Some(Identifier::simple(
-                symbol,
+                name,
                 Span::new(id_start as u32, id_end as u32),
             ))
         } else if name_required {
@@ -223,7 +223,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
             Ok(ExportFunctionDeclaration::Declare(TSDeclareFunction {
                 id: id.unwrap_or_else(|| {
-                    Identifier::simple(self.intern(""), Span::new(start as u32, start as u32))
+                    // Anonymous: empty name over a zero-width span (span-identity).
+                    Identifier::simple(
+                        IdentName {
+                            escaped: None,
+                            raw_len: 0,
+                        },
+                        Span::new(start as u32, start as u32),
+                    )
                 }),
                 type_parameters,
                 params,
@@ -303,10 +310,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let id = self.with_in_await(is_async, |p| {
             if matches!(p.current_kind(), TokenKind::Identifier) || p.at_await_identifier() {
                 let (id_start, id_end) = p.current_pos();
-                let symbol = p.intern_identifier_or_await();
+                let name = p.current_ident_name_or_await();
                 p.advance()?;
                 Ok(Some(Identifier::simple(
-                    symbol,
+                    name,
                     Span::new(id_start as u32, id_end as u32),
                 )))
             } else {
