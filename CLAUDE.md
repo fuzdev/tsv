@@ -263,6 +263,11 @@ deno task corpus:compare:format ~/dev/some-project  # single project (or --all f
 deno task corpus:compare:parse --all   # deep-diff parse ASTs vs acorn-typescript/svelte/parseCss
 # Options: --multibyte-only (offset-translation slice), --filter <lang>, --limit <n>, --json
 
+deno task conformance:svelte-fixtures  # tsv's Svelte parser vs Svelte's own test suite (../svelte/packages/svelte/tests)
+# Drop-in-parser analog of test262 (JS) / wpt (CSS). Periodic (non-check) gate; oracle = the live
+# modern Svelte parser. Enforces verdict parity (over-rejections must be SANCTIONED or a tracked
+# KNOWN_GAP, else exit 1); AST-shape diff is a report-only triage surface. Options: -v, --json, <subtree>.
+
 deno task divergence:audit         # audit divergence pattern coverage (--json for machine-readable)
 ```
 

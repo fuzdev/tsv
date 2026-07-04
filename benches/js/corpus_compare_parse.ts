@@ -69,7 +69,7 @@ type DiffKind =
 	| 'missing_canonical'
 	| 'length_mismatch';
 
-interface DiffEntry {
+export interface DiffEntry {
 	/** Concrete path into the AST, e.g. `body[3].declarations[0].init.start` */
 	path: string;
 	/** Grouping key: kind + path with array indices normalized to `[]` */
@@ -128,8 +128,9 @@ function has_non_ascii(s: string): boolean {
 
 // Matches the fixture sidecar's jsonReplacer (crates/tsv_debug/src/deno/sidecar.ts)
 // so corpus comparison and expected.json generation serialize the canonical AST
-// identically (BigInt literal values can't be serialized natively).
-function bigint_replacer(_key: string, value: unknown): unknown {
+// identically (BigInt literal values can't be serialized natively). Exported so
+// diagnostics/svelte_fixtures_compare.ts serializes its canonical AST the same way.
+export function bigint_replacer(_key: string, value: unknown): unknown {
 	return typeof value === 'bigint' ? value.toString() : value;
 }
 
@@ -164,7 +165,7 @@ function value_type(v: unknown): ValueType {
 // here AND ensure the divergence is cataloged in conformance_svelte.md.
 
 /** Per-file context available to matchers (some divergences are file-level, e.g. BOM). */
-interface MatchContext {
+export interface MatchContext {
 	source: string;
 	/** Root of the canonical AST — lets matchers resolve ancestors from the entry path. */
 	canonical_root: unknown;
@@ -524,7 +525,7 @@ function path_signature(path: string): string {
  * entries. Arrays with differing lengths report one length_mismatch and still
  * recurse the shared prefix so positional drift inside is visible.
  */
-function diff_asts(
+export function diff_asts(
 	ours: unknown,
 	canonical: unknown,
 	ctx: MatchContext,
@@ -1035,4 +1036,9 @@ function build_error_json_report(message: string): Record<string, unknown> {
 	};
 }
 
-run_compare_main(main, CorpusCompareParseArgs, build_error_json_report);
+// Guarded so this module can be imported for its diff engine (`diff_asts`,
+// `DiffEntry`, `MatchContext`) — e.g. by diagnostics/svelte_fixtures_compare.ts —
+// without running the CLI on import.
+if (import.meta.main) {
+	run_compare_main(main, CorpusCompareParseArgs, build_error_json_report);
+}

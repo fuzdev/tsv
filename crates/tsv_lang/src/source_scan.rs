@@ -349,8 +349,10 @@ pub fn rfind_keyword(
 /// Whether the `/` at `slash_pos` starts a regex literal (rather than a division
 /// operator). Decided by the previous significant byte, walking back to
 /// `lower_bound`: a `/` after something that *ends* an expression (identifier
-/// char, `)`, `]`) is division; after anything else (or at the start) it is a
-/// regex.
+/// char, `)`, `]`, or a string/template closing quote `'` `"` `` ` ``) is
+/// division; after anything else (or at the start) it is a regex. Callers run
+/// [`skip_trivia`] first, which consumes complete strings/templates, so a quote
+/// immediately before a significant `/` is always a *closing* quote.
 ///
 /// This is the one piece of `/`-disambiguation the trivia cursor deliberately
 /// leaves out of [`skip_trivia`]/[`TriviaProfile`]: it needs a *backward*
@@ -365,8 +367,17 @@ pub fn is_regex_start(bytes: &[u8], slash_pos: usize, lower_bound: usize) -> boo
         j -= 1;
         let b = bytes[j];
         if !b.is_ascii_whitespace() {
-            // Bytes that END an expression — a `/` after these is DIVISION.
-            return !(b.is_ascii_alphanumeric() || b == b'_' || b == b')' || b == b']');
+            // Bytes that END an expression — a `/` after these is DIVISION. The
+            // string/template closing quotes (`'` `"` `` ` ``) belong here: after a
+            // literal like `'ab' / 2`, the `/` divides (skip_trivia already ate the
+            // whole string, so this quote can only be its close).
+            return !(b.is_ascii_alphanumeric()
+                || b == b'_'
+                || b == b')'
+                || b == b']'
+                || b == b'\''
+                || b == b'"'
+                || b == b'`');
         }
     }
     // Nothing significant before it (start of the scanned region) → regex.
@@ -415,6 +426,80 @@ pub fn skip_regex_literal(bytes: &[u8], start: usize, end: usize) -> usize {
     end
 }
 
+/// Scan from `scan_start` — the first byte inside an already-open `{` (counted as
+/// depth 1) — to that brace's matching `}`, returning the `}`'s offset, or `None`
+/// if the braces don't balance before `end`.
+///
+/// Expression-context aware: strings and line/block comments are skipped via
+/// [`skip_trivia`] (JS), regex literals via [`is_regex_start`] / [`skip_regex_literal`],
+/// and template literals — interpolation and all — via [`skip_template_literal`], so
+/// a `}` inside any of them is inert. The shared core behind Svelte's `{…}`-tag
+/// matcher (`tsv_svelte`'s `scan_to_matching_brace`) and the `${…}` interpolation
+/// skip below. A binding-PATTERN scanner (`match_bracket`) deliberately does **not**
+/// route through here — Svelte rejects a regex in that position, so the pattern
+/// scan stays regex-unaware — but it *does* share [`skip_template_literal`].
+pub fn scan_to_matching_brace(bytes: &[u8], scan_start: usize, end: usize) -> Option<usize> {
+    let mut depth: u32 = 1;
+    let mut i = scan_start;
+    while i < end {
+        if bytes[i] == b'`' {
+            i = skip_template_literal(bytes, i, end);
+            continue;
+        }
+        if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+            i = past;
+            continue;
+        }
+        if bytes[i] == b'/' && i + 1 < end && is_regex_start(bytes, i, scan_start) {
+            i = skip_regex_literal(bytes, i, end);
+            continue;
+        }
+        match bytes[i] {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(i);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Skip a template literal whose opening `` ` `` is at `start`, returning the
+/// position just past the closing `` ` `` (bounded by `end`; an unterminated
+/// literal returns `end`).
+///
+/// **Interpolation-aware**, unlike [`skip_trivia`]'s opaque quote-to-quote
+/// template handling: a `${…}` region is scanned with *balanced braces* (via
+/// [`scan_to_matching_brace`]), so a `}` inside it — and any nested template /
+/// string / regex / object literal — doesn't end the template early. `skip_trivia`
+/// scans `` ` `` to the next `` ` ``, which mis-pairs across a nested template
+/// (`` `${`x`}` `` pairs the outer and inner opening backticks), swallowing the rest
+/// of the input. So the brace matchers that need *exact* template extents (Svelte's
+/// `{…}` tag scanner and binding-pattern scanner) intercept `` ` `` and call this
+/// instead of delegating it to `skip_trivia`.
+pub fn skip_template_literal(bytes: &[u8], start: usize, end: usize) -> usize {
+    let mut i = start + 1; // past the opening backtick
+    while i < end {
+        match bytes[i] {
+            b'\\' if i + 1 < end => i += 2, // escape — skip the next byte
+            b'`' => return i + 1,           // closing backtick
+            b'$' if i + 1 < end && bytes[i + 1] == b'{' => {
+                // `${…}` interpolation — skip its balanced-brace body (which may
+                // itself hold nested templates, strings, regex, and braces). Runs
+                // just past the matching `}`, or to `end` if unterminated.
+                i = scan_to_matching_brace(bytes, i + 2, end).map_or(end, |close| close + 1);
+            }
+            _ => i += 1,
+        }
+    }
+    end // unterminated template literal
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -453,6 +538,53 @@ mod tests {
         // delimiter; the real comma is at index 5.
         let src = r"'\,' , x";
         assert_eq!(find(src, b',', TriviaProfile::JS), Some(5));
+    }
+
+    #[test]
+    fn skip_template_literal_basic() {
+        let s = |src: &str| skip_template_literal(src.as_bytes(), 0, src.len());
+        assert_eq!(s("`abc`"), 5); // whole literal
+        assert_eq!(s("`abc`de"), 5); // stops at the close, not EOF
+        assert_eq!(s(r"`a\`b`"), 6); // an escaped backtick is not the close
+    }
+
+    #[test]
+    fn skip_template_literal_interpolation_balances_braces() {
+        let s = |src: &str| skip_template_literal(src.as_bytes(), 0, src.len());
+        assert_eq!(s("`a${b}c`"), 8); // simple `${…}`
+        assert_eq!(s("`${ {x: 1} }`"), 13); // an object literal `}` inside doesn't end it
+        assert_eq!(s("`${ `}` }`"), 10); // a `}` inside a NESTED template isn't the close
+    }
+
+    #[test]
+    fn skip_template_literal_nested_template() {
+        // The bug this fixes: `skip_trivia`'s opaque `` ` ``-to-`` ` `` scan mis-pairs
+        // across a nested template. `skip_template_literal` recurses through `${…}`,
+        // so a nested template — even one holding a lone quote — is skipped whole.
+        let s = |src: &str| skip_template_literal(src.as_bytes(), 0, src.len());
+        assert_eq!(s("`${`x`}`"), 8);
+        assert_eq!(s(r#"`${`"`}`"#), 8); // nested template holding a `"`
+        assert_eq!(s("`${`${`y`}`}`"), 13); // doubly nested
+    }
+
+    #[test]
+    fn skip_template_literal_unterminated_returns_end() {
+        let s = |src: &str| skip_template_literal(src.as_bytes(), 0, src.len());
+        assert_eq!(s("`abc"), 4); // no closing backtick
+        assert_eq!(s("`${abc"), 6); // unterminated interpolation
+    }
+
+    #[test]
+    fn is_regex_start_division_after_string_close() {
+        // A `/` after a string/template closing quote is DIVISION, not a regex.
+        // `lower_bound` = 0; the `/` position is the last byte.
+        let div = |src: &str| !is_regex_start(src.as_bytes(), src.len() - 1, 0);
+        assert!(div("'ab' /")); // single-quote close
+        assert!(div("\"ab\" /")); // double-quote close
+        assert!(div("`ab` /")); // template close
+        assert!(div("x /")); // identifier — already division
+        // ...but a `/` after an operator is a regex start (not division).
+        assert!(!div("= /"));
     }
 
     #[test]

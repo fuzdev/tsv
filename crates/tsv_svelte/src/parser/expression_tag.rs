@@ -4,7 +4,6 @@ use std::rc::Rc;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use tsv_lang::source_scan::{TriviaProfile, is_regex_start, skip_regex_literal, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
@@ -88,56 +87,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 }
 
 /// Find the `}` that closes the construct opened by a `{` just before
-/// `scan_start`, skipping nested braces, string literals, line/block comments,
-/// and regex literals. `scan_start` is the first byte to scan (the opening `{` is
-/// counted as depth 1). Returns the byte offset of the matching `}`, or `None`
-/// if the braces never balance.
+/// `scan_start`, skipping nested braces, strings, line/block comments, regex
+/// literals, and (interpolation-aware) template literals. `scan_start` is the
+/// first byte to scan (the opening `{` is counted as depth 1). Returns the byte
+/// offset of the matching `}`, or `None` if the braces never balance.
 ///
 /// The single robust brace matcher shared by every `{…}` construct — expression
-/// tags, `{@…}` tags, `{...spread}`, and block tags — so none reimplements it
-/// (and weaker copies can't desync on a `}` inside a regex/comment/string).
+/// tags, `{@…}` tags, `{...spread}`, and block tags — so none reimplements it (and
+/// weaker copies can't desync on a `}` inside a regex/comment/string/template).
 ///
-/// Strings and line/block comments are skipped by the shared trivia cursor
-/// (`skip_trivia`, JS profile) — so escape handling is correct in exactly one
-/// place. Regex literals are the one thing the cursor deliberately leaves
-/// significant (disambiguating `/` needs previous-token lookback); this matcher
-/// handles them via the shared `source_scan::is_regex_start` /
-/// `skip_regex_literal` helpers (the same ones the TS arrow-vs-paren lookahead
-/// uses).
+/// A thin wrapper over `tsv_lang::source_scan::scan_to_matching_brace` (the shared
+/// expression-context balanced-brace scanner, which the `${…}` template-interpolation
+/// skip also uses) with `end = bytes.len()`.
+#[inline]
 pub(crate) fn scan_to_matching_brace(bytes: &[u8], scan_start: usize) -> Option<usize> {
-    let end = bytes.len();
-    let mut brace_depth: u32 = 1; // the opening `{` before scan_start
-
-    let mut i = scan_start;
-    while i < end {
-        // Strings / line / block comments: a brace inside them isn't significant.
-        if let Some(past) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
-            i = past;
-            continue;
-        }
-
-        // A `/` the cursor left significant is division or a regex literal. The
-        // `i + 1 < end` guard mirrors the historical scanner (a trailing `/` is
-        // never a regex start). `is_regex_start` only fires here because
-        // `skip_trivia` already consumed `//` and `/*`.
-        if bytes[i] == b'/' && i + 1 < end && is_regex_start(bytes, i, scan_start) {
-            i = skip_regex_literal(bytes, i, end);
-            continue;
-        }
-
-        match bytes[i] {
-            b'{' => brace_depth += 1,
-            b'}' => {
-                brace_depth -= 1;
-                if brace_depth == 0 {
-                    return Some(i);
-                }
-            }
-            _ => {}
-        }
-
-        i += 1;
-    }
-
-    None
+    tsv_lang::source_scan::scan_to_matching_brace(bytes, scan_start, bytes.len())
 }
