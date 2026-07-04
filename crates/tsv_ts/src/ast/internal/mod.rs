@@ -104,16 +104,12 @@ pub use expressions::{
 /// Program node - the root of the AST
 ///
 /// Returned by value from `parse`; `body` points into the caller-supplied
-/// `'arena`. `comments`/`line_breaks` are root-level owned `Vec`s (single
-/// allocations, not the per-node arena target — every consumer borrows them as
-/// `&[…]` slices).
+/// `'arena`. `comments` is a root-level owned `Vec` (a single allocation, not
+/// the per-node arena target — every consumer borrows it as a `&[…]` slice).
 #[derive(Debug, Clone)]
 pub struct Program<'arena> {
     pub body: &'arena [Statement<'arena>],
     pub comments: Vec<Comment>,
-    /// Precomputed line break positions (byte offsets of newlines).
-    /// Used for O(log n) line boundary lookups during printing.
-    pub line_breaks: Vec<u32>,
     pub span: Span,
     pub interner: std::rc::Rc<std::cell::RefCell<DefaultStringInterner>>,
     /// The goal symbol this program was parsed against. Drives the public AST's
