@@ -18,8 +18,9 @@ fn text_flat_width<R: TextResolver + ?Sized>(t: &DocText, resolver: Option<&R>) 
         CachedWidth::Width(w) => Some(u32::from(w)),
         CachedWidth::HasNewline => None,
         CachedWidth::NotComputed => {
-            // Only `Static`/`SourceSpan`/`Symbol` texts can be `NotComputed`
-            // (`Pooled` always precomputes — see `pooled_text_width`), so the
+            // Only `SourceSpan` identifiers and `Symbol` texts can be
+            // `NotComputed` (`Pooled` and `Static` always precompute — see
+            // `pooled_text_width` / the arena's static width cache), so the
             // resolve never needs the arena text pool; the empty pool passed
             // here would panic loudly (slice OOB) if that invariant ever broke.
             let s = resolve_text(t, resolver, "");

@@ -210,7 +210,10 @@ impl PoolSpan {
 #[derive(Debug, Clone)]
 pub enum DocText {
     /// Static string literal - no allocation, just stores pointer.
-    /// Second field is precomputed visual width (u16::MAX = contains newline).
+    /// Second field is the precomputed visual width (a real width or
+    /// [`TEXT_WIDTH_HAS_NEWLINE`], never [`TEXT_WIDTH_NOT_COMPUTED`]) —
+    /// amortized through the arena's static width cache, measured once per
+    /// unique string per arena rather than per node.
     Static(&'static str, u16),
     /// Dynamically generated text, stored in the arena's text pool — the
     /// drop-glue-free replacement for a per-node owned `String`. Resolved
@@ -271,7 +274,8 @@ pub enum CachedWidth {
     /// The text contains a newline — there is no single-line width; fits
     /// treats the line as ending inside this text.
     HasNewline,
-    /// Not precomputed (ASCII policy or `Symbol`) — measure on demand.
+    /// Not precomputed (`source_span_ident` identifier names, or `Symbol`) —
+    /// measure on demand.
     NotComputed,
 }
 
