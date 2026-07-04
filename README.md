@@ -15,7 +15,7 @@ The extensibility story is currently limited to using its Rust crates as librari
 bridging to JS and/or WASM plugins is an open question (currently leaning against for performance and simplicity).
 For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
-tsv prioritizes, in order (with balance not strictness):
+tsv prioritizes, in order:
 
 1. correctness (Svelte and TypeScript conformance, spec adherence for HTML/CSS/JS)
 2. speed
