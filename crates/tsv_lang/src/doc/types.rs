@@ -182,25 +182,58 @@ pub const TEXT_WIDTH_HAS_NEWLINE: u16 = u16::MAX;
 /// Used for owned strings that may be expensive to measure upfront.
 pub const TEXT_WIDTH_NOT_COMPUTED: u16 = u16::MAX - 1;
 
+/// A slice into the [`super::DocArena`]'s text pool — the arena-owned `String`
+/// holding every dynamically-built text body ([`DocText::Pooled`],
+/// [`super::DocNode::MultilineText`]). Offsets are byte indices into that pool,
+/// resolved at render time against the pool borrowed from the same arena the
+/// node lives in (the pool-keyed sibling of the source-keyed
+/// [`DocText::SourceSpan`]). Storing a span instead of an owned `String` keeps
+/// `DocNode` free of drop glue, so the arena's `reset()`/drop never walk the
+/// node store running destructors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PoolSpan {
+    /// Byte offset of the text's start in the arena text pool.
+    pub start: u32,
+    /// Byte length of the text.
+    pub len: u32,
+}
+
+impl PoolSpan {
+    /// Resolve to the text slice within `pool` (the owning arena's text pool).
+    #[inline]
+    pub fn slice(self, pool: &str) -> &str {
+        &pool[self.start as usize..(self.start + self.len) as usize]
+    }
+}
+
 /// Text content in a Doc - static, owned, or a symbol to resolve at print time
 #[derive(Debug, Clone)]
 pub enum DocText {
     /// Static string literal - no allocation, just stores pointer.
     /// Second field is precomputed visual width (u16::MAX = contains newline).
     Static(&'static str, u16),
-    /// Dynamically generated text - requires allocation.
-    /// Second field is precomputed visual width (u16::MAX = contains newline).
-    Owned(String, u16),
+    /// Dynamically generated text, stored in the arena's text pool — the
+    /// drop-glue-free replacement for a per-node owned `String`. Resolved
+    /// against the pool at render time (like `SourceSpan` against `source`).
+    /// Second field is the precomputed visual width — **always** computed at
+    /// build (a real width or [`TEXT_WIDTH_HAS_NEWLINE`], never
+    /// [`TEXT_WIDTH_NOT_COMPUTED`]), so the fits walk never needs the pool:
+    /// width queries answer from the node alone, and only the render loop
+    /// (which borrows the pool once per render) reads the bytes. Pooled text
+    /// is rare (~1.4% of Text nodes), so the eager measure is off the hot
+    /// path by construction.
+    Pooled(PoolSpan, u16),
     /// Verbatim source slice, resolved against `source` at print time — like
     /// `Symbol` but keyed on a span instead of an interner id. Second field is
-    /// the precomputed visual width (u16::MAX = contains newline), exactly as
-    /// `Owned`. Lets a printer emit verbatim source text (comments, template
-    /// chunks, already-canonical literals) with **no `String` allocation** — the
-    /// lifetime-free alternative to a borrowed `&'src str` (which would force
-    /// `DocArena<'src>` and forfeit the cross-file arena `reset()` reuse). The
-    /// span is resolved by a source-aware [`TextResolver`] (see
-    /// [`SourceTextResolver`]); behaves identically to the `Owned` it replaces in
-    /// every doc transform (a `DocNode::Text` is matched generically).
+    /// the precomputed visual width (u16::MAX = contains newline; ASCII defers
+    /// to on-demand measurement). Lets a printer emit verbatim source text
+    /// (comments, template chunks, already-canonical literals) with **no
+    /// allocation and no copy** — the lifetime-free alternative to a borrowed
+    /// `&'src str` (which would force `DocArena<'src>` and forfeit the
+    /// cross-file arena `reset()` reuse). The span is resolved by a
+    /// source-aware [`TextResolver`] (see [`SourceTextResolver`]); behaves
+    /// identically to the pooled text it replaces in every doc transform (a
+    /// `DocNode::Text` is matched generically).
     SourceSpan(Span, u16),
     /// Symbol ID to be resolved at print time - no allocation during doc building.
     /// No cached width — identifiers are ASCII, fast path handles them.
@@ -208,20 +241,6 @@ pub enum DocText {
 }
 
 impl DocText {
-    /// Resolve text content using the provided resolver
-    ///
-    /// For Static and Owned, returns the string directly.
-    /// For Symbol, uses the resolver to look up the interned string.
-    #[inline]
-    pub fn resolve<'a, R: TextResolver + ?Sized>(&'a self, resolver: &'a R) -> &'a str {
-        match self {
-            DocText::Static(s, _) => s,
-            DocText::Owned(s, _) => s,
-            DocText::SourceSpan(span, _) => resolver.resolve_source_span(*span),
-            DocText::Symbol(id) => resolver.resolve(*id),
-        }
-    }
-
     /// Get the cached visual width.
     ///
     /// Decodes the stored `u16` (a real width or one of the two sentinel
@@ -232,7 +251,7 @@ impl DocText {
     #[inline]
     pub const fn cached_width(&self) -> CachedWidth {
         match self {
-            DocText::Static(_, w) | DocText::Owned(_, w) | DocText::SourceSpan(_, w) => match *w {
+            DocText::Static(_, w) | DocText::Pooled(_, w) | DocText::SourceSpan(_, w) => match *w {
                 TEXT_WIDTH_NOT_COMPUTED => CachedWidth::NotComputed,
                 TEXT_WIDTH_HAS_NEWLINE => CachedWidth::HasNewline,
                 w => CachedWidth::Width(w),
@@ -256,8 +275,9 @@ pub enum CachedWidth {
 
 /// Resolve DocText to a string, using resolver if provided
 ///
-/// For Static and Owned text, returns directly.
-/// For Symbol text, uses the resolver (panics if resolver is None).
+/// For Static text, returns directly. For Pooled text, slices the arena text
+/// pool the caller borrowed (render hoists it once per render). For Symbol
+/// text, uses the resolver (panics if resolver is None).
 ///
 /// # Panics
 ///
@@ -268,10 +288,11 @@ pub enum CachedWidth {
 pub(super) fn resolve_text<'a, R: TextResolver + ?Sized>(
     text: &'a DocText,
     resolver: Option<&'a R>,
+    pool: &'a str,
 ) -> &'a str {
     match text {
         DocText::Static(s, _) => s,
-        DocText::Owned(s, _) => s,
+        DocText::Pooled(span, _) => span.slice(pool),
         DocText::SourceSpan(span, _) => resolver
             .expect("SourceSpan encountered in Doc but no TextResolver provided")
             .resolve_source_span(*span),

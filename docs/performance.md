@@ -371,7 +371,7 @@ memory shape of the doc IR: **nodes/byte** (actual vs the `with_source_size_hint
 2/byte pre-size) with **per-file density percentiles** (p50/p90/p95/p99/max — what a
 safe hint must clear), **capacity fill %** (used vs reserved node slots), the **DocNode
 variant histogram** (which node kind dominates the `Vec` the render/`fits`/build
-loops linearly scan), and the **DocText sub-histogram** (`Static` / `Owned` /
+loops linearly scan), and the **DocText sub-histogram** (`Static` / `Pooled` /
 `SourceSpan` / `Symbol` share of `Text`). `--reuse` instead reports the
 **`reset()`-reuse high-water** — the peak retained node/children capacity across one
 shared arena (as the CLI/FFI/WASM batch drivers use), the number that shows a lower

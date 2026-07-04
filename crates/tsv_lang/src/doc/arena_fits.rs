@@ -18,7 +18,11 @@ fn text_flat_width<R: TextResolver + ?Sized>(t: &DocText, resolver: Option<&R>) 
         CachedWidth::Width(w) => Some(u32::from(w)),
         CachedWidth::HasNewline => None,
         CachedWidth::NotComputed => {
-            let s = resolve_text(t, resolver);
+            // Only `Static`/`SourceSpan`/`Symbol` texts can be `NotComputed`
+            // (`Pooled` always precomputes — see `pooled_text_width`), so the
+            // resolve never needs the arena text pool; the empty pool passed
+            // here would panic loudly (slice OOB) if that invariant ever broke.
+            let s = resolve_text(t, resolver, "");
             if s.contains('\n') {
                 None
             } else {
@@ -68,7 +72,7 @@ fn flat_width_fill<R: TextResolver + ?Sized>(
         DocNode::Text(t) => text_flat_width(t, resolver),
         // Contains hardlines → no break-free flat width (like a newline-bearing
         // `Text` or a `Line(Hard)`); force the `arena_fits` walk.
-        DocNode::MultilineText(_) => None,
+        DocNode::MultilineText { .. } => None,
         DocNode::Line(kind) => match kind {
             LineKind::Hard | LineKind::Literal => None,
             LineKind::Soft => Some(0),
@@ -203,14 +207,16 @@ pub(super) fn arena_fits_with_lookahead<R: TextResolver + ?Sized>(
                     None => return true,
                 },
 
-                DocNode::MultilineText(s) => {
+                DocNode::MultilineText { first_width, .. } => {
                     // Equivalent to walking `[Text(first_line), Line(Hard), …]`: the
                     // first line's width counts, then the first newline ends the line
                     // (a hardline returns true in either mode). `remaining >= 0`
                     // distinguishes the two loop outcomes: ≥0 → the next item would be
                     // the hardline → true; <0 → the bottom check would return false.
-                    let first = s.split('\n').next().unwrap_or("");
-                    remaining -= visual_width(first, TAB_WIDTH) as isize;
+                    // The width is precomputed at build (clamped — verdict-preserving,
+                    // print width is orders of magnitude below the clamp), so no pool
+                    // read happens here.
+                    remaining -= *first_width as isize;
                     return remaining >= 0;
                 }
 
