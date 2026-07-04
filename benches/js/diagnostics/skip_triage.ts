@@ -31,41 +31,21 @@
 
 import { DevReposLoader, DirectoryLoader, group_by_language } from '../lib/corpus.ts';
 import { init_implementations } from '../lib/implementations.ts';
+import { type Sanction, sanction_for, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
 import type { Language } from '../lib/types.ts';
 
 /**
  * Over-rejections (tsv rejects, canonical accepts) that are deliberate, not
  * gaps — matched as a substring of the file path. Each needs a reason so the
  * list stays a reviewed catalogue, never a silent bug suppressor. Adding one is
- * a claim that tsv is *correctly* stricter (or that the input is invalid Svelte
- * the canonical parser is merely lenient about); a genuine gap gets fixed, not
- * listed. These cover Svelte's own `tests/` fixtures; real source needs none.
+ * a claim that tsv is *correctly* stricter (or that the input is invalid the
+ * canonical parser is merely lenient about); a genuine gap gets fixed, not
+ * listed. The Svelte-fixture entries are shared (`lib/parse_sanctions.ts`, also
+ * used by the dedicated `svelte_fixtures_compare.ts` gate); the entries below
+ * cover the prettier test corpus, which only this general sweep scans.
  */
-const SANCTIONED: { pattern: string; reason: string }[] = [
-	// CSS grammar-strictness — Svelte's parser is lenient where tsv follows the
-	// CSS grammar. See docs/conformance_svelte.md §CSS Parser Scope & Error Model.
-	{
-		pattern: 'css/samples/comment-html/',
-		reason: 'HTML comment (`<!-- -->`) in a CSS selector — svelte lenient, tsv grammar-stricter',
-	},
-	{
-		pattern: 'css/samples/supports-import/',
-		reason: '`@import` inside `@supports` prelude — svelte lenient, tsv grammar-stricter',
-	},
-	{
-		pattern: 'validator/samples/css-invalid-combinator-selector',
-		reason: 'invalid leading combinator (`>`/`+`) — svelte parser accepts, its validator rejects',
-	},
-	// Invalid Svelte markup — Svelte's PARSER accepts, its VALIDATOR rejects; the
-	// input is invalid either way, tsv just rejects one stage earlier.
-	{
-		pattern: 'validator/samples/attribute-invalid-name',
-		reason: 'invalid attribute-name character — svelte parser lenient, validator rejects',
-	},
-	{
-		pattern: 'validator/samples/if-block-whitespace',
-		reason: 'whitespace after `{#` (`{ #if}`) — svelte parser lenient, validator rejects',
-	},
+const SANCTIONED: Sanction[] = [
+	...SVELTE_FIXTURE_SANCTIONS,
 	// Legacy Stage-3 import-assertions `assert { … }` clause — never merged into
 	// ecma262 (the final WithClause grammar is `with`-only) and since removed from
 	// engines; acorn-typescript still accepts it. tsv parses only the spec form.
@@ -76,7 +56,7 @@ const SANCTIONED: { pattern: string; reason: string }[] = [
 	},
 	// CSS spec-strictness on the prettier test corpus — Svelte's parseCss is
 	// lenient where tsv follows the CSS grammar. Same class as the svelte/tests
-	// CSS entries above; see docs/conformance_svelte.md §CSS Parser Scope & Error Model.
+	// CSS entries; see docs/conformance_svelte.md §CSS Parser Scope & Error Model.
 	{
 		pattern: 'tests/format/css/attribute/quotes.css',
 		reason: 'function as attr value `[id=func("foo")]` — selectors-4 attr value is <string>|<ident>',
@@ -100,10 +80,6 @@ const SANCTIONED: { pattern: string; reason: string }[] = [
 		reason: '.html file, not Svelte — raw template `[` svelte tolerates; out of tsv scope',
 	},
 ];
-
-function sanction_for(path: string): string | null {
-	return SANCTIONED.find((s) => path.includes(s.pattern))?.reason ?? null;
-}
 
 const corpus_path = Deno.args.find((a) => !a.startsWith('-'));
 
@@ -159,7 +135,7 @@ for (const lang of langs) {
 			canon_err = String(e instanceof Error ? e.message : e).split('\n')[0];
 		}
 		if (tsv_err && !canon_err) {
-			const reason = sanction_for(f.path);
+			const reason = sanction_for(SANCTIONED, f.path);
 			if (reason) {
 				buckets.sanctioned_over_rejection.push({ path: f.path, error: tsv_err, reason });
 			} else {
