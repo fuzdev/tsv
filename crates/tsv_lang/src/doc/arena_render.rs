@@ -99,8 +99,9 @@ fn render_text<R: TextResolver + ?Sized>(
 /// Update position after rendering a text string, accounting for tab expansion.
 ///
 /// The overwhelmingly common input here is short ASCII with no newline — every
-/// interned identifier (`Symbol`) and every static punctuation/keyword token
-/// reaches this via `render_text`'s uncached-width arm. For those the previous
+/// interned identifier (`Symbol`) and every span-identity identifier name
+/// (`source_span_ident`) reaches this via `render_text`'s uncached-width arm
+/// (statics carry an amortized cached width and skip it). For those the previous
 /// shape scanned the bytes three times (`rfind('\n')` + `visual_width`'s own
 /// `is_ascii` + tab count). The fast path below folds the newline reset, tab
 /// expansion, and width accumulation into a single forward byte pass, so no

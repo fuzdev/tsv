@@ -13,7 +13,7 @@
 //! - Cache-friendly contiguous storage
 //! - Bulk deallocation
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::Span;
 use crate::config::TAB_WIDTH;
@@ -236,18 +236,19 @@ impl ArenaCommand {
 pub(super) const FLAT_WIDTH_UNKNOWN: u32 = u32::MAX;
 pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 
-/// The eager width-cache policy for dynamic doc text: pool-stored text
-/// ([`DocText::Pooled`], `MultilineText` first lines) and verbatim source
-/// slices ([`DocArena::source_span`]) **always** cache a real width or the
-/// newline sentinel at build — so every width query (the fits walk,
-/// `render_text`'s column advance) answers from the node alone, the fits path
-/// never borrows the pool, and render's per-text byte scan is skipped. The one
-/// exception is identifier names ([`DocArena::source_span_ident`], plus
-/// `text()` statics and interner `Symbol`s): high-frequency, newline-free, and
-/// rarely fits-measured, so for them the build-time scan costs more than it
-/// saves (measured both ways — eager per-ident width was ~+1.1% on
-/// identifier-dense corpora; eager everything-else was −0.6..−0.8% on every
-/// mixed corpus).
+/// The eager width-cache policy for doc text: pool-stored text
+/// ([`DocText::Pooled`], `MultilineText` first lines), verbatim source slices
+/// ([`DocArena::source_span`]), and `text()` statics (amortized through the
+/// arena's static width cache — measured once per unique string, not per
+/// node) **always** cache a real width or the newline sentinel at build — so
+/// every width query (the fits walk, `render_text`'s column advance) answers
+/// from the node alone, the fits path never borrows the pool, and render's
+/// per-text byte scan is skipped. The one exception is identifier names
+/// ([`DocArena::source_span_ident`]) and interner `Symbol`s: high-frequency,
+/// newline-free, and rarely fits-measured, so for them a per-node build-time
+/// scan costs more than it saves (measured both ways — eager per-ident width
+/// was ~+1.1% on identifier-dense corpora; eager everything-else was
+/// −0.6..−0.8% on every mixed corpus).
 ///
 /// The measured width is clamped below the sentinels. Unlike the `u32`
 /// flat-width cache above (where aliasing needs a ~4 GB subtree and is benign
@@ -296,6 +297,20 @@ pub struct DocArena {
     /// (depends only on the fixed `TAB_WIDTH` + the interner, both fixed for a
     /// render).
     flat_width_cache: RefCell<Vec<u32>>,
+    /// Direct-mapped width cache for [`Self::text`] statics: maps a static
+    /// string's address to its precomputed visual width, so `Static` nodes
+    /// carry a real cached width (fits answers from the node, `render_text`
+    /// skips its column byte-scan) while the width is *measured* only once
+    /// per unique string per arena — never per node (the per-node eager
+    /// measure was a measured loss). The address is a link-time constant, so
+    /// the slot hash folds per call site; a collision evict just re-measures
+    /// (rare — slots comfortably exceed the unique-static population). Entries
+    /// are `'static`-valid, so the cache survives `reset()` and warms once per
+    /// arena lifetime. `Cell` (no borrow flag) — probes never alias the
+    /// `RefCell` stores. Inline by design: the arena lives on the stack or in
+    /// a thread-local and is only ever borrowed, never moved after
+    /// construction, so the array adds no per-use indirection.
+    static_width_cache: [Cell<StaticWidthSlot>; STATIC_CACHE_SLOTS],
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -306,6 +321,39 @@ pub struct DocArena {
     line_comment_ids: RefCell<Vec<u32>>,
 }
 
+/// One `static_width_cache` slot: a static string's identity (`ptr`+`len`)
+/// mapped to its precomputed width. The `len` compare is load-bearing, not
+/// belt-and-braces: linker constant-merging can make one static share
+/// another's *start* pointer (prefix overlap), so `ptr` alone is not identity —
+/// `ptr`+`len` is (same address + same length ⇒ same bytes).
+#[derive(Clone, Copy, Debug)]
+struct StaticWidthSlot {
+    ptr: usize,
+    len: u32,
+    width: u16,
+}
+
+impl StaticWidthSlot {
+    /// An empty slot: `ptr == 0` is never a real entry (references are never
+    /// null — even `""` has a non-null dangling address).
+    const EMPTY: Self = Self {
+        ptr: 0,
+        len: 0,
+        width: 0,
+    };
+}
+
+/// 512 slots (× 16 B on 64-bit = 8 KB inline). Kept in lockstep with the
+/// slot-hash shift — see the assert below; comfortably above the unique-static
+/// population, so steady-state collisions are rare.
+const STATIC_CACHE_SLOTS: usize = 512;
+
+// The slot index is the TOP 9 BITS of the 64-bit multiplicative hash
+// (`>> 55` in `static_width`), which is provably `< 512` — that both elides
+// the array bounds check and hard-couples the shift to the slot count. This
+// assert makes changing one without the other a compile error.
+const _: () = assert!(STATIC_CACHE_SLOTS == 1 << 9);
+
 impl DocArena {
     /// Create a new empty arena.
     pub fn new() -> Self {
@@ -315,6 +363,7 @@ impl DocArena {
             text_pool: RefCell::new(String::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
+            static_width_cache: [const { Cell::new(StaticWidthSlot::EMPTY) }; STATIC_CACHE_SLOTS],
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }
@@ -350,6 +399,7 @@ impl DocArena {
             // to absorb those reallocs. Only capacity changes — never values.
             will_break_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
             flat_width_cache: RefCell::new(Vec::with_capacity(estimated_nodes)),
+            static_width_cache: [const { Cell::new(StaticWidthSlot::EMPTY) }; STATIC_CACHE_SLOTS],
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }
@@ -375,6 +425,10 @@ impl DocArena {
     /// previous document is invalidated (ids restart at 0), so no `DocId` from a
     /// prior render may be read after a reset. `&mut self` enforces this — no
     /// borrow of the arena's contents can be live across the call.
+    ///
+    /// The static width cache is deliberately NOT cleared: its entries key on
+    /// `'static` string addresses, so they stay valid for the arena's whole
+    /// lifetime and the cache warms once across documents.
     pub fn reset(&mut self) {
         self.nodes.get_mut().clear();
         self.children.get_mut().clear();
@@ -429,12 +483,50 @@ impl DocArena {
 
     /// Create a text doc from a static string (zero allocation).
     ///
-    /// Never precomputes width. Static strings are short ASCII punctuation,
-    /// keywords, and operators — `visual_width()`'s ASCII byte-count fast path
-    /// measures them on demand for less than the caching would cost.
+    /// Carries a real cached width, amortized through the arena's static
+    /// width cache (one direct-mapped slot probe per call; the width is
+    /// measured once per unique string per arena — the *per-node* eager
+    /// measure was a measured loss). Fits queries answer from the node alone
+    /// and `render_text`'s column advance skips its byte scan.
     #[inline]
     pub fn text(&self, s: &'static str) -> DocId {
-        self.alloc(DocNode::Text(DocText::Static(s, TEXT_WIDTH_NOT_COMPUTED)))
+        let w = self.static_width(s);
+        self.alloc(DocNode::Text(DocText::Static(s, w)))
+    }
+
+    /// Look up (or compute-and-cache) the visual width of a static string via
+    /// the direct-mapped `static_width_cache`.
+    ///
+    /// Hot path: one slot load + pointer/len compare (the address is a
+    /// link-time constant, so the slot hash folds per call site). Miss (first
+    /// sighting or collision evict) measures and refills in the cold helper.
+    #[inline]
+    fn static_width(&self, s: &'static str) -> u16 {
+        let ptr = s.as_ptr() as usize;
+        // Hash in u64: usize is 32-bit on wasm32, where the Fibonacci constant
+        // and the top-9-bit shift would overflow. The `>> 55` keeps the top 9
+        // bits ⇒ index < 512, locked to `STATIC_CACHE_SLOTS` by the assert at
+        // its definition (and eliding the bounds check below).
+        let slot_i = ((ptr as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 55) as usize;
+        let slot = self.static_width_cache[slot_i].get();
+        if slot.ptr == ptr && slot.len as usize == s.len() {
+            return slot.width;
+        }
+        self.static_width_miss(s, slot_i)
+    }
+
+    /// The cold half of [`Self::static_width`]: measure the width and refill
+    /// the slot.
+    #[cold]
+    #[inline(never)]
+    fn static_width_miss(&self, s: &'static str, slot_i: usize) -> u16 {
+        let width = pooled_text_width(s);
+        self.static_width_cache[slot_i].set(StaticWidthSlot {
+            ptr: s.as_ptr() as usize,
+            len: s.len() as u32,
+            width,
+        });
+        width
     }
 
     /// Create a text doc from a dynamically-built string, copied into the
@@ -513,10 +605,10 @@ impl DocArena {
     /// [`Self::source_span`] for a slice the caller guarantees is newline-free
     /// (identifier names): skips the width precompute entirely — no source read
     /// at build. Width is measured on demand at the first `fits()` touch
-    /// (memoized), exactly like [`Self::text`]'s never-precompute policy; a
-    /// non-ASCII name measures the same value lazily as eagerly, so output is
-    /// unaffected. Do NOT use for text that can contain `\n` — the newline
-    /// sentinel would be missed.
+    /// (memoized) — the deferral kept only for identifier names and `Symbol`s
+    /// (high-frequency, rarely fits-measured); a non-ASCII name measures the
+    /// same value lazily as eagerly, so output is unaffected. Do NOT use for
+    /// text that can contain `\n` — the newline sentinel would be missed.
     #[inline]
     pub fn source_span_ident(&self, span: Span) -> DocId {
         self.alloc(DocNode::Text(DocText::SourceSpan(
