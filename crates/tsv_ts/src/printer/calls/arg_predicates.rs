@@ -403,6 +403,7 @@ pub fn contains_call_expression(expr: &Expression<'_>) -> bool {
         Expression::UpdateExpression(e) => contains_call_expression(e.argument),
         Expression::SpreadElement(e) => contains_call_expression(e.argument),
         Expression::JsdocCast(cast) => contains_call_expression(cast.inner),
+        Expression::ParenthesizedExpression(paren) => contains_call_expression(paren.expression),
 
         // Binary expressions (includes logical operators in internal AST)
         Expression::BinaryExpression(e) => {

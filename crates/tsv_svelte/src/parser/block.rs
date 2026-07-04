@@ -1083,8 +1083,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             const WRAPPER_PREFIX: &str = "function f";
             let wrapper = format!("{WRAPPER_PREFIX}{head_slice} {{}}");
             let base = (content_offset + head_start).saturating_sub(WRAPPER_PREFIX.len());
-            match tsv_ts::parse_with_interner(&wrapper, base, Rc::clone(&self.interner), self.arena)
-            {
+            // Snippet parameters preserve grouping parens (acorn's `preserveParens`,
+            // without Svelte's `remove_parens`), so a default like `c = (2, 3)` keeps
+            // its `ParenthesizedExpression` — matching Svelte's snippet-param AST.
+            match tsv_ts::parse_with_interner_preserve_parens(
+                &wrapper,
+                base,
+                Rc::clone(&self.interner),
+                self.arena,
+            ) {
                 Ok(mut program) => {
                     self.expression_comments.append(&mut program.comments);
                     if let Some(tsv_ts::Statement::FunctionDeclaration(func)) = program.body.first()

@@ -4,10 +4,10 @@ use crate::ast::internal::{
     AssignmentExpression, AwaitExpression, BinaryExpression, BinaryOperator, BlockStatement,
     CallExpression, ConditionalExpression, Expression, IdentName, Identifier, ImportExpression,
     ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression,
-    RegexLiteral, SequenceExpression, SpreadElement, Statement, Super, TSAsExpression,
-    TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression, TSTypeAssertion,
-    TaggedTemplateExpression, ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression,
-    UpdateOperator, YieldExpression,
+    ParenthesizedExpression, RegexLiteral, SequenceExpression, SpreadElement, Statement, Super,
+    TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression,
+    TSTypeAssertion, TaggedTemplateExpression, ThisExpression, UnaryExpression, UnaryOperator,
+    UpdateExpression, UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
@@ -113,8 +113,9 @@ impl<'arena> ParsedExpr<'arena> {
 
     /// Create a ParsedExpr from an already-arena-boxed expression with explicit
     /// paren bounds. Unlike `from_expr`/`with_end`, the caller supplies the
-    /// `&'arena Expression` — the inner's own allocation reused (parenthesized
-    /// expression) or a freshly built wrapper node (JSDoc cast).
+    /// `&'arena Expression` — the inner's own allocation reused (a discarded
+    /// grouping paren) or a freshly built wrapper node (a JSDoc cast, or a
+    /// preserved `ParenthesizedExpression`).
     fn with_bounds(
         expr: &'arena Expression<'arena>,
         actual_start: usize,
@@ -1465,13 +1466,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Track actual_start BEFORE '(' and actual_end AFTER ')' for correct spans
         // when this expression is used as a callee: (a ? b : c)() should have
         // CallExpression span starting at '(', not at 'a'
-        //
-        // JSDoc type cast parens (`/** @type {T} */ (expr)`) are special: the parens
-        // are semantically required (without them the cast is dropped), so when a
-        // `@type`/`@satisfies` block comment immediately precedes the `(` we wrap the
-        // inner expression in a `JsdocCast` node to preserve them, instead of
-        // discarding them like ordinary grouping parens. Comments themselves are
-        // still located positionally in the flat `Vec<Comment>` at print time.
         let (paren_start, _) = self.current_pos();
         let is_jsdoc_cast = self.paren_preceded_by_jsdoc_cast_comment(paren_start);
         self.expect(&TokenKind::ParenOpen)?; // consume '('
@@ -1484,22 +1478,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?; // consume ')'
         self.grouping_depth -= 1;
 
-        // Return expression with its original span (excluding parens), but with
-        // actual_start before '(' and actual_end after ')' for containing expressions.
-        // A JSDoc cast keeps the same actual bounds (so containing expressions still
-        // get the paren-inclusive span) but carries the explicit wrapper node.
-        if is_jsdoc_cast {
-            let cast = Expression::JsdocCast(JsdocCast {
+        // Grouping parens are normally discarded (the inner's own allocation flows
+        // through, paren-free like acorn/Svelte). Two positions preserve them as an
+        // explicit wrapper node spanning `(`…`)`, while keeping the paren-inclusive
+        // `actual_start`/`actual_end` bounds so containing expressions still span the
+        // parens:
+        // - **JSDoc type cast** (`/** @type {T} */ (expr)`) — the parens are
+        //   semantically required (dropping them drops the cast), so a preceding
+        //   `@type`/`@satisfies` block comment wraps the inner in a `JsdocCast`. Cast
+        //   semantics subsume grouping, so this wins when both apply.
+        // - **Snippet-parameter sub-parse** (`preserve_parens`) — acorn's
+        //   `preserveParens` without Svelte's `remove_parens`; wraps in a
+        //   layout-transparent `ParenthesizedExpression` so only the wire shape moves.
+        // Comments themselves are still located positionally in the flat
+        // `Vec<Comment>` at print time.
+        let paren_span = Span::new(paren_start as u32, paren_end as u32);
+        let expr = if is_jsdoc_cast {
+            self.alloc(Expression::JsdocCast(JsdocCast {
                 inner: parsed.expr,
-                span: Span::new(paren_start as u32, paren_end as u32),
-            });
-            return Ok(ParsedExpr::with_bounds(
-                self.alloc(cast),
-                paren_start,
-                paren_end,
-            ));
-        }
-        Ok(ParsedExpr::with_bounds(parsed.expr, paren_start, paren_end))
+                span: paren_span,
+            }))
+        } else if self.preserve_parens {
+            self.alloc(Expression::ParenthesizedExpression(
+                ParenthesizedExpression {
+                    expression: parsed.expr,
+                    span: paren_span,
+                },
+            ))
+        } else {
+            parsed.expr
+        };
+        Ok(ParsedExpr::with_bounds(expr, paren_start, paren_end))
     }
 
     /// Whether a `(` at `paren_start` is immediately preceded by a JSDoc type-cast
