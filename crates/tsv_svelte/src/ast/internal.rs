@@ -144,7 +144,19 @@ pub struct AwaitBlock<'arena> {
     pub expression: Expression<'arena>,
     pub value: Option<Expression<'arena>>, // Pattern for :then binding
     pub error: Option<Expression<'arena>>, // Pattern for :catch binding
+    /// The pending-phase **content** (`{#await x}<here>{:then}…`), or `None` when
+    /// empty. Distinct from `pending_block`: an empty block-form pending is `None`
+    /// here but `pending_block == true`. The printer reads this (an empty pending
+    /// full form collapses to the `then`/`catch` shorthand, matching prettier).
     pub pending: Option<Fragment<'arena>>,
+    /// Whether the block form was used (`{#await x}…{/await}`) vs the inline
+    /// `then`/`catch` shorthand (`{#await x then v}` / `{#await x catch e}`). The
+    /// block form always has a pending Fragment — empty or not — matching Svelte's
+    /// `block.pending = create_fragment()`; the shorthand has `pending: null`. The
+    /// writer emits `{Fragment, nodes: []}` vs `null` from this flag (the wire
+    /// distinction the formatter's shorthand-collapse erases). See
+    /// `ast/convert/write.rs::write_await_block`.
+    pub pending_block: bool,
     pub then: Option<Fragment<'arena>>,
     pub catch: Option<Fragment<'arena>>,
     pub span: Span,

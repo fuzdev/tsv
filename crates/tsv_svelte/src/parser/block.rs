@@ -606,6 +606,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             None
         };
 
+        // The block form (`{#await x}…{/await}`) always carries a pending Fragment —
+        // empty or not — unlike the inline `then`/`catch` shorthand (no pending
+        // phase); the writer emits `{Fragment, []}` vs `null` from this.
+        let pending_block = shorthand_then.is_none() && shorthand_catch.is_none();
         let (pending, then_fragment, catch_fragment, value, error, end) = if let Some(value_str) =
             shorthand_then
         {
@@ -721,6 +725,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             value,
             error,
             pending,
+            pending_block,
             then: then_fragment,
             catch: catch_fragment,
             span: Span {
