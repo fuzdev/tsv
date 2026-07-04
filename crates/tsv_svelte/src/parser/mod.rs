@@ -332,6 +332,49 @@ pub(crate) fn find_exact_tag_close(bytes: &[u8], from: usize, tag: &[u8]) -> Opt
     find_tag_close(bytes, from, tag, false)
 }
 
+/// If a whitespace/attribute-tolerant closing tag `</tag…>` starts **exactly** at byte
+/// `i`, return `(lt, gt)` — the `<` offset (`== i`) and the closing `>` offset;
+/// otherwise `None`.
+///
+/// Ports Svelte's RCDATA close `regex_closing_textarea_tag = /<\/textarea(\s[^>]*)?>/iy`
+/// (`1-parse/state/element.js`): sticky at `i`, case-insensitive on the tag name, then
+/// either `>` immediately or **one** whitespace followed by any run of non-`>` up to the
+/// first `>`. The RCDATA reader calls it at every content byte (the sticky-at-each-index
+/// model of Svelte's `read_sequence` `done()` predicate).
+///
+/// Distinct from the raw-text finders above on three counts, so it can't reuse them: it
+/// tolerates attributes on the close (`</textarea data-x >`, not just `\s*>`), it matches
+/// the tag name case-insensitively (`</TEXTAREA>`), and it reports the `>` offset (the
+/// reader needs it for the element end).
+pub(crate) fn rcdata_close_at(bytes: &[u8], i: usize, tag: &[u8]) -> Option<(usize, usize)> {
+    if bytes.get(i) != Some(&b'<') || bytes.get(i + 1) != Some(&b'/') {
+        return None;
+    }
+    let name_start = i + 2;
+    let rest = bytes.get(name_start..)?;
+    if rest.len() < tag.len() || !rest[..tag.len()].eq_ignore_ascii_case(tag) {
+        return None;
+    }
+    let after_name = name_start + tag.len();
+    match bytes.get(after_name) {
+        // `</textarea>` — closes directly.
+        Some(b'>') => Some((i, after_name)),
+        // `</textarea\s[^>]*>` — the required whitespace, then non-`>`* to the first `>`.
+        Some(b) if b.is_ascii_whitespace() => {
+            let mut j = after_name + 1;
+            while let Some(&c) = bytes.get(j) {
+                if c == b'>' {
+                    return Some((i, j));
+                }
+                j += 1;
+            }
+            None
+        }
+        // Any other trailing byte (`</textareax`, `</textarea/`) is not a close.
+        _ => None,
+    }
+}
+
 /// Shared core of `find_raw_text_close` / `find_exact_tag_close`; `allow_ws_before_gt`
 /// selects the whitespace-tolerant (`\s*>`) vs exact (`>`) close. Callers pick a named
 /// wrapper so the boolean never reaches a call site.
