@@ -24,6 +24,17 @@ fn brace_starts_expression(bytes: &[u8], pos: usize) -> bool {
     }
 }
 
+/// Svelte's `regex_token_ending_character = /[\s=/>"']/` — the bytes that end an
+/// attribute/directive name run (`read_tag` in `1-parse/state/element.js`). Everything
+/// else (including `%`, `&`, `#`, digits, …) is part of the name; the lexer's identifier
+/// scan is narrower, so the name reader extends past its token end up to one of these.
+const fn is_attr_name_terminator(b: u8) -> bool {
+    matches!(
+        b,
+        b' ' | b'\t' | b'\n' | b'\r' | b'\x0b' | b'\x0c' | b'=' | b'/' | b'>' | b'"' | b'\''
+    )
+}
+
 /// Directive prefix types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DirectiveType {
@@ -156,6 +167,49 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.source.get(pos..)?.chars().find(|c| !c.is_whitespace())
     }
 
+    /// Byte offset of the first attribute-name terminator at/after `start`, mirroring
+    /// Svelte's `read_tag(regex_token_ending_character)`. The name is `source[start..end]`.
+    /// Shared by the plain/directive name reader and `parse_static_brace_attribute`.
+    fn attribute_name_end(&self, start: usize) -> usize {
+        let bytes = self.source.as_bytes();
+        let mut end = start;
+        while end < bytes.len() && !is_attr_name_terminator(bytes[end]) {
+            end += 1;
+        }
+        end
+    }
+
+    /// End of the current attribute/directive name run. The lexer already scanned the
+    /// leading identifier into `current`; Svelte folds any trailing non-terminator chars
+    /// (`%`, `&`, `#`, …) into the same name. Fast path (the common case): the token
+    /// already ends at a terminator or EOF, so return its end without re-scanning.
+    //
+    // TODO: this covers names that *start* with a lexer-identifier char (the realistic
+    // case). Svelte also accepts names starting with a symbol (`<div %foo>`), where the
+    // lexer chokes before this dispatch runs — handling that needs the in-tag lexer to
+    // stop erroring on symbols AND a port of Svelte's `is_valid_element_name` tag-name
+    // validation (else `<%foo>` would flip from a correct reject to an over-acceptance).
+    // Off-frontier (no corpus/real occurrence), deferred deliberately.
+    fn attribute_name_run_end(&self) -> usize {
+        match self.source.as_bytes().get(self.current_end) {
+            None => self.current_end,
+            Some(&b) if is_attr_name_terminator(b) => self.current_end,
+            _ => self.attribute_name_end(self.current_end),
+        }
+    }
+
+    /// Resync the lexer past an attribute/directive name ending at `name_end`. Fast path
+    /// (`name_end` == the current Identifier token's end) is a plain `advance()`; when the
+    /// name was extended past the token (special chars, à la Svelte's `read_tag`), re-lex
+    /// at `name_end`.
+    fn advance_past_name(&mut self, name_end: usize) -> Result<(), ParseError> {
+        if name_end == self.current_end {
+            self.advance()
+        } else {
+            self.advance_to_position(name_end)
+        }
+    }
+
     /// Parse an attribute or directive
     ///
     /// Detects if the attribute name contains a colon (`:`) indicating a directive,
@@ -164,21 +218,30 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         parse_expressions: bool,
     ) -> Result<AttributeNode<'arena>, ParseError> {
-        // `&'a str` borrows the source, so it survives the `&mut self` call below.
-        let name_str = self.current_value();
+        // Read the full attribute/directive name as Svelte's `read_tag` does — a raw run up
+        // to a token-ending char (`/[\s=/>"']/`). The lexer only scanned the leading
+        // identifier; extend it past any special chars (`ysc%%gibberish`) before the
+        // directive `:` split so both paths see the whole name. `&'a str` borrows the
+        // source, so it survives the `&mut self` calls below.
+        let name_start = self.current_start;
+        let name_end = self.attribute_name_run_end();
+        let name_str = &self.source[name_start..name_end];
 
         // Check if this is a directive (contains colon)
         if let Some(colon_idx) = name_str.find(':') {
             let prefix = &name_str[..colon_idx];
             if let Some(directive_type) = DirectiveType::from_prefix(prefix) {
-                return self.parse_directive(directive_type, name_str, colon_idx);
+                return self.parse_directive(directive_type, name_str, colon_idx, name_end);
             }
         }
 
         // Not a directive, parse as regular attribute
-        Ok(AttributeNode::Attribute(
-            self.parse_attribute_inner(parse_expressions)?,
-        ))
+        Ok(AttributeNode::Attribute(self.parse_attribute_inner(
+            name_str,
+            name_start,
+            name_end,
+            parse_expressions,
+        )?))
     }
 
     /// Parse a directive (on:, bind:, class:, style:, use:, transition:, in:, out:, animate:, let:)
@@ -187,9 +250,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         directive_type: DirectiveType,
         full_name: &str,
         colon_idx: usize,
+        name_end: usize,
     ) -> Result<AttributeNode<'arena>, ParseError> {
         let start = self.current_start;
-        let name_end = self.current_end;
         let head_span = Span {
             start: start as u32,
             end: name_end as u32,
@@ -223,7 +286,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             ));
         }
 
-        self.advance()?; // consume the identifier
+        self.advance_past_name(name_end)?; // consume the (possibly special-char-extended) name
 
         // Style directives accept expression OR string values, handle separately
         if directive_type == DirectiveType::Style {
@@ -712,26 +775,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// name has no `=` in practice.)
     fn parse_static_brace_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
         let start = self.current_start;
-        let bytes = self.source.as_bytes();
-        // Svelte's `regex_token_ending_character = /[\s=/>"']/`.
-        let mut end = start;
-        while end < bytes.len()
-            && !matches!(
-                bytes[end],
-                b' ' | b'\t'
-                    | b'\n'
-                    | b'\r'
-                    | b'\x0b'
-                    | b'\x0c'
-                    | b'='
-                    | b'/'
-                    | b'>'
-                    | b'"'
-                    | b'\''
-            )
-        {
-            end += 1;
-        }
+        // Svelte's `read_static_attribute` reads the raw run up to a token-ending char
+        // (`regex_token_ending_character = /[\s=/>"']/`) as the attribute name.
+        let end = self.attribute_name_end(start);
         let name = self.intern(&self.source[start..end]);
         let span = Span {
             start: start as u32,
@@ -748,18 +794,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     fn parse_attribute_inner(
         &mut self,
+        name_str: &'a str,
+        name_start: usize,
+        name_end: usize,
         parse_expressions: bool,
     ) -> Result<Attribute<'arena>, ParseError> {
-        let start = self.current_start;
-
-        // Parse attribute name
-        if !self.check(TokenKind::Identifier) {
-            return Err(self.error_expected_found("attribute name"));
-        }
-
-        let name = self.intern(self.current_value());
-        let name_end = self.current_end; // Save end position of name token
-        self.advance()?;
+        // The name was already read as a Svelte `read_tag` run by the caller; it starts at
+        // an Identifier token but may extend past it over special chars (`a%b`). Intern the
+        // full name and resync the lexer past it.
+        let start = name_start;
+        let name = self.intern(name_str);
+        self.advance_past_name(name_end)?;
 
         // Check for = (attribute with value)
         if self.check(TokenKind::Equals) {

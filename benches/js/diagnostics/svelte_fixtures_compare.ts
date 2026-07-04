@@ -91,12 +91,9 @@ const SANCTIONED = SVELTE_FIXTURE_SANCTIONS;
  * (TODO_PARSE_COVERAGE.md §"Svelte parse over-rejections vs `svelte/tests`").
  */
 const KNOWN_GAPS: { pattern: string; category: string; reason: string }[] = [
-	// Attribute-name lexer over-strict on characters HTML permits in attr names.
-	{
-		pattern: 'runtime-runes/samples/props-alias-weird/',
-		category: 'attr-name-lexer',
-		reason: "`%` in an attribute name (`ysc%%gibberish`) — permitted by HTML; tsv's attr-name lexer rejects it",
-	},
+	// Empty: the frontier is at 0 — every tracked Svelte over-rejection has been fixed.
+	// A NEW over-rejection surfaces as `unexpected` (exits 1); add an entry here only to
+	// deliberately track a gap while its fix is pending, and delete it once fixed.
 ];
 
 interface OverRejection {
