@@ -31,10 +31,16 @@ impl<'a> Printer<'a> {
                 // Single-line block comment — the full span is verbatim `/*…*/`,
                 // so emit it as a source slice (no allocation).
                 d.source_span(comment.span, self.source)
-            } else if printing::is_indentable_block_comment(content) {
-                self.build_indentable_block_comment_doc(content)
             } else {
-                self.build_preserved_block_comment_doc(comment)
+                // Split once — the classifier and the indentable builder read
+                // the same lines. (The rare preserved path re-derives its own
+                // lines from the indentation-stripped body instead.)
+                let lines: CommentLines<'_> = content.split('\n').collect();
+                if printing::is_indentable_block_comment(&lines) {
+                    self.build_indentable_block_comment_doc(content, &lines)
+                } else {
+                    self.build_preserved_block_comment_doc(comment)
+                }
             }
         } else if comment.span.start == 0 && content.starts_with("#!") {
             // Hashbang comment: #!/usr/bin/env node (no // prefix). The span is
@@ -55,12 +61,12 @@ impl<'a> Printer<'a> {
     /// `*` — the context indent is supplied by the per-line hardline (here baked
     /// into a [`DocNode::MultilineText`]), and content after the `*` is
     /// untouched. Mirrors prettier's `printIndentableBlockComment`.
-    fn build_indentable_block_comment_doc(&self, content: &str) -> DocId {
+    fn build_indentable_block_comment_doc(&self, content: &str, lines: &[&str]) -> DocId {
         let d = self.d();
-        // ≥2 lines: `build_comment_doc` only routes newline-containing content here.
-        let lines: CommentLines<'_> = content.split('\n').collect();
+        // ≥2 lines: `build_comment_doc` only routes newline-containing content
+        // here, pre-split (`lines` is `content.split('\n')`).
         #[allow(clippy::unreachable)] // content has a newline ⇒ split yields ≥2 lines
-        let [first, middle @ .., last] = lines.as_slice() else {
+        let [first, middle @ .., last] = lines else {
             unreachable!("multi-line comment");
         };
 

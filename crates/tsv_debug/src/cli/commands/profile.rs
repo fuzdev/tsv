@@ -4,7 +4,6 @@ use std::time::{Duration, Instant};
 
 use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
-use tsv_lang::estimated_ast_arena_capacity;
 
 /// Profile parse + format timing on files or directories.
 #[derive(FromArgs, Debug)]
@@ -29,11 +28,22 @@ impl ProfileCommand {
 
         let mut results = Vec::new();
 
+        // One AST `Bump` and one `DocArena` reused across every file and
+        // iteration with `reset()` between them — the same lifecycle as
+        // `tsv_cli format`'s worker loop and the bindings' `tsv_arena`
+        // thread-locals, so the measured phases are product-shaped (arena
+        // growth amortizes across the corpus instead of recurring per call).
+        let mut arena = bumpalo::Bump::new();
+        let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
+
         for path in &files {
-            match profile_file(path, self.iterations) {
+            match profile_file(path, self.iterations, &mut arena, &mut doc_arena) {
                 Ok(result) => results.push(result),
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
+                    // A failed iteration bails before its in-loop resets.
+                    arena.reset();
+                    doc_arena.reset();
                 }
             }
         }
@@ -153,8 +163,18 @@ fn files_label(n: usize) -> String {
     }
 }
 
-/// Profile a single file: parse and format N times, return median timing
-fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
+/// Profile a single file: parse and format N times, return median timing.
+///
+/// The arenas are shared across the whole run (see `run`); the owned
+/// `tsv_*::format` entry would instead allocate and drop a fresh `DocArena`
+/// inside the timed region — a per-call teardown (`drop_in_place<Vec<DocNode>>`)
+/// no production hot path pays per file.
+fn profile_file(
+    path: &Path,
+    iterations: usize,
+    arena: &mut bumpalo::Bump,
+    doc_arena: &mut tsv_lang::doc::arena::DocArena,
+) -> Result<FileResult, String> {
     let source = std::fs::read_to_string(path).map_err(|e| format!("read error: {e}"))?;
     let parser_type = ParserType::from_extension(&path.to_string_lossy());
 
@@ -162,9 +182,13 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
     let mut format_times = Vec::with_capacity(iterations);
 
     for _ in 0..iterations {
-        let (parse_dur, format_dur) = profile_once(&source, parser_type)?;
+        let (parse_dur, format_dur) = profile_once(&source, parser_type, arena, doc_arena)?;
         parse_times.push(parse_dur);
         format_times.push(format_dur);
+        // Arena teardown outside the timed regions, mirroring how arena setup is
+        // excluded: the timers isolate parse/format work proper.
+        arena.reset();
+        doc_arena.reset();
     }
 
     parse_times.sort();
@@ -183,43 +207,46 @@ fn profile_file(path: &Path, iterations: usize) -> Result<FileResult, String> {
     })
 }
 
-/// Run one parse + format iteration, return (parse_duration, format_duration)
-fn profile_once(source: &str, parser_type: ParserType) -> Result<(Duration, Duration), String> {
+/// Run one parse + format iteration, return (parse_duration, format_duration).
+///
+/// Arenas are caller-owned and reset between iterations (see `profile_file`);
+/// setup/teardown stays outside both timed regions.
+fn profile_once(
+    source: &str,
+    parser_type: ParserType,
+    arena: &bumpalo::Bump,
+    doc_arena: &tsv_lang::doc::arena::DocArena,
+) -> Result<(Duration, Duration), String> {
     match parser_type {
         ParserType::TypeScript => {
-            // Allocate the arena outside the timed region so its setup isn't
-            // counted in the parse measurement.
-            let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
-            let ast = tsv_ts::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_ts::format(&ast, source);
+            let _ = tsv_ts::format_in(&ast, source, doc_arena);
             let format_dur = t1.elapsed();
 
             Ok((parse_dur, format_dur))
         }
         ParserType::Svelte => {
-            let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
-            let ast = tsv_svelte::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_svelte::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_svelte::format(&ast, source);
+            let _ = tsv_svelte::format_in(&ast, source, doc_arena);
             let format_dur = t1.elapsed();
 
             Ok((parse_dur, format_dur))
         }
         ParserType::Css => {
-            let arena = bumpalo::Bump::with_capacity(estimated_ast_arena_capacity(source.len()));
             let t0 = Instant::now();
-            let ast = tsv_css::parse(source, &arena).map_err(|e| format!("parse error: {e}"))?;
+            let ast = tsv_css::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
             let parse_dur = t0.elapsed();
 
             let t1 = Instant::now();
-            let _ = tsv_css::format(&ast, source);
+            let _ = tsv_css::format_in(&ast, source, doc_arena);
             let format_dur = t1.elapsed();
 
             Ok((parse_dur, format_dur))
