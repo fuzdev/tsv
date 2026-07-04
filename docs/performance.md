@@ -406,12 +406,13 @@ cargo run -p tsv_debug arena_stats <paths> --list-errors   # list parse-skipped 
 
 1. **`tsv_debug profile`** on the target workload — note the phase split
 2. **`perf report --stdio`** — identify which functions are hot
-3. **Record baseline** with corpus benchmarks: `deno task bench`
+3. **Record baseline** with corpus benchmarks: `deno task bench:perf`
 
 ### After an optimization
 
 1. **`tsv_debug profile`** — same workload, compare phase split
-2. **`deno task bench`** — measure overall corpus impact
+2. **`deno task bench:perf`** — measure overall corpus impact (perf surface;
+   the full `deno task bench` also runs the slower conformance surface)
 3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or the `bench:node:run` / `bench:bun:run` siblings for the other runtimes)
 
 ## WASM bundle size

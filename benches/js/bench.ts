@@ -340,7 +340,7 @@ const RESULTS_DIR = './benches/js/results';
 //
 
 log('Loading corpus...\n');
-const corpus_loader = new DevReposLoader(IS_CONFORMANCE ? 'conformance' : 'perf', {
+const corpus_loader = new DevReposLoader(CORPUS_MODE, {
 	allow_missing: env.BENCH_ALLOW_MISSING === '1',
 });
 // Drain `stream()` directly instead of `load()` so we skip the loader's
