@@ -9,12 +9,17 @@ use tsv_lang::{ParseError, Span};
 use super::find_exact_tag_close;
 use super::parser_impl::SvelteParser;
 
-/// Check if a tag name is a component (last segment starts with uppercase)
-/// Examples: "Comp" -> true, "ns.Comp" -> true, "deep.nested.Comp" -> true, "div" -> false
+/// Check if a tag name is a component.
+///
+/// A dotted tag (member access, e.g. `ns.Comp`, `Object.component`, `object.property`) is always
+/// a component; otherwise it's a component iff the first char is uppercase. Mirrors Svelte's
+/// `regex_valid_component_name` (`1-parse/state/element.js`): uppercase-first with optional dots,
+/// or any `ID_Start`-first name with one or more dotted segments.
+///
+/// Examples: "Comp" -> true, "ns.Comp" -> true, "Object.component" -> true, "object.property" ->
+/// true, "div" -> false
 fn is_component(name: &str) -> bool {
-    // For dot notation (ns.Comp), check the last segment
-    let last_segment = name.rsplit('.').next().unwrap_or(name);
-    last_segment.chars().next().is_some_and(char::is_uppercase)
+    name.contains('.') || name.chars().next().is_some_and(char::is_uppercase)
 }
 
 /// Result type for parsing elements - either a regular element or a special element.
@@ -31,14 +36,22 @@ type SpecialElementAttrs<'arena> = (
 );
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
+    /// Whether an attribute list carries a `shadowrootmode` attribute (by name). On a
+    /// RegularElement this marks a declarative-shadow-root template, so descendant `<slot>`s are
+    /// ordinary elements rather than `SlotElement`s — mirrors Svelte's
+    /// `parent_is_shadowroot_template` (`1-parse/state/element.js`).
+    fn attrs_have_shadowrootmode(&self, attributes: &[AttributeNode<'arena>]) -> bool {
+        let interner = self.interner.borrow();
+        attributes.iter().any(|attr| {
+            matches!(attr, AttributeNode::Attribute(a) if interner.resolve(a.name) == Some("shadowrootmode"))
+        })
+    }
+
     /// Parse an element or special element: <tag></tag> or <tag/> or <void>
     ///
     /// Detects special elements (svelte:*, slot) and parses them appropriately.
     /// Returns a ParsedElement enum to distinguish between regular and special elements.
-    pub(crate) fn parse_element_or_special(
-        &mut self,
-        in_svelte_head: bool,
-    ) -> Result<ParsedElement<'arena>, ParseError> {
+    pub(crate) fn parse_element_or_special(&mut self) -> Result<ParsedElement<'arena>, ParseError> {
         let start = self.current_start;
 
         // Parse opening tag: <tag>
@@ -56,8 +69,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         };
         self.advance()?;
 
-        // Check if this is a special element
-        if let Some(special_tag) = SpecialElementTag::from_tag_name(tag_name, in_svelte_head) {
+        // Check if this is a special element. `title`/`slot` classification depends on the
+        // ancestor context tracked on the parser (see `SpecialElementTag::from_tag_name`).
+        if let Some(special_tag) = SpecialElementTag::from_tag_name(
+            tag_name,
+            self.in_svelte_head,
+            self.in_shadowroot_template,
+        ) {
             return self.parse_special_element_body(start, name_span, special_tag);
         }
 
@@ -69,14 +87,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             ElementKind::Html
         };
 
-        self.parse_regular_element_body(
-            start,
-            tag_name,
-            tag_symbol,
-            kind,
-            name_span,
-            in_svelte_head,
-        )
+        self.parse_regular_element_body(start, tag_name, tag_symbol, kind, name_span)
     }
 
     /// Parse a regular element (HTML or component)
@@ -87,7 +98,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag_symbol: string_interner::DefaultSymbol,
         kind: ElementKind,
         name_span: Span,
-        in_svelte_head: bool,
     ) -> Result<ParsedElement<'arena>, ParseError> {
         // Parse attributes
         let attributes = self.parse_attributes()?;
@@ -148,8 +158,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // `parse_children` resolves `end` — past this element's `</tag>` (explicit
         // close) or at the `<` that implicitly closed it.
         let is_html = matches!(kind, ElementKind::Html);
-        let (child_nodes, end) =
-            self.parse_children(tag_name, opening_tag_end, start, in_svelte_head, is_html)?;
+        // Enter this element's ancestor context: a RegularElement/Component resets head context
+        // (mirrors Svelte's `parent_is_head`), and a RegularElement carrying `shadowrootmode`
+        // turns on shadow-root-template context for its subtree (`parent_is_shadowroot_template`).
+        let in_shadow =
+            self.in_shadowroot_template || (is_html && self.attrs_have_shadowrootmode(&attributes));
+        let (child_nodes, end) = self.parse_children_in_context(
+            false,
+            in_shadow,
+            tag_name,
+            opening_tag_end,
+            start,
+            is_html,
+        )?;
 
         Ok(ParsedElement::Element(Element {
             name: tag_symbol,
@@ -175,7 +196,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         tag: SpecialElementTag,
     ) -> Result<ParsedElement<'arena>, ParseError> {
         let tag_name = tag.tag_name();
-        let in_svelte_head = tag == SpecialElementTag::SvelteHead;
 
         // Parse attributes, extracting `this` for SvelteElement and SvelteComponent
         let (attributes, tag_expr, component_expr) = self.parse_special_element_attributes(tag)?;
@@ -211,8 +231,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse children. Special elements (`svelte:*`, `slot`, …) are not HTML
         // RegularElements, so they never auto-close (`is_html = false`) — a
         // mismatched close falls to `parse_closing_tag`'s strict error.
-        let (child_nodes, end) =
-            self.parse_children(tag_name, opening_tag_end, start, in_svelte_head, false)?;
+        //
+        // Ancestor context: `<svelte:head>` turns head context on; every other special element is
+        // transparent (Svelte's `parent_is_head`/`parent_is_shadowroot_template` only stop at a
+        // RegularElement/Component), so both flags carry through unchanged otherwise.
+        let in_head = tag == SpecialElementTag::SvelteHead || self.in_svelte_head;
+        let (child_nodes, end) = self.parse_children_in_context(
+            in_head,
+            self.in_shadowroot_template,
+            tag_name,
+            opening_tag_end,
+            start,
+            false,
+        )?;
 
         Ok(ParsedElement::SpecialElement(SpecialElement {
             kind,
@@ -341,6 +372,30 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok((attributes, tag_expr, component_expr))
     }
 
+    /// Parse an element's children under a given ancestor context (`in_svelte_head` /
+    /// `in_shadowroot_template`), restoring the caller's context afterward — so the context is
+    /// scoped to this subtree and siblings are unaffected (Svelte's stack push/pop). Delegates to
+    /// [`Self::parse_children`] for the actual parse; the save/restore is the only added work. The
+    /// restore also runs on the error path, though the parse aborts then anyway.
+    fn parse_children_in_context(
+        &mut self,
+        in_svelte_head: bool,
+        in_shadowroot_template: bool,
+        tag_name: &str,
+        opening_tag_end: usize,
+        start: usize,
+        is_html: bool,
+    ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
+        let saved_head = self.in_svelte_head;
+        let saved_shadow = self.in_shadowroot_template;
+        self.in_svelte_head = in_svelte_head;
+        self.in_shadowroot_template = in_shadowroot_template;
+        let result = self.parse_children(tag_name, opening_tag_end, start, is_html);
+        self.in_svelte_head = saved_head;
+        self.in_shadowroot_template = saved_shadow;
+        result
+    }
+
     /// Parse children until this element's end is resolved, returning the child
     /// nodes and the element's end byte offset. The end is either past this
     /// element's own `</tag>` (consumed here via `parse_closing_tag`) or, under
@@ -348,13 +403,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// close (an ancestor's `</other>` or an auto-closing sibling `<next>`, left
     /// unconsumed for the caller's caller to re-read — matching Svelte's
     /// `parent.end = start`). `is_html` enables the auto-close rules: only HTML
-    /// `RegularElement`s participate (see the callers).
+    /// `RegularElement`s participate (see the callers). Callers that establish an ancestor
+    /// context (head / shadowroot-template) should go through [`Self::parse_children_in_context`].
     fn parse_children(
         &mut self,
         tag_name: &str,
         opening_tag_end: usize,
         start: usize,
-        in_svelte_head: bool,
         is_html: bool,
     ) -> Result<(BumpVec<'arena, FragmentNode<'arena>>, u32), ParseError> {
         let mut child_nodes = self.bvec();
@@ -401,7 +456,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     return Ok((child_nodes, self.current_start as u32));
                 }
                 // Parse child element (may be special or regular)
-                let child = self.parse_element_or_special(in_svelte_head)?;
+                let child = self.parse_element_or_special()?;
                 match child {
                     ParsedElement::Element(elem) => {
                         last_end = elem.span.end_usize();
@@ -540,14 +595,17 @@ mod tests {
     use super::is_component;
 
     #[test]
-    fn component_classification_by_last_segment() {
-        // Uppercase first char (of the last dotted segment) ⇒ component.
+    fn component_classification() {
+        // Uppercase first char ⇒ component.
         assert!(is_component("Comp"));
         assert!(is_component("ns.Comp"));
         assert!(is_component("deep.nested.Comp"));
-        // Lowercase ⇒ regular HTML element, even with dots.
+        // Any dotted tag is member access ⇒ component, regardless of segment casing.
+        assert!(is_component("Object.component"));
+        assert!(is_component("object.property"));
+        assert!(is_component("ns.lower"));
+        // No dot + lowercase first char ⇒ regular HTML element.
         assert!(!is_component("div"));
-        assert!(!is_component("ns.lower"));
         // Empty name has no first char.
         assert!(!is_component(""));
         // Non-ASCII uppercase still counts.

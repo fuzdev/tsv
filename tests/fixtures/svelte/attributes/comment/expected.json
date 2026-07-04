@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 672,
+	"end": 852,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -486,55 +486,55 @@
 			{
 				"type": "Comment",
 				"start": 572,
-				"end": 601,
-				"data": " Inline block comment "
+				"end": 647,
+				"data": " Multiline block comment (content preserved verbatim, not dedented) "
 			},
 			{
 				"type": "Text",
-				"start": 601,
-				"end": 602,
+				"start": 647,
+				"end": 648,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 602,
-				"end": 671,
+				"start": 648,
+				"end": 750,
 				"name": "div",
 				"name_loc": {
 					"start": {
 						"line": 46,
 						"column": 1,
-						"character": 603
+						"character": 649
 					},
 					"end": {
 						"line": 46,
 						"column": 4,
-						"character": 606
+						"character": 652
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 607,
-						"end": 626,
+						"start": 654,
+						"end": 673,
 						"name": "data-attr1",
 						"name_loc": {
 							"start": {
-								"line": 46,
-								"column": 5,
-								"character": 607
+								"line": 47,
+								"column": 1,
+								"character": 654
 							},
 							"end": {
-								"line": 46,
-								"column": 15,
-								"character": 617
+								"line": 47,
+								"column": 11,
+								"character": 664
 							}
 						},
 						"value": [
 							{
-								"start": 619,
-								"end": 625,
+								"start": 666,
+								"end": 672,
 								"type": "Text",
 								"raw": "value1",
 								"data": "value1"
@@ -543,25 +543,25 @@
 					},
 					{
 						"type": "Attribute",
-						"start": 640,
-						"end": 659,
+						"start": 715,
+						"end": 734,
 						"name": "data-attr2",
 						"name_loc": {
 							"start": {
-								"line": 46,
-								"column": 38,
-								"character": 640
+								"line": 52,
+								"column": 1,
+								"character": 715
 							},
 							"end": {
-								"line": 46,
-								"column": 48,
-								"character": 650
+								"line": 52,
+								"column": 11,
+								"character": 725
 							}
 						},
 						"value": [
 							{
-								"start": 652,
-								"end": 658,
+								"start": 727,
+								"end": 733,
 								"type": "Text",
 								"raw": "value2",
 								"data": "value2"
@@ -574,10 +574,116 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 660,
-							"end": 665,
-							"raw": "text6",
-							"data": "text6"
+							"start": 736,
+							"end": 744,
+							"raw": "\n\ttext6\n",
+							"data": "\n\ttext6\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 750,
+				"end": 752,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 752,
+				"end": 781,
+				"data": " Inline block comment "
+			},
+			{
+				"type": "Text",
+				"start": 781,
+				"end": 782,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 782,
+				"end": 851,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 58,
+						"column": 1,
+						"character": 783
+					},
+					"end": {
+						"line": 58,
+						"column": 4,
+						"character": 786
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 787,
+						"end": 806,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 58,
+								"column": 5,
+								"character": 787
+							},
+							"end": {
+								"line": 58,
+								"column": 15,
+								"character": 797
+							}
+						},
+						"value": [
+							{
+								"start": 799,
+								"end": 805,
+								"type": "Text",
+								"raw": "value1",
+								"data": "value1"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 820,
+						"end": 839,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 58,
+								"column": 38,
+								"character": 820
+							},
+							"end": {
+								"line": 58,
+								"column": 48,
+								"character": 830
+							}
+						},
+						"value": [
+							{
+								"start": 832,
+								"end": 838,
+								"type": "Text",
+								"raw": "value2",
+								"data": "value2"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 840,
+							"end": 845,
+							"raw": "text7",
+							"data": "text7"
 						}
 					]
 				}
@@ -696,19 +802,37 @@
 		},
 		{
 			"type": "Block",
-			"start": 627,
-			"end": 639,
+			"start": 675,
+			"end": 713,
+			"value": " multiline block\n\t\tline2\n\t\tline3\n\t",
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 1,
+					"character": 675
+				},
+				"end": {
+					"line": 51,
+					"column": 3,
+					"character": 713
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 807,
+			"end": 819,
 			"value": " inline ",
 			"loc": {
 				"start": {
-					"line": 46,
+					"line": 58,
 					"column": 25,
-					"character": 627
+					"character": 807
 				},
 				"end": {
-					"line": 46,
+					"line": 58,
 					"column": 37,
-					"character": 639
+					"character": 819
 				}
 			}
 		}

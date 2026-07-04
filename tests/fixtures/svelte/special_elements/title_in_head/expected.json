@@ -1,0 +1,367 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 472,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteHead",
+				"start": 0,
+				"end": 471,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 13,
+							"end": 15,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 15,
+							"end": 59,
+							"data": " direct child of head → TitleElement "
+						},
+						{
+							"type": "Text",
+							"start": 59,
+							"end": 61,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "TitleElement",
+							"start": 61,
+							"end": 81,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 2,
+									"character": 62
+								},
+								"end": {
+									"line": 3,
+									"column": 7,
+									"character": 67
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 68,
+										"end": 73,
+										"raw": "text1",
+										"data": "text1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 81,
+							"end": 84,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 84,
+							"end": 147,
+							"data": " inside a block → TitleElement (blocks are transparent) "
+						},
+						{
+							"type": "Text",
+							"start": 147,
+							"end": 149,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "IfBlock",
+							"elseif": false,
+							"start": 149,
+							"end": 189,
+							"test": {
+								"type": "Identifier",
+								"start": 154,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 6
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"name": "cond"
+							},
+							"consequent": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 159,
+										"end": 162,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "TitleElement",
+										"start": 162,
+										"end": 182,
+										"name": "title",
+										"name_loc": {
+											"start": {
+												"line": 7,
+												"column": 3,
+												"character": 163
+											},
+											"end": {
+												"line": 7,
+												"column": 8,
+												"character": 168
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 169,
+													"end": 174,
+													"raw": "text2",
+													"data": "text2"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 182,
+										"end": 184,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							},
+							"alternate": null
+						},
+						{
+							"type": "Text",
+							"start": 189,
+							"end": 192,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 192,
+							"end": 273,
+							"data": " inside svelte:fragment → TitleElement (special elements are transparent) "
+						},
+						{
+							"type": "Text",
+							"start": 273,
+							"end": 275,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "SvelteFragment",
+							"start": 275,
+							"end": 335,
+							"name": "svelte:fragment",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 2,
+									"character": 276
+								},
+								"end": {
+									"line": 11,
+									"column": 17,
+									"character": 291
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 292,
+										"end": 295,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "TitleElement",
+										"start": 295,
+										"end": 315,
+										"name": "title",
+										"name_loc": {
+											"start": {
+												"line": 12,
+												"column": 3,
+												"character": 296
+											},
+											"end": {
+												"line": 12,
+												"column": 8,
+												"character": 301
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 302,
+													"end": 307,
+													"raw": "text3",
+													"data": "text3"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 315,
+										"end": 317,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 335,
+							"end": 338,
+							"raw": "\n\n\t",
+							"data": "\n\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 338,
+							"end": 418,
+							"data": " inside a regular element → RegularElement (elements reset head context) "
+						},
+						{
+							"type": "Text",
+							"start": 418,
+							"end": 420,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 420,
+							"end": 456,
+							"name": "div",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 2,
+									"character": 421
+								},
+								"end": {
+									"line": 16,
+									"column": 5,
+									"character": 424
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 425,
+										"end": 428,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 428,
+										"end": 448,
+										"name": "title",
+										"name_loc": {
+											"start": {
+												"line": 17,
+												"column": 3,
+												"character": 429
+											},
+											"end": {
+												"line": 17,
+												"column": 8,
+												"character": 434
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 435,
+													"end": 440,
+													"raw": "text4",
+													"data": "text4"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 448,
+										"end": 450,
+										"raw": "\n\t",
+										"data": "\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 456,
+							"end": 457,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

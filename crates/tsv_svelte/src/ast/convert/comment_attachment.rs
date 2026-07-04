@@ -361,18 +361,23 @@ fn recurse_children(tree: &SkeletonTree, node: u32, ctx: &mut CommentAttachmentC
 
 /// Get comment value with indentation stripping applied (Svelte compatibility)
 ///
-/// For multi-line block comments, strips leading indentation to match Svelte's behavior.
-/// See: svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js:115-124
+/// For a multi-line block comment, Svelte's *acorn* `onComment` handler dedents the content by
+/// the comment's line indentation (see
+/// `svelte/packages/svelte/src/compiler/phases/1-parse/acorn.js:115-124`). This applies **only to
+/// comments acorn parses** — `<script>` bodies and template expressions — not to comments Svelte's
+/// own template reader collects (in-tag `//` / `/* */` between attributes), which keep their raw
+/// content. `emit_character_field` distinguishes the two: it's set for template-open-tag-shape
+/// comments (the template-reader ones) and cleared for acorn-shape comments, so the dedent is
+/// gated on `!emit_character_field`.
 ///
 /// `pub(super)` so the wire-JSON writer emits the `value` field directly (no
 /// intermediate allocation).
 ///
-/// Returns `Cow` so the common single-line / non-dedented case borrows its
-/// content slice verbatim — only the multi-line block dedent path (rare)
-/// allocates.
+/// Returns `Cow` so the common single-line / verbatim case borrows its content
+/// slice — only the acorn multi-line block dedent path (rare) allocates.
 pub(super) fn get_comment_value<'s>(comment: &Comment, source: &'s str) -> Cow<'s, str> {
     let content = comment.content(source);
-    if comment.is_block && comment.multiline {
+    if comment.is_block && comment.multiline && !comment.emit_character_field {
         Cow::Owned(printing::strip_comment_indentation(
             source,
             content,
