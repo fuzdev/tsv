@@ -225,8 +225,10 @@ pub enum DocText {
     Pooled(PoolSpan, u16),
     /// Verbatim source slice, resolved against `source` at print time — like
     /// `Symbol` but keyed on a span instead of an interner id. Second field is
-    /// the precomputed visual width (u16::MAX = contains newline; ASCII defers
-    /// to on-demand measurement). Lets a printer emit verbatim source text
+    /// the precomputed visual width — always computed at build like `Pooled`
+    /// (a real width or [`TEXT_WIDTH_HAS_NEWLINE`]), except identifier names
+    /// (via `source_span_ident`), which defer to on-demand measurement
+    /// ([`TEXT_WIDTH_NOT_COMPUTED`]). Lets a printer emit verbatim source text
     /// (comments, template chunks, already-canonical literals) with **no
     /// allocation and no copy** — the lifetime-free alternative to a borrowed
     /// `&'src str` (which would force `DocArena<'src>` and forfeit the

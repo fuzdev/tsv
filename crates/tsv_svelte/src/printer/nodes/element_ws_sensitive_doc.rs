@@ -434,11 +434,11 @@ impl<'a> Printer<'a> {
             opening.push(pattern_doc);
             if let Some(index) = block.index {
                 opening.push(d.text(", "));
-                opening.push(d.text_owned(index.to_string()));
+                opening.push(d.text_pooled(index));
             }
         } else if let Some(index) = block.index {
             opening.push(d.text(", "));
-            opening.push(d.text_owned(index.to_string()));
+            opening.push(d.text_pooled(index));
         }
 
         if let Some(key) = &block.key {

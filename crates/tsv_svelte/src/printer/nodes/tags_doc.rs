@@ -219,8 +219,7 @@ impl<'a> Printer<'a> {
                     last_end = comment.span.end;
                 }
             }
-            let name = self.extract_source_range(id.span().start_usize(), id.span().end_usize());
-            parts.push(d.text_owned(name.to_string()));
+            parts.push(d.source_span(id.span(), self.source));
             last_end = id.span().end;
         }
 

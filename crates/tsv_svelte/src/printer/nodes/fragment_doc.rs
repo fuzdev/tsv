@@ -1212,7 +1212,7 @@ impl<'a> Printer<'a> {
             if !parts.is_empty() {
                 parts.push(d.line());
             }
-            parts.push(d.text_owned(word.to_string()));
+            parts.push(d.text_pooled(word));
         }
         parts
     }
@@ -1344,7 +1344,7 @@ impl<'a> Printer<'a> {
                 } else {
                     words[0].to_string()
                 };
-                let parts = [d.text_owned(word), d.line()];
+                let parts = [d.text_pooled(&word), d.line()];
                 return Some(d.fill(&parts));
             }
             let mut result = String::new();
@@ -1355,7 +1355,7 @@ impl<'a> Printer<'a> {
             if !trim_trailing && has_trailing_ws {
                 result.push(' ');
             }
-            return Some(d.text_owned(result));
+            return Some(d.text_pooled(&result));
         }
 
         // Multiple words (or leading_line): build fill parts
@@ -1378,14 +1378,14 @@ impl<'a> Printer<'a> {
                 let mut s = String::with_capacity(1 + word.len());
                 s.push(' ');
                 s.push_str(word);
-                parts.push(d.text_owned(s));
+                parts.push(d.text_pooled(&s));
             } else if i == words.len() - 1 && append_space {
                 let mut s = String::with_capacity(word.len() + 1);
                 s.push_str(word);
                 s.push(' ');
-                parts.push(d.text_owned(s));
+                parts.push(d.text_pooled(&s));
             } else {
-                parts.push(d.text_owned((*word).to_string()));
+                parts.push(d.text_pooled(word));
             }
         }
 

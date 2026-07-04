@@ -250,14 +250,7 @@ impl<'a> Printer<'a> {
         match value {
             internal::AttributeValue::Text(text) => {
                 let normalized = normalize_class_text(text.raw(self.source), is_last_part);
-                // `normalized` is freshly owned — move it straight into the doc on the
-                // common single-line path instead of re-cloning through the borrowed
-                // `build_attribute_text_doc` (which would `to_string()` it again).
-                if normalized.contains('\n') {
-                    self.build_attribute_text_doc(&normalized)
-                } else {
-                    self.d().text_owned(normalized)
-                }
+                self.build_attribute_text_doc(&normalized)
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 self.build_attribute_expression_doc(expr_tag)
@@ -276,14 +269,11 @@ impl<'a> Printer<'a> {
         if raw.contains('\n') {
             // Split at newlines, join with literalline to preserve literal newlines
             // and trigger will_break on the attribute group
-            let line_docs: DocBuf = raw
-                .split('\n')
-                .map(|part| d.text_owned(part.to_string()))
-                .collect();
+            let line_docs: DocBuf = raw.split('\n').map(|part| d.text_pooled(part)).collect();
             let sep = d.literalline();
             d.join_doc(line_docs, sep)
         } else {
-            d.text_owned(raw.to_string())
+            d.text_pooled(raw)
         }
     }
 
@@ -362,7 +352,7 @@ impl<'a> Printer<'a> {
         expression_tag_span: Option<Span>,
     ) -> DocId {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![prefix, d.text_owned(name.to_string())];
+        let mut parts: DocBuf = smallvec![prefix, d.text_pooled(name)];
         parts.extend(self.build_modifiers_doc(modifiers));
         if let Some(expr) = expression {
             parts.extend(self.build_expression_doc_parts_with_span(expr, expression_tag_span));
@@ -385,7 +375,7 @@ impl<'a> Printer<'a> {
     fn build_bind_directive_doc(&self, dir: &internal::BindDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf = smallvec![d.text("bind:"), d.text_owned(name.to_string())];
+        let mut parts: DocBuf = smallvec![d.text("bind:"), d.text_pooled(name)];
         parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&dir.expression, name) {
@@ -402,7 +392,7 @@ impl<'a> Printer<'a> {
     fn build_class_directive_doc(&self, dir: &internal::ClassDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf = smallvec![d.text("class:"), d.text_owned(name.to_string())];
+        let mut parts: DocBuf = smallvec![d.text("class:"), d.text_pooled(name)];
         parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&dir.expression, name) {
@@ -417,7 +407,7 @@ impl<'a> Printer<'a> {
     fn build_style_directive_doc(&self, dir: &internal::StyleDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf = smallvec![d.text("style:"), d.text_owned(name.to_string())];
+        let mut parts: DocBuf = smallvec![d.text("style:"), d.text_pooled(name)];
         parts.extend(self.build_modifiers_doc(dir.modifiers));
         match &dir.value {
             internal::StyleDirectiveValue::True => {}
@@ -476,7 +466,7 @@ impl<'a> Printer<'a> {
     fn build_let_directive_doc(&self, dir: &internal::LetDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf = smallvec![d.text("let:"), d.text_owned(name.to_string())];
+        let mut parts: DocBuf = smallvec![d.text("let:"), d.text_pooled(name)];
         parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand (let:foo={foo} → let:foo)
         if let Some(expr) = &dir.expression
@@ -495,7 +485,7 @@ impl<'a> Printer<'a> {
     fn build_modifiers_doc(&self, modifiers: &[&str]) -> DocBuf {
         modifiers
             .iter()
-            .flat_map(|m| [self.d().text("|"), self.d().text_owned((*m).to_string())])
+            .flat_map(|m| [self.d().text("|"), self.d().text_pooled(m)])
             .collect()
     }
 

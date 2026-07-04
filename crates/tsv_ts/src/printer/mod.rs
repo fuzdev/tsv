@@ -1025,20 +1025,23 @@ impl<'a> Printer<'a> {
     /// whitespace, and prettier never preserves it — some spans (e.g. a
     /// `TSConstructSignatureDeclaration`'s) over-extend to the next line's start.
     fn raw_source_doc(&self, span: Span) -> DocId {
-        self.d()
-            .text_owned(span.extract(self.source).trim_end().to_string())
+        self.raw_source_range(span.start, span.end)
     }
 
     /// Emit `[start, end)` of the source verbatim. Like `raw_source_doc` but for a
     /// format-ignored member whose verbatim slice must exclude a separator
     /// the surrounding loop emits itself (e.g. a type-literal member's `;`), so
     /// the terminator isn't duplicated.
+    ///
+    /// Emitted as a `source_span` over the whitespace-trimmed sub-span — an
+    /// ignored region can be large, and the verbatim slice needs no pool copy.
     fn raw_source_range(&self, start: u32, end: u32) -> DocId {
-        self.d().text_owned(
-            self.source[start as usize..end as usize]
-                .trim_end()
-                .to_string(),
-        )
+        let trimmed = self.source[start as usize..end as usize].trim_end();
+        let span = Span {
+            start,
+            end: start + trimmed.len() as u32,
+        };
+        self.d().source_span(span, self.source)
     }
 
     /// Emit an identifier-name doc node — the doc-side name-emission seam.

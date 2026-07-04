@@ -82,7 +82,7 @@ pub enum DocNode {
     /// allocation) per line.
     ///
     /// `first_width` is the precomputed visual width of the first line
-    /// (clamped like every cached text width — see [`precompute_text_width`]),
+    /// (clamped like every cached text width — see [`pooled_text_width`]),
     /// so the fits walk measures the node without touching the pool.
     ///
     /// Used for indentable (JSDoc / `*`-aligned) multi-line block comments,
@@ -236,11 +236,18 @@ impl ArenaCommand {
 pub(super) const FLAT_WIDTH_UNKNOWN: u32 = u32::MAX;
 pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 
-/// The width-cache policy for [`DocArena::source_span`] (verbatim source
-/// slices): skip ASCII (the byte-count fast path measures on demand for less
-/// than caching costs), flag newline-bearing text, else take the grapheme path
-/// once (it may be re-measured many times in fits). Pool-stored text uses
-/// [`pooled_text_width`] instead — always eager, so fits never needs the pool.
+/// The eager width-cache policy for dynamic doc text: pool-stored text
+/// ([`DocText::Pooled`], `MultilineText` first lines) and verbatim source
+/// slices ([`DocArena::source_span`]) **always** cache a real width or the
+/// newline sentinel at build — so every width query (the fits walk,
+/// `render_text`'s column advance) answers from the node alone, the fits path
+/// never borrows the pool, and render's per-text byte scan is skipped. The one
+/// exception is identifier names ([`DocArena::source_span_ident`], plus
+/// `text()` statics and interner `Symbol`s): high-frequency, newline-free, and
+/// rarely fits-measured, so for them the build-time scan costs more than it
+/// saves (measured both ways — eager per-ident width was ~+1.1% on
+/// identifier-dense corpora; eager everything-else was −0.6..−0.8% on every
+/// mixed corpus).
 ///
 /// The measured width is clamped below the sentinels. Unlike the `u32`
 /// flat-width cache above (where aliasing needs a ~4 GB subtree and is benign
@@ -253,25 +260,6 @@ pub(super) const FLAT_WIDTH_BREAKS: u32 = u32::MAX - 1;
 /// answer identically. The same holds for the other consumer, `render_text`'s
 /// column advance — the column only feeds threshold comparisons (print width,
 /// `first_line_offset`) far below the clamp, and resets at each newline.
-#[inline]
-fn precompute_text_width(s: &str) -> u16 {
-    if s.is_ascii() {
-        TEXT_WIDTH_NOT_COMPUTED
-    } else if s.contains('\n') {
-        TEXT_WIDTH_HAS_NEWLINE
-    } else {
-        visual_width(s, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16
-    }
-}
-
-/// The eager width policy for pool-stored text ([`DocText::Pooled`]): unlike
-/// [`precompute_text_width`]'s ASCII skip (measure on demand), pooled text
-/// **always** caches a real width or the newline sentinel at build — so every
-/// width query (the fits walk, `render_text`'s column advance) answers from
-/// the node alone and the fits path never borrows the pool. Pooled text is
-/// rare (~1.4% of Text nodes on real corpora), so the eager measure is off the
-/// hot path; the clamp reasoning on [`precompute_text_width`] applies
-/// unchanged.
 #[inline]
 fn pooled_text_width(s: &str) -> u16 {
     if s.contains('\n') {
@@ -309,7 +297,7 @@ pub struct DocArena {
     /// render).
     flat_width_cache: RefCell<Vec<u32>>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
-    /// recorded by `line_comment_text_owned` only while the swallow check is
+    /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
     /// the vec is sorted ascending — the renderer membership-tests via binary
     /// search. See [`super::swallow`]. Compiled in only under the `swallow_check`
@@ -350,9 +338,13 @@ impl DocArena {
         Self {
             nodes: RefCell::new(Vec::with_capacity(estimated_nodes)),
             children: RefCell::new(Vec::with_capacity(estimated_children)),
-            // Pooled text is rare (~1.4% of Text nodes), so the pool grows
-            // organically — no pre-size.
-            text_pool: RefCell::new(String::new()),
+            // Pooled text is rare (~1.4% of Text nodes) but its bytes are not
+            // negligible: measured per-file pool demand is p50 ≈ 0.17× source /
+            // p90 ≈ 0.57× (MultilineText comment bodies dominate). A `len/8`
+            // floor absorbs the growth chain's first ~7 doublings on fresh
+            // arenas without inflating the reuse high-water (reset() retains
+            // organic capacity, bounded by the largest file's demand).
+            text_pool: RefCell::new(String::with_capacity(source_len / 8)),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -445,17 +437,20 @@ impl DocArena {
         self.alloc(DocNode::Text(DocText::Static(s, TEXT_WIDTH_NOT_COMPUTED)))
     }
 
-    /// Create a text doc from an owned string, stored in the arena text pool.
+    /// Create a text doc from a dynamically-built string, copied into the
+    /// arena text pool.
+    ///
+    /// Takes `&str` — the body is copied into the pool either way, so callers
+    /// with a source slice pass it directly (no transient `String`), and
+    /// callers that build a `String` pass a borrow and keep (or immediately
+    /// drop) their buffer.
     ///
     /// Width-cache policy: see [`pooled_text_width`] (always eager, so the
     /// fits walk never touches the pool).
-    // TODO: now that the body is copied into the pool rather than moved, the
-    // signature could take `&str` and spare the callers that build a `String`
-    // purely to satisfy it — sweep call sites when next touching them.
     #[inline]
-    pub fn text_owned(&self, s: String) -> DocId {
-        let w = pooled_text_width(&s);
-        let span = self.pool_push(&s);
+    pub fn text_pooled(&self, s: &str) -> DocId {
+        let w = pooled_text_width(s);
+        let span = self.pool_push(s);
         self.alloc(DocNode::Text(DocText::Pooled(span, w)))
     }
 
@@ -471,25 +466,25 @@ impl DocArena {
     /// orders of magnitude below the clamp), so fits measures the node without
     /// borrowing the pool.
     #[inline]
-    pub fn multiline_text(&self, s: String) -> DocId {
+    pub fn multiline_text(&self, s: &str) -> DocId {
         let first = s.split('\n').next().unwrap_or("");
         let first_width =
             visual_width(first, TAB_WIDTH).min(TEXT_WIDTH_NOT_COMPUTED as usize - 1) as u16;
-        let span = self.pool_push(&s);
+        let span = self.pool_push(s);
         self.alloc(DocNode::MultilineText { span, first_width })
     }
 
-    /// Create a pooled-text doc (via [`Self::text_owned`]) for a *line comment*
+    /// Create a pooled-text doc (via [`Self::text_pooled`]) for a *line comment*
     /// (`// …` or hashbang) — text whose content runs to end-of-line.
     ///
-    /// Identical to [`Self::text_owned`] for output. Under the `swallow_check`
+    /// Identical to [`Self::text_pooled`] for output. Under the `swallow_check`
     /// feature, while the check is enabled ([`super::swallow`]) it additionally
     /// records the node's id so the renderer can flag any content emitted on the
     /// same physical line after it (silent content loss). Without the feature it
-    /// is exactly `text_owned` — no recording, no side-set.
+    /// is exactly `text_pooled` — no recording, no side-set.
     #[inline]
-    pub fn line_comment_text_owned(&self, s: String) -> DocId {
-        let id = self.text_owned(s);
+    pub fn line_comment_text_pooled(&self, s: &str) -> DocId {
+        let id = self.text_pooled(s);
         #[cfg(feature = "swallow_check")]
         if swallow_check_enabled() {
             // Recorded in alloc order → sorted ascending (see field doc).
@@ -500,15 +495,18 @@ impl DocArena {
 
     /// Create a text doc from a verbatim source slice, resolved at render time
     /// against `source` (no `String` allocation). The doc renders byte-identically
-    /// to `text_owned(span.extract(source).to_string())` — use it wherever a
+    /// to `text_pooled(span.extract(source))` — use it wherever a
     /// printer emits an unmodified source slice (comments, template chunks,
     /// already-canonical literals). `source` is read only to precompute width
-    /// (same policy as [`Self::text_owned`]: skip ASCII, flag newline, else
-    /// measure once) and is **not** retained — the span lives in the lifetime-less
-    /// arena and is re-resolved at render via a [`super::SourceTextResolver`].
+    /// (the eager [`pooled_text_width`] policy: a real width or the newline
+    /// sentinel, so fits and render never re-scan the text) and is **not**
+    /// retained — the span lives in the lifetime-less arena and is re-resolved
+    /// at render via a [`super::SourceTextResolver`]. Identifier names use
+    /// [`Self::source_span_ident`] instead (deferred width — the opposite
+    /// tradeoff).
     #[inline]
     pub fn source_span(&self, span: Span, source: &str) -> DocId {
-        let w = precompute_text_width(span.extract(source));
+        let w = pooled_text_width(span.extract(source));
         self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
     }
 
@@ -527,7 +525,7 @@ impl DocArena {
         )))
     }
 
-    /// Verbatim-source-slice form of [`Self::line_comment_text_owned`]: emits a
+    /// Verbatim-source-slice form of [`Self::line_comment_text_pooled`]: emits a
     /// [`DocText::SourceSpan`] (no allocation) and, under the `swallow_check`
     /// feature while enabled, records the node so the renderer can flag content
     /// emitted on the same physical line after a `//`/hashbang comment. Without
@@ -1118,7 +1116,7 @@ impl DocArena {
 
         match info {
             Info::Keep => id,
-            Info::MultilineText(flat) => self.text_owned(flat),
+            Info::MultilineText(flat) => self.text_pooled(&flat),
             Info::Line(kind) => match kind {
                 LineKind::Normal => self.text(" "),
                 LineKind::Soft | LineKind::Hard | LineKind::Literal => self.empty(),

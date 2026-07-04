@@ -150,11 +150,7 @@ mod tests {
     fn line_comment_followed_by_text_on_same_line_is_a_swallow() {
         let (_out, reports) = with_check(|d| {
             // `[ // c ]` collapsed flat: the `]` lands on the comment's line.
-            let doc = d.concat(&[
-                d.text("["),
-                d.line_comment_text_owned("// c".to_string()),
-                d.text("]"),
-            ]);
+            let doc = d.concat(&[d.text("["), d.line_comment_text_pooled("// c"), d.text("]")]);
             arena_print_doc(d, doc, &EmbedContext::default())
         });
         assert_eq!(reports.len(), 1, "expected one swallow");
@@ -167,7 +163,7 @@ mod tests {
         let (_out, reports) = with_check(|d| {
             let doc = d.concat(&[
                 d.text("["),
-                d.line_comment_text_owned("// c".to_string()),
+                d.line_comment_text_pooled("// c"),
                 d.hardline(),
                 d.text("]"),
             ]);

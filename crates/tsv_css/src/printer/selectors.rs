@@ -156,12 +156,12 @@ impl<'a> Printer<'a> {
                 );
                 if !before.is_empty() {
                     parts.push(d.text(" "));
-                    parts.push(d.text_owned(before));
+                    parts.push(d.text_pooled(&before));
                 }
                 parts.push(d.text(","));
                 parts.push(if breakable { d.line() } else { d.text(" ") });
                 if !after.is_empty() {
-                    parts.push(d.text_owned(after));
+                    parts.push(d.text_pooled(&after));
                     parts.push(d.text(" "));
                 }
             }
@@ -278,7 +278,7 @@ impl<'a> Printer<'a> {
                     if let Some(cs) = rel.combinator_span {
                         let after = self.comment_blocks_in_range(cs.end, first_start);
                         if !after.is_empty() {
-                            parts.push(d.text_owned(after));
+                            parts.push(d.text_pooled(&after));
                             parts.push(d.text(" "));
                         }
                     }
@@ -317,7 +317,7 @@ impl<'a> Printer<'a> {
                         start: prev_end,
                         end: sspan.start,
                     };
-                    parts.push(d.text_owned(gap.extract(self.source).to_string()));
+                    parts.push(d.source_span(gap, self.source));
                 }
                 parts.push(self.build_simple_selector_doc(simple, j + 1 == n));
                 prev_end = sspan.end;
@@ -345,7 +345,7 @@ impl<'a> Printer<'a> {
             internal::Combinator::Descendant => {
                 let gap = self.comment_blocks_in_range(gap_start, gap_end);
                 if !gap.is_empty() {
-                    parts.push(d.text_owned(gap));
+                    parts.push(d.text_pooled(&gap));
                     parts.push(d.text(" "));
                 }
             }
@@ -361,13 +361,13 @@ impl<'a> Printer<'a> {
                     ),
                 };
                 if !before.is_empty() {
-                    parts.push(d.text_owned(before));
+                    parts.push(d.text_pooled(&before));
                     parts.push(d.text(" "));
                 }
                 parts.push(d.text(other.as_str()));
                 parts.push(d.text(" "));
                 if !after.is_empty() {
-                    parts.push(d.text_owned(after));
+                    parts.push(d.text_pooled(&after));
                     parts.push(d.text(" "));
                 }
             }
@@ -406,7 +406,7 @@ impl<'a> Printer<'a> {
         } else {
             raw
         };
-        self.d().text_owned(text.to_string())
+        self.d().text_pooled(text)
     }
 
     /// Reconstruct an attribute selector (`[ns|name op 'value' flags]`) verbatim
@@ -499,13 +499,13 @@ impl<'a> Printer<'a> {
                 if self.in_keyframes {
                     let text = span.extract(self.source).trim();
                     if text.eq_ignore_ascii_case("from") || text.eq_ignore_ascii_case("to") {
-                        return d.text_owned(text.to_ascii_lowercase());
+                        return d.text_pooled(&text.to_ascii_lowercase());
                     }
                 }
                 self.span_leaf_doc(*span, is_last_in_compound)
             }
             internal::SimpleSelector::Universal { namespace, .. } => match namespace {
-                Some(ns) => d.text_owned(format!("{ns}|*")),
+                Some(ns) => d.text_pooled(&format!("{ns}|*")),
                 None => d.text("*"),
             },
             internal::SimpleSelector::Class { span } => {
@@ -520,7 +520,7 @@ impl<'a> Printer<'a> {
                 flags,
                 ..
             } => {
-                d.text_owned(self.build_attribute_selector_text(
+                d.text_pooled(&self.build_attribute_selector_text(
                     *namespace, *name_span, *matcher, *value, *flags,
                 ))
             }
@@ -531,7 +531,9 @@ impl<'a> Printer<'a> {
                 self.build_pseudo_doc(*span, args.as_ref(), is_last_in_compound)
             }
             internal::SimpleSelector::Nesting { .. } => d.text("&"),
-            internal::SimpleSelector::Percentage { value, .. } => d.text_owned(format!("{value}%")),
+            internal::SimpleSelector::Percentage { value, .. } => {
+                d.text_pooled(&format!("{value}%"))
+            }
             internal::SimpleSelector::Nth { span } => {
                 // Normalize An+B operator spacing (`2n+1` → `2n + 1`) to match prettier,
                 // exactly like the dedicated `:nth-child` args path. An `An+B of S` term
@@ -541,12 +543,12 @@ impl<'a> Printer<'a> {
                 // in the glued compound.
                 let raw = span.extract(self.source);
                 match split_nth_of(raw) {
-                    Some(anb) => d.text_owned(format!("{} of ", Self::normalize_an_plus_b(anb))),
-                    None => d.text_owned(Self::normalize_an_plus_b(raw)),
+                    Some(anb) => d.text_pooled(&format!("{} of ", Self::normalize_an_plus_b(anb))),
+                    None => d.text_pooled(&Self::normalize_an_plus_b(raw)),
                 }
             }
             internal::SimpleSelector::Invalid { span } => {
-                d.text_owned(span.extract(self.source).trim().to_string())
+                d.text_pooled(span.extract(self.source).trim())
             }
         }
     }
@@ -565,18 +567,18 @@ impl<'a> Printer<'a> {
         match args {
             Some(args) => {
                 let name = self.pseudo_name_text(span, true);
-                d.concat(&[d.text_owned(name), self.build_pseudo_args_doc(args)])
+                d.concat(&[d.text_pooled(&name), self.build_pseudo_args_doc(args)])
             }
             None => {
                 // No args: the whole span is the name; drop its escape terminator
                 // when it ends the compound.
                 let name = self.pseudo_name_text(span, false);
                 let text = if is_last_in_compound {
-                    name.trim_end().to_string()
+                    name.trim_end()
                 } else {
-                    name
+                    &name
                 };
-                d.text_owned(text)
+                d.text_pooled(text)
             }
         }
     }
@@ -619,7 +621,7 @@ impl<'a> Printer<'a> {
                     None => {
                         let trailing = self.comment_blocks_in_range(value_span.end, span.end);
                         let inner = self.wrap_inner_with_comments(
-                            d.text_owned(normalized),
+                            d.text_pooled(&normalized),
                             &leading,
                             &trailing,
                         );
@@ -635,7 +637,7 @@ impl<'a> Printer<'a> {
                             "",
                         );
                         let trailing = self.comment_blocks_in_range(selectors.span.end, span.end);
-                        let inner = d.concat(&[d.text_owned(normalized), d.text(" of "), list]);
+                        let inner = d.concat(&[d.text_pooled(&normalized), d.text(" of "), list]);
                         let inner = self.wrap_inner_with_comments(inner, &leading, &trailing);
                         self.wrap_pseudo_args(inner)
                     }
@@ -694,7 +696,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         if idents.len() < 2 || !has_comments_in_range(self.comments, run_span.start, run_span.end) {
-            return d.text_owned(idents.join(" "));
+            return d.text_pooled(&idents.join(" "));
         }
         let mut parts = DocBuf::new();
         for (i, ident) in idents.iter().enumerate() {
@@ -703,11 +705,11 @@ impl<'a> Printer<'a> {
                 let gap =
                     self.comment_blocks_in_range(ident_spans[i - 1].end, ident_spans[i].start);
                 if !gap.is_empty() {
-                    parts.push(d.text_owned(gap));
+                    parts.push(d.text_pooled(&gap));
                     parts.push(d.text(" "));
                 }
             }
-            parts.push(d.text_owned(ident.to_string()));
+            parts.push(d.text_pooled(ident));
         }
         d.concat(&parts)
     }
@@ -722,13 +724,13 @@ impl<'a> Printer<'a> {
         }
         let mut parts = DocBuf::new();
         if !leading.is_empty() {
-            parts.push(d.text_owned(leading.to_string()));
+            parts.push(d.text_pooled(leading));
             parts.push(d.text(" "));
         }
         parts.push(inner);
         if !trailing.is_empty() {
             parts.push(d.text(" "));
-            parts.push(d.text_owned(trailing.to_string()));
+            parts.push(d.text_pooled(trailing));
         }
         d.concat(&parts)
     }

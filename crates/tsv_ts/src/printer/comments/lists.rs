@@ -569,7 +569,7 @@ impl<'a> Printer<'a> {
         let mut comments = comments_in_range(self.comments, body_start, body_end).peekable();
 
         if comments.peek().is_none() {
-            return d.text_owned(format!("{open}{close}"));
+            return d.text_pooled(&format!("{open}{close}"));
         }
         let mut comment_parts = DocBuf::new();
 
@@ -672,7 +672,7 @@ impl<'a> Printer<'a> {
             .collect();
 
         if comments.is_empty() {
-            return d.text_owned(format!("{open}{close}"));
+            return d.text_pooled(&format!("{open}{close}"));
         }
 
         // Dangling comments join with hardline (prettier `printDanglingComments`).
@@ -846,7 +846,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
-                parts.push(d.text_owned(format!("/*{}*/ ", comment.content(self.source))));
+                parts.push(d.text_pooled(&format!("/*{}*/ ", comment.content(self.source))));
             }
         }
     }
@@ -864,7 +864,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         for comment in comments_in_range(self.comments, start, end) {
             if comment.is_block {
-                parts.push(d.text_owned(format!(" /*{}*/", comment.content(self.source))));
+                parts.push(d.text_pooled(&format!(" /*{}*/", comment.content(self.source))));
             }
         }
     }

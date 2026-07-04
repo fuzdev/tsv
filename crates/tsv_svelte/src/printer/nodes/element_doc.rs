@@ -847,7 +847,7 @@ impl<'a> Printer<'a> {
                 for line in lines {
                     content_lines.push(d.hardline());
                     if !line.is_empty() {
-                        content_lines.push(d.text_owned(line.to_string()));
+                        content_lines.push(d.text_pooled(line));
                     }
                 }
 
@@ -866,7 +866,7 @@ impl<'a> Printer<'a> {
                 // Fallback: preserve raw content if parsing fails
                 d.concat(&[
                     opening_tag,
-                    d.text_owned(content.to_string()),
+                    d.text_pooled(&content),
                     d.text("</"),
                     d.symbol(tag_sym),
                     d.text(">"),

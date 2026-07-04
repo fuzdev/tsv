@@ -95,7 +95,7 @@ impl<'a> Printer<'a> {
         body.push_str(last.trim_start());
         body.push_str("*/");
 
-        d.multiline_text(body)
+        d.multiline_text(&body)
     }
 
     /// Build a multi-line *non-indentable* block comment (at least one line does
@@ -129,7 +129,7 @@ impl<'a> Printer<'a> {
         // Unlike the indentable path this mixes line kinds, so it stays a
         // per-line `concat` rather than a `MultilineText`.
         let mut docs = DocBuf::with_capacity((middle.len() + 1) * 2 + 2);
-        docs.push(d.text_owned(format!("/*{}", first.trim_end())));
+        docs.push(d.text_pooled(&format!("/*{}", first.trim_end())));
         for line in middle {
             // Blank lines stay truly empty (column 0); otherwise apply context
             // indent. Trailing whitespace is trimmed (matches prettier).
@@ -138,7 +138,7 @@ impl<'a> Printer<'a> {
             } else {
                 d.hardline()
             });
-            docs.push(d.text_owned(line.trim_end().to_string()));
+            docs.push(d.text_pooled(line.trim_end()));
         }
         // Closing line gets context indent; its content (the space before `*/`)
         // is preserved verbatim.
@@ -147,7 +147,7 @@ impl<'a> Printer<'a> {
         } else {
             d.literalline()
         });
-        docs.push(d.text_owned((*last).to_string()));
+        docs.push(d.text_pooled(last));
         docs.push(d.text("*/"));
         d.concat(&docs)
     }

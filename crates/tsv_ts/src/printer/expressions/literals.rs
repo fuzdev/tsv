@@ -295,7 +295,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         match value {
             Cow::Borrowed(_) => d.source_span(span, self.source),
-            Cow::Owned(s) => d.text_owned(s),
+            Cow::Owned(s) => d.text_pooled(&s),
         }
     }
 
@@ -399,7 +399,7 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a regex literal
     /// Flags are sorted alphabetically to match prettier's output.
     pub(super) fn build_regex_doc(&self, regex: &internal::RegexLiteral) -> DocId {
-        self.d().text_owned(format!(
+        self.d().text_pooled(&format!(
             "/{}/{}",
             regex.pattern(self.source),
             sort_regex_flags(regex.flags(self.source))

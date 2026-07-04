@@ -29,18 +29,18 @@ The doc builder is the core of the formatting architecture. Language printers bu
 
 ### Key Types
 
-- **`DocArena`** — Contiguous storage for all doc nodes, plus the text pool (the `String` backing `Pooled`/`MultilineText` bodies). Heuristic capacity: ~2 nodes per source byte. `reset()` clears the node/child/text-pool/memo stores while retaining capacity — O(1) on the node store, since `DocNode` carries no drop glue — so a multi-file driver reuses one arena across files (the doc-IR analogue of the binding crates' `Bump::reset()` reuse); the printers borrow `&DocArena` and the caller owns the reusable one (`format_in` on each language crate is the borrowed-arena entry point).
+- **`DocArena`** — Contiguous storage for all doc nodes, plus the text pool (the `String` backing `Pooled`/`MultilineText` bodies). Heuristic capacity: ~2 nodes per source byte; the text pool pre-sizes at source/8 (measured per-file demand p50 ≈ 0.17× source). `reset()` clears the node/child/text-pool/memo stores while retaining capacity — O(1) on the node store, since `DocNode` carries no drop glue — so a multi-file driver reuses one arena across files (the doc-IR analogue of the binding crates' `Bump::reset()` reuse); the printers borrow `&DocArena` and the caller owns the reusable one (`format_in` on each language crate is the borrowed-arena entry point).
 - **`DocId`** (`u32`) — Lightweight, `Copy` handle into the arena. No cloning, no recursive Drop.
 - **`DocBuf`** (`SmallVec<[DocId; 8]>`) — Shared stack buffer for assembling a node's doc parts before `concat()` / `fill()`. Most nodes have only a handful of parts, so the common case stays off the heap; larger nodes spill. Used by all language printers (the TS chain / binary-operator printers, the Svelte template printer) as the single canonical doc-parts buffer type.
 - **`DocNode`** — Node variants: `Text`, `MultilineText` (a `\n`-separated body rendered with per-line context indent — one pool-stored body for an indentable multi-line block comment), `Line`, `Indent`, `Dedent`, `Group`, `IfBreak`, `Concat`, `Fill`, etc. `DocNode` carries no drop glue (`const`-asserted via `needs_drop`): dynamic text lives in the arena text pool, so `reset()`/drop never walk the node store running destructors.
-- **`DocText`** — Four variants: `Static(&'static str)` (punctuation/keywords), `Pooled(PoolSpan)` (dynamic text, stored in the arena text pool; width always precomputed so fits never borrows the pool), `SourceSpan(Span)` (verbatim source slice — resolved against `source` at print time, like `Symbol` but keyed on a span; zero allocation for unmodified text such as identifier names (via the width-deferring `source_span_ident` constructor), comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), and Svelte markup text, with no `DocArena` lifetime), `Symbol(u32)` (deferred resolution via interner).
+- **`DocText`** — Four variants: `Static(&'static str)` (punctuation/keywords), `Pooled(PoolSpan)` (dynamic text, stored in the arena text pool), `SourceSpan(Span)` (verbatim source slice — resolved against `source` at print time, like `Symbol` but keyed on a span; zero allocation for unmodified text such as identifier names (via `source_span_ident`), comments, template chunks, already-canonical literals (TS numbers/strings, CSS dimensions), and Svelte markup text, with no `DocArena` lifetime), `Symbol(u32)` (deferred resolution via interner). Width policy: `Pooled` and `SourceSpan` always precompute their visual width at build (a real width or the newline sentinel — fits never borrows the pool, render skips its column byte-scan); the exceptions are identifier names (`source_span_ident`), `text()` statics, and `Symbol`, which measure on demand (high-frequency, rarely fits-measured — the opposite tradeoff, measured both ways).
 - **`LineKind`** — `Normal` (space in flat, newline in break), `Soft` (nothing in flat), `Hard` (always newline), `Literal` (newline without indent).
 
 ### Builder API Categories
 
 All methods take `&self` (interior mutability via `RefCell`):
 
-- Text — `text()`, `text_owned()`, `multiline_text()`, `source_span()` / `source_span_ident()` (newline-free, width-deferred — identifier names) / `line_comment_source_span()` (verbatim source slice, no allocation), `empty()`, `symbol()`
+- Text — `text()`, `text_pooled(&str)` (dynamic text, copied into the pool), `multiline_text(&str)`, `source_span()` / `source_span_ident()` (newline-free, width-deferred — identifier names) / `line_comment_source_span()` (verbatim source slice, no allocation), `empty()`, `symbol()`
 - Lines — `line()`, `softline()`, `hardline()`, `literalline()`
 - Structure — `group()`, `group_break()`, `indent()`, `dedent()`, `align()`
 - Conditionals — `if_break()`, `indent_if_break()`, `conditional_group()`
@@ -49,14 +49,14 @@ All methods take `&self` (interior mutability via `RefCell`):
 - Line suffix — `line_suffix()`, `line_suffix_boundary()`, `break_parent()`
 - Convenience — `wrap()`, `parens()`, `brackets()`, `braces()`
 - Inspection — `will_break()`, `has_forced_break()`
-- Diagnostics — `line_comment_text_owned()` (tags `//` text for the swallow check)
+- Diagnostics — `line_comment_text_pooled()` (tags `//` text for the swallow check)
 
 The `doc::swallow` module is a render-time guard against the
 line-comment-swallow bug class (a `//` emitted inline runs to EOL and consumes
 the following token). It lives behind the **`swallow_check` cargo feature** (off
 by default, like tsv_ts's `convert`), so production builds compile it out
-entirely — no `DocArena` side-set, no render hook; `line_comment_text_owned`
-collapses to `text_owned`. With the feature, `set_swallow_check(true)` arms it
+entirely — no `DocArena` side-set, no render hook; `line_comment_text_pooled`
+collapses to `text_pooled`. With the feature, `set_swallow_check(true)` arms it
 and the renderer (via `SwallowTracker`) records every swallow into a thread-local
 sink drained by `take_swallow_reports()`. Output-neutral. `tsv_debug` forwards
 the feature as its own opt-in `swallow_check` feature (off by default so its

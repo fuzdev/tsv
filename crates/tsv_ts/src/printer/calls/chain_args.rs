@@ -410,10 +410,10 @@ fn build_chain_args_empty(
                 parts.push(inner);
                 parts.push(d.text(")"));
             }
-            None => parts.push(d.text_owned(format!("{prefix})"))),
+            None => parts.push(d.text_pooled(&format!("{prefix})"))),
         }
     } else {
-        parts.push(d.text_owned(format!("{prefix})")));
+        parts.push(d.text_pooled(&format!("{prefix})")));
     }
     d.concat(&parts)
 }
