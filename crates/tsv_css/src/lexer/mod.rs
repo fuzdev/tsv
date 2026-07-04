@@ -37,23 +37,8 @@ use identifiers::{is_identifier_start, read_identifier};
 use numbers::read_number;
 use strings::read_string;
 pub use token::{Token, TokenKind};
-use tsv_lang::ParseError;
-
-/// Construct a boxed lexer error. The lexer returns `Result<_, Box<ParseError>>`
-/// (see `From<Box<ParseError>>` in `tsv_lang`): boxing keeps the hot `next_token`
-/// Ok path pointer-sized. `#[cold]` / `#[inline(never)]` outlines the error
-/// construction so it never bloats the inlined token-scan fast path. Shared by the
-/// scanner submodules (each reaches it via `super::lex_err`).
-#[cold]
-#[inline(never)]
-#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
-fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
-    Box::new(ParseError::InvalidSyntax {
-        message: message.into(),
-        position,
-        context: None,
-    })
-}
+// Shared lexer-error constructor: the scanner submodules reach it via `super::lex_err`.
+use tsv_lang::{ParseError, lex_err};
 
 pub struct Lexer<'a> {
     source: &'a str,

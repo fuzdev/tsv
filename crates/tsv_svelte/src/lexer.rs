@@ -1,23 +1,7 @@
 use std::fmt;
 use std::str::Chars;
-use tsv_lang::ParseError;
-
-/// Construct a boxed lexer error. The lexer returns `Result<_, Box<ParseError>>`
-/// (see `From<Box<ParseError>>` in `tsv_lang`): boxing keeps the hot `next_token`
-/// Ok path pointer-sized. `#[cold]` / `#[inline(never)]` outlines the error
-/// construction so it never bloats the inlined token-scan fast path. Mirrors
-/// `tsv_ts` / `tsv_css`'s `lex_err`; used by the unterminated/unexpected sites in
-/// `next_token`.
-#[cold]
-#[inline(never)]
-#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
-fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
-    Box::new(ParseError::InvalidSyntax {
-        message: message.into(),
-        position,
-        context: None,
-    })
-}
+// Shared lexer-error constructor: used by the unterminated/unexpected sites in `next_token`.
+use tsv_lang::{ParseError, lex_err};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
