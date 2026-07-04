@@ -29,6 +29,7 @@ use std::rc::Rc;
 
 use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::printing::build_line_breaks;
 pub use tsv_lang::{ParseError, Result, SharedInterner};
 
 pub use goal::Goal;
@@ -143,11 +144,12 @@ pub fn format(program: &Program<'_>, source: &str) -> String {
 /// borrowed from `arena` escapes — the result is an owned `String` — so the
 /// caller may reset and reuse it the moment this returns.
 pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
+    let line_breaks = build_line_breaks(source);
     let inputs = PrinterInputs {
         source,
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
-        line_breaks: &program.line_breaks,
+        line_breaks: &line_breaks,
     };
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.print_program(program);
@@ -479,17 +481,22 @@ pub fn build_type_parameters_doc_with_comments(
 ///
 /// Returns a DocId that can be rendered with the arena.
 /// Used when embedding TypeScript in other formats like Svelte's `<script>`.
+///
+/// `line_breaks` must be the host document's whole-source newline table
+/// (spans are absolute, so a table built from an island slice is wrong);
+/// `comments`/`interner` stay island-local, taken from `program`.
 pub fn build_program_doc(
     arena: &DocArena,
     program: &Program<'_>,
     source: &str,
+    line_breaks: &[u32],
     embed: EmbedContext,
 ) -> DocId {
     let inputs = PrinterInputs {
         source,
         interner: Rc::clone(&program.interner),
         comments: &program.comments,
-        line_breaks: &program.line_breaks,
+        line_breaks,
     };
     let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)

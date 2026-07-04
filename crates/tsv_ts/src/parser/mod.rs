@@ -1445,25 +1445,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Use current_pos() to get global position (includes base_offset)
         let (_, end) = self.current_pos();
 
-        // Build line breaks table for O(log n) line boundary lookups
-        // Must add base_offset to each position since AST spans use global positions
-        let base_offset_u32 = self.base_offset as u32;
-        // Standalone (`.ts`/`.svelte.ts`) parses have `base_offset == 0`, so the per-position
-        // shift is an identity — return the table directly instead of cloning it through
-        // `.map(|pos| pos + 0).collect()`. Only embedded `<script>` (base_offset > 0) needs the shift.
-        let line_breaks: Vec<u32> = if base_offset_u32 == 0 {
-            tsv_lang::printing::build_line_breaks(self.source)
-        } else {
-            tsv_lang::printing::build_line_breaks(self.source)
-                .into_iter()
-                .map(|pos| pos + base_offset_u32)
-                .collect()
-        };
-
         Ok(Program {
             body: body.into_bump_slice(),
             comments: std::mem::take(&mut self.comments),
-            line_breaks,
             span: Span::new(start as u32, end as u32),
             interner: Rc::clone(&self.interner),
             goal: self.goal,
