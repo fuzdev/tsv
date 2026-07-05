@@ -394,6 +394,31 @@ const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
 	conformance: ['real', 'prettier_fixture', 'suite'],
 };
 
+/**
+ * Canonical-reject cache for the conformance view's Svelte set — absolute paths
+ * of files `svelte/compiler` rejects, written by `bench:harvest:svelte-rejects`
+ * (`diagnostics/svelte_reject_harvest.ts`). Excluded from the `conformance` view
+ * so the parse-COVERAGE headline measures fidelity on *valid* Svelte, not
+ * permissiveness over an adversarial corpus (svelte's own error fixtures + the
+ * non-Svelte prettier HTML). Svelte only: svelte/compiler is the parser tsv is a
+ * strict drop-in for, so its verdict defines validity; acorn-ts (trails modern
+ * TS) and parseCss (lenient) are not validity oracles, so TS/CSS get no cache.
+ */
+const SVELTE_REJECT_CACHE = 'benches/js/.cache/svelte_parse_rejects.json';
+
+/**
+ * Load the canonical-reject cache as an absolute-path set, or `null` if absent.
+ * Absent is fail-open: the conformance corpus stays un-filtered (the pre-harvest
+ * numbers), matching the wpt/test262 optional-cache posture — disclosed in the
+ * loader's log rather than silently assumed.
+ */
+async function load_svelte_reject_set(): Promise<Set<string> | null> {
+	const cache_path = resolve(SVELTE_REJECT_CACHE);
+	if (!(await fs_exists(cache_path))) return null;
+	const paths = JSON.parse(await readFile(cache_path, 'utf8')) as string[];
+	return new Set(paths);
+}
+
 //
 // Dev Repos Loader
 //
@@ -425,6 +450,14 @@ export interface CorpusSource {
 export class DevReposLoader {
 	readonly view: CorpusView;
 	readonly allow_missing: boolean;
+	/**
+	 * Whether the `conformance` view applies the Svelte canonical-reject cache
+	 * (`SVELTE_REJECT_CACHE`). Default true. The reject **harvest** itself must set
+	 * this false — it loads the conformance corpus to *produce* that cache, so
+	 * applying it would exclude the very files it needs to grade (and, on a second
+	 * run, overwrite the cache with an empty set).
+	 */
+	readonly apply_reject_cache: boolean;
 
 	/**
 	 * Per-entry file counts from the most recent `stream()`/`load()` — the
@@ -434,9 +467,10 @@ export class DevReposLoader {
 	 */
 	sources: CorpusSource[] = [];
 
-	constructor(view: CorpusView, options?: { allow_missing?: boolean }) {
+	constructor(view: CorpusView, options?: { allow_missing?: boolean; apply_reject_cache?: boolean }) {
 		this.view = view;
 		this.allow_missing = options?.allow_missing ?? false;
+		this.apply_reject_cache = options?.apply_reject_cache ?? true;
 	}
 
 	async *stream(logger: Logger = console.log): AsyncGenerator<SourceFile> {
@@ -474,6 +508,22 @@ export class DevReposLoader {
 		this.sources = [];
 		logger(`Loading ${present.length} corpus paths (${this.view} view)`);
 
+		// Conformance view: exclude the Svelte files svelte/compiler rejects (the
+		// canonical-reject cache) so parse coverage measures fidelity on valid
+		// Svelte, not permissiveness over the suite's error fixtures. Fail-open
+		// when the cache is absent (pre-harvest), disclosed here.
+		const apply_rejects = this.view === 'conformance' && this.apply_reject_cache;
+		const reject_set = apply_rejects ? await load_svelte_reject_set() : null;
+		if (apply_rejects) {
+			logger(
+				reject_set
+					? `  canonical-reject cache: excluding ${reject_set.size} Svelte files rejected by svelte/compiler`
+					: `  ⚠ canonical-reject cache absent — Svelte coverage counts svelte/compiler's rejects ` +
+						`(run \`deno task bench:harvest:svelte-rejects\`)`,
+			);
+		}
+		let reject_excluded = 0;
+
 		for (const entry of present) {
 			const entry_path = entry_source(entry);
 			const resolved_path = resolve(entry_path);
@@ -487,10 +537,21 @@ export class DevReposLoader {
 					yield file;
 				}
 			} else {
+				const base_skip = entry.skip;
+				// `reject_set` holds only Svelte paths (harvested Svelte-only), so a
+				// bare membership test is inherently language-scoped.
 				const skip: SkipFn | undefined = this.view === 'perf'
 					? async (path, relative) =>
-						should_prune_perf(relative) || ((await entry.skip?.(path, relative)) ?? false)
-					: entry.skip;
+						should_prune_perf(relative) || ((await base_skip?.(path, relative)) ?? false)
+					: reject_set
+					? async (path, relative) => {
+						if (reject_set.has(path)) {
+							reject_excluded++;
+							return true;
+						}
+						return (await base_skip?.(path, relative)) ?? false;
+					}
+					: base_skip;
 				for await (
 					const file of walk_corpus(resolved_path, { extensions: entry.extensions, skip })
 				) {
@@ -504,6 +565,19 @@ export class DevReposLoader {
 				this.sources.push({ path: entry_path, files: count, by_language });
 				logger(`  ${entry_path}: ${count} files`);
 			}
+		}
+
+		if (reject_set && reject_excluded !== reject_set.size) {
+			// Stale cache: it names more paths than this corpus still yields (fewer
+			// hit than cached). Only detects cache-names-a-gone-path; a NEW reject the
+			// corpus grew but the cache doesn't name isn't counted here (it's simply
+			// not excluded) — a re-harvest, chained ahead of `bench:conformance`,
+			// picks those up. Not fatal — disclose the drift so a re-harvest is
+			// prompted for the `:run` (skip-harvest) path.
+			logger(
+				`  ⚠ canonical-reject cache drift: excluded ${reject_excluded} of ${reject_set.size} ` +
+					`cached paths — re-run \`deno task bench:harvest:svelte-rejects\``,
+			);
 		}
 	}
 
