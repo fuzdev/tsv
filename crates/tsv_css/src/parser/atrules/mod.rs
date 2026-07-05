@@ -290,10 +290,24 @@ fn parse_atrule_block<'arena>(
             continue;
         }
 
-        // For @media, @supports, @layer, @keyframes, parse rules
+        // @media/@supports/@layer/@container/keyframes/… block. This is a rule-list
+        // context, but CSS block parsing is agnostic (CSS Syntax 3 §"consume a block's
+        // contents"): a bare declaration still parses here — invalid-in-context and
+        // dropped by a later validity step, but parseCss keeps it, so tsv parses it too
+        // (`@media screen { color: red }`, the shape @function/@mixin bodies use). Route
+        // each child by the same declaration-vs-rule heuristic as the fallback below, but
+        // keep the non-relative selector grammar (`parse_rule(_, false)`) so keyframe
+        // stops (`0%`, `from`) and top-level complex selectors parse unchanged.
         if expect_rules {
-            let rule = super::declarations::parse_rule(parser, false)?;
-            children.push(CssBlockChild::Rule(rule));
+            if super::declarations::is_nested_rule_start(parser)? {
+                let rule = super::declarations::parse_rule(parser, false)?;
+                children.push(CssBlockChild::Rule(rule));
+            } else if parser.check(TokenKind::Identifier) {
+                let decl = super::declarations::parse_declaration(parser)?;
+                children.push(CssBlockChild::Declaration(decl));
+            } else {
+                return Err(parser.error_unexpected(&format!("token in @{atrule_name} block")));
+            }
             parser.skip_whitespace()?;
             continue;
         }
