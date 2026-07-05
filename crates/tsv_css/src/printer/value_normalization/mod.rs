@@ -12,7 +12,7 @@ pub(crate) use colors::format_color_from_source;
 pub(crate) use numbers::normalize_dimension_from_source;
 pub(crate) use splitting::{
     extract_function_args, normalize_css_whitespace, normalize_value_spacing, split_args_by_comma,
-    split_by_space_preserving_parens,
+    split_by_space_preserving_parens, value_normalizes_to_self,
 };
 
 use std::borrow::Cow;

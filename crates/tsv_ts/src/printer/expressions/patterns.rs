@@ -292,7 +292,7 @@ impl<'a> Printer<'a> {
             } else {
                 // Use group with line breaks for width-based expansion
                 // Include type annotation in the group so its width is considered
-                let mut parts = DocBuf::new();
+                let mut parts = d.pooled_docbuf();
 
                 // Track previous end for comment detection (start after `{`)
                 let mut prev_end = obj.span.start + 1;
@@ -784,7 +784,7 @@ impl<'a> Printer<'a> {
     /// Build grouped array pattern doc (width-based expansion)
     fn build_grouped_array_pattern_doc(&self, arr: &internal::ArrayPattern<'_>) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
         let mut prev_end = arr.span.start + 1;
 
         for (i, elem) in arr.elements.iter().enumerate() {

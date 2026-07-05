@@ -240,7 +240,7 @@ impl<'a> Printer<'a> {
     fn build_attribute_value_doc(&self, value: &internal::AttributeValue<'_>) -> DocId {
         match value {
             internal::AttributeValue::Text(text) => {
-                self.build_attribute_text_doc(text.raw(self.source))
+                self.build_attribute_text_doc(text.raw(self.source), Some(text.raw_span))
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
                 self.build_attribute_expression_doc(expr_tag)
@@ -262,10 +262,10 @@ impl<'a> Printer<'a> {
             internal::AttributeValue::Text(text) => {
                 let raw = text.raw(self.source);
                 if class_text_is_normalized(raw) {
-                    self.build_attribute_text_doc(raw)
+                    self.build_attribute_text_doc(raw, Some(text.raw_span))
                 } else {
                     let normalized = normalize_class_text(raw, is_last_part);
-                    self.build_attribute_text_doc(&normalized)
+                    self.build_attribute_text_doc(&normalized, None)
                 }
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
@@ -280,7 +280,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for attribute text content, handling newlines as literallines.
-    fn build_attribute_text_doc(&self, raw: &str) -> DocId {
+    fn build_attribute_text_doc(&self, raw: &str, raw_span: Option<Span>) -> DocId {
         let d = self.d();
         if raw.contains('\n') {
             // Split at newlines, join with literalline to preserve literal newlines
@@ -288,7 +288,11 @@ impl<'a> Printer<'a> {
             let line_docs: DocBuf = raw.split('\n').map(|part| d.text_pooled(part)).collect();
             let sep = d.literalline();
             d.join_doc(line_docs, sep)
+        } else if let Some(span) = raw_span {
+            // Verbatim source slice (`raw == source[span]`): emit without a pool copy.
+            d.source_span(span, self.source)
         } else {
+            // Owned/normalized text (no source span): pool it.
             d.text_pooled(raw)
         }
     }
@@ -362,13 +366,13 @@ impl<'a> Printer<'a> {
     fn build_simple_directive_doc(
         &self,
         prefix: DocId,
-        name: &str,
+        name_span: Span,
         modifiers: &[&str],
         expression: Option<&Expression<'_>>,
         expression_tag_span: Option<Span>,
     ) -> DocId {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![prefix, d.text_pooled(name)];
+        let mut parts: DocBuf = smallvec![prefix, d.source_span(name_span, self.source)];
         parts.extend(self.build_modifiers_doc(modifiers));
         if let Some(expr) = expression {
             parts.extend(self.build_expression_doc_parts_with_span(expr, expression_tag_span));
@@ -380,7 +384,7 @@ impl<'a> Printer<'a> {
     fn build_on_directive_doc(&self, dir: &internal::OnDirective<'_>) -> DocId {
         self.build_simple_directive_doc(
             self.d().text("on:"),
-            dir.name_span.extract(self.source),
+            dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
@@ -391,7 +395,8 @@ impl<'a> Printer<'a> {
     fn build_bind_directive_doc(&self, dir: &internal::BindDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf = smallvec![d.text("bind:"), d.text_pooled(name)];
+        let mut parts: DocBuf =
+            smallvec![d.text("bind:"), d.source_span(dir.name_span, self.source)];
         parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&dir.expression, name) {
@@ -408,7 +413,8 @@ impl<'a> Printer<'a> {
     fn build_class_directive_doc(&self, dir: &internal::ClassDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf = smallvec![d.text("class:"), d.text_pooled(name)];
+        let mut parts: DocBuf =
+            smallvec![d.text("class:"), d.source_span(dir.name_span, self.source)];
         parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand
         if !self.is_identifier_with_name(&dir.expression, name) {
@@ -423,7 +429,8 @@ impl<'a> Printer<'a> {
     fn build_style_directive_doc(&self, dir: &internal::StyleDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf = smallvec![d.text("style:"), d.text_pooled(name)];
+        let mut parts: DocBuf =
+            smallvec![d.text("style:"), d.source_span(dir.name_span, self.source)];
         parts.extend(self.build_modifiers_doc(dir.modifiers));
         match &dir.value {
             internal::StyleDirectiveValue::True => {}
@@ -449,7 +456,7 @@ impl<'a> Printer<'a> {
     fn build_use_directive_doc(&self, dir: &internal::UseDirective<'_>) -> DocId {
         self.build_simple_directive_doc(
             self.d().text("use:"),
-            dir.name_span.extract(self.source),
+            dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
@@ -460,7 +467,7 @@ impl<'a> Printer<'a> {
     fn build_transition_directive_doc(&self, dir: &internal::TransitionDirective<'_>) -> DocId {
         self.build_simple_directive_doc(
             self.d().text(dir.direction.prefix_with_colon()),
-            dir.name_span.extract(self.source),
+            dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
@@ -471,7 +478,7 @@ impl<'a> Printer<'a> {
     fn build_animate_directive_doc(&self, dir: &internal::AnimateDirective<'_>) -> DocId {
         self.build_simple_directive_doc(
             self.d().text("animate:"),
-            dir.name_span.extract(self.source),
+            dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
@@ -482,7 +489,8 @@ impl<'a> Printer<'a> {
     fn build_let_directive_doc(&self, dir: &internal::LetDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf = smallvec![d.text("let:"), d.text_pooled(name)];
+        let mut parts: DocBuf =
+            smallvec![d.text("let:"), d.source_span(dir.name_span, self.source)];
         parts.extend(self.build_modifiers_doc(dir.modifiers));
         // Only include expression if not shorthand (let:foo={foo} → let:foo)
         if let Some(expr) = &dir.expression

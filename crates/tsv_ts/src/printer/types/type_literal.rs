@@ -359,7 +359,7 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        let mut member_parts: DocBuf = smallvec![];
+        let mut member_parts = d.pooled_docbuf();
         let mut prev_end = t.span.start + 1; // after opening brace
 
         // Width-aware: the opening bracketSpacing boundary leads (a space when flat
@@ -618,7 +618,7 @@ impl<'a> Printer<'a> {
             parts.push(d.concat(&brace_line_prefix));
 
             // Multi-line format (same for both modes)
-            let mut member_parts: DocBuf = smallvec![];
+            let mut member_parts = d.pooled_docbuf();
             let mut prev_end = t.span.start + 1; // after opening brace
             for (i, m) in t.members.iter().enumerate() {
                 let is_first = i == 0;
@@ -681,7 +681,8 @@ impl<'a> Printer<'a> {
             // The opening bracketSpacing boundary leads (a space when flat `{ a }`,
             // a newline when broken), THEN any interior leading comments, so the
             // padding sits before the comment (`{ /* c */ a }`, not `{/* c */ a }`).
-            let mut member_parts: DocBuf = smallvec![d.line()];
+            let mut member_parts = d.pooled_docbuf();
+            member_parts.push(d.line());
             if comments_present && let Some(first) = t.members.first() {
                 member_parts.extend(
                     self.build_type_literal_leading_comments_inline(
