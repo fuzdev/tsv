@@ -1,0 +1,317 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 433,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 243,
+				"end": 382,
+				"name": "scope",
+				"prelude": "(.a)",
+				"block": {
+					"type": "Block",
+					"start": 255,
+					"end": 382,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 259,
+							"end": 271,
+							"property": "color",
+							"value": "green"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 275,
+								"end": 279,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 275,
+										"end": 279,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "span",
+														"start": 275,
+														"end": 279
+													}
+												],
+												"start": 275,
+												"end": 279
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 280,
+								"end": 300,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 285,
+										"end": 295,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 275,
+							"end": 300
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 303,
+								"end": 306,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 303,
+										"end": 306,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": {
+													"type": "Combinator",
+													"name": ">",
+													"start": 303,
+													"end": 304
+												},
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "p",
+														"start": 305,
+														"end": 306
+													}
+												],
+												"start": 303,
+												"end": 306
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 307,
+								"end": 328,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 312,
+										"end": 323,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 303,
+							"end": 328
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 331,
+								"end": 358,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 331,
+										"end": 358,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": {
+													"type": "Combinator",
+													"name": ">",
+													"start": 331,
+													"end": 332
+												},
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 333,
+														"end": 336
+													},
+													{
+														"type": "PseudoClassSelector",
+														"name": "nth-of-type",
+														"args": {
+															"type": "SelectorList",
+															"start": 349,
+															"end": 350,
+															"children": [
+																{
+																	"type": "ComplexSelector",
+																	"start": 349,
+																	"end": 350,
+																	"children": [
+																		{
+																			"type": "RelativeSelector",
+																			"combinator": null,
+																			"selectors": [
+																				{
+																					"type": "Nth",
+																					"value": "2",
+																					"start": 349,
+																					"end": 350
+																				}
+																			],
+																			"start": 349,
+																			"end": 350
+																		}
+																	]
+																}
+															]
+														},
+														"start": 336,
+														"end": 351
+													}
+												],
+												"start": 331,
+												"end": 351
+											},
+											{
+												"type": "RelativeSelector",
+												"combinator": {
+													"type": "Combinator",
+													"name": ">",
+													"start": 352,
+													"end": 353
+												},
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "span",
+														"start": 354,
+														"end": 358
+													}
+												],
+												"start": 352,
+												"end": 358
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 359,
+								"end": 379,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 364,
+										"end": 374,
+										"property": "z-index",
+										"value": "1"
+									}
+								]
+							},
+							"start": 331,
+							"end": 379
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 384,
+				"end": 424,
+				"name": "scope",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 391,
+					"end": 424,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 395,
+								"end": 400,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 395,
+										"end": 400,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": {
+													"type": "Combinator",
+													"name": ">",
+													"start": 395,
+													"end": 396
+												},
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 397,
+														"end": 400
+													}
+												],
+												"start": 395,
+												"end": 400
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 401,
+								"end": 421,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 406,
+										"end": 416,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 395,
+							"end": 421
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 425,
+			"styles": "\n\t/* @scope body is a relative-selector-list scoped to :scope (CSS Cascade 6\n\t   §\"Scoped Style Rules\"): a bare declaration applies to :scope, a plain\n\t   selector is implicitly :scope-relative, and a leading combinator is allowed. */\n\t@scope (.a) {\n\t\tcolor: green;\n\t\tspan {\n\t\t\tcolor: red;\n\t\t}\n\t\t> p {\n\t\t\tcolor: blue;\n\t\t}\n\t\t> div:nth-of-type(2) > span {\n\t\t\tz-index: 1;\n\t\t}\n\t}\n\t@scope {\n\t\t> div {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 434,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

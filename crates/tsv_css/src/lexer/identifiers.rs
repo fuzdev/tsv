@@ -134,7 +134,11 @@ pub(crate) fn read_identifier(
 }
 
 /// Decode a CSS unicode escape sequence: \XXXXXX (1-6 hex digits)
-/// Advances position past the escape sequence
+/// Advances position past the escape sequence.
+///
+/// Per CSS Syntax 3 §4.3.7 (consume an escaped code point), a value that is
+/// zero, is for a surrogate, or is greater than the maximum allowed code point
+/// (U+10FFFF) decodes to U+FFFD REPLACEMENT CHARACTER — it is not a parse error.
 pub(crate) fn decode_unicode_escape(
     source: &str,
     pos: &mut usize,
@@ -166,13 +170,15 @@ pub(crate) fn decode_unicode_escape(
         *pos += ch.len_utf8();
     }
 
-    let code_point = u32::from_str_radix(&hex_str, 16)
-        .map_err(|_| lex_err(format!("Invalid unicode code point: {hex_str}"), start))?;
-
-    char::from_u32(code_point).ok_or_else(|| {
-        lex_err(
-            format!("Invalid unicode code point: U+{code_point:X}"),
-            start,
-        )
-    })
+    // The 1–6 hex digits always fit a u32. Per CSS Syntax 3 §4.3.7, zero / a surrogate /
+    // an above-maximum code point decodes to U+FFFD REPLACEMENT CHARACTER rather than being
+    // a parse error: `char::from_u32` already returns `None` for the surrogate / above-maximum
+    // cases, and zero is a valid `char` (NUL) so it needs the explicit guard.
+    let code_point = u32::from_str_radix(&hex_str, 16).unwrap_or(0xFFFD);
+    let decoded = if code_point == 0 {
+        '\u{FFFD}'
+    } else {
+        char::from_u32(code_point).unwrap_or('\u{FFFD}')
+    };
+    Ok(decoded)
 }

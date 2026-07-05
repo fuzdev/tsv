@@ -119,7 +119,11 @@ Where the two goals conflict on conformant input, Svelte-parity wins for now.
   accepts some grammar-invalid CSS that tsv rejects — an invalid attribute
   case-flag (`[type=a x]`; Selectors 4 allows only `i`/`s`), a function token as
   an attribute value (`[id=func("foo")]`), a `url` keyword split across whitespace
-  in `@import`, and a backslash immediately before a newline outside a string
+  in `@import`, a leading combinator in an `@scope` prelude selector
+  (`@scope (> .b)`, `to (> .b)`; CSS Cascade 6 defines `<scope-start>`/`<scope-end>`
+  as a non-relative `<selector-list>`, so a leading `>`/`+`/`~` is invalid there —
+  unlike the `@scope` *body*, whose relative-selector-list tsv accepts), and a
+  backslash immediately before a newline outside a string
   (`color: red\` + newline — an invalid escape per CSS Syntax 3 §4.3.7; Svelte
   reads the `\` into the value, and prettier never converges on it). tsv is
   **grammar-stricter**, but _not_ more spec-correct: the spec

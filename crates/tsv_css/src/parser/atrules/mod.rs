@@ -237,15 +237,15 @@ fn parse_atrule_block<'arena>(
 
     // Determine what content to expect based on at-rule type and nesting context
     // When nested inside a rule, at-rules that normally contain rules should contain declarations instead
+    // NB: `@scope` is deliberately absent — its body is a nested-declarations
+    // context (CSS Cascade 6 §"Scoped Style Rules"): the selectors are a
+    // `<relative-selector-list>` scoped to `:scope` (a leading combinator like
+    // `> p` is valid) and bare declarations apply to `:scope`. It therefore flows
+    // through the generic fallback below (relative rules via `parse_rule(nested)`
+    // + declarations), not this non-relative rule-list path.
     let expect_rules = (matches!(
         atrule_name,
-        "media"
-            | "supports"
-            | "layer"
-            | "container"
-            | "starting-style"
-            | "scope"
-            | "font-feature-values"
+        "media" | "supports" | "layer" | "container" | "starting-style" | "font-feature-values"
     ) || is_keyframes_atrule(atrule_name))
         && !nested_in_rule;
     let expect_declarations = matches!(
@@ -298,8 +298,9 @@ fn parse_atrule_block<'arena>(
             continue;
         }
 
-        // Generic fallback for unknown at-rules: try to detect whether this is a declaration or rule
-        // by checking if the current position looks like a nested rule start
+        // Nested-declarations fallback (unknown at-rules + `@scope`): detect whether
+        // this child is a declaration or a rule by checking if the current position
+        // looks like a nested rule start
         let looks_like_rule = super::declarations::is_nested_rule_start(parser)?;
         if looks_like_rule {
             // Parse as rule (selector + block) — use nested=true to allow leading combinators
