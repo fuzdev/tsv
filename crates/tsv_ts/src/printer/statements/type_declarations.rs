@@ -763,8 +763,13 @@ impl<'a> Printer<'a> {
         match elem {
             internal::TSTypeElement::PropertySignature(p) => {
                 // Shared with the type-literal printer; the only difference is
-                // the interface member carries its own `;`.
-                d.concat(&[self.build_property_signature_member_doc(p), d.text(";")])
+                // the interface member carries its own `;`. An own-line comment in
+                // the member→`;` gap is deferred past the `;` (prettier).
+                let mut deferred = DocBuf::new();
+                let member = self.build_property_signature_member_doc(p, &mut deferred);
+                let mut parts: DocBuf = smallvec![member, d.text(";")];
+                parts.extend(deferred);
+                d.concat(&parts)
             }
             internal::TSTypeElement::MethodSignature(m) => {
                 // Shared with the type-literal printer; the interface member
