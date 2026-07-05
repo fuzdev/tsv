@@ -1,0 +1,1167 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 600,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " own-line block comment in the init→`;` gap moves to its own line after `;`",
+			"start": 10,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 110,
+			"end": 118,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line line comment in the init→`;` gap moves to its own line after `;`",
+			"start": 153,
+			"end": 229,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 252,
+			"end": 257,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a same-line block stays before `;`; a following own-line block defers after `;`",
+			"start": 292,
+			"end": 374,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 394,
+			"end": 402,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 12
+				},
+				"end": {
+					"line": 24,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 406,
+			"end": 414,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line block comment in the test→`;` gap moves to its own line after `;`",
+			"start": 449,
+			"end": 526,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 559,
+			"end": 567,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 2
+				},
+				"end": {
+					"line": 36,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 599,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 590,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 41,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 89,
+					"end": 150,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 97,
+						"end": 106,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 11
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 101,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 6
+									},
+									"end": {
+										"line": 4,
+										"column": 11
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 101,
+									"end": 102,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 6
+										},
+										"end": {
+											"line": 4,
+											"column": 7
+										}
+									},
+									"name": "i"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 105,
+									"end": 106,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 10
+										},
+										"end": {
+											"line": 4,
+											"column": 11
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 121,
+						"end": 127,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 8
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 121,
+							"end": 122,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "i"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 125,
+							"end": 127,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 6
+								},
+								"end": {
+									"line": 6,
+									"column": 8
+								}
+							},
+							"value": 10,
+							"raw": "10"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 110,
+								"end": 118
+							}
+						]
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 131,
+						"end": 134,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 2
+							},
+							"end": {
+								"line": 7,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 131,
+							"end": 132,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"name": "i"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 138,
+						"end": 150,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 3
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 142,
+								"end": 147,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 142,
+									"end": 146,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 142,
+										"end": 144,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " own-line block comment in the init→`;` gap moves to its own line after `;`",
+							"start": 10,
+							"end": 87
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 231,
+					"end": 289,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 239,
+						"end": 248,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 2
+							},
+							"end": {
+								"line": 14,
+								"column": 11
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 243,
+								"end": 248,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 6
+									},
+									"end": {
+										"line": 14,
+										"column": 11
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 243,
+									"end": 244,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 6
+										},
+										"end": {
+											"line": 14,
+											"column": 7
+										}
+									},
+									"name": "j"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 247,
+									"end": 248,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 10
+										},
+										"end": {
+											"line": 14,
+											"column": 11
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 260,
+						"end": 266,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 2
+							},
+							"end": {
+								"line": 16,
+								"column": 8
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 260,
+							"end": 261,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 3
+								}
+							},
+							"name": "j"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 264,
+							"end": 266,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 6
+								},
+								"end": {
+									"line": 16,
+									"column": 8
+								}
+							},
+							"value": 10,
+							"raw": "10"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 252,
+								"end": 257
+							}
+						]
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 270,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 270,
+							"end": 271,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 3
+								}
+							},
+							"name": "j"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 277,
+						"end": 289,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 3
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 281,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 281,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 2
+										},
+										"end": {
+											"line": 19,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 281,
+										"end": 283,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " own-line line comment in the init→`;` gap moves to its own line after `;`",
+							"start": 153,
+							"end": 229
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 376,
+					"end": 446,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 384,
+						"end": 393,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 2
+							},
+							"end": {
+								"line": 24,
+								"column": 11
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 388,
+								"end": 393,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 6
+									},
+									"end": {
+										"line": 24,
+										"column": 11
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 388,
+									"end": 389,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 6
+										},
+										"end": {
+											"line": 24,
+											"column": 7
+										}
+									},
+									"name": "k"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 392,
+									"end": 393,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 10
+										},
+										"end": {
+											"line": 24,
+											"column": 11
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								}
+							}
+						],
+						"kind": "let",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 394,
+								"end": 402
+							}
+						]
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 417,
+						"end": 423,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 2
+							},
+							"end": {
+								"line": 26,
+								"column": 8
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 417,
+							"end": 418,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 2
+								},
+								"end": {
+									"line": 26,
+									"column": 3
+								}
+							},
+							"name": "k"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 421,
+							"end": 423,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 6
+								},
+								"end": {
+									"line": 26,
+									"column": 8
+								}
+							},
+							"value": 10,
+							"raw": "10"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c4 ",
+								"start": 406,
+								"end": 414
+							}
+						]
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 427,
+						"end": 430,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 2
+							},
+							"end": {
+								"line": 27,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 427,
+							"end": 428,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 2
+								},
+								"end": {
+									"line": 27,
+									"column": 3
+								}
+							},
+							"name": "k"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 434,
+						"end": 446,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 3
+							},
+							"end": {
+								"line": 30,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 438,
+								"end": 443,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 438,
+									"end": 442,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 438,
+										"end": 440,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a same-line block stays before `;`; a following own-line block defers after `;`",
+							"start": 292,
+							"end": 374
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 528,
+					"end": 589,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "VariableDeclaration",
+						"start": 536,
+						"end": 545,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 2
+							},
+							"end": {
+								"line": 34,
+								"column": 11
+							}
+						},
+						"declarations": [
+							{
+								"type": "VariableDeclarator",
+								"start": 540,
+								"end": 545,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 6
+									},
+									"end": {
+										"line": 34,
+										"column": 11
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 540,
+									"end": 541,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 6
+										},
+										"end": {
+											"line": 34,
+											"column": 7
+										}
+									},
+									"name": "m"
+								},
+								"init": {
+									"type": "Literal",
+									"start": 544,
+									"end": 545,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 10
+										},
+										"end": {
+											"line": 34,
+											"column": 11
+										}
+									},
+									"value": 0,
+									"raw": "0"
+								}
+							}
+						],
+						"kind": "let"
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 549,
+						"end": 555,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 2
+							},
+							"end": {
+								"line": 35,
+								"column": 8
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 549,
+							"end": 550,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 2
+								},
+								"end": {
+									"line": 35,
+									"column": 3
+								}
+							},
+							"name": "m"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 553,
+							"end": 555,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 6
+								},
+								"end": {
+									"line": 35,
+									"column": 8
+								}
+							},
+							"value": 10,
+							"raw": "10"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 570,
+						"end": 573,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 2
+							},
+							"end": {
+								"line": 37,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 570,
+							"end": 571,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 2
+								},
+								"end": {
+									"line": 37,
+									"column": 3
+								}
+							},
+							"name": "m"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 559,
+								"end": 567
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 577,
+						"end": 589,
+						"loc": {
+							"start": {
+								"line": 38,
+								"column": 3
+							},
+							"end": {
+								"line": 40,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 581,
+								"end": 586,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 2
+									},
+									"end": {
+										"line": 39,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 581,
+									"end": 585,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 2
+										},
+										"end": {
+											"line": 39,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 581,
+										"end": 583,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 2
+											},
+											"end": {
+												"line": 39,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " own-line block comment in the test→`;` gap moves to its own line after `;`",
+							"start": 449,
+							"end": 526
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

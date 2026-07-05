@@ -404,11 +404,8 @@ impl<'a> Printer<'a> {
             }
             inner_parts.push(self.build_for_init_doc(init));
         }
-        // Block comment trailing the init clause stays before its `;` (`a /* c */;`);
-        // a line comment is relocated to after the `;` (`a; // c`).
-        self.push_for_clause_trailing_comments(&mut inner_parts, init_end, first_semi, true);
-        inner_parts.push(d.text(";"));
-        self.push_for_clause_trailing_comments(&mut inner_parts, init_end, first_semi, false);
+        // The init clause→`;` gap comments bind to the `;` like a list separator.
+        self.push_for_clause_semicolon(&mut inner_parts, init_end, first_semi);
 
         // Inline comments after init (between semicolon and test, on same line as init)
         if let (Some(semi), Some(end)) = (first_semi, init_end) {
@@ -447,11 +444,8 @@ impl<'a> Printer<'a> {
             let condition_doc = self.build_condition_doc(test);
             inner_parts.push(d.group(condition_doc));
         }
-        // Block comment trailing the test clause stays before its `;`; a line comment
-        // is relocated to after it.
-        self.push_for_clause_trailing_comments(&mut inner_parts, test_end, second_semi, true);
-        inner_parts.push(d.text(";"));
-        self.push_for_clause_trailing_comments(&mut inner_parts, test_end, second_semi, false);
+        // The test clause→`;` gap comments bind to the `;` like a list separator.
+        self.push_for_clause_semicolon(&mut inner_parts, test_end, second_semi);
 
         // Inline comments after test (between second semicolon and update, on same line as test)
         if let (Some(semi), Some(end)) = (second_semi, test_end) {
@@ -576,29 +570,29 @@ impl<'a> Printer<'a> {
         false
     }
 
-    /// Emit comments in `start..end` matching `want_block`, each inline with a
-    /// leading space. No-op unless both bounds are known.
-    ///
-    /// Used for the gap between a for-clause expression and its `;`: block comments
-    /// stay before the `;` (`for (a /* c */; ...)`), line comments are relocated to
-    /// after it (`a; // c`) — so the caller picks the kind and the insertion point.
-    fn push_for_clause_trailing_comments(
+    /// Emit a for-header clause terminator `;` with its content→`;` gap comments
+    /// bound to the `;` **like a list separator** (`split_separator_gap_comments`,
+    /// `block_after_separator: false`): a same-line block stays before the `;`
+    /// (`a /* c */;`), a same-line line trails it via `line_suffix` (`a; // c`),
+    /// and an own-line comment defers to its own line **after** the `;`
+    /// (matching prettier, which keeps a for-header comment inline only when all
+    /// three clauses are empty — see `build_for_empty_with_comments`). A blank
+    /// line before an own-line comment is not preserved, as prettier collapses it
+    /// in a for-header gap. `clause_end`/`semi` are the clause's end and the
+    /// source `;` position; either being absent emits a bare `;`.
+    fn push_for_clause_semicolon(
         &self,
         parts: &mut DocBuf,
-        start: Option<u32>,
-        end: Option<u32>,
-        want_block: bool,
+        clause_end: Option<u32>,
+        semi: Option<u32>,
     ) {
-        let (Some(start), Some(end)) = (start, end) else {
-            return;
-        };
         let d = self.d();
-        for comment in comments_in_range(self.comments, start, end) {
-            if comment.is_block == want_block {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
-        }
+        let after = match (clause_end, semi) {
+            (Some(start), Some(sep)) => self.split_separator_gap_comments(parts, start, sep, false),
+            _ => DocBuf::new(),
+        };
+        parts.push(d.text(";"));
+        parts.extend(after);
     }
 
     /// Find the two `;` separators in a for-header, scanning forward from
@@ -652,9 +646,9 @@ impl<'a> Printer<'a> {
     /// Push comments in `range_start..boundary` that sit on the same source line as
     /// `end`, each inline with a leading space. Used for the inline comments
     /// trailing a for-clause: after init's `;`, after test's `;`, and after the
-    /// update expression. Unlike `push_for_clause_trailing_comments` (the
-    /// `;`-adjacent block/line split), this emits every comment kind that shares a
-    /// line with the clause end.
+    /// update expression. Unlike `push_for_clause_semicolon` (the content→`;` gap,
+    /// bound to the `;`), this emits every comment kind that shares a line with the
+    /// clause end, from the region *after* the `;`.
     fn push_for_clause_same_line_comments(
         &self,
         parts: &mut DocBuf,
