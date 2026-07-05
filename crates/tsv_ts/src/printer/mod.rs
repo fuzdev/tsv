@@ -301,7 +301,11 @@ impl<'a> Printer<'a> {
             self.embed.base_indent_offset * TAB_WIDTH
         };
         let current_col = self.current_column() + context_offset;
-        let output = {
+        // Render into the arena-parked scratch: one warm buffer across the
+        // file's renders (the whole program standalone; one per template
+        // expression when Svelte-embedded) instead of an alloc/free per call.
+        let mut output = self.arena.take_render_scratch();
+        {
             let interner = self.interner.borrow();
             // Source-aware resolver so `DocText::SourceSpan` nodes (verbatim
             // comment/literal slices) resolve without a `DocArena` lifetime.
@@ -309,16 +313,18 @@ impl<'a> Printer<'a> {
                 inner: &*interner,
                 source: self.source,
             };
-            doc::arena_print_doc_with_indent_resolved(
+            doc::arena_print_doc_with_indent_resolved_into(
                 self.arena,
                 d,
                 &self.embed,
                 current_col,
                 self.indent_level,
                 &resolver,
-            )
-        };
+                &mut output,
+            );
+        }
         self.write(&output);
+        self.arena.park_render_scratch(output);
     }
 
     /// Render an arena DocId to a flat string with effectively infinite width.

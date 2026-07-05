@@ -144,21 +144,26 @@ impl<'a> Printer<'a> {
         //
         // start_column = tab_width (2) to account for the initial indent we'll add
         // start_indent_level = 1 to account for the Svelte wrapper indent
-        let interner = script.content.interner.borrow();
-        // Source-aware resolver: the embedded TS doc carries `DocText::SourceSpan`
-        // leaves (comments etc.) whose spans are absolute into the host source.
-        let resolver = doc::SourceTextResolver {
-            inner: &*interner,
-            source: self.source(),
-        };
-        let output = doc::arena_print_doc_with_indent_resolved(
-            self.d(),
-            script_doc_id,
-            &embed,
-            TAB_WIDTH, // start column = 1 tab's visual width
-            1,         // start indent level = 1 (accounts for Svelte wrapper)
-            &resolver,
-        );
+        // Render into the arena-parked scratch (one warm buffer, no per-block alloc).
+        let mut output = self.d().take_render_scratch();
+        {
+            let interner = script.content.interner.borrow();
+            // Source-aware resolver: the embedded TS doc carries `DocText::SourceSpan`
+            // leaves (comments etc.) whose spans are absolute into the host source.
+            let resolver = doc::SourceTextResolver {
+                inner: &*interner,
+                source: self.source(),
+            };
+            doc::arena_print_doc_with_indent_resolved_into(
+                self.d(),
+                script_doc_id,
+                &embed,
+                TAB_WIDTH, // start column = 1 tab's visual width
+                1,         // start indent level = 1 (accounts for Svelte wrapper)
+                &resolver,
+                &mut output,
+            );
+        }
 
         // Only write content if there is any (skip indent for empty scripts)
         // The output always ends with a hardline (\n), so non-empty content is at least "\n"
@@ -170,6 +175,7 @@ impl<'a> Printer<'a> {
             self.indent_level -= 1;
             self.write(&output);
         }
+        self.d().park_render_scratch(output);
 
         // Closing tag
         self.write("</script>\n");
@@ -405,22 +411,26 @@ impl<'a> Printer<'a> {
             suffix_width: closing_tag_width,
             ..self.embed
         };
-        let output = {
+        // Render into the arena-parked scratch (one warm buffer, no per-tag alloc).
+        let mut output = self.arena.take_render_scratch();
+        {
             let interner = self.interner.borrow();
             let resolver = doc::SourceTextResolver {
                 inner: &*interner,
                 source: self.source(),
             };
-            doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
+            doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
                 self.arena,
                 group,
                 &embed,
                 col,
                 self.indent_level,
                 &resolver,
-            )
-        };
+                &mut output,
+            );
+        }
         self.write(&output);
+        self.arena.park_render_scratch(output);
     }
 }
 
