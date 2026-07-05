@@ -251,7 +251,10 @@ impl<'a> Printer<'a> {
     /// (see doc::render_single_doc line breaks). We should NOT add it again here.
     pub(crate) fn write_arena_doc(&mut self, d: DocId) {
         let current_col = self.current_column();
-        let output = doc::arena_print_doc_with_indent_resolved(
+        // Render into the arena-parked scratch: one warm buffer across the
+        // file's rules instead of an alloc/free per rule.
+        let mut output = self.arena.take_render_scratch();
+        doc::arena_print_doc_with_indent_resolved_into(
             self.arena,
             d,
             &self.embed,
@@ -260,8 +263,10 @@ impl<'a> Printer<'a> {
             &CssSourceResolver {
                 source: self.source,
             },
+            &mut output,
         );
         self.write(&output);
+        self.arena.park_render_scratch(output);
     }
 
     /// Like `write_arena_doc`, but reserving `suffix_width` columns for the
@@ -274,7 +279,8 @@ impl<'a> Printer<'a> {
         let current_col = self.current_column();
         let mut embed = self.embed;
         embed.suffix_width = suffix_width;
-        let output = doc::arena_print_doc_with_indent_resolved(
+        let mut output = self.arena.take_render_scratch();
+        doc::arena_print_doc_with_indent_resolved_into(
             self.arena,
             d,
             &embed,
@@ -283,8 +289,10 @@ impl<'a> Printer<'a> {
             &CssSourceResolver {
                 source: self.source,
             },
+            &mut output,
         );
         self.write(&output);
+        self.arena.park_render_scratch(output);
     }
 
     /// Get the formatted output
@@ -760,10 +768,15 @@ pub(crate) fn format_css_in(
     source: &str,
     arena: &DocArena,
 ) -> String {
-    let line_breaks = printing::build_line_breaks(source);
+    // Fill the arena-parked line-break table (one warm table across a
+    // multi-file driver's files instead of a fresh Vec per file).
+    let mut line_breaks = arena.take_line_breaks_scratch();
+    printing::build_line_breaks_into(source, &mut line_breaks);
     let mut printer = Printer::new(arena, source, &stylesheet.comments, &line_breaks);
     printer.print_css_nodes(stylesheet.nodes);
-    printer.into_string()
+    let output = printer.into_string();
+    arena.park_line_breaks_scratch(line_breaks);
+    output
 }
 
 /// Format a CSS stylesheet embedded in another language (e.g., Svelte), using

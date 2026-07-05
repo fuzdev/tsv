@@ -51,7 +51,9 @@ pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_
 pub use arena_render::{
     arena_print_doc, arena_print_doc_at_column, arena_print_doc_flat_resolved,
     arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
+    arena_print_doc_with_indent_resolved_into,
     arena_print_doc_with_indent_resolved_preserve_whitespace,
+    arena_print_doc_with_indent_resolved_preserve_whitespace_into,
 };
 
 // Arena fits
@@ -281,6 +283,29 @@ mod arena_tests {
         assert_eq!(a.line(), normal_2);
         assert_eq!(a.line_suffix_boundary(), lsb_2);
         assert_eq!(a.break_parent(), bp_2);
+    }
+
+    #[test]
+    fn test_symbol_node_interned_per_document() {
+        let mut a = DocArena::new();
+
+        // Repeated symbol ids within one document share one node; distinct
+        // ids stay distinct (including sparse ids beyond the table's growth).
+        let sym_5 = a.symbol(5);
+        assert_eq!(a.symbol(5), sym_5);
+        let sym_0 = a.symbol(0);
+        assert_ne!(sym_5, sym_0);
+        assert_eq!(a.symbol(0), sym_0);
+        assert_eq!(a.borrow_nodes().len(), 2); // ids 5 and 0
+
+        // reset() invalidates every interned symbol node (ids restart at 0):
+        // the next document re-allocs rather than returning a prior
+        // document's id, and interning resumes within it.
+        a.reset();
+        let sym_5_2 = a.symbol(5);
+        assert_eq!(sym_5_2.index(), 0);
+        assert_eq!(a.symbol(5), sym_5_2);
+        assert_ne!(a.symbol(9), sym_5_2);
     }
 
     #[test]

@@ -15,6 +15,8 @@
 
 use std::cell::{Cell, RefCell};
 
+use smallvec::SmallVec;
+
 use crate::Span;
 use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
@@ -220,13 +222,34 @@ impl ArenaCommand {
     }
 }
 
+/// Inline-backed render work-list. The renderers run many times per file (CSS
+/// per declaration/value, Svelte per template expression), each spinning up a
+/// fresh command stack from empty — so a `SmallVec` keeps the common small
+/// sub-render fully on the stack (no heap allocation), mirroring the fits path's
+/// `SmallVec<[(DocId, Mode); 16]>`. `N = 8` is the measured knee of the
+/// per-call high-water distribution (≈89% of CSS top-level renders and ≈99.7%
+/// of the high-frequency single-doc sub-renders stay inline — measured
+/// before the tail-continuation rewrite, which only lowered stack transit, so
+/// the knee holds a fortiori); its 128-byte inline footprint matches the fits
+/// stack and the `DocBuf` convention. Top-level renders additionally borrow
+/// the arena-pooled instance (`borrow_render_commands_scratch`) so their spill
+/// capacity warms once per arena instead of re-allocating per rendered piece.
+pub(super) type CmdStack = SmallVec<[ArenaCommand; 8]>;
+
+/// Inline-backed pending `line_suffix` buffer. Line suffixes are sparse — the
+/// measured high-water never exceeds 1 — so `N = 4` is generous headroom at a
+/// 64-byte inline footprint, keeping even the rare suffix push off the heap.
+pub(super) type LineSuffixBuf = SmallVec<[ArenaCommand; 4]>;
+
 /// Sentinel cache values for the `arena_fits` flat-width fast-path. A cell holds
 /// either a real break-free flat width, or one of these two sentinels — the top
 /// two `u32` values, mirroring the `u16` text-width sentinels in `doc::types`
 /// (`TEXT_WIDTH_HAS_NEWLINE` / `TEXT_WIDTH_NOT_COMPUTED`). Packing the cache as
 /// `u32` (vs an 8-byte enum) halves its footprint — one `u32` per doc node, ~4
 /// nodes per source byte — which matters most for the memory-constrained WASM
-/// target.
+/// target. (A further `u16` narrowing was measured and rejected: instructions
+/// +0.26% on the fits-memo path, and WASM steady high-water +2 pages — the
+/// halved realloc-size sequence fragments under talc's binning.)
 ///
 /// A real width aliasing a sentinel would need a ~4 GB-wide break-free flat
 /// subtree, which is unreachable on real source; and even then it is
@@ -296,6 +319,32 @@ pub struct DocArena {
     /// buffer. Survives `reset()` (always empty between uses; only capacity
     /// persists).
     pool_scratch: Cell<String>,
+    /// Parked per-render output scratch backing the printers' render-and-write
+    /// seams (`write_arena_doc` / `render_doc_immediate`): taken (moved out)
+    /// per render via [`Self::take_render_scratch`], rendered into, copied into
+    /// the printer's output buffer, and returned via
+    /// [`Self::park_render_scratch`] with capacity retained — so the
+    /// per-statement output `String` is allocation-free once warm, the render
+    /// analog of `pool_scratch`. Logically empty whenever parked; a nested
+    /// render takes the `Cell`'s empty default and simply warms its own buffer
+    /// (fresh-fallback, so re-entrancy costs an alloc but stays correct).
+    /// Survives `reset()` (always empty between uses; only capacity persists).
+    render_scratch: Cell<String>,
+    /// Pooled top-level render work buffers: the render loop's pending-command
+    /// stack and its deferred line-suffix buffer, borrowed for the duration of
+    /// one top-level render (`render_doc_iterative`) so their spill capacity
+    /// warms once per arena instead of re-allocating per rendered piece.
+    /// Sub-renders (fill segments, line-suffix flushes) construct their own
+    /// inline `SmallVec`s — measured allocation-free — and never borrow these,
+    /// so the held `RefMut` is exclusive by construction (a violated nesting
+    /// assumption panics loudly rather than corrupting). Cleared at each
+    /// borrow; capacity survives `reset()`.
+    render_commands_scratch: RefCell<CmdStack>,
+    line_suffix_scratch: RefCell<LineSuffixBuf>,
+    /// Parked whole-source line-break table backing the per-file
+    /// `build_line_breaks` in each `format_in` — taken (moved out), filled,
+    /// and parked back cleared with capacity retained, like `render_scratch`.
+    line_breaks_scratch: Cell<Vec<u32>>,
     /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
@@ -334,9 +383,9 @@ pub struct DocArena {
     /// indirection.
     static_cache: [Cell<StaticSlot>; STATIC_CACHE_SLOTS],
     /// The current document's format generation, keying the validity of the
-    /// interned node halves in `static_cache` and the singleton cells
+    /// interned node halves in `static_cache`, the singleton cells
     /// (`empty_node`, `line_nodes`, `line_suffix_boundary_node`,
-    /// `break_parent_node`). Starts
+    /// `break_parent_node`), and the `symbol_nodes` table. Starts
     /// at 1 (0 marks a never-stamped slot) and is bumped by `reset()`, so a
     /// prior document's `node_id`s — invalidated by the reset — can never be
     /// returned for the new document.
@@ -363,6 +412,17 @@ pub struct DocArena {
     /// (generation, id) — stateless like `Line`, same dedicated-cell
     /// interning. Valid iff the generation matches `format_gen`.
     break_parent_node: Cell<(u32, DocId)>,
+    /// Per-document interned [`DocText::Symbol`] nodes, direct-indexed by the
+    /// symbol id — the Symbol analog of the static cache's node half. A Symbol
+    /// node is position-free at render (the id fully determines the resolved
+    /// text) and carries no per-use state, so every `symbol(id)` within one
+    /// document can return one shared node. Ids are small dense integers from
+    /// the per-document interner (vocabulary = element/attribute names,
+    /// typically tens), so a direct-indexed table needs no hash probe. Each
+    /// entry is `(generation, id)`, valid iff the generation matches
+    /// [`Self::format_gen`]; lazily grown to the document's max id + 1, with
+    /// capacity retained across `reset()` (the gen bump invalidates in O(1)).
+    symbol_nodes: RefCell<Vec<(u32, DocId)>>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -426,6 +486,10 @@ impl DocArena {
             children: RefCell::new(Vec::new()),
             text_pool: RefCell::new(String::new()),
             pool_scratch: Cell::new(String::new()),
+            render_scratch: Cell::new(String::new()),
+            render_commands_scratch: RefCell::new(SmallVec::new()),
+            line_suffix_scratch: RefCell::new(SmallVec::new()),
+            line_breaks_scratch: Cell::new(Vec::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
@@ -434,6 +498,7 @@ impl DocArena {
             line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
+            symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }
@@ -468,6 +533,10 @@ impl DocArena {
             // organic capacity, bounded by the largest file's demand).
             text_pool: RefCell::new(String::with_capacity(source_len / 8)),
             pool_scratch: Cell::new(String::new()),
+            render_scratch: Cell::new(String::new()),
+            render_commands_scratch: RefCell::new(SmallVec::new()),
+            line_suffix_scratch: RefCell::new(SmallVec::new()),
+            line_breaks_scratch: Cell::new(Vec::new()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -479,6 +548,7 @@ impl DocArena {
             line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
+            symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
         }
@@ -530,6 +600,7 @@ impl DocArena {
             }
             self.line_suffix_boundary_node.set((0, DocId(0)));
             self.break_parent_node.set((0, DocId(0)));
+            self.symbol_nodes.get_mut().clear();
             self.format_gen.set(1);
         } else {
             self.format_gen.set(next);
@@ -833,10 +904,40 @@ impl DocArena {
         self.interned_singleton(&self.empty_node, || DocNode::Text(DocText::Static("", 0)))
     }
 
-    /// Create a text doc from a symbol ID (deferred resolution).
+    /// Create a text doc from a symbol ID (deferred resolution), interned per
+    /// document — repeated `symbol(id)` calls within one format return one
+    /// shared node instead of allocating per call (Symbol nodes are
+    /// position-free at render and carry no per-use state, like `Static` text
+    /// and the `Line` singletons; measured ~65–80% of calls dedup on Svelte
+    /// corpora — Symbol is Svelte-only in practice).
     #[inline]
     pub fn symbol(&self, id: u32) -> DocId {
-        self.alloc(DocNode::Text(DocText::Symbol(id)))
+        let format_gen = self.format_gen.get();
+        {
+            let slots = self.symbol_nodes.borrow();
+            if let Some(&(node_gen, node_id)) = slots.get(id as usize)
+                && node_gen == format_gen
+            {
+                return node_id;
+            }
+        }
+        self.symbol_miss(id, format_gen)
+    }
+
+    /// The cold half of [`Self::symbol`]: alloc this document's node for `id`,
+    /// grow the table to cover the id, and stamp the slot (once per distinct
+    /// symbol per document).
+    #[cold]
+    #[inline(never)]
+    fn symbol_miss(&self, id: u32, format_gen: u32) -> DocId {
+        let node_id = self.alloc(DocNode::Text(DocText::Symbol(id)));
+        let mut slots = self.symbol_nodes.borrow_mut();
+        let i = id as usize;
+        if i >= slots.len() {
+            slots.resize(i + 1, (0, DocId(0)));
+        }
+        slots[i] = (format_gen, node_id);
+        node_id
     }
 
     /// Create a normal line break (space if fits, newline if doesn't),
@@ -1527,6 +1628,59 @@ impl DocArena {
         self.text_pool.borrow()
     }
 
+    /// Take the parked render-output scratch (logically empty; warm capacity
+    /// when previously parked). Pair with [`Self::park_render_scratch`]; a
+    /// nested taker gets the `Cell`'s empty default and warms its own buffer,
+    /// so overlapping renders stay correct.
+    #[inline]
+    pub fn take_render_scratch(&self) -> String {
+        self.render_scratch.take()
+    }
+
+    /// Park the render-output scratch back for the next render, retaining its
+    /// capacity (cleared here, so it is always logically empty while parked).
+    #[inline]
+    pub fn park_render_scratch(&self, mut scratch: String) {
+        scratch.clear();
+        self.render_scratch.set(scratch);
+    }
+
+    /// Borrow the pooled top-level render command stack (cleared here). Held
+    /// for the duration of one top-level render; sub-renders use their own
+    /// inline locals and never take this borrow.
+    #[inline]
+    pub(super) fn borrow_render_commands_scratch(&self) -> std::cell::RefMut<'_, CmdStack> {
+        let mut scratch = self.render_commands_scratch.borrow_mut();
+        scratch.clear();
+        scratch
+    }
+
+    /// Borrow the pooled top-level line-suffix buffer (cleared here) — the
+    /// companion of [`Self::borrow_render_commands_scratch`].
+    #[inline]
+    pub(super) fn borrow_line_suffix_scratch(&self) -> std::cell::RefMut<'_, LineSuffixBuf> {
+        let mut scratch = self.line_suffix_scratch.borrow_mut();
+        scratch.clear();
+        scratch
+    }
+
+    /// Take the parked line-break-table scratch (logically empty; warm
+    /// capacity when previously parked). Pair with
+    /// [`Self::park_line_breaks_scratch`]; a nested taker gets the `Cell`'s
+    /// empty default and simply warms its own table.
+    #[inline]
+    pub fn take_line_breaks_scratch(&self) -> Vec<u32> {
+        self.line_breaks_scratch.take()
+    }
+
+    /// Park the line-break table back for the next format, retaining its
+    /// capacity (cleared here, so it is always logically empty while parked).
+    #[inline]
+    pub fn park_line_breaks_scratch(&self, mut breaks: Vec<u32>) {
+        breaks.clear();
+        self.line_breaks_scratch.set(breaks);
+    }
+
     /// Mutably borrow the flat-width cache for the `arena_fits` fast-path.
     #[inline]
     pub(super) fn borrow_flat_width_cache(&self) -> std::cell::RefMut<'_, Vec<u32>> {
@@ -1535,16 +1689,22 @@ impl DocArena {
 
     /// Estimate output buffer capacity (bytes) for a rendered string.
     ///
-    /// Consumer shape: this sizes the **per-render-call** `String` created by the
-    /// `arena_print_doc*` entry points — on the TS path that is per-statement
-    /// scratch (`write_arena_doc` renders each statement into its own `String`,
-    /// pushed into the file-level `OutputBuffer` and freed). The file-level
-    /// buffer is sized from **source length** (`Printer::with_context`'s
-    /// `buffer_capacity`), not this estimate. Mid-build, `nodes.len()` is the
-    /// *cumulative* count at that point — an over-estimate for later statements'
-    /// scratch, which is fine: the scratch is transient (freed before the next
-    /// statement) and the reservation only needs to clear the statement's output
-    /// to avoid mid-render reallocs.
+    /// Consumer shape: this sizes the reservation for the **per-render-call**
+    /// output the `arena_print_doc*` entry points write — usually the
+    /// arena-parked scratch the `*_into` forms render into (reserved at each
+    /// call; a no-op once the warm scratch has grown past it) rather than a
+    /// freshly allocated `String`. Render granularity is per *piece*:
+    /// standalone TS renders the whole program doc in one call (plus one call
+    /// per template expression when Svelte-embedded), CSS renders per
+    /// selector/declaration/value, Svelte per root node and per
+    /// `<script>`/`<style>` block. The file-level buffer is sized from
+    /// **source length** (`Printer::with_context`'s `buffer_capacity`), not
+    /// this estimate. Mid-render-sequence, `nodes.len()` is the *cumulative*
+    /// count at that point — an over-estimate for later pieces, absorbed by
+    /// the pooled scratch as retained capacity (bounded by the largest
+    /// reservation; whether the per-piece reserve still earns its keep on the
+    /// warm path is an open calibration question — dropping it must be gated
+    /// on the WASM memory probe).
     ///
     /// Pre-interning calibration: rendered output measured **~1.9 bytes per doc
     /// node** (aggregate 1.888×nodes = 1.00×source), so `nodes.len() * 2` reserved

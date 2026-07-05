@@ -41,13 +41,12 @@ impl<'a> Printer<'a> {
     /// - **Fallback**: block hugs `>` with the last attr; no attrs → plain `<tag>`.
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
-        tag_name: &str,
         element: &internal::Element<'_>,
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
-        let is_inline = !tsv_html::is_block_element(tag_name);
+        let is_inline = self.with_resolved_symbol(element.name, |t| !tsv_html::is_block_element(t));
         let is_html = element.kind == internal::ElementKind::Html;
         let has_content = !element.fragment.nodes.is_empty();
 
@@ -320,7 +319,6 @@ impl<'a> Printer<'a> {
             // comes from the parent's collective wrap (build_whitespace_sensitive_content_doc),
             // so no per-node wrapper here. Handles <pre><code> where <code> inherits ws preservation.
             FragmentNode::Element(element) => {
-                let tag_name = self.resolve_symbol(element.name);
                 let ws_is_html = element.kind == internal::ElementKind::Html;
                 // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
                 let attr_docs = self.build_element_attrs_doc(
@@ -330,7 +328,7 @@ impl<'a> Printer<'a> {
                     element.open_tag_end,
                     ws_is_html,
                 );
-                self.build_whitespace_sensitive_element_doc(&tag_name, element, attr_docs)
+                self.build_whitespace_sensitive_element_doc(element, attr_docs)
             }
             FragmentNode::SpecialElement(element) => {
                 // Special elements in whitespace-sensitive context: format normally without indent

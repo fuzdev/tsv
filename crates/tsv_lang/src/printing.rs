@@ -495,12 +495,25 @@ pub fn has_newline_between_fast(line_breaks: &[u32], start: u32, end: u32) -> bo
 /// ```
 pub fn build_line_breaks(source: &str) -> Vec<u32> {
     let mut breaks = Vec::new();
+    build_line_breaks_into(source, &mut breaks);
+    breaks
+}
+
+/// Like [`build_line_breaks`], filling a caller-provided (empty) table — the
+/// seam behind the arena-parked line-break scratch
+/// (`DocArena::take_line_breaks_scratch`), so multi-file drivers fill one warm
+/// table per file instead of allocating a fresh `Vec`.
+pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
+    // Pre-size to ~one newline per 32 bytes (average code lines run ~25–40
+    // bytes), so typical files fill in one allocation instead of the doubling
+    // chain (a no-op once the parked table is warm). Capacity-only — never
+    // affects the recorded values.
+    breaks.reserve(source.len() / 32);
     for (pos, ch) in source.bytes().enumerate() {
         if ch == b'\n' {
             breaks.push(pos as u32);
         }
     }
-    breaks
 }
 
 /// Check if a line ends with a JS/TypeScript string line continuation

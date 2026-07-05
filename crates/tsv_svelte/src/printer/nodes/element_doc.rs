@@ -152,9 +152,22 @@ impl<'a> Printer<'a> {
     /// 2. Classify: Determine layout strategy (void, empty, hug modes, etc.)
     /// 3. Build: Construct doc based on layout
     pub(crate) fn build_element_doc(&self, element: &internal::Element<'_>) -> DocId {
-        let tag_name = self.resolve_symbol(element.name);
         let tag_sym = element.name.to_u32();
         let is_html = element.kind == internal::ElementKind::Html;
+
+        // Resolve once inside the borrow and derive every tag-name-keyed classification
+        // bool here, releasing the borrow before any doc building — skips a per-element
+        // `String` alloc. Emission uses the symbol, never the string.
+        let (is_style, is_script, is_template, is_ws_sensitive, is_declaration) = self
+            .with_resolved_symbol(element.name, |t| {
+                (
+                    t == "style",
+                    t == "script",
+                    t == "template",
+                    tsv_html::preserves_whitespace(t),
+                    t.starts_with('!'),
+                )
+            });
 
         // Build attribute docs (needed for all paths)
         let attr_docs = self.build_element_attrs_doc(
@@ -166,13 +179,13 @@ impl<'a> Printer<'a> {
         );
 
         // Special handling for <style> and <script> elements
-        if tag_name == "style" || tag_name == "script" {
-            return self.build_raw_content_element_doc(&tag_name, element, attr_docs);
+        if is_style || is_script {
+            return self.build_raw_content_element_doc(is_style, element, attr_docs);
         }
 
         // Foreign language <template> elements (e.g., <template lang="pug">)
         // preserve content raw — we can't format non-HTML template languages
-        if tag_name == "template"
+        if is_template
             && let Some(lang) = self.get_lang_attribute(element.attributes)
             && lang != "html"
         {
@@ -180,8 +193,8 @@ impl<'a> Printer<'a> {
         }
 
         // Whitespace-sensitive elements (pre, textarea, etc.)
-        if tsv_html::preserves_whitespace(&tag_name) {
-            return self.build_whitespace_sensitive_element_doc(&tag_name, element, attr_docs);
+        if is_ws_sensitive {
+            return self.build_whitespace_sensitive_element_doc(element, attr_docs);
         }
 
         // Phase 1: Analyze element
@@ -194,7 +207,6 @@ impl<'a> Printer<'a> {
         match layout {
             ElementLayout::Void | ElementLayout::SelfClosing => {
                 // DOCTYPE uses > (no self-closing slash) — it's a declaration, not an element
-                let is_declaration = tag_name.starts_with('!');
                 self.build_void_element_doc(tag_sym, attr_docs, is_declaration)
             }
             ElementLayout::Empty => {
@@ -792,7 +804,7 @@ impl<'a> Printer<'a> {
     /// that need their content formatted as CSS/JS rather than as regular fragment nodes.
     pub(super) fn build_raw_content_element_doc(
         &self,
-        tag_name: &str,
+        is_style: bool,
         element: &internal::Element<'_>,
         attr_docs: DocBuf,
     ) -> DocId {
@@ -828,7 +840,7 @@ impl<'a> Printer<'a> {
         // length to avoid the bump's chunk-doubling tail.
         let arena =
             bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(content.len()));
-        let formatted = if tag_name == "style" {
+        let formatted = if is_style {
             tsv_css::parse(&content, &arena)
                 .ok()
                 .map(|ast| tsv_css::format(&ast, &content))

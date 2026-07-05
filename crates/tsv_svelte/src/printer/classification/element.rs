@@ -76,7 +76,11 @@ mod tests {
             .nodes
             .iter()
             .find_map(|n| match n {
-                FragmentNode::Element(el) if printer.resolve_symbol(el.name) == tag => Some(el),
+                FragmentNode::Element(el)
+                    if printer.with_resolved_symbol(el.name, |n| n == tag) =>
+                {
+                    Some(el)
+                }
                 _ => None,
             })
             .unwrap_or_else(|| panic!("no <{tag}> child"))

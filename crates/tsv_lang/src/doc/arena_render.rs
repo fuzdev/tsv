@@ -5,30 +5,13 @@ use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 use smallvec::SmallVec;
 
-use super::arena::{ArenaCommand, DocArena, DocId, DocNode};
+use super::arena::{ArenaCommand, CmdStack, DocArena, DocId, DocNode, LineSuffixBuf};
 use super::arena_fits::arena_fits_with_lookahead;
 use super::arena_render_fill::render_fill_iterative;
 use super::render_config::RenderConfig;
 #[cfg(feature = "swallow_check")]
 use super::swallow::SwallowTracker;
 use super::types::{CachedWidth, DocContext, GroupId, LineKind, Mode, TextResolver, resolve_text};
-
-/// Inline-backed render work-list. The renderers run many times per file (CSS
-/// per declaration/value, Svelte per template expression), each spinning up a
-/// fresh command stack from empty — so a `SmallVec` keeps the common small
-/// sub-render fully on the stack (no heap allocation), mirroring the fits path's
-/// `SmallVec<[(DocId, Mode); 16]>`. `N = 8` is the measured knee of the
-/// per-call high-water distribution (≈89% of CSS top-level renders and ≈99.7%
-/// of the high-frequency single-doc sub-renders stay inline — measured
-/// before the tail-continuation rewrite, which only lowered stack transit, so
-/// the knee holds a fortiori); its 128-byte inline footprint matches the fits
-/// stack and the `DocBuf` convention.
-type CmdStack = SmallVec<[ArenaCommand; 8]>;
-
-/// Inline-backed pending `line_suffix` buffer. Line suffixes are sparse — the
-/// measured high-water never exceeds 1 — so `N = 4` is generous headroom at a
-/// 64-byte inline footprint, keeping even the rare suffix push off the heap.
-type LineSuffixBuf = SmallVec<[ArenaCommand; 4]>;
 
 /// The mode each id-bearing group resolved to, as a total map over the closed
 /// [`GroupId`] enum. Backed by a fixed inline array indexed by `id as usize`, so
@@ -57,11 +40,17 @@ impl GroupModeMap {
 /// Trim trailing whitespace from only the last line of output.
 /// Interior lines are already handled by `trim_trailing_whitespace()` in `render_line_break()`.
 fn trim_last_line(mut s: String) -> String {
+    trim_last_line_in_place(&mut s);
+    s
+}
+
+/// In-place form of [`trim_last_line`] for the `*_into` entry points that
+/// render into a caller-provided buffer.
+fn trim_last_line_in_place(s: &mut String) {
     // Find the last newline — only trim after it (the final line)
     let trim_start = s.rfind('\n').map_or(0, |i| i + 1);
     let trimmed_len = s[trim_start..].trim_end_matches([' ', '\t']).len();
     s.truncate(trim_start + trimmed_len);
-    s
 }
 
 //
@@ -343,14 +332,42 @@ pub fn arena_print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
     start_indent_level: usize,
     resolver: &R,
 ) -> String {
+    let mut output = String::new();
+    arena_print_doc_with_indent_resolved_into(
+        arena,
+        doc,
+        embed,
+        start_column,
+        start_indent_level,
+        resolver,
+        &mut output,
+    );
+    output
+}
+
+/// Like [`arena_print_doc_with_indent_resolved`], rendering into a
+/// caller-provided (empty) buffer — the seam behind the printers' pooled
+/// render scratch ([`DocArena::take_render_scratch`]), so the per-statement
+/// output `String` reuses one warm allocation instead of alloc/free per call.
+/// Reserves [`DocArena::estimated_output_capacity`] itself (a no-op once the
+/// pooled buffer is warm).
+pub fn arena_print_doc_with_indent_resolved_into<R: TextResolver + ?Sized>(
+    arena: &DocArena,
+    doc: DocId,
+    embed: &EmbedContext,
+    start_column: usize,
+    start_indent_level: usize,
+    resolver: &R,
+    output: &mut String,
+) {
     let render = RenderConfig::default();
-    let mut output = String::with_capacity(arena.estimated_output_capacity());
     let mut pos: usize = start_column;
 
+    output.reserve(arena.estimated_output_capacity());
     render_doc_iterative(
         arena,
         doc,
-        &mut output,
+        output,
         &mut pos,
         start_indent_level,
         &render,
@@ -358,7 +375,7 @@ pub fn arena_print_doc_with_indent_resolved<R: TextResolver + ?Sized>(
         Some(resolver),
     );
 
-    trim_last_line(output)
+    trim_last_line_in_place(output);
 }
 
 /// Convert an arena doc tree, preserving trailing whitespace on the last line
@@ -372,22 +389,46 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace<R: TextResolver 
     start_indent_level: usize,
     resolver: &R,
 ) -> String {
+    let mut output = String::new();
+    arena_print_doc_with_indent_resolved_preserve_whitespace_into(
+        arena,
+        doc,
+        embed,
+        start_column,
+        start_indent_level,
+        resolver,
+        &mut output,
+    );
+    output
+}
+
+/// Like [`arena_print_doc_with_indent_resolved_preserve_whitespace`],
+/// rendering into a caller-provided (empty) buffer — the pooled-scratch seam
+/// (see [`arena_print_doc_with_indent_resolved_into`]). Reserves
+/// [`DocArena::estimated_output_capacity`] itself.
+pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into<R: TextResolver + ?Sized>(
+    arena: &DocArena,
+    doc: DocId,
+    embed: &EmbedContext,
+    start_column: usize,
+    start_indent_level: usize,
+    resolver: &R,
+    output: &mut String,
+) {
     let render = RenderConfig::default();
-    let mut output = String::with_capacity(arena.estimated_output_capacity());
     let mut pos: usize = start_column;
 
+    output.reserve(arena.estimated_output_capacity());
     render_doc_iterative(
         arena,
         doc,
-        &mut output,
+        output,
         &mut pos,
         start_indent_level,
         &render,
         embed,
         Some(resolver),
     );
-
-    output
 }
 
 /// Test-only entry point: render with explicit width/indent overrides.
@@ -594,7 +635,12 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         #[cfg(feature = "swallow_check")]
         swallow: SwallowTracker::new(),
     };
-    let mut line_suffix: LineSuffixBuf = SmallVec::new();
+    // Borrow the arena-pooled work buffers for the duration of this top-level
+    // render: their spill capacity warms once per arena instead of
+    // re-allocating per rendered piece. Sub-renders (fill segments,
+    // line-suffix flushes) use their own inline locals, never these.
+    let mut commands = arena.borrow_render_commands_scratch();
+    let mut line_suffix = arena.borrow_line_suffix_scratch();
     let mut should_remeasure = false;
 
     render_doc_core(
@@ -608,6 +654,7 @@ fn render_doc_iterative<R: TextResolver + ?Sized>(
         embed,
         resolver,
         &mut policy,
+        &mut commands,
         &mut line_suffix,
         &mut should_remeasure,
     );
@@ -652,10 +699,13 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
     embed: &EmbedContext,
     resolver: Option<&R>,
     policy: &mut P,
+    commands: &mut CmdStack,
     line_suffix: &mut LineSuffixBuf,
     should_remeasure: &mut bool,
 ) {
-    let mut commands: CmdStack = SmallVec::new();
+    // The loop's termination condition is `commands` draining back to empty,
+    // so the caller-provided (pooled or local) stack must start empty.
+    debug_assert!(commands.is_empty());
     let mut cmd = ArenaCommand {
         indent: indent_level,
         mode,
@@ -830,7 +880,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                             arena,
                             contents,
                             Mode::Flat,
-                            &commands,
+                            commands,
                             remaining,
                             embed,
                             resolver,
@@ -851,7 +901,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                                     arena,
                                     state,
                                     Mode::Flat,
-                                    &commands,
+                                    commands,
                                     remaining,
                                     embed,
                                     resolver,
@@ -885,7 +935,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                         arena,
                         contents,
                         Mode::Flat,
-                        &commands,
+                        commands,
                         remaining_width(*pos, render, embed),
                         embed,
                         resolver,
@@ -914,7 +964,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                     arena,
                     contents,
                     Mode::Flat,
-                    &commands,
+                    commands,
                     remaining_width(*pos, render, embed),
                     embed,
                     resolver,
@@ -987,7 +1037,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                     render,
                     embed,
                     &DocContext::default(),
-                    &commands,
+                    commands,
                     resolver,
                     should_remeasure,
                 );
@@ -1009,7 +1059,7 @@ fn render_doc_core<R: TextResolver + ?Sized, P: RenderPolicy>(
                             render,
                             embed,
                             &context,
-                            policy.with_context_fill_rest(&commands),
+                            policy.with_context_fill_rest(commands),
                             resolver,
                             should_remeasure,
                         );
@@ -1135,6 +1185,10 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
     let mut dummy_suffix: LineSuffixBuf = SmallVec::new();
     let line_suffix = suffix_buffer.unwrap_or(&mut dummy_suffix);
 
+    // Sub-renders keep a local inline stack (measured allocation-free — the
+    // common single-doc render never spills) rather than borrowing the pooled
+    // one, which the enclosing top-level render already holds.
+    let mut commands: CmdStack = SmallVec::new();
     render_doc_core(
         arena,
         doc,
@@ -1146,6 +1200,7 @@ fn render_single_doc_inner<R: TextResolver + ?Sized>(
         embed,
         resolver,
         &mut policy,
+        &mut commands,
         line_suffix,
         should_remeasure,
     );
