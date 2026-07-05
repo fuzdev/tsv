@@ -2,10 +2,10 @@
 	"version": 6,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-05T15:40:47.791Z",
-	"git_commit": "d7d873b2",
+	"timestamp": "2026-07-05T16:36:58.498Z",
+	"git_commit": "bbd52a6b",
 	"corpus": {
-		"svelte": 5355,
+		"svelte": 5217,
 		"typescript": 46708,
 		"css": 22672
 	},
@@ -183,9 +183,9 @@
 		},
 		{
 			"path": "../prettier-plugin-svelte/test",
-			"files": 309,
+			"files": 302,
 			"by_language": {
-				"svelte": 309,
+				"svelte": 302,
 				"typescript": 0,
 				"css": 0
 			}
@@ -219,18 +219,18 @@
 		},
 		{
 			"path": "../prettier/tests/format/html",
-			"files": 124,
+			"files": 84,
 			"by_language": {
-				"svelte": 124,
+				"svelte": 84,
 				"typescript": 0,
 				"css": 0
 			}
 		},
 		{
 			"path": "../svelte/packages/svelte/tests",
-			"files": 4432,
+			"files": 4341,
 			"by_language": {
-				"svelte": 4117,
+				"svelte": 4026,
 				"typescript": 135,
 				"css": 180
 			}
@@ -350,7 +350,7 @@
 			"ops_per_second": null,
 			"sample_size": null,
 			"files_processed": 5217,
-			"files_total": 5355,
+			"files_total": 5217,
 			"files_iterated": 5209,
 			"runtime": "node"
 		},
@@ -369,8 +369,8 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5241,
-			"files_total": 5355,
+			"files_processed": 5209,
+			"files_total": 5217,
 			"files_iterated": 5209,
 			"runtime": "node"
 		},
@@ -389,8 +389,8 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5241,
-			"files_total": 5355,
+			"files_processed": 5209,
+			"files_total": 5217,
 			"files_iterated": 5209,
 			"runtime": "node"
 		},
@@ -409,8 +409,8 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5241,
-			"files_total": 5355,
+			"files_processed": 5209,
+			"files_total": 5217,
 			"files_iterated": 5209,
 			"runtime": "node"
 		},
@@ -429,8 +429,8 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5241,
-			"files_total": 5355,
+			"files_processed": 5209,
+			"files_total": 5217,
 			"files_iterated": 5209,
 			"runtime": "node"
 		},
