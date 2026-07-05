@@ -27,6 +27,21 @@ use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
 
+// WASM global allocator: talc replaces std's default dlmalloc on wasm32. The
+// format path is allocation-heavy (doc IR, output string, memo vecs) and
+// dlmalloc's grow/memcpy behavior is the measured allocation wall there; talc
+// is a pure-Rust no_std allocator tuned for WebAssembly. The `WasmGrowAndExtend`
+// source (vs the default `WasmGrowAndClaim`) extends one contiguous heap on
+// `memory.grow` instead of claiming fragmented new ones — it holds the
+// long-lived reset()-reuse instance's linear-memory high-water at dlmalloc
+// parity, where the claim-source fragments it. Single-threaded WASM only
+// (`TalcSyncCell::new_wasm` panics under atomics, which tsv never builds
+// with); native builds keep the system allocator via the target gate.
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOCATOR: talc::cell::TalcSyncCell<talc::wasm::WasmGrowAndExtend, talc::wasm::WasmBinning> =
+    talc::cell::TalcSyncCell::new_wasm(talc::wasm::WasmGrowAndExtend::new());
+
 fn err(e: impl ToString) -> JsError {
     JsError::new(&e.to_string())
 }
