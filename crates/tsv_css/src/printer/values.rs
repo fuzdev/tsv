@@ -189,8 +189,13 @@ impl<'a> Printer<'a> {
     ///
     /// Preserves color syntax (hex, rgb, hsl, etc.) from source.
     fn build_color_doc(&self, color: &crate::ast::internal::Color, span: Span) -> DocId {
-        let formatted = value_normalization::format_color_from_source(color, self.source, span);
-        self.d().text_pooled(&formatted)
+        // A verbatim named color comes back `Cow::Borrowed` (== source[span]) and is
+        // emitted as a zero-allocation `DocText::SourceSpan`, like the identifier /
+        // dimension paths; hex and function syntaxes own their reconstructed text.
+        match value_normalization::format_color_from_source(color, self.source, span) {
+            Cow::Borrowed(_) => self.d().source_span(span, self.source),
+            Cow::Owned(s) => self.d().text_pooled(&s),
+        }
     }
 
     /// Build a flat (non-wrapping) `name(args_doc)` function doc.

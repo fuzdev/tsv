@@ -1,5 +1,7 @@
 // Color formatting: semantic color rendering and source-preserving color syntax.
 
+use std::borrow::Cow;
+
 use super::numbers::canonical_unit;
 use crate::ast::internal::{Color, ColorChannel};
 use tsv_lang::Span;
@@ -85,12 +87,19 @@ fn format_color_channel(channel: &ColorChannel) -> String {
 /// * `color` - The parsed color
 /// * `source` - The original source code
 /// * `span` - The span of the color in source
-pub(crate) fn format_color_from_source(color: &Color, source: &str, span: Span) -> String {
-    // Named and hex colors are recovered verbatim from source (span-for-verbatim);
-    // hex is lowercased to match prettier, named colors keep their source casing.
+pub(crate) fn format_color_from_source<'s>(
+    color: &Color,
+    source: &'s str,
+    span: Span,
+) -> Cow<'s, str> {
+    // Named and hex colors are recovered verbatim from source (span-for-verbatim). A
+    // named color keeps its source casing, so it borrows the slice unchanged and
+    // `build_color_doc` emits it as a zero-allocation `DocText::SourceSpan` — like the
+    // identifier / dimension paths. Hex owns its lowercased form, and the function
+    // syntaxes below own their reconstructed text (genuine transforms).
     match color {
-        Color::Named => return span.extract(source).to_string(),
-        Color::Hex => return span.extract(source).to_lowercase(),
+        Color::Named => return Cow::Borrowed(span.extract(source)),
+        Color::Hex => return Cow::Owned(span.extract(source).to_lowercase()),
         _ => {}
     }
 
@@ -103,7 +112,7 @@ pub(crate) fn format_color_from_source(color: &Color, source: &str, span: Span) 
         let has_slash = raw.contains('/');
         let has_comma = raw.contains(',');
 
-        match color {
+        Cow::Owned(match color {
             Color::Rgb { r, g, b, alpha } => {
                 let r_str = format_color_channel(r);
                 let g_str = format_color_channel(g);
@@ -158,9 +167,9 @@ pub(crate) fn format_color_from_source(color: &Color, source: &str, span: Span) 
             }
             // Fallback for any other color types (future-proofing)
             _ => format_color_value(color),
-        }
+        })
     } else {
         // Fallback to basic formatting
-        format_color_value(color)
+        Cow::Owned(format_color_value(color))
     }
 }
