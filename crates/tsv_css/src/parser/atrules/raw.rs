@@ -21,7 +21,18 @@ pub(super) fn parse_raw_prelude_content<'arena>(
 ) -> Result<(&'arena str, Span), ParseError> {
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
     let prelude_start = parser.span_pos(parser.current_start);
-    let mut prelude_parts = Vec::new();
+    // One growable buffer rather than a `Vec<String>` of per-token / per-space pieces
+    // joined at the end (the perf10 `parse_declaration` idiom, extended to the at-rule
+    // prelude siblings): each token value is `push_str`ed directly and each normalized
+    // separator is a single `push(' ')`, so a `@media (min-width: …) and (…)` prelude
+    // no longer allocs a heap `String` per token and per space.
+    let mut prelude = String::new();
+    // Count of trailing programmatically-inserted single spaces — the normalize path's
+    // collapse unit. Tracked as a counter (truncate this many bytes) instead of scanning
+    // `prelude.ends_with(' ')`, so an identifier whose raw slice ends in an escape-terminator
+    // space (`\41 `, kept verbatim so escapes survive) is never mistaken for a collapsible
+    // separator. Mirrors the old `Vec<String>` "last part is `\" \"`" test exactly.
+    let mut trailing_spaces: usize = 0;
     let mut prev_token_kind: Option<TokenKind> = None;
     let mut last_non_whitespace_kind: Option<TokenKind> = None;
     let mut paren_depth: u32 = 0; // Track parenthesis nesting for selector detection
@@ -37,9 +48,10 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             // Verbatim mode (non-@media raw at-rules): preserve the source whitespace
             // exactly — prettier and Svelte keep it (`@layer a  ,  b` stays `a  ,  b`).
             if !normalize_whitespace {
-                let ws = parser.current_value().to_string();
+                // Verbatim mode never reads `trailing_spaces` (the collapse logic below is
+                // normalize-only), so the raw whitespace goes straight in.
+                prelude.push_str(parser.current_value());
                 parser.advance()?;
-                prelude_parts.push(ws);
                 prev_token_kind = Some(TokenKind::Whitespace);
                 continue;
             }
@@ -70,7 +82,8 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             if skip_whitespace {
                 continue;
             }
-            prelude_parts.push(" ".to_string());
+            prelude.push(' ');
+            trailing_spaces += 1;
             prev_token_kind = Some(TokenKind::Whitespace);
             continue;
         }
@@ -84,12 +97,15 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         // trimming is gated on the lowercase spelling.
         if matches!(parser.current_kind, TokenKind::Url) {
             let raw = parser.current_value();
-            let part = if raw.starts_with("url(") {
-                trim_url_raw(raw).unwrap_or_else(|| raw.to_string())
+            if raw.starts_with("url(") {
+                match trim_url_raw(raw) {
+                    Some(trimmed) => prelude.push_str(&trimmed),
+                    None => prelude.push_str(raw),
+                }
             } else {
-                raw.to_string()
-            };
-            prelude_parts.push(part);
+                prelude.push_str(raw);
+            }
+            trailing_spaces = 0;
             prev_token_kind = Some(TokenKind::Url);
             last_non_whitespace_kind = Some(TokenKind::Url);
             parser.advance()?;
@@ -142,36 +158,12 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             } else {
                 raw.to_string()
             };
-            prelude_parts.push(part);
+            prelude.push_str(&part);
+            trailing_spaces = 0;
             prev_token_kind = Some(TokenKind::RightParen);
             last_non_whitespace_kind = Some(TokenKind::RightParen);
             continue;
         }
-
-        let part = match &parser.current_kind {
-            // Use the raw source slice, not the decoded identifier: an at-rule prelude
-            // is serialized verbatim (Svelte stores the raw string, prettier preserves
-            // it), so escapes must survive — `@keyframes \@mymove` must not collapse to
-            // `@keyframes @mymove` (which would re-parse as an at-rule) and `\31 23` must
-            // not collapse to `123`.
-            TokenKind::Identifier => parser.current_value().to_string(),
-            TokenKind::String { quote } => {
-                let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                if normalize_quotes {
-                    format_string_literal(content, *quote)
-                } else {
-                    format!("{quote}{content}{quote}")
-                }
-            }
-            TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
-                parser.current_value().to_string()
-            }
-            TokenKind::Comment => {
-                // Include comments in prelude (Svelte includes them in the prelude string)
-                parser.current_value().to_string()
-            }
-            _ => parser.current_value().to_string(),
-        };
 
         // Add space before boolean operators (and, or, not) or comments if not preceded by space
         // Note: @scope preludes are now parsed structurally, so they don't go through this code
@@ -182,7 +174,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         // normalized `@media` path; verbatim raw at-rules keep the source spacing.
         if normalize_whitespace {
             // Check if we already have a trailing space (from programmatic insertion or whitespace token)
-            let has_trailing_space = prelude_parts.last().is_some_and(|s| s == " ");
+            let has_trailing_space = trailing_spaces > 0;
 
             // Add space before comments or boolean operators if not already preceded
             // by space — but not for a boolean operator right after `(`: `(not …)`
@@ -190,18 +182,37 @@ pub(super) fn parse_raw_prelude_content<'arena>(
             // path's same `not`-after-`(` suppression).
             let after_open_paren = last_non_whitespace_kind == Some(TokenKind::LeftParen);
             if (is_comment || (is_bool_op && !after_open_paren)) && !has_trailing_space {
-                prelude_parts.push(" ".to_string());
+                prelude.push(' ');
+                trailing_spaces += 1;
             }
 
-            // Remove trailing whitespace before ':' or ',' (CSS convention: no space before these)
+            // Remove trailing whitespace before ':' or ',' (CSS convention: no space before these).
+            // Only the counted programmatic spaces are stripped, never a token's own bytes — so an
+            // identifier ending in an escape-terminator space is left intact. (The counter is reset
+            // by the token emission just below, which always runs next.)
             if matches!(parser.current_kind, TokenKind::Colon | TokenKind::Comma) {
-                while prelude_parts.last().is_some_and(|s| s == " ") {
-                    prelude_parts.pop();
-                }
+                prelude.truncate(prelude.len() - trailing_spaces);
             }
         }
 
-        prelude_parts.push(part);
+        // Emit the token verbatim from source — identifiers / numbers / comments keep their
+        // raw slice so escapes survive (`@keyframes \@mymove` must not collapse to
+        // `@keyframes @mymove`, `\31 23` must not collapse to `123`); only a string's
+        // surrounding quotes are normalized under `normalize_quotes`.
+        match &parser.current_kind {
+            TokenKind::String { quote } => {
+                let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                if normalize_quotes {
+                    prelude.push_str(&format_string_literal(content, *quote));
+                } else {
+                    prelude.push(*quote);
+                    prelude.push_str(content);
+                    prelude.push(*quote);
+                }
+            }
+            _ => prelude.push_str(parser.current_value()),
+        }
+        trailing_spaces = 0;
 
         let current_kind = parser.current_kind;
 
@@ -218,18 +229,21 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         // Note: @scope preludes are now parsed structurally, so they don't go through this code
         if normalize_whitespace && !parser.check(TokenKind::Whitespace) {
             if is_bool_op {
-                prelude_parts.push(" ".to_string());
+                prelude.push(' ');
+                trailing_spaces += 1;
             } else if is_comment {
                 // Add space after comment, but not if followed by comma, close paren, or semicolon
                 if !matches!(
                     parser.current_kind,
                     TokenKind::Comma | TokenKind::RightParen | TokenKind::Semicolon
                 ) {
-                    prelude_parts.push(" ".to_string());
+                    prelude.push(' ');
+                    trailing_spaces += 1;
                 }
             } else if matches!(current_kind, TokenKind::Comma) {
                 // Add space after comma in media queries (comma acts as OR)
-                prelude_parts.push(" ".to_string());
+                prelude.push(' ');
+                trailing_spaces += 1;
             } else if matches!(current_kind, TokenKind::Colon) {
                 // Add space after ':' for property:value pairs (preceded by identifier/number/dimension)
                 // For selector list preludes (@scope): Don't add space inside parentheses (pseudo-classes like :hover)
@@ -245,7 +259,8 @@ pub(super) fn parse_raw_prelude_content<'arena>(
                     );
 
                 if should_add_space {
-                    prelude_parts.push(" ".to_string());
+                    prelude.push(' ');
+                    trailing_spaces += 1;
                 }
             }
         }
@@ -257,8 +272,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
         }
     }
 
-    let joined = prelude_parts.join("");
-    let content = parser.alloc_str_in(joined.trim());
+    let content = parser.alloc_str_in(prelude.trim());
     let prelude_end = parser.span_pos(parser.current_start);
     let span = Span {
         start: prelude_start,

@@ -75,7 +75,14 @@ pub(super) fn parse_condition_query<'arena>(
 
         // Parse a condition part (may start with `not`, then parenthesized content)
         let part_start = parser.span_pos(parser.current_start);
-        let mut part_content = Vec::new();
+        // One growable buffer instead of a `Vec<String>` of per-token / per-space pieces
+        // joined at the end (mirrors `parse_raw_prelude_content` and perf10's
+        // `parse_declaration`): tokens `push_str` straight in, separators are a single
+        // `push(' ')`. `trailing_spaces` counts the trailing programmatic spaces (the
+        // collapse unit) so `truncate` strips exactly those, never a token's own
+        // escape-terminator space — the old `Vec` "last part is `\" \"`" test, exactly.
+        let mut part_buf = String::new();
+        let mut trailing_spaces: usize = 0;
         let mut paren_depth: usize = 0;
 
         // Check for leading `not` (ASCII case-insensitive). Its source case is kept
@@ -83,20 +90,23 @@ pub(super) fn parse_condition_query<'arena>(
         if parser.check(TokenKind::Identifier) {
             let ident = parser.current_identifier();
             if ident.eq_ignore_ascii_case("not") {
-                part_content.push(parser.current_value().to_string());
+                part_buf.push_str(parser.current_value());
+                trailing_spaces = 0;
                 parser.advance()?;
                 parser.skip_whitespace()?;
                 // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
-                // These go in part_content rather than being registered, since they're
+                // These go in the part buffer rather than being registered, since they're
                 // inside the condition part's span
                 while parser.check(TokenKind::Comment) {
-                    part_content.push(" ".to_string());
-                    part_content.push(parser.current_value().to_string());
+                    part_buf.push(' ');
+                    part_buf.push_str(parser.current_value());
+                    trailing_spaces = 0;
                     end_pos = parser.base_offset() + parser.current_end;
                     parser.advance()?;
                     parser.skip_whitespace()?;
                 }
-                part_content.push(" ".to_string());
+                part_buf.push(' ');
+                trailing_spaces += 1;
             }
         }
 
@@ -106,7 +116,8 @@ pub(super) fn parse_condition_query<'arena>(
         if parser.check(TokenKind::Identifier)
             && parser.source.get(parser.current_end..=parser.current_end) == Some("(")
         {
-            part_content.push(parser.current_value().to_string());
+            part_buf.push_str(parser.current_value());
+            trailing_spaces = 0;
             parser.advance()?;
             // Continue to parse the parenthesized part below
         }
@@ -135,8 +146,8 @@ pub(super) fn parse_condition_query<'arena>(
 
             // Check for end of part (at top level)
             if paren_depth == 0 && parser.check(TokenKind::RightParen) {
-                // Include the closing paren
-                part_content.push(")".to_string());
+                // Include the closing paren (loop ends here, so no counter reset needed)
+                part_buf.push(')');
                 end_pos = parser.base_offset() + parser.current_end;
                 parser.advance()?;
                 break;
@@ -152,36 +163,18 @@ pub(super) fn parse_condition_query<'arena>(
                 if skip_whitespace {
                     continue;
                 }
-                part_content.push(" ".to_string());
+                part_buf.push(' ');
+                trailing_spaces += 1;
                 prev_token_kind = Some(TokenKind::Whitespace);
                 continue;
             }
-
-            // Get token value. Identifiers serialize verbatim from source so escapes
-            // survive (`\@foo` stays `\@foo`); keyword matching below decodes instead.
-            let part = match &parser.current_kind {
-                TokenKind::Identifier => parser.current_value().to_string(),
-                TokenKind::String { quote } => {
-                    let content =
-                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                    format!("{quote}{content}{quote}")
-                }
-                TokenKind::Number | TokenKind::Percentage | TokenKind::Dimension { .. } => {
-                    parser.current_value().to_string()
-                }
-                TokenKind::Comment => {
-                    // Include comment and preserve trailing space before next token
-                    parser.current_value().to_string()
-                }
-                _ => parser.current_value().to_string(),
-            };
 
             // Add space after comment if followed by non-whitespace
             // (Comments need space before the next token)
             let is_comment = matches!(parser.current_kind, TokenKind::Comment);
 
             // Check if this is a boolean operator (and/or/not) inside nested parens.
-            // Match on the decoded value, not the now-verbatim `part`, so an escaped
+            // Match on the decoded value, not the verbatim source slice, so an escaped
             // operator still spaces correctly.
             let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
                 && is_boolean_operator_keyword(parser.current_identifier());
@@ -195,24 +188,39 @@ pub(super) fn parse_condition_query<'arena>(
                     Some(TokenKind::Whitespace | TokenKind::LeftParen)
                 )
             {
-                part_content.push(" ".to_string());
+                part_buf.push(' ');
+                trailing_spaces += 1;
             }
 
-            // Remove trailing whitespace before ':'
+            // Remove trailing whitespace before ':' — only the counted programmatic
+            // spaces, never a token's own escape-terminator space. (The counter is reset
+            // by the token emission just below, which always runs next.)
             if matches!(parser.current_kind, TokenKind::Colon) {
-                while part_content.last().is_some_and(|s| s == " ") {
-                    part_content.pop();
-                }
+                part_buf.truncate(part_buf.len() - trailing_spaces);
             }
 
-            part_content.push(part);
+            // Emit the token verbatim from source: identifiers serialize their raw slice so
+            // escapes survive (`\@foo` stays `\@foo`), a string keeps its surrounding quotes,
+            // and a comment is included verbatim.
+            match &parser.current_kind {
+                TokenKind::String { quote } => {
+                    let content =
+                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                    part_buf.push(*quote);
+                    part_buf.push_str(content);
+                    part_buf.push(*quote);
+                }
+                _ => part_buf.push_str(parser.current_value()),
+            }
+            trailing_spaces = 0;
             let current_kind = parser.current_kind;
             end_pos = parser.base_offset() + parser.current_end;
             parser.advance()?;
 
             // Add space after boolean operators
             if is_bool_op && !parser.check(TokenKind::Whitespace) {
-                part_content.push(" ".to_string());
+                part_buf.push(' ');
+                trailing_spaces += 1;
             }
 
             // Add space after comment if followed by non-whitespace
@@ -221,7 +229,8 @@ pub(super) fn parse_condition_query<'arena>(
                 && !parser.check(TokenKind::Whitespace)
                 && !parser.check(TokenKind::RightParen)
             {
-                part_content.push(" ".to_string());
+                part_buf.push(' ');
+                trailing_spaces += 1;
             }
 
             // Add space after ':' for property:value pairs
@@ -235,7 +244,8 @@ pub(super) fn parse_condition_query<'arena>(
                         | Some(TokenKind::Percentage)
                 )
             {
-                part_content.push(" ".to_string());
+                part_buf.push(' ');
+                trailing_spaces += 1;
             }
 
             prev_token_kind = Some(current_kind);
@@ -245,8 +255,7 @@ pub(super) fn parse_condition_query<'arena>(
         }
 
         // Build the part
-        let joined = part_content.join("");
-        let content = joined.trim();
+        let content = part_buf.trim();
         if !content.is_empty() {
             parts.push(ConditionPart {
                 connector: current_connector.take(),

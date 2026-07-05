@@ -24,15 +24,18 @@ pub fn estimated_json_capacity(source_len: usize) -> usize {
         .max(128)
 }
 
-/// Estimated bump-arena bytes per source byte for the internal AST.
+/// Bump-arena pre-size floor, in bytes per source byte, for the internal AST.
 ///
-/// The bump-allocated AST (nodes inline-by-value, child slices, arena-copied
-/// strings) runs on the order of this many bytes per source byte. Sizing the
-/// `Bump` up front turns the handful of chunk-doubling `malloc`s a fresh
-/// `Bump::new()` would pay (512 B first chunk, then doubling) into one
+/// This is a deliberate *partial* pre-size, not the AST's true footprint — the
+/// bump-allocated AST (nodes inline-by-value, child slices, arena-copied
+/// strings) runs to roughly 30–50 bytes per source byte in practice. Sizing the
+/// `Bump` to 16x up front folds the first several chunk-doubling `malloc`s a
+/// fresh `Bump::new()` would pay (512 B first chunk, then doubling) into one
 /// allocation — a small win on the WASM-format wall (dlmalloc) and native.
-/// This does not change the allocation *count* materially; it trims the
-/// chunk-grow tail.
+/// Provisioning all the way to true demand buys nothing measurable: it does not
+/// change the allocation *count*, only trims the chunk-grow tail, and the batch
+/// drivers reuse one arena across files (`Bump::reset()`), so cold-start sizing
+/// is moot after the first file.
 const AST_ARENA_BYTES_PER_SOURCE_BYTE: usize = 16;
 
 /// Pre-size estimate (in bytes) for the parse-time bump arena that owns the
