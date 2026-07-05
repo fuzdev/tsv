@@ -1,0 +1,190 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 733,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 612,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 405,
+							"end": 412,
+							"property": "--\\0",
+							"value": "a"
+						},
+						{
+							"type": "Declaration",
+							"start": 416,
+							"end": 426,
+							"property": "--\\d7ff",
+							"value": "b"
+						},
+						{
+							"type": "Declaration",
+							"start": 430,
+							"end": 440,
+							"property": "--\\d800",
+							"value": "c"
+						},
+						{
+							"type": "Declaration",
+							"start": 444,
+							"end": 454,
+							"property": "--\\dfff",
+							"value": "d"
+						},
+						{
+							"type": "Declaration",
+							"start": 458,
+							"end": 468,
+							"property": "--\\e000",
+							"value": "e"
+						},
+						{
+							"type": "Declaration",
+							"start": 472,
+							"end": 484,
+							"property": "--\\10ffff",
+							"value": "f"
+						},
+						{
+							"type": "Declaration",
+							"start": 488,
+							"end": 500,
+							"property": "--\\110000",
+							"value": "g"
+						},
+						{
+							"type": "Declaration",
+							"start": 559,
+							"end": 578,
+							"property": "color",
+							"value": "var(--\\d800)"
+						},
+						{
+							"type": "Declaration",
+							"start": 582,
+							"end": 608,
+							"property": "background",
+							"value": "var(--\\ffffff)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 612
+			},
+			{
+				"type": "Atrule",
+				"start": 659,
+				"end": 724,
+				"name": "supports",
+				"prelude": "(color: var(--\\d800))",
+				"block": {
+					"type": "Block",
+					"start": 691,
+					"end": 724,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 695,
+								"end": 698,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 695,
+										"end": 698,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 695,
+														"end": 698
+													}
+												],
+												"start": 695,
+												"end": 698
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 699,
+								"end": 721,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 704,
+										"end": 716,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							},
+							"start": 695,
+							"end": 721
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 725,
+			"styles": "\n\tdiv {\n\t\t/* CSS Syntax 3 §4.3.7: an escape whose code point is zero, is a surrogate\n\t\t   (U+D800–U+DFFF), or is above the maximum allowed code point (U+10FFFF)\n\t\t   decodes to U+FFFD REPLACEMENT CHARACTER rather than being a parse error;\n\t\t   the neighbouring in-range code points decode normally. Names are emitted\n\t\t   from raw source, so only the accept/reject verdict is under test here. */\n\t\t--\\0: a;\n\t\t--\\d7ff: b;\n\t\t--\\d800: c;\n\t\t--\\dfff: d;\n\t\t--\\e000: e;\n\t\t--\\10ffff: f;\n\t\t--\\110000: g;\n\t\t/* The same rule applies inside a var() reference */\n\t\tcolor: var(--\\d800);\n\t\tbackground: var(--\\ffffff);\n\t}\n\n\t/* ...and inside an @supports condition */\n\t@supports (color: var(--\\d800)) {\n\t\tdiv {\n\t\t\tcolor: green;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 734,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
