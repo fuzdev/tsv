@@ -289,8 +289,12 @@ impl<'a> Printer<'a> {
                 base_indent_offset: 1,
                 ..tsv_lang::EmbedContext::default()
             };
-            let formatted_css =
-                tsv_css::format_embedded(&style.css_stylesheet, self.source(), embed);
+            let formatted_css = tsv_css::format_embedded(
+                &style.css_stylesheet,
+                self.source(),
+                &self.line_breaks,
+                embed,
+            );
 
             // Indent each line - trim trailing newlines first to avoid extra blank lines
             // Note: CSS formatter adds trailing newline, we need to remove it before line processing

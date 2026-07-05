@@ -771,17 +771,16 @@ pub(crate) fn format_css_in(
 pub(crate) fn format_css_embedded(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,
+    line_breaks: &[u32],
     embed: EmbedContext,
 ) -> String {
     // Embedded `<style>` formats to its own string with its own column-0 render
     // pass, so it can't share the host svelte printer's arena; a fresh per-block
     // arena is the deliberate scope boundary (per-`<style>`, not per-file).
-    // `source` is the whole host document (spans are absolute), so the table
-    // built here is whole-source — never island-local.
+    // `source` is the whole host document (spans are absolute), so the caller's
+    // `line_breaks` is the host's whole-source table — never island-local.
     let arena = DocArena::for_source(source);
-    let line_breaks = printing::build_line_breaks(source);
-    let mut printer =
-        Printer::with_embed(&arena, source, &stylesheet.comments, &line_breaks, embed);
+    let mut printer = Printer::with_embed(&arena, source, &stylesheet.comments, line_breaks, embed);
     printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()
 }

@@ -1,0 +1,14 @@
+# Workspace cargo config. The rustflags below are scoped to the wasm32
+# target, so native builds are unaffected; CI and scripts/publish.ts run
+# the same cargo/wasm-pack tasks from the repo root and inherit them —
+# this file is the single source of truth for the wasm feature baseline.
+
+[target.wasm32-unknown-unknown]
+# +multivalue lets pair-shaped returns (16-byte Token, Span, &str fats)
+# use the multi-value ABI instead of round-tripping through linear memory;
+# +simd128 vectorizes library code (memcpy/memcmp/str scans). Both are
+# supported by every engine tsv targets (all browsers since 2021, Node 16+,
+# Deno, Bun). wasm-opt must be told to accept these instructions — see the
+# matching --enable-simd --enable-multivalue in crates/tsv_wasm/Cargo.toml
+# [package.metadata.wasm-pack.profile.release].
+rustflags = ["-Ctarget-feature=+simd128,+multivalue"]
