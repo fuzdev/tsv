@@ -26,11 +26,17 @@ impl<'a> Printer<'a> {
     /// Comment handling at each gap: keyword→key (`readonly /* c */ a`),
     /// key→`?` (`a /* c */?`), `?`→`:` (preserved after `?`, a line comment
     /// forcing a break via `build_marker_to_colon_comments_doc`), key→`:` when
-    /// not optional (block inline, a line comment forcing a break), and type→end
-    /// (`: A /* c */`).
+    /// not optional (block inline, a line comment forcing a break), and type→`;`
+    /// (the pre-`;` gap): a same-line block stays inline (`: A /* c */;`), a
+    /// same-line line trails past the `;` (`: A; // c`), and an **own-line**
+    /// comment is *deferred* — pushed to `deferred` (own line, blank preserved)
+    /// for the type-element joiner to emit **after** its `;`, matching prettier
+    /// (the member doc doesn't own the `;`). `deferred` is empty on the common
+    /// no-comment path.
     pub(crate) fn build_property_signature_member_doc(
         &self,
         prop: &internal::TSPropertySignature<'_>,
+        deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
@@ -107,13 +113,18 @@ impl<'a> Printer<'a> {
             after_marker
         };
 
-        // Trailing comments before the synthetic `;`, shared by both arms: with an
-        // annotation (`a: A /* c */;`) or in the no-annotation marker→`;` gap
-        // (`a /* c */;`, `a? /* c */;`), where they'd otherwise be dropped. Break-safe
-        // (a line comment floats after `;` via `line_suffix`, never swallowing it).
-        // Prettier relocates a no-annotation block before `?` for the optional case —
-        // a cataloged divergence (we preserve the author's position).
-        self.append_trailing_member_comments(&mut parts, trailing_start, prop.span.end);
+        // Comments in the content→`;` gap, shared by both arms: with an annotation
+        // (`a: A /* c */;`) or in the no-annotation marker→`;` gap (`a /* c */;`,
+        // `a? /* c */;`), where they'd otherwise be dropped. Same-line comments stay
+        // with the member (a block inline, a line via `line_suffix`); an own-line
+        // comment is deferred to `deferred` for the joiner to emit after the `;`
+        // (matching prettier). Prettier relocates a no-annotation block before `?` for
+        // the optional case — a cataloged divergence (we preserve the author's position).
+        deferred.extend(self.split_member_terminator_gap_comments(
+            &mut parts,
+            trailing_start,
+            prop.span.end,
+        ));
         d.concat(&parts)
     }
 
@@ -339,10 +350,17 @@ impl<'a> Printer<'a> {
 
     /// Build doc for a type member without its trailing `;` — the type-literal
     /// printer is responsible for the separator and any surrounding comments.
-    pub(super) fn build_type_member_doc_inner(&self, member: &TSTypeElement<'_>) -> DocId {
+    /// `deferred` collects own-line comments in a member's content→`;` gap that must
+    /// render **after** the joiner's `;` (property signatures today; other member kinds
+    /// leave it empty — their own-line-before-`;` deferral is a tracked follow-up).
+    pub(super) fn build_type_member_doc_inner(
+        &self,
+        member: &TSTypeElement<'_>,
+        deferred: &mut DocBuf,
+    ) -> DocId {
         match member {
             TSTypeElement::PropertySignature(prop) => {
-                self.build_property_signature_member_doc(prop)
+                self.build_property_signature_member_doc(prop, deferred)
             }
             TSTypeElement::MethodSignature(method) => {
                 self.build_method_signature_member_doc(method)

@@ -399,7 +399,8 @@ impl<'a> Printer<'a> {
                     None,
                     comments_present,
                 ));
-                member_parts.push(self.build_type_member_doc_inner(m));
+                let mut deferred = DocBuf::new();
+                member_parts.push(self.build_type_member_doc_inner(m, &mut deferred));
 
                 // Handle trailing comments - preserve position relative to semicolon
                 let upper_bound = t
@@ -418,6 +419,8 @@ impl<'a> Printer<'a> {
                     member_content_end,
                     upper_bound,
                 ));
+                // Own-line comments from the member→`;` gap, deferred past the `;`.
+                member_parts.extend(deferred);
             } else {
                 // Width-aware: softlines, conditional semicolons. The opening
                 // bracketSpacing boundary precedes the first member (emitted before
@@ -426,7 +429,8 @@ impl<'a> Printer<'a> {
                 if !is_first {
                     member_parts.push(d.softline());
                 }
-                member_parts.push(self.build_type_member_doc_inner(m));
+                let mut deferred = DocBuf::new();
+                member_parts.push(self.build_type_member_doc_inner(m, &mut deferred));
 
                 // Handle trailing comments - preserve position relative to semicolon
                 let upper_bound = t
@@ -444,6 +448,7 @@ impl<'a> Printer<'a> {
                     // In flat mode there's no semicolon, so all comments are "after"
                     // In break mode semicolon is added, comments still come after
                     member_parts.push(d.if_break(d.text(";"), d.empty()));
+                    member_parts.extend(deferred);
                     for comment in &trailing {
                         member_parts.push(self.build_trailing_comment_doc(comment));
                     }
@@ -454,6 +459,7 @@ impl<'a> Printer<'a> {
                         member_content_end,
                         upper_bound,
                     ));
+                    member_parts.extend(deferred);
                     // Space before next member only when flat
                     member_parts.push(d.if_break(d.empty(), d.text(" ")));
                 }
@@ -630,12 +636,13 @@ impl<'a> Printer<'a> {
                 // verbatim. Use the content span (no trailing
                 // `;`); the loop's semicolon handling below re-adds the `;`.
                 // (A directive is itself a comment, so the gate is exact.)
+                let mut deferred = DocBuf::new();
                 let member_doc = if comments_present
                     && self.has_format_ignore_in_range(prev_end, m.span().start)
                 {
                     self.raw_source_range(m.span().start, member_content_end)
                 } else {
-                    self.build_type_member_doc_inner(m)
+                    self.build_type_member_doc_inner(m, &mut deferred)
                 };
                 member_parts.push(member_doc);
 
@@ -656,6 +663,8 @@ impl<'a> Printer<'a> {
                     member_content_end,
                     upper_bound,
                 ));
+                // Own-line comments from the member→`;` gap, deferred past the `;`.
+                member_parts.extend(deferred);
 
                 prev_end = m.span().end;
             }
@@ -693,7 +702,8 @@ impl<'a> Printer<'a> {
                 if !is_first {
                     member_parts.push(d.softline());
                 }
-                member_parts.push(self.build_type_member_doc_inner(m));
+                let mut deferred = DocBuf::new();
+                member_parts.push(self.build_type_member_doc_inner(m, &mut deferred));
 
                 let upper_bound = t
                     .members
@@ -708,6 +718,7 @@ impl<'a> Printer<'a> {
                 if is_last {
                     // Last member: semicolon only when broken, comments after
                     member_parts.push(d.if_break(d.text(";"), d.empty()));
+                    member_parts.extend(deferred);
                     for comment in &trailing {
                         member_parts.push(self.build_trailing_comment_doc(comment));
                     }
@@ -718,6 +729,8 @@ impl<'a> Printer<'a> {
                         member_content_end,
                         upper_bound,
                     ));
+                    // Own-line comments from the member→`;` gap, deferred past the `;`.
+                    member_parts.extend(deferred);
                     // Space before next member only when flat
                     member_parts.push(d.if_break(d.empty(), d.text(" ")));
                 }

@@ -758,10 +758,12 @@ impl<'a> Printer<'a> {
     /// the break-safe idiom for a type member's gap before its `;` terminator. Each
     /// goes through `build_trailing_comment_doc`, so a block trails inline
     /// (` /* c */`) and a line comment floats after the terminator via `line_suffix`
-    /// instead of swallowing it. Shared by the property arm
-    /// (`build_property_signature_member_doc`) and the signature arms
-    /// (`append_signature_end_comments`) so every `TSTypeElement` trailing emission
-    /// uses the one break-safe path.
+    /// instead of swallowing it. Used by the **signature** arms
+    /// (`append_signature_end_comments`). The property arm instead uses
+    /// `split_member_terminator_gap_comments`, which additionally defers an own-line
+    /// comment past the `;` (matching prettier); the signature arms keep collapsing
+    /// an own-line comment here — a tracked follow-up (they also hit the acorn
+    /// root-comments duplication, so they need `_svelte_divergence` coverage).
     pub(crate) fn append_trailing_member_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
         for comment in comments_in_range(self.comments, start, end) {
             parts.push(self.build_trailing_comment_doc(comment));
@@ -803,25 +805,61 @@ impl<'a> Printer<'a> {
         sep_pos: u32,
         block_after_separator: bool,
     ) -> DocBuf {
+        // The two axes move together here: a `;` terminator (`true`) trails a same-line
+        // block after the separator AND preserves a blank line, while a `,`/for-header
+        // separator (`false`) does neither. The mixed `MemberTerminator` case (block
+        // before, blank preserved) uses `split_member_terminator_gap_comments`.
+        self.push_gap_comments(
+            parts,
+            start,
+            sep_pos,
+            block_after_separator,
+            block_after_separator,
+        )
+    }
+
+    /// The **type-member `;`** variant of `split_separator_gap_comments`: a same-line
+    /// block stays *before* the `;` (`a: A /* c */;`, like a list separator) **but** a
+    /// blank line before an own-line comment IS preserved (like a statement terminator).
+    /// This mixed binding is what prettier does for a type-literal / interface member
+    /// terminator, which the single `block_after_separator` bool can't express. Same
+    /// caller idiom (the returned own-line docs are emitted by the type-element *joiner*
+    /// after its `;`, since the member doc doesn't own the `;`).
+    pub(crate) fn split_member_terminator_gap_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        sep_pos: u32,
+    ) -> DocBuf {
+        self.push_gap_comments(parts, start, sep_pos, false, true)
+    }
+
+    /// Core of the gap-comment partition, with the two policy axes decoupled:
+    /// `block_after` moves a **same-line block** past the separator (deferred), and
+    /// `preserve_blank` keeps a single blank line before a deferred **own-line** comment
+    /// (`literalline`). A same-line line comment always uses `line_suffix` (zero width,
+    /// floats past the separator); an own-line comment is always deferred on its own
+    /// `hardline`. `prev` tracks the content/prior-comment end for blank detection.
+    fn push_gap_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        sep_pos: u32,
+        block_after: bool,
+        preserve_blank: bool,
+    ) -> DocBuf {
         let d = self.d();
         let mut deferred = DocBuf::new();
         let mut prev = start;
         for comment in comments_in_range(self.comments, start, sep_pos) {
             if self.is_same_line(start, comment.span.start) {
-                if block_after_separator && comment.is_block {
+                if block_after && comment.is_block {
                     deferred.push(self.build_trailing_comment_doc(comment));
                 } else {
                     parts.push(self.build_trailing_comment_doc(comment));
                 }
             } else {
-                // Own-line comment: after a `;` *terminator* (`block_after_separator`),
-                // preserve a single blank line before it when the author left one —
-                // prettier keeps one blank line between the content and an own-line
-                // trailing comment (`expr;\n\n// c`). A `,` *separator* does not: prettier
-                // emits no blank in a list element→comma gap (`1,\n// c\n2`), so the flag
-                // gates it. `prev` is the content/separator start for the first comment,
-                // then the previous comment's end.
-                if block_after_separator && self.has_blank_line_between(prev, comment.span.start) {
+                if preserve_blank && self.has_blank_line_between(prev, comment.span.start) {
                     deferred.push(d.literalline());
                 }
                 deferred.push(d.hardline());
