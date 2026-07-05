@@ -107,7 +107,10 @@ pub fn format_in(
 ///
 /// # Arguments
 /// * `stylesheet` - CSS stylesheet (nodes + value comments)
-/// * `source` - Original CSS source code (for blank line preservation)
+/// * `source` - The whole host document (spans are absolute)
+/// * `line_breaks` - The host's whole-source line-break table
+///   (`tsv_lang::printing::build_line_breaks(source)`) — the host printer
+///   already holds one, so embedding doesn't rebuild it per `<style>` block
 /// * `embed` - Embedding context (e.g., `base_indent_offset`)
 ///
 /// # Example
@@ -118,15 +121,17 @@ pub fn format_in(
 /// let css = "div{color:red;}";
 /// let arena = bumpalo::Bump::new();
 /// let stylesheet = parse(css, &arena).expect("Failed to parse CSS");
+/// let line_breaks = tsv_lang::printing::build_line_breaks(css);
 /// let embed = EmbedContext { base_indent_offset: 1, ..EmbedContext::default() };
-/// let formatted = format_embedded(&stylesheet, css, embed);
+/// let formatted = format_embedded(&stylesheet, css, &line_breaks, embed);
 /// ```
 pub fn format_embedded(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,
+    line_breaks: &[u32],
     embed: tsv_lang::EmbedContext,
 ) -> String {
-    printer::format_css_embedded(stylesheet, source, embed)
+    printer::format_css_embedded(stylesheet, source, line_breaks, embed)
 }
 
 /// Convert CSS AST to JSON with character-based positions
