@@ -37,7 +37,8 @@ impl<'a> Printer<'a> {
         // try keyword to block: `try /* comment */ {`
         let try_keyword_end = stmt.span.start + "try".len() as u32;
         let block_start = stmt.block.span.start;
-        let mut parts = smallvec![d.text("try")];
+        let mut parts = d.pooled_docbuf();
+        parts.push(d.text("try"));
         self.append_keyword_to_body_comments(&mut parts, try_keyword_end, block_start);
         // Try block expands empty: `try {\n}` not `try {}`
         parts.push(self.build_block_statement_expand_empty_doc(&stmt.block));
