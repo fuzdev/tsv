@@ -306,14 +306,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         for attr in all_attrs {
             match &attr {
                 AttributeNode::Attribute(a) => {
-                    let attr_name = self
-                        .interner
-                        .borrow()
-                        .resolve(a.name)
-                        .map(str::to_owned)
-                        .unwrap_or_default();
-                    // Check for `this` attribute on svelte:element and svelte:component
-                    if attr_name == "this" {
+                    // Check for `this` attribute on svelte:element and svelte:component.
+                    // Compare the resolved name by borrow — no per-attribute `String`.
+                    if self.interner.borrow().resolve(a.name) == Some("this") {
                         if tag == SpecialElementTag::SvelteElement {
                             // Extract expression from the attribute value
                             if let Some(values) = a.value {

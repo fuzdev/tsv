@@ -292,7 +292,7 @@ impl<'a> Printer<'a> {
         // Width check uses the NORMALIZED source length (comments included), since the
         // comments aren't in the doc and the value must round-trip verbatim.
         let func_source = span.extract(self.source);
-        let normalized = value_normalization::normalize_value_spacing(func_source);
+        let normalized = value_normalization::normalize_css_whitespace(func_source);
         // Visual width (not byte length) of `property: value !important;`. The multibyte
         // comment's byte inflation is excluded by `visual_width`; the ` !important` tail is
         // counted via `declaration_tail` (the same string the emit appends) so an important
@@ -591,7 +591,7 @@ impl<'a> Printer<'a> {
         let arg_strs = value_normalization::split_args_by_comma(args_content);
         for (i, arg_str) in arg_strs.iter().enumerate() {
             self.write_indent();
-            let normalized = value_normalization::normalize_value_spacing(arg_str);
+            let normalized = value_normalization::normalize_css_whitespace(arg_str);
 
             // Check if this arg has space-separated values that would exceed width
             // Split by top-level spaces (not inside parens) to get individual values
