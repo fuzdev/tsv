@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 335,
+	"end": 539,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " 100 chars - stays flat (both formatters match)",
+			"value": " Interpolation fits at printWidth (100 chars) — inline",
 			"start": 20,
-			"end": 69,
+			"end": 76,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 50
+					"column": 57
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " 101 chars - we break, prettier stays inline",
-			"start": 172,
-			"end": 218,
+			"value": " Compact source over printWidth (101 chars) — stays inline (atomized)",
+			"start": 179,
+			"end": 250,
 			"loc": {
 				"start": {
 					"line": 5,
@@ -38,7 +38,23 @@
 				},
 				"end": {
 					"line": 5,
-					"column": 47
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Source spans lines over printWidth — breaks to respect printWidth",
+			"start": 354,
+			"end": 422,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 69
 				}
 			}
 		}
@@ -46,27 +62,27 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 334,
+		"end": 538,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 325,
+			"end": 529,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 12,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 71,
-					"end": 169,
+					"start": 78,
+					"end": 176,
 					"loc": {
 						"start": {
 							"line": 3,
@@ -80,8 +96,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 77,
-							"end": 168,
+							"start": 84,
+							"end": 175,
 							"loc": {
 								"start": {
 									"line": 3,
@@ -94,8 +110,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 77,
-								"end": 78,
+								"start": 84,
+								"end": 85,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -110,8 +126,8 @@
 							},
 							"init": {
 								"type": "TemplateLiteral",
-								"start": 81,
-								"end": 168,
+								"start": 88,
+								"end": 175,
 								"loc": {
 									"start": {
 										"line": 3,
@@ -125,8 +141,8 @@
 								"expressions": [
 									{
 										"type": "Identifier",
-										"start": 153,
-										"end": 157,
+										"start": 160,
+										"end": 164,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -143,8 +159,8 @@
 								"quasis": [
 									{
 										"type": "TemplateElement",
-										"start": 82,
-										"end": 151,
+										"start": 89,
+										"end": 158,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -163,8 +179,8 @@
 									},
 									{
 										"type": "TemplateElement",
-										"start": 158,
-										"end": 167,
+										"start": 165,
+										"end": 174,
 										"loc": {
 											"start": {
 												"line": 3,
@@ -189,45 +205,45 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " 100 chars - stays flat (both formatters match)",
+							"value": " Interpolation fits at printWidth (100 chars) — inline",
 							"start": 20,
-							"end": 69
+							"end": 76
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 220,
-					"end": 324,
+					"start": 252,
+					"end": 351,
 					"loc": {
 						"start": {
 							"line": 6,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
-							"column": 13
+							"line": 6,
+							"column": 100
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 226,
-							"end": 323,
+							"start": 258,
+							"end": 350,
 							"loc": {
 								"start": {
 									"line": 6,
 									"column": 7
 								},
 								"end": {
-									"line": 8,
-									"column": 12
+									"line": 6,
+									"column": 99
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 226,
-								"end": 227,
+								"start": 258,
+								"end": 259,
 								"loc": {
 									"start": {
 										"line": 6,
@@ -242,31 +258,31 @@
 							},
 							"init": {
 								"type": "TemplateLiteral",
-								"start": 230,
-								"end": 323,
+								"start": 262,
+								"end": 350,
 								"loc": {
 									"start": {
 										"line": 6,
 										"column": 11
 									},
 									"end": {
-										"line": 8,
-										"column": 12
+										"line": 6,
+										"column": 99
 									}
 								},
 								"expressions": [
 									{
 										"type": "Identifier",
-										"start": 306,
-										"end": 310,
+										"start": 335,
+										"end": 339,
 										"loc": {
 											"start": {
-												"line": 7,
-												"column": 2
+												"line": 6,
+												"column": 84
 											},
 											"end": {
-												"line": 7,
-												"column": 6
+												"line": 6,
+												"column": 88
 											}
 										},
 										"name": "expr"
@@ -275,8 +291,8 @@
 								"quasis": [
 									{
 										"type": "TemplateElement",
-										"start": 231,
-										"end": 301,
+										"start": 263,
+										"end": 333,
 										"loc": {
 											"start": {
 												"line": 6,
@@ -295,15 +311,147 @@
 									},
 									{
 										"type": "TemplateElement",
-										"start": 313,
-										"end": 322,
+										"start": 340,
+										"end": 349,
 										"loc": {
 											"start": {
-												"line": 8,
+												"line": 6,
+												"column": 89
+											},
+											"end": {
+												"line": 6,
+												"column": 98
+											}
+										},
+										"value": {
+											"raw": " yyyyyyyy",
+											"cooked": " yyyyyyyy"
+										},
+										"tail": true
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Compact source over printWidth (101 chars) — stays inline (atomized)",
+							"start": 179,
+							"end": 250
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 424,
+					"end": 528,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 13
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 430,
+							"end": 527,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 12
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 430,
+								"end": 431,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TemplateLiteral",
+								"start": 434,
+								"end": 527,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 12
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 510,
+										"end": 514,
+										"loc": {
+											"start": {
+												"line": 10,
 												"column": 2
 											},
 											"end": {
-												"line": 8,
+												"line": 10,
+												"column": 6
+											}
+										},
+										"name": "expr"
+									}
+								],
+								"quasis": [
+									{
+										"type": "TemplateElement",
+										"start": 435,
+										"end": 505,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 12
+											},
+											"end": {
+												"line": 9,
+												"column": 82
+											}
+										},
+										"value": {
+											"raw": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ",
+											"cooked": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "
+										},
+										"tail": false
+									},
+									{
+										"type": "TemplateElement",
+										"start": 517,
+										"end": 526,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
 												"column": 11
 											}
 										},
@@ -321,9 +469,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " 101 chars - we break, prettier stays inline",
-							"start": 172,
-							"end": 218
+							"value": " Source spans lines over printWidth — breaks to respect printWidth",
+							"start": 354,
+							"end": 422
 						}
 					]
 				}

@@ -17,7 +17,10 @@ use tsv_lang::printing::visual_width;
 impl<'a> Printer<'a> {
     /// Build a Doc for a template literal.
     ///
-    /// Two formatting strategies based on expression type:
+    /// Each `${…}` interpolation is kept on one line (atomized — see the
+    /// `interpolation_has_newline` gate below) unless its source spans multiple
+    /// lines or the expression forces a break. When it does break, two
+    /// strategies apply based on expression type:
     /// - **Qualifying types** (Identifier, MemberExpression, Conditional, etc.):
     ///   softline wrapping in a regular group — `${/}` breaks when line exceeds width.
     /// - **Non-qualifying types** (CallExpression, chains, arrows, etc.):
@@ -93,19 +96,42 @@ impl<'a> Printer<'a> {
                 let has_comments = !leading_comments.is_empty() || !trailing_comments.is_empty();
                 let has_trailing_line_comment = trailing_comments.iter().any(|c| !c.is_block);
 
-                // Qualifying types and trailing line comments use softline wrapping
-                // at ${/} boundaries so the group can break there.
-                // Non-qualifying types keep expression doc as-is (no ${/} softlines)
-                // so ${ hugs while the expression breaks internally.
-                let use_softline_wrap = has_trailing_line_comment
-                    || Self::is_template_softline_expression(expr, has_comments);
-                let inner = if use_softline_wrap {
-                    d.concat(&[
-                        d.indent(d.concat(&[d.softline(), full_expr_doc])),
-                        d.softline(),
-                    ])
+                // Prettier's `interpolationHasNewline` gate (template-literal.js
+                // `printTemplateExpression`): an interpolation stays on one line
+                // unless its *source* already spans multiple lines, or the
+                // expression would render with a newline anyway (e.g. a nested
+                // function/block body). `quasi.span.end` sits just past `${` and
+                // `next_quasi.span.start` at the closing `}`, so the range is the
+                // interpolation interior — the equivalent of prettier's
+                // `hasNewlineInRange(locEnd(quasi[i]), locStart(quasi[i + 1]))`.
+                // `will_break_deep` stands in for prettier's re-render at
+                // `printWidth: Infinity`: a doc breaks at infinite width iff it
+                // carries a hardline / forced break, i.e. renders with a newline.
+                let interpolation_has_newline = self
+                    .has_newline_between(quasi.span.end, next_quasi.span.start)
+                    || d.will_break_deep(full_expr_doc);
+
+                let inner = if interpolation_has_newline {
+                    // Qualifying types and trailing line comments use softline
+                    // wrapping at ${/} boundaries so the group can break there.
+                    // Non-qualifying types keep the expression doc as-is (no ${/}
+                    // softlines) so ${ hugs while the expression breaks internally.
+                    let use_softline_wrap = has_trailing_line_comment
+                        || Self::is_template_softline_expression(expr, has_comments);
+                    if use_softline_wrap {
+                        d.concat(&[
+                            d.indent(d.concat(&[d.softline(), full_expr_doc])),
+                            d.softline(),
+                        ])
+                    } else {
+                        full_expr_doc
+                    }
                 } else {
-                    full_expr_doc
+                    // No newline in the interpolation and nothing forces a break:
+                    // atomize by removing all soft breaks so the `${…}` stays on one
+                    // line even past print width (prettier replaces the expression
+                    // doc with its `printWidth: Infinity` rendering here).
+                    d.remove_lines(full_expr_doc)
                 };
 
                 // Apply alignment based on quasi indent (Prettier's addAlignmentToDoc).
@@ -232,19 +258,15 @@ impl<'a> Printer<'a> {
         // Matches Prettier's qualifying types (template-literal.js:230-238):
         // Identifier, MemberExpression, ConditionalExpression, SequenceExpression,
         // isBinaryCastExpression (TSAsExpression, TSSatisfiesExpression),
-        // isBinaryish (BinaryExpression — includes &&, ||, ??).
-        // Plus additional simple types that have no internal break points.
+        // isBinaryish (BinaryExpression — folds &&, ||, ?? here). Other node kinds
+        // are non-qualifying: they either hug at ${/} and break internally, or (now
+        // that the softline wrap is gated on `interpolation_has_newline`) stay
+        // atomized inline, exactly as prettier renders them.
         matches!(
             expr,
             Expression::Identifier(_)
-                | Expression::Literal(_)
                 | Expression::MemberExpression(_)
                 | Expression::ConditionalExpression(_)
-                | Expression::UnaryExpression(_)
-                | Expression::UpdateExpression(_)
-                | Expression::MetaProperty(_)
-                | Expression::ThisExpression(_)
-                | Expression::Super(_)
                 | Expression::BinaryExpression(_)
                 | Expression::SequenceExpression(_)
                 | Expression::TSAsExpression(_)
