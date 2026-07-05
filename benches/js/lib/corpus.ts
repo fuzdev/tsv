@@ -402,6 +402,12 @@ const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
 export interface CorpusSource {
 	path: string;
 	files: number;
+	/**
+	 * Per-language split of `files` (the svelte/typescript/css counts sum to
+	 * `files`), so the composition disclosure shows each entry's language mix
+	 * rather than only a bare total.
+	 */
+	by_language: Record<Language, number>;
 }
 
 /**
@@ -473,9 +479,11 @@ export class DevReposLoader {
 			const resolved_path = resolve(entry_path);
 
 			let count = 0;
+			const by_language: Record<Language, number> = { svelte: 0, typescript: 0, css: 0 };
 			if (entry.files_from !== undefined) {
 				for await (const file of load_file_list(resolved_path)) {
 					count++;
+					by_language[file.language]++;
 					yield file;
 				}
 			} else {
@@ -487,12 +495,13 @@ export class DevReposLoader {
 					const file of walk_corpus(resolved_path, { extensions: entry.extensions, skip })
 				) {
 					count++;
+					by_language[file.language]++;
 					yield file;
 				}
 			}
 
 			if (count > 0) {
-				this.sources.push({ path: entry_path, files: count });
+				this.sources.push({ path: entry_path, files: count, by_language });
 				logger(`  ${entry_path}: ${count} files`);
 			}
 		}
