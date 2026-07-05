@@ -102,11 +102,20 @@ subset: tsv is a drop-in replacement and Svelte's parser is the fixture baseline
 Where the two goals conflict on conformant input, Svelte-parity wins for now.
 
 - **Current behavior is hard-fail; recovery is the target, not the design.**
-  Today tsv (like Svelte's `parseCss`) **errors on the first invalid construct**,
-  which aborts the whole stylesheet — so one bad rule currently discards the
-  file's valid rules too. That is a way-station: a spec-compliant parser drops
-  only the offending rule and continues (CSS Syntax 3 §9). Hard-fail is inherited
-  from Svelte's throw model; error recovery is tracked as future work.
+  Today tsv **errors on the first invalid construct**, which aborts the whole
+  stylesheet — so one bad rule currently discards the file's valid rules too. That
+  is a way-station: a spec-compliant parser drops only the offending
+  declaration/rule and keeps going (CSS Syntax 3's _consume a declaration_ /
+  _consume a block's contents_, §5.5 — a missing colon is a parse error that
+  "returns nothing," and the block skips the item rather than aborting). The
+  throw-don't-recover model is inherited from Svelte — but tsv is now _stricter_
+  than `parseCss`, not equal to it: `parseCss`'s declaration reader is
+  colon-optional and scan-based (`read_declaration`), so it **lenient-accepts**
+  malformed `prop value;` — and even `//`-comment — lines as `{property, value}`
+  nodes that tsv rejects. prettier/postcss rejects those same lines, so tsv's
+  stricter parse currently tracks the _formatter_ oracle; spec error recovery
+  matches **neither** oracle (parseCss keeps the bad declaration, prettier rejects
+  the whole file) and is tracked as future work.
 - **A corpus "CSS failure" is usually a deliberate rejection, not a gap.** In the
   benchmark corpus tsv parses a lower share of `.css` than prettier/biome/oxfmt,
   but that gap is **scope, not deficiency**: those tools run the lenient PostCSS /
