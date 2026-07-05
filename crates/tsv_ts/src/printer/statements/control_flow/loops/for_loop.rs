@@ -847,7 +847,7 @@ impl<'a> Printer<'a> {
         // Build the `for ... (` opening once — shared by both the inline and the
         // breaking (line-comment) layouts, so each preserves any `for`-to-`(`
         // comment and emits `await` from the AST.
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
         self.push_for_open_paren(
             &mut parts,
             keyword_comments,
@@ -865,7 +865,7 @@ impl<'a> Printer<'a> {
                 keyword_pos,
                 open_paren,
                 close_paren,
-                parts,
+                &mut parts,
             );
         }
 
@@ -929,8 +929,9 @@ impl<'a> Printer<'a> {
         open_paren: Option<u32>,
         close_paren: Option<u32>,
         // The `for ... (` opening, prebuilt by the caller (comments preserved,
-        // `await` from the AST) — shared with the inline layout.
-        mut parts: DocBuf,
+        // `await` from the AST) — shared with the inline layout. Filled in place
+        // (a pooled buffer owned by the caller) rather than taken by value.
+        parts: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
         let left_start = self.get_for_in_of_left_start(left);
@@ -992,11 +993,11 @@ impl<'a> Printer<'a> {
         parts.push(d.hardline());
 
         // `)` + comments + body (shared with the inline layout)
-        self.push_for_close_paren_and_body(&mut parts, body, right_end, close_paren);
+        self.push_for_close_paren_and_body(parts, body, right_end, close_paren);
 
         // Group so the non-block body's `adjustClause` line breaks (the
         // hardline-broken header forces this group open via `will_break`).
-        d.group(d.concat(&parts))
+        d.group(d.concat(parts))
     }
 
     /// Push the `for [comments] [await] (` opening into `parts`.

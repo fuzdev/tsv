@@ -496,7 +496,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion);
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
         if needs_parens {
             parts.push(d.text("("));
         }
@@ -838,7 +838,7 @@ impl<'a> Printer<'a> {
         // object/array on the right, keep operator and RHS on the same line.
         // Prettier ref: binaryish.js:275, 361
         let should_inline_last = assignment::should_inline_logical_expression(binary);
-        let mut parts: DocBuf = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
 
         for (i, operand) in operands.iter().enumerate() {
             let is_last = i == operands.len() - 1;

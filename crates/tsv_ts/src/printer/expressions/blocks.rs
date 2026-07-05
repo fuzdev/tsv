@@ -140,12 +140,17 @@ impl<'a> Printer<'a> {
         };
 
         // Build statements (leading comments, blank-line separators,
-        // format-ignore, trailing same-line comments) via the shared walk.
-        let (mut body_parts, _prev_end, prev_stmt_end) = self.build_statement_list_docs(
+        // format-ignore, trailing same-line comments) via the shared walk,
+        // filling a pooled buffer (pre-loaded with any hoisted leading content)
+        // in place — one RAII owner, released back to the free-list on scope exit.
+        let mut body_parts = d.pooled_docbuf();
+        body_parts.extend(leading_content);
+        let (_prev_end, prev_stmt_end) = self.build_statement_list_docs_into(
+            &mut body_parts,
             block.body,
             block_start,
             block_end,
-            leading_content,
+            has_leading,
             delimiter_pull_pos,
         );
 
@@ -182,12 +187,15 @@ impl<'a> Printer<'a> {
     ///
     /// For each statement, appends (in order): blank-line separators, leading
     /// comments, the statement doc (or raw source under format-ignore), and
-    /// trailing same-line comments. `leading_content` (outer comments hoisted into
-    /// the body) is emitted first.
+    /// trailing same-line comments — filling the caller-owned `body_parts` buffer
+    /// in place. The caller pre-loads `body_parts` with any hoisted outer comments
+    /// (emitted first) and passes `has_leading` for that state; the buffer is
+    /// drawn from the arena's `DocBuf` free-list, so a fill-in-place seam (rather
+    /// than take-by-value + return) keeps a single RAII owner and no aliasing.
     ///
     /// `body_start` is the offset just after `{`; `body_end` is the offset of `}`.
-    /// Returns `(docs, prev_end, prev_stmt_end)` where `prev_end` is advanced past
-    /// the final statement's trailing same-line comments (the start position for
+    /// Returns `(prev_end, prev_stmt_end)` where `prev_end` is advanced past the
+    /// final statement's trailing same-line comments (the start position for
     /// own-line trailing-comment handling) and `prev_stmt_end` is the final
     /// statement's span end (`None` for an empty body).
     ///
@@ -198,17 +206,16 @@ impl<'a> Printer<'a> {
     ///
     /// Callers handle the empty-body case, own-line trailing comments after the
     /// last statement, and the enclosing braces — those differ between contexts.
-    pub(in crate::printer) fn build_statement_list_docs(
+    pub(in crate::printer) fn build_statement_list_docs_into(
         &self,
+        body_parts: &mut DocBuf,
         body: &[internal::Statement<'_>],
         body_start: u32,
         body_end: u32,
-        leading_content: DocBuf,
+        has_leading: bool,
         delimiter_pull_pos: Option<u32>,
-    ) -> (DocBuf, u32, Option<u32>) {
+    ) -> (u32, Option<u32>) {
         let d = self.d();
-        let has_leading = !leading_content.is_empty();
-        let mut body_parts = leading_content;
         let mut prev_end = body_start;
         let mut prev_stmt_end: Option<u32> = None;
 
@@ -269,7 +276,7 @@ impl<'a> Printer<'a> {
             prev_stmt_end = Some(stmt_end);
         }
 
-        (body_parts, prev_end, prev_stmt_end)
+        (prev_end, prev_stmt_end)
     }
 
     /// Collect leading comments for a statement, filtering out trailing same-line from previous

@@ -585,7 +585,7 @@ impl<'a> Printer<'a> {
         };
 
         // Build the mapping body (starting from `[`)
-        let mut body_parts = smallvec![];
+        let mut body_parts = d.pooled_docbuf();
 
         // The node-adjacent inline block comment leads the body, before the
         // `readonly` modifier and `[` (prettier: `/* c */ readonly [K in T]`).
@@ -798,7 +798,7 @@ impl<'a> Printer<'a> {
                 all_parts.push(self.build_comment_doc(comment));
             }
             all_parts.push(d.line());
-            all_parts.extend(body_parts);
+            all_parts.extend(body_parts.iter().copied());
             all_parts.push(d.if_break(d.text(";"), d.empty()));
 
             d.group(d.concat(&[

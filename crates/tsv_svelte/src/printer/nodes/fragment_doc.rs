@@ -234,7 +234,7 @@ impl<'a> Printer<'a> {
         // - Each text node → fill([word, line, word, ...])
         // - Inline elements → wrapped with group([line, element]) or group([element, line])
         //   depending on surrounding whitespace
-        let mut child_docs: DocBuf = DocBuf::new();
+        let mut child_docs = d.pooled_docbuf();
         let mut handle_whitespace_of_prev_text = false;
 
         // forceBreakContent (prettier-plugin-svelte): a fragment that mixes a block element
@@ -1241,7 +1241,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let words = self.word_fill_parts(raw);
-        let mut parts: DocBuf = SmallVec::with_capacity(3 + words.len());
+        let mut parts = d.pooled_docbuf();
         parts.push(prev);
         parts.push(d.line());
         parts.extend(words);
@@ -1367,7 +1367,7 @@ impl<'a> Printer<'a> {
         // both: [line, word, line, ..., word, line]
         let prepend_space = !leading_line && !trim_leading && has_leading_ws;
         let append_space = !trim_trailing && has_trailing_ws && !trailing_line;
-        let mut parts: DocBuf = SmallVec::with_capacity(words.len() * 2 + 2);
+        let mut parts = d.pooled_docbuf();
 
         if leading_line {
             parts.push(d.line());

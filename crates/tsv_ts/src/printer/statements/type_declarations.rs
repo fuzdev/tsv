@@ -1038,7 +1038,7 @@ impl<'a> Printer<'a> {
         is_root: bool,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
 
         // Only print keywords for root declaration
         if is_root {
@@ -1136,14 +1136,15 @@ impl<'a> Printer<'a> {
                     // same as block-statement bodies.
                     let body_start = block.span.start + 1; // After opening '{'
                     let body_end = block.span.end.saturating_sub(1); // Before '}'
-                    let (mut stmt_parts, prev_end, _prev_stmt_end) = self
-                        .build_statement_list_docs(
-                            block.body,
-                            body_start,
-                            body_end,
-                            DocBuf::new(),
-                            delimiter_pull_pos,
-                        );
+                    let mut stmt_parts = d.pooled_docbuf();
+                    let (prev_end, _prev_stmt_end) = self.build_statement_list_docs_into(
+                        &mut stmt_parts,
+                        block.body,
+                        body_start,
+                        body_end,
+                        false,
+                        delimiter_pull_pos,
+                    );
 
                     // Handle own-line trailing comments after the last statement
                     stmt_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));

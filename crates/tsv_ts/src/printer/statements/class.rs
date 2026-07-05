@@ -249,7 +249,7 @@ impl<'a> Printer<'a> {
             self.delimiter_line_comment_prefix(body.span.start, first_member_start);
 
         // Build member docs with comments and blank line preservation
-        let mut member_parts = DocBuf::new();
+        let mut member_parts = d.pooled_docbuf();
         let mut prev_end = body.span.start + 1; // Start after '{'
 
         for (i, member) in body.body.iter().enumerate() {

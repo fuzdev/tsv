@@ -1243,7 +1243,7 @@ impl<'a> Printer<'a> {
             || should_break_for_param_properties
             || has_blank_line_between_params;
 
-        let mut inner_parts: DocBuf = DocBuf::new();
+        let mut inner_parts = d.pooled_docbuf();
         // Block comment trailing the last param after its source comma — emitted past
         // where the comma was, after the loop (no trailing comma; trailingComma: 'none').
         let mut last_after_comma_docs: DocBuf = DocBuf::new();

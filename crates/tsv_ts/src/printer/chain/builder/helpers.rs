@@ -97,24 +97,27 @@ pub(crate) fn push_gap_comments_and_break<P: ChainPrinter>(
 ///
 /// Encapsulates the logic for interleaving comments, line breaks, and groups
 /// when building the rest of a chain (everything after the first group).
-pub(crate) struct ChainPartsBuilder<'a, P: ChainPrinter> {
-    parts: DocBuf,
+pub(crate) struct ChainPartsBuilder<'a, 'p, P: ChainPrinter> {
+    parts: &'p mut DocBuf,
     printer: &'a P,
     use_hardline: bool,
     use_expanded: bool,
 }
 
-impl<'a, P: ChainPrinter> ChainPartsBuilder<'a, P> {
+impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     pub(crate) fn new(
+        parts: &'p mut DocBuf,
         printer: &'a P,
         use_hardline: bool,
         use_expanded: bool,
         group_count: usize,
     ) -> Self {
+        // Each group produces ~5 docs: trailing comments, line break, block comments,
+        // leading comments, and the group doc itself. `parts` is the caller-owned
+        // pooled buffer, filled in place (retaining a prior spill's capacity).
+        parts.reserve(group_count * 5);
         Self {
-            // Each group produces ~5 docs: trailing comments, line break, block comments,
-            // leading comments, and the group doc itself
-            parts: DocBuf::with_capacity(group_count * 5),
+            parts,
             printer,
             use_hardline,
             use_expanded,
@@ -176,7 +179,7 @@ impl<'a, P: ChainPrinter> ChainPartsBuilder<'a, P> {
     fn add_comments_and_break(&mut self, group: &ChainGroup<'_>) {
         if let Some((object_end, property_start)) = group.first_member_range() {
             push_gap_comments_and_break(
-                &mut self.parts,
+                self.parts,
                 self.printer,
                 object_end,
                 property_start,
@@ -204,21 +207,18 @@ impl<'a, P: ChainPrinter> ChainPartsBuilder<'a, P> {
             print_group_skip_first_comments(group, self.printer)
         });
     }
-
-    pub(crate) fn build(self) -> DocBuf {
-        self.parts
-    }
 }
 
 /// Build rest parts with comments and blank line preservation
 /// Handles both trailing line comments (same line) and leading line comments (own line)
 /// Emits: [trailing_comments?, line_break, leading_comments?, group] for each rest group
 pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
+    parts: &mut DocBuf,
     rest_groups: &[ChainGroup<'a>],
     printer: &P,
     use_hardline: bool,
     use_expanded: bool,
-) -> DocBuf {
+) {
     // Check if last group is a simple member (no calls) - it should stay on same line as `})`
     // e.g., `.filter().map({...})).length` - `.length` stays on same line as `})`
     let last_is_simple_member = rest_groups.last().is_some_and(|g| {
@@ -242,8 +242,13 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
             }
         });
 
-    let mut builder =
-        ChainPartsBuilder::new(printer, use_hardline, use_expanded, rest_groups.len());
+    let mut builder = ChainPartsBuilder::new(
+        parts,
+        printer,
+        use_hardline,
+        use_expanded,
+        rest_groups.len(),
+    );
     for (i, group) in rest_groups.iter().enumerate() {
         // Don't add hardline before last group if it's a simple member WITHOUT
         // comments that force a break
@@ -254,7 +259,6 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
             builder.add_group(group);
         }
     }
-    builder.build()
 }
 
 /// Build an expanded chain doc with first group(s) inline and rest indented
@@ -284,7 +288,8 @@ pub(super) fn build_expanded_chain_doc<'a, P: ChainPrinter>(
     }
 
     // Print rest with hardlines and indent (including trailing comments and blank line preservation)
-    let rest_parts = build_rest_parts_with_comments(rest, printer, true, false);
+    let mut rest_parts = d.pooled_docbuf();
+    build_rest_parts_with_comments(&mut rest_parts, rest, printer, true, false);
 
     d.concat(&[first_doc, d.indent(d.concat(&rest_parts))])
 }
