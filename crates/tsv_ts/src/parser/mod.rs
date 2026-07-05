@@ -634,6 +634,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Take the current token as a declaration-name `BindingIdentifier` — an
+    /// identifier or a contextual keyword valid as a binding name (`enum string {}`,
+    /// `type any = …`, `namespace number {}`) — advancing past it. Returns `Ok(None)`
+    /// *without advancing* when the current token can't be a binding name, so the
+    /// caller emits its own position-specific error. The single home for the
+    /// "a declaration name is a `BindingIdentifier`" policy shared by the interface /
+    /// namespace-segment / declare-module / enum / type-alias name parsers. The class
+    /// paths capture inline instead (they additionally exclude the heritage-starting
+    /// `implements`), and the import path captures the name across a following branch.
+    pub(super) fn take_binding_identifier(
+        &mut self,
+    ) -> Result<Option<Identifier<'arena>>, ParseError> {
+        let Some(name) = self.try_binding_name() else {
+            return Ok(None);
+        };
+        let (id_start, id_end) = self.current_pos();
+        self.advance()?;
+        Ok(Some(Identifier::simple(
+            name,
+            Span::new(id_start as u32, id_end as u32),
+        )))
+    }
+
     /// Whether `await` may be used as an ordinary identifier in the current
     /// context: only at `Goal::Script` and outside any `[+Await]` context. This
     /// is the conjunction of the two independent ECMAScript early errors —
@@ -993,6 +1016,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// name demotes the keyword to a plain identifier and ASI splits the statement.
     pub(super) fn peek_is_same_line_identifier(&mut self) -> bool {
         self.peek_is_identifier() && !self.peek_preceded_by_line_terminator()
+    }
+
+    /// Whether the peeked token is a same-line *declaration name word* — a plain
+    /// identifier or a contextual keyword valid as a binding name (`string`,
+    /// `number`, `any`, …; the set `KeywordKind::can_be_binding_name` accepts,
+    /// since these are not reserved words). Used by the `interface`/`namespace`/
+    /// `module` dispatch, which commits to a declaration only when a name follows
+    /// on the same line (tsc `nextTokenIsIdentifier…OnSameLine`, whose
+    /// `isIdentifier` is likewise true for contextual keywords). A genuinely
+    /// reserved word fails the gate, leaving the contextual keyword an ordinary
+    /// identifier. Mirrors the `try_binding_name` name-capture predicate the
+    /// declaration parsers use for the name itself.
+    pub(super) fn peek_is_same_line_name_word(&mut self) -> bool {
+        let is_name = match self.peek_kind() {
+            TokenKind::Identifier => true,
+            TokenKind::Keyword(kw) => kw.can_be_binding_name(),
+            _ => false,
+        };
+        is_name && !self.peek_preceded_by_line_terminator()
     }
 
     /// Whether the peeked token is a same-line *binding word* for a `using`

@@ -224,7 +224,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // break before the name (then `interface` is an expression). The `&&`
         // short-circuits, so the peek runs only when the keyword is actually present.
         let is_default_interface =
-            self.current_value() == "interface" && self.peek_is_same_line_identifier();
+            self.current_value() == "interface" && self.peek_is_same_line_name_word();
 
         let (declaration, end) = match self.current_kind() {
             TokenKind::Keyword(KeywordKind::Async) => {
@@ -617,10 +617,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut default_needs_comma = false;
 
         // Parse default import: `import x from "y"` or `import type X from "y"`
-        // Also check for `import x = require("y")` or `import x = A.B`
-        if matches!(self.current_kind(), TokenKind::Identifier) {
+        // Also check for `import x = require("y")` or `import x = A.B`. The binding is
+        // a `BindingIdentifier`, so a contextual type keyword is a valid name
+        // (`import any from "y"`, `import string = N.M`).
+        if let Some(name) = self.try_binding_name() {
             let (id_start, id_end) = self.current_pos();
-            let name = self.current_ident_name();
             self.advance()?;
 
             // Check for `import x = ...` (TSImportEqualsDeclaration)
@@ -675,17 +676,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             self.advance()?;
 
-            // Parse local name
-            if !matches!(self.current_kind(), TokenKind::Identifier) {
+            // Parse local name — a `BindingIdentifier`, so a contextual type keyword
+            // is a valid namespace-import binding (`import * as any from "y"`).
+            let Some(local) = self.take_binding_identifier()? else {
                 return Err(self.error_expected_after("identifier", "as"));
-            }
-            let (id_start, id_end) = self.current_pos();
-            let name = self.current_ident_name();
-            self.advance()?;
+            };
+            let local_end = local.span.end;
 
             specifiers.push(ImportSpecifier::Namespace(ImportNamespaceSpecifier {
-                local: Identifier::simple(name, Span::new(id_start as u32, id_end as u32)),
-                span: Span::new(ns_start as u32, id_end as u32),
+                local,
+                span: Span::new(ns_start as u32, local_end),
             }));
         }
 

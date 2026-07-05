@@ -230,12 +230,14 @@ impl KeywordKind {
                 | KeywordKind::From
                 | KeywordKind::As
                 | KeywordKind::Satisfies
-                // Type keywords are also valid binding names in value positions
+                // Contextual type keywords are also valid binding names in value
+                // positions (`let string = 1`, `class any {}`). `void` is NOT among
+                // them — it is a reserved unary operator, not a contextual keyword, so
+                // `let void`/`class void {}` are syntax errors (acorn/tsc reject).
                 | KeywordKind::Number
                 | KeywordKind::String
                 | KeywordKind::Boolean
                 | KeywordKind::Any
-                | KeywordKind::Void
                 | KeywordKind::Never
                 | KeywordKind::Unknown
                 | KeywordKind::Object
@@ -246,7 +248,7 @@ impl KeywordKind {
                 // restriction on `undefined` is a runtime concern, not parse-time.
                 | KeywordKind::Undefined
         )
-        // NOTE: Await, Yield, Let are NOT included - they cannot be binding names
+        // NOTE: Await, Yield, Let, Void are NOT included - they cannot be binding names
     }
 }
 

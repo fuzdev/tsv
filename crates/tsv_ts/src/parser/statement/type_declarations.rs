@@ -59,16 +59,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         start: usize,
         declare: bool,
     ) -> Result<TSTypeAliasDeclaration<'arena>, ParseError> {
-        // Parse type name (identifier)
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse type name — a `BindingIdentifier`, so contextual type keywords
+        // (`type any = …`) are valid names, matching acorn/tsc.
+        let Some(id) = self.take_binding_identifier()? else {
             return Err(self.error_expected_after("type name", "type"));
-        }
-
-        let (id_start, id_end) = self.current_pos();
-        let name = self.current_ident_name();
-        self.advance()?;
-
-        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
+        };
 
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -130,16 +125,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         debug_assert!(self.current_value() == "interface");
         self.advance()?;
 
-        // Parse interface name
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse interface name — a `BindingIdentifier`, so contextual type keywords
+        // (`interface string {}`) are valid names, matching acorn/tsc.
+        let Some(id) = self.take_binding_identifier()? else {
             return Err(self.error_expected_after("interface name", "interface"));
-        }
-
-        let (id_start, id_end) = self.current_pos();
-        let name = self.current_ident_name();
-        self.advance()?;
-
-        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
+        };
 
         // Parse optional type parameters: <T, U>
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -544,16 +534,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Consume 'enum' keyword
         self.expect(&TokenKind::Keyword(KeywordKind::Enum))?;
 
-        // Parse enum name
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse enum name — a `BindingIdentifier`, so contextual type keywords
+        // (`enum string {}`) are valid names, matching acorn/tsc.
+        let Some(id) = self.take_binding_identifier()? else {
             return Err(self.error_expected_after("enum name", "enum"));
-        }
-
-        let (id_start, id_end) = self.current_pos();
-        let name = self.current_ident_name();
-        self.advance()?;
-
-        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
+        };
 
         // Parse enum body: { members }
         self.expect(&TokenKind::BraceOpen)?;
@@ -669,12 +654,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         {
             let lit = self.parse_string_literal()?;
             TSModuleName::Literal(lit)
-        } else if matches!(self.current_kind(), TokenKind::Identifier) {
-            let (id_start, id_end) = self.current_pos();
-            let name = self.current_ident_name();
-            let ident = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
-            self.advance()?;
-
+        } else if let Some(ident) = self.take_binding_identifier()? {
+            // The name is a `BindingIdentifier`, so contextual type keywords are
+            // valid (`declare namespace string { … }`).
             // Check for nested namespace: `namespace Outer.Inner { }`
             if matches!(self.current_kind(), TokenKind::Dot) {
                 return self.parse_nested_module_declaration(start as u32, ident, declare, kind);
@@ -781,14 +763,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         declare: bool,
         kind: TSModuleDeclarationKind,
     ) -> Result<TSModuleDeclaration<'arena>, ParseError> {
-        // Parse namespace name (identifier for nested parts)
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse namespace name (identifier or contextual type keyword for nested
+        // parts, e.g. the `number` in `namespace a.number {}`).
+        let Some(id) = self.take_binding_identifier()? else {
             return Err(self.error_expected("identifier for namespace name"));
-        }
-        let (id_start, id_end) = self.current_pos();
-        let name = self.current_ident_name();
-        let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));
-        self.advance()?;
+        };
 
         // Check for nested namespace: `namespace Outer.Inner { }`
         let body = if matches!(self.current_kind(), TokenKind::Dot) {

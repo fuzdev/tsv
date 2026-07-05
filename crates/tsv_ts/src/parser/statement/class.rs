@@ -235,6 +235,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok((Some(expr), type_args))
     }
 
+    /// Take an optional class name — a `BindingIdentifier`, so contextual type keywords
+    /// (`class any {}`) are valid names and `await` is one only at Script `[~Await]` (both
+    /// handled by `take_binding_identifier`). `implements` (a strict-mode reserved word, but
+    /// a plain identifier token) can never be the name: directly after `class` it begins the
+    /// extends-less `implements` clause of an anonymous class (`class implements Foo {}`), so
+    /// it's excluded here (without advancing) and left for the heritage parser — where
+    /// acorn-typescript rejects it. Returns `Ok(None)` for both `implements` and a
+    /// non-binding token; the caller decides whether a missing name is an error (declaration)
+    /// or fine (expression / `export default`). Shared by both class paths.
+    fn take_class_name(&mut self) -> Result<Option<Identifier<'arena>>, ParseError> {
+        if self.current_value() == "implements" {
+            return Ok(None);
+        }
+        self.take_binding_identifier()
+    }
+
     /// Parse a class expression: `class { }` or `class Foo<T> extends Bar { }`
     ///
     /// Class expressions are similar to class declarations but:
@@ -251,28 +267,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Parse optional class name. `implements` is a strict-mode reserved word, so it
-        // can never be the name — directly after `class` it starts the (extends-less)
-        // `implements` clause of an anonymous class expression (`class implements Foo {}`).
-        // Without this guard it lexes as an identifier and gets swallowed as the name,
-        // leaving the `implements` clause unparsed. acorn matches this; the declaration
-        // path keeps its own behavior (acorn rejects a bare-`implements` class statement).
-        let id = if (matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() != "implements")
-            || self.at_await_identifier()
-        {
-            let (id_start, id_end) = self.current_pos();
-            // `await` (Script `[~Await]`) is a valid class-name `BindingIdentifier`.
-            let name = self.current_ident_name_or_await();
-            self.advance()?;
-
-            Some(Identifier::simple(
-                name,
-                Span::new(id_start as u32, id_end as u32),
-            ))
-        } else {
-            None
-        };
+        // Parse optional class name (`implements` excluded — it begins the heritage
+        // clause of an anonymous class; see `take_class_name`).
+        let id = self.take_class_name()?;
 
         // Parse type parameters (TypeScript generics): class Foo<T>
         let type_parameters = self.parse_optional_type_parameters()?;
@@ -337,30 +334,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Parse class name (required for declarations, optional for export default).
-        // Like the class-expression path, `implements` (a strict-mode reserved word) can
-        // never be the name — after `class` it starts the extends-less `implements` clause
-        // of an anonymous class, so `export default class implements Foo {}` (spec-valid,
-        // name optional) parses where acorn-typescript rejects it (`implements` reserved).
-        // A `name_required` declaration (`class implements Foo {}`) still errors below.
-        let id = if (matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() != "implements")
-            || self.at_await_identifier()
-        {
-            let (id_start, id_end) = self.current_pos();
-            // `await` (Script `[~Await]`) is a valid class-name `BindingIdentifier`.
-            let name = self.current_ident_name_or_await();
-            self.advance()?;
-
-            Some(Identifier::simple(
-                name,
-                Span::new(id_start as u32, id_end as u32),
-            ))
-        } else if name_required {
+        // Parse class name (required for declarations, optional for export default; see
+        // `take_class_name`). `export default class implements Foo {}` (spec-valid, name
+        // optional) parses where acorn-typescript rejects it (`implements` reserved); a
+        // `name_required` declaration (`class implements Foo {}` / no name) still errors.
+        let id = self.take_class_name()?;
+        if name_required && id.is_none() {
             return Err(self.error_expected_after("class name", "class"));
-        } else {
-            None
-        };
+        }
 
         // Parse type parameters (TypeScript generics): class Foo<T>()
         let type_parameters = self.parse_optional_type_parameters()?;
