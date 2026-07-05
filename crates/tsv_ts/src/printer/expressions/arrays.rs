@@ -341,7 +341,7 @@ impl<'a> Printer<'a> {
     /// Note: Arrays with expanding comments use build_array_doc_with_expanding_comments instead.
     fn build_array_group_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
 
         // Check if last element is an elision (requires mandatory trailing comma)
         let has_trailing_elision = arr.elements.last().is_some_and(Option::is_none);
