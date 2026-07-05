@@ -111,6 +111,10 @@ impl<'a> Printer<'a> {
         comments: &'a [Comment],
         embed: EmbedContext,
     ) -> Self {
+        // The document's one whole-source line-break table: every embedded
+        // island borrows it (`build_program_doc` for `<script>`/`{expr}` TS,
+        // `tsv_css::format_embedded` for `<style>` CSS) — never rebuild it
+        // per island.
         let line_breaks = tsv_lang::printing::build_line_breaks(source);
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),

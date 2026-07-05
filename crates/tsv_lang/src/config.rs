@@ -43,6 +43,11 @@ pub enum LayoutMode {
 /// tree. This is per-input *state*, not configuration: the host language (e.g.
 /// tsv_svelte) constructs it when invoking an embedded language's printer.
 /// Defaults to a standalone, column-0, no-suffix, no-base-offset layout.
+///
+/// Deliberately lifetime-free and `Copy`: borrowed per-document inputs
+/// (source, comments, the `line_breaks` table) travel as separate parameters
+/// on the embedding entry points — folding one in here would force a lifetime
+/// onto every `EmbedContext` holder.
 #[derive(Debug, Clone, Copy)]
 pub struct EmbedContext {
     /// Base indent offset for width calculations.
