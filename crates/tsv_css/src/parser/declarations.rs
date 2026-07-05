@@ -26,6 +26,10 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, P
         | TokenKind::Asterisk
         | TokenKind::Colon
         | TokenKind::LeftBracket
+        // Keyframe selector stop (`0%`, `50%`): a `<percentage>`-led block child is
+        // always a keyframe rule, never a declaration (a property name is an
+        // identifier or `--custom`), so it starts a rule wherever this is consulted.
+        | TokenKind::Percentage
         // Leading combinators (CSS Nesting relative selectors: `> .child {}`, `+ .sibling {}`)
         | TokenKind::GreaterThan
         | TokenKind::Plus

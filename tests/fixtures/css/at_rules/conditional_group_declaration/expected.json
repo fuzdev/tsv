@@ -1,0 +1,157 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 595,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 205,
+				"end": 250,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 219,
+					"end": 250,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 223,
+							"end": 233,
+							"property": "color",
+							"value": "red"
+						},
+						{
+							"type": "Declaration",
+							"start": 237,
+							"end": 246,
+							"property": "--x",
+							"value": "blue"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 370,
+				"end": 447,
+				"name": "container",
+				"prelude": "(width > 1px)",
+				"block": {
+					"type": "Block",
+					"start": 395,
+					"end": 447,
+					"children": [
+						{
+							"type": "Atrule",
+							"start": 399,
+							"end": 444,
+							"name": "supports",
+							"prelude": "(color: red)",
+							"block": {
+								"type": "Block",
+								"start": 422,
+								"end": 444,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 427,
+										"end": 439,
+										"property": "color",
+										"value": "green"
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 517,
+				"end": 586,
+				"name": "supports",
+				"prelude": "(color: red)",
+				"block": {
+					"type": "Block",
+					"start": 540,
+					"end": 586,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 544,
+							"end": 555,
+							"property": "color",
+							"value": "blue"
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 559,
+								"end": 562,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 559,
+										"end": 562,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 559,
+														"end": 562
+													}
+												],
+												"start": 559,
+												"end": 562
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 563,
+								"end": 583,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 568,
+										"end": 578,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 559,
+							"end": 583
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 587,
+			"styles": "\n\t/* Bare declarations parse directly in a conditional-group at-rule: CSS block\n\t   parsing is agnostic (CSS Syntax 3 §consume-a-block), so a declaration is\n\t   parsed here — parseCss keeps it. */\n\t@media screen {\n\t\tcolor: red;\n\t\t--x: blue;\n\t}\n\n\t/* A declaration in a conditional nested inside another conditional — the shape\n\t   @function/@mixin bodies use. */\n\t@container (width > 1px) {\n\t\t@supports (color: red) {\n\t\t\tcolor: green;\n\t\t}\n\t}\n\n\t/* A conditional block mixing a declaration and a nested rule. */\n\t@supports (color: red) {\n\t\tcolor: blue;\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 596,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
