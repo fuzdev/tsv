@@ -287,10 +287,68 @@ Two comparisons per input:
   also shrinks the `corpus:compare:parse` count) or fixing it as a writer bug is a
   tracked campaign, so this half does **not** gate yet.
 
-**Pre-release aggregate — `deno task conformance`.** This gate, plus
+## TypeScript-Fixtures Parse Conformance
+
+`deno task conformance:ts-fixtures` runs tsv's TypeScript parser against
+**acorn-typescript's own test suite** (`../acorn-typescript/test`, ~200
+adversarial `input.ts` fixtures) — the TS analog of the Svelte gate above (and of
+test262 / WPT). tsv is a drop-in for acorn + acorn-typescript, so that parser's
+own regression corpus is the natural TS edge-case oracle: the shape real-world
+code (`corpus:compare:parse`) can't reach. Periodic (non-`check`) gate;
+`diagnostics/ts_fixtures_compare.ts` is the entry.
+
+```bash
+deno task conformance:ts-fixtures            # builds corpus FFI, then runs
+deno task conformance:ts-fixtures:run        # skip rebuild (freshness-guarded)
+deno task conformance:ts-fixtures:run -v     # + per-file known-gap / AST-group detail
+deno task conformance:ts-fixtures:run --json 2>/dev/null > report.json
+deno task conformance:ts-fixtures:run ../acorn-typescript/test/class_accessor  # a subtree
+```
+
+**Oracle = the LIVE `@sveltejs/acorn-typescript` parser** (pinned in
+`package.json` / `sidecar.ts`), not the committed `expected.json` artifacts — same
+reasoning as the Svelte gate: a committed artifact can drift from the pinned
+version that defines fixture correctness, and the live parser is exactly what
+`corpus:compare:parse` diffs against, so the two stay consistent by construction.
+
+**Scope**: every `input.ts` under the suite root (the `*.test.ts` / `utils.ts`
+harness files are excluded by basename). `.tsx`/JSX fixtures parse as ordinary
+`.ts` here — tsv and acorn (module mode, no JSX plugin) both reject them, so they
+land in `parity`. Fail-open on a missing `../acorn-typescript` checkout (0 scanned
+→ green), matching the publish gate's tolerance for absent oracles.
+
+Two comparisons per input, same structure as the Svelte gate:
+
+- **Verdict parity** (the enforced gate) — over-rejections bucket into
+  `SANCTIONED` (tsv over-rejects *deliberately* — deprecated syntax it declines,
+  e.g. import assertions `assert {…}`, or input its own grammar rejects;
+  `TS_FIXTURE_SANCTIONS` in `lib/parse_sanctions.ts`), `KNOWN_GAPS` (tsv wrong; a
+  tracked drop-in gap that must only shrink; in `ts_fixtures_compare.ts`), and
+  `unexpected` (a NEW gap — **exits 1**). `over_acceptance` (tsv accepts, acorn
+  rejects) is a deferred early-error, reported not gated.
+- **AST-shape** (report-only) — for inputs both accept, deep-diffs tsv's wire AST
+  vs the acorn AST via the SHARED `corpus_compare_parse.ts` engine. Unlike the
+  Svelte tree's large backlog, this corpus is near-clean, so promoting AST-shape
+  to a gate once the undocumented-group count hits 0 is a natural follow-up.
+
+**Broadening — `conformance:ts-repo` (the official `typescript` compiler corpus).**
+`deno task conformance:ts-repo` (`diagnostics/ts_repo_compare.ts`) runs tsv's TS
+parser over `../typescript/tests/cases/conformance/parser` (~800 single-file `.ts`)
+using **tsc's OWN baselines as the validity oracle** — a `tests/baselines/reference/<name>.errors.txt`
+with a `TS1xxx` code = tsc's parser rejects (→ tsv correctly stricter), no `TS1xxx`
+= tsc accepts (→ a tsv reject is a real gap). tsc is authoritative because acorn-ts
+(tsv's *target*) is itself over-lenient; using tsc's baselines auto-resolves those
+leniency cases to reject-parity (no sanction needed), and acorn's verdict sub-labels
+each gap (`gap` = acorn-confirmed → gates; `gap_beyond_acorn` = acorn also rejects, a
+mixed acorn-gap / early-error-timing surface → reported, not gated). Standalone triage
+tool (**not** in the blocking aggregate — large, growing corpus), tracked SEPARATELY
+from the acorn-suite gate (own `KNOWN_GAPS`). `.tsx` and `@filename` multi-file tests
+are skipped. Baseline: 768 scanned, 0 untracked gaps (12 tracked: Gaps A–C).
+
+**Pre-release aggregate — `deno task conformance`.** These two gates, plus
 `corpus:compare:parse --all` and `corpus:compare:format --all`, are the
 release-cadence correctness gates that run against external oracles (and so can't
-live in `deno task check`). `deno task conformance` runs all three in one pass
+live in `deno task check`). `deno task conformance` runs all four in one pass
 (building the corpus FFI once) and is wired into `scripts/publish.ts` **Step 3b**
 (skipped by `--no-check`; warn-and-skipped when `../svelte` or this dir's
 `node_modules` is absent). `corpus:compare:format` there gates only on **SAFETY**
@@ -779,7 +837,9 @@ benches/js/
 ├── divergence_audit.ts    # Divergence audit entry point (Deno-only)
 ├── diagnostics/           # diagnostic scripts (most ad-hoc, not wired into `deno task` — see §Diagnostic scripts)
 │   ├── skip_triage.ts        # parse-parity gate (tsv vs canonical; allowlisted over-rejections)
-│   ├── svelte_fixtures_compare.ts  # Svelte-fixtures parse-conformance gate (task: conformance:svelte-fixtures; verdict parity + AST-shape)
+│   ├── svelte_fixtures_compare.ts  # Svelte-fixtures parse-conformance gate: docstring + config over lib/fixtures_gate.ts (task: conformance:svelte-fixtures)
+│   ├── ts_fixtures_compare.ts  # TypeScript-fixtures parse-conformance gate: same, vs acorn-typescript's test/ suite (task: conformance:ts-fixtures)
+│   ├── ts_repo_compare.ts    # TypeScript-repo parse triage vs the official tsc corpus, tsc-baselines validity oracle (task: conformance:ts-repo; standalone, not in aggregate)
 │   ├── test262_compare.ts    # test262 differential (tsv vs oxc-parser, from the Rust manifest)
 │   ├── wpt_css_harvest.ts    # wpt <style> blocks → .cache/wpt_css (task: bench:harvest:wpt)
 │   ├── svelte_reject_harvest.ts  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json (task: bench:harvest:svelte-rejects; conformance view excludes these)
@@ -795,11 +855,12 @@ benches/js/
 │   ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
 │   ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
 │   ├── diff.ts            # Line-based diff utilities (LCS algorithm)
+│   ├── fixtures_gate.ts   # Shared per-language parse-conformance gate engine (run_fixtures_gate; svelte + ts fixtures scripts are docstring+config over it)
 │   ├── ffi.ts             # Deno.dlopen bindings (NativeImplementation — Deno native, runtime-specific)
 │   ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native, runtime-specific)
 │   ├── runtime.ts         # Tiny cross-runtime helpers: current_runtime / os / arch normalizers
 │   ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
-│   ├── parse_sanctions.ts # Shared parse-parity SANCTIONS (Svelte-fixture over-rejections tsv is correctly stricter on; used by skip_triage + svelte_fixtures_compare)
+│   ├── parse_sanctions.ts # Shared parse-parity tracking vocabulary: Sanction (keep deliberately) + KnownGap (fix eventually) types + SVELTE_/TS_FIXTURE_SANCTIONS data; used by skip_triage + all the gates
 │   ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
 │   ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime wasi entry)
 │   ├── report.ts          # Summary report generation

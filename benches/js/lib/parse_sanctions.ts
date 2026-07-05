@@ -1,19 +1,37 @@
 /**
  * Shared parse-parity SANCTIONS — over-rejections (tsv rejects input the
- * canonical parser accepts) where tsv is *correctly* stricter: the input is
- * invalid Svelte the parser is merely lenient about (its own validator/compiler
- * rejects it), so tsv rejecting one stage earlier is right. Matched as a path
- * substring; each carries a reason so the list stays a reviewed catalogue, never
- * a silent bug suppressor. A genuine gap gets FIXED (or, for a tracked drop-in
- * gap, listed in the consuming tool's own KNOWN_GAPS) — never sanctioned here.
+ * canonical parser accepts) that tsv *keeps deliberately*: either the input is
+ * invalid the canonical parser is merely lenient about (its own
+ * validator/compiler rejects it), or it is valid-but-deprecated syntax tsv
+ * declines in favour of its successor. Either way rejecting is intended and must
+ * NOT be "fixed". Matched as a path substring; each carries a reason so the list
+ * stays a reviewed catalogue, never a silent bug suppressor. A genuine gap
+ * (tsv wrong, intent-to-fix) goes in the consuming tool's own KNOWN_GAPS, never
+ * here.
  *
  * One home shared by `diagnostics/skip_triage.ts` (the general parse-parity gate)
- * and `diagnostics/svelte_fixtures_compare.ts` (the dedicated Svelte-fixtures
- * conformance gate), so the Svelte-fixture sanctions don't drift between them.
+ * and the dedicated per-language fixtures gates (`svelte_fixtures_compare.ts`,
+ * `ts_fixtures_compare.ts`), so a language's sanctions don't drift between them.
+ * Also the single home for the sibling {@link KnownGap} type (below) that every
+ * gate's `KNOWN_GAPS` list uses.
  */
 
 export interface Sanction {
 	pattern: string;
+	reason: string;
+}
+
+/**
+ * The sibling of {@link Sanction}: an over-rejection where tsv is WRONG — a genuine
+ * drop-in parse gap, tracked (in the consuming gate's own `KNOWN_GAPS`) so the gate
+ * is green at baseline and only a NEW untracked over-rejection fails it. Matched as
+ * a path substring. This set must only SHRINK: delete an entry once its gap is fixed
+ * (the input then parses → parity). `Sanction` = keep deliberately; `KnownGap` =
+ * fix eventually — the two never overlap.
+ */
+export interface KnownGap {
+	pattern: string;
+	category: string;
 	reason: string;
 }
 
@@ -45,6 +63,21 @@ export const SVELTE_FIXTURE_SANCTIONS: Sanction[] = [
 	{
 		pattern: 'validator/samples/if-block-whitespace',
 		reason: 'whitespace after `{#` (`{ #if}`) — Svelte parser lenient, validator rejects',
+	},
+];
+
+/**
+ * acorn-typescript's own `test/` fixtures where tsv over-rejects deliberately.
+ * Real source needs none of these. A genuine gap (tsv wrong) goes in
+ * `ts_fixtures_compare.ts` KNOWN_GAPS, never here.
+ */
+export const TS_FIXTURE_SANCTIONS: Sanction[] = [
+	// Deprecated import assertions (`assert { type: 'json' }`) — superseded by
+	// import attributes (`with { … }`, which tsv parses). Deliberate non-support,
+	// not a gap: see grimoire TODO_CORPUS_FORMATTING §Reference "Expected errors".
+	{
+		pattern: 'assert_import_assert/',
+		reason: "deprecated import assertions (`assert {…}`) — tsv supports the successor `with {…}` only",
 	},
 ];
 
