@@ -1213,12 +1213,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.check(kind) {
             self.advance()
         } else {
-            Err(ParseError::UnexpectedToken {
-                expected: kind.to_string(),
-                found: self.current.kind.to_string(),
-                position: self.current_pos().0,
-                context: None,
-            })
+            Err(self.unexpected_token_err(kind))
+        }
+    }
+
+    /// Construct the `UnexpectedToken` error for a failed `expect`. Cold-outlined
+    /// out of the hot `expect` body: valid input never takes this branch, so the
+    /// two `to_string` allocations + struct build shouldn't inflate the caller.
+    #[cold]
+    #[inline(never)]
+    fn unexpected_token_err(&self, kind: &TokenKind) -> ParseError {
+        ParseError::UnexpectedToken {
+            expected: kind.to_string(),
+            found: self.current.kind.to_string(),
+            position: self.current_pos().0,
+            context: None,
         }
     }
 
