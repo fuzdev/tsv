@@ -175,6 +175,19 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
     }
 }
 
+/// Whether `s` normalizes to itself — i.e. every byte is a
+/// [`is_normalize_noop_byte`], so [`normalize_css_whitespace`] would return a
+/// verbatim copy of `s`. A printer holding the value's source span can then emit
+/// it as a zero-allocation `DocText::SourceSpan` (the same borrow the number /
+/// dimension normalizers already take) instead of paying the fast-path
+/// `to_string()` + pool copy. Because `(` is not a no-op byte, a verbatim value
+/// can never be a parenthesized group, so the caller's paren-group branch is
+/// unreachable for it.
+#[inline]
+pub(crate) fn value_normalizes_to_self(s: &str) -> bool {
+    s.bytes().all(is_normalize_noop_byte)
+}
+
 /// Whether `normalize_css_whitespace` leaves byte `b` untouched: an ASCII,
 /// non-whitespace byte that is none of the structural bytes the normalizer acts on
 /// (`(` `)` `,` `/` and the two quotes). A string composed only of such bytes

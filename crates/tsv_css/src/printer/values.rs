@@ -74,6 +74,17 @@ impl<'a> Printer<'a> {
         if span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
             if !raw.is_empty() {
+                // Verbatim fast path: a value with no byte the normalizer acts on
+                // (the overwhelmingly-common single-token identifier — `red`,
+                // `flex`, `1px`, `100%`) normalizes to itself, so emit it as a
+                // zero-allocation `DocText::SourceSpan` — the same source borrow
+                // the number / dimension normalizers already take — instead of the
+                // fast-path `to_string()` + pool copy. A verbatim value can never
+                // contain `(`, so the paren-group branch below is unreachable for it.
+                if value_normalization::value_normalizes_to_self(raw) {
+                    return d.source_span(span, self.source);
+                }
+
                 // Normalize whitespace for parenthesized expressions
                 // (e.g., "(  100%  -  40px  )" → "(100% - 40px)")
                 let normalized = value_normalization::normalize_css_whitespace(raw);
