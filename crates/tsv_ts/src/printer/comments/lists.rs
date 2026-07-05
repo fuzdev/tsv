@@ -731,15 +731,22 @@ impl<'a> Printer<'a> {
     /// Append the comments between a signature's last content token and the
     /// member's end (typically right before the printed `;`): after the return
     /// type, or after the params' closing `)` when there is no return type.
+    /// Same-line comments stay with the member (a block inline, a line via
+    /// `line_suffix`); an **own-line** comment is deferred to `deferred` (own line,
+    /// blank preserved) for the caller to emit **after** the `;`, matching prettier
+    /// (the member doc doesn't own the `;`). `deferred` is empty on the common
+    /// no-comment path.
     ///
-    /// Shared by method/call/construct signatures in interfaces and type
-    /// literals, abstract/overload class methods, and declare functions.
+    /// Shared by method/call/construct signatures in interfaces and type literals
+    /// and by declare functions (all use the type-member `;` binding —
+    /// `split_member_terminator_gap_comments`).
     pub(crate) fn append_signature_end_comments(
         &self,
         parts: &mut DocBuf,
         return_type: Option<&internal::TSTypeAnnotation<'_>>,
         paren_pos: Option<u32>,
         span_end: u32,
+        deferred: &mut DocBuf,
     ) {
         let content_end = return_type.map_or_else(
             || {
@@ -749,25 +756,7 @@ impl<'a> Printer<'a> {
             },
             |rt| rt.span.end,
         );
-        // Break-safe: a line comment in the signature→`;` gap floats after `;` via
-        // `line_suffix` instead of swallowing it (`m(): void; // c`).
-        self.append_trailing_member_comments(parts, content_end, span_end);
-    }
-
-    /// Push every comment in `[start, end)` to `parts` as a **trailing** comment —
-    /// the break-safe idiom for a type member's gap before its `;` terminator. Each
-    /// goes through `build_trailing_comment_doc`, so a block trails inline
-    /// (` /* c */`) and a line comment floats after the terminator via `line_suffix`
-    /// instead of swallowing it. Used by the **signature** arms
-    /// (`append_signature_end_comments`). The property arm instead uses
-    /// `split_member_terminator_gap_comments`, which additionally defers an own-line
-    /// comment past the `;` (matching prettier); the signature arms keep collapsing
-    /// an own-line comment here — a tracked follow-up (they also hit the acorn
-    /// root-comments duplication, so they need `_svelte_divergence` coverage).
-    pub(crate) fn append_trailing_member_comments(&self, parts: &mut DocBuf, start: u32, end: u32) {
-        for comment in comments_in_range(self.comments, start, end) {
-            parts.push(self.build_trailing_comment_doc(comment));
-        }
+        deferred.extend(self.split_member_terminator_gap_comments(parts, content_end, span_end));
     }
 
     /// Partition the comments in a content→separator gap `[start, sep_pos)`, binding
