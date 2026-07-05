@@ -1,6 +1,8 @@
 // Value splitting and whitespace normalization: top-level splits that respect
 // parens/quotes/comments, plus prettier-style whitespace collapsing.
 
+use std::borrow::Cow;
+
 use crate::whitespace::is_css_whitespace;
 
 /// Normalize CSS whitespace in extracted source text
@@ -29,19 +31,21 @@ use crate::whitespace::is_css_whitespace;
 ///     "url('path with spaces')"
 /// );
 /// ```
-pub(crate) fn normalize_css_whitespace(s: &str) -> String {
+pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     // Fast path: input with no byte the normalizer acts on normalizes to itself.
     // With no ASCII whitespace (to collapse), no `(`/`)` (paren-space stripping),
     // no `,` (comma spacing), no `/` (comment spacing) and no quote (string
     // handling), every char takes the loop's regular-character branch, so
     // `pending_space` never sets and the final `trim()` is a no-op — the output
-    // equals the input. Skip the char scan, the per-char push, and the trim; one
-    // bulk copy instead. The overwhelmingly-common `CssValue::Identifier` value
-    // (`red`, `flex`, `1px`) hits this. Non-ASCII bytes still bail to the slow path
-    // (conservative), but there they are preserved: CSS whitespace is ASCII-only,
-    // so NBSP/U+2028/… are value content, not separators to collapse.
+    // equals the input. Return the source slice *borrowed* — no allocation, no
+    // char scan, no per-char push, no trim; a caller holding the value's span can
+    // then emit it as a zero-allocation `DocText::SourceSpan` (see
+    // `build_identifier_doc`). The overwhelmingly-common `CssValue::Identifier`
+    // value (`red`, `flex`, `1px`) hits this. Non-ASCII bytes still bail to the
+    // slow path (conservative), but there they are preserved: CSS whitespace is
+    // ASCII-only, so NBSP/U+2028/… are value content, not separators to collapse.
     if s.bytes().all(is_normalize_noop_byte) {
-        return s.to_string();
+        return Cow::Borrowed(s);
     }
 
     let mut result = String::with_capacity(s.len());
@@ -169,23 +173,10 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> String {
     // byte-identical to `result.trim().to_string()` either way.
     let trimmed = result.trim();
     if trimmed.len() == result.len() {
-        result
+        Cow::Owned(result)
     } else {
-        trimmed.to_string()
+        Cow::Owned(trimmed.to_string())
     }
-}
-
-/// Whether `s` normalizes to itself — i.e. every byte is a
-/// [`is_normalize_noop_byte`], so [`normalize_css_whitespace`] would return a
-/// verbatim copy of `s`. A printer holding the value's source span can then emit
-/// it as a zero-allocation `DocText::SourceSpan` (the same borrow the number /
-/// dimension normalizers already take) instead of paying the fast-path
-/// `to_string()` + pool copy. Because `(` is not a no-op byte, a verbatim value
-/// can never be a parenthesized group, so the caller's paren-group branch is
-/// unreachable for it.
-#[inline]
-pub(crate) fn value_normalizes_to_self(s: &str) -> bool {
-    s.bytes().all(is_normalize_noop_byte)
 }
 
 /// Whether `normalize_css_whitespace` leaves byte `b` untouched: an ASCII,
@@ -204,12 +195,6 @@ fn is_normalize_noop_byte(b: u8) -> bool {
             b,
             b'\t' | b'\n' | 0x0C | b'\r' | b' ' | b'(' | b')' | b',' | b'/' | b'\'' | b'"'
         )
-}
-
-/// Normalize spacing in a value containing comments (alias for backward compatibility)
-#[inline]
-pub(crate) fn normalize_value_spacing(value: &str) -> String {
-    normalize_css_whitespace(value)
 }
 
 /// Extract the content between a function's parentheses from source
