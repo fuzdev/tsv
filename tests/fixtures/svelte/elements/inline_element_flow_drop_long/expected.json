@@ -88,8 +88,8 @@
 											"start": 492,
 											"end": 513,
 											"type": "Text",
-											"raw": "https://example.com/a",
-											"data": "https://example.com/a"
+											"raw": "https://aaa.fuz.dev/a",
+											"data": "https://aaa.fuz.dev/a"
 										}
 									]
 								}
@@ -154,8 +154,8 @@
 											"start": 580,
 											"end": 612,
 											"type": "Text",
-											"raw": "https://example.com/bbbbbbbbbbbb",
-											"data": "https://example.com/bbbbbbbbbbbb"
+											"raw": "https://aaa.fuz.dev/bbbbbbbbbbbb",
+											"data": "https://aaa.fuz.dev/bbbbbbbbbbbb"
 										}
 									]
 								}

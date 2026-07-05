@@ -2,21 +2,21 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 103,
+		"end": 101,
 		"attributes": [],
 		"children": [
 			{
 				"type": "Atrule",
 				"start": 9,
-				"end": 43,
+				"end": 41,
 				"name": "namespace",
-				"prelude": "'http://example.com/a'",
+				"prelude": "'http://a.fuz.dev/a'",
 				"block": null
 			},
 			{
 				"type": "Atrule",
-				"start": 45,
-				"end": 94,
+				"start": 43,
+				"end": 92,
 				"name": "namespace",
 				"prelude": "svg url('http://www.w3.org/2000/svg')",
 				"block": null
@@ -24,14 +24,14 @@
 		],
 		"content": {
 			"start": 7,
-			"end": 95,
-			"styles": "\n\t@namespace 'http://example.com/a';\n\t@namespace svg url('http://www.w3.org/2000/svg');\n",
+			"end": 93,
+			"styles": "\n\t@namespace 'http://a.fuz.dev/a';\n\t@namespace svg url('http://www.w3.org/2000/svg');\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 104,
+	"end": 102,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
