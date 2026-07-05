@@ -860,7 +860,7 @@ benches/js/
 │   ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native, runtime-specific)
 │   ├── runtime.ts         # Tiny cross-runtime helpers: current_runtime / os / arch normalizers
 │   ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
-│   ├── parse_sanctions.ts # Shared parse-parity SANCTIONS (SVELTE_/TS_FIXTURE_SANCTIONS — over-rejections tsv keeps deliberately; used by skip_triage + the fixtures gates)
+│   ├── parse_sanctions.ts # Shared parse-parity tracking vocabulary: Sanction (keep deliberately) + KnownGap (fix eventually) types + SVELTE_/TS_FIXTURE_SANCTIONS data; used by skip_triage + all the gates
 │   ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
 │   ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime wasi entry)
 │   ├── report.ts          # Summary report generation

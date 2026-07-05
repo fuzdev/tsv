@@ -24,21 +24,9 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { init_compare_implementations } from './compare_cli.ts';
-import { type Sanction, sanction_for } from './parse_sanctions.ts';
+import { type KnownGap, type Sanction, sanction_for } from './parse_sanctions.ts';
 import type { Language } from './types.ts';
 import { bigint_replacer, type DiffEntry, diff_asts, type MatchContext } from '../corpus_compare_parse.ts';
-
-/**
- * An over-rejection where tsv is WRONG — a genuine drop-in gap, tracked so the
- * gate is green at baseline and only a NEW untracked over-rejection fails it.
- * Matched as a path substring. This set must only SHRINK: delete an entry once
- * its gap is fixed (the input then parses → parity).
- */
-export interface KnownGap {
-	pattern: string;
-	category: string;
-	reason: string;
-}
 
 export interface FixturesGateConfig {
 	/** Display title, e.g. `TypeScript-fixtures`. */

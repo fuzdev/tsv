@@ -33,8 +33,8 @@
  *   deno task conformance:svelte-fixtures:run ../svelte/packages/svelte/tests/parser-modern
  */
 
-import { type FixturesGateConfig, type KnownGap, run_fixtures_gate } from '../lib/fixtures_gate.ts';
-import { SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
+import { type FixturesGateConfig, run_fixtures_gate } from '../lib/fixtures_gate.ts';
+import { type KnownGap, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
 
 /**
  * Over-rejections where tsv is WRONG — genuine drop-in parse gaps, tracked so the

@@ -66,18 +66,12 @@ import { readdir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 import { init_compare_implementations } from '../lib/compare_cli.ts';
+import type { KnownGap } from '../lib/parse_sanctions.ts';
 
 /** The official TypeScript checkout (baselines live at a fixed path under it). */
 const TS_REPO = '../typescript';
 const BASELINE_DIR = `${TS_REPO}/tests/baselines/reference`;
 const DEFAULT_ROOT = `${TS_REPO}/tests/cases/conformance/parser`;
-
-interface KnownGap {
-	/** Substring of the file path (use `<basename>.ts` to avoid numeric collisions). */
-	pattern: string;
-	category: string;
-	reason: string;
-}
 
 /**
  * tsv parse gaps confirmed against BOTH oracles (tsc-valid AND acorn-accepts),
@@ -85,6 +79,8 @@ interface KnownGap {
  * SHRINK: delete an entry when its gap is fixed. Kept SEPARATE from
  * `ts_fixtures_compare.ts` KNOWN_GAPS (different corpus + oracle). Full triage:
  * grimoire TODO_PARSE_COVERAGE.md §"Broadening — the official typescript repo".
+ * `pattern` uses `<basename>.ts` to avoid numeric-suffix collisions
+ * (`…Declaration1` vs `…Declaration11`).
  */
 const KNOWN_GAPS: KnownGap[] = [
 	// Gap A — contextual type keywords (any/string/number/… — NOT reserved words)

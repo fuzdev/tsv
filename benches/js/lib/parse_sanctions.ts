@@ -12,10 +12,26 @@
  * One home shared by `diagnostics/skip_triage.ts` (the general parse-parity gate)
  * and the dedicated per-language fixtures gates (`svelte_fixtures_compare.ts`,
  * `ts_fixtures_compare.ts`), so a language's sanctions don't drift between them.
+ * Also the single home for the sibling {@link KnownGap} type (below) that every
+ * gate's `KNOWN_GAPS` list uses.
  */
 
 export interface Sanction {
 	pattern: string;
+	reason: string;
+}
+
+/**
+ * The sibling of {@link Sanction}: an over-rejection where tsv is WRONG — a genuine
+ * drop-in parse gap, tracked (in the consuming gate's own `KNOWN_GAPS`) so the gate
+ * is green at baseline and only a NEW untracked over-rejection fails it. Matched as
+ * a path substring. This set must only SHRINK: delete an entry once its gap is fixed
+ * (the input then parses → parity). `Sanction` = keep deliberately; `KnownGap` =
+ * fix eventually — the two never overlap.
+ */
+export interface KnownGap {
+	pattern: string;
+	category: string;
 	reason: string;
 }
 
