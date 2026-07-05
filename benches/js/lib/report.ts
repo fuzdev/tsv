@@ -20,7 +20,7 @@ export interface GroupResults {
  * non-full file count (e.g. `659/660`) would read as self-contradictory.
  * A genuinely full set returns exactly 100.
  */
-function coverage_pct(processed: number, total: number): number {
+export function coverage_pct(processed: number, total: number): number {
 	return processed === total ? 100 : Math.floor((processed / total) * 100);
 }
 

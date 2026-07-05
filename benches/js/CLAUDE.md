@@ -28,7 +28,8 @@ delta on the same row is the detector.
   `results/report.{json,md}` — the cross-runtime view tsv.fuz.dev consumes
   (`compose_reports.ts`; a per-runtime delta on a row is the headline). The
   conformance surface (`BENCH_CORPUS=conformance`) writes its own
-  `report.conformance.<runtime>.*` siblings, outside the compose glob.
+  `report.conformance.node.*` (coverage-only + node-only — see §Corpus), outside
+  the compose glob.
 - **One bench body, runtime-detected.** `bench.ts` runs under both — it detects
   the runtime (`lib/runtime.ts` `current_runtime()`) and selects the
   runtime-specific artifacts. No forked entry; `bench:node:run` is literally
@@ -372,8 +373,8 @@ Every pattern in `patterns.ts` includes:
 
 Each runtime saves to `benches/js/results/` as timestamped files plus a
 committed `report.<runtime>.{json,md}` pair (`report.deno.*` / `report.node.*`).
-Conformance runs (`BENCH_CORPUS=conformance`) write sibling
-`report.conformance.<runtime>.{json,md}` pairs instead — a separate committed
+The conformance surface (`BENCH_CORPUS=conformance`, coverage-only + node-only)
+writes `report.conformance.node.{json,md}` instead — a separate committed
 surface that never clobbers the perf reports and is invisible to
 `bench:compose` (which globs the exact perf filenames). To publish benchmarks
 to tsv.fuz.dev, run `npm run update-benchmarks` in ~/dev/tsv.fuz.dev (it reads
@@ -383,9 +384,11 @@ the old single `report.json`).
 The committed `report.<runtime>.json` (baseline `version: 6`) carries, beyond
 timing stats: a top-level `runtime`, `corpus_kind` (`perf` | `conformance` —
 which corpus/surface produced it), per-language `corpus` totals,
-`corpus_sources` (per-entry loaded file counts — the composition disclosure;
+`corpus_sources` (per-entry loaded file counts + a `by_language`
+svelte/typescript/css split summing to `files` — the composition disclosure;
 see [Corpus](#corpus)), `versions`, and `binary_sizes` (each with
-`gzip_bytes`). Each `entries[]` row adds a `runtime` field,
+`gzip_bytes`). A coverage-only conformance report (see §Corpus) has null
+`entries[]` timing stats. Each `entries[]` row adds a `runtime` field,
 `files_processed`/`files_total` (per-impl preflight coverage — the `Coverage:`
 line) and `files_iterated` (the timed set — the `Files (intersection):`
 count). A top-level `suppressed_noise` map records silenced third-party stderr
@@ -398,40 +401,46 @@ deno task bench:install   # one-time: install harness npm deps (see Cross-Runtim
 # Run benchmarks (builds the runtime's bench artifacts automatically).
 # `bench` regenerates EVERY committed artifact the site consumes: the perf
 # surface across all three runtimes + compose, then the node conformance
-# report (node-only there because coverage — the conformance headline — is
-# runtime-invariant; it reuses the artifacts the perf half just built). It
+# COVERAGE report (bench:conformance:run — coverage-only + node-only by design;
+# coverage is a pre-flight product and runtime-invariant, and the site reads
+# only its coverage counts). It reuses the node artifacts the perf half just built. It
 # FAILS FAST if node or bun isn't installed (the `&&` chain stops at the
 # missing binary). Deno is the only hard dependency, so if you don't have
 # node and/or bun, run the per-runtime tasks you DO have — each writes its
 # own report.<runtime>.* sibling, and `bench:compose` folds whatever exists.
-deno task bench           # full refresh: perf ×3 + compose + node conformance
+deno task bench           # full refresh: perf ×3 + compose + node conformance coverage
 deno task bench:perf      # perf surface only: all three runtimes + compose
 deno task bench:deno      # Deno only (no node/bun needed)
 deno task bench:node      # Node only (needs node)
 deno task bench:bun       # Bun only (needs bun; reuses the Node artifacts — N-API + nodejs-target WASM)
 deno task bench:compose   # Fold whatever report.{deno,node,bun}.json exist → combined report.{json,md}
 
-# Conformance measurement — per-tool PARSE coverage/throughput over the full
-# fixtures-included corpus (the `conformance` view; parse groups only, no
-# format impls). The headline is the per-tool Coverage lines; throughput runs
-# on the all-tools-pass intersection. Writes report.conformance.<runtime>.*.
-# Baseline flags are rejected here (perf-surface tool); coverage regressions
-# are reviewed via the committed report diff. BENCH_DURATION defaults to
-# 15000 in this mode (vs 5000 perf) — full-corpus sweeps per iteration mean
-# slow rows need the longer window for a usable sample count.
-deno task bench:conformance        # all three runtimes: harvest + builds + runs (needs node AND bun)
-deno task bench:conformance:deno   # per-runtime (harvest + build + run)
-deno task bench:conformance:node
-deno task bench:conformance:bun
-deno task bench:conformance:deno:run   # skip harvest + rebuild (freshness-guarded)
+# Conformance measurement — per-tool PARSE COVERAGE over the full
+# fixtures-included corpus (the `conformance` view; parse groups only, no format
+# impls) → report.conformance.node.{json,md}. COVERAGE-ONLY + NODE-ONLY by design
+# (BENCH_COVERAGE_ONLY=1): coverage is a pre-flight product, so the timed phase is
+# skipped, and it's runtime-invariant (same parser engine — the site folds a tool's
+# native/wasm variants into one per-engine row), so one node run is the whole surface.
+# Entries carry null timing; no throughput/comparison sections; baseline save/compare
+# are no-ops. Skipping the timed phase reclaims a fixed ≥8 full-corpus sweeps/row
+# (3 warmup + ≥5 measured) that no consumer reads.
+deno task bench:conformance        # harvest + build:bench:node + coverage run
+deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
+# The timed parse-throughput over this adversarial corpus has no consumer (the site
+# reads coverage; `bench:compose` excludes conformance), so no task produces it. To
+# investigate it ad-hoc: `BENCH_CORPUS=conformance node benches/js/bench.ts` (coverage
+# flag unset) — it overwrites report.conformance.node.*, so re-run bench:conformance:run
+# after to restore the committed coverage report.
 
 # Harvest the derived suite caches for the conformance corpus (idempotent;
 # warn-and-skip when the source checkout is absent). Chained into the
 # bench:conformance build tasks; run standalone after a ../wpt or ../test262
 # update.
-deno task bench:harvest            # both harvests
+deno task bench:harvest            # all three harvests
 deno task bench:harvest:wpt        # ../wpt/css <style> blocks → .cache/wpt_css
 deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
+deno task bench:harvest:svelte-rejects  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json
+                                        # (the conformance view excludes these — see §Corpus)
 
 # Run without rebuilding (if already built) — guarded against stale artifacts,
 # see "Artifact Freshness Guard" below
@@ -453,7 +462,7 @@ deno task bench:deno:run -- --compare-baseline  # Compare against saved baseline
 
 # Wipe local-only bench state (gitignored): baseline.json, timestamped
 # results pairs, and the harvest caches (benches/js/.cache). Preserves the
-# committed `report.<runtime>.{json,md}` / `report.conformance.<runtime>.*`
+# committed `report.<runtime>.{json,md}` / `report.conformance.node.*`
 # because the glob is anchored on a leading digit (timestamped files start
 # with a year).
 deno task bench:clean
@@ -556,10 +565,12 @@ Things the published numbers measure that aren't quite what they look like:
   corpus was prettier's fixture suite), so its per-file ratios are the
   noisiest in the report.
 - **Conformance-surface semantics (`BENCH_CORPUS=conformance`).** Parse-only
-  by design; the headline is per-tool **Coverage** (preflight parse success
-  over the full fixtures-included corpus), while the timed throughput runs on
-  the all-tools-pass intersection — over an adversarial corpus that's the
-  "easy" subset (`BENCH_MODE=union` audits what it hides). test262 files are
+  by design, and the committed surface is **coverage-only** (per-tool preflight
+  parse success over the full fixtures-included corpus) — the timed phase is
+  skipped, so there is no committed throughput. If you run the ad-hoc timed
+  variant (coverage flag unset), its throughput is over the all-tools-pass
+  intersection — an adversarial corpus that's the "easy" subset
+  (`BENCH_MODE=union` audits what it hides). test262 files are
   parsed at every tool's default **module** goal: none of the tsv bindings
   take a goal parameter, the canonical acorn wrapper hardcodes
   `sourceType: 'module'`, and oxc infers module from the synthetic `.ts`
@@ -567,7 +578,7 @@ Things the published numbers measure that aren't quite what they look like:
   identifier) count against every tool equally. The goal-aware per-test
   differential is `diagnostics/test262_compare.ts`, and the graded pass/fail
   conformance gates remain `tsv_debug test262` / `conformance:svelte-fixtures` —
-  this surface measures coverage/throughput, it doesn't replace them.
+  this surface measures coverage, it doesn't replace them.
 - **Measurement-shape asymmetries (small, mostly self-cancelling).** (a) Every
   `tsv` FFI format call UTF-8-encodes the input and decodes the output back to a
   JS string (`lib/ffi.ts`); `tsv_wasm` marshals strings across the JS↔WASM
@@ -708,7 +719,28 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   (`benches/js/.cache/test262_files.json`, a `files_from` entry from
   `deno task bench:harvest:test262`). This is what
   `deno task bench:conformance` measures — the per-tool parse
-  coverage/throughput surface.
+  coverage surface (coverage-only + node-only).
+
+  **Canonical-reject exclusion (Svelte only, conformance view only).** The
+  suite deliberately bundles deliberately-invalid fixtures (svelte's own
+  `compiler-errors/`, `loose-*` error-tolerant fixtures, preprocess inputs) plus
+  non-Svelte HTML (prettier's `tests/format/html`), so a raw parse-**coverage**
+  number scores those intentional rejects as failures — and makes tsv's *higher*
+  coverage read as superiority when it's really tsv's deferred-early-error
+  *permissiveness* (see grimoire `TODO_NODE_BENCHMARKS.md` §"Reading the Svelte
+  conformance-coverage number"). So the conformance view excludes the Svelte
+  files `svelte/compiler` rejects — the `svelte_parse_rejects.json` cache from
+  `deno task bench:harvest:svelte-rejects` (`diagnostics/svelte_reject_harvest.ts`),
+  loaded by `DevReposLoader` only when `view === 'conformance'`. Coverage then
+  measures fidelity on *valid* Svelte: svelte/compiler → 100% (it's the oracle),
+  tsv → ~99.85% (residual = the 8 sanctioned over-rejections, `SVELTE_FIXTURE_SANCTIONS`).
+  **Svelte only** — svelte/compiler is the parser tsv is a strict drop-in *for*;
+  `acorn-typescript` **trails** modern TS/JS (its rejects include valid code tsv
+  correctly parses) and `parseCss` is lenient, so neither is a validity oracle and
+  TS/CSS get no reject cache. The cache is machine-local + regenerable (like the
+  wpt/test262 caches, gitignored); absent = fail-open to the un-filtered corpus
+  (disclosed in the load log). The **`gates` view is untouched**, so
+  `corpus:compare:*` / `skip_triage` still see the error fixtures they need.
 
 Extensions: `.svelte`, `.ts`, `.js`, `.css`, `.html` (treated as Svelte; only
 loaded by entries that opt in).
@@ -744,6 +776,7 @@ benches/js/
 │   ├── svelte_fixtures_compare.ts  # Svelte-fixtures parse-conformance gate (task: conformance:svelte-fixtures; verdict parity + AST-shape)
 │   ├── test262_compare.ts    # test262 differential (tsv vs oxc-parser, from the Rust manifest)
 │   ├── wpt_css_harvest.ts    # wpt <style> blocks → .cache/wpt_css (task: bench:harvest:wpt)
+│   ├── svelte_reject_harvest.ts  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json (task: bench:harvest:svelte-rejects; conformance view excludes these)
 │   ├── wasm_json_probe.ts    # WASM-vs-native JSON parse penalty attribution
 │   ├── wasm_format_probe.ts  # WASM format wall-time A/B
 │   ├── comment_dup_scan.ts   # comment-dup fixture-corpus completeness guard

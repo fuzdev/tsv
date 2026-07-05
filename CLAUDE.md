@@ -294,13 +294,23 @@ shared code using `node:` builtins.
 
 **Perf vs conformance surfaces.** The perf surface (`deno task bench:perf`) measures a
 **real-world-only** corpus (app + framework source; fixture suites excluded) — the
-throughput headline. The conformance surface (`deno task bench:conformance`, or
-`BENCH_CORPUS=conformance`) measures per-tool **parse** coverage/throughput over the full
-fixtures-included corpus (prettier suites + svelte compiler tests + the wpt-css/test262
-harvests), writing sibling `report.conformance.<runtime>.{json,md}` files.
-`deno task bench` is the full publish-cadence refresh: perf across all three runtimes +
-compose, then the **node** conformance report (node-only because coverage — the
-conformance headline — is runtime-invariant; the site consumes the node sibling). The
+throughput headline. The conformance surface (`deno task bench:conformance`) measures
+per-tool **parse coverage** over the fixtures-included corpus (prettier suites +
+svelte compiler tests + the wpt-css/test262 harvests), writing
+`report.conformance.node.{json,md}`. Its **Svelte** set excludes the files
+`svelte/compiler` rejects (the `bench:harvest:svelte-rejects` cache) so coverage
+measures fidelity on *valid* Svelte rather than permissiveness over the suite's
+deliberately-invalid error fixtures — svelte-only, since svelte/compiler is the
+one canonical parser tsv is a strict drop-in for (acorn-ts trails, parseCss is
+lenient — neither is a validity oracle). See ./benches/js/CLAUDE.md §Corpus. It's **coverage-only and node-only by design**:
+coverage is a pre-flight product (no timed phase), and it's runtime-invariant (same parser
+engine — the site even folds a tool's native/wasm variants into one per-engine row), so
+one node run is the whole surface. The timed parse-throughput over this adversarial corpus
+has no consumer (the site reads coverage; `compose` excludes conformance), so it isn't
+produced by any task — it's an ad-hoc `BENCH_CORPUS=conformance node benches/js/bench.ts`
+(coverage flag unset), which overwrites the report, so re-run `bench:conformance:run`
+after to restore coverage. `deno task bench` is the full publish-cadence refresh: perf
+across all three runtimes + compose, then the node conformance coverage run. The
 correctness gates (`deno task conformance`, corpus:compare) keep their own unchanged
 corpus scope. See ./benches/js/CLAUDE.md §Corpus for the three views.
 
@@ -316,7 +326,7 @@ deno task smoke
 # Run benchmarks (builds the runtime's bench artifacts automatically).
 # `bench` runs ALL three and FAILS FAST if node or bun is missing — Deno is the
 # only hard dep, so without node/bun run the per-runtime tasks you have instead.
-deno task bench         # full refresh: perf ×3 + compose + node conformance (needs node AND bun)
+deno task bench         # full refresh: perf ×3 + compose + node conformance COVERAGE (needs node AND bun)
 deno task bench:perf    # perf surface only: all three runtimes + compose
 deno task bench:deno    # Deno only (no node/bun needed)
 deno task bench:node    # Node only (needs node)
@@ -328,11 +338,12 @@ deno task bench:deno:run
 deno task bench:node:run
 deno task bench:bun:run
 
-# Conformance surface: per-tool parse coverage/throughput, full fixtures-included
-# corpus (parse groups only) → report.conformance.<runtime>.{json,md}
-deno task bench:conformance        # all three runtimes
-deno task bench:conformance:deno   # per-runtime (harvest + build + run); also :node / :bun
-deno task bench:harvest            # regenerate the wpt-css + test262 suite caches
+# Conformance surface: per-tool parse COVERAGE, full fixtures-included corpus
+# (parse groups only) → report.conformance.node.{json,md}. Coverage-only + node-only
+# by design (see "Perf vs conformance surfaces" above): entries carry null timing.
+deno task bench:conformance        # harvest + build:bench:node + coverage run
+deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
+deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject caches
 
 # Per-file skip detail (off by default — counts always shown, paths/errors opt-in)
 deno task bench:deno:run -- --verbose
