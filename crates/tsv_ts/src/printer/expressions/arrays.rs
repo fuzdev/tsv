@@ -554,7 +554,7 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
 
         // A comment trailing the opening `[` on its own line is kept on the `[`
         // line (divergence from prettier, which relocates it to its own line as the
