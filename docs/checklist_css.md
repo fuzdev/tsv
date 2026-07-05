@@ -368,6 +368,7 @@ Specs: `css-color-3` (REC), `css-color-4` (CR), `css-color-5` (WD - widely shipp
 
 - `@charset`
 - `@import` (basic)
+- `@import` with media-query condition (media-type-led `screen and (…)` or a bare `<media-condition>` `(max-width: 40px)`)
 - `@namespace`
 - `@media`
 - `@page`

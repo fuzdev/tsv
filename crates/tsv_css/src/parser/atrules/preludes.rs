@@ -406,6 +406,8 @@ pub(super) fn parse_scope_prelude<'arena>(
 /// - `url('tabs.css') layer(framework)`
 /// - `url('override.css') layer`
 /// - `url('narrow.css') supports(display: flex) screen`
+/// - `url('a.css') screen and (min-width: 5px)` (media-type-led query)
+/// - `url('b.css') (max-width: 40px)` (bare `<media-condition>` query)
 pub(super) fn parse_import_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<PreludeValue<'arena>, ParseError> {
@@ -484,50 +486,54 @@ pub(super) fn parse_import_prelude<'arena>(
             // layer() or supports() function
             values.push(parse_function_value(parser)?);
             parser.skip_whitespace_registering_comments()?;
-        } else if parser.check(TokenKind::Identifier) {
-            // Check for bare "layer" keyword or media query
-            let ident = parser.current_identifier();
+        } else if parser.check(TokenKind::Identifier) && parser.current_identifier() == "layer" {
+            // Bare "layer" keyword (without function call); text recovered from
+            // `span` at print time (span-for-verbatim).
+            let value_start = parser.span_pos(parser.current_start);
+            let value_end = parser.span_pos(parser.current_end);
+            values.push(CssValue::Identifier {
+                span: Span {
+                    start: value_start,
+                    end: value_end,
+                },
+            });
+            parser.advance()?;
+            parser.skip_whitespace_registering_comments()?;
+        } else if parser.check(TokenKind::Identifier) || parser.check(TokenKind::LeftParen) {
+            // Media-query-list — the last prelude component (css-cascade-5
+            // §import-conditions). Consume the rest verbatim to `;`/EOF, preserving
+            // original whitespace; the text is recovered from `span` at print time.
+            // A query may lead with a media type (`screen and (…)`, an identifier) OR a
+            // bare `<media-condition>` (`(max-width: 40px)`, `(width < 100px)`, a `(`) —
+            // Media Queries 4 §media-query makes a lone `<media-condition>` a valid query,
+            // so both starts are accepted. Any other leading token (e.g. a stray `)`) is
+            // not a media-query start and falls through to the reject below.
+            let media_local_start = parser.current_start;
+            let media_start = parser.span_pos(media_local_start);
+            let mut media_local_end = parser.current_end;
 
-            if ident == "layer" {
-                // Bare "layer" keyword (without function call); text recovered from
-                // `span` at print time (span-for-verbatim).
-                let value_start = parser.span_pos(parser.current_start);
-                let value_end = parser.span_pos(parser.current_end);
+            while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
+                if !parser.check(TokenKind::Whitespace) {
+                    media_local_end = parser.current_end;
+                }
+                parser.advance()?;
+            }
+
+            let media_end = parser.span_pos(media_local_end);
+
+            // Media-query text recovered verbatim from `span` at print time.
+            if media_local_end > media_local_start {
                 values.push(CssValue::Identifier {
                     span: Span {
-                        start: value_start,
-                        end: value_end,
+                        start: media_start,
+                        end: media_end,
                     },
                 });
-                parser.advance()?;
-                parser.skip_whitespace_registering_comments()?;
-            } else {
-                // Media query - preserve original whitespace from source
-                let media_local_start = parser.current_start;
-                let media_start = parser.span_pos(media_local_start);
-                let mut media_local_end = parser.current_end;
-
-                while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
-                    if !parser.check(TokenKind::Whitespace) {
-                        media_local_end = parser.current_end;
-                    }
-                    parser.advance()?;
-                }
-
-                let media_end = parser.span_pos(media_local_end);
-
-                // Media-query text recovered verbatim from `span` at print time.
-                if media_local_end > media_local_start {
-                    values.push(CssValue::Identifier {
-                        span: Span {
-                            start: media_start,
-                            end: media_end,
-                        },
-                    });
-                }
-                break;
             }
+            break;
         } else {
+            // Not a media-query start (e.g. a stray `)`); leave it for the caller to
+            // reject as an unterminated at-rule prelude.
             break;
         }
     }
