@@ -290,48 +290,24 @@ fn parse_atrule_block<'arena>(
             continue;
         }
 
-        // @media/@supports/@layer/@container/keyframes/… block. This is a rule-list
-        // context, but CSS block parsing is agnostic (CSS Syntax 3 §"consume a block's
-        // contents"): a bare declaration still parses here — invalid-in-context and
-        // dropped by a later validity step, but parseCss keeps it, so tsv parses it too
-        // (`@media screen { color: red }`, the shape @function/@mixin bodies use). Route
-        // each child by the same declaration-vs-rule heuristic as the fallback below, but
-        // keep the non-relative selector grammar (`parse_rule(_, false)`) so keyframe
-        // stops (`0%`, `from`) and top-level complex selectors parse unchanged.
+        // @media/@supports/@layer/@container/keyframes/… block — a rule-list context.
+        // But CSS block parsing is agnostic (CSS Syntax 3 §"consume a block's contents"):
+        // a bare declaration still parses here (invalid-in-context, dropped by a later
+        // validity step, but parseCss keeps it — e.g. `@media screen { color: red }`, the
+        // shape @function/@mixin bodies use). `parse_block_child` disambiguates; `false`
+        // keeps the non-relative selector grammar so keyframe stops (`0%`, `from`) and
+        // top-level complex selectors parse unchanged.
         if expect_rules {
-            if super::declarations::is_nested_rule_start(parser)? {
-                let rule = super::declarations::parse_rule(parser, false)?;
-                children.push(CssBlockChild::Rule(rule));
-            } else if parser.check(TokenKind::Identifier) {
-                let decl = super::declarations::parse_declaration(parser)?;
-                children.push(CssBlockChild::Declaration(decl));
-            } else {
-                return Err(parser.error_unexpected(&format!("token in @{atrule_name} block")));
-            }
+            children.push(parse_block_child(parser, false, atrule_name)?);
             parser.skip_whitespace()?;
             continue;
         }
 
-        // Nested-declarations fallback (unknown at-rules + `@scope`): detect whether
-        // this child is a declaration or a rule by checking if the current position
-        // looks like a nested rule start
-        let looks_like_rule = super::declarations::is_nested_rule_start(parser)?;
-        if looks_like_rule {
-            // Parse as rule (selector + block) — use nested=true to allow leading combinators
-            let rule = super::declarations::parse_rule(parser, true)?;
-            children.push(CssBlockChild::Rule(rule));
-            parser.skip_whitespace()?;
-            continue;
-        } else if parser.check(TokenKind::Identifier) {
-            // Parse as declaration (property: value)
-            let decl = super::declarations::parse_declaration(parser)?;
-            children.push(CssBlockChild::Declaration(decl));
-            parser.skip_whitespace()?;
-            continue;
-        }
-
-        // Fallback: unexpected token
-        return Err(parser.error_unexpected(&format!("token in @{atrule_name} block")));
+        // Nested-declarations fallback (unknown at-rules + `@scope`): the same
+        // declaration-vs-rule disambiguation, but `true` allows leading combinators
+        // (relative selectors, e.g. a `> .child {}` in a `@scope` body).
+        children.push(parse_block_child(parser, true, atrule_name)?);
+        parser.skip_whitespace()?;
     }
 
     // Expect }
@@ -345,4 +321,29 @@ fn parse_atrule_block<'arena>(
         children: children.into_bump_slice(),
         span: Span { start, end },
     })
+}
+
+/// Parse one at-rule block child, disambiguating a nested rule from a bare
+/// declaration via `is_nested_rule_start` (CSS block parsing is agnostic — CSS
+/// Syntax 3 §"consume a block's contents"). `allow_relative_selectors` picks the
+/// selector grammar for the rule case: `false` = non-relative (top-level rule-list
+/// blocks — conditional groups, keyframes), `true` = relative (nested-declarations
+/// contexts — unknown at-rules, `@scope` — where a leading combinator is valid).
+fn parse_block_child<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    allow_relative_selectors: bool,
+    atrule_name: &str,
+) -> Result<CssBlockChild<'arena>, ParseError> {
+    if super::declarations::is_nested_rule_start(parser)? {
+        Ok(CssBlockChild::Rule(super::declarations::parse_rule(
+            parser,
+            allow_relative_selectors,
+        )?))
+    } else if parser.check(TokenKind::Identifier) {
+        Ok(CssBlockChild::Declaration(
+            super::declarations::parse_declaration(parser)?,
+        ))
+    } else {
+        Err(parser.error_unexpected(&format!("token in @{atrule_name} block")))
+    }
 }

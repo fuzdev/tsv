@@ -422,13 +422,7 @@ pub(super) fn parse_import_prelude<'arena>(
     parser.skip_whitespace_registering_comments()?;
 
     // Parse first value: url() function or bare string
-    let is_function = parser.check(TokenKind::Identifier) && {
-        // Check if next char in source is '(' (function call)
-        let end_pos = parser.current_end;
-        parser.source.get(end_pos..=end_pos) == Some("(")
-    };
-
-    if is_function {
+    if is_function_token(parser) {
         // url() function
         values.push(parse_function_value(parser)?);
     } else if let TokenKind::String { .. } = &parser.current_kind {
@@ -477,12 +471,7 @@ pub(super) fn parse_import_prelude<'arena>(
 
     // Parse optional layer(), supports() functions and other conditions
     while !parser.check(TokenKind::Semicolon) && !parser.check(TokenKind::Eof) {
-        let is_function = parser.check(TokenKind::Identifier) && {
-            let end_pos = parser.current_end;
-            parser.source.get(end_pos..=end_pos) == Some("(")
-        };
-
-        if is_function {
+        if is_function_token(parser) {
             // layer() or supports() function
             values.push(parse_function_value(parser)?);
             parser.skip_whitespace_registering_comments()?;
@@ -547,6 +536,18 @@ pub(super) fn parse_import_prelude<'arena>(
 }
 
 /// Parse a function value (e.g., url(), layer(), supports())
+/// Whether the current token is a CSS `<function-token>` — an identifier
+/// immediately followed by `(` with no intervening whitespace (`url(`, `layer(`,
+/// `supports(`). The lexer emits the name and `(` as separate tokens (only an
+/// unquoted `url(...)` is one opaque `Url` token), so the function-vs-plain-ident
+/// distinction is recovered here by peeking the source byte after the identifier.
+fn is_function_token(parser: &CssParser<'_, '_>) -> bool {
+    parser.check(TokenKind::Identifier) && {
+        let end_pos = parser.current_end;
+        parser.source.get(end_pos..=end_pos) == Some("(")
+    }
+}
+
 fn parse_function_value<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<CssValue<'arena>, ParseError> {
