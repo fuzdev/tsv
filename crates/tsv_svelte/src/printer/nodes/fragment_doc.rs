@@ -105,7 +105,16 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let mut docs: DocBuf = DocBuf::new();
         let mut format_ignore_next = false;
+        // Running flag for the control-flow `has_preceding_breakable` test below. `is_inline_content`
+        // is monotone over the prefix, so OR-in the prior node once per iteration instead of
+        // re-scanning `nodes[..i]` at each control-flow node (O(N²) over the sibling list). Reading
+        // `nodes[i - 1]` at the top keeps the flag equal to `nodes[..i]` through the `continue`s below
+        // (a format-ignored inline element must still count for a later block).
+        let mut has_preceding_breakable = false;
         for (i, node) in nodes.iter().enumerate() {
+            if i > 0 && is_inline_content(&nodes[i - 1]) {
+                has_preceding_breakable = true;
+            }
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
                 if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
@@ -126,8 +135,8 @@ impl<'a> Printer<'a> {
             let is_control_flow = is_control_flow_block(node);
             let doc = if is_control_flow {
                 // "Breakable preceding content" is exactly the inline-content set — text never
-                // breaks before a control-flow block, so reuse the one predicate.
-                let has_preceding_breakable = nodes[..i].iter().any(is_inline_content);
+                // breaks before a control-flow block, so reuse the one predicate (tracked as the
+                // running flag above rather than re-scanned here).
                 self.build_fragment_node_doc_with_preceding_context(
                     node,
                     trim_text,
@@ -247,7 +256,15 @@ impl<'a> Printer<'a> {
             && trimmed_nodes.iter().any(|n| self.is_block_element_node(n));
 
         let mut format_ignore_next = false;
+        // Running `has_preceding_breakable` flag (see `build_nodes_doc_with_context`): OR-in the
+        // prior node once per iteration rather than re-scanning `trimmed_nodes[..i]` at each of the
+        // two use sites below. Reading `trimmed_nodes[i - 1]` at the top keeps the flag equal to
+        // `trimmed_nodes[..i]` through the `continue`s (format-ignore, whitespace-run collapse).
+        let mut has_preceding_breakable = false;
         for (i, node) in trimmed_nodes.iter().enumerate() {
+            if i > 0 && is_inline_content(&trimmed_nodes[i - 1]) {
+                has_preceding_breakable = true;
+            }
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
                 if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
@@ -334,8 +351,6 @@ impl<'a> Printer<'a> {
                     // wrapping work). The non-multiline callers keep the inline
                     // `build_fragment_node_doc_*` path below.
                     let node_doc = if self.is_root_inline_run_block(node) {
-                        let has_preceding_breakable =
-                            trimmed_nodes[..i].iter().any(is_inline_content);
                         self.build_fragment_node_doc_with_preceding_context(
                             node,
                             false,
@@ -357,11 +372,9 @@ impl<'a> Printer<'a> {
                 );
             } else {
                 // Other nodes (comments, `{@const}`/`{@debug}`/`{const}`/`{let}` tags).
-                // Check if there's preceding breakable content (expression tags or elements)
-                // This affects whether block conditions should use remove_lines() or not:
-                // - With preceding breakable content: use remove_lines() so that content breaks first
-                // - Without preceding breakable content: allow wrapping to respect print_width
-                let has_preceding_breakable = trimmed_nodes[..i].iter().any(is_inline_content);
+                // `has_preceding_breakable` (tracked above) affects whether block conditions use
+                // remove_lines(): with preceding breakable content, content breaks first so it
+                // respects print_width; without, allow wrapping.
                 if let Some(node_doc) = self.build_fragment_node_doc_with_preceding_context(
                     node,
                     false,
