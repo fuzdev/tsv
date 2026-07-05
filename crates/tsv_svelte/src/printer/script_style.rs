@@ -282,9 +282,11 @@ impl<'a> Printer<'a> {
         if !style.css_stylesheet.nodes.is_empty() || !style.css_stylesheet.comments.is_empty() {
             self.write("\n");
 
-            // Pass the entire source to CSS printer (CSS node spans are absolute)
-            // The CSS printer will use the spans to detect blank lines correctly
-            // Use base_indent_offset=1 to account for the Svelte wrapper indent
+            // Pass the entire source to the CSS printer (CSS node spans are
+            // absolute, which keeps blank-line detection correct) and share the
+            // printer's whole-source line_breaks table rather than rebuilding
+            // it per <style> island. base_indent_offset=1 accounts for the
+            // Svelte wrapper indent.
             let embed = tsv_lang::EmbedContext {
                 base_indent_offset: 1,
                 ..tsv_lang::EmbedContext::default()
