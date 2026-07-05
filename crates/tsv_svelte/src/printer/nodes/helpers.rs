@@ -6,7 +6,7 @@
 
 use crate::ast::internal::{EachBlock, FragmentNode};
 use crate::printer::Printer;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
 use tsv_lang::comments_in_range;
@@ -433,7 +433,7 @@ impl<'a> Printer<'a> {
             // keeps inline (so they share the always-inline binding shape, not the breakable
             // expression printer); they just need the same comment-awareness.
             Expression::ObjectPattern(obj) => {
-                let entries: Vec<(u32, u32, DocId)> = obj
+                let entries: SmallVec<[(u32, u32, DocId); 8]> = obj
                     .properties
                     .iter()
                     .map(|p| {
@@ -444,7 +444,7 @@ impl<'a> Printer<'a> {
                 self.build_object_braces(obj.span.start, obj.span.end, &entries)
             }
             Expression::ObjectExpression(obj) => {
-                let entries: Vec<(u32, u32, DocId)> = obj
+                let entries: SmallVec<[(u32, u32, DocId); 8]> = obj
                     .properties
                     .iter()
                     .map(|p| {
