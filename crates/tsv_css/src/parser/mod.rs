@@ -414,18 +414,9 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
         // Comments are already sorted by span.start since we add them in order during parsing
 
-        // Build line breaks table for O(log n) line boundary lookups
-        // Must add base_offset to each position since AST spans use global positions
-        let base_offset_u32 = self.base_offset as u32;
-        let line_breaks: Vec<u32> = tsv_lang::printing::build_line_breaks(self.source)
-            .into_iter()
-            .map(|pos| pos + base_offset_u32)
-            .collect();
-
         Ok(CssStyleSheet {
             nodes: nodes.into_bump_slice(),
             comments: std::mem::take(&mut self.comments),
-            line_breaks,
         })
     }
 }
