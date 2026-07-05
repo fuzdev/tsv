@@ -38,6 +38,8 @@
  *                       perf = real-world corpus view, parse + format groups;
  *                       conformance = fixtures-included view (Svelte minus canonical-rejects), parse groups only
  *                       (see benches/js/CLAUDE.md §Corpus)
+ *   BENCH_COVERAGE_ONLY Set to 1 to emit coverage from pre-flight and SKIP the
+ *                       timed phase (requires BENCH_CORPUS=conformance). Default off
  *   BENCH_ALLOW_MISSING Set to 1 to tolerate missing corpus repos (default: off —
  *                       a missing required entry fails fast, since numbers from a
  *                       partial corpus aren't comparable to the committed reports)
@@ -75,10 +77,10 @@ import {
 	init_implementations,
 } from './lib/implementations.ts';
 import {
-	coverage_pct,
 	type EffectiveCorpusEntry,
 	generate_comparison_markdown,
 	generate_comparison_summary,
+	generate_coverage_only_markdown,
 	generate_effective_corpus_report,
 	generate_group_bench_table_markdown,
 	generate_group_coverage_markdown,
@@ -1132,28 +1134,11 @@ function generate_markdown_report(
 	);
 
 	// Coverage-only run: no timed groups exist, so render the per-tool coverage
-	// tables straight from pre-flight state (the timed loop below no-ops). Unlike
-	// the perf report's suppress-when-all-full coverage line (there it's a
-	// "some impl skipped" warning), here coverage IS the headline, so every row
-	// is shown including 100%.
+	// tables straight from pre-flight state (the timed loop below no-ops).
 	if (COVERAGE_ONLY) {
-		for (const language of LANGUAGES) {
-			for (const operation of OPERATIONS) {
-				const group_name = `${operation}/${language}`;
-				const tracking = task_tracking.get(group_name);
-				if (!tracking) continue;
-				const rows: string[] = [];
-				for (const [name, tracking_key] of tracking) {
-					const e = effective_size.get(tracking_key);
-					if (!e) continue;
-					const pct = coverage_pct(e.processed, e.total);
-					rows.push(`${name} ${e.processed}/${e.total} (${pct}%)`);
-				}
-				if (rows.length === 0) continue;
-				lines.push(`## ${group_name}\n`);
-				lines.push(`**Coverage:** ${rows.join(', ')}`, '');
-			}
-		}
+		lines.push(
+			...generate_coverage_only_markdown(LANGUAGES, OPERATIONS, task_tracking, effective_size),
+		);
 	}
 
 	for (const group of groups) {

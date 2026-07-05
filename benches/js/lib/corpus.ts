@@ -568,8 +568,12 @@ export class DevReposLoader {
 		}
 
 		if (reject_set && reject_excluded !== reject_set.size) {
-			// Stale cache: it names paths this corpus no longer yields (or vice
-			// versa). Not fatal — disclose the drift so a re-harvest is prompted.
+			// Stale cache: it names more paths than this corpus still yields (fewer
+			// hit than cached). Only detects cache-names-a-gone-path; a NEW reject the
+			// corpus grew but the cache doesn't name isn't counted here (it's simply
+			// not excluded) — a re-harvest, chained ahead of `bench:conformance`,
+			// picks those up. Not fatal — disclose the drift so a re-harvest is
+			// prompted for the `:run` (skip-harvest) path.
 			logger(
 				`  ⚠ canonical-reject cache drift: excluded ${reject_excluded} of ${reject_set.size} ` +
 					`cached paths — re-run \`deno task bench:harvest:svelte-rejects\``,
