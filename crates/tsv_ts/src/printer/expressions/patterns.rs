@@ -46,30 +46,45 @@ fn is_nested_arrow_function(expr: &Expression<'_>) -> bool {
     false
 }
 
+/// Layout role of an assignment-chain segment's right side (`a = b = value`).
+///
+/// Collapses the former `is_tail` / `is_arrow_chain` bool pair — `is_arrow_chain`
+/// was only ever consulted when `is_tail` held, so the two flags encode three states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChainSegment {
+    /// Chain middle (`a =` in `a = b = value`) — soft line break, no indent.
+    Middle,
+    /// Chain tail — indent the final value onto its own line when it breaks.
+    Tail,
+    /// Chain tail whose value is a nested arrow (`(x) => (y) => …`) — space, no indent.
+    ArrowChainTail,
+}
+
 /// Build chain formatting doc: [group(left), op, ...right parts]
 fn build_chain_doc(
     d: &tsv_lang::doc::arena::DocArena,
     left_doc: DocId,
     operator: &'static str,
     right_doc: DocId,
-    is_tail: bool,
-    is_arrow_chain: bool,
+    segment: ChainSegment,
 ) -> DocId {
     let mut parts: DocBuf = smallvec![d.group(left_doc), d.text(operator)];
 
-    if is_tail {
-        if is_arrow_chain {
+    match segment {
+        ChainSegment::ArrowChainTail => {
             // Chain-tail-arrow-chain: (x) => (y) => x + y
             parts.push(d.text(" "));
             parts.push(right_doc);
-        } else {
+        }
+        ChainSegment::Tail => {
             // Standard chain tail: indent the final value
             parts.push(d.indent_line(right_doc));
         }
-    } else {
-        // Chain middle: soft line break, no indent
-        parts.push(d.line());
-        parts.push(right_doc);
+        ChainSegment::Middle => {
+            // Chain middle: soft line break, no indent
+            parts.push(d.line());
+            parts.push(right_doc);
+        }
     }
 
     d.concat(&parts)
@@ -194,15 +209,19 @@ impl<'a> Printer<'a> {
 
         if matches!(context, AssignmentContext::Chain) {
             // Chain formatting - parent is an assignment
-            let is_tail = !rhs_is_assignment;
-            let is_arrow_chain = is_tail && is_nested_arrow_function(assign.right);
+            let segment = if rhs_is_assignment {
+                ChainSegment::Middle
+            } else if is_nested_arrow_function(assign.right) {
+                ChainSegment::ArrowChainTail
+            } else {
+                ChainSegment::Tail
+            };
             build_chain_doc(
                 d,
                 left_doc,
                 assign.operator.as_str_with_leading_space(),
                 right_doc,
-                is_tail,
-                is_arrow_chain,
+                segment,
             )
         } else if matches!(assign.left, Expression::ObjectPattern(_)) {
             // Object patterns on LHS - never break after operator
