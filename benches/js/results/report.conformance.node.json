@@ -2,121 +2,256 @@
 	"version": 6,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-04T22:58:25.136Z",
-	"git_commit": "34a14e63",
+	"timestamp": "2026-07-05T15:06:16.483Z",
+	"git_commit": "ade06e02",
 	"corpus": {
-		"svelte": 50,
-		"typescript": 50,
-		"css": 50
+		"svelte": 5355,
+		"typescript": 46708,
+		"css": 22672
 	},
 	"corpus_sources": [
 		{
 			"path": "../zzz/src",
-			"files": 325
+			"files": 325,
+			"by_language": {
+				"svelte": 173,
+				"typescript": 151,
+				"css": 1
+			}
 		},
 		{
 			"path": "../fuz_app/src",
-			"files": 664
+			"files": 664,
+			"by_language": {
+				"svelte": 33,
+				"typescript": 630,
+				"css": 1
+			}
 		},
 		{
 			"path": "../fuz_blog/src",
-			"files": 32
+			"files": 32,
+			"by_language": {
+				"svelte": 18,
+				"typescript": 13,
+				"css": 1
+			}
 		},
 		{
 			"path": "../fuz_code/src",
-			"files": 68
+			"files": 64,
+			"by_language": {
+				"svelte": 21,
+				"typescript": 38,
+				"css": 5
+			}
 		},
 		{
 			"path": "../fuz_css/src",
-			"files": 124
+			"files": 124,
+			"by_language": {
+				"svelte": 37,
+				"typescript": 85,
+				"css": 2
+			}
 		},
 		{
 			"path": "../fuz_docs/src",
-			"files": 64
+			"files": 64,
+			"by_language": {
+				"svelte": 45,
+				"typescript": 18,
+				"css": 1
+			}
 		},
 		{
 			"path": "../fuz_gitops/src",
-			"files": 203
+			"files": 203,
+			"by_language": {
+				"svelte": 28,
+				"typescript": 174,
+				"css": 1
+			}
 		},
 		{
 			"path": "../fuz_mastodon/src",
-			"files": 24
+			"files": 24,
+			"by_language": {
+				"svelte": 15,
+				"typescript": 8,
+				"css": 1
+			}
 		},
 		{
 			"path": "../fuz_template/src",
-			"files": 15
+			"files": 15,
+			"by_language": {
+				"svelte": 10,
+				"typescript": 4,
+				"css": 1
+			}
 		},
 		{
 			"path": "../fuz_ui/src",
-			"files": 215
+			"files": 215,
+			"by_language": {
+				"svelte": 121,
+				"typescript": 94,
+				"css": 0
+			}
 		},
 		{
 			"path": "../fuz_util/src",
-			"files": 144
+			"files": 144,
+			"by_language": {
+				"svelte": 8,
+				"typescript": 135,
+				"css": 1
+			}
 		},
 		{
 			"path": "../gro/src",
-			"files": 187
+			"files": 187,
+			"by_language": {
+				"svelte": 11,
+				"typescript": 175,
+				"css": 1
+			}
 		},
 		{
 			"path": "../svelte-docinfo/src",
-			"files": 297
+			"files": 297,
+			"by_language": {
+				"svelte": 82,
+				"typescript": 214,
+				"css": 1
+			}
 		},
 		{
 			"path": "../tsv.fuz.dev/src",
-			"files": 26
+			"files": 28,
+			"by_language": {
+				"svelte": 16,
+				"typescript": 11,
+				"css": 1
+			}
 		},
 		{
 			"path": "../kit/packages/kit/src",
-			"files": 381
+			"files": 318,
+			"by_language": {
+				"svelte": 84,
+				"typescript": 233,
+				"css": 1
+			}
 		},
 		{
 			"path": "../svelte/packages/svelte/src",
-			"files": 380
+			"files": 375,
+			"by_language": {
+				"svelte": 0,
+				"typescript": 375,
+				"css": 0
+			}
 		},
 		{
 			"path": "../svelte.dev/apps/svelte.dev/src",
-			"files": 138
+			"files": 135,
+			"by_language": {
+				"svelte": 60,
+				"typescript": 75,
+				"css": 0
+			}
 		},
 		{
 			"path": "../svelte.dev/packages/repl/src",
-			"files": 48
+			"files": 48,
+			"by_language": {
+				"svelte": 17,
+				"typescript": 29,
+				"css": 2
+			}
 		},
 		{
 			"path": "../svelte.dev/packages/site-kit/src",
-			"files": 65
+			"files": 65,
+			"by_language": {
+				"svelte": 26,
+				"typescript": 28,
+				"css": 11
+			}
 		},
 		{
 			"path": "../prettier-plugin-svelte/test",
-			"files": 325
+			"files": 309,
+			"by_language": {
+				"svelte": 309,
+				"typescript": 0,
+				"css": 0
+			}
 		},
 		{
 			"path": "../prettier/tests/format/typescript",
-			"files": 789
+			"files": 789,
+			"by_language": {
+				"svelte": 0,
+				"typescript": 789,
+				"css": 0
+			}
 		},
 		{
 			"path": "../prettier/tests/format/js",
-			"files": 1103
+			"files": 1103,
+			"by_language": {
+				"svelte": 0,
+				"typescript": 1103,
+				"css": 0
+			}
 		},
 		{
 			"path": "../prettier/tests/format/css",
-			"files": 228
+			"files": 228,
+			"by_language": {
+				"svelte": 0,
+				"typescript": 78,
+				"css": 150
+			}
 		},
 		{
 			"path": "../prettier/tests/format/html",
-			"files": 124
+			"files": 124,
+			"by_language": {
+				"svelte": 124,
+				"typescript": 0,
+				"css": 0
+			}
 		},
 		{
 			"path": "../svelte/packages/svelte/tests",
-			"files": 4543
+			"files": 4432,
+			"by_language": {
+				"svelte": 4117,
+				"typescript": 135,
+				"css": 180
+			}
 		},
 		{
 			"path": "benches/js/.cache/wpt_css",
-			"files": 22310
+			"files": 22310,
+			"by_language": {
+				"svelte": 0,
+				"typescript": 0,
+				"css": 22310
+			}
 		},
 		{
 			"path": "benches/js/.cache/test262_files.json",
-			"files": 42113
+			"files": 42113,
+			"by_language": {
+				"svelte": 0,
+				"typescript": 42113,
+				"css": 0
+			}
 		}
 	],
 	"versions": {
@@ -133,45 +268,45 @@
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3324480,
+			"bytes": 3307360,
 			"kind": "native",
-			"gzip_bytes": 1423272
+			"gzip_bytes": 1428738
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3070736,
+			"bytes": 3054656,
 			"kind": "native",
-			"gzip_bytes": 1317789
+			"gzip_bytes": 1324423
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1545168,
+			"bytes": 1542576,
 			"kind": "native",
-			"gzip_bytes": 683595
+			"gzip_bytes": 682941
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3447328,
+			"bytes": 3431120,
 			"kind": "native",
-			"gzip_bytes": 1464803
+			"gzip_bytes": 1470536
 		},
 		{
 			"label": "tsv_format_wasm",
-			"bytes": 2312689,
+			"bytes": 2186094,
 			"kind": "wasm",
-			"gzip_bytes": 784944
+			"gzip_bytes": 754306
 		},
 		{
 			"label": "tsv_parse_wasm",
-			"bytes": 1126329,
+			"bytes": 1015654,
 			"kind": "wasm",
-			"gzip_bytes": 401394
+			"gzip_bytes": 375849
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2540357,
+			"bytes": 2410073,
 			"kind": "wasm",
-			"gzip_bytes": 866096
+			"gzip_bytes": 833573
 		},
 		{
 			"label": "biome (wasm)",
@@ -202,341 +337,341 @@
 		{
 			"name": "svelte/compiler",
 			"group": "parse/svelte",
-			"mean_ns": 42592126.652173914,
-			"p50_ns": 42372503,
-			"p75_ns": 45104994.75,
-			"p90_ns": 45953787,
-			"p95_ns": 46785490.85,
-			"p99_ns": 52088600.62,
-			"min_ns": 38997284,
-			"max_ns": 53632500,
-			"std_dev_ns": 2420666.899346065,
-			"cv": 0.05683367067144353,
-			"ops_per_second": 23.478517712121796,
-			"sample_size": 23,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 711837306,
+			"p50_ns": 714220953,
+			"p75_ns": 715413109,
+			"p90_ns": 726956792.8,
+			"p95_ns": 730804687.4,
+			"p99_ns": 733883003.08,
+			"min_ns": 696738177,
+			"max_ns": 734652582,
+			"std_dev_ns": 15443531.08049325,
+			"cv": 0.021695310080437468,
+			"ops_per_second": 1.4048153862843484,
+			"sample_size": 5,
+			"files_processed": 5217,
+			"files_total": 5355,
+			"files_iterated": 5209,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv-json",
 			"group": "parse/svelte",
-			"mean_ns": 17520284.375,
-			"p50_ns": 17484422,
-			"p75_ns": 17756645,
-			"p90_ns": 18229084.4,
-			"p95_ns": 18622561.6,
-			"p99_ns": 18941451.279999997,
-			"min_ns": 16824456,
-			"max_ns": 19231608,
-			"std_dev_ns": 459761.35622087336,
-			"cv": 0.026241660602091304,
-			"ops_per_second": 57.07669913320114,
-			"sample_size": 56,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 355459711.2,
+			"p50_ns": 354466667,
+			"p75_ns": 356068214,
+			"p90_ns": 358833872.6,
+			"p95_ns": 359755758.8,
+			"p99_ns": 360493267.76,
+			"min_ns": 352185836,
+			"max_ns": 360677645,
+			"std_dev_ns": 3230077.3328286894,
+			"cv": 0.009087042022074004,
+			"ops_per_second": 2.813258348250186,
+			"sample_size": 5,
+			"files_processed": 5241,
+			"files_total": 5355,
+			"files_iterated": 5209,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv_wasm-json",
 			"group": "parse/svelte",
-			"mean_ns": 19937617.36734694,
-			"p50_ns": 19894594,
-			"p75_ns": 20359697.25,
-			"p90_ns": 20799981.7,
-			"p95_ns": 21010359.85,
-			"p99_ns": 21736769.689999998,
-			"min_ns": 19127492,
-			"max_ns": 22395829,
-			"std_dev_ns": 538124.008094583,
-			"cv": 0.026990386974518922,
-			"ops_per_second": 50.156444552786006,
-			"sample_size": 49,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 386411127.3333333,
+			"p50_ns": 386422999,
+			"p75_ns": 386439730,
+			"p90_ns": 389706363.4,
+			"p95_ns": 390795241.2,
+			"p99_ns": 391666343.44,
+			"min_ns": 386370653,
+			"max_ns": 391884119,
+			"std_dev_ns": 36036.23640633596,
+			"cv": 0.00009325879576767388,
+			"ops_per_second": 2.58791719301955,
+			"sample_size": 3,
+			"files_processed": 5241,
+			"files_total": 5355,
+			"files_iterated": 5209,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv-internal",
 			"group": "parse/svelte",
-			"mean_ns": 1561040.194221509,
-			"p50_ns": 1558470,
-			"p75_ns": 1599678,
-			"p90_ns": 1641439.2,
-			"p95_ns": 1705062.7999999998,
-			"p99_ns": 1859773.76,
-			"min_ns": 1453612,
-			"max_ns": 2576662,
-			"std_dev_ns": 60498.44548723698,
-			"cv": 0.03875521316567224,
-			"ops_per_second": 640.5984956067708,
-			"sample_size": 623,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 37838861,
+			"p50_ns": 38017131,
+			"p75_ns": 38134240,
+			"p90_ns": 39168125.8,
+			"p95_ns": 39512754.4,
+			"p99_ns": 39788457.28,
+			"min_ns": 37396175,
+			"max_ns": 39857383,
+			"std_dev_ns": 324529.684572408,
+			"cv": 0.00857662403137367,
+			"ops_per_second": 26.427856800446502,
+			"sample_size": 4,
+			"files_processed": 5241,
+			"files_total": 5355,
+			"files_iterated": 5209,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv_wasm-internal",
 			"group": "parse/svelte",
-			"mean_ns": 2351937.689903846,
-			"p50_ns": 2351807.5,
-			"p75_ns": 2400101.25,
-			"p90_ns": 2463373.7,
-			"p95_ns": 2530434.9499999997,
-			"p99_ns": 2663788.4799999995,
-			"min_ns": 2207946,
-			"max_ns": 2793461,
-			"std_dev_ns": 81268.77684799174,
-			"cv": 0.03455396679803802,
-			"ops_per_second": 425.1813320959548,
-			"sample_size": 416,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 52819275.333333336,
+			"p50_ns": 53183599,
+			"p75_ns": 78185568,
+			"p90_ns": 79334740.2,
+			"p95_ns": 79717797.6,
+			"p99_ns": 80024243.52,
+			"min_ns": 52405770,
+			"max_ns": 80100855,
+			"std_dev_ns": 391239.8440373032,
+			"cv": 0.007407141456755247,
+			"ops_per_second": 18.932482388089813,
+			"sample_size": 3,
+			"files_processed": 5241,
+			"files_total": 5355,
+			"files_iterated": 5209,
 			"runtime": "node"
 		},
 		{
 			"name": "acorn-typescript",
 			"group": "parse/typescript",
-			"mean_ns": 49106025.84210526,
-			"p50_ns": 49163618,
-			"p75_ns": 49871864,
-			"p90_ns": 51325036,
-			"p95_ns": 53582887,
-			"p99_ns": 54569459.800000004,
-			"min_ns": 47755199,
-			"max_ns": 54816103,
-			"std_dev_ns": 979671.3320026867,
-			"cv": 0.01995012455605156,
-			"ops_per_second": 20.364099575383765,
-			"sample_size": 19,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 10546714871.285715,
+			"p50_ns": 10531234774,
+			"p75_ns": 10623521053,
+			"p90_ns": 10655027623.8,
+			"p95_ns": 10669469424.9,
+			"p99_ns": 10681022865.78,
+			"min_ns": 10439500875,
+			"max_ns": 10683911226,
+			"std_dev_ns": 97599727.07873665,
+			"cv": 0.009254040549105941,
+			"ops_per_second": 0.0948162543696503,
+			"sample_size": 7,
+			"files_processed": 46030,
+			"files_total": 46708,
+			"files_iterated": 45959,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv-json",
 			"group": "parse/typescript",
-			"mean_ns": 31513656.464285713,
-			"p50_ns": 31588069,
-			"p75_ns": 31932624.25,
-			"p90_ns": 34192304.7,
-			"p95_ns": 34608299.95,
-			"p99_ns": 35685192.4,
-			"min_ns": 30599438,
-			"max_ns": 36043261,
-			"std_dev_ns": 521142.4047038912,
-			"cv": 0.01653703388226306,
-			"ops_per_second": 31.732274581760944,
-			"sample_size": 28,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 5764540928.142858,
+			"p50_ns": 5760753423,
+			"p75_ns": 5773887260,
+			"p90_ns": 5807996417.6,
+			"p95_ns": 5827958654.3,
+			"p99_ns": 5843928443.66,
+			"min_ns": 5710986387,
+			"max_ns": 5847920891,
+			"std_dev_ns": 43250996.46975181,
+			"cv": 0.007502938570285394,
+			"ops_per_second": 0.1734743516379485,
+			"sample_size": 7,
+			"files_processed": 46464,
+			"files_total": 46708,
+			"files_iterated": 45959,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv_wasm-json",
 			"group": "parse/typescript",
-			"mean_ns": 34645150.2962963,
-			"p50_ns": 34680689,
-			"p75_ns": 35207563,
-			"p90_ns": 36540927.8,
-			"p95_ns": 38035464.4,
-			"p99_ns": 39149145.36,
-			"min_ns": 33500061,
-			"max_ns": 39240163,
-			"std_dev_ns": 762383.5100824264,
-			"cv": 0.022005490048745094,
-			"ops_per_second": 28.86406874981587,
-			"sample_size": 27,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 6126542016.428572,
+			"p50_ns": 6130197740,
+			"p75_ns": 6141894028.5,
+			"p90_ns": 6151765711.6,
+			"p95_ns": 6154230910.3,
+			"p99_ns": 6156203069.26,
+			"min_ns": 6094006411,
+			"max_ns": 6156696109,
+			"std_dev_ns": 22744048.227786593,
+			"cv": 0.003712379375967308,
+			"ops_per_second": 0.16322421315620775,
+			"sample_size": 7,
+			"files_processed": 46464,
+			"files_total": 46708,
+			"files_iterated": 45959,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv-internal",
 			"group": "parse/typescript",
-			"mean_ns": 2162101.937360179,
-			"p50_ns": 2168251,
-			"p75_ns": 2197687,
-			"p90_ns": 2237192,
-			"p95_ns": 2292356,
-			"p99_ns": 2471238.999999999,
-			"min_ns": 2049307,
-			"max_ns": 2664057,
-			"std_dev_ns": 56058.794264350276,
-			"cv": 0.025927914542639617,
-			"ops_per_second": 462.5128828203869,
-			"sample_size": 447,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 450847760.4,
+			"p50_ns": 450898135,
+			"p75_ns": 451459309,
+			"p90_ns": 451880158.6,
+			"p95_ns": 452020441.8,
+			"p99_ns": 452132668.36,
+			"min_ns": 449571935,
+			"max_ns": 452160725,
+			"std_dev_ns": 1026745.3459499099,
+			"cv": 0.0022773659672590224,
+			"ops_per_second": 2.2180436232239074,
+			"sample_size": 5,
+			"files_processed": 46464,
+			"files_total": 46708,
+			"files_iterated": 45959,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv_wasm-internal",
 			"group": "parse/typescript",
-			"mean_ns": 3276734.684931507,
-			"p50_ns": 3273948,
-			"p75_ns": 3346114,
-			"p90_ns": 3449610.6,
-			"p95_ns": 3578550.349999999,
-			"p99_ns": 3893452.9999999986,
-			"min_ns": 3098076,
-			"max_ns": 4042888,
-			"std_dev_ns": 103174.0229134631,
-			"cv": 0.031486840661199195,
-			"ops_per_second": 305.1818643110261,
-			"sample_size": 292,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 636976103,
+			"p50_ns": 637059871,
+			"p75_ns": 637081070,
+			"p90_ns": 638550510.2,
+			"p95_ns": 639040323.6,
+			"p99_ns": 639432174.32,
+			"min_ns": 636787368,
+			"max_ns": 639530137,
+			"std_dev_ns": 163792.62672354942,
+			"cv": 0.0002571409287603203,
+			"ops_per_second": 1.569917608039371,
+			"sample_size": 3,
+			"files_processed": 46464,
+			"files_total": 46708,
+			"files_iterated": 45959,
 			"runtime": "node"
 		},
 		{
 			"name": "oxc-parser",
 			"group": "parse/typescript",
-			"mean_ns": 17757639.431818184,
-			"p50_ns": 17790378.5,
-			"p75_ns": 18193898,
-			"p90_ns": 36024234.7,
-			"p95_ns": 37406521.9,
-			"p99_ns": 42044068.58999999,
-			"min_ns": 16896211,
-			"max_ns": 45152388,
-			"std_dev_ns": 470654.8101898134,
-			"cv": 0.026504356730348566,
-			"ops_per_second": 56.313791246836416,
-			"sample_size": 44,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 3712865724.5,
+			"p50_ns": 3714305438,
+			"p75_ns": 3735694100,
+			"p90_ns": 3853014017,
+			"p95_ns": 3892120656,
+			"p99_ns": 3923405967.2,
+			"min_ns": 3697862054,
+			"max_ns": 3931227295,
+			"std_dev_ns": 16674802.163212162,
+			"cv": 0.004491086777844007,
+			"ops_per_second": 0.269333736849497,
+			"sample_size": 4,
+			"files_processed": 46465,
+			"files_total": 46708,
+			"files_iterated": 45959,
 			"runtime": "node"
 		},
 		{
 			"name": "oxc-parser-wasm",
 			"group": "parse/typescript",
-			"mean_ns": 22603262.589743588,
-			"p50_ns": 22243320,
-			"p75_ns": 23859140.5,
-			"p90_ns": 25405074.8,
-			"p95_ns": 27667718.099999998,
-			"p99_ns": 34038511.29999999,
-			"min_ns": 21268100,
-			"max_ns": 36715228,
-			"std_dev_ns": 1210693.4068062142,
-			"cv": 0.05356277227675867,
-			"ops_per_second": 44.24140081678996,
-			"sample_size": 39,
-			"files_processed": 50,
-			"files_total": 50,
-			"files_iterated": 50,
+			"mean_ns": 4347237533.2,
+			"p50_ns": 4346363747,
+			"p75_ns": 4362145916,
+			"p90_ns": 4417627440.2,
+			"p95_ns": 4436121281.6,
+			"p99_ns": 4450916354.72,
+			"min_ns": 4284843015,
+			"max_ns": 4454615123,
+			"std_dev_ns": 69154051.2776857,
+			"cv": 0.015907585161738663,
+			"ops_per_second": 0.23003113870888495,
+			"sample_size": 5,
+			"files_processed": 46708,
+			"files_total": 46708,
+			"files_iterated": 45959,
 			"runtime": "node"
 		},
 		{
 			"name": "svelte/compiler",
 			"group": "parse/css",
-			"mean_ns": 3965116.419213974,
-			"p50_ns": 3948034,
-			"p75_ns": 4097113.25,
-			"p90_ns": 4408711.2,
-			"p95_ns": 4583902.6,
-			"p99_ns": 5021958.08,
-			"min_ns": 3734547,
-			"max_ns": 6578933,
-			"std_dev_ns": 165867.08268332237,
-			"cv": 0.04183157949148012,
-			"ops_per_second": 252.199404575928,
-			"sample_size": 229,
-			"files_processed": 48,
-			"files_total": 50,
-			"files_iterated": 48,
+			"mean_ns": 240630028.8,
+			"p50_ns": 241029027,
+			"p75_ns": 242335570,
+			"p90_ns": 243382705,
+			"p95_ns": 243731750,
+			"p99_ns": 244010986,
+			"min_ns": 237629418,
+			"max_ns": 244080795,
+			"std_dev_ns": 2761611.3235657727,
+			"cv": 0.011476586431617352,
+			"ops_per_second": 4.155757305050034,
+			"sample_size": 5,
+			"files_processed": 22433,
+			"files_total": 22672,
+			"files_iterated": 22409,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv-json",
 			"group": "parse/css",
-			"mean_ns": 6552144.952380952,
-			"p50_ns": 6536829.5,
-			"p75_ns": 6652212.25,
-			"p90_ns": 6797909.7,
-			"p95_ns": 6915894.9,
-			"p99_ns": 8203895.45,
-			"min_ns": 6259591,
-			"max_ns": 8306503,
-			"std_dev_ns": 152812.986907506,
-			"cv": 0.023322589475371122,
-			"ops_per_second": 152.62177611571533,
-			"sample_size": 147,
-			"files_processed": 48,
-			"files_total": 50,
-			"files_iterated": 48,
+			"mean_ns": 454197684,
+			"p50_ns": 453949601,
+			"p75_ns": 455880395,
+			"p90_ns": 457332746,
+			"p95_ns": 457816863,
+			"p99_ns": 458204156.6,
+			"min_ns": 450319049,
+			"max_ns": 458300980,
+			"std_dev_ns": 3062970.3310990464,
+			"cv": 0.006743694296554463,
+			"ops_per_second": 2.201684498241519,
+			"sample_size": 5,
+			"files_processed": 22478,
+			"files_total": 22672,
+			"files_iterated": 22409,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv_wasm-json",
 			"group": "parse/css",
-			"mean_ns": 8055132.974789916,
-			"p50_ns": 8046998.5,
-			"p75_ns": 8244085.25,
-			"p90_ns": 8485059.8,
-			"p95_ns": 9021225,
-			"p99_ns": 9823383.929999998,
-			"min_ns": 7526642,
-			"max_ns": 10726119,
-			"std_dev_ns": 288354.58832505083,
-			"cv": 0.03579761988132435,
-			"ops_per_second": 124.14444344118115,
-			"sample_size": 119,
-			"files_processed": 48,
-			"files_total": 50,
-			"files_iterated": 48,
+			"mean_ns": 535892000.6,
+			"p50_ns": 535585178,
+			"p75_ns": 537001487,
+			"p90_ns": 537083391.2,
+			"p95_ns": 537110692.6,
+			"p99_ns": 537132533.72,
+			"min_ns": 534584622,
+			"max_ns": 537137994,
+			"std_dev_ns": 1133173.9163799174,
+			"cv": 0.0021145565059959535,
+			"ops_per_second": 1.8660476343747834,
+			"sample_size": 5,
+			"files_processed": 22478,
+			"files_total": 22672,
+			"files_iterated": 22409,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv-internal",
 			"group": "parse/css",
-			"mean_ns": 2505575.1297709923,
-			"p50_ns": 2513632,
-			"p75_ns": 2551819.5,
-			"p90_ns": 2572908.4,
-			"p95_ns": 2603319.3,
-			"p99_ns": 2775517.0599999996,
-			"min_ns": 2376735,
-			"max_ns": 3187926,
-			"std_dev_ns": 61166.80711833826,
-			"cv": 0.024412282190847283,
-			"ops_per_second": 399.10996406298113,
-			"sample_size": 393,
-			"files_processed": 48,
-			"files_total": 50,
-			"files_iterated": 48,
+			"mean_ns": 108869208,
+			"p50_ns": 108826588,
+			"p75_ns": 109251275,
+			"p90_ns": 109666637,
+			"p95_ns": 109805091,
+			"p99_ns": 109915854.2,
+			"min_ns": 108051914,
+			"max_ns": 109943545,
+			"std_dev_ns": 762522.368359447,
+			"cv": 0.007004022371132222,
+			"ops_per_second": 9.185333652835979,
+			"sample_size": 5,
+			"files_processed": 22478,
+			"files_total": 22672,
+			"files_iterated": 22409,
 			"runtime": "node"
 		},
 		{
 			"name": "tsv_wasm-internal",
 			"group": "parse/css",
-			"mean_ns": 3581292.0037037036,
-			"p50_ns": 3572496,
-			"p75_ns": 3635640.25,
-			"p90_ns": 3718303.7,
-			"p95_ns": 3817991.65,
-			"p99_ns": 4150013.95,
-			"min_ns": 3421496,
-			"max_ns": 5141341,
-			"std_dev_ns": 91275.83305976799,
-			"cv": 0.025486844682134902,
-			"ops_per_second": 279.2288366784443,
-			"sample_size": 270,
-			"files_processed": 48,
-			"files_total": 50,
-			"files_iterated": 48,
+			"mean_ns": 169215491.4,
+			"p50_ns": 168845557,
+			"p75_ns": 169885669,
+			"p90_ns": 170432503.6,
+			"p95_ns": 170614781.8,
+			"p99_ns": 170760604.36,
+			"min_ns": 167811576,
+			"max_ns": 170797060,
+			"std_dev_ns": 1149642.567479258,
+			"cv": 0.006793955789554017,
+			"ops_per_second": 5.909624418701419,
+			"sample_size": 5,
+			"files_processed": 22478,
+			"files_total": 22672,
+			"files_iterated": 22409,
 			"runtime": "node"
 		}
 	],
