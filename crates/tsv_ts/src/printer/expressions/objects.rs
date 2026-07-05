@@ -280,7 +280,7 @@ impl<'a> Printer<'a> {
             }
         } else {
             // No comments, no forced multiline: use width-based wrapping with soft lines
-            let mut parts = DocBuf::new();
+            let mut parts = d.pooled_docbuf();
 
             for (i, prop) in obj.properties.iter().enumerate() {
                 // Check for blank line before this property (preserved in multiline).

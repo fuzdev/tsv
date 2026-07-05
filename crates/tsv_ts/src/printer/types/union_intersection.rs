@@ -202,7 +202,7 @@ impl<'a> Printer<'a> {
         // Break: | T1
         //        | T2
         //        | T3
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
 
         for (i, t) in union.types.iter().enumerate() {
             let type_start = t.span().start;

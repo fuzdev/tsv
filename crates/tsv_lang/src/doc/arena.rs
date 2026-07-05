@@ -345,6 +345,17 @@ pub struct DocArena {
     /// `build_line_breaks` in each `format_in` — taken (moved out), filled,
     /// and parked back cleared with capacity retained, like `render_scratch`.
     line_breaks_scratch: Cell<Vec<u32>>,
+    /// Free-list of reusable [`DocBuf`] assembly buffers for the wide-list doc
+    /// builders (statement lists, object/array/call-arg lists, member chains).
+    /// A builder assembling a variable-length parts list `acquire`s a cleared
+    /// buffer (with retained heap capacity from a prior spill) and `release`s it
+    /// on scope exit via the [`PooledDocBuf`] guard. A recursion-safe
+    /// pop-or-new / clear-and-push-on-release pool self-sizes to the max
+    /// concurrent-live buffers (~30 for real code), turning the per-spill
+    /// `SmallVec` malloc/free churn into a handful of long-lived reused
+    /// allocations. Retained across `reset()` (reused across files), like the
+    /// other scratches; only ever affects allocation, never output.
+    docbuf_pool: RefCell<Vec<DocBuf>>,
     /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
@@ -490,6 +501,7 @@ impl DocArena {
             render_commands_scratch: RefCell::new(SmallVec::new()),
             line_suffix_scratch: RefCell::new(SmallVec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
+            docbuf_pool: RefCell::new(Vec::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
@@ -537,6 +549,7 @@ impl DocArena {
             render_commands_scratch: RefCell::new(SmallVec::new()),
             line_suffix_scratch: RefCell::new(SmallVec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
+            docbuf_pool: RefCell::new(Vec::new()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -1645,6 +1658,35 @@ impl DocArena {
         self.render_scratch.set(scratch);
     }
 
+    /// Acquire a cleared [`DocBuf`] assembly buffer from the free-list (or a
+    /// fresh empty one). Prefer the RAII [`Self::pooled_docbuf`]; pair a raw
+    /// acquire with [`Self::release_docbuf`]. Recursion-safe: nested builders
+    /// each pop a distinct buffer (or `new`), so overlapping assembly stays
+    /// correct, and the pool self-sizes to the max concurrent-live buffers.
+    #[inline]
+    pub fn acquire_docbuf(&self) -> DocBuf {
+        self.docbuf_pool.borrow_mut().pop().unwrap_or_default()
+    }
+
+    /// Return a [`DocBuf`] to the free-list, cleared (capacity retained), for a
+    /// later builder to reuse. Only affects allocation, never output.
+    #[inline]
+    pub fn release_docbuf(&self, mut buf: DocBuf) {
+        buf.clear();
+        self.docbuf_pool.borrow_mut().push(buf);
+    }
+
+    /// RAII form of [`Self::acquire_docbuf`]: a [`PooledDocBuf`] that derefs to
+    /// the buffer for assembly and, on drop, returns it to the pool (called
+    /// after the builder's `concat`/`fill` has copied the parts into the arena).
+    #[inline]
+    pub fn pooled_docbuf(&self) -> PooledDocBuf<'_> {
+        PooledDocBuf {
+            buf: self.acquire_docbuf(),
+            arena: self,
+        }
+    }
+
     /// Borrow the pooled top-level render command stack (cleared here). Held
     /// for the duration of one top-level render; sub-renders use their own
     /// inline locals and never take this borrow.
@@ -1734,6 +1776,38 @@ impl DocArena {
     #[inline]
     pub fn estimated_output_capacity(&self) -> usize {
         (self.nodes.borrow().len() * 5).clamp(256, 1 << 30)
+    }
+}
+
+/// RAII guard wrapping a pooled [`DocBuf`] (see [`DocArena::pooled_docbuf`]).
+/// Derefs to the buffer for assembly; on drop, returns it to the arena's
+/// free-list (cleared, capacity retained). `#![forbid(unsafe_code)]`-clean: the
+/// drop moves the buffer out via `mem::take` (`DocBuf: Default`), leaving a
+/// stack-only empty `SmallVec` to drop as a no-op.
+pub struct PooledDocBuf<'a> {
+    buf: DocBuf,
+    arena: &'a DocArena,
+}
+
+impl std::ops::Deref for PooledDocBuf<'_> {
+    type Target = DocBuf;
+    #[inline]
+    fn deref(&self) -> &DocBuf {
+        &self.buf
+    }
+}
+
+impl std::ops::DerefMut for PooledDocBuf<'_> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut DocBuf {
+        &mut self.buf
+    }
+}
+
+impl Drop for PooledDocBuf<'_> {
+    #[inline]
+    fn drop(&mut self) {
+        self.arena.release_docbuf(std::mem::take(&mut self.buf));
     }
 }
 

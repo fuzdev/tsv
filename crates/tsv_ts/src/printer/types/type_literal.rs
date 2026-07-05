@@ -618,7 +618,7 @@ impl<'a> Printer<'a> {
             parts.push(d.concat(&brace_line_prefix));
 
             // Multi-line format (same for both modes)
-            let mut member_parts: DocBuf = smallvec![];
+            let mut member_parts = d.pooled_docbuf();
             let mut prev_end = t.span.start + 1; // after opening brace
             for (i, m) in t.members.iter().enumerate() {
                 let is_first = i == 0;

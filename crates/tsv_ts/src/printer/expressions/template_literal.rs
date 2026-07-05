@@ -28,7 +28,7 @@ impl<'a> Printer<'a> {
         template: &crate::ast::internal::TemplateLiteral<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
         parts.push(d.line_suffix_boundary());
         parts.push(d.text("`"));
 
@@ -200,7 +200,7 @@ impl<'a> Printer<'a> {
         // of the verbatim source slice, so track a running byte offset from
         // `raw_span.start` and emit each as its own (allocation-free) span.
         let text = raw_span.extract(self.source);
-        let mut doc_parts = DocBuf::new();
+        let mut doc_parts = d.pooled_docbuf();
         let mut offset = raw_span.start;
         for (i, part) in text.split('\n').enumerate() {
             if i > 0 {

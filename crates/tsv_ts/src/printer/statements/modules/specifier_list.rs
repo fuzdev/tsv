@@ -351,7 +351,7 @@ impl<'a> Printer<'a> {
         // `,` + line. Tree-identical: the skipped singleton `concat`s collapse
         // to the item doc, and the skipped pushes are empty docs.
         if !self.has_comments_between(brace_start, brace_close + 1) {
-            let mut inner_parts = DocBuf::new();
+            let mut inner_parts = d.pooled_docbuf();
             for (i, item) in items.iter().enumerate() {
                 if i > 0 {
                     inner_parts.push(d.text(","));
