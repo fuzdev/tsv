@@ -654,7 +654,7 @@ impl<'a> Printer<'a> {
         delimiter_pull_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
         let mut prev_end = body_start + 1; // after opening brace
 
         for (i, member) in members.iter().enumerate() {
