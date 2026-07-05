@@ -114,8 +114,10 @@ impl<'a> Printer<'a> {
         // The document's one whole-source line-break table: every embedded
         // island borrows it (`build_program_doc` for `<script>`/`{expr}` TS,
         // `tsv_css::format_embedded` for `<style>` CSS) — never rebuild it
-        // per island.
-        let line_breaks = tsv_lang::printing::build_line_breaks(source);
+        // per island. Filled into the arena-parked scratch (one warm table
+        // across a multi-file driver's files); `into_string` parks it back.
+        let mut line_breaks = arena.take_line_breaks_scratch();
+        tsv_lang::printing::build_line_breaks_into(source, &mut line_breaks);
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
@@ -194,6 +196,9 @@ impl<'a> Printer<'a> {
     /// - Normal elements: rendered with `print_doc_with_indent_resolved()` which strips
     /// - Whitespace-sensitive elements: rendered with `print_doc_with_indent_resolved_preserve_whitespace()` which preserves
     pub(crate) fn into_string(self) -> String {
+        // Park the line-break table back on the arena for the next format
+        // (capacity retained; see `with_embed`).
+        self.arena.park_line_breaks_scratch(self.line_breaks);
         self.buffer.into_string()
     }
 
@@ -212,7 +217,10 @@ impl<'a> Printer<'a> {
     /// doc building, not rendering.
     pub(crate) fn render_doc_immediate(&mut self, d: DocId) {
         let col = self.buffer.current_column(TAB_WIDTH);
-        let output = {
+        // Render into the arena-parked scratch: one warm buffer across the
+        // document's root nodes instead of an alloc/free per node.
+        let mut output = self.arena.take_render_scratch();
+        {
             let interner = self.interner.borrow();
             // Source-aware resolver: the doc tree's verbatim leaves — this
             // printer's own markup text / comment slices plus any embedded
@@ -221,16 +229,18 @@ impl<'a> Printer<'a> {
                 inner: &*interner,
                 source: self.source,
             };
-            tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace(
+            tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
                 self.arena,
                 d,
                 &self.embed,
                 col,
                 self.indent_level,
                 &resolver,
-            )
-        };
+                &mut output,
+            );
+        }
         self.write(&output);
+        self.arena.park_render_scratch(output);
     }
 }
 

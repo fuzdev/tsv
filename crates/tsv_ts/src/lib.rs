@@ -29,7 +29,7 @@ use std::rc::Rc;
 
 use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
-use tsv_lang::printing::build_line_breaks;
+use tsv_lang::printing::build_line_breaks_into;
 pub use tsv_lang::{ParseError, Result, SharedInterner};
 
 pub use goal::Goal;
@@ -144,7 +144,10 @@ pub fn format(program: &Program<'_>, source: &str) -> String {
 /// borrowed from `arena` escapes — the result is an owned `String` — so the
 /// caller may reset and reuse it the moment this returns.
 pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> String {
-    let line_breaks = build_line_breaks(source);
+    // Fill the arena-parked line-break table (one warm table across a
+    // multi-file driver's files instead of a fresh Vec per file).
+    let mut line_breaks = arena.take_line_breaks_scratch();
+    build_line_breaks_into(source, &mut line_breaks);
     let inputs = PrinterInputs {
         source,
         interner: Rc::clone(&program.interner),
@@ -153,7 +156,9 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     };
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.print_program(program);
-    printer.into_string()
+    let output = printer.into_string();
+    arena.park_line_breaks_scratch(line_breaks);
+    output
 }
 
 /// Convert internal AST to JSON with character-based positions
