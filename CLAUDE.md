@@ -235,7 +235,7 @@ Package shape: built from the wasm-pack `web` target, then `scripts/patch_npm_pa
 
 `scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → conformance → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). The user keeps it updated as work lands — agents don't touch `CHANGELOG.md` (see [Committing](#committing)). A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
 
-**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`) plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`, and skipped-with-a-warning when the `../svelte` checkout or the `benches/js` `node_modules` sidecar (`deno task bench:install`) is absent (a clean machine / resumed wetrun). Run `deno task conformance` manually before a release if the step was skipped. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit under `--all` can be the known FFI heisenbug — re-run it on the single repo to confirm before treating it as real (see ./benches/js/CLAUDE.md §Known Issues).
+**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`, and skipped-with-a-warning when the `../svelte` checkout or the `benches/js` `node_modules` sidecar (`deno task bench:install`) is absent (a clean machine / resumed wetrun). Run `deno task conformance` manually before a release if the step was skipped. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit under `--all` can be the known FFI heisenbug — re-run it on the single repo to confirm before treating it as real (see ./benches/js/CLAUDE.md §Known Issues).
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation
@@ -270,10 +270,17 @@ deno task conformance:svelte-fixtures  # tsv's Svelte parser vs Svelte's own tes
 # modern Svelte parser. Enforces verdict parity (over-rejections must be SANCTIONED or a tracked
 # KNOWN_GAP, else exit 1); AST-shape diff is a report-only triage surface. Options: -v, --json, <subtree>.
 
-deno task conformance                  # the pre-release aggregate: svelte-fixtures + corpus:compare:parse --all +
-# corpus:compare:format --all in one run (builds the corpus FFI once). The release-cadence correctness gates
-# across Svelte/CSS/TS that need external oracles (svelte/compiler, acorn-ts/parseCss, prettier) so they can't
-# live in `deno task check`. Wired into `publish.ts` Step 3b; test262 (../test262) + CSS-WPT harvest stay manual.
+deno task conformance:ts-fixtures      # tsv's TS parser vs acorn-typescript's own test suite (../acorn-typescript/test)
+# The TS analog of the above (and of test262/wpt): the adversarial TS edge-case corpus real-world code
+# can't reach. Oracle = the live @sveltejs/acorn-typescript parser. Same shape — verdict parity gates
+# (over-rejections SANCTIONED or a tracked KNOWN_GAP, else exit 1), AST-shape is report-only. Fail-open
+# on a missing ../acorn-typescript checkout (0 scanned → green). Options: -v, --json, <subtree>.
+
+deno task conformance                  # the pre-release aggregate: svelte-fixtures + ts-fixtures +
+# corpus:compare:parse --all + corpus:compare:format --all in one run (builds the corpus FFI once). The
+# release-cadence correctness gates across Svelte/CSS/TS that need external oracles (svelte/compiler,
+# acorn-ts/parseCss, prettier) so they can't live in `deno task check`. Wired into `publish.ts` Step 3b;
+# test262 (../test262) + CSS-WPT harvest stay manual.
 
 deno task divergence:audit         # audit divergence pattern coverage (--json for machine-readable)
 ```
