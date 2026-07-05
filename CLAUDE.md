@@ -1033,6 +1033,7 @@ Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/
 - `unicode-segmentation` — Grapheme clustering for visual width measurement
 - `unicode-width` — Character display width (CJK, zero-width)
 - `bumpalo` — Bump arena for the internal AST (and, via the `tsv_arena` crate, the bindings' per-thread `reset()` reuse — `tsv_ffi`/`tsv_napi`/`tsv_wasm`)
+- `talc` — WASM global allocator (`tsv_wasm` only, wasm32-only target dep): pure-Rust `no_std` allocator replacing std's default dlmalloc; the `WasmGrowAndExtend` source keeps the warm instance's linear-memory high-water at dlmalloc parity. Pulls `lock_api` + `allocator-api2` (+ `scopeguard`) into the wasm32 graph only; native builds unaffected
 - `napi` / `napi-derive` / `napi-build` — N-API bindings for `tsv_napi` (Node/Bun native addon; tsv-scoped carve-out)
 
 ## Canonical References

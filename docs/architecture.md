@@ -654,7 +654,7 @@ A `format-ignore` / `prettier-ignore` comment suppresses formatting of the const
 
 ## Allocation & Memory
 
-tsv runs on the system allocator — no `#[global_allocator]`, no alternative-allocator dependency. The performance posture is structural: each layer avoids allocation by design rather than allocating faster. (An allocator swap remains an open lever; it is a dependency decision, not an architectural one.)
+Native tsv runs on the system allocator — no `#[global_allocator]`, no alternative-allocator dependency. The one exception is WebAssembly: `tsv_wasm` sets a wasm32-gated `#[global_allocator]` to [talc](https://github.com/SFBdragon/talc) (its `WasmGrowAndExtend` source), replacing std's default dlmalloc — the WASM format path is allocation-bound enough that the allocator itself was a measured wall, and the extend source holds the long-lived instance's linear-memory high-water at dlmalloc parity. The performance posture is otherwise structural: each layer avoids allocation by design rather than allocating faster.
 
 **Lexing — spans, not strings.** Tokens store `u32` byte offsets (`start`, `end`) into the source, never slices or copies — `Token` is a 16-byte POD the byte cursor (`bytes: &[u8]` + `position`) emits and the parser unpacks in registers. The exception is deliberate: a string literal allocates its decoded value only when it actually contains escape sequences, held **out-of-band on the lexer** (`Lexer::decoded`, drained via `take_decoded`) so the per-token `Token` stays pointer-free. Comments are spans too — the token carries a `content_start` and the `Comment` node a `content_span`, recovered from source on demand and never copied.
 

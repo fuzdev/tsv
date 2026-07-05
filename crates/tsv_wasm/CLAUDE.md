@@ -134,7 +134,7 @@ require dual updates.
 
 ## Files
 
-- `src/lib.rs` — WASM bindings (`lang_bindings!` macro + typed extern types)
+- `src/lib.rs` — WASM bindings (`lang_bindings!` macro + typed extern types) + the wasm32-gated talc `#[global_allocator]`
 - `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
 - `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv_format_wasm` (copied by `patch_npm_package.ts`)

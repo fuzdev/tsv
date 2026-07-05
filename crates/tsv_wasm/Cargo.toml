@@ -64,5 +64,13 @@ wasm-bindgen = "0.2"
 # graph (measurably faster materialization).
 js-sys = { version = "0.3", optional = true }
 
+# WASM-only global allocator (see the `#[global_allocator]` in lib.rs): a
+# pure-Rust no_std allocator replacing std's default dlmalloc on wasm32. Its
+# transitive deps (`lock_api`, `allocator-api2`, `scopeguard`) are tiny
+# pure-Rust no_std crates. Native builds are untouched — the target cfg-gate
+# keeps all of it out of every non-wasm dependency graph.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+talc = "5.0.4"
+
 [lints]
 workspace = true

@@ -270,7 +270,8 @@ Notes:
   corpus-dependent and can hit a corpus that barely exercises the changed path
   *harder* than one that leans on it, and it does not touch the WASM-format wall.
   Allocation count is the right gate for the
-  **WASM-format** wall (dlmalloc memcpys on every heap growth, §6) *only when
+  **WASM-format** wall (allocator work in linear memory is costlier than
+  native malloc, §6) *only when
   storage stays cache-dense*, and a churn signal for native — never a substitute
   for the format-phase wall A/B itself (`tsv_debug profile` native rate with
   parse as the machine-state control, plus `wasm_format_probe`). Confirm the
@@ -322,9 +323,10 @@ noise floor before trusting any delta; on this workload the floor is roughly
 
 The tools above measure the native Rust side. Allocation *counts* are
 target-independent (heaptrack reads the same on either), but WASM *wall-time* is
-not: `@fuzdev/tsv_format_wasm` runs on dlmalloc, which memcpys on every heap
-growth, so an allocation-count win can move WASM format time even when the same
-change is a wash on native glibc. The full `deno task bench` is too coarse to
+not: `@fuzdev/tsv_format_wasm` runs on talc (the wasm32 `#[global_allocator]` in
+`tsv_wasm`; std's default dlmalloc before the swap), whose per-call cost profile
+differs from native glibc — so an allocation-count win can move WASM format time
+even when the same change is a wash on native. The full `deno task bench` is too coarse to
 see those single-digit-% moves; `benches/js/diagnostics/wasm_format_probe.ts` resolves
 them.
 

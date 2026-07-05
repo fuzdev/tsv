@@ -55,25 +55,24 @@ function file_size(path: URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-07-03 (the Svelte comment-island attach no longer re-parses
-// its emitted bytes into a `serde_json::Value` — the skeleton recorder walks
-// the wire tree structurally — so the last production `from_slice::<Value>`
-// left the convert path and serde_json's `Value` deserializer tree-shakes out
-// of the `parse` feature entirely): parse 1,120,110 B (−97 KB); all
-// 2,529,672 B (npm == deno, identical `.wasm`). format 2,302,533 B — ≈flat
-// (−10 KB from span-identity identifier emission + printer gates), since the
-// deleted machinery was convert-only. Bounds recentered ±8%.
+// Measured 2026-07-04 (two size cuts landed together: the wasm32 feature
+// baseline moved to `+simd128,+multivalue` — the multivalue return ABI
+// shrinks the pair-return-dense parse path most, ≈−9% parse / ≈−4.4%
+// format+all — and talc replaced std's default dlmalloc as the wasm32 global
+// allocator, dropping a few more KB per bundle): format 2,178,122 B; parse
+// 1,015,388 B; all 2,401,628 B (npm == deno, identical `.wasm`). Bounds
+// recentered ±8%.
 const BOUNDS = {
-	format: { min: 2_115_000, max: 2_490_000 },
-	parse: { min: 1_030_000, max: 1_210_000 },
-	all: { min: 2_325_000, max: 2_735_000 },
+	format: { min: 2_005_000, max: 2_350_000 },
+	parse: { min: 934_000, max: 1_097_000 },
+	all: { min: 2_210_000, max: 2_595_000 },
 };
 
 // all = format + parse. `all − format` is the parse feature (parser convert
-// path; measured 227,139 B — down from 312,547 B when it still carried the
+// path; measured 223,506 B — down from 312,547 B when it still carried the
 // comment-island round-trip's `Value` deserialization machinery); `all −
 // parse` is the format feature (printers + doc builder, dropped from the
-// parse-only build at link time; measured 1,409,562 B, ≈unchanged — the
+// parse-only build at link time; measured 1,386,240 B, ≈unchanged — the
 // gate-health signal). A delta near zero means a feature gate broke.
 const DELTAS = {
 	format: { min: 209_000, max: 245_000 }, // all − format
