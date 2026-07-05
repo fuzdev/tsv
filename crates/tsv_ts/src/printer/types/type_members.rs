@@ -143,6 +143,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_method_signature_member_doc(
         &self,
         method: &internal::TSMethodSignature<'_>,
+        deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
@@ -227,6 +228,7 @@ impl<'a> Printer<'a> {
             method.return_type.as_ref(),
             paren_pos,
             method.span.end,
+            deferred,
         );
         d.group(d.concat(&parts))
     }
@@ -237,14 +239,15 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_call_signature_member_doc(
         &self,
         call: &internal::TSCallSignatureDeclaration<'_>,
+        deferred: &mut DocBuf,
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
             call.type_parameters.as_ref(),
             call.params,
             call.return_type.as_ref(),
-            call.span.start,
-            call.span.end,
+            call.span,
             None,
+            deferred,
         )
     }
 
@@ -254,14 +257,15 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_construct_signature_member_doc(
         &self,
         ctor: &internal::TSConstructSignatureDeclaration<'_>,
+        deferred: &mut DocBuf,
     ) -> DocId {
         self.build_call_or_construct_signature_doc(
             ctor.type_parameters.as_ref(),
             ctor.params,
             ctor.return_type.as_ref(),
-            ctor.span.start,
-            ctor.span.end,
+            ctor.span,
             Some(ctor.span.start + "new".len() as u32),
+            deferred,
         )
     }
 
@@ -281,9 +285,9 @@ impl<'a> Printer<'a> {
         type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
         params: &[internal::Expression<'_>],
         return_type: Option<&internal::TSTypeAnnotation<'_>>,
-        span_start: u32,
-        span_end: u32,
+        span: internal::Span,
         new_keyword_end: Option<u32>,
+        deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
@@ -309,7 +313,7 @@ impl<'a> Printer<'a> {
         }
 
         // Find `(` (skip comments so a `(` inside one isn't matched).
-        let paren_search_start = type_parameters.map_or(span_start, |tp| tp.span.end);
+        let paren_search_start = type_parameters.map_or(span.start, |tp| tp.span.end);
         let paren_pos = find_char_skipping_comments(
             self.source.as_bytes(),
             paren_search_start as usize,
@@ -344,16 +348,16 @@ impl<'a> Printer<'a> {
             parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
         }
         // Comments between return type (or params) and `;`
-        self.append_signature_end_comments(&mut parts, return_type, paren_pos, span_end);
+        self.append_signature_end_comments(&mut parts, return_type, paren_pos, span.end, deferred);
         d.group(d.concat(&parts))
     }
 
     /// Build doc for a type member without its trailing `;` — the type-literal
     /// printer is responsible for the separator and any surrounding comments.
     /// `deferred` collects own-line comments in a member's content→`;` gap that must
-    /// render **after** the joiner's `;` (property signatures today; other member kinds
-    /// leave it empty — their own-line-before-`;` deferral is a tracked follow-up).
-    pub(super) fn build_type_member_doc_inner(
+    /// render **after** the joiner's `;` (matching prettier, since the member doc
+    /// doesn't own the `;`); empty on the common no-comment path.
+    pub(in crate::printer) fn build_type_member_doc_inner(
         &self,
         member: &TSTypeElement<'_>,
         deferred: &mut DocBuf,
@@ -363,14 +367,34 @@ impl<'a> Printer<'a> {
                 self.build_property_signature_member_doc(prop, deferred)
             }
             TSTypeElement::MethodSignature(method) => {
-                self.build_method_signature_member_doc(method)
+                self.build_method_signature_member_doc(method, deferred)
             }
-            TSTypeElement::CallSignature(call) => self.build_call_signature_member_doc(call),
+            TSTypeElement::CallSignature(call) => {
+                self.build_call_signature_member_doc(call, deferred)
+            }
             TSTypeElement::ConstructSignature(ctor) => {
-                self.build_construct_signature_member_doc(ctor)
+                self.build_construct_signature_member_doc(ctor, deferred)
             }
-            TSTypeElement::IndexSignature(idx) => self.build_index_signature_member_doc(idx),
+            TSTypeElement::IndexSignature(idx) => {
+                self.build_index_signature_member_doc(idx, deferred)
+            }
         }
+    }
+
+    /// Wrap a member doc with its own trailing `;` followed by the own-line comments
+    /// that deferred past the `;` (`deferred`). This is the **interface / class**
+    /// member idiom, where each member carries its own separator (unlike the
+    /// type-literal joiner, which owns the `;` and emits `deferred` in its member
+    /// loop). `deferred` is empty on the common no-comment path.
+    pub(in crate::printer) fn build_member_with_semicolon_doc(
+        &self,
+        member: DocId,
+        deferred: DocBuf,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![member, d.text(";")];
+        parts.extend(deferred);
+        d.concat(&parts)
     }
 
     /// Build a `TSIndexSignature` member (`static`? `readonly`? `[key: KeyType]`
@@ -401,6 +425,7 @@ impl<'a> Printer<'a> {
     pub(in crate::printer) fn build_index_signature_member_doc(
         &self,
         idx: &internal::TSIndexSignature<'_>,
+        deferred: &mut DocBuf,
     ) -> DocId {
         let d = self.d();
         let mut parts = smallvec![];
@@ -596,6 +621,18 @@ impl<'a> Printer<'a> {
             }
             _ => parts.push(val_annotation),
         }
+
+        // Comments in the value-type→`;` gap (`[k: string]: T /* c */;`). Without this
+        // they were dropped (content loss) — nothing else covers this gap: the member
+        // doc ends at the value type, and the joiner's `content_end` starts at the `;`.
+        // Same-line comments stay before the `;` (a block inline, a line via
+        // `line_suffix`); an own-line comment defers to `deferred` for the joiner to
+        // emit after the `;`, matching prettier.
+        deferred.extend(self.split_member_terminator_gap_comments(
+            &mut parts,
+            idx.type_annotation.span.end,
+            idx.span.end,
+        ));
 
         d.concat(&parts)
     }

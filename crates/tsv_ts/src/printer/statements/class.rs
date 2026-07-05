@@ -344,10 +344,12 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a class index signature: `[key: Type]: ValueType;`.
     /// Delegates to the shared `build_index_signature_member_doc` (which handles
     /// the `static`/`readonly` modifiers and every in-bracket comment gap) and
-    /// appends the trailing `;`, matching the interface caller.
+    /// appends the trailing `;`, matching the interface caller. An own-line comment
+    /// in the value-type→`;` gap defers past the `;` (prettier).
     fn build_index_signature_doc(&self, sig: &internal::TSIndexSignature<'_>) -> DocId {
-        let d = self.d();
-        d.concat(&[self.build_index_signature_member_doc(sig), d.text(";")])
+        let mut deferred = DocBuf::new();
+        let member = self.build_index_signature_member_doc(sig, &mut deferred);
+        self.build_member_with_semicolon_doc(member, deferred)
     }
 
     /// Build a Doc for a static initialization block

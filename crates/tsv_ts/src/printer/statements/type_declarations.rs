@@ -613,15 +613,19 @@ impl<'a> Printer<'a> {
             tail.push(self.build_signature_return_type_doc(paren_pos, return_type));
         }
 
-        // Comments between return type (or `)`) and `;`
+        // Comments between return type (or `)`) and `;`. An own-line comment defers
+        // past the `;` (prettier); here the `;` is in this same doc, so emit it locally.
+        let mut deferred = DocBuf::new();
         self.append_signature_end_comments(
             &mut tail,
             decl.return_type.as_ref(),
             paren_pos,
             decl.span.end,
+            &mut deferred,
         );
 
         tail.push(d.text(";"));
+        tail.extend(deferred);
 
         // Comments between `function` keyword and name; a line comment indents the
         // whole continuation (uniform declaration-header rule).
@@ -759,39 +763,12 @@ impl<'a> Printer<'a> {
 
     /// Build doc for a single type element
     fn build_type_element_doc(&self, elem: &internal::TSTypeElement<'_>) -> DocId {
-        let d = self.d();
-        match elem {
-            internal::TSTypeElement::PropertySignature(p) => {
-                // Shared with the type-literal printer; the only difference is
-                // the interface member carries its own `;`. An own-line comment in
-                // the member→`;` gap is deferred past the `;` (prettier).
-                let mut deferred = DocBuf::new();
-                let member = self.build_property_signature_member_doc(p, &mut deferred);
-                let mut parts: DocBuf = smallvec![member, d.text(";")];
-                parts.extend(deferred);
-                d.concat(&parts)
-            }
-            internal::TSTypeElement::MethodSignature(m) => {
-                // Shared with the type-literal printer; the interface member
-                // appends its own `;`.
-                d.concat(&[self.build_method_signature_member_doc(m), d.text(";")])
-            }
-            internal::TSTypeElement::CallSignature(c) => {
-                // Shared with the type-literal printer; the interface member
-                // appends its own `;`.
-                d.concat(&[self.build_call_signature_member_doc(c), d.text(";")])
-            }
-            internal::TSTypeElement::ConstructSignature(c) => {
-                // Shared with the type-literal printer; the interface member
-                // appends its own `;`.
-                d.concat(&[self.build_construct_signature_member_doc(c), d.text(";")])
-            }
-            internal::TSTypeElement::IndexSignature(i) => {
-                // Shared with the type-literal printer; the interface member
-                // appends its own `;`.
-                d.concat(&[self.build_index_signature_member_doc(i), d.text(";")])
-            }
-        }
+        // Every member doc is shared with the type-literal printer (via the same
+        // dispatcher); the only difference is the interface member carries its own
+        // `;`, with any own-line comment in the member→`;` gap deferred past it.
+        let mut deferred = DocBuf::new();
+        let member = self.build_type_member_doc_inner(elem, &mut deferred);
+        self.build_member_with_semicolon_doc(member, deferred)
     }
 
     /// Print an enum declaration: `enum Foo { A, B }` or `const enum Foo { A = 1 }`
