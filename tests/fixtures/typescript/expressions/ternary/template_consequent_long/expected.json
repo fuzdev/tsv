@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 306,
+	"end": 334,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " Ternary with template consequent exceeding print width",
+			"value": " Ternary with a template consequent exceeding printWidth (101 chars).",
 			"start": 20,
-			"end": 77,
+			"end": 91,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 58
+					"column": 72
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " Prettier: keeps template inline (101 chars), tsv: breaks at ${",
-			"start": 79,
-			"end": 144,
+			"value": " Compact source: the ${...} stays inline (atomized) in both tsv and prettier.",
+			"start": 93,
+			"end": 172,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,7 +38,7 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 66
+					"column": 80
 				}
 			}
 		}
@@ -46,12 +46,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 305,
+		"end": 333,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 296,
+			"end": 324,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -65,8 +65,8 @@
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 146,
-					"end": 295,
+					"start": 174,
+					"end": 323,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -80,8 +80,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 152,
-							"end": 294,
+							"start": 180,
+							"end": 322,
 							"loc": {
 								"start": {
 									"line": 4,
@@ -94,8 +94,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 152,
-								"end": 153,
+								"start": 180,
+								"end": 181,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -110,8 +110,8 @@
 							},
 							"init": {
 								"type": "ConditionalExpression",
-								"start": 156,
-								"end": 294,
+								"start": 184,
+								"end": 322,
 								"loc": {
 									"start": {
 										"line": 4,
@@ -124,8 +124,8 @@
 								},
 								"test": {
 									"type": "Identifier",
-									"start": 156,
-									"end": 181,
+									"start": 184,
+									"end": 209,
 									"loc": {
 										"start": {
 											"line": 4,
@@ -140,8 +140,8 @@
 								},
 								"consequent": {
 									"type": "TemplateLiteral",
-									"start": 186,
-									"end": 281,
+									"start": 214,
+									"end": 309,
 									"loc": {
 										"start": {
 											"line": 5,
@@ -155,8 +155,8 @@
 									"expressions": [
 										{
 											"type": "Identifier",
-											"start": 189,
-											"end": 279,
+											"start": 217,
+											"end": 307,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -173,8 +173,8 @@
 									"quasis": [
 										{
 											"type": "TemplateElement",
-											"start": 187,
-											"end": 187,
+											"start": 215,
+											"end": 215,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -193,8 +193,8 @@
 										},
 										{
 											"type": "TemplateElement",
-											"start": 280,
-											"end": 280,
+											"start": 308,
+											"end": 308,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -215,8 +215,8 @@
 								},
 								"alternate": {
 									"type": "Identifier",
-									"start": 286,
-									"end": 294,
+									"start": 314,
+									"end": 322,
 									"loc": {
 										"start": {
 											"line": 6,
@@ -236,15 +236,15 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " Ternary with template consequent exceeding print width",
+							"value": " Ternary with a template consequent exceeding printWidth (101 chars).",
 							"start": 20,
-							"end": 77
+							"end": 91
 						},
 						{
 							"type": "Line",
-							"value": " Prettier: keeps template inline (101 chars), tsv: breaks at ${",
-							"start": 79,
-							"end": 144
+							"value": " Compact source: the ${...} stays inline (atomized) in both tsv and prettier.",
+							"start": 93,
+							"end": 172
 						}
 					]
 				}

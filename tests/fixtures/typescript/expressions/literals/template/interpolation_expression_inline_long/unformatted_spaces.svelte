@@ -1,28 +1,28 @@
 <script lang="ts">
-	// Long member expression - we break when source is compact, prettier keeps inline
+	// Member expression, compact source - stays inline past printWidth (atomized), matches prettier
 	const a = `${ obj.aaa.bbb.ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc }` ;
 
-	// Multiple interpolations - we break when source is compact, prettier keeps inline
+	// Multiple interpolations, compact source - stay inline (atomized), matches prettier
 	const b = `${ obj.aaa.bbb }__${ fn() }__${ obj.ccc.ddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd }` ;
 
-	// Call chain - we break when source is compact, prettier keeps inline
+	// Call chain, compact source - stays inline (atomized), matches prettier
 	const c = `${ obj.fn().method().anotherrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr }` ;
 
-	// Tagged template - we break when source is compact, prettier keeps inline
+	// Tagged template, compact source - stays inline (atomized), matches prettier
 	const d = tag`text1 ${ obj.aaa.bbb.cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc }` ;
 
-	// Logical AND - qualifying, breaks at ${/}
+	// Logical AND (qualifying type) - compact source stays inline (atomized); breaks only with a source newline
 	const e = `${ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb }` ;
 
-	// Nullish coalescing - qualifying, breaks at ${/}
+	// Nullish coalescing (qualifying type) - compact source stays inline (atomized)
 	const f = `${ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ?? bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb }` ;
 
-	// TSAsExpression - qualifying, breaks at ${/}
+	// TSAsExpression (qualifying type) - compact source stays inline (atomized)
 	const g = `${ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa as BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB }` ;
 
-	// TSSatisfiesExpression - qualifying, breaks at ${/}
+	// TSSatisfiesExpression (qualifying type) - compact source stays inline (atomized)
 	const h = `${ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa satisfies BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB }` ;
 
-	// SequenceExpression - qualifying, breaks at ${/}
+	// SequenceExpression (qualifying type) - compact source stays inline (atomized)
 	const i = `${ (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) }` ;
 </script>

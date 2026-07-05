@@ -5,6 +5,7 @@
 
 use crate::ast::internal::Expression;
 use crate::printer::comments::CommentSpacing;
+use crate::printer::needs_parens::strip_non_null_wrappers;
 use crate::printer::{CommentVec, ParenContext, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -256,16 +257,25 @@ impl<'a> Printer<'a> {
             return true;
         }
         // Matches Prettier's qualifying types (template-literal.js:230-238):
-        // Identifier, MemberExpression, ConditionalExpression, SequenceExpression,
-        // isBinaryCastExpression (TSAsExpression, TSSatisfiesExpression),
-        // isBinaryish (BinaryExpression — folds &&, ||, ?? here). Other node kinds
-        // are non-qualifying: they either hug at ${/} and break internally, or (now
-        // that the softline wrap is gated on `interpolation_has_newline`) stay
-        // atomized inline, exactly as prettier renders them.
+        // Identifier, `isMemberExpression(stripChainElementWrappers(node))`,
+        // ConditionalExpression, SequenceExpression, isBinaryCastExpression
+        // (TSAsExpression, TSSatisfiesExpression), isBinaryish (BinaryExpression —
+        // folds &&, ||, ?? here). Other node kinds are non-qualifying: they either
+        // hug at ${/} and break internally, or (now that the softline wrap is gated
+        // on `interpolation_has_newline`) stay atomized inline, exactly as prettier
+        // renders them.
+        //
+        // Applying prettier's `stripChainElementWrappers` (here just the non-null
+        // peel — see `strip_non_null_wrappers`) before the member test makes
+        // `obj.a.b!` qualify like the bare `obj.a.b`, breaking at ${/} rather than
+        // mid-chain. Member-only: `foo()!` / `x!` stay non-qualifying, and
+        // `(obj.a as T)` already qualifies via TSAsExpression below.
         matches!(
+            strip_non_null_wrappers(expr),
+            Expression::MemberExpression(_)
+        ) || matches!(
             expr,
             Expression::Identifier(_)
-                | Expression::MemberExpression(_)
                 | Expression::ConditionalExpression(_)
                 | Expression::BinaryExpression(_)
                 | Expression::SequenceExpression(_)
