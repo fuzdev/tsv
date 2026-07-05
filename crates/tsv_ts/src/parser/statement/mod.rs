@@ -185,14 +185,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Contextual keyword `type` starts a type alias only when the name is
                 // on the SAME line (tsc `nextTokenIsIdentifierOnSameLine`). A line
                 // break demotes `type` to a plain identifier and ASI splits the
-                // statement in two. peek_kind() skips comments: `type /* c */ A = T`.
-                if self.current_value() == "type" && self.peek_is_same_line_identifier() {
+                // statement in two. The name may itself be a contextual type keyword
+                // (`type any = …`). peek_kind() skips comments: `type /* c */ A = T`.
+                if self.current_value() == "type" && self.peek_is_same_line_name_word() {
                     return self.parse_type_alias_declaration();
                 }
                 // Contextual keyword `interface` starts a declaration only when the
                 // name is on the SAME line (tsc `nextTokenIsIdentifierOnSameLine`); a
-                // line break demotes it to an identifier. peek_kind() skips comments.
-                if self.current_value() == "interface" && self.peek_is_same_line_identifier() {
+                // line break demotes it to an identifier. The name may itself be a
+                // contextual type keyword (`interface string {}`). peek_kind() skips comments.
+                if self.current_value() == "interface" && self.peek_is_same_line_name_word() {
                     return self.parse_interface_declaration();
                 }
                 // Contextual keyword `declare` is an ambient-declaration modifier only
@@ -215,11 +217,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Contextual keywords `namespace`/`module` start a declaration only
                 // when the name is on the SAME line (tsc
                 // `nextTokenIsIdentifierOrStringLiteralOnSameLine`); a line break
-                // demotes them to identifiers. Only `module` also takes a
+                // demotes them to identifiers. The name may itself be a contextual
+                // type keyword (`namespace number {}`). Only `module` also takes a
                 // string-literal name (`module 'x' {}`); acorn rejects
                 // `namespace 'x'`. peek_kind() skips comments.
                 if (matches!(self.current_value(), "namespace" | "module")
-                    && self.peek_is_same_line_identifier())
+                    && self.peek_is_same_line_name_word())
                     || (self.current_value() == "module"
                         && self.peek_kind() == TokenKind::String
                         && !self.peek_preceded_by_line_terminator())

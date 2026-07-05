@@ -83,23 +83,18 @@ const DEFAULT_ROOT = `${TS_REPO}/tests/cases/conformance/parser`;
  * (`…Declaration1` vs `…Declaration11`).
  */
 const KNOWN_GAPS: KnownGap[] = [
-	// Gap A — contextual type keywords (any/string/number/… — NOT reserved words)
-	// rejected as class / interface / namespace NAMES (incl. dotted namespace
-	// segments), though `let any` / `function string` / `class foo` parse.
-	{ pattern: 'parserClassDeclaration24.ts', category: 'type-keyword-decl-name', reason: 'class any {}' },
-	{ pattern: 'parserInterfaceDeclaration8.ts', category: 'type-keyword-decl-name', reason: 'interface string {}' },
-	{ pattern: 'parserModuleDeclaration6.ts', category: 'type-keyword-decl-name', reason: 'namespace number {}' },
-	{ pattern: 'parserModuleDeclaration7.ts', category: 'type-keyword-decl-name', reason: 'namespace number.a {}' },
-	{ pattern: 'parserModuleDeclaration8.ts', category: 'type-keyword-decl-name', reason: 'namespace a.number {}' },
-	{ pattern: 'parserModuleDeclaration9.ts', category: 'type-keyword-decl-name', reason: 'namespace a.number.b {}' },
-	{ pattern: 'parserModuleDeclaration11.ts', category: 'type-keyword-decl-name', reason: 'declare namespace string {…}' },
-	{ pattern: 'parserModuleDeclaration12.ts', category: 'type-keyword-decl-name', reason: 'namespace A.string {}' },
 	// Gap B — consecutive computed class members across ASI (no `;` between them).
 	{ pattern: 'parserComputedPropertyName29.ts', category: 'computed-member-asi', reason: 'class { [e] = id++⏎[e2]: number }' },
 	{ pattern: 'parserComputedPropertyName31.ts', category: 'computed-member-asi', reason: 'class { [e]: number⏎[e2]: number }' },
 	// Gap C — accessor WITH A BODY in a `declare` class (parse_declare_class_member).
 	{ pattern: 'parserAccessors5.ts', category: 'declare-accessor-body', reason: 'declare class { get foo() { return 0 } }' },
 	{ pattern: 'parserAccessors6.ts', category: 'declare-accessor-body', reason: 'declare class { set foo(v) {} }' },
+	// Gap D — contextual type keyword as the HEAD of a qualified TYPE name
+	// (`var x: string.X`, `number.A.B`). Distinct from the now-fixed Gap A
+	// (decl-name positions): this is the type parser, which emits a primitive
+	// `TSStringKeyword` and can't qualify it, where acorn/tsc read `string.X` as a
+	// `TSTypeReference`/`TSQualifiedName`. A tail keyword (`A.string`) already works.
+	{ pattern: 'parserModuleDeclaration11.ts', category: 'type-keyword-qualified-type', reason: 'var x: string.X' },
 ];
 
 const flags = new Set(Deno.args.filter((a) => a.startsWith('-')));
