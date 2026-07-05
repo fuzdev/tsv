@@ -168,6 +168,14 @@ pub enum DocNode {
 // route the payload through the pool instead.
 const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 
+// `DocNode` is a 32-byte AoS node, and the whole memory strategy is load-bearing on that:
+// the arena's node store is walked linearly at render, so the AoS layout's cache locality is
+// the point (SoA and per-variant boxing both measured worse), and shrinking the node has been
+// refuted repeatedly (a smaller node loses on this traversal-bound engine — the bumpalo lesson).
+// A variant that bloats it past 32 B would silently regress that locality with no other signal,
+// so pin the size — a change here is a deliberate decision, not an accident.
+const _: () = assert!(size_of::<DocNode>() == 32);
+
 /// A command in the printer's command stack.
 ///
 /// Holds a `DocId` index, making it `Copy` with no lifetime parameter.
