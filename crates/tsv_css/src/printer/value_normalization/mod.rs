@@ -11,8 +11,8 @@ mod splitting;
 pub(crate) use colors::format_color_from_source;
 pub(crate) use numbers::normalize_dimension_from_source;
 pub(crate) use splitting::{
-    extract_function_args, normalize_css_whitespace, normalize_value_spacing, split_args_by_comma,
-    split_by_space_preserving_parens, value_normalizes_to_self,
+    extract_function_args, normalize_css_whitespace, split_args_by_comma,
+    split_by_space_preserving_parens,
 };
 
 use std::borrow::Cow;
@@ -607,8 +607,8 @@ pub(crate) fn extract_string_value(decl_source: &str, quote: char) -> Option<Str
 pub(crate) fn extract_value_with_comments(decl_source: &str) -> Option<String> {
     if let Some(colon_pos) = find_declaration_colon(decl_source) {
         let value_with_ws = &decl_source[colon_pos + 1..];
-        let normalized = normalize_value_spacing(value_with_ws);
-        Some(normalized)
+        let normalized = normalize_css_whitespace(value_with_ws);
+        Some(normalized.into_owned())
     } else {
         None
     }

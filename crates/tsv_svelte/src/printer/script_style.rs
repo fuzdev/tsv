@@ -187,7 +187,7 @@ impl<'a> Printer<'a> {
     pub(crate) fn get_lang_attribute(
         &self,
         attributes: &[internal::AttributeNode<'_>],
-    ) -> Option<String> {
+    ) -> Option<&'a str> {
         let interner = self.interner.borrow();
         for attr_node in attributes {
             if let internal::AttributeNode::Attribute(attr) = attr_node {
@@ -197,9 +197,11 @@ impl<'a> Printer<'a> {
                 {
                     for part in value_parts {
                         if let internal::AttributeValue::Text(text) = part {
+                            // The value is a source slice (`&'a`), so callers compare
+                            // it without a per-call `String` allocation.
                             let lang = text.raw(self.source).trim();
                             let lang = lang.strip_prefix("text/").unwrap_or(lang);
-                            return Some(lang.to_string());
+                            return Some(lang);
                         }
                     }
                 }

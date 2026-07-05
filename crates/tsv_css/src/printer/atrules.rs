@@ -114,7 +114,7 @@ impl<'a> Printer<'a> {
                         let lower = if normalized.bytes().any(|b| b.is_ascii_uppercase()) {
                             Cow::Owned(normalized.to_ascii_lowercase())
                         } else {
-                            Cow::Borrowed(normalized.as_str())
+                            Cow::Borrowed(&*normalized)
                         };
                         if lower.contains(" and ")
                             || lower.contains(" or ")

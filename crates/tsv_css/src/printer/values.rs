@@ -74,19 +74,10 @@ impl<'a> Printer<'a> {
         if span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
             if !raw.is_empty() {
-                // Verbatim fast path: a value with no byte the normalizer acts on
-                // (the overwhelmingly-common single-token identifier — `red`,
-                // `flex`, `1px`, `100%`) normalizes to itself, so emit it as a
-                // zero-allocation `DocText::SourceSpan` — the same source borrow
-                // the number / dimension normalizers already take — instead of the
-                // fast-path `to_string()` + pool copy. A verbatim value can never
-                // contain `(`, so the paren-group branch below is unreachable for it.
-                if value_normalization::value_normalizes_to_self(raw) {
-                    return d.source_span(span, self.source);
-                }
-
                 // Normalize whitespace for parenthesized expressions
-                // (e.g., "(  100%  -  40px  )" → "(100% - 40px)")
+                // (e.g., "(  100%  -  40px  )" → "(100% - 40px)"). The
+                // overwhelmingly-common single-token identifier (`red`, `flex`,
+                // `1px`, `100%`) normalizes to itself and comes back `Cow::Borrowed`.
                 let normalized = value_normalization::normalize_css_whitespace(raw);
 
                 // Parenthesized groups with multiple space-separated tokens get
@@ -100,7 +91,15 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                return d.text_pooled(&normalized);
+                return match normalized {
+                    // Verbatim value: normalized == source[span], so emit a
+                    // zero-allocation `DocText::SourceSpan` — the same source borrow
+                    // the number / dimension normalizers take — instead of the pool
+                    // copy. (A verbatim value can never contain `(`, so it never
+                    // reaches the paren-group branch above.)
+                    Cow::Borrowed(_) => d.source_span(span, self.source),
+                    Cow::Owned(s) => d.text_pooled(&s),
+                };
             }
         }
         // Empty / whitespace-only span (the empty-identifier sentinel) or an
@@ -190,8 +189,13 @@ impl<'a> Printer<'a> {
     ///
     /// Preserves color syntax (hex, rgb, hsl, etc.) from source.
     fn build_color_doc(&self, color: &crate::ast::internal::Color, span: Span) -> DocId {
-        let formatted = value_normalization::format_color_from_source(color, self.source, span);
-        self.d().text_pooled(&formatted)
+        // A verbatim named color comes back `Cow::Borrowed` (== source[span]) and is
+        // emitted as a zero-allocation `DocText::SourceSpan`, like the identifier /
+        // dimension paths; hex and function syntaxes own their reconstructed text.
+        match value_normalization::format_color_from_source(color, self.source, span) {
+            Cow::Borrowed(_) => self.d().source_span(span, self.source),
+            Cow::Owned(s) => self.d().text_pooled(&s),
+        }
     }
 
     /// Build a flat (non-wrapping) `name(args_doc)` function doc.
