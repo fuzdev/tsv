@@ -633,7 +633,7 @@ impl<'a> Printer<'a> {
                         }
 
                         let state_inline =
-                            build_inline_args(d, callee_with_types, head_parts, last_arg_doc);
+                            build_inline_args(d, callee_with_types, &head_parts, last_arg_doc);
 
                         return d.conditional_group(&[
                             state_inline,
@@ -644,7 +644,7 @@ impl<'a> Printer<'a> {
 
                     // Block-body arrow/function: inline vs expand-all (no hug state)
                     let state_inline =
-                        build_inline_args(d, callee_with_types, head_parts, last_arg_doc);
+                        build_inline_args(d, callee_with_types, &head_parts, last_arg_doc);
                     let state_expand_all =
                         build_expand_all_args(d, callee_with_types, all_args_broken);
                     return d.conditional_group(&[state_inline, state_expand_all]);
@@ -660,7 +660,7 @@ impl<'a> Printer<'a> {
                     return build_inline_or_expand_all(
                         d,
                         callee_with_types,
-                        head_parts,
+                        &head_parts,
                         last_arg_doc,
                         all_args_broken,
                     );
@@ -671,7 +671,7 @@ impl<'a> Printer<'a> {
                     return build_inline_or_expand_all(
                         d,
                         callee_with_types,
-                        head_parts,
+                        &head_parts,
                         last_arg_doc,
                         all_args_broken,
                     );
@@ -679,7 +679,7 @@ impl<'a> Printer<'a> {
 
                 // No forced breaks: 3-state (inline → hug → expand all)
                 let state_inline =
-                    build_inline_args(d, callee_with_types, head_parts.clone(), last_arg_doc);
+                    build_inline_args(d, callee_with_types, &head_parts, last_arg_doc);
                 let state_hug = d.concat(&[
                     callee_with_types,
                     d.text("("),

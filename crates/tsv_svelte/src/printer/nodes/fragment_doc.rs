@@ -1214,20 +1214,21 @@ impl<'a> Printer<'a> {
     // Text nodes
     //
 
-    /// Split `s` into `[word, line, word, …]` fill parts (ASCII-whitespace separated,
-    /// matching `build_text_fill_doc_trimmed`'s word split, so non-breaking spaces stay
+    /// Append `s` as `[word, line, word, …]` fill parts (a `line` between words, none before
+    /// the first / after the last) directly into `parts` — no intermediate buffer. ASCII-whitespace
+    /// separated, matching `build_text_fill_doc_trimmed`'s word split (so non-breaking spaces stay
     /// attached). Used by the inline-element fold so the words after a folded element pack
     /// greedily into the surrounding fill rather than moving as one nested unit.
-    fn word_fill_parts(&self, s: &str) -> DocBuf {
+    fn extend_with_word_fill(&self, parts: &mut DocBuf, s: &str) {
         let d = self.d();
-        let mut parts: DocBuf = DocBuf::new();
+        let mut first = true;
         for word in s.split_ascii_whitespace() {
-            if !parts.is_empty() {
+            if !first {
                 parts.push(d.line());
             }
+            first = false;
             parts.push(d.text_pooled(word));
         }
-        parts
     }
 
     /// Build the after-element fold doc: one `fill([element, line, word …])` so the element's
@@ -1253,11 +1254,10 @@ impl<'a> Printer<'a> {
         sandwiched: bool,
     ) -> DocId {
         let d = self.d();
-        let words = self.word_fill_parts(raw);
         let mut parts = d.pooled_docbuf();
         parts.push(prev);
         parts.push(d.line());
-        parts.extend(words);
+        self.extend_with_word_fill(&mut parts, raw);
         if trailing_line {
             parts.push(d.line());
         }

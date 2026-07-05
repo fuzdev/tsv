@@ -544,13 +544,13 @@ pub(super) fn build_chain_expand_all_args(
 pub(crate) fn build_inline_args(
     d: &DocArena,
     callee: DocId,
-    head_parts: DocBuf,
+    head_parts: &[DocId],
     last_arg_doc: DocId,
 ) -> DocId {
     d.concat(&[
         callee,
         d.text("("),
-        d.concat(&head_parts),
+        d.concat(head_parts),
         last_arg_doc,
         d.text(")"),
     ])
@@ -570,7 +570,7 @@ pub(crate) fn build_inline_args(
 pub(crate) fn build_inline_or_expand_all(
     d: &DocArena,
     callee: DocId,
-    head_parts: DocBuf,
+    head_parts: &[DocId],
     last_arg_doc: DocId,
     all_args_broken: DocId,
 ) -> DocId {

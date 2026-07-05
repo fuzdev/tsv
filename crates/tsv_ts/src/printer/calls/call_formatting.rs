@@ -920,7 +920,7 @@ fn try_expand_last_function_arg(
                 return Some(d.conditional_group(&[state_break_body, state_expand_all]));
             }
 
-            let state_inline = build_inline_args(d, callee, head_parts, last_arg_doc);
+            let state_inline = build_inline_args(d, callee, &head_parts, last_arg_doc);
 
             return Some(d.conditional_group(&[state_inline, state_break_body, state_expand_all]));
         }
@@ -942,7 +942,7 @@ fn try_expand_last_function_arg(
             let body_doc =
                 prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
-            let state_inline = build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
+            let state_inline = build_inline_args(d, callee, &head_parts, last_arg_doc);
 
             let state_hug = d.concat(&[
                 callee,
@@ -977,7 +977,7 @@ fn try_expand_last_function_arg(
             return Some(build_inline_or_expand_all(
                 d,
                 callee,
-                head_parts,
+                &head_parts,
                 last_arg_doc,
                 all_args_broken,
             ));
@@ -1052,7 +1052,7 @@ fn try_expand_last_array_object_arg(
             return Some(build_inline_or_expand_all(
                 d,
                 callee,
-                head_parts,
+                &head_parts,
                 last_arg_doc,
                 all_args_broken,
             ));
@@ -1074,7 +1074,7 @@ fn try_expand_last_array_object_arg(
             return Some(build_inline_or_expand_all(
                 d,
                 callee,
-                head_parts,
+                &head_parts,
                 last_arg_doc,
                 all_args_broken,
             ));
@@ -1094,7 +1094,7 @@ fn try_expand_last_array_object_arg(
         // to break. This makes fits() return true when it hits the first line inside,
         // allowing the hug state to be selected when head args + opening bracket fit.
         // Matches Prettier: group(lastArg, { shouldBreak: true })
-        let state_inline = build_inline_args(d, callee, head_parts.clone(), last_arg_doc);
+        let state_inline = build_inline_args(d, callee, &head_parts, last_arg_doc);
         let state_hug = d.concat(&[
             callee,
             d.text("("),
