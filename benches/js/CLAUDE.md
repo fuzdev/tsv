@@ -566,8 +566,14 @@ Things the published numbers measure that aren't quite what they look like:
   noisiest in the report.
 - **Conformance-surface semantics (`BENCH_CORPUS=conformance`).** Parse-only
   by design, and the committed surface is **coverage-only** (per-tool preflight
-  parse success over the full fixtures-included corpus) — the timed phase is
-  skipped, so there is no committed throughput. If you run the ad-hoc timed
+  parse success over the fixtures-included corpus) — the timed phase is
+  skipped, so there is no committed throughput. The **Svelte** set has the
+  `svelte/compiler`-rejected files removed (the `bench:harvest:svelte-rejects`
+  cache, see §Corpus), so Svelte coverage reads as fidelity on *valid* Svelte
+  (svelte/compiler → 100%, the oracle) rather than raw success over the suite's
+  deliberately-invalid error fixtures; a *higher* number is better, not "more
+  permissive." TS/CSS keep the full set (acorn-ts trails, parseCss is lenient —
+  neither is a validity oracle). If you run the ad-hoc timed
   variant (coverage flag unset), its throughput is over the all-tools-pass
   intersection — an adversarial corpus that's the "easy" subset
   (`BENCH_MODE=union` audits what it hides). test262 files are

@@ -338,8 +338,8 @@ deno task bench:deno:run
 deno task bench:node:run
 deno task bench:bun:run
 
-# Conformance surface: per-tool parse COVERAGE, full fixtures-included corpus
-# (parse groups only) → report.conformance.node.{json,md}. Coverage-only + node-only
+# Conformance surface: per-tool parse COVERAGE, fixtures-included corpus (Svelte set
+# minus canonical-rejects) (parse groups only) → report.conformance.node.{json,md}. Coverage-only + node-only
 # by design (see "Perf vs conformance surfaces" above): entries carry null timing.
 deno task bench:conformance        # harvest + build:bench:node + coverage run
 deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)

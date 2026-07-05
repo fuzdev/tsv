@@ -36,7 +36,7 @@
  *   BENCH_MODE          'intersection' (default) | 'union' — iteration corpus mode
  *   BENCH_CORPUS        'perf' (default) | 'conformance' — corpus + surface selector:
  *                       perf = real-world corpus view, parse + format groups;
- *                       conformance = full fixtures-included view, parse groups only
+ *                       conformance = fixtures-included view (Svelte minus canonical-rejects), parse groups only
  *                       (see benches/js/CLAUDE.md §Corpus)
  *   BENCH_ALLOW_MISSING Set to 1 to tolerate missing corpus repos (default: off —
  *                       a missing required entry fails fast, since numbers from a
@@ -272,10 +272,11 @@ type CorpusKind = 'perf' | 'conformance';
 /**
  * Corpus + surface selector. Default `perf`: the real-world corpus view, parse
  * + format groups, writing `report.<runtime>.*` — the throughput headline.
- * `BENCH_CORPUS=conformance`: the full fixtures-included corpus view (real
- * repos + prettier suites + the parse-conformance suites), parse groups ONLY,
- * writing `report.conformance.<runtime>.*` — the per-tool parse
- * coverage/throughput surface. Format impls are deliberately excluded there:
+ * `BENCH_CORPUS=conformance`: the fixtures-included corpus view (real
+ * repos + prettier suites + the parse-conformance suites, minus the Svelte
+ * files svelte/compiler rejects — see `lib/corpus.ts` `SVELTE_REJECT_CACHE`),
+ * parse groups ONLY, writing `report.conformance.<runtime>.*` — the per-tool
+ * parse coverage/throughput surface. Format impls are deliberately excluded there:
  * grading formatter behavior on the fixture suites is the correctness gates'
  * job (`corpus:compare:format`), and timing it would put prettier/oxfmt/biome
  * through tens of thousands of fixture files for numbers nothing consumes.
@@ -886,9 +887,9 @@ interface Baseline {
 	runtime: Runtime;
 	/**
 	 * Which corpus/surface produced this report: `perf` (real-world corpus,
-	 * parse + format groups — `report.<runtime>.*`) or `conformance` (full
-	 * fixtures-included corpus, parse groups only —
-	 * `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
+	 * parse + format groups — `report.<runtime>.*`) or `conformance`
+	 * (fixtures-included corpus, Svelte set minus canonical-rejects, parse
+	 * groups only — `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
 	 */
 	corpus_kind: CorpusKind;
 	timestamp: string;
