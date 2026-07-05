@@ -36,8 +36,10 @@
  *   BENCH_MODE          'intersection' (default) | 'union' — iteration corpus mode
  *   BENCH_CORPUS        'perf' (default) | 'conformance' — corpus + surface selector:
  *                       perf = real-world corpus view, parse + format groups;
- *                       conformance = full fixtures-included view, parse groups only
+ *                       conformance = fixtures-included view (Svelte minus canonical-rejects), parse groups only
  *                       (see benches/js/CLAUDE.md §Corpus)
+ *   BENCH_COVERAGE_ONLY Set to 1 to emit coverage from pre-flight and SKIP the
+ *                       timed phase (requires BENCH_CORPUS=conformance). Default off
  *   BENCH_ALLOW_MISSING Set to 1 to tolerate missing corpus repos (default: off —
  *                       a missing required entry fails fast, since numbers from a
  *                       partial corpus aren't comparable to the committed reports)
@@ -78,6 +80,7 @@ import {
 	type EffectiveCorpusEntry,
 	generate_comparison_markdown,
 	generate_comparison_summary,
+	generate_coverage_only_markdown,
 	generate_effective_corpus_report,
 	generate_group_bench_table_markdown,
 	generate_group_coverage_markdown,
@@ -271,10 +274,11 @@ type CorpusKind = 'perf' | 'conformance';
 /**
  * Corpus + surface selector. Default `perf`: the real-world corpus view, parse
  * + format groups, writing `report.<runtime>.*` — the throughput headline.
- * `BENCH_CORPUS=conformance`: the full fixtures-included corpus view (real
- * repos + prettier suites + the parse-conformance suites), parse groups ONLY,
- * writing `report.conformance.<runtime>.*` — the per-tool parse
- * coverage/throughput surface. Format impls are deliberately excluded there:
+ * `BENCH_CORPUS=conformance`: the fixtures-included corpus view (real
+ * repos + prettier suites + the parse-conformance suites, minus the Svelte
+ * files svelte/compiler rejects — see `lib/corpus.ts` `SVELTE_REJECT_CACHE`),
+ * parse groups ONLY, writing `report.conformance.<runtime>.*` — the per-tool
+ * parse coverage/throughput surface. Format impls are deliberately excluded there:
  * grading formatter behavior on the fixture suites is the correctness gates'
  * job (`corpus:compare:format`), and timing it would put prettier/oxfmt/biome
  * through tens of thousands of fixture files for numbers nothing consumes.
@@ -317,6 +321,31 @@ const REPORT_TAG = IS_CONFORMANCE ? `conformance.${RUNTIME}` : RUNTIME;
  * window for a usable sample count. `BENCH_DURATION` overrides either.
  */
 const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5000);
+
+/**
+ * Coverage-only mode (`BENCH_COVERAGE_ONLY=1`): run pre-flight — which fully
+ * determines per-tool parse coverage — and emit the report straight from it,
+ * SKIPPING the timed benchmark phase entirely. That phase costs a fixed floor
+ * of ≥8 full-corpus sweeps per row (3 warmup + ≥5 measured) no matter how low
+ * `BENCH_DURATION` goes, yet the conformance surface's coverage consumers (the
+ * site's per-engine table, `derive_conformance_groups`) read only the
+ * pre-flight counts — so on a coverage refresh the whole timing cost is wasted.
+ * Entries are emitted with null timing stats; the output stays the same
+ * `report.<tag>.{json,md}` files (coverage is what a conformance report is
+ * for). Orthogonal to `BENCH_CORPUS`, but only meaningful with `conformance` —
+ * in perf mode the timing IS the headline.
+ */
+const COVERAGE_ONLY = env.BENCH_COVERAGE_ONLY === '1';
+if (COVERAGE_ONLY && !IS_CONFORMANCE) {
+	// Coverage-only is a conformance-surface mode. In perf mode it would skip the
+	// timed phase and then overwrite the perf report (`report.<runtime>.json`) with
+	// null-timing entries — corrupting the throughput headline. Reject the combo.
+	console.error(
+		'BENCH_COVERAGE_ONLY=1 requires BENCH_CORPUS=conformance (it is a conformance-only mode; ' +
+			'running it in perf mode would overwrite the perf report with null-timing entries).',
+	);
+	exit(1);
+}
 
 /** Maximum length of error message to display (longer messages are truncated) */
 const MAX_ERROR_MESSAGE_LENGTH = 200;
@@ -777,10 +806,14 @@ for (const lang of LANGUAGES) {
 	}
 }
 
-log('\nRunning benchmarks:');
-for (const lang of LANGUAGES) {
-	for (const operation of OPERATIONS) {
-		await run_benchmark_group(operation, lang);
+if (COVERAGE_ONLY) {
+	log('\nCoverage-only mode: skipping the timed benchmark phase (coverage is a pre-flight product).');
+} else {
+	log('\nRunning benchmarks:');
+	for (const lang of LANGUAGES) {
+		for (const operation of OPERATIONS) {
+			await run_benchmark_group(operation, lang);
+		}
 	}
 }
 
@@ -791,18 +824,21 @@ for (const lang of LANGUAGES) {
 interface BaselineEntry {
 	name: string;
 	group: string;
-	mean_ns: number;
-	p50_ns: number;
-	p75_ns: number;
-	p90_ns: number;
-	p95_ns: number;
-	p99_ns: number;
-	min_ns: number;
-	max_ns: number;
-	std_dev_ns: number;
-	cv: number;
-	ops_per_second: number;
-	sample_size: number;
+	// Timing stats — `null` in a coverage-only run (`BENCH_COVERAGE_ONLY=1`),
+	// which skips the timed phase and emits coverage from pre-flight alone. A
+	// timed run always fills them.
+	mean_ns: number | null;
+	p50_ns: number | null;
+	p75_ns: number | null;
+	p90_ns: number | null;
+	p95_ns: number | null;
+	p99_ns: number | null;
+	min_ns: number | null;
+	max_ns: number | null;
+	std_dev_ns: number | null;
+	cv: number | null;
+	ops_per_second: number | null;
+	sample_size: number | null;
 	/**
 	 * Files this impl successfully processed during preflight / the language's
 	 * total discovered files — the per-impl `Coverage:` line in the markdown
@@ -853,9 +889,9 @@ interface Baseline {
 	runtime: Runtime;
 	/**
 	 * Which corpus/surface produced this report: `perf` (real-world corpus,
-	 * parse + format groups — `report.<runtime>.*`) or `conformance` (full
-	 * fixtures-included corpus, parse groups only —
-	 * `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
+	 * parse + format groups — `report.<runtime>.*`) or `conformance`
+	 * (fixtures-included corpus, Svelte set minus canonical-rejects, parse
+	 * groups only — `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
 	 */
 	corpus_kind: CorpusKind;
 	timestamp: string;
@@ -919,6 +955,53 @@ async function get_git_commit(): Promise<string | null> {
 	return null;
 }
 
+/** Null timing stats — the coverage-only entry shape (no timed run happened). */
+const NULL_STATS = {
+	mean_ns: null,
+	p50_ns: null,
+	p75_ns: null,
+	p90_ns: null,
+	p95_ns: null,
+	p99_ns: null,
+	min_ns: null,
+	max_ns: null,
+	std_dev_ns: null,
+	cv: null,
+	ops_per_second: null,
+	sample_size: null,
+} as const;
+
+/**
+ * Coverage-only entries, synthesized from pre-flight state (no timed run). One
+ * row per impl per group, carrying the per-tool coverage counts with null
+ * timing — the shape `derive_conformance_groups` reads. Iterates
+ * `LANGUAGES × OPERATIONS` for a stable order matching pre-flight.
+ */
+function build_coverage_entries(): BaselineEntry[] {
+	const entries: BaselineEntry[] = [];
+	for (const language of LANGUAGES) {
+		for (const operation of OPERATIONS) {
+			const group_name = `${operation}/${language}`;
+			const tracking = task_tracking_by_group.get(group_name);
+			if (!tracking) continue;
+			for (const [name, tracking_key] of tracking) {
+				const coverage = effective_corpus_size.get(tracking_key);
+				const iterated = iterated_file_count.get(tracking_key);
+				entries.push({
+					name,
+					group: group_name,
+					...NULL_STATS,
+					files_processed: coverage?.processed ?? null,
+					files_total: coverage?.total ?? null,
+					files_iterated: iterated ?? null,
+					runtime: RUNTIME,
+				});
+			}
+		}
+	}
+	return entries;
+}
+
 /** Build results data from current benchmark run */
 async function build_results_data(
 	groups: GroupResults[],
@@ -927,34 +1010,38 @@ async function build_results_data(
 	binary_sizes: BinarySize[],
 ): Promise<Baseline> {
 	const entries: BaselineEntry[] = [];
-	for (const group of groups) {
-		// Resolve per-impl preflight coverage (the markdown `Coverage:` line) via
-		// the same display-name → tracking_key map the report uses.
-		const tracking = task_tracking_by_group.get(group.name);
-		for (const result of group.results) {
-			const tracking_key = tracking?.get(result.name);
-			const coverage = tracking_key ? effective_corpus_size.get(tracking_key) : undefined;
-			const iterated = tracking_key ? iterated_file_count.get(tracking_key) : undefined;
-			entries.push({
-				name: result.name,
-				group: group.name,
-				mean_ns: result.stats.mean_ns,
-				p50_ns: result.stats.p50_ns,
-				p75_ns: result.stats.p75_ns,
-				p90_ns: result.stats.p90_ns,
-				p95_ns: result.stats.p95_ns,
-				p99_ns: result.stats.p99_ns,
-				min_ns: result.stats.min_ns,
-				max_ns: result.stats.max_ns,
-				std_dev_ns: result.stats.std_dev_ns,
-				cv: result.stats.cv,
-				ops_per_second: result.stats.ops_per_second,
-				sample_size: result.stats.sample_size,
-				files_processed: coverage?.processed ?? null,
-				files_total: coverage?.total ?? null,
-				files_iterated: iterated ?? null,
-				runtime: RUNTIME,
-			});
+	if (COVERAGE_ONLY) {
+		entries.push(...build_coverage_entries());
+	} else {
+		for (const group of groups) {
+			// Resolve per-impl preflight coverage (the markdown `Coverage:` line) via
+			// the same display-name → tracking_key map the report uses.
+			const tracking = task_tracking_by_group.get(group.name);
+			for (const result of group.results) {
+				const tracking_key = tracking?.get(result.name);
+				const coverage = tracking_key ? effective_corpus_size.get(tracking_key) : undefined;
+				const iterated = tracking_key ? iterated_file_count.get(tracking_key) : undefined;
+				entries.push({
+					name: result.name,
+					group: group.name,
+					mean_ns: result.stats.mean_ns,
+					p50_ns: result.stats.p50_ns,
+					p75_ns: result.stats.p75_ns,
+					p90_ns: result.stats.p90_ns,
+					p95_ns: result.stats.p95_ns,
+					p99_ns: result.stats.p99_ns,
+					min_ns: result.stats.min_ns,
+					max_ns: result.stats.max_ns,
+					std_dev_ns: result.stats.std_dev_ns,
+					cv: result.stats.cv,
+					ops_per_second: result.stats.ops_per_second,
+					sample_size: result.stats.sample_size,
+					files_processed: coverage?.processed ?? null,
+					files_total: coverage?.total ?? null,
+					files_iterated: iterated ?? null,
+					runtime: RUNTIME,
+				});
+			}
 		}
 	}
 
@@ -1003,11 +1090,12 @@ function generate_markdown_report(
 	);
 	const commit_str = git_commit ? ` (${git_commit})` : '';
 	lines.push(`**Runtime:** ${RUNTIME}\n`);
+	const conformance_note = COVERAGE_ONLY
+		? 'conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
+		: 'conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; the headline is the per-tool Coverage lines (parse success over the valid set), with throughput measured on the all-tools-pass intersection';
 	lines.push(
 		`**Corpus kind:** ${
-			IS_CONFORMANCE
-				? 'conformance — full fixtures-included corpus, parse groups only; the headline is the per-tool Coverage lines (parse success over the full set), with throughput measured on the all-tools-pass intersection'
-				: 'perf — real-world code only (fixture suites excluded)'
+			IS_CONFORMANCE ? conformance_note : 'perf — real-world code only (fixture suites excluded)'
 		}\n`,
 	);
 	lines.push(`**Date:** ${timestamp} — tsv ${versions.tsv}${commit_str}\n`);
@@ -1044,6 +1132,14 @@ function generate_markdown_report(
 			'measured sequentially with no cross-file parallelism. The numbers are per-file, single-core ' +
 			'latency/throughput, not the multi-core batch throughput a CLI gets formatting many files at once.\n',
 	);
+
+	// Coverage-only run: no timed groups exist, so render the per-tool coverage
+	// tables straight from pre-flight state (the timed loop below no-ops).
+	if (COVERAGE_ONLY) {
+		lines.push(
+			...generate_coverage_only_markdown(LANGUAGES, OPERATIONS, task_tracking, effective_size),
+		);
+	}
 
 	for (const group of groups) {
 		if (group.results.length === 0) continue;
@@ -1086,12 +1182,16 @@ function generate_markdown_report(
 		}
 	}
 
-	// Convention note: every `Nx` in this report is speedup form — values > 1
-	// mean self is faster than the opponent. File counts are surfaced per
-	// group (Files / Coverage lines) and per row in the Comparisons tables.
-	lines.push(
-		'_Note: every `Nx` is speedup form — values > 1 mean self is faster. File counts come from the per-group `Files (intersection):` / `Coverage:` lines and the Comparisons table row labels._\n',
-	);
+	// Convention note + Comparisons table are throughput-only — skip them in a
+	// coverage-only run (no `Nx` speedups exist).
+	if (!COVERAGE_ONLY) {
+		// Convention note: every `Nx` in this report is speedup form — values > 1
+		// mean self is faster than the opponent. File counts are surfaced per
+		// group (Files / Coverage lines) and per row in the Comparisons tables.
+		lines.push(
+			'_Note: every `Nx` is speedup form — values > 1 mean self is faster. File counts come from the per-group `Files (intersection):` / `Coverage:` lines and the Comparisons table row labels._\n',
+		);
+	}
 
 	const binary_size_markdown = generate_binary_size_markdown(binary_sizes);
 	if (binary_size_markdown) {
@@ -1099,15 +1199,17 @@ function generate_markdown_report(
 		lines.push('');
 	}
 
-	const comparison_markdown = generate_comparison_markdown(
-		groups,
-		LANGUAGES,
-		iterated_counts,
-		task_tracking,
-	);
-	if (comparison_markdown) {
-		lines.push(comparison_markdown);
-		lines.push('');
+	if (!COVERAGE_ONLY) {
+		const comparison_markdown = generate_comparison_markdown(
+			groups,
+			LANGUAGES,
+			iterated_counts,
+			task_tracking,
+		);
+		if (comparison_markdown) {
+			lines.push(comparison_markdown);
+			lines.push('');
+		}
 	}
 
 	const skipped_markdown = generate_skipped_files_markdown(
@@ -1336,8 +1438,11 @@ if (args.json) {
 		),
 	);
 } else {
-	// Standard text output
-	console.log(generate_summary_report(all_group_results, LANGUAGES));
+	// Standard text output. The timed summary is empty in coverage-only mode —
+	// the effective-corpus report below carries the coverage picture instead.
+	if (!COVERAGE_ONLY) {
+		console.log(generate_summary_report(all_group_results, LANGUAGES));
+	}
 
 	console.log(generate_versions_info(versions));
 
@@ -1364,15 +1469,18 @@ if (args.json) {
 		console.log(binary_size_report);
 	}
 
-	// Compact comparison summary
-	console.log(
-		generate_comparison_summary(
-			all_group_results,
-			LANGUAGES,
-			iterated_file_count,
-			task_tracking_by_group,
-		),
-	);
+	// Compact comparison summary (throughput-only — nothing to compare in
+	// coverage-only mode)
+	if (!COVERAGE_ONLY) {
+		console.log(
+			generate_comparison_summary(
+				all_group_results,
+				LANGUAGES,
+				iterated_file_count,
+				task_tracking_by_group,
+			),
+		);
+	}
 
 	console.log('\n' + '='.repeat(80));
 }
@@ -1407,11 +1515,21 @@ if (write_report) {
 	log(`Skipped canonical report (limited run — pass --save-report to override)`);
 }
 
-// Handle baseline operations
+// Handle baseline operations. Coverage-only runs have no timing, so save/compare
+// are no-ops here — skip with a note rather than persisting/comparing an empty
+// baseline.
 if (args.save_baseline) {
-	await save_baseline(results_data);
+	if (COVERAGE_ONLY) {
+		log('Skipping --save-baseline in coverage-only mode (no timing measured).');
+	} else {
+		await save_baseline(results_data);
+	}
 }
 
 if (args.compare_baseline) {
-	await compare_baseline(results_data);
+	if (COVERAGE_ONLY) {
+		log('Skipping --compare-baseline in coverage-only mode (no timing measured).');
+	} else {
+		await compare_baseline(results_data);
+	}
 }

@@ -24,6 +24,21 @@ function coverage_pct(processed: number, total: number): number {
 	return processed === total ? 100 : Math.floor((processed / total) * 100);
 }
 
+/**
+ * Render one `**Coverage:** …` line from pre-resolved per-impl counts. Shared by
+ * `generate_group_coverage_markdown` (the perf/timed per-group summary) and
+ * `generate_coverage_only_markdown` (the conformance report) so the row format
+ * (`name processed/total (pct%)`) lives in exactly one place.
+ */
+function format_coverage_line(
+	rows: ReadonlyArray<{ name: string; processed: number; total: number }>,
+): string {
+	const parts = rows.map(
+		(e) => `${e.name} ${e.processed}/${e.total} (${coverage_pct(e.processed, e.total)}%)`,
+	);
+	return `**Coverage:** ${parts.join(', ')}`;
+}
+
 /** Create a visual bar for comparison (based on time - slower = longer bar) */
 function create_bar(value: number, max: number, width = 40): string {
 	const filled = Math.round((value / max) * width);
@@ -854,11 +869,43 @@ export function generate_group_coverage_markdown(
 	if (all_full || entries.length === 0) return null;
 	// Section presence already signals "some impl skipped"; per-row ⚠ added
 	// no signal when every row was sub-100% (the common case).
-	const parts = entries.map((e) => {
-		const pct = coverage_pct(e.processed, e.total);
-		return `${e.name} ${e.processed}/${e.total} (${pct}%)`;
-	});
-	return `**Coverage:** ${parts.join(', ')}`;
+	return format_coverage_line(entries);
+}
+
+/**
+ * Coverage-only conformance report body: one `## group` + `**Coverage:**`
+ * section per `language × operation`, rendered straight from pre-flight state
+ * (a `BENCH_COVERAGE_ONLY=1` run skips the timed phase, so no result groups
+ * exist). Unlike `generate_group_coverage_markdown` — the per-group perf
+ * summary, which suppresses a line when every impl processed 100% (there it's a
+ * "some impl skipped" warning) — every row is shown here including 100%, because
+ * coverage IS the conformance headline. Returns the lines to splice into the
+ * report (empty when no group has coverage data).
+ */
+export function generate_coverage_only_markdown(
+	languages: readonly Language[],
+	operations: readonly ('parse' | 'format')[],
+	task_tracking: Map<string, Map<string, string>>,
+	effective_corpus_size: Map<string, EffectiveCorpusEntry>,
+): string[] {
+	const lines: string[] = [];
+	for (const language of languages) {
+		for (const operation of operations) {
+			const group_name = `${operation}/${language}`;
+			const tracking = task_tracking.get(group_name);
+			if (!tracking) continue;
+			const rows: { name: string; processed: number; total: number }[] = [];
+			for (const [name, tracking_key] of tracking) {
+				const e = effective_corpus_size.get(tracking_key);
+				if (!e) continue;
+				rows.push({ name, processed: e.processed, total: e.total });
+			}
+			if (rows.length === 0) continue;
+			lines.push(`## ${group_name}\n`);
+			lines.push(format_coverage_line(rows), '');
+		}
+	}
+	return lines;
 }
 
 /**
