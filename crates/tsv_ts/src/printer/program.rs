@@ -169,7 +169,7 @@ impl<'a> Printer<'a> {
         force_non_inline: bool,
     ) -> Option<DocId> {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
         let mut last_comment_end = prev_end;
         let mut printed_any = false;
         let mut last_was_inline = false;

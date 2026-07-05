@@ -503,7 +503,8 @@ fn build_multiarg_short_chain_doc<'a, P: ChainPrinter>(
     let state_first_expanded = d.concat(&state_first_expanded_parts);
 
     // State: Everything expanded (first args broken, chain broken)
-    let rest_parts_hard = build_rest_parts_with_comments(rest_groups, printer, true, true);
+    let mut rest_parts_hard = d.pooled_docbuf();
+    build_rest_parts_with_comments(&mut rest_parts_hard, rest_groups, printer, true, true);
     let state_all_expanded = d.concat(&[first_expanded_doc, d.indent(d.concat(&rest_parts_hard))]);
 
     d.conditional_group(&[

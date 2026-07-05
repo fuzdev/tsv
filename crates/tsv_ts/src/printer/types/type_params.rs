@@ -253,7 +253,7 @@ impl<'a> Printer<'a> {
         param: &TSTypeParameter<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
+        let mut parts = d.pooled_docbuf();
 
         // Add modifiers in order: const, in, out
         if param.is_const {
