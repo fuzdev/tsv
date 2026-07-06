@@ -701,8 +701,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ..
         } = header;
 
-        // Method definition - use accessor_kind if set, otherwise check for constructor
-        let kind = accessor_kind.unwrap_or(if name_is_constructor {
+        // Method definition - use accessor_kind if set, otherwise check for
+        // constructor. A `static` method named `constructor` is NOT the class
+        // constructor (that name is only reserved on instance methods), so it
+        // stays `MethodKind::Method` — matching acorn.
+        let kind = accessor_kind.unwrap_or(if name_is_constructor && !is_static {
             MethodKind::Constructor
         } else {
             MethodKind::Method

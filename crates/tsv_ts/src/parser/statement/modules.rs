@@ -6,6 +6,19 @@ use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
 
+/// The parsed pieces of a module specifier that begins with the contextual
+/// `type` keyword, after acorn-typescript's type-only disambiguation has run.
+/// `left` is the imported/local name, `right` the optional rename target
+/// (local/exported), and `has_type_specifier` whether the leading `type` was
+/// the type-only modifier rather than the name itself. `end` is the end of the
+/// last token the specifier consumed (its span end).
+struct TypeSpecifierParts<'arena> {
+    left: Identifier<'arena>,
+    right: Option<ModuleExportName<'arena>>,
+    has_type_specifier: bool,
+    end: usize,
+}
+
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Wrap a declaration statement in an `ExportNamedDeclaration` with no
     /// specifiers or source (`export <declaration>`).
@@ -339,6 +352,180 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Whether the current token is the `as` keyword.
+    #[inline]
+    fn at_as_keyword(&self) -> bool {
+        matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As))
+    }
+
+    /// Whether the current token is an identifier or any keyword — acorn's
+    /// `tokenIsKeywordOrIdentifier` (an identifier-*shaped* word, reserved or
+    /// not), the test that drives the type-only specifier state machine below.
+    #[inline]
+    fn at_keyword_or_ident(&self) -> bool {
+        matches!(
+            self.current_kind(),
+            TokenKind::Identifier | TokenKind::Keyword(_)
+        )
+    }
+
+    /// Consume the current identifier-or-keyword token as an `Identifier`. Used
+    /// for the `as` word(s) in the type-only specifier state machine (a keyword
+    /// token, never escaped). Assumes [`Parser::at_keyword_or_ident`].
+    fn take_keyword_or_ident(&mut self) -> Result<Identifier<'arena>, ParseError> {
+        let (start, end) = self.current_pos();
+        let Some(name) = self.try_identifier_name() else {
+            return Err(self.error_expected("identifier in specifier"));
+        };
+        self.advance()?;
+        Ok(Identifier::simple(
+            name,
+            Span::new(start as u32, end as u32),
+        ))
+    }
+
+    /// Parse the rename target after `as` (`rightOfAs`): a `BindingIdentifier`
+    /// for an import (`import { x as local }`), or a `ModuleExportName` — an
+    /// identifier or a string — for an export (`export { local as 'name' }`).
+    fn parse_specifier_rename_target(
+        &mut self,
+        is_import: bool,
+    ) -> Result<(ModuleExportName<'arena>, usize), ParseError> {
+        if is_import {
+            let (start, end) = self.current_pos();
+            let Some(name) = self.try_binding_name() else {
+                return Err(self.error_expected_after("identifier", "as"));
+            };
+            self.advance()?;
+            Ok((
+                ModuleExportName::Identifier(Identifier::simple(
+                    name,
+                    Span::new(start as u32, end as u32),
+                )),
+                end,
+            ))
+        } else {
+            let (_, end) = self.current_pos();
+            Ok((self.parse_module_export_name()?, end))
+        }
+    }
+
+    /// Parse the name in the `{ type <name> … }` case (`leftOfAs` when `type` is
+    /// the type-only modifier). Import mirrors acorn's `parseIdent(true)` +
+    /// `checkUnreserved` unless a rename follows (so `import { type class }`
+    /// rejects but `import { type class as C }` accepts); export uses the same
+    /// identifier-or-contextual-keyword name its plain specifiers accept.
+    fn parse_type_modifier_name(
+        &mut self,
+        is_import: bool,
+    ) -> Result<(Identifier<'arena>, usize), ParseError> {
+        let (start, end) = self.current_pos();
+        let name = if is_import && self.peek_kind() == TokenKind::Keyword(KeywordKind::As) {
+            self.try_identifier_name()
+        } else {
+            self.try_ident_or_keyword_name()
+        };
+        let Some(name) = name else {
+            return Err(self.error_expected("identifier in specifier"));
+        };
+        self.advance()?;
+        Ok((
+            Identifier::simple(name, Span::new(start as u32, end as u32)),
+            end,
+        ))
+    }
+
+    /// Disambiguate a module specifier that begins with the contextual `type`
+    /// keyword: `type` may be the type-only modifier (`{ type A }`) or the name
+    /// itself (`{ type as age }` — a value import/export of a binding named
+    /// `type`, renamed). A faithful port of acorn-typescript's
+    /// `parseTypeOnlyImportExportSpecifier`, which needs a two-token lookahead
+    /// past the `as`(es):
+    ///
+    /// - `type as <name>` → `type` is the name (value), `as <name>` the rename
+    /// - `type as as` → `type` is the name (value), renamed to `as`
+    /// - `type as as <name>` → `as` is the name (type-only), renamed
+    /// - `type as` → `as` is the name (type-only)
+    /// - `type <name>` → `type` is the modifier (type-only)
+    /// - `type` → `type` is the name (value)
+    ///
+    /// `is_import` selects the rename-target grammar (see
+    /// [`Parser::parse_specifier_rename_target`]). The caller has already checked
+    /// the current token is the contextual `type` keyword.
+    fn parse_type_specifier_parts(
+        &mut self,
+        is_import: bool,
+    ) -> Result<TypeSpecifierParts<'arena>, ParseError> {
+        // The leading `type` is consumed as the tentative name (acorn's
+        // `node.imported/local = parseModuleExportName()`); the state machine may
+        // reassign `left` to a later token if `type` turns out to be the modifier.
+        let (type_start, type_end) = self.current_pos();
+        let mut left = Identifier::simple(
+            self.current_ident_name(),
+            Span::new(type_start as u32, type_end as u32),
+        );
+        self.advance()?; // consume `type`
+
+        let mut right: Option<ModuleExportName<'arena>> = None;
+        let mut has_type_specifier = false;
+        let mut can_parse_as = true;
+        let mut end = type_end;
+
+        if self.at_as_keyword() {
+            // `{ type as …? }`
+            let first_as = self.take_keyword_or_ident()?;
+            end = first_as.span.end as usize;
+            if self.at_as_keyword() {
+                // `{ type as as …? }`
+                let second_as = self.take_keyword_or_ident()?;
+                end = second_as.span.end as usize;
+                if self.at_keyword_or_ident() {
+                    // `{ type as as something }` — type-only, `as` is the name, renamed.
+                    has_type_specifier = true;
+                    left = first_as;
+                    let (r, r_end) = self.parse_specifier_rename_target(is_import)?;
+                    right = Some(r);
+                    end = r_end;
+                    can_parse_as = false;
+                } else {
+                    // `{ type as as }` — value, `type` is the name, renamed to `as`.
+                    right = Some(ModuleExportName::Identifier(second_as));
+                    can_parse_as = false;
+                }
+            } else if self.at_keyword_or_ident() {
+                // `{ type as something }` — value, `type` is the name, renamed.
+                can_parse_as = false;
+                let (r, r_end) = self.parse_specifier_rename_target(is_import)?;
+                right = Some(r);
+                end = r_end;
+            } else {
+                // `{ type as }` — type-only, `as` is the name.
+                has_type_specifier = true;
+                left = first_as;
+            }
+        } else if self.at_keyword_or_ident() {
+            // `{ type something …? }` — `type` is the modifier; `something` the name.
+            has_type_specifier = true;
+            let (name, name_end) = self.parse_type_modifier_name(is_import)?;
+            left = name;
+            end = name_end;
+        }
+
+        if can_parse_as && self.at_as_keyword() {
+            self.advance()?; // consume `as`
+            let (r, r_end) = self.parse_specifier_rename_target(is_import)?;
+            right = Some(r);
+            end = r_end;
+        }
+
+        Ok(TypeSpecifierParts {
+            left,
+            right,
+            has_type_specifier,
+            end,
+        })
+    }
+
     /// Parse export all declaration:
     /// - `export * from "y"`
     /// - `export * as ns from "y"`
@@ -402,36 +589,41 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         while !matches!(self.current_kind(), TokenKind::BraceClose) {
             let (spec_start, _) = self.current_pos();
 
-            // Check for inline type modifier: `export { type A, B }`.
-            // Not recognized inside `export type { ... }` (TS rejects doubled
-            // type modifiers), so `type A` there errors at `A` below.
-            let specifier_export_kind = if matches!(export_kind, ExportKind::Value)
+            // A specifier that begins with the contextual `type` keyword needs
+            // acorn's type-only disambiguation (`export { type as age }` is a
+            // value export of the local `type`, renamed — not the modifier),
+            // via the shared helper. Not recognized inside `export type { ... }`
+            // (TS rejects doubled type modifiers), so there `type A` falls to the
+            // plain path and errors at `A`.
+            if matches!(export_kind, ExportKind::Value)
                 && matches!(self.current_kind(), TokenKind::Identifier)
                 && self.current_value() == "type"
             {
-                // Look ahead to see if next is identifier or keyword-as-identifier
-                // (inline type) or 'as'/',' (regular export named "type")
-                let next_kind = self.peek_kind();
-                let next_is_identifier = matches!(next_kind, TokenKind::Identifier)
-                    || matches!(next_kind, TokenKind::Keyword(kw) if kw.can_be_identifier());
-                if next_is_identifier {
-                    self.advance()?; // consume 'type'
-                    ExportKind::Type
-                } else {
-                    ExportKind::Value
-                }
+                let parts = self.parse_type_specifier_parts(/* is_import */ false)?;
+                let local = ModuleExportName::Identifier(parts.left.clone());
+                let exported = parts
+                    .right
+                    .unwrap_or(ModuleExportName::Identifier(parts.left));
+                specifiers.push(ExportSpecifier {
+                    local,
+                    exported,
+                    export_kind: if parts.has_type_specifier {
+                        ExportKind::Type
+                    } else {
+                        ExportKind::Value
+                    },
+                    span: Span::new(spec_start as u32, parts.end as u32),
+                });
             } else {
-                ExportKind::Value
-            };
+                let (local, exported, spec_end) = self.parse_export_specifier_names()?;
 
-            let (local, exported, spec_end) = self.parse_export_specifier_names()?;
-
-            specifiers.push(ExportSpecifier {
-                local,
-                exported,
-                export_kind: specifier_export_kind,
-                span: Span::new(spec_start as u32, spec_end),
-            });
+                specifiers.push(ExportSpecifier {
+                    local,
+                    exported,
+                    export_kind: ExportKind::Value,
+                    span: Span::new(spec_start as u32, spec_end),
+                });
+            }
 
             // Check for comma
             if matches!(self.current_kind(), TokenKind::Comma) {
@@ -707,89 +899,104 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
                 let (spec_start, _) = self.current_pos();
 
-                // Check for inline type modifier: `import { type A, B } from "y"`
-                let specifier_import_kind = if matches!(self.current_kind(), TokenKind::Identifier)
+                // A specifier that begins with the contextual `type` keyword needs
+                // acorn's type-only disambiguation: `type` may be the modifier
+                // (`import { type A }`) or the imported name itself
+                // (`import { type as age }` — a value import of a binding named
+                // `type`, renamed). The two-token lookahead lives in the shared
+                // helper; every other specifier is a plain value import.
+                if matches!(self.current_kind(), TokenKind::Identifier)
                     && self.current_value() == "type"
                 {
-                    // Look ahead to see if next is identifier or keyword-as-identifier
-                    // (inline type) or 'as'/',' (regular import named "type")
-                    let next_kind = self.peek_kind();
-                    let next_is_identifier = matches!(next_kind, TokenKind::Identifier)
-                        || matches!(next_kind, TokenKind::Keyword(kw) if kw.can_be_identifier());
-                    if next_is_identifier {
-                        self.advance()?; // consume 'type'
-                        ImportKind::Type
-                    } else {
-                        ImportKind::Value
-                    }
-                } else {
-                    ImportKind::Value
-                };
-
-                // Parse imported name. Grammar:
-                //   ImportSpecifier : ImportedBinding
-                //                   | ModuleExportName as ImportedBinding
-                // With `as`, the first name is a `ModuleExportName` — a string
-                // (arbitrary module namespace name) or any `IdentifierName`
-                // including reserved words (`import { class as C }`). Without
-                // `as`, it is an `ImportedBinding` (a `BindingIdentifier`), so
-                // reserved words are rejected (`import { class }` is a syntax
-                // error, see `input_invalid_keyword_no_binding`).
-                let (imp_start, imp_end) = self.current_pos();
-                let imported = if matches!(self.current_kind(), TokenKind::String) {
-                    ModuleExportName::Literal(self.parse_string_literal()?)
-                } else {
-                    let imported_name = if self.peek_kind() == TokenKind::Keyword(KeywordKind::As) {
-                        self.try_identifier_name()
-                    } else {
-                        self.try_ident_or_keyword_name()
+                    let parts = self.parse_type_specifier_parts(/* is_import */ true)?;
+                    // An import's rename target is a `BindingIdentifier`, so `right`
+                    // is always an identifier here (never a string).
+                    let local = match parts.right {
+                        Some(ModuleExportName::Identifier(id)) => id,
+                        Some(ModuleExportName::Literal(_)) => {
+                            return Err(self.error_msg("an import binding must be an identifier"));
+                        }
+                        None => parts.left.clone(),
                     };
-                    let Some(imported_name) = imported_name else {
-                        return Err(self.error_expected("identifier in import specifier"));
-                    };
-                    self.advance()?;
-                    ModuleExportName::Identifier(Identifier::simple(
-                        imported_name,
-                        Span::new(imp_start as u32, imp_end as u32),
-                    ))
-                };
-
-                // Check for 'as' rename → local binding (always an identifier)
-                let (local, spec_end) =
-                    if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
-                        self.advance()?;
-
-                        let (local_start, local_end) = self.current_pos();
-                        let Some(local_name) = self.try_binding_name() else {
-                            return Err(self.error_expected_after("identifier", "as"));
+                    specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
+                        imported: ModuleExportName::Identifier(parts.left),
+                        local,
+                        import_kind: if parts.has_type_specifier {
+                            ImportKind::Type
+                        } else {
+                            ImportKind::Value
+                        },
+                        span: Span::new(spec_start as u32, parts.end as u32),
+                    }));
+                } else {
+                    // Parse imported name. Grammar:
+                    //   ImportSpecifier : ImportedBinding
+                    //                   | ModuleExportName as ImportedBinding
+                    // With `as`, the first name is a `ModuleExportName` — a string
+                    // (arbitrary module namespace name) or any `IdentifierName`
+                    // including reserved words (`import { class as C }`). Without
+                    // `as`, it is an `ImportedBinding` (a `BindingIdentifier`), so
+                    // reserved words are rejected (`import { class }` is a syntax
+                    // error, see `input_invalid_keyword_no_binding`).
+                    let (imp_start, imp_end) = self.current_pos();
+                    let imported = if matches!(self.current_kind(), TokenKind::String) {
+                        ModuleExportName::Literal(self.parse_string_literal()?)
+                    } else {
+                        let imported_name =
+                            if self.peek_kind() == TokenKind::Keyword(KeywordKind::As) {
+                                self.try_identifier_name()
+                            } else {
+                                self.try_ident_or_keyword_name()
+                            };
+                        let Some(imported_name) = imported_name else {
+                            return Err(self.error_expected("identifier in import specifier"));
                         };
                         self.advance()?;
-
-                        (
-                            Identifier::simple(
-                                local_name,
-                                Span::new(local_start as u32, local_end as u32),
-                            ),
-                            local_end,
-                        )
-                    } else {
-                        // No `as`: the local binding is the imported identifier itself.
-                        // A string imported name has no valid binding without `as` —
-                        // reject (matches acorn).
-                        match &imported {
-                            ModuleExportName::Identifier(id) => (id.clone(), imp_end),
-                            ModuleExportName::Literal(_) => {
-                                return Err(self.error_expected_after("'as'", "string import name"));
-                            }
-                        }
+                        ModuleExportName::Identifier(Identifier::simple(
+                            imported_name,
+                            Span::new(imp_start as u32, imp_end as u32),
+                        ))
                     };
 
-                specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
-                    imported,
-                    local,
-                    import_kind: specifier_import_kind,
-                    span: Span::new(spec_start as u32, spec_end as u32),
-                }));
+                    // Check for 'as' rename → local binding (always an identifier)
+                    let (local, spec_end) =
+                        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
+                            self.advance()?;
+
+                            let (local_start, local_end) = self.current_pos();
+                            let Some(local_name) = self.try_binding_name() else {
+                                return Err(self.error_expected_after("identifier", "as"));
+                            };
+                            self.advance()?;
+
+                            (
+                                Identifier::simple(
+                                    local_name,
+                                    Span::new(local_start as u32, local_end as u32),
+                                ),
+                                local_end,
+                            )
+                        } else {
+                            // No `as`: the local binding is the imported identifier itself.
+                            // A string imported name has no valid binding without `as` —
+                            // reject (matches acorn).
+                            match &imported {
+                                ModuleExportName::Identifier(id) => (id.clone(), imp_end),
+                                ModuleExportName::Literal(_) => {
+                                    return Err(
+                                        self.error_expected_after("'as'", "string import name")
+                                    );
+                                }
+                            }
+                        };
+
+                    specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
+                        imported,
+                        local,
+                        import_kind: ImportKind::Value,
+                        span: Span::new(spec_start as u32, spec_end as u32),
+                    }));
+                }
 
                 // Comma separator
                 if matches!(self.current_kind(), TokenKind::Comma) {
@@ -1007,6 +1214,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             return Err(self.error_expected("'require(...)' or a module reference after '='"));
         };
+
+        // The `type` modifier is valid on an import-equals only for an external
+        // module reference (`import type A = require('m')`); on an entity-name
+        // alias (`import type A = B.C`) tsc rejects it at parse time (TS1392), and
+        // acorn raises when `importKind === 'type'` and the reference is not a
+        // `TSExternalModuleReference`. (`export import X = …` always passes
+        // `ImportKind::Value`, so this never fires there.)
+        if matches!(import_kind, ImportKind::Type)
+            && !matches!(
+                module_reference,
+                TSModuleReference::ExternalModuleReference(_)
+            )
+        {
+            return Err(self.error_msg("an import alias cannot use 'import type'"));
+        }
 
         let end = self.semicolon_end()?;
 
