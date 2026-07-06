@@ -58,6 +58,7 @@ fn expression_skeleton(
         LocationMapper::identity(tracker),
         interner,
         CommentMode::Record(&recorder),
+        true, // skeleton pass: bytes discarded, loc irrelevant
     );
     recorder.finish()
 }
@@ -160,6 +161,7 @@ pub(super) fn build_declaration_tag_writer_comments(
         LocationMapper::identity(tracker),
         interner,
         CommentMode::Record(&recorder),
+        true, // skeleton pass: bytes discarded, loc irrelevant
     );
     let tree = recorder.finish();
     let mut out = WriterComments::default();
@@ -205,6 +207,7 @@ pub(super) fn build_expression_list_writer_comments(
             LocationMapper::identity(tracker),
             interner,
             CommentMode::Record(&recorder),
+            true, // skeleton pass: bytes discarded, loc irrelevant
         );
     }
     let tree = recorder.finish();
@@ -254,6 +257,7 @@ pub(super) fn build_script_writer_comments(
         schema,
         (dummy, dummy),
         CommentMode::Record(&recorder),
+        true, // skeleton pass: bytes discarded, loc irrelevant
     );
     let tree = recorder.finish();
     let root = tree.roots()[0];

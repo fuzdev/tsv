@@ -165,6 +165,18 @@ pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> V
     ast::convert::write_stylesheet_file_bytes(stylesheet.nodes, source)
 }
 
+/// The `no-locations` variant, for parity with the TS/Svelte writers and the
+/// uniform `lang_bindings!` macro. `parseCss` emits no per-node `loc`, so the
+/// CSS wire already carries only `start`/`end` offsets — this is an exact alias
+/// of `convert_ast_json_bytes` (a documented no-op, not a distinct shape).
+#[cfg(feature = "convert")]
+pub fn convert_ast_json_bytes_no_locations(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+) -> Vec<u8> {
+    convert_ast_json_bytes(stylesheet, source)
+}
+
 /// Like `convert_ast_json_bytes`, as a `String` for `&str` boundaries (the
 /// WASM binding's `JSON.parse`, N-API strings): same wire bytes plus one
 /// UTF-8 validation of the output.
@@ -173,6 +185,17 @@ pub fn convert_ast_json_bytes(stylesheet: &CssStyleSheet<'_>, source: &str) -> V
 pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(stylesheet, source))
         .expect("serde_json emits valid UTF-8")
+}
+
+/// The `String` form of `convert_ast_json_bytes_no_locations` (an alias — CSS
+/// has no `loc`).
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string_no_locations(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+) -> String {
+    convert_ast_json_string(stylesheet, source)
 }
 
 /// Drive the raw lexer over `source` and return a deterministic, line-per-token

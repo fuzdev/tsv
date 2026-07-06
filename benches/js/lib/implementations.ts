@@ -240,6 +240,19 @@ export function get_benchmark_tasks(
 			});
 		}
 
+		// Native parser, no-locations wire (span-only: no per-node `loc`). The
+		// payload-matched opponent to oxc-parser, whose default AST is also
+		// span-only. CSS is skipped — `parseCss` emits no `loc`, so a CSS
+		// no-locations row would duplicate `tsv-json`.
+		if (impls.native?.parse_no_locations && language !== 'css') {
+			tasks.push({
+				name: 'tsv-json-no-locations',
+				tracking_key: `${group_name}/native-no-locations`,
+				is_async: false,
+				run: (source) => impls.native!.parse_no_locations!(source, language),
+			});
+		}
+
 		// WASM parser (with JSON serialization)
 		if (impls.wasm) {
 			tasks.push({
@@ -247,6 +260,17 @@ export function get_benchmark_tasks(
 				tracking_key: `${group_name}/wasm`,
 				is_async: false,
 				run: (source) => impls.wasm!.parse(source, language),
+			});
+		}
+
+		// WASM parser, no-locations wire (span-only). Materialized in Rust like
+		// `tsv_wasm-json`, so the two are mechanism-matched. CSS skipped (no `loc`).
+		if (impls.wasm?.parse_no_locations && language !== 'css') {
+			tasks.push({
+				name: 'tsv_wasm-json-no-locations',
+				tracking_key: `${group_name}/wasm-no-locations`,
+				is_async: false,
+				run: (source) => impls.wasm!.parse_no_locations!(source, language),
 			});
 		}
 

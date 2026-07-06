@@ -69,7 +69,9 @@ const DISPLAY_ORDER = [
 	'prettier',
 	// tsv variants
 	'tsv-json',
+	'tsv-json-no-locations',
 	'tsv_wasm-json',
+	'tsv_wasm-json-no-locations',
 	'tsv',
 	'tsv_wasm',
 	// Internal variants (shown separately)
@@ -132,6 +134,10 @@ export function generate_summary_report(
 	}
 
 	// Parse performance comparison
+	// The `*-json-no-locations` rows render here as ordinary bars (they're not
+	// INTERNAL_PARSE_VARIANTS). TODO: add a curated "no-locations vs oxc-parser"
+	// summary line — that's the payload-matched comparison (same span-only shape),
+	// where plain `tsv-json` carries the richer loc-bearing drop-in AST.
 	lines.push('');
 	lines.push('Parse Performance:');
 	for (const lang of languages) {

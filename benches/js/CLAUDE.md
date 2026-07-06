@@ -715,17 +715,26 @@ Things the published numbers measure that aren't quite what they look like:
   - A `report.<runtime>.md` generated with the hook on has a narrower
     internal-vs-JSON-materializing-parser spread than a default (hook-off)
     run, so don't diff numbers across the two configurations line-for-line.
-- **`-json` parse rows are apples-to-apples; the `oxc-parser` "lazy" story
-  is a myth for the path we benchmark.** In oxc-parser's _default_ mode
-  (what we call), the AST is serialized to a JSON string in Rust and
-  deserialized in JS — the native `oxc-parser` package's `index.js`
-  `wrap()` runs `JSON.parse` on `.program` access (verified: `typeof
-  program === 'object'`), exactly the model `tsv-json` uses (Rust →
-  JSON string → FFI → `JSON.parse`) and `tsv_wasm-json` uses (Rust →
-  JSON string → boundary decode → engine `JSON.parse` via `js_sys`).
-  So `tsv-json` vs `oxc-parser` and `tsv_wasm-json` vs
-  `oxc-parser-wasm` are like-for-like full-materialization comparisons —
-  oxc is just faster at it. Two non-obvious points this turned up:
+- **`-json` parse rows are mechanism-matched but not payload-matched; the
+  `oxc-parser` "lazy" story is a myth for the path we benchmark.** In
+  oxc-parser's _default_ mode (what we call), the AST is serialized to a
+  JSON string in Rust and deserialized in JS — the native `oxc-parser`
+  package's `index.js` `wrap()` runs `JSON.parse` on `.program` access
+  (verified: `typeof program === 'object'`), exactly the model `tsv-json`
+  uses (Rust → JSON string → FFI → `JSON.parse`) and `tsv_wasm-json` uses
+  (Rust → JSON string → boundary decode → engine `JSON.parse` via
+  `js_sys`). So the rows are like-for-like full-materialization comparisons
+  in _mechanism_ — but the _deliverables_ differ: tsv emits the
+  acorn/svelte drop-in AST with per-node `loc` line/column objects
+  (measured: 46–48% of TS wire bytes and ~61% of its `JSON.parse` time —
+  three nested objects per node), while oxc's default AST is span-only (no
+  `loc`; it pads `decorators`/`optional`/`typeAnnotation` fields instead
+  and still nets ~30% fewer wire bytes per source byte). Measured with
+  `loc` stripped, tsv's wire is _smaller_ than oxc's and `JSON.parse`s
+  _faster_, and the two Rust parse+serialize sides are at parity — so a
+  large share of the row ratio is the richer deliverable the drop-in
+  contract mandates, not engine speed. Two further non-obvious points this
+  turned up:
   - **The WASI binding (`oxc-parser-wasm`) does _not_ wrap**, so `.program`
     is the raw unparsed JSON _string_ — `lib/oxc_wasm.ts` now `JSON.parse`s it
     so the row materializes like the others. Before that fix it skipped the

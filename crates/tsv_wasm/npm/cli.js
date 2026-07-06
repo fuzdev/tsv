@@ -58,6 +58,10 @@ const PARSERS = {
 	css: parse_css_json,
 };
 
+// TODO: wire a `--no-locations` parse flag (mirrors `tsv_cli`'s), routing to the
+// `parse_{typescript,svelte}_json_no_locations` wasm exports (css is a no-op).
+// Deferred: the native CLI + bench cover the variant; this is JS-CLI feature parity.
+
 /** Valid `--parser` values (shared by `format` and `parse` — `FORMATTERS` and
  * `PARSERS` are keyed by the same names). */
 const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);

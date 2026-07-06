@@ -51,6 +51,24 @@ remain the `Module` default. Only these two TS variants exist — no typed-objec
 wiring); add one only if a typed consumer needs it. `npm/cli.js` routes
 `tsv parse|format --goal` through them (TS only); see [../../docs/cli.md §Input Handling](../../docs/cli.md).
 
+## No-Locations Exports
+
+The opt-in **span-only** parse wire — the same AST minus the per-node `loc`
+(Svelte also minus `name_loc`) — is exposed as `parse_{typescript,svelte}_no_locations`
+(object, materialized in Rust via `js_sys::JSON::parse`) and their
+`parse_{typescript,svelte}_json_no_locations` string siblings. Like the goal-aware
+exports, these are **hand-written outside** `lang_bindings!` and **TS + Svelte only** —
+CSS's `parseCss` emits no `loc`, so a CSS variant would duplicate `parse_css`.
+The object form returns an untyped `JsValue` (`any`), **not** a `tsv_ast.d.ts`
+interface: those interfaces declare `loc` as required, and the shape here
+deliberately omits it, so there is no typed-object export and no `.d.ts` wiring.
+The object form exists (rather than string-only) so a benchmark of this path
+materializes in Rust exactly as `parse_*` does, keeping the comparison
+mechanism-matched. `loc` is derivable from `start`/`end` + source (see
+[../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API), so this is a distinct
+narrower product, not a second encoding of the drop-in contract. `npm/cli.js`
+does **not** yet route a `--no-locations` flag (a follow-on).
+
 ## Discovery Matcher + Policy (`IgnoreStack`)
 
 The `format` feature exports an `IgnoreStack` class wrapping

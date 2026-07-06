@@ -137,6 +137,7 @@ Parser auto-detected from extension (`.ts`/`.svelte`/`.css`). `--content` and `-
 ```bash
 cargo run -p tsv_cli parse file.ts                                       # compact JSON
 cargo run -p tsv_cli parse file.ts --pretty                              # formatted JSON
+cargo run -p tsv_cli parse file.ts --no-locations                        # span-only wire (no per-node loc; ~46% smaller)
 cargo run -p tsv_cli parse --content '<div>x</div>' --parser svelte      # parse string (preferred for agents)
 cargo run -p tsv_cli parse --stdin --parser svelte                       # parse stdin (not preferred for agents)
 cargo run -p tsv_cli format file.svelte src/lib                          # format files/dirs in place
