@@ -19,7 +19,7 @@ import { execFile } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { current_arch, current_os, current_runtime } from './runtime.ts';
+import { current_arch, current_os, current_runtime, native_library_filename } from './runtime.ts';
 
 const exec_file = promisify(execFile);
 
@@ -198,20 +198,18 @@ export async function collect_binary_sizes(
 ): Promise<BinarySize[]> {
 	const project_root = fileURLToPath(new URL('../../..', import.meta.url));
 	const node_modules = node_modules_dir();
-	const os = current_os();
 
 	// Stage 1: collect (label, kind, path) for everything that exists.
 	const staged: StagedEntry[] = [];
 
 	// tsv native (FFI shared library)
-	const ext = os === 'darwin' ? 'dylib' : os === 'windows' ? 'dll' : 'so';
-	const prefix = os === 'windows' ? '' : 'lib';
+	const ffi_lib = native_library_filename('tsv_ffi');
 	if (options?.has_native !== false) {
 		await push_size(
 			staged,
 			LABELS.tsv_ffi,
 			'native',
-			`${project_root}/target/release/${prefix}tsv_ffi.${ext}`,
+			`${project_root}/target/release/${ffi_lib}`,
 		);
 		// tsv format-only native — the native mirror of @fuzdev/tsv_format_wasm:
 		// dropping the convert/JSON layer (and the parse exports) leaves a
@@ -223,7 +221,7 @@ export async function collect_binary_sizes(
 			staged,
 			LABELS.tsv_format_ffi,
 			'native',
-			`${project_root}/target/ffi-format/release/${prefix}tsv_ffi.${ext}`,
+			`${project_root}/target/ffi-format/release/${ffi_lib}`,
 		);
 		// tsv parse-only native — the native mirror of @fuzdev/tsv_parse_wasm:
 		// keeps the parse exports + the convert/JSON layer and drops the printers,
@@ -234,7 +232,7 @@ export async function collect_binary_sizes(
 			staged,
 			LABELS.tsv_parse_ffi,
 			'native',
-			`${project_root}/target/ffi-parse/release/${prefix}tsv_ffi.${ext}`,
+			`${project_root}/target/ffi-parse/release/${ffi_lib}`,
 		);
 	}
 
@@ -246,7 +244,7 @@ export async function collect_binary_sizes(
 			staged,
 			LABELS.tsv_napi,
 			'native',
-			`${project_root}/target/release/${prefix}tsv_napi.${ext}`,
+			`${project_root}/target/release/${native_library_filename('tsv_napi')}`,
 		);
 	}
 

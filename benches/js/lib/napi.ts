@@ -20,11 +20,11 @@
 
 import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { current_os } from './runtime.ts';
+import { native_library_filename } from './runtime.ts';
 import type { Language, TsvImplementation } from './types.ts';
 
 /** The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI). */
-interface NapiAddon {
+export interface NapiAddon {
 	parse_svelte: (source: string) => string;
 	parse_internal_svelte: (source: string) => void;
 	format_svelte: (source: string) => string;
@@ -41,11 +41,8 @@ interface NapiAddon {
 
 /** Path to the built `tsv_napi` cdylib (loaded directly as an N-API addon). */
 export function get_napi_library_path(): string {
-	const os = current_os();
-	const ext = os === 'darwin' ? 'dylib' : os === 'windows' ? 'dll' : 'so';
-	const prefix = os === 'windows' ? '' : 'lib';
 	const project_root = fileURLToPath(new URL('../../../', import.meta.url));
-	return `${project_root}target/release/${prefix}tsv_napi.${ext}`;
+	return `${project_root}target/release/${native_library_filename('tsv_napi')}`;
 }
 
 export class NapiImplementation implements TsvImplementation {

@@ -445,16 +445,18 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 			const prettier = await canonical.format_async(file.content, lang, file.path);
 
 			// Prettier is the source of truth for the differential safety check
-			// below. An empty format of NON-empty source means prettier (the Deno
-			// sidecar) malfunctioned, not that the file is empty — and trusting it
+			// below. An empty format of NON-empty source means the in-process
+			// prettier malfunctioned, not that the file is empty — and trusting it
 			// is actively dangerous: an empty `prettier` inflates `prettier_excess`
 			// to the whole source, so the differential would CANCEL (mask) any real
 			// loss in `ours` (see the `safety_test.ts` "prettier-empty masks a real
-			// loss" case). Error out so the sidecar miss is surfaced rather than
-			// silently suppressing a safety verdict.
-			if (prettier === '' && file.content.trim() !== '') {
+			// loss" case). Whitespace-only output is semantically empty to the
+			// differential (`count_semantic_chars` strips whitespace), so it masks
+			// exactly the same way — hence `.trim()`. Error out so the miss is
+			// surfaced rather than silently suppressing a safety verdict.
+			if (prettier.trim() === '' && file.content.trim() !== '') {
 				throw new Error(
-					'prettier returned empty output for non-empty source (sidecar miss — safety verdict unreliable)',
+					'prettier returned empty output for non-empty source (prettier miss — safety verdict unreliable)',
 				);
 			}
 
@@ -491,7 +493,21 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 					});
 					tally_patterns(coverage, file.path, hunks);
 				} else {
-					// Unexplained safety violations — real data loss
+					// Unexplained safety violations — before recording data loss,
+					// self-verify: re-run the native format and require byte-identity
+					// with the first run. The historical Deno-FFI heisenbug fabricated
+					// SAFETY by corrupting OURS non-deterministically (see
+					// lib/ffi.ts + CLAUDE.md §Known Issues); a deterministic re-run is
+					// the discriminator (a real loss reproduces, corruption doesn't).
+					// On divergence, throw — the process's FFI layer can't be trusted
+					// for a verdict on this file, so it must surface as a loud error,
+					// never as a fabricated (or vanished) SAFETY finding.
+					const ours_verify = native.format(file.content, lang);
+					if (ours_verify !== ours) {
+						throw new Error(
+							'native format nondeterminism: two runs on identical input differ (FFI corruption — safety verdict unreliable)',
+						);
+					}
 					lang_stats.safety_violation++;
 					lang_results.push({
 						path: file.path,

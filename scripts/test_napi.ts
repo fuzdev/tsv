@@ -20,29 +20,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { get_napi_library_path, type NapiAddon } from '../benches/js/lib/napi.ts';
 
-/** The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI). */
-interface NapiAddon {
-	parse_typescript: (source: string) => string;
-	format_typescript: (source: string) => string;
-	format_css: (source: string) => string;
-	format_svelte: (source: string) => string;
-}
-
-/**
- * Path to the built `tsv_napi` cdylib, loaded directly as an N-API addon (no
- * `.node` rename). Mirrors `benches/js/lib/napi.ts` `get_napi_library_path`.
- */
-function napi_library_path(): string {
-	const ext =
-		process.platform === 'darwin' ? 'dylib' : process.platform === 'win32' ? 'dll' : 'so';
-	const prefix = process.platform === 'win32' ? '' : 'lib';
-	const project_root = fileURLToPath(new URL('../', import.meta.url));
-	return `${project_root}target/release/${prefix}tsv_napi.${ext}`;
-}
-
-const lib_path = napi_library_path();
+const lib_path = get_napi_library_path();
 if (!existsSync(lib_path)) {
 	console.error(`tsv_napi addon not found at ${lib_path}. Run 'deno task build:napi' first.`);
 	process.exit(1);

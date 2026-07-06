@@ -11,7 +11,9 @@
 //! # Safety
 //!
 //! These functions use raw pointers for FFI compatibility. The caller must ensure:
-//! - `source_ptr` points to valid UTF-8 data of `source_len` bytes
+//! - `source_ptr` points to valid UTF-8 data of `source_len` bytes (a null
+//!   `source_ptr` with `source_len == 0` is accepted as the empty source; a
+//!   null pointer with a non-zero length returns an error JSON)
 //! - `out_len` points to a valid `usize` location for writing the output length
 //! - The returned pointer is freed exactly once via `tsv_free`
 
@@ -31,12 +33,24 @@ use tsv_arena::with_doc_arena;
 /// Extract a &str from source pointer, or return an error result.
 ///
 /// # Safety
-/// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
+/// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes
+/// (a null `source_ptr` is tolerated when `source_len` is 0, and reported as an
+/// error otherwise).
 unsafe fn extract_source<'a>(
     source_ptr: *const u8,
     source_len: usize,
     out_len: *mut usize,
 ) -> Result<&'a str, *mut u8> {
+    // An empty source needs no read at all — and short-circuiting matters for
+    // soundness: `slice::from_raw_parts` requires a non-null pointer even for
+    // length 0, while FFI hosts commonly hand (null, 0) for an empty buffer
+    // (e.g. Deno's `UnsafePointer.of` on an empty typed array is null).
+    if source_len == 0 {
+        return Ok("");
+    }
+    if source_ptr.is_null() {
+        return Err(error_result("Null source pointer", out_len));
+    }
     let bytes = unsafe { slice::from_raw_parts(source_ptr, source_len) };
     match std::str::from_utf8(bytes) {
         Ok(s) => Ok(s),
@@ -495,6 +509,35 @@ mod tests {
                 "{label}: empty parse errored: {out}"
             );
         }
+    }
+
+    // --- null source pointer: (null, 0) is the empty source; (null, n>0) errors ---
+
+    #[test]
+    fn null_source_pointer_is_handled() {
+        let mut out_len: usize = 0;
+        // (null, 0) — the empty source, as FFI hosts commonly pass it (e.g.
+        // Deno's `UnsafePointer.of` on an empty typed array is null). Formats
+        // to empty output, no error.
+        // Safety: extract_source short-circuits before any read.
+        let ptr = unsafe { tsv_format_typescript(std::ptr::null(), 0, &raw mut out_len) };
+        assert!(!ptr.is_null(), "FFI returned a null pointer");
+        let out = unsafe { slice::from_raw_parts(ptr, out_len) };
+        assert_eq!(out, b"", "(null, 0) must format as the empty source");
+        unsafe { tsv_free(ptr, out_len) };
+
+        // (null, n>0) — an invalid buffer; must surface as an error JSON, not UB.
+        // Safety: the null check precedes any read of the (bogus) 5 bytes.
+        let ptr = unsafe { tsv_format_typescript(std::ptr::null(), 5, &raw mut out_len) };
+        assert!(!ptr.is_null(), "FFI returned a null pointer");
+        let out = unsafe { slice::from_raw_parts(ptr, out_len) };
+        let msg = error_message(std::str::from_utf8(out).expect("error JSON is UTF-8"))
+            .expect("expected an error object");
+        assert!(
+            msg.contains("Null source pointer"),
+            "expected a null-pointer error, got: {msg}"
+        );
+        unsafe { tsv_free(ptr, out_len) };
     }
 
     // --- tsv_free tolerates null / zero-length (documented no-op) ---

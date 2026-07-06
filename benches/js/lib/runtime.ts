@@ -56,3 +56,15 @@ export function current_arch(): string {
 			return node_arch;
 	}
 }
+
+/** Platform-shaped filename of a Rust cdylib built from `crate_name` —
+ * `libtsv_ffi.so` / `libtsv_ffi.dylib` / `tsv_ffi.dll`. The single home for
+ * the prefix/extension mapping shared by the FFI and N-API loaders, the
+ * binary-size table, the doctor's artifact checks, and the N-API boundary
+ * test. */
+export function native_library_filename(crate_name: string): string {
+	const os = current_os();
+	const ext = os === 'darwin' ? 'dylib' : os === 'windows' ? 'dll' : 'so';
+	const prefix = os === 'windows' ? '' : 'lib';
+	return `${prefix}${crate_name}.${ext}`;
+}

@@ -13,9 +13,12 @@ interface OxcParserModule {
 	parseSync: (filename: string, source: string) => { program: unknown; errors: unknown[] };
 }
 
-/** oxfmt module types */
+/** oxfmt module types (the subset of oxfmt's real option surface the bench sets) */
 interface OxfmtFormatOptions {
 	useTabs?: boolean;
+	printWidth?: number;
+	singleQuote?: boolean;
+	trailingComma?: 'all' | 'es5' | 'none';
 	/** Enable experimental Svelte support — `{}` accepts defaults. */
 	svelte?: boolean | Record<string, unknown>;
 }
@@ -101,7 +104,17 @@ export class OxcImplementation implements TsvImplementation {
 			throw new Error(`OXC formatter does not support ${language}`);
 		}
 
-		const options: OxfmtFormatOptions = { useTabs: true };
+		// Match the prettier/tsv config (printWidth 100, tabs, single quotes, no
+		// trailing commas) so every format row does the same layout work. oxfmt's
+		// own printWidth default is already 100 (pinned here so a future default
+		// change can't silently skew the rows); singleQuote (default false) and
+		// trailingComma differed for real.
+		const options: OxfmtFormatOptions = {
+			useTabs: true,
+			printWidth: 100,
+			singleQuote: true,
+			trailingComma: 'none',
+		};
 		// oxfmt gates .svelte handling behind the `svelte` config key (experimental as of 0.49).
 		if (language === 'svelte') options.svelte = {};
 

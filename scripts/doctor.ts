@@ -20,6 +20,7 @@
  */
 
 import { probe_node_modules } from '../benches/js/lib/check_node_modules.ts';
+import { native_library_filename } from '../benches/js/lib/runtime.ts';
 import { load_all_versions } from '../benches/js/lib/versions.ts';
 
 let warnings = 0;
@@ -206,16 +207,8 @@ try {
 // --- Build artifacts (informational) --------------------------------------------
 
 section('Build artifacts (built on demand — absence is normal before a run)');
-const ffi_lib = Deno.build.os === 'darwin'
-	? 'libtsv_ffi.dylib'
-	: Deno.build.os === 'windows'
-	? 'tsv_ffi.dll'
-	: 'libtsv_ffi.so';
-const napi_lib = Deno.build.os === 'darwin'
-	? 'libtsv_napi.dylib'
-	: Deno.build.os === 'windows'
-	? 'tsv_napi.dll'
-	: 'libtsv_napi.so';
+const ffi_lib = native_library_filename('tsv_ffi');
+const napi_lib = native_library_filename('tsv_napi');
 const artifacts: [string, string][] = [
 	[`target/release/${ffi_lib}`, 'deno task build:ffi'],
 	[`target/corpus/${ffi_lib}`, 'deno task build:ffi:corpus (conformance gates)'],

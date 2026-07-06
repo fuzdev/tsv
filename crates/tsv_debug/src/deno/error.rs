@@ -42,6 +42,11 @@ pub enum DenoError {
     #[error("sidecar response missing output")]
     MissingOutput,
 
+    /// Prettier returned empty output for non-empty input — the under-load
+    /// miss, never a real format result
+    #[error("prettier returned empty output for non-empty input (sidecar miss)")]
+    EmptyOutput,
+
     /// Sidecar process crashed
     #[error("deno sidecar process crashed")]
     SidecarCrashed,
@@ -64,6 +69,9 @@ impl DenoError {
             Self::ProcessSpawn(_) => "Check that 'deno' is in your PATH",
             Self::SidecarCrashed => "This may be a bug in the sidecar script",
             Self::Timeout { .. } => "The sidecar may be stuck processing a request",
+            Self::EmptyOutput => {
+                "Transient under load — re-run; if it persists, check the sidecar (tsv_debug check)"
+            }
             _ => "",
         }
     }

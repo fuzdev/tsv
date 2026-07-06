@@ -106,9 +106,10 @@ impl ValidationSummary {
         self.results.iter().filter(|r| r.has_errors())
     }
 
-    /// Count fixtures that failed due to Deno sidecar shutdown
+    /// Count fixtures that failed due to a transient Deno sidecar fault —
+    /// shutdown, crash, or the empty-output miss (`DenoError::EmptyOutput`)
     ///
-    /// A high count indicates the sidecar crashed during the test run,
+    /// A high count indicates the sidecar malfunctioned during the test run,
     /// causing cascading failures that aren't real fixture issues.
     ///
     /// Called from `tests/fixtures_tests.rs` (root-crate integration test).
@@ -121,7 +122,9 @@ impl ValidationSummary {
             .filter(|r| {
                 r.errors.iter().any(|e| {
                     matches!(e, ValidationError::FormatterError(msg) | ValidationError::ParserError(msg)
-                        if msg.contains("deno actor shut down") || msg.contains("sidecar crashed"))
+                        if msg.contains("deno actor shut down")
+                            || msg.contains("sidecar crashed")
+                            || msg.contains("returned empty output for non-empty input"))
                 })
             })
             .count()

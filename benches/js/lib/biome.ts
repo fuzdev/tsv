@@ -49,8 +49,12 @@ export class BiomeImplementation implements TsvImplementation {
 		const { projectKey } = this._biome.openProject('/tmp');
 		this._project_key = projectKey;
 
-		// Tab indent for every language to match prettier's style (the per-language
-		// `formatter.indentStyle` keys don't inherit the top-level one). Biome has no
+		// Match the prettier/tsv config — tabs, line width 100, single quotes, no
+		// trailing commas — so every format row does the same layout work (at
+		// biome's defaults, width 80 + double quotes, the rows wrap different
+		// amounts of code and the ratios conflate config with engine speed). The
+		// per-language `formatter.*` keys don't inherit the top-level ones, so
+		// each section repeats them. Biome has no
 		// dedicated Svelte formatter — `html.experimentalFullSupportEnabled` is what lets
 		// it format `.svelte` at all, via its experimental HTML-superset pipeline; that
 		// path formats the embedded `<script>`/`<style>` too (verified), so the svelte row
@@ -58,19 +62,29 @@ export class BiomeImplementation implements TsvImplementation {
 		this._biome.applyConfiguration(projectKey, {
 			formatter: {
 				indentStyle: 'tab',
+				lineWidth: 100,
 			},
 			javascript: {
 				formatter: {
 					indentStyle: 'tab',
+					lineWidth: 100,
+					quoteStyle: 'single',
+					trailingCommas: 'none',
 				},
 			},
 			css: {
 				formatter: {
 					indentStyle: 'tab',
+					lineWidth: 100,
+					quoteStyle: 'single',
 				},
 			},
 			html: {
 				experimentalFullSupportEnabled: true,
+				formatter: {
+					indentStyle: 'tab',
+					lineWidth: 100,
+				},
 			},
 		});
 	}
