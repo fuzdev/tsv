@@ -715,17 +715,26 @@ Things the published numbers measure that aren't quite what they look like:
   - A `report.<runtime>.md` generated with the hook on has a narrower
     internal-vs-JSON-materializing-parser spread than a default (hook-off)
     run, so don't diff numbers across the two configurations line-for-line.
-- **`-json` parse rows are apples-to-apples; the `oxc-parser` "lazy" story
-  is a myth for the path we benchmark.** In oxc-parser's _default_ mode
-  (what we call), the AST is serialized to a JSON string in Rust and
-  deserialized in JS — the native `oxc-parser` package's `index.js`
-  `wrap()` runs `JSON.parse` on `.program` access (verified: `typeof
-  program === 'object'`), exactly the model `tsv-json` uses (Rust →
-  JSON string → FFI → `JSON.parse`) and `tsv_wasm-json` uses (Rust →
-  JSON string → boundary decode → engine `JSON.parse` via `js_sys`).
-  So `tsv-json` vs `oxc-parser` and `tsv_wasm-json` vs
-  `oxc-parser-wasm` are like-for-like full-materialization comparisons —
-  oxc is just faster at it. Two non-obvious points this turned up:
+- **`-json` parse rows are mechanism-matched but not payload-matched; the
+  `oxc-parser` "lazy" story is a myth for the path we benchmark.** In
+  oxc-parser's _default_ mode (what we call), the AST is serialized to a
+  JSON string in Rust and deserialized in JS — the native `oxc-parser`
+  package's `index.js` `wrap()` runs `JSON.parse` on `.program` access
+  (verified: `typeof program === 'object'`), exactly the model `tsv-json`
+  uses (Rust → JSON string → FFI → `JSON.parse`) and `tsv_wasm-json` uses
+  (Rust → JSON string → boundary decode → engine `JSON.parse` via
+  `js_sys`). So the rows are like-for-like full-materialization comparisons
+  in _mechanism_ — but the _deliverables_ differ: tsv emits the
+  acorn/svelte drop-in AST with per-node `loc` line/column objects
+  (measured: 46–48% of TS wire bytes and ~61% of its `JSON.parse` time —
+  three nested objects per node), while oxc's default AST is span-only (no
+  `loc`; it pads `decorators`/`optional`/`typeAnnotation` fields instead
+  and still nets ~30% fewer wire bytes per source byte). Measured with
+  `loc` stripped, tsv's wire is _smaller_ than oxc's and `JSON.parse`s
+  _faster_, and the two Rust parse+serialize sides are at parity — so a
+  large share of the row ratio is the richer deliverable the drop-in
+  contract mandates, not engine speed. Two further non-obvious points this
+  turned up:
   - **The WASI binding (`oxc-parser-wasm`) does _not_ wrap**, so `.program`
     is the raw unparsed JSON _string_ — `lib/oxc_wasm.ts` now `JSON.parse`s it
     so the row materializes like the others. Before that fix it skipped the
@@ -1164,6 +1173,26 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
   `deno run --allow-read --allow-env --allow-net --allow-sys --config benches/js/deno.json benches/js/diagnostics/acorn_dup_fuzz.ts`
 - `diagnostics/wasm_json_probe.ts` — split parse cost into pure-parse vs materialization for
   native + WASM, isolating JS-side `JSON.parse`.
+- `diagnostics/no_locations_parity.ts` — prove the `no-locations` wire is losslessly
+  reconstructible: parse each corpus file the full (loc-bearing) way as the oracle, rebuild
+  `loc` from `start`/`end` (UTF-16 offsets) + source via the ECMAScript (TS) / LF-only
+  (Svelte) line rules, and assert equality. TS is 100% exact; the two Svelte non-derivable
+  cases (the `<script>` `Program` tag-position override, the destructure `+1`-column quirk)
+  are classified, not failed. Exits 1 on any unexplained mismatch. The reference
+  reconstruction a `no-locations` consumer would use. Run:
+  `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/no_locations_parity.ts`
+- `diagnostics/reconstruct_vs_materialize.ts` — the **perf** sibling of the parity
+  check above: for a consumer that needs full `loc`, is it faster to (A) get the
+  full loc-bearing wire (materialized in Rust) or (B) get the smaller `no-locations`
+  wire and reconstruct `loc` in JS? Times A / B (dogfoods the shipped
+  `create_locator().reconstruct()` helper) / B' (no-loc parse only) end-to-end over
+  the `perf` corpus (TS exact, Svelte approximate) and prints sum-of-medians + the
+  A/B, A/B' ratios. Finding: B beats A (the full wire's `loc` bytes cost real
+  `JSON.parse`), so pre-materializing `loc` in Rust isn't optimal for JS consumers.
+  Feeds the committed report's consumer-side note (`report.ts`
+  `generate_reconstruct_note`). `BENCH_LIMIT` (files/lang) + `BENCH_FILTER` (path
+  substring) tune it. Run:
+  `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/reconstruct_vs_materialize.ts`
 - `diagnostics/wasm_format_probe.ts` — measure WASM **format** wall-time at the resolution
   the full bench folds into noise (single-digit-% changes). A/Bs two WASM builds
   (copy `pkg/all/deno` aside before editing, rebuild, pass `--baseline

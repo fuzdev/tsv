@@ -66,6 +66,13 @@ only — file paths are always formatted as modules (Svelte and CSS have no goal
 passing `--goal` with a path argument is a usage error (exit 2 for `format`). Both
 goals are strict; see [conformance_test262.md §Strict Mode Only, Explicit Goal Axis](./conformance_test262.md#design-decision-strict-mode-only-explicit-goal-axis).
 
+`parse` also takes `--no-locations`: it emits the span-only wire — `start`/`end`
+offsets but no per-node `loc` (line/column) object, and for Svelte no `name_loc`
+either. `loc` is derivable from the offsets plus source, so nothing is lost for a
+consumer that has the source; it mirrors acorn's `locations: false`. No-op for CSS
+(`parseCss` emits no `loc`). Orthogonal to `--goal` (goal drives the parser,
+`--no-locations` the writer), so the two compose.
+
 Implemented in `tsv_cli/src/cli/input.rs`
 
 ## Multi-File Formatting

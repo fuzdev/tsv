@@ -31,6 +31,7 @@ macro_rules! lang_bindings {
     (
         $lang:ident,
         $parse_fn:ident, $parse_js:literal,
+        $parse_no_loc_fn:ident, $parse_no_loc_js:literal,
         $parse_internal_fn:ident, $parse_internal_js:literal,
         $format_fn:ident, $format_js:literal
     ) => {
@@ -42,6 +43,18 @@ macro_rules! lang_bindings {
                 let ast = $lang::parse(&source, arena)
                     .map_err(|e| napi::Error::from_reason(e.to_string()))?;
                 Ok($lang::convert_ast_json_string(&ast, &source))
+            })
+        }
+
+        /// Parse source and return its JSON AST string **without** per-node `loc`
+        /// (the span-only `no-locations` wire). CSS is identical to `$parse_fn`.
+        #[cfg(feature = "parse")]
+        #[napi(js_name = $parse_no_loc_js)]
+        pub fn $parse_no_loc_fn(source: String) -> napi::Result<String> {
+            with_ast_arena(|arena| {
+                let ast = $lang::parse(&source, arena)
+                    .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+                Ok($lang::convert_ast_json_string_no_locations(&ast, &source))
             })
         }
 
@@ -78,6 +91,8 @@ lang_bindings!(
     tsv_svelte,
     parse_svelte,
     "parse_svelte",
+    parse_svelte_no_locations,
+    "parse_svelte_no_locations",
     parse_internal_svelte,
     "parse_internal_svelte",
     format_svelte,
@@ -87,6 +102,8 @@ lang_bindings!(
     tsv_ts,
     parse_typescript,
     "parse_typescript",
+    parse_typescript_no_locations,
+    "parse_typescript_no_locations",
     parse_internal_typescript,
     "parse_internal_typescript",
     format_typescript,
@@ -96,6 +113,8 @@ lang_bindings!(
     tsv_css,
     parse_css,
     "parse_css",
+    parse_css_no_locations,
+    "parse_css_no_locations",
     parse_internal_css,
     "parse_internal_css",
     format_css,

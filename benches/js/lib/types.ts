@@ -67,6 +67,13 @@ export interface TsvImplementation {
 	/** Parse source without JSON serialization (native/wasm only, for measuring pure parse speed) */
 	parse_internal?(source: string, language: Language): void;
 
+	/**
+	 * Parse source dropping per-node `loc` (the span-only `no-locations` wire) —
+	 * the payload-matched comparison against oxc-parser's span-only default AST.
+	 * Native/wasm only; TypeScript + Svelte only (CSS emits no `loc`).
+	 */
+	parse_no_locations?(source: string, language: Language): unknown;
+
 	/** Format source synchronously (native, wasm) */
 	format?(source: string, language: Language): string;
 

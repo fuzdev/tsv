@@ -83,9 +83,29 @@ use super::special::{
 /// One AST walk, no intermediate `serde_json::Value` for the spine — the fused
 /// char-space wire the FFI/CLI/WASM parse bindings ship.
 pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u8> {
+    write_root_bytes_variant(root, source, true)
+}
+
+/// The `no-locations` variant of `write_root_bytes`: drops every line/column
+/// object from the Svelte wire — the acorn `loc` on `<script>`/`{expr}` nodes,
+/// the `name_loc` on elements/attributes/directives, and the root-comment
+/// `loc`. Only `start`/`end` offsets remain; nothing else changes. Because that
+/// removes *all* line/column emission, the LF line table is never queried.
+pub(crate) fn write_root_bytes_no_locations(root: &internal::Root<'_>, source: &str) -> Vec<u8> {
+    write_root_bytes_variant(root, source, false)
+}
+
+fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: bool) -> Vec<u8> {
     // LF-only tracker (Svelte's `locate-character` convention) + byte→UTF-16 map
-    // in one source scan; the identity map short-circuits on ASCII.
-    let (tracker, map) = LocationTracker::new_with_map(source);
+    // in one source scan; the identity map short-circuits on ASCII. The
+    // `no-locations` path emits no line/column at all (loc, name_loc, and
+    // root-comment loc are all gated off), so it skips the LF line scan entirely
+    // (`new_map_only` builds just the byte→char map) — once per file, no per-node cost.
+    let (tracker, map) = if emit_loc {
+        LocationTracker::new_with_map(source)
+    } else {
+        LocationTracker::new_map_only(source)
+    };
     let interner = root.interner.borrow();
 
     // Template comments (outside `<script>` content spans) are the only comments
@@ -108,6 +128,7 @@ pub(crate) fn write_root_bytes(root: &internal::Root<'_>, source: &str) -> Vec<u
         // Component-global: `lang="ts"` on any script makes *every* script emit the
         // acorn-typescript wire shape (Svelte's single `this.ts` flag).
         component_is_ts: component_is_typescript(root, source, &interner),
+        emit_loc,
     };
 
     let mut w = JsonWriter::with_capacity(estimated_json_capacity(source.len()));
@@ -134,6 +155,11 @@ struct Ctx<'a> {
     /// wire schema (`Schema::Acorn` vs `Schema::SvelteScript`), so a plain `<script>` beside a
     /// `lang="ts"` sibling still emits the acorn-typescript import/export shape.
     component_is_ts: bool,
+    /// Whether to emit line/column data (the acorn `loc`, `name_loc`, and
+    /// root-comment `loc`). `true` for the default drop-in wire; `false` for the
+    /// opt-in `no-locations` variant (offsets only). Threaded into the embedded
+    /// `tsv_ts` writers so `<script>`/`{expr}` islands drop `loc` in lockstep.
+    emit_loc: bool,
 }
 
 impl<'a> Ctx<'a> {
@@ -244,12 +270,8 @@ fn write_root(w: &mut JsonWriter, root: &internal::Root<'_>, ctx: &Ctx<'_>) {
 /// `character` in its `loc` — the `emit_character_field` axis keys both
 /// differences.
 fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
-    let (start_char, start_pos) = ctx.loc.pos_and_position(comment.span.start);
-    let (end_char, end_pos) = ctx.loc.pos_and_position(comment.span.end);
-    // The block-pattern synthetic-`(` column shift (`bump_pattern_columns`);
-    // a multiline block comment's `end` sits on an unshifted later line.
-    let bump = usize::from(comment.bump_pattern_columns);
-    let bump_end = usize::from(comment.bump_pattern_columns && !comment.multiline);
+    let start_char = ctx.loc.pos(comment.span.start);
+    let end_char = ctx.loc.pos(comment.span.end);
     w.raw("{\"type\":\"");
     w.raw(if comment.is_block { "Block" } else { "Line" });
     if comment.emit_character_field {
@@ -267,6 +289,17 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
         w.raw(",\"end\":");
         w.u32(end_char);
     }
+    if !ctx.emit_loc {
+        // `no-locations`: no `loc` on the comment; close the object directly.
+        w.raw("}");
+        return;
+    }
+    let start_pos = ctx.loc.pos_and_position(comment.span.start).1;
+    let end_pos = ctx.loc.pos_and_position(comment.span.end).1;
+    // The block-pattern synthetic-`(` column shift (`bump_pattern_columns`);
+    // a multiline block comment's `end` sits on an unshifted later line.
+    let bump = usize::from(comment.bump_pattern_columns);
+    let bump_end = usize::from(comment.bump_pattern_columns && !comment.multiline);
     w.raw(",\"loc\":{\"start\":{\"line\":");
     w.usize(start_pos.line);
     w.raw(",\"column\":");
@@ -342,10 +375,19 @@ fn write_generic_island(
             ctx.loc,
             ctx.interner,
             CommentMode::Emit(&wc),
+            ctx.emit_loc,
         );
         wc.debug_assert_consumed();
     } else {
-        write_expression_embedded(w, expr, ctx.source, ctx.loc, ctx.interner, CommentMode::Off);
+        write_expression_embedded(
+            w,
+            expr,
+            ctx.source,
+            ctx.loc,
+            ctx.interner,
+            CommentMode::Off,
+            ctx.emit_loc,
+        );
     }
 }
 
@@ -383,8 +425,10 @@ fn write_element(w: &mut JsonWriter, elem: &internal::Element<'_>, ctx: &Ctx<'_>
     w.u32(ctx.pos(elem.span.end));
     w.raw(",\"name\":");
     w.string(ctx.interner.resolve_infallible(elem.name));
-    w.raw(",\"name_loc\":");
-    write_name_loc(w, elem.name_span, ctx);
+    if ctx.emit_loc {
+        w.raw(",\"name_loc\":");
+        write_name_loc(w, elem.name_span, ctx);
+    }
     w.raw(",\"attributes\":");
     write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
     w.raw(",\"fragment\":");
@@ -417,8 +461,10 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     // Escape-free `&'static str` (`svelte:head`, `slot`, `title`, …) → skip the
     // serde string-escape scan.
     w.token(elem.kind.tag_name());
-    w.raw(",\"name_loc\":");
-    write_name_loc(w, elem.name_span, ctx);
+    if ctx.emit_loc {
+        w.raw(",\"name_loc\":");
+        write_name_loc(w, elem.name_span, ctx);
+    }
     w.raw(",\"attributes\":");
     write_array(w, elem.attributes, |w, a| write_attribute_node(w, a, ctx));
     w.raw(",\"fragment\":");
@@ -501,6 +547,7 @@ fn write_shorthand_expression_tag(
         ctx.loc,
         ctx.interner,
         CommentMode::Off,
+        ctx.emit_loc,
     );
     w.raw("}");
 }
@@ -735,6 +782,7 @@ fn write_snippet_name(
             ctx.loc,
             ctx.interner,
             CommentMode::Emit(&wc),
+            ctx.emit_loc,
         );
         wc.debug_assert_consumed();
     } else {
@@ -745,6 +793,7 @@ fn write_snippet_name(
             ctx.loc,
             ctx.interner,
             CommentMode::Off,
+            ctx.emit_loc,
         );
     }
 }
@@ -781,12 +830,21 @@ fn write_snippet_parameters(
                 ctx.loc,
                 ctx.interner,
                 CommentMode::Emit(&wc),
+                ctx.emit_loc,
             );
         });
         wc.debug_assert_consumed();
     } else {
         write_array(w, parameters, |w, p| {
-            write_expression_embedded(w, p, ctx.source, ctx.loc, ctx.interner, CommentMode::Off);
+            write_expression_embedded(
+                w,
+                p,
+                ctx.source,
+                ctx.loc,
+                ctx.interner,
+                CommentMode::Off,
+                ctx.emit_loc,
+            );
         });
     }
 }
@@ -849,6 +907,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
                 ctx.loc,
                 ctx.interner,
                 CommentMode::Emit(&wc),
+                ctx.emit_loc,
             );
         });
         wc.debug_assert_consumed();
@@ -910,9 +969,25 @@ fn write_const_declaration(
     w.raw(
         "{\"type\":\"VariableDeclaration\",\"kind\":\"const\",\"declarations\":[{\"type\":\"VariableDeclarator\",\"id\":",
     );
-    write_pattern_embedded(w, &tag.id, ctx.source, ctx.loc, ctx.interner, mode);
+    write_pattern_embedded(
+        w,
+        &tag.id,
+        ctx.source,
+        ctx.loc,
+        ctx.interner,
+        mode,
+        ctx.emit_loc,
+    );
     w.raw(",\"init\":");
-    write_expression_embedded(w, &tag.init, ctx.source, ctx.loc, ctx.interner, mode);
+    write_expression_embedded(
+        w,
+        &tag.init,
+        ctx.source,
+        ctx.loc,
+        ctx.interner,
+        mode,
+        ctx.emit_loc,
+    );
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
@@ -946,6 +1021,7 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             ctx.loc,
             ctx.interner,
             CommentMode::Off,
+            ctx.emit_loc,
         );
     } else {
         let wc = build_declaration_tag_writer_comments(
@@ -964,6 +1040,7 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
             ctx.loc,
             ctx.interner,
             CommentMode::Emit(&wc),
+            ctx.emit_loc,
         );
         wc.debug_assert_consumed();
     }
@@ -1000,8 +1077,10 @@ fn write_attribute(w: &mut JsonWriter, attr: &internal::Attribute<'_>, ctx: &Ctx
     w.u32(ctx.pos(attr.span.end));
     w.raw(",\"name\":");
     w.string(ctx.interner.resolve_infallible(attr.name));
-    w.raw(",\"name_loc\":");
-    write_name_loc(w, attr.name_span, ctx);
+    if ctx.emit_loc {
+        w.raw(",\"name_loc\":");
+        write_name_loc(w, attr.name_span, ctx);
+    }
     w.raw(",\"value\":");
     write_attribute_value_field(w, attr.value, ctx);
     w.raw("}");
@@ -1119,8 +1198,10 @@ fn write_directive_head(
     w.raw(node_type);
     w.raw("\",\"name\":");
     w.string(name_span.extract(ctx.source));
-    w.raw(",\"name_loc\":");
-    write_name_loc(w, head_span, ctx);
+    if ctx.emit_loc {
+        w.raw(",\"name_loc\":");
+        write_name_loc(w, head_span, ctx);
+    }
 }
 
 /// The `modifiers` array (arena `&str`s → JSON strings).
@@ -1407,10 +1488,18 @@ fn write_script_program_fused(
             ) as usize,
         }
     };
-    let loc_override = (
-        position_at(script.span.start, program.span.start),
-        position_at(script.span.end, program.span.end),
-    );
+    // The override is only consumed when `loc` is emitted; on the no-locations
+    // path it's discarded, so skip the two `get_line_column` line-table lookups
+    // (which would only hit the stub `[0]` table anyway — see `new_map_only`).
+    let loc_override = if ctx.emit_loc {
+        (
+            position_at(script.span.start, program.span.start),
+            position_at(script.span.end, program.span.end),
+        )
+    } else {
+        let dummy = Position { line: 1, column: 0 };
+        (dummy, dummy)
+    };
     write_program_embedded(
         w,
         program,
@@ -1420,6 +1509,7 @@ fn write_script_program_fused(
         schema,
         loc_override,
         comments,
+        ctx.emit_loc,
     );
 }
 
@@ -1610,6 +1700,7 @@ fn write_custom_element_field(
                         ctx.loc,
                         ctx.interner,
                         CommentMode::Off,
+                        ctx.emit_loc,
                     );
                 }
                 _ => {}
@@ -1625,6 +1716,7 @@ fn write_custom_element_field(
                     ctx.loc,
                     ctx.interner,
                     CommentMode::Off,
+                    ctx.emit_loc,
                 );
             }
             w.raw("}");
@@ -1676,7 +1768,15 @@ fn write_pattern_island(
     expr: &tsv_ts::ast::internal::Expression<'_>,
     ctx: &Ctx<'_>,
 ) {
-    write_pattern_embedded(w, expr, ctx.source, ctx.loc, ctx.interner, CommentMode::Off);
+    write_pattern_embedded(
+        w,
+        expr,
+        ctx.source,
+        ctx.loc,
+        ctx.interner,
+        CommentMode::Off,
+        ctx.emit_loc,
+    );
 }
 
 /// A fragment or `null` (the `AwaitBlock` branch fields and `IfBlock`'s

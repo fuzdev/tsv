@@ -27,8 +27,11 @@ import {
 	IgnoreStack,
 	parse_css_json,
 	parse_svelte_json,
+	parse_svelte_json_no_locations,
 	parse_typescript_json,
+	parse_typescript_json_no_locations,
 	parse_typescript_json_with_goal,
+	parse_typescript_json_with_goal_no_locations,
 } from './index.js';
 
 /** tsv's native ignore file, discovered hierarchically (one per directory).
@@ -55,6 +58,14 @@ const FORMATTERS = {
 const PARSERS = {
 	svelte: parse_svelte_json,
 	typescript: parse_typescript_json,
+	css: parse_css_json,
+};
+
+// Span-only variant (`--no-locations`): drops per-node `loc` (svelte also `name_loc`).
+// CSS is a no-op (`parseCss` emits no `loc`), so it maps to the plain parser.
+const PARSERS_NO_LOCATIONS = {
+	svelte: parse_svelte_json_no_locations,
+	typescript: parse_typescript_json_no_locations,
 	css: parse_css_json,
 };
 
@@ -97,7 +108,7 @@ Options:
 Exit codes: 0 clean, 1 would change (--check), 2 errors.
 `;
 
-const PARSE_HELP = `Usage: tsv parse [<file>] [--pretty] [--content <s> | --stdin] [--parser <p>] [--goal <g>]
+const PARSE_HELP = `Usage: tsv parse [<file>] [--pretty] [--content <s> | --stdin] [--parser <p>] [--goal <g>] [--no-locations]
 
 Parse source code into AST JSON.
 
@@ -107,6 +118,7 @@ Options:
   --stdin           read from stdin (requires --parser)
   --parser <p>      parser type: svelte | typescript | css
   --goal <g>        TypeScript parse goal: script | module (default: module)
+  --no-locations    omit per-node loc (span-only wire; svelte also omits name_loc; no-op for css)
 `;
 
 main();
@@ -379,6 +391,7 @@ function run_parse(args) {
 			stdin: { type: 'boolean' },
 			parser: { type: 'string' },
 			goal: { type: 'string' },
+			'no-locations': { type: 'boolean' },
 			help: { type: 'boolean' },
 		},
 		PARSE_HELP,
@@ -425,11 +438,18 @@ function run_parse(args) {
 		process.exit(1);
 	}
 
+	// --no-locations drops per-node `loc` (span-only wire); orthogonal to --goal
+	// (goal drives the TS parser, no-locations the writer), so they compose.
+	const no_locations = values['no-locations'] === true;
 	let json;
 	try {
-		json = parser === 'typescript' && goal !== undefined
-			? parse_typescript_json_with_goal(input, goal)
-			: PARSERS[parser](input);
+		if (parser === 'typescript' && goal !== undefined) {
+			json = no_locations
+				? parse_typescript_json_with_goal_no_locations(input, goal)
+				: parse_typescript_json_with_goal(input, goal);
+		} else {
+			json = (no_locations ? PARSERS_NO_LOCATIONS : PARSERS)[parser](input);
+		}
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
 		process.exit(1);

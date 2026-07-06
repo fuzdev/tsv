@@ -143,6 +143,10 @@ interface SmokeTarget {
 	entry: string;
 	has_format: boolean;
 	has_parse: boolean;
+	/** The published npm package (patched by `patch_npm_package.ts`) vs the raw
+	 * wasm-pack deno bundle. The pure-JS `locations.js` helper is patched into the
+	 * npm packages only, so it's checked on npm entries alone. */
+	is_npm: boolean;
 }
 
 const smoke_entries = (variant: 'format' | 'parse' | 'all'): SmokeTarget[] => [
@@ -152,6 +156,7 @@ const smoke_entries = (variant: 'format' | 'parse' | 'all'): SmokeTarget[] => [
 		entry: `crates/tsv_wasm/pkg/${variant}/npm/index.js`,
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
+		is_npm: true,
 	},
 	// deno-target bundle (auto-init at import)
 	{
@@ -159,6 +164,7 @@ const smoke_entries = (variant: 'format' | 'parse' | 'all'): SmokeTarget[] => [
 		entry: `crates/tsv_wasm/pkg/${variant}/deno/tsv_wasm.js`,
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
+		is_npm: false,
 	},
 ];
 
@@ -166,7 +172,7 @@ const smoke_targets: SmokeTarget[] = VARIANTS.flatMap(smoke_entries);
 
 console.log('\n=== Deno runtime smoke ===');
 
-for (const { label, entry, has_format, has_parse } of smoke_targets) {
+for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 	const entry_url = new URL(entry, root);
 	if (file_size(entry_url) === null) {
 		skip(`${label} — not built`);
@@ -243,6 +249,29 @@ for (const { label, entry, has_format, has_parse } of smoke_targets) {
 			'parse_css',
 			() => (mod.parse_css('a { color: red }') as { type: string }).type === 'StyleSheetFile',
 		);
+	}
+	// The pure-JS `no-locations` reconstruction helper is patched into the npm
+	// packages only (the raw wasm-pack deno bundle doesn't carry it), so scope this
+	// to npm entries. Parse-side analog of IgnoreStack — Deno-runtime smoke that
+	// test_npm.ts (Node) can't give: reconstruct must mutate in place and add loc.
+	if (is_npm) {
+		if (has_parse) {
+			check(label, 'reconstruct_locations', () => {
+				const reconstruct = (mod as Record<string, unknown>).reconstruct_locations as
+					| ((ast: unknown, source: string) => { loc?: unknown })
+					| undefined;
+				if (typeof reconstruct !== 'function') return false;
+				const ast = mod.parse_typescript_no_locations('const x = 1;') as { loc?: unknown };
+				const out = reconstruct(ast, 'const x = 1;');
+				return out === ast && !!out.loc; // same reference (in-place) + loc added
+			});
+		} else {
+			check(
+				label,
+				'reconstruct_locations absent (format-only build)',
+				() => (mod as Record<string, unknown>).reconstruct_locations === undefined,
+			);
+		}
 	}
 }
 

@@ -28,6 +28,10 @@ interface WasmModule {
 	parse_css: (source: string) => unknown;
 	parse_internal_css: (source: string) => void;
 	format_css: (source: string) => string;
+	// span-only wire, materialized in Rust (mechanism-matched with parse_*) —
+	// svelte + typescript only (CSS emits no `loc`)
+	parse_svelte_no_locations: (source: string) => unknown;
+	parse_typescript_no_locations: (source: string) => unknown;
 }
 
 export class WasmImplementation implements TsvImplementation {
@@ -81,6 +85,14 @@ export class WasmImplementation implements TsvImplementation {
 		};
 	}
 
+	// Span-only wire — svelte + typescript only (CSS has no `loc`).
+	private get parse_no_locations_fns(): Partial<Record<Language, (source: string) => unknown>> {
+		return {
+			svelte: this.module.parse_svelte_no_locations,
+			typescript: this.module.parse_typescript_no_locations,
+		};
+	}
+
 	async init(): Promise<void> {
 		const target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
 		const wasm_path = fileURLToPath(
@@ -121,6 +133,8 @@ export class WasmImplementation implements TsvImplementation {
 			parse_css: module.parse_css,
 			parse_internal_css: module.parse_internal_css,
 			format_css: module.format_css,
+			parse_svelte_no_locations: module.parse_svelte_no_locations,
+			parse_typescript_no_locations: module.parse_typescript_no_locations,
 		};
 	}
 
@@ -130,6 +144,12 @@ export class WasmImplementation implements TsvImplementation {
 
 	parse_internal(source: string, language: Language): void {
 		this.parse_internal_fns[language](source);
+	}
+
+	parse_no_locations(source: string, language: Language): unknown {
+		const fn = this.parse_no_locations_fns[language];
+		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
+		return fn(source);
 	}
 
 	format(source: string, language: Language): string {

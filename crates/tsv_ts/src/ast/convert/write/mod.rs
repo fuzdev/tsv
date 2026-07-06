@@ -67,10 +67,12 @@ pub fn write_program_json(
     source: &str,
     loc: LocationMapper<'_>,
     schema: Schema,
+    locations: bool,
 ) -> Vec<u8> {
     let interner = program.interner.borrow();
     let mut ctx = Ctx::new(source, loc, &interner);
     ctx.vanilla_acorn = schema.is_svelte_script();
+    ctx.emit_loc = locations;
     let mut w = JsonWriter::with_capacity(tsv_lang::estimated_json_capacity(source.len()));
     write_program(&mut w, program, &ctx, schema);
     w.into_bytes()
@@ -93,9 +95,11 @@ pub fn write_expression_embedded(
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
     comments: CommentMode<'_>,
+    emit_loc: bool,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
     ctx.comments = comments;
+    ctx.emit_loc = emit_loc;
     expressions::write_expression(w, expr, &ctx);
 }
 
@@ -111,9 +115,11 @@ pub fn write_variable_declaration_embedded(
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
     comments: CommentMode<'_>,
+    emit_loc: bool,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
     ctx.comments = comments;
+    ctx.emit_loc = emit_loc;
     write_variable_declaration(w, var_decl, &ctx, false);
 }
 
@@ -132,9 +138,11 @@ pub fn write_identifier_expression_with_character(
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
     comments: CommentMode<'_>,
+    emit_loc: bool,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
     ctx.comments = comments;
+    ctx.emit_loc = emit_loc;
     write_identifier_expression_with_character_in(w, expr, &ctx);
 }
 
@@ -187,9 +195,11 @@ pub fn write_pattern_embedded(
     loc: LocationMapper<'_>,
     interner: &DefaultStringInterner,
     comments: CommentMode<'_>,
+    emit_loc: bool,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
     ctx.comments = comments;
+    ctx.emit_loc = emit_loc;
     // The pattern root's own annotation is the `read_context`-synthesized one
     // whose `loc` is omitted (a block-pattern root is always an identifier or a
     // destructure, so no other root shape can carry one).
@@ -205,9 +215,13 @@ pub fn write_pattern_embedded(
     match expr {
         internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => {
             // Destructure: `+1`-column adjustment on the start line (when `> 1`).
-            let line = loc.pos_and_position(expr.span().start).1.line;
-            if line > 1 {
-                ctx.pattern_line = line;
+            // Only affects column output, so skip the line lookup entirely on the
+            // no-locations path (where it would only hit the stub `[0]` table).
+            if emit_loc {
+                let line = loc.pos_and_position(expr.span().start).1.line;
+                if line > 1 {
+                    ctx.pattern_line = line;
+                }
             }
             expressions::write_expression(w, expr, &ctx);
         }
@@ -271,25 +285,30 @@ pub fn write_program_embedded(
     schema: Schema,
     loc_override: (Position, Position),
     comments: CommentMode<'_>,
+    emit_loc: bool,
 ) {
     let mut ctx = Ctx::new(source, loc, interner);
     ctx.vanilla_acorn = schema.is_svelte_script();
     ctx.comments = comments;
-    let (start_pos, end_pos) = loc_override;
+    ctx.emit_loc = emit_loc;
     record_open("Program", program.span, &ctx);
     w.raw("{\"type\":\"Program\",\"start\":");
     w.u32(loc.pos(program.span.start));
     w.raw(",\"end\":");
     w.u32(loc.pos(program.span.end));
-    w.raw(",\"loc\":{\"start\":{\"line\":");
-    w.usize(start_pos.line);
-    w.raw(",\"column\":");
-    w.usize(start_pos.column);
-    w.raw("},\"end\":{\"line\":");
-    w.usize(end_pos.line);
-    w.raw(",\"column\":");
-    w.usize(end_pos.column);
-    w.raw("}},\"body\":");
+    if emit_loc {
+        let (start_pos, end_pos) = loc_override;
+        w.raw(",\"loc\":{\"start\":{\"line\":");
+        w.usize(start_pos.line);
+        w.raw(",\"column\":");
+        w.usize(start_pos.column);
+        w.raw("},\"end\":{\"line\":");
+        w.usize(end_pos.line);
+        w.raw(",\"column\":");
+        w.usize(end_pos.column);
+        w.raw("}}");
+    }
+    w.raw(",\"body\":");
     write_array(w, program.body, |w, s| write_statement(w, s, &ctx, schema));
     w.raw(",\"sourceType\":");
     w.token(program.goal.source_type());
@@ -345,6 +364,13 @@ pub(super) struct Ctx<'a> {
     /// get/set path assigns `kind` first). `false` for standalone TS and every
     /// `lang="ts"` component.
     pub(super) vanilla_acorn: bool,
+    /// Whether to emit the per-node `loc` object (line/column). `true` for the
+    /// default acorn/svelte drop-in wire; `false` for the opt-in `no-locations`
+    /// variant (`start`/`end` offsets only — `loc` is derivable from them plus
+    /// source, so nothing is lost). Constant for a whole document, so the
+    /// per-node branch in `position_fields` predicts perfectly on the default
+    /// path.
+    pub(super) emit_loc: bool,
 }
 
 impl<'a> Ctx<'a> {
@@ -359,6 +385,7 @@ impl<'a> Ctx<'a> {
             pattern_ann_span: Span::new(0, 0),
             comments: CommentMode::Off,
             vanilla_acorn: false,
+            emit_loc: true,
         }
     }
 }
@@ -459,6 +486,16 @@ fn node_header_impl<const CHARACTER: bool>(
 /// the tail of `node_header_impl`, also emitted after a leading `name` for
 /// the Svelte-constructed identifiers whose fields precede the positions.
 fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
+    if !ctx.emit_loc {
+        // `no-locations` variant: offsets only, no `loc` (and no `character`,
+        // which lives inside `loc`). Only the byte→char `pos` is needed, so the
+        // per-node line/column lookup is skipped entirely.
+        w.raw(",\"start\":");
+        w.u32(ctx.loc.pos(span.start));
+        w.raw(",\"end\":");
+        w.u32(ctx.loc.pos(span.end));
+        return;
+    }
     let (start_pos, start) = ctx.loc.pos_and_position(span.start);
     let (end_pos, end) = ctx.loc.pos_and_position(span.end);
     w.raw(",\"start\":");

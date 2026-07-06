@@ -33,6 +33,24 @@ AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `im
 
 Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) returning the AST as a compact JSON string — faster when you're writing it to disk or sending it over the wire, since it skips materializing the JS object tree.
 
+For TypeScript and Svelte there are also **span-only** variants — `parse_typescript_no_locations` / `parse_svelte_no_locations` (and their `_json_no_locations` string forms) — that emit `start`/`end` offsets but drop the per-node `loc` (line/column) object (Svelte also drops `name_loc`). This mirrors acorn's `locations: false`: the wire is ~46% smaller and materializes much faster, and line/column stays derivable from the offsets plus your source, so nothing is lost if you have the source. (CSS has no `loc`, so no variant is needed.)
+
+### Reconstructing line/column
+
+Need `loc` back? The package ships a pure-JS helper that derives it from the span-only wire + your source — no re-parse:
+
+```typescript
+import {parse_typescript_no_locations, reconstruct_locations} from '@fuzdev/tsv_parse_wasm';
+
+const src = 'const x = 1;\n';
+const ast = reconstruct_locations(parse_typescript_no_locations(src), src);
+// every node now carries loc: {start: {line, column}, end: {line, column}}
+```
+
+`reconstruct_locations(ast, source)` walks the tree and adds `loc` to every node, **mutating in place** and returning it (`structuredClone(ast)` first if you need the input untouched). It's **exact for TypeScript** — each node's `loc` value equals acorn's exactly (the key is appended last, so an object consumer matches but a re-serialized tree won't byte-match the wire's key order) — and **approximate for Svelte**: it doesn't recover `name_loc` and doesn't replicate Svelte's `<script>` tag-position or destructure `+1`-column parser quirks; everything else reconstructs exactly. CSS is a no-op (there's no `loc` to rebuild).
+
+For sparse or repeated lookups, `create_locator(source, opts?)` holds the prebuilt line-start table and exposes `loc_of(node)` and `reconstruct(ast)`; pass `{language: 'svelte'}` for a `.svelte` document (LF-only line rule). A one-shot `loc_of(node, source)` is also exported for the occasional single lookup (it rebuilds the table each call).
+
 ## Status
 
 v0.1 — pre-release. API may change.

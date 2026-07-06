@@ -145,7 +145,7 @@ fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
 /// - `out_len` must point to a valid `usize` for writing output length
 /// - Caller must free returned pointer via `tsv_free(ptr, *out_len)`
 macro_rules! lang_bindings {
-    ($parse_fn:ident, $parse_internal_fn:ident, $format_fn:ident, $lang:ident) => {
+    ($parse_fn:ident, $parse_no_loc_fn:ident, $parse_internal_fn:ident, $format_fn:ident, $lang:ident) => {
         /// Parse source code and return JSON AST.
         ///
         /// # Safety
@@ -162,6 +162,30 @@ macro_rules! lang_bindings {
                     with_ast_arena(|arena| {
                         let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
                         Ok($lang::convert_ast_json_bytes(&ast, source))
+                    })
+                })
+            }
+        }
+
+        /// Parse source and return JSON AST **without** per-node `loc` (the
+        /// span-only `no-locations` wire — see the language crate's
+        /// `convert_ast_json_bytes_no_locations`). CSS is identical to
+        /// `$parse_fn` (`parseCss` emits no `loc`).
+        ///
+        /// # Safety
+        /// See the module-level safety contract.
+        #[cfg(feature = "parse")]
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $parse_no_loc_fn(
+            source_ptr: *const u8,
+            source_len: usize,
+            out_len: *mut usize,
+        ) -> *mut u8 {
+            unsafe {
+                with_source_string(source_ptr, source_len, out_len, |source| {
+                    with_ast_arena(|arena| {
+                        let ast = $lang::parse(source, arena).map_err(|e| e.to_string())?;
+                        Ok($lang::convert_ast_json_bytes_no_locations(&ast, source))
                     })
                 })
             }
@@ -219,18 +243,21 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     tsv_parse_svelte,
+    tsv_parse_svelte_no_locations,
     tsv_parse_internal_svelte,
     tsv_format_svelte,
     tsv_svelte
 );
 lang_bindings!(
     tsv_parse_typescript,
+    tsv_parse_typescript_no_locations,
     tsv_parse_internal_typescript,
     tsv_format_typescript,
     tsv_ts
 );
 lang_bindings!(
     tsv_parse_css,
+    tsv_parse_css_no_locations,
     tsv_parse_internal_css,
     tsv_format_css,
     tsv_css

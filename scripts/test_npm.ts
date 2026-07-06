@@ -92,6 +92,11 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		assert.ok(pkg.files.includes('tsv_ast.d.ts'));
 	});
 
+	it('parse-capable variants bundle the locations helper', { skip: !has_parse }, () => {
+		assert.ok(pkg.files.includes('locations.js'));
+		assert.ok(pkg.files.includes('locations.d.ts'));
+	});
+
 	it('all variant ships the tsv bin', { skip: variant !== 'all' }, () => {
 		assert.deepEqual(pkg.bin, { tsv: './cli.js' });
 		assert.ok(pkg.files.includes('cli.js'));
@@ -132,6 +137,11 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.equal(node_entry.parse_typescript, undefined);
 	});
 
+	it('reconstruct_locations absent from the format-only build', { skip: has_parse }, () => {
+		assert.equal(node_entry.reconstruct_locations, undefined);
+		assert.equal(node_entry.create_locator, undefined);
+	});
+
 	it('parse_typescript returns a Program', { skip: !has_parse }, () => {
 		const program = node_entry.parse_typescript('const x = 1;');
 		assert.equal(program.type, 'Program');
@@ -166,6 +176,85 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 	});
 });
 
+// Locations helper (locations.js, re-exported from index.js) — reconstruct the
+// per-node `loc` a `no-locations` wire drops, from `start`/`end` + source. Its
+// correctness is also gated by benches/js/diagnostics/no_locations_parity.ts at
+// corpus scale; these assert the shipped package export works end-to-end.
+describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
+	it('reconstruct_locations is EXACT for TypeScript (equals the full wire)', () => {
+		const ts = 'const x = 1;\nconst y = 2;\n';
+		const full = node_entry.parse_typescript(ts);
+		const recon = node_entry.reconstruct_locations(node_entry.parse_typescript_no_locations(ts), ts);
+		// The span-only wire is the full wire minus `loc`; adding it back must
+		// reproduce acorn's `loc` byte-for-byte on every node.
+		assert.deepEqual(recon, full);
+	});
+
+	it('reconstruct_locations mutates in place and returns the same object', () => {
+		const ast = node_entry.parse_typescript_no_locations('const x = 1;');
+		const returned = node_entry.reconstruct_locations(ast, 'const x = 1;');
+		assert.equal(returned, ast); // same reference
+		assert.ok(ast.loc); // mutated in place
+	});
+
+	it('loc_of derives a single node line/column', () => {
+		const ts = 'const x = 1;\nconst y = 2;\n';
+		const full = node_entry.parse_typescript(ts);
+		const noloc = node_entry.parse_typescript_no_locations(ts);
+		// second statement starts on line 2, column 0
+		assert.deepEqual(node_entry.loc_of(noloc.body[1], ts), full.body[1].loc);
+		assert.equal(node_entry.loc_of({ type: 'X' }, ts), null); // no start/end → null
+	});
+
+	it('create_locator reuses one line table for many lookups', () => {
+		const ts = 'const x = 1;\nconst y = 2;\n';
+		const full = node_entry.parse_typescript(ts);
+		const noloc = node_entry.parse_typescript_no_locations(ts);
+		const locator = node_entry.create_locator(ts);
+		assert.deepEqual(locator.loc_of(noloc.body[0]), full.body[0].loc);
+		assert.deepEqual(locator.loc_of(noloc.body[1]), full.body[1].loc);
+	});
+
+	it('reconstruct_locations is a no-op for CSS (parseCss emits no loc)', () => {
+		// CSS has no `loc` in the wire, so reconstruct must leave the tree untouched.
+		// Language inferred from the `StyleSheetFile` root.
+		const css = node_entry.parse_css('a {\n\tcolor: red;\n}\n');
+		const out = node_entry.reconstruct_locations(css, 'a {\n\tcolor: red;\n}\n');
+		assert.equal(out, css);
+		assert.equal('loc' in css, false); // root gained no loc
+		assert.equal('loc' in css.children[0], false); // nor did a rule node
+	});
+
+	it('reconstruct_locations matches Svelte acorn-node loc, except the documented quirks', () => {
+		// No destructure pattern here, so the Svelte +1-column quirk can't appear;
+		// the `<script>` Program loc (Svelte's tag-position override) is skipped.
+		const sv = '<script>\nconst x = 1;\n</script>\n\n<div class="a">{x}</div>';
+		const full = node_entry.parse_svelte(sv);
+		const recon = node_entry.reconstruct_locations(node_entry.parse_svelte_no_locations(sv), sv);
+		let checked = 0;
+		const walk = (r: any, f: any): void => {
+			if (Array.isArray(f)) {
+				f.forEach((x, i) => walk(r[i], x));
+			} else if (f && typeof f === 'object') {
+				// Svelte's wire carries `loc` only on embedded ECMAScript nodes; where
+				// it does, the reconstruction must match — except `Program`.
+				if (f.loc && f.type !== 'Program') {
+					assert.deepEqual(r.loc, f.loc, `loc mismatch at ${f.type}@${f.start}`);
+					checked++;
+				}
+				for (const k of Object.keys(f)) {
+					if (k === 'loc' || k === 'name_loc') continue;
+					walk(r[k], f[k]);
+				}
+			}
+		};
+		walk(recon, full);
+		assert.ok(checked > 0, 'expected at least one acorn node to compare');
+		// The walk is a superset: it adds `loc` to template nodes Svelte's wire omits.
+		assert.ok(recon.loc, 'reconstruct added loc to the Root (template node)');
+	});
+});
+
 // Browser entry (browser.js) — tests the init guard wrapper.
 // Imports browser.js which does NOT auto-init WASM, then tests:
 // - Pre-init guard throws a clear error
@@ -180,6 +269,18 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 	it('exports throw before init', () => {
 		const guarded = has_format ? 'format_typescript' : 'parse_typescript';
 		assert.throws(() => browser[guarded]('const x = 1'), /WASM not initialized/);
+	});
+
+	it('reconstruct_locations works BEFORE init (pure JS, no WASM)', { skip: !has_parse }, () => {
+		// A hand-built span-only node — no parse needed, so this runs before the
+		// init_sync below, proving the helper carries no init guard (it never
+		// touches WASM). This is why browser.js re-exports it directly.
+		const ast = { type: 'Program', start: 0, end: 5, body: [] };
+		const out = browser.reconstruct_locations(ast, 'x = 1');
+		assert.deepEqual(out.loc, {
+			start: { line: 1, column: 0 },
+			end: { line: 1, column: 5 },
+		});
 	});
 
 	it('init_sync initializes WASM', () => {

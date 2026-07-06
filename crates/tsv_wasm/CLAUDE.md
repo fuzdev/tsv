@@ -51,6 +51,62 @@ remain the `Module` default. Only these two TS variants exist — no typed-objec
 wiring); add one only if a typed consumer needs it. `npm/cli.js` routes
 `tsv parse|format --goal` through them (TS only); see [../../docs/cli.md §Input Handling](../../docs/cli.md).
 
+## No-Locations Exports
+
+The opt-in **span-only** parse wire — the same AST minus the per-node `loc`
+(Svelte also minus `name_loc`) — is exposed as `parse_{typescript,svelte}_no_locations`
+(object, materialized in Rust via `js_sys::JSON::parse`) and their
+`parse_{typescript,svelte}_json_no_locations` string siblings, plus
+`parse_typescript_json_with_goal_no_locations` (the goal-and-no-loc combination —
+goal drives the parser, no-loc the writer, so they compose, mirroring `tsv_cli`'s
+`--goal` + `--no-locations`; `npm/cli.js` routes both flags through it). Like the
+goal-aware exports, these are **hand-written outside** `lang_bindings!` and **TS +
+Svelte only** — CSS's `parseCss` emits no `loc`, so a CSS variant would duplicate
+`parse_css`.
+The object form returns an untyped `JsValue` (`any`), **not** a `tsv_ast.d.ts`
+interface: those interfaces declare `loc` as required, and the shape here
+deliberately omits it, so there is no typed-object export and no `.d.ts` wiring.
+The object form exists (rather than string-only) so a benchmark of this path
+materializes in Rust exactly as `parse_*` does, keeping the comparison
+mechanism-matched. `loc` is derivable from `start`/`end` + source (see
+[../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API), so this is a distinct
+narrower product, not a second encoding of the drop-in contract. `npm/cli.js`
+routes a `--no-locations` flag through these (and the goal combination above).
+
+### Line/Column Reconstruction Helper (`npm/locations.js`)
+
+Because `loc` is a pure function of `start`/`end` + source, a consumer holding
+only the span-only wire recovers it in JS — and, for a consumer that needs full
+`loc`, no-loc-wire + JS-reconstruct beats the full loc-bearing wire end-to-end
+(the full wire's `loc` bytes cost real `JSON.parse` tokenization; a line-start
+table + binary search is cheaper). `npm/locations.js` (pure JS, zero deps, no
+WASM) is that reconstruction, shipped so callers don't reimplement the line
+rules: `reconstruct_locations(ast, source, opts?)` (one-shot, adds `loc` to every
+node, **mutates in place**), `create_locator(source, opts?)` (amortized — holds
+the prebuilt line table, exposes `loc_of(node)` / `reconstruct(ast)`), and a bare
+`loc_of(node, source, opts?)` convenience. **Exact for TypeScript**; **approximate
+for Svelte** (doesn't recover `name_loc`, doesn't replicate the `<script>`
+tag-position or destructure `+1`-column parser quirks, and adds `loc` to template
+nodes Svelte's own wire omits); **a no-op for CSS**. It rides the **parse-capable**
+packages only (`@fuzdev/tsv_parse_wasm`, `@fuzdev/tsv_wasm`) — it operates on the
+parse wire, so the format-only package has no use for it. `patch_npm_package.ts`
+copies it + the hand-written `npm/locations.d.ts` into the package root and
+re-exports the functions from index.js/browser.js/index.d.ts (directly, with no
+init guard — it never touches WASM). Its correctness is gated by the package Node
+tests (`scripts/test_npm.ts`) and, at corpus scale, by
+`benches/js/diagnostics/no_locations_parity.ts`.
+
+**`.d.ts` export-name constraint.** `index.d.ts` re-exports both `tsv_ast.d.ts`
+(`export type *`) and `locations.d.ts` (`export *`), so a name exported by BOTH is
+ambiguated away (TS2308) — silently dropping that name from the package. `tsv_ast`
+owns `Position` / `SourceLocation` / `NameLocation` / `NamePosition` (+ every AST
+node type), so `locations.d.ts` must not export any of those — its `Loc` inlines
+the `{line, column}` point rather than naming a `Position`. Any future hand-written
+`.d.ts` added to the parse packages faces the same rule; nothing in-repo type-checks
+the merged package `.d.ts` (`check:ast-types` covers `tsv_ast.d.ts` alone), so a
+collision only surfaces at a consumer's compile — check names against `tsv_ast`
+before adding.
+
 ## Discovery Matcher + Policy (`IgnoreStack`)
 
 The `format` feature exports an `IgnoreStack` class wrapping
@@ -137,6 +193,7 @@ require dual updates.
 - `src/lib.rs` — WASM bindings (`lang_bindings!` macro + typed extern types) + the wasm32-gated talc `#[global_allocator]`
 - `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
 - `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps
+- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only `no-locations` wire; ships in the parse-capable packages, re-exported from index.js/browser.js by `patch_npm_package.ts` (see [No-Locations Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv_format_wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv_parse_wasm` (copied by `patch_npm_package.ts`)
 - `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv_wasm` (copied by `patch_npm_package.ts`)
