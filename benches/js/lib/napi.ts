@@ -34,6 +34,9 @@ interface NapiAddon {
 	parse_css: (source: string) => string;
 	parse_internal_css: (source: string) => void;
 	format_css: (source: string) => string;
+	// span-only wire — svelte + typescript only (CSS emits no `loc`)
+	parse_svelte_no_locations: (source: string) => string;
+	parse_typescript_no_locations: (source: string) => string;
 }
 
 /** Path to the built `tsv_napi` cdylib (loaded directly as an N-API addon). */
@@ -112,6 +115,14 @@ export class NapiImplementation implements TsvImplementation {
 		};
 	}
 
+	// Span-only wire — svelte + typescript only (CSS has no `loc`).
+	private get parse_no_locations_fns(): Partial<Record<Language, (source: string) => string>> {
+		return {
+			svelte: this.addon.parse_svelte_no_locations,
+			typescript: this.addon.parse_typescript_no_locations,
+		};
+	}
+
 	parse(source: string, language: Language): unknown {
 		// `parse_<lang>` returns a JSON string (the engine throws on parse error);
 		// materialize it the same way ffi.ts / wasm.ts do for an apples-to-apples
@@ -121,6 +132,12 @@ export class NapiImplementation implements TsvImplementation {
 
 	parse_internal(source: string, language: Language): void {
 		this.parse_internal_fns[language](source);
+	}
+
+	parse_no_locations(source: string, language: Language): unknown {
+		const fn = this.parse_no_locations_fns[language];
+		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
+		return JSON.parse(fn(source));
 	}
 
 	format(source: string, language: Language): string {

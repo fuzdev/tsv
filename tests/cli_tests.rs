@@ -130,6 +130,143 @@ fn test_parse_command_with_pretty() {
 }
 
 #[test]
+fn test_parse_no_locations_omits_loc() {
+    // `--no-locations` emits the span-only wire: `start`/`end` offsets, no `loc`.
+    let full = tsv(&[
+        "parse",
+        "--content",
+        "const x = 42;",
+        "--parser",
+        "typescript",
+    ]);
+    let no_loc = tsv(&[
+        "parse",
+        "--content",
+        "const x = 42;",
+        "--parser",
+        "typescript",
+        "--no-locations",
+    ]);
+    assert!(full.status.success() && no_loc.status.success());
+    let full_out = String::from_utf8_lossy(&full.stdout);
+    let no_loc_out = String::from_utf8_lossy(&no_loc.stdout);
+    // The default wire carries the `loc` object; the span-only wire drops it but
+    // keeps offsets and the rest of the payload.
+    assert!(
+        full_out.contains(r#""loc":{"#),
+        "default wire should carry loc"
+    );
+    assert!(
+        !no_loc_out.contains(r#""loc":{"#),
+        "no-locations wire must not carry a loc object: {no_loc_out}"
+    );
+    assert!(
+        no_loc_out.contains(r#""start":0"#) && no_loc_out.contains(r#""type":"Program"#),
+        "no-locations wire keeps offsets + payload: {no_loc_out}"
+    );
+}
+
+#[test]
+fn test_parse_no_locations_pretty_reparses() {
+    // `--pretty --no-locations` rides the reparse-the-bytes pretty path — assert
+    // it's tab-indented AND loc-free (the only place the two branches combine).
+    let output = tsv(&[
+        "parse",
+        "--content",
+        "const x = 42;",
+        "--parser",
+        "typescript",
+        "--pretty",
+        "--no-locations",
+    ]);
+    assert!(
+        output.status.success(),
+        "pretty no-locations should succeed"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("\n\t"),
+        "pretty output is tab-indented: {stdout}"
+    );
+    assert!(
+        !stdout.contains(r#""loc""#),
+        "no loc key in pretty output: {stdout}"
+    );
+}
+
+#[test]
+fn test_parse_no_locations_svelte_omits_name_loc() {
+    // Svelte also drops the element/attribute/directive `name_loc`.
+    let full = tsv(&["parse", "--content", "<div>x</div>", "--parser", "svelte"]);
+    let no_loc = tsv(&[
+        "parse",
+        "--content",
+        "<div>x</div>",
+        "--parser",
+        "svelte",
+        "--no-locations",
+    ]);
+    let full_out = String::from_utf8_lossy(&full.stdout);
+    let no_loc_out = String::from_utf8_lossy(&no_loc.stdout);
+    assert!(
+        full_out.contains(r#""name_loc""#),
+        "default Svelte wire carries name_loc"
+    );
+    assert!(
+        !no_loc_out.contains(r#""name_loc""#) && !no_loc_out.contains(r#""loc":{"#),
+        "no-locations Svelte wire drops name_loc and loc: {no_loc_out}"
+    );
+}
+
+#[test]
+fn test_parse_no_locations_css_is_noop() {
+    // `parseCss` emits no `loc`, so `--no-locations` is a documented no-op for CSS
+    // — byte-identical to the default wire.
+    let full = tsv(&["parse", "--content", "a { color: red }", "--parser", "css"]);
+    let no_loc = tsv(&[
+        "parse",
+        "--content",
+        "a { color: red }",
+        "--parser",
+        "css",
+        "--no-locations",
+    ]);
+    assert_eq!(
+        full.stdout, no_loc.stdout,
+        "CSS no-locations must equal the default wire"
+    );
+}
+
+#[test]
+fn test_parse_no_locations_composes_with_goal_script() {
+    // `--goal` drives the parser, `--no-locations` the writer — orthogonal, so the
+    // two combine (the `sourceType` still follows the goal; no loc is emitted).
+    let output = tsv(&[
+        "parse",
+        "--content",
+        "var await = 1;",
+        "--parser",
+        "typescript",
+        "--goal",
+        "script",
+        "--no-locations",
+    ]);
+    assert!(
+        output.status.success(),
+        "goal + no-locations should succeed"
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(r#""sourceType":"script""#),
+        "sourceType follows the goal: {stdout}"
+    );
+    assert!(
+        !stdout.contains(r#""loc":{"#),
+        "no-locations still drops loc: {stdout}"
+    );
+}
+
+#[test]
 fn test_format_command_typescript() {
     let output = tsv(&[
         "format",

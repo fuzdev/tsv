@@ -21,7 +21,10 @@
  * `crates/tsv_wasm/types/tsv_ast.d.ts` into the package root alongside the
  * generated `tsv_wasm.d.ts`. The wasm-bindgen
  * `typescript_type = "import('./tsv_ast').*"` extern types resolve against
- * this bundled file at consumer compile time.
+ * this bundled file at consumer compile time. It also copies the pure-JS
+ * `no-locations` reconstruction helper (`npm/locations.js` + `locations.d.ts`)
+ * and re-exports its functions from index.js/browser.js/index.d.ts — it works on
+ * the span-only parse wire, so it ships only where parsing does (not format-only).
  *
  * The `all` variant additionally ships the CLI: `crates/tsv_wasm/npm/cli.js`
  * is copied into the package root and wired up as the `tsv` bin.
@@ -54,6 +57,17 @@ const main_js = 'tsv_wasm.js';
 const dts_file = 'tsv_wasm.d.ts';
 const wasm_file = 'tsv_wasm_bg.wasm';
 const cli_file = 'cli.js';
+// The pure-JS `no-locations` line/column reconstruction helper (`npm/locations.js`
+// + hand-written `locations.d.ts`). Rides the parse-capable packages only — it
+// operates on the span-only parse wire, so the format-only package has no use for
+// it. Needs no WASM init (pure computation over an already-parsed AST).
+const locations_file = 'locations.js';
+const locations_dts = 'locations.d.ts';
+const locations_exports = ['create_locator', 'loc_of', 'reconstruct_locations'];
+// A plain re-export line (no init guard — pure JS), shared by index.js + browser.js.
+const locations_reexport = has_parse_exports
+	? `export { ${locations_exports.join(', ')} } from './${locations_file}';\n`
+	: '';
 
 // 1. Extract the public function exports from the generated JS.
 
@@ -119,7 +133,7 @@ const wasm = readFileSync(new URL('./${wasm_file}', import.meta.url));
 initSync({ module: wasm });
 
 export { init, initSync as init_sync, ${[...fns, ...classes].join(', ')} };
-`;
+${locations_reexport}`;
 
 Deno.writeTextFileSync(`${pkg_root}/index.js`, index_js);
 console.log(`Created ${pkg_root}/index.js`);
@@ -136,6 +150,9 @@ ${fns.map((f) => `\t${f} as _${f},`).join('\n')}
 ${
 	// classes re-export as-is — consumers must `await init()` before instantiating
 	classes.length ? `export { ${classes.join(', ')} } from './${main_js}';\n` : ''
+}${
+	// the reconstruction helper is pure JS — re-export directly, no init guard
+	locations_reexport
 }
 let _ready = false;
 
@@ -178,7 +195,11 @@ console.log(`Created ${pkg_root}/browser.js`);
 // signatures to avoid leaking wasm-bindgen internals (InitOutput with raw pointers).
 
 const ast_reexport = has_parse_exports ? `export type * from './tsv_ast';\n` : '';
-const index_dts = `${ast_reexport}export {
+// `export *` (not `export type *`) so the helper's functions AND its types flow through.
+const locations_reexport_dts = has_parse_exports
+	? `export * from './${locations_dts.replace(/\.d\.ts$/, '')}';\n`
+	: '';
+const index_dts = `${ast_reexport}${locations_reexport_dts}export {
 ${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
 } from './${dts_file.replace(/\.d\.ts$/, '')}';
 /** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
@@ -207,6 +228,12 @@ if (has_parse_exports) {
 	// Bundle the hand-maintained AST types alongside the generated `tsv_wasm.d.ts`.
 	Deno.copyFileSync('crates/tsv_wasm/types/tsv_ast.d.ts', `${pkg_root}/tsv_ast.d.ts`);
 	console.log(`Copied crates/tsv_wasm/types/tsv_ast.d.ts → ${pkg_root}/tsv_ast.d.ts`);
+	// Bundle the pure-JS `no-locations` line/column reconstruction helper + its
+	// hand-written types (re-exported from index.js/browser.js/index.d.ts above).
+	Deno.copyFileSync(`crates/tsv_wasm/npm/${locations_file}`, `${pkg_root}/${locations_file}`);
+	console.log(`Copied crates/tsv_wasm/npm/${locations_file} → ${pkg_root}/${locations_file}`);
+	Deno.copyFileSync(`crates/tsv_wasm/npm/${locations_dts}`, `${pkg_root}/${locations_dts}`);
+	console.log(`Copied crates/tsv_wasm/npm/${locations_dts} → ${pkg_root}/${locations_dts}`);
 }
 
 if (variant === 'all') {
@@ -245,7 +272,7 @@ pkg.files = [
 	main_js,
 	dts_file,
 	wasm_file,
-	...(has_parse_exports ? ['tsv_ast.d.ts'] : []),
+	...(has_parse_exports ? ['tsv_ast.d.ts', locations_file, locations_dts] : []),
 	...(variant === 'all' ? [cli_file] : []),
 	'README.md',
 	'LICENSE',

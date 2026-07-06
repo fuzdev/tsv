@@ -10,4 +10,4 @@ mod comment_attachment;
 mod special;
 mod write;
 
-pub(crate) use write::write_root_bytes;
+pub(crate) use write::{write_root_bytes, write_root_bytes_no_locations};

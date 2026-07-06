@@ -137,6 +137,7 @@ Parser auto-detected from extension (`.ts`/`.svelte`/`.css`). `--content` and `-
 ```bash
 cargo run -p tsv_cli parse file.ts                                       # compact JSON
 cargo run -p tsv_cli parse file.ts --pretty                              # formatted JSON
+cargo run -p tsv_cli parse file.ts --no-locations                        # span-only wire (no per-node loc; ~46% smaller)
 cargo run -p tsv_cli parse --content '<div>x</div>' --parser svelte      # parse string (preferred for agents)
 cargo run -p tsv_cli parse --stdin --parser svelte                       # parse stdin (not preferred for agents)
 cargo run -p tsv_cli format file.svelte src/lib                          # format files/dirs in place
@@ -224,8 +225,8 @@ wasm-pack build crates/tsv_wasm --target deno --release --out-dir pkg/parse/deno
 npm-only, three packages from one WASM crate:
 
 - `@fuzdev/tsv_format_wasm` — format only (`--no-default-features --features format`)
-- `@fuzdev/tsv_parse_wasm` — parse only (`--no-default-features --features parse`); bundles hand-maintained `tsv_ast.d.ts` from `crates/tsv_wasm/types/`
-- `@fuzdev/tsv_wasm` — full tool (default build, both features); bundles `tsv_ast.d.ts` and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` subcommands mirroring `tsv_cli`'s flags/exit codes, `node:util` `parseArgs`, zero deps, single-threaded)
+- `@fuzdev/tsv_parse_wasm` — parse only (`--no-default-features --features parse`); bundles hand-maintained `tsv_ast.d.ts` from `crates/tsv_wasm/types/` and the pure-JS `no-locations` line/column reconstruction helper (`crates/tsv_wasm/npm/locations.js` + `.d.ts`)
+- `@fuzdev/tsv_wasm` — full tool (default build, both features); bundles `tsv_ast.d.ts` + the `locations.js` reconstruction helper and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` subcommands mirroring `tsv_cli`'s flags/exit codes, `node:util` `parseArgs`, zero deps, single-threaded)
 
 A separate types-only `@fuzdev/tsv_ast` package is deferred — `import type` from `tsv_parse_wasm` is zero-runtime-cost, and no 0.1 consumer profile needs the standalone split. Reconsider if/when a real consumer appears. `@fuzdev/tsv` (bare) stays reserved for a future native-binary flagship.
 
@@ -460,7 +461,7 @@ tsv/
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
-│   ├── tsv_wasm/    # WebAssembly bindings (published as @fuzdev/tsv_format_wasm + @fuzdev/tsv_parse_wasm + @fuzdev/tsv_wasm; bundles hand-maintained types/tsv_ast.d.ts; npm/cli.js is the tsv bin)
+│   ├── tsv_wasm/    # WebAssembly bindings (published as @fuzdev/tsv_format_wasm + @fuzdev/tsv_parse_wasm + @fuzdev/tsv_wasm; bundles hand-maintained types/tsv_ast.d.ts + npm/locations.js no-loc reconstruction helper; npm/cli.js is the tsv bin)
 │   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only for the Node bench, 0.2 publish target)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API addon tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)

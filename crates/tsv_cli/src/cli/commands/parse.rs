@@ -29,6 +29,13 @@ pub struct ParseCommand {
     #[argh(option)]
     goal: Option<String>,
 
+    /// omit per-node `loc` (line/column). Emits `start`/`end` offsets only — the
+    /// opt-in span-only wire (mirrors acorn's `locations: false`). `loc` is
+    /// derivable from the offsets plus source, so nothing is lost for a consumer
+    /// that has the source. No-op for css (`parseCss` emits no `loc`).
+    #[argh(switch)]
+    no_locations: bool,
+
     /// file path (parser auto-detected from extension)
     #[argh(positional)]
     file: Option<String>,
@@ -57,7 +64,13 @@ impl ParseCommand {
             }
         };
 
-        match parse_to_json(input.content(), self.pretty, parser_type, goal) {
+        match parse_to_json(
+            input.content(),
+            self.pretty,
+            parser_type,
+            goal,
+            !self.no_locations,
+        ) {
             Ok(json) => {
                 // The wire bytes are UTF-8 by construction; writing them
                 // directly (plus the newline `println!` would add) skips the
@@ -97,6 +110,7 @@ fn parse_to_json(
     pretty: bool,
     parser_type: ParserType,
     goal: tsv_ts::Goal,
+    locations: bool,
 ) -> Result<Vec<u8>, String> {
     // Compact output uses the convert_ast_json_bytes hot path (skips the
     // intermediate serde_json::Value and the output UTF-8 validation a String
@@ -109,12 +123,23 @@ fn parse_to_json(
     macro_rules! emit {
         ($lang:ident, $parse:expr) => {{
             let ast = $parse.map_err(|e| e.to_string())?;
+            let bytes = if locations {
+                $lang::convert_ast_json_bytes(&ast, source)
+            } else {
+                $lang::convert_ast_json_bytes_no_locations(&ast, source)
+            };
             if pretty {
-                to_json_with_tabs(&$lang::convert_ast_json(&ast, source))
+                // Reparse the wire bytes for tab-indented serialization (the
+                // compact bytes are the sole emission path; `--pretty` is the
+                // cold `Value` consumer, so a no-locations pretty print rides the
+                // same bytes rather than a separate `Value` writer).
+                let value: serde_json::Value = serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("JSON parse failed: {e}"))?;
+                to_json_with_tabs(&value)
                     .map_err(|e| format!("JSON serialization failed: {e}"))?
                     .into_bytes()
             } else {
-                $lang::convert_ast_json_bytes(&ast, source)
+                bytes
             }
         }};
     }

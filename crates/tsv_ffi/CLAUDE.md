@@ -24,6 +24,7 @@ The default both-features build is the full `libtsv_ffi` the bench perf rows loa
 The `lang_bindings!` macro generates three `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
 
 - `tsv_parse_<lang>` — JSON AST (public, converted)
+- `tsv_parse_<lang>_no_locations` — the span-only variant (drops per-node `loc`; Svelte also drops `name_loc`). CSS is byte-identical to `tsv_parse_css` (`parseCss` emits no `loc`). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
 - `tsv_parse_internal_<lang>` — Empty string (benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
 - `tsv_format_<lang>` — Formatted source
 

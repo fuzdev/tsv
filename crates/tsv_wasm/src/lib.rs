@@ -342,3 +342,76 @@ pub fn format_typescript_with_goal(source: &str, goal: &str) -> Result<String, J
         }))
     })
 }
+
+// --- `no-locations` parse exports (TypeScript + Svelte) ---
+//
+// The opt-in span-only wire (drops per-node `loc`; Svelte also drops `name_loc`
+// — see the language crates' `convert_ast_json_*_no_locations`). Hand-written
+// outside the uniform macro, like the goal-aware exports: CSS is a no-op
+// (`parseCss` emits no `loc`), so only TS and Svelte get a distinct export.
+//
+// Two forms per language, mirroring the macro's `$parse_fn` / `$parse_json_fn`
+// split: `_json` returns the compact wire string (for consumers forwarding it),
+// and the object form parses it in Rust via `js_sys::JSON::parse` so the return
+// crosses the boundary already materialized — the same transport the typed
+// `parse_*` exports use, which keeps a benchmark of this path mechanism-matched
+// with `parse_*`. The object form returns an untyped `JsValue` (not the
+// `tsv_ast.d.ts` interface, which declares `loc` as required) since the shape is
+// deliberately loc-less.
+
+/// `parse_typescript_json` without per-node `loc` (span-only wire string).
+#[cfg(feature = "parse")]
+#[wasm_bindgen]
+pub fn parse_typescript_json_no_locations(source: &str) -> Result<String, JsError> {
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse(source, arena).map_err(err)?;
+        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, source))
+    })
+}
+
+/// `parse_typescript_json_no_locations` against an explicit goal — the parse
+/// goal and the no-locations wire are orthogonal (goal drives the parser, no-loc
+/// the writer), so the two combine, mirroring `tsv_cli`'s `--goal` + `--no-locations`.
+#[cfg(feature = "parse")]
+#[wasm_bindgen]
+pub fn parse_typescript_json_with_goal_no_locations(
+    source: &str,
+    goal: &str,
+) -> Result<String, JsError> {
+    let goal = goal_from_str(goal)?;
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
+        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, source))
+    })
+}
+
+/// `parse_typescript` without per-node `loc`, materialized in Rust. Untyped
+/// (`any`) return — the shape omits the `loc` that `tsv_ast.d.ts` requires.
+#[cfg(feature = "parse")]
+#[wasm_bindgen]
+pub fn parse_typescript_no_locations(source: &str) -> Result<JsValue, JsError> {
+    let json = parse_typescript_json_no_locations(source)?;
+    js_sys::JSON::parse(&json).map_err(|_| err("internal error: AST serialized to invalid JSON"))
+}
+
+/// `parse_svelte_json` without per-node `loc`/`name_loc` (span-only wire string).
+#[cfg(feature = "parse")]
+#[wasm_bindgen]
+pub fn parse_svelte_json_no_locations(source: &str) -> Result<String, JsError> {
+    with_ast_arena(|arena| {
+        let ast = tsv_svelte::parse(source, arena).map_err(err)?;
+        Ok(tsv_svelte::convert_ast_json_string_no_locations(
+            &ast, source,
+        ))
+    })
+}
+
+/// `parse_svelte` without per-node `loc`/`name_loc`, materialized in Rust.
+/// Untyped (`any`) return — the shape omits the `loc`/`name_loc` that
+/// `tsv_ast.d.ts` requires.
+#[cfg(feature = "parse")]
+#[wasm_bindgen]
+pub fn parse_svelte_no_locations(source: &str) -> Result<JsValue, JsError> {
+    let json = parse_svelte_json_no_locations(source)?;
+    js_sys::JSON::parse(&json).map_err(|_| err("internal error: AST serialized to invalid JSON"))
+}

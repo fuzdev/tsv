@@ -142,7 +142,15 @@ same bytes plus that one validation, for `&str` boundaries (the WASM
 binding's `JSON.parse`, N-API strings), and `convert_ast_json` parses the
 bytes back into a `serde_json::Value` for the `Value` consumers (the CLI's
 `--pretty` tab-serialization, the fixture gate) — a thin wrapper, not an
-independent conversion. Each writer is a faithful emission of the acorn /
+independent conversion. Each of the three has a `_no_locations` sibling
+(`convert_ast_json_bytes_no_locations` / `_string_no_locations`) emitting the
+same wire minus every line/column object — the per-node `loc`, plus Svelte's
+`name_loc` — so only `start`/`end` offsets remain. Line/column is a pure function
+of an offset plus source, so the variant derives it lazily consumer-side rather
+than emitting it (the parse WASM packages ship that derivation as a pure-JS
+`reconstruct_locations` helper); it's an opt-in span-only product mirroring
+acorn's `locations: false`, not a second encoding of the drop-in wire, which
+stays byte-identical. Each writer is a faithful emission of the acorn /
 `parseCss` quirk catalog; the fixture suite gates its output against the
 canonical parser's `expected.json` on every fixture (including the multibyte
 and template-comment ones that exercise the fused offset translation and

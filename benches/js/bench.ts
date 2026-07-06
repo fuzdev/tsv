@@ -87,6 +87,7 @@ import {
 	generate_group_files_markdown,
 	generate_group_throughput_markdown,
 	generate_json_overhead_note,
+	generate_reconstruct_note,
 	generate_skipped_files_markdown,
 	generate_skipped_files_report,
 	generate_summary_report,
@@ -1210,6 +1211,10 @@ function generate_markdown_report(
 			lines.push(comparison_markdown);
 			lines.push('');
 		}
+		// Consumer-side reconstruct-vs-materialize note — a curated cross-ref to
+		// `diagnostics/reconstruct_vs_materialize.ts` (not a bench row), sitting
+		// with the parse comparison since it's about the `no-locations` wire.
+		lines.push(generate_reconstruct_note(), '');
 	}
 
 	const skipped_markdown = generate_skipped_files_markdown(

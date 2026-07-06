@@ -332,6 +332,22 @@ impl LocationTracker {
         )
     }
 
+    /// A line-data-free tracker: only the byte→char `map` half of a
+    /// `LocationMapper` is populated (`ByteToCharMap`), the tracker carries no
+    /// `line_starts` scan. For the `no-locations` wire path: every line/column
+    /// field is gated off, so the writer's line-table readers
+    /// (`pos_and_position()` / `get_line_column()`, which back only `loc` /
+    /// `name_loc` / column output) are all skipped behind the same `emit_loc`
+    /// flag — leaving `LocationMapper::pos()` (byte→UTF-16 offset) as the sole
+    /// live consumer. So the O(n) line scan the fused `new_ecmascript_with_map` /
+    /// `new_with_map` do is pure dead work here. The stub `line_starts` (`[0]`)
+    /// keeps `get_line_column` non-panicking if ever reached; the `map` is
+    /// byte-identical to the fused constructors' map — line rules only affect
+    /// `line_starts`, which this skips — so `start`/`end` offsets are unchanged.
+    pub fn new_map_only(source: &str) -> (Self, ByteToCharMap) {
+        (Self::with_line_starts(vec![0]), ByteToCharMap::new(source))
+    }
+
     /// Resolve `offset` to `(line_idx, line_start)`, consulting the 1-entry
     /// line-range cache first and filling it via binary search on a miss.
     /// Byte-identical to the bare `binary_search` + `saturating_sub` both

@@ -57,6 +57,15 @@ const symbols = {
 		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
+	// no-locations parse (span-only wire) — svelte + typescript only (CSS emits no `loc`)
+	tsv_parse_svelte_no_locations: {
+		parameters: ['pointer', 'usize', 'pointer'],
+		result: 'pointer',
+	},
+	tsv_parse_typescript_no_locations: {
+		parameters: ['pointer', 'usize', 'pointer'],
+		result: 'pointer',
+	},
 	tsv_format_css: {
 		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
@@ -221,6 +230,14 @@ export class NativeImplementation implements TsvImplementation {
 		};
 	}
 
+	// Span-only wire — svelte + typescript only (CSS has no `loc`).
+	private get parse_no_locations_fns(): Partial<Record<Language, FfiFn>> {
+		return {
+			svelte: this.symbols.tsv_parse_svelte_no_locations as FfiFn,
+			typescript: this.symbols.tsv_parse_typescript_no_locations as FfiFn,
+		};
+	}
+
 	private get format_fns(): Record<Language, FfiFn> {
 		return {
 			svelte: this.symbols.tsv_format_svelte as FfiFn,
@@ -241,6 +258,16 @@ export class NativeImplementation implements TsvImplementation {
 	parse_internal(source: string, language: Language): void {
 		const result = this.call_ffi(this.parse_internal_fns[language], source);
 		this.check_error(result);
+	}
+
+	parse_no_locations(source: string, language: Language): unknown {
+		const fn = this.parse_no_locations_fns[language];
+		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
+		const parsed = JSON.parse(this.call_ffi(fn, source));
+		if (parsed.error) {
+			throw new Error(parsed.error);
+		}
+		return parsed;
 	}
 
 	format(source: string, language: Language): string {

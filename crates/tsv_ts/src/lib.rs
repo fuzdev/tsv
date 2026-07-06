@@ -190,9 +190,37 @@ pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Valu
 /// source).
 #[cfg(feature = "convert")]
 pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
-    // One fused source scan builds both; ASCII sources take a byte-level
-    // line scan and get the identity map.
-    let (tracker, map) = tsv_lang::LocationTracker::new_ecmascript_with_map(source);
+    convert_ast_json_bytes_variant(program, source, true)
+}
+
+/// Convert internal AST to compact JSON wire bytes **without** per-node `loc`.
+///
+/// The opt-in `no-locations` variant of `convert_ast_json_bytes`: emits
+/// `start`/`end` offsets but drops the per-node `loc` object (line/column) that
+/// the acorn/svelte drop-in wire carries. `loc` is a pure function of a node's
+/// `start`/`end` (UTF-16 offsets) plus the source, so a consumer that has the
+/// source loses nothing — line/column is derived lazily. Dropping it removes
+/// ~46% of the wire and ~61% of the downstream `JSON.parse` cost (three nested
+/// objects per node), and lets emission skip the per-node line/column lookup
+/// entirely. This is a distinct, narrower product from the default wire — not a
+/// second encoding of the acorn contract — mirroring acorn's own
+/// `locations: false`.
+#[cfg(feature = "convert")]
+pub fn convert_ast_json_bytes_no_locations(program: &Program<'_>, source: &str) -> Vec<u8> {
+    convert_ast_json_bytes_variant(program, source, false)
+}
+
+#[cfg(feature = "convert")]
+fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations: bool) -> Vec<u8> {
+    // One fused source scan builds both; ASCII sources take a byte-level line
+    // scan and get the identity map. The `no-locations` path emits no line/column,
+    // so it skips the line-start scan entirely (`new_map_only` builds just the
+    // byte→char map) — a once-per-file entry branch, no per-node cost.
+    let (tracker, map) = if locations {
+        tsv_lang::LocationTracker::new_ecmascript_with_map(source)
+    } else {
+        tsv_lang::LocationTracker::new_map_only(source)
+    };
     ast::convert::write_program_json(
         program,
         source,
@@ -201,6 +229,7 @@ pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
             map: &map,
         },
         ast::convert::Schema::Acorn,
+        locations,
     )
 }
 
@@ -214,6 +243,15 @@ pub fn convert_ast_json_bytes(program: &Program<'_>, source: &str) -> Vec<u8> {
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json_string(program: &Program<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(program, source))
+        .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
+}
+
+/// The `String` form of `convert_ast_json_bytes_no_locations` for `&str`
+/// boundaries (the WASM binding's `JSON.parse`, N-API strings).
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string_no_locations(program: &Program<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes_no_locations(program, source))
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 

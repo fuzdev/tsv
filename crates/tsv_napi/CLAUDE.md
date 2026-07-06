@@ -29,6 +29,7 @@ Mirrors `tsv_ffi` / `tsv_wasm`:
 The `lang_bindings!` macro generates three `#[napi]` functions per language (svelte, typescript, css); the `format`/`parse` features gate which are emitted:
 
 - `parse_<lang>(source) -> string` — JSON AST string (host `JSON.parse`s it — parity with FFI/WASM)
+- `parse_<lang>_no_locations(source) -> string` — the span-only variant (drops per-node `loc`; Svelte also `name_loc`; CSS identical to `parse_css`). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API.
 - `parse_internal_<lang>(source) -> void` — parses without converting (benchmark-only; `black_box` prevents elision)
 - `format_<lang>(source) -> string` — formatted source
 

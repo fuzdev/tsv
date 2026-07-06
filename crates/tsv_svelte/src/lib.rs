@@ -116,6 +116,22 @@ pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
     ast::convert::write_root_bytes(root, source)
 }
 
+/// Convert internal AST to compact JSON wire bytes **without** line/column data.
+///
+/// The opt-in `no-locations` variant of `convert_ast_json_bytes`: drops every
+/// line/column object from the Svelte wire — the acorn `loc` on
+/// `<script>`/`{expr}` nodes, the `name_loc` on elements/attributes/directives,
+/// and the root-comment `loc` — keeping only `start`/`end` offsets. All are
+/// derivable from those offsets plus source, so a consumer that has the source
+/// loses nothing; a name's exact span reconstructs as `node.start + a fixed
+/// per-node-type prefix`. Because this removes *all* line/column emission,
+/// nothing queries the line table. Mirrors acorn's `locations: false`; a
+/// distinct, narrower product from the default drop-in wire.
+#[cfg(feature = "convert")]
+pub fn convert_ast_json_bytes_no_locations(root: &Root<'_>, source: &str) -> Vec<u8> {
+    ast::convert::write_root_bytes_no_locations(root, source)
+}
+
 /// Convert internal AST to a compact JSON string with character-based positions
 ///
 /// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the
@@ -126,6 +142,15 @@ pub fn convert_ast_json_bytes(root: &Root<'_>, source: &str) -> Vec<u8> {
 #[allow(clippy::expect_used)]
 pub fn convert_ast_json_string(root: &Root<'_>, source: &str) -> String {
     String::from_utf8(convert_ast_json_bytes(root, source)).expect("serde_json emits valid UTF-8")
+}
+
+/// The `String` form of `convert_ast_json_bytes_no_locations` for `&str`
+/// boundaries (the WASM binding's `JSON.parse`, N-API strings).
+#[cfg(feature = "convert")]
+#[allow(clippy::expect_used)]
+pub fn convert_ast_json_string_no_locations(root: &Root<'_>, source: &str) -> String {
+    String::from_utf8(convert_ast_json_bytes_no_locations(root, source))
+        .expect("serde_json emits valid UTF-8")
 }
 
 /// Byte spans of the instance/module `<script>` element contents.
