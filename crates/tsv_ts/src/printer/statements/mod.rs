@@ -147,6 +147,16 @@ impl<'a> Printer<'a> {
             self.is_expression_statement.set(false);
             self.expr_stmt_paren_target.set(None);
 
+            // A parenthesized *decorated* class expression breaks its parens open and
+            // indents the content (prettier): `(⏎\t@dec⏎\tclass {}⏎)`. The decorators
+            // force the break; an undecorated `(class {})` / `(function () {})` stays
+            // inline (flat `else` below).
+            let decorated_class_expr = needs_parens
+                && matches!(
+                    &stmt.expression,
+                    Expression::ClassExpression(c) if c.decorators.is_some_and(|dec| !dec.is_empty())
+                );
+
             if paren_open_own_line_comment {
                 let mut inner: DocBuf = smallvec![d.hardline()];
                 for comment in comments_in_range(self.comments, stmt.span.start + 1, expr_start) {
@@ -158,6 +168,8 @@ impl<'a> Printer<'a> {
                 parts.push(d.indent(d.concat(&inner)));
                 parts.push(d.hardline());
                 parts.push(d.text(")"));
+            } else if decorated_class_expr {
+                parts.push(self.build_break_open_parens(expr_doc));
             } else {
                 if needs_parens {
                     parts.push(d.text("("));
