@@ -356,6 +356,19 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 	// Personal sites (public repos beyond the fuz ecosystem)
 	{ path: '../ryanatkn.com/src', tier: 'real' },
 	{ path: '../webdevladder.net/src', tier: 'real' },
+	// Real-authored CSS extracted from the perf-view `.svelte` files' <style>
+	// blocks, concatenated per source repo (bench:harvest:svelte-styles). Derived
+	// but real content: ~3×es the otherwise-tiny standalone-CSS sample with
+	// naturally-sized files, and in the gates view exercises the *standalone* CSS
+	// path on real content (embedded CSS rides EmbedContext — a different path).
+	// The same bytes are also timed in the svelte rows; rows are never summed.
+	{
+		path: 'benches/js/.cache/svelte_styles',
+		tier: 'real',
+		extensions: ['css'],
+		optional: true,
+		hint: 'run `deno task bench:harvest:svelte-styles`',
+	},
 	// External projects (monorepo subpaths)
 	{ path: '../kit/packages/kit/src', tier: 'real' },
 	{ path: '../svelte/packages/svelte/src', tier: 'real' },

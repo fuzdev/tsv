@@ -369,7 +369,7 @@ deno task bench:bun:run
 # by design (see "Perf vs conformance surfaces" above): entries carry null timing.
 deno task bench:conformance        # harvest + build:bench:node + coverage run
 deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
-deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject caches (freshness-stamped: skips when the source commits + pins match; --force after harvest-logic changes)
+deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject + svelte-styles caches (first three freshness-stamped: skip when the source commits + pins match, --force after harvest-logic changes; svelte-styles always re-harvests — live-repo source, ~2 s)
 
 # Per-file skip detail (off by default — counts always shown, paths/errors opt-in)
 deno task bench:deno:run -- --verbose

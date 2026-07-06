@@ -2,12 +2,12 @@
 	"version": 6,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-06T21:59:12.381Z",
-	"git_commit": "a7e0b6a3",
+	"timestamp": "2026-07-06T22:11:05.872Z",
+	"git_commit": "f672d035",
 	"corpus": {
 		"svelte": 5507,
 		"typescript": 46847,
-		"css": 22676
+		"css": 22694
 	},
 	"corpus_sources": [
 		{
@@ -161,6 +161,15 @@
 				"svelte": 24,
 				"typescript": 13,
 				"css": 1
+			}
+		},
+		{
+			"path": "benches/js/.cache/svelte_styles",
+			"files": 18,
+			"by_language": {
+				"svelte": 0,
+				"typescript": 0,
+				"css": 18
 			}
 		},
 		{
@@ -696,9 +705,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22437,
-			"files_total": 22676,
-			"files_iterated": 22413,
+			"files_processed": 22455,
+			"files_total": 22694,
+			"files_iterated": 22431,
 			"runtime": "node"
 		},
 		{
@@ -716,9 +725,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22482,
-			"files_total": 22676,
-			"files_iterated": 22413,
+			"files_processed": 22500,
+			"files_total": 22694,
+			"files_iterated": 22431,
 			"runtime": "node"
 		},
 		{
@@ -736,9 +745,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22482,
-			"files_total": 22676,
-			"files_iterated": 22413,
+			"files_processed": 22500,
+			"files_total": 22694,
+			"files_iterated": 22431,
 			"runtime": "node"
 		},
 		{
@@ -756,9 +765,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22482,
-			"files_total": 22676,
-			"files_iterated": 22413,
+			"files_processed": 22500,
+			"files_total": 22694,
+			"files_iterated": 22431,
 			"runtime": "node"
 		},
 		{
@@ -776,9 +785,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22482,
-			"files_total": 22676,
-			"files_iterated": 22413,
+			"files_processed": 22500,
+			"files_total": 22694,
+			"files_iterated": 22431,
 			"runtime": "node"
 		}
 	],

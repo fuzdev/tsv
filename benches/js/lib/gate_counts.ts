@@ -81,7 +81,7 @@ export const TS_REPO_PINS = { scanned: 768, accept_parity: 424 };
 export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
 	svelte: 1372,
 	typescript: 4250,
-	css: 150,
+	css: 168,
 };
 
 /**
@@ -109,7 +109,7 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 1111,
 	typescript: 3983,
-	css: 110,
+	css: 126,
 };
 
 /**
@@ -140,6 +140,15 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	typescript: 63,
 	css: 8,
 };
+
+/**
+ * bench:harvest:svelte-styles — MINIMUM extracted `<style>` block count (live
+ * corpus, same semantics as `CORPUS_PARSE_COMPARED_MIN`: the perf-view repos
+ * grow with ordinary work, so growth passes and a shrink — broken extraction or
+ * a gutted corpus — fails before the cache is written). Measured 2026-07-06 at
+ * the ryanatkn.com + webdevladder.net + mdz corpus additions.
+ */
+export const SVELTE_STYLES_BLOCKS_MIN = 265;
 
 /** bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured 2026-07-06: ../wpt at 7437c7bc. */
 export const WPT_CSS_HARVEST_PIN = 22_310;

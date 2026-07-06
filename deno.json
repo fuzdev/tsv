@@ -46,7 +46,7 @@
 
 		"bench:install": "node benches/js/install_deps.ts",
 		"bench": "deno task bench:perf && deno task bench:harvest && deno task bench:conformance:run",
-		"bench:perf": "deno task bench:deno && deno task bench:node && deno task bench:bun:run && deno task bench:compose",
+		"bench:perf": "deno task bench:harvest:svelte-styles && deno task bench:deno && deno task bench:node && deno task bench:bun:run && deno task bench:compose",
 		"bench:deno": "deno task build:bench:deno && deno task bench:deno:run",
 		"bench:deno:run": "deno run --v8-flags=--expose-gc --allow-ffi --allow-read --allow-write=benches/js/results --allow-run=git,gzip --allow-env --allow-net --allow-sys benches/js/bench.ts",
 		"bench:node": "deno task build:bench:node && deno task bench:node:run",
@@ -56,7 +56,8 @@
 		"bench:compose": "deno run --allow-read --allow-write=benches/js/results benches/js/compose_reports.ts",
 		"bench:conformance": "deno task bench:harvest && deno task build:bench:node && deno task bench:conformance:run",
 		"bench:conformance:run": "BENCH_CORPUS=conformance BENCH_COVERAGE_ONLY=1 node benches/js/bench.ts",
-		"bench:harvest": "deno task bench:harvest:wpt && deno task bench:harvest:test262 && deno task bench:harvest:svelte-rejects",
+		"bench:harvest": "deno task bench:harvest:wpt && deno task bench:harvest:test262 && deno task bench:harvest:svelte-rejects && deno task bench:harvest:svelte-styles",
+		"bench:harvest:svelte-styles": "deno run --allow-read --allow-write=benches/js/.cache --allow-env --allow-sys --config benches/js/deno.json benches/js/diagnostics/svelte_styles_harvest.ts",
 		"bench:harvest:wpt": "deno run --allow-read --allow-write --allow-run=git benches/js/diagnostics/wpt_css_harvest.ts --if-present",
 		"bench:harvest:test262": "deno run --allow-read --allow-write --allow-run=cargo,git benches/js/harvest_test262.ts --if-present",
 		"bench:harvest:svelte-rejects": "deno run --allow-read --allow-write=benches/js/.cache --allow-env --allow-net --allow-sys --allow-run=git --config benches/js/deno.json benches/js/diagnostics/svelte_reject_harvest.ts --if-present",

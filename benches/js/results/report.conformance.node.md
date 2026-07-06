@@ -4,11 +4,11 @@
 
 **Corpus kind:** conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-07-06T21:59:12.381Z — tsv 0.1.0 (a7e0b6a3)
+**Date:** 2026-07-06T22:11:05.872Z — tsv 0.1.0 (f672d035)
 
-**Corpus:** 5507 Svelte (2.9 MB), 46847 TypeScript (79.5 MB), 22676 CSS (7.8 MB) — 75030 files, 90.3 MB total
+**Corpus:** 5507 Svelte (2.9 MB), 46847 TypeScript (79.5 MB), 22694 CSS (8.0 MB) — 75048 files, 90.5 MB total
 
-**Sources:** ../zzz/src (325), ../fuz_app/src (664), ../fuz_blog/src (32), ../fuz_code/src (68), ../fuz_css/src (124), ../fuz_docs/src (64), ../fuz_gitops/src (203), ../fuz_mastodon/src (24), ../fuz_template/src (15), ../fuz_ui/src (215), ../fuz_util/src (144), ../mdz/src (144), ../gro/src (187), ../svelte-docinfo/src (297), ../tsv.fuz.dev/src (27), ../ryanatkn.com/src (51), ../webdevladder.net/src (38), ../kit/packages/kit/src (381), ../svelte/packages/svelte/src (380), ../svelte.dev/apps/svelte.dev/src (138), ../svelte.dev/packages/repl/src (48), ../svelte.dev/packages/site-kit/src (65), ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
+**Sources:** ../zzz/src (325), ../fuz_app/src (664), ../fuz_blog/src (32), ../fuz_code/src (68), ../fuz_css/src (124), ../fuz_docs/src (64), ../fuz_gitops/src (203), ../fuz_mastodon/src (24), ../fuz_template/src (15), ../fuz_ui/src (215), ../fuz_util/src (144), ../mdz/src (144), ../gro/src (187), ../svelte-docinfo/src (297), ../tsv.fuz.dev/src (27), ../ryanatkn.com/src (51), ../webdevladder.net/src (38), benches/js/.cache/svelte_styles (18), ../kit/packages/kit/src (381), ../svelte/packages/svelte/src (380), ../svelte.dev/apps/svelte.dev/src (138), ../svelte.dev/packages/repl/src (48), ../svelte.dev/packages/site-kit/src (65), ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
 
 **Versions:** svelte@5.56.4, acorn@8.16.0, acorn-typescript@1.0.10, prettier@3.9.0, prettier-plugin-svelte@4.1.1, oxc-parser@0.139.0, oxfmt@0.57.0, @biomejs/wasm-bundler@2.5.2
 
@@ -24,7 +24,7 @@
 
 ## parse/css
 
-**Coverage:** svelte/compiler 22437/22676 (98%), tsv-json 22482/22676 (99%), tsv_wasm-json 22482/22676 (99%), tsv-internal 22482/22676 (99%), tsv_wasm-internal 22482/22676 (99%)
+**Coverage:** svelte/compiler 22455/22694 (98%), tsv-json 22500/22694 (99%), tsv_wasm-json 22500/22694 (99%), tsv-internal 22500/22694 (99%), tsv_wasm-internal 22500/22694 (99%)
 
 ## Binary Sizes
 

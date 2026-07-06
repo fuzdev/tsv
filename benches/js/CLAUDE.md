@@ -636,11 +636,18 @@ deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
 # bench:conformance build tasks; run standalone after a ../wpt or ../test262
 # update — EXPECT the pinned harvest count to trip after a source pull
 # (§Pinned gate counts): re-pin in lib/gate_counts.ts deliberately.
-deno task bench:harvest            # all three harvests
+deno task bench:harvest            # all four harvests
 deno task bench:harvest:wpt        # ../wpt/css <style> blocks → .cache/wpt_css
 deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
 deno task bench:harvest:svelte-rejects  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json
                                         # (the conformance view excludes these — see §Corpus)
+deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks, concatenated per repo
+                                        # → .cache/svelte_styles/<repo>.css — a real-tier corpus
+                                        # entry (see §Corpus). NOT stamped (sources are the live
+                                        # dev repos; the walk is ~2 s, always re-harvests, rewrites
+                                        # only changed files); block count pinned as a MINIMUM.
+                                        # Also chained at the start of bench:perf so perf runs
+                                        # measure a fresh cache.
 
 # Run without rebuilding (if already built) — guarded against stale artifacts,
 # see "Artifact Freshness Guard" below
@@ -773,9 +780,13 @@ Things the published numbers measure that aren't quite what they look like:
   ecosystem plus svelte/kit source — the same code tsv is developed and
   fixture-tuned against. Throughput tracks the syntactic mix of _this_
   corpus, so the ratios are "N× on this corpus," not universal. CSS is by
-  far the weakest sample (a few dozen real files — most of the old CSS
-  corpus was prettier's fixture suite), so its per-file ratios are the
-  noisiest in the report.
+  far the weakest sample: only a few dozen real standalone files exist in
+  this ecosystem (most CSS is authored inside `.svelte` `<style>` blocks),
+  so the corpus adds the `svelte_styles` harvest — those blocks extracted
+  and concatenated per repo (~3× the standalone bytes, naturally-sized
+  files). Note the harvest bytes are also timed inside the svelte rows
+  (rows are never summed, so this is disclosure, not distortion), and CSS
+  per-file ratios remain the noisiest in the report.
 - **Conformance-surface semantics (`BENCH_CORPUS=conformance`).** Parse-only
   by design, and the committed surface is **coverage-only** (per-tool preflight
   parse success over the fixtures-included corpus) — the timed phase is
@@ -1018,6 +1029,7 @@ benches/js/
 │   ├── test262_compare.ts    # test262 differential (tsv vs oxc-parser, from the Rust manifest)
 │   ├── wpt_css_harvest.ts    # wpt <style> blocks → .cache/wpt_css (task: bench:harvest:wpt)
 │   ├── svelte_reject_harvest.ts  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json (task: bench:harvest:svelte-rejects; conformance view excludes these)
+│   ├── svelte_styles_harvest.ts  # perf-view .svelte <style> blocks → per-repo concats in .cache/svelte_styles/ (task: bench:harvest:svelte-styles; a real-tier corpus entry — see §Corpus)
 │   ├── wasm_json_probe.ts    # WASM-vs-native JSON parse penalty attribution
 │   ├── wasm_format_probe.ts  # WASM format wall-time A/B
 │   ├── comment_dup_scan.ts   # comment-dup fixture-corpus completeness guard
