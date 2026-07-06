@@ -2,12 +2,12 @@
 	"version": 6,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-05T16:36:58.498Z",
-	"git_commit": "bbd52a6b",
+	"timestamp": "2026-07-06T20:30:33.457Z",
+	"git_commit": "1970e001",
 	"corpus": {
-		"svelte": 5217,
-		"typescript": 46708,
-		"css": 22672
+		"svelte": 5351,
+		"typescript": 46773,
+		"css": 22673
 	},
 	"corpus_sources": [
 		{
@@ -39,10 +39,10 @@
 		},
 		{
 			"path": "../fuz_code/src",
-			"files": 64,
+			"files": 68,
 			"by_language": {
-				"svelte": 21,
-				"typescript": 38,
+				"svelte": 23,
+				"typescript": 40,
 				"css": 5
 			}
 		},
@@ -129,37 +129,37 @@
 		},
 		{
 			"path": "../tsv.fuz.dev/src",
-			"files": 28,
+			"files": 27,
 			"by_language": {
 				"svelte": 16,
-				"typescript": 11,
+				"typescript": 10,
 				"css": 1
 			}
 		},
 		{
 			"path": "../kit/packages/kit/src",
-			"files": 318,
+			"files": 381,
 			"by_language": {
-				"svelte": 84,
-				"typescript": 233,
+				"svelte": 93,
+				"typescript": 287,
 				"css": 1
 			}
 		},
 		{
 			"path": "../svelte/packages/svelte/src",
-			"files": 375,
+			"files": 380,
 			"by_language": {
 				"svelte": 0,
-				"typescript": 375,
+				"typescript": 380,
 				"css": 0
 			}
 		},
 		{
 			"path": "../svelte.dev/apps/svelte.dev/src",
-			"files": 135,
+			"files": 138,
 			"by_language": {
 				"svelte": 60,
-				"typescript": 75,
+				"typescript": 78,
 				"css": 0
 			}
 		},
@@ -183,9 +183,9 @@
 		},
 		{
 			"path": "../prettier-plugin-svelte/test",
-			"files": 302,
+			"files": 318,
 			"by_language": {
-				"svelte": 302,
+				"svelte": 318,
 				"typescript": 0,
 				"css": 0
 			}
@@ -228,11 +228,11 @@
 		},
 		{
 			"path": "../svelte/packages/svelte/tests",
-			"files": 4341,
+			"files": 4451,
 			"by_language": {
-				"svelte": 4026,
-				"typescript": 135,
-				"css": 180
+				"svelte": 4133,
+				"typescript": 137,
+				"css": 181
 			}
 		},
 		{
@@ -256,81 +256,81 @@
 	],
 	"versions": {
 		"tsv": "0.1.0",
-		"svelte": "5.56.1",
+		"svelte": "5.56.4",
 		"acorn": "8.16.0",
 		"acorn_ts": "1.0.10",
 		"prettier": "3.9.0",
 		"prettier_svelte": "4.1.1",
-		"oxc_parser": "0.134.0",
-		"oxfmt": "0.53.0",
-		"biome": "2.4.16"
+		"oxc_parser": "0.139.0",
+		"oxfmt": "0.57.0",
+		"biome": "2.5.2"
 	},
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3307360,
+			"bytes": 3341840,
 			"kind": "native",
-			"gzip_bytes": 1428738
+			"gzip_bytes": 1442351
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3054656,
+			"bytes": 3083200,
 			"kind": "native",
-			"gzip_bytes": 1324423
+			"gzip_bytes": 1336005
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1542576,
+			"bytes": 1564640,
 			"kind": "native",
-			"gzip_bytes": 682941
+			"gzip_bytes": 691200
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3431120,
+			"bytes": 3469072,
 			"kind": "native",
-			"gzip_bytes": 1470536
+			"gzip_bytes": 1484336
 		},
 		{
 			"label": "tsv_format_wasm",
-			"bytes": 2186094,
+			"bytes": 2211111,
 			"kind": "wasm",
-			"gzip_bytes": 754306
+			"gzip_bytes": 762642
 		},
 		{
 			"label": "tsv_parse_wasm",
-			"bytes": 1015654,
+			"bytes": 1036525,
 			"kind": "wasm",
-			"gzip_bytes": 375849
+			"gzip_bytes": 380964
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2410073,
+			"bytes": 2440110,
 			"kind": "wasm",
-			"gzip_bytes": 833573
+			"gzip_bytes": 841799
 		},
 		{
 			"label": "biome (wasm)",
-			"bytes": 34430368,
+			"bytes": 37540009,
 			"kind": "wasm",
-			"gzip_bytes": 8187702
+			"gzip_bytes": 9006428
 		},
 		{
 			"label": "oxc-parser (napi)",
-			"bytes": 2658008,
+			"bytes": 2428632,
 			"kind": "native",
-			"gzip_bytes": 1032774
+			"gzip_bytes": 977389
 		},
 		{
 			"label": "oxfmt (napi)",
-			"bytes": 8016464,
+			"bytes": 9061136,
 			"kind": "native",
-			"gzip_bytes": 3224684
+			"gzip_bytes": 3631974
 		},
 		{
 			"label": "oxc-parser (wasm)",
-			"bytes": 1866798,
+			"bytes": 1616596,
 			"kind": "wasm",
-			"gzip_bytes": 518682
+			"gzip_bytes": 501431
 		}
 	],
 	"entries": [
@@ -349,9 +349,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5217,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 5351,
+			"files_total": 5351,
+			"files_iterated": 5343,
 			"runtime": "node"
 		},
 		{
@@ -369,9 +369,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5209,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 5343,
+			"files_total": 5351,
+			"files_iterated": 5343,
+			"runtime": "node"
+		},
+		{
+			"name": "tsv-json-no-locations",
+			"group": "parse/svelte",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 5343,
+			"files_total": 5351,
+			"files_iterated": 5343,
 			"runtime": "node"
 		},
 		{
@@ -389,9 +409,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5209,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 5343,
+			"files_total": 5351,
+			"files_iterated": 5343,
+			"runtime": "node"
+		},
+		{
+			"name": "tsv_wasm-json-no-locations",
+			"group": "parse/svelte",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 5343,
+			"files_total": 5351,
+			"files_iterated": 5343,
 			"runtime": "node"
 		},
 		{
@@ -409,9 +449,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5209,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 5343,
+			"files_total": 5351,
+			"files_iterated": 5343,
 			"runtime": "node"
 		},
 		{
@@ -429,9 +469,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5209,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 5343,
+			"files_total": 5351,
+			"files_iterated": 5343,
 			"runtime": "node"
 		},
 		{
@@ -449,9 +489,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46030,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 46095,
+			"files_total": 46773,
+			"files_iterated": 46025,
 			"runtime": "node"
 		},
 		{
@@ -469,9 +509,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46464,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 46524,
+			"files_total": 46773,
+			"files_iterated": 46025,
+			"runtime": "node"
+		},
+		{
+			"name": "tsv-json-no-locations",
+			"group": "parse/typescript",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 46524,
+			"files_total": 46773,
+			"files_iterated": 46025,
 			"runtime": "node"
 		},
 		{
@@ -489,9 +549,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46464,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 46524,
+			"files_total": 46773,
+			"files_iterated": 46025,
+			"runtime": "node"
+		},
+		{
+			"name": "tsv_wasm-json-no-locations",
+			"group": "parse/typescript",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 46524,
+			"files_total": 46773,
+			"files_iterated": 46025,
 			"runtime": "node"
 		},
 		{
@@ -509,9 +589,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46464,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 46524,
+			"files_total": 46773,
+			"files_iterated": 46025,
 			"runtime": "node"
 		},
 		{
@@ -529,9 +609,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46464,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 46524,
+			"files_total": 46773,
+			"files_iterated": 46025,
 			"runtime": "node"
 		},
 		{
@@ -549,9 +629,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46465,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 46528,
+			"files_total": 46773,
+			"files_iterated": 46025,
 			"runtime": "node"
 		},
 		{
@@ -569,9 +649,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46708,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 46773,
+			"files_total": 46773,
+			"files_iterated": 46025,
 			"runtime": "node"
 		},
 		{
@@ -589,9 +669,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22433,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22434,
+			"files_total": 22673,
+			"files_iterated": 22410,
 			"runtime": "node"
 		},
 		{
@@ -609,9 +689,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22478,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22479,
+			"files_total": 22673,
+			"files_iterated": 22410,
 			"runtime": "node"
 		},
 		{
@@ -629,9 +709,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22478,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22479,
+			"files_total": 22673,
+			"files_iterated": 22410,
 			"runtime": "node"
 		},
 		{
@@ -649,9 +729,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22478,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22479,
+			"files_total": 22673,
+			"files_iterated": 22410,
 			"runtime": "node"
 		},
 		{
@@ -669,9 +749,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22478,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22479,
+			"files_total": 22673,
+			"files_iterated": 22410,
 			"runtime": "node"
 		}
 	],

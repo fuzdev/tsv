@@ -4,65 +4,69 @@
 
 **Corpus kind:** conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-07-05T16:36:58.498Z — tsv 0.1.0 (bbd52a6b)
+**Date:** 2026-07-06T20:30:33.457Z — tsv 0.1.0 (1970e001)
 
-**Corpus:** 5217 Svelte (2.7 MB), 46708 TypeScript (78.5 MB), 22672 CSS (7.8 MB) — 74597 files, 89.0 MB total
+**Corpus:** 5351 Svelte (2.7 MB), 46773 TypeScript (78.9 MB), 22673 CSS (7.8 MB) — 74797 files, 89.4 MB total
 
-**Sources:** ../zzz/src (325), ../fuz_app/src (664), ../fuz_blog/src (32), ../fuz_code/src (64), ../fuz_css/src (124), ../fuz_docs/src (64), ../fuz_gitops/src (203), ../fuz_mastodon/src (24), ../fuz_template/src (15), ../fuz_ui/src (215), ../fuz_util/src (144), ../gro/src (187), ../svelte-docinfo/src (297), ../tsv.fuz.dev/src (28), ../kit/packages/kit/src (318), ../svelte/packages/svelte/src (375), ../svelte.dev/apps/svelte.dev/src (135), ../svelte.dev/packages/repl/src (48), ../svelte.dev/packages/site-kit/src (65), ../prettier-plugin-svelte/test (302), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4341), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
+**Sources:** ../zzz/src (325), ../fuz_app/src (664), ../fuz_blog/src (32), ../fuz_code/src (68), ../fuz_css/src (124), ../fuz_docs/src (64), ../fuz_gitops/src (203), ../fuz_mastodon/src (24), ../fuz_template/src (15), ../fuz_ui/src (215), ../fuz_util/src (144), ../gro/src (187), ../svelte-docinfo/src (297), ../tsv.fuz.dev/src (27), ../kit/packages/kit/src (381), ../svelte/packages/svelte/src (380), ../svelte.dev/apps/svelte.dev/src (138), ../svelte.dev/packages/repl/src (48), ../svelte.dev/packages/site-kit/src (65), ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
 
-**Versions:** svelte@5.56.1, acorn@8.16.0, acorn-typescript@1.0.10, prettier@3.9.0, prettier-plugin-svelte@4.1.1, oxc-parser@0.134.0, oxfmt@0.53.0, @biomejs/wasm-bundler@2.4.16
+**Versions:** svelte@5.56.4, acorn@8.16.0, acorn-typescript@1.0.10, prettier@3.9.0, prettier-plugin-svelte@4.1.1, oxc-parser@0.139.0, oxfmt@0.57.0, @biomejs/wasm-bundler@2.5.2
 
-**Methodology:** Single-threaded — every implementation formats/parses one file at a time, measured sequentially with no cross-file parallelism. The numbers are per-file, single-core latency/throughput, not the multi-core batch throughput a CLI gets formatting many files at once.
+**Methodology:** Single-threaded — every implementation formats/parses one file at a time, measured sequentially with no cross-file parallelism. One timed iteration is one full sweep over the group’s iterated file set, so the absolute columns (sweeps/sec, p50–p99, min/max) are per-sweep, not per-file — divide by the group’s file count (the Files lines / `(Mf)` annotations) for per-file figures; ratios and MB/s are denominated consistently either way. This is single-core throughput, not the multi-core batch throughput a CLI gets formatting many files at once.
 
 ## parse/svelte
 
-**Coverage:** svelte/compiler 5217/5217 (100%), tsv-json 5209/5217 (99%), tsv_wasm-json 5209/5217 (99%), tsv-internal 5209/5217 (99%), tsv_wasm-internal 5209/5217 (99%)
+**Coverage:** svelte/compiler 5351/5351 (100%), tsv-json 5343/5351 (99%), tsv-json-no-locations 5343/5351 (99%), tsv_wasm-json 5343/5351 (99%), tsv_wasm-json-no-locations 5343/5351 (99%), tsv-internal 5343/5351 (99%), tsv_wasm-internal 5343/5351 (99%)
 
 ## parse/typescript
 
-**Coverage:** acorn-typescript 46030/46708 (98%), tsv-json 46464/46708 (99%), tsv_wasm-json 46464/46708 (99%), tsv-internal 46464/46708 (99%), tsv_wasm-internal 46464/46708 (99%), oxc-parser 46465/46708 (99%), oxc-parser-wasm 46708/46708 (100%)
+**Coverage:** acorn-typescript 46095/46773 (98%), tsv-json 46524/46773 (99%), tsv-json-no-locations 46524/46773 (99%), tsv_wasm-json 46524/46773 (99%), tsv_wasm-json-no-locations 46524/46773 (99%), tsv-internal 46524/46773 (99%), tsv_wasm-internal 46524/46773 (99%), oxc-parser 46528/46773 (99%), oxc-parser-wasm 46773/46773 (100%)
 
 ## parse/css
 
-**Coverage:** svelte/compiler 22433/22672 (98%), tsv-json 22478/22672 (99%), tsv_wasm-json 22478/22672 (99%), tsv-internal 22478/22672 (99%), tsv_wasm-internal 22478/22672 (99%)
+**Coverage:** svelte/compiler 22434/22673 (98%), tsv-json 22479/22673 (99%), tsv_wasm-json 22479/22673 (99%), tsv-internal 22479/22673 (99%), tsv_wasm-internal 22479/22673 (99%)
 
 ## Binary Sizes
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv_format_wasm | 2.2 MB | 754.3 KB | 0.9x | 0.9x |
-| tsv_parse_wasm | 1.0 MB | 375.8 KB | 0.4x | 0.5x |
-| tsv_wasm | 2.4 MB | 833.6 KB | — | — |
-| biome (wasm) | 34.4 MB | 8.2 MB | 14.3x | 9.8x |
-| oxc-parser (wasm) | 1.9 MB | 518.7 KB | 0.8x | 0.6x |
+| tsv_format_wasm | 2.2 MB | 762.6 KB | 0.9x | 0.9x |
+| tsv_parse_wasm | 1.0 MB | 381.0 KB | 0.4x | 0.5x |
+| tsv_wasm | 2.4 MB | 841.8 KB | — | — |
+| biome (wasm) | 37.5 MB | 9.0 MB | 15.4x | 10.7x |
+| oxc-parser (wasm) | 1.6 MB | 501.4 KB | 0.7x | 0.6x |
 | tsv (ffi) | 3.3 MB | 1.4 MB | 1.0x | 1.0x |
 | tsv format (ffi) | 3.1 MB | 1.3 MB | 0.9x | 0.9x |
-| tsv parse (ffi) | 1.5 MB | 682.9 KB | 0.4x | 0.5x |
-| tsv (napi) | 3.4 MB | 1.5 MB | — | — |
-| oxc-parser+oxfmt (napi) | 10.7 MB | 4.3 MB | 3.1x | 2.9x |
-| oxc-parser (napi) | 2.7 MB | 1.0 MB | 0.8x | 0.7x |
-| oxfmt (napi) | 8.0 MB | 3.2 MB | 2.3x | 2.2x |
+| tsv parse (ffi) | 1.6 MB | 691.2 KB | 0.5x | 0.5x |
+| tsv (napi) | 3.5 MB | 1.5 MB | — | — |
+| oxc-parser+oxfmt (napi) | 11.5 MB | 4.6 MB | 3.3x | 3.1x |
+| oxc-parser (napi) | 2.4 MB | 977.4 KB | 0.7x | 0.7x |
+| oxfmt (napi) | 9.1 MB | 3.6 MB | 2.6x | 2.4x |
 
 _Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (gz)` compares gzipped bytes; `vs tsv` compares raw on-disk bytes._
 
 ## Skipped Files
 
-1606 unique file+error combinations — Svelte 8, TypeScript 1165, CSS 433.
+1613 unique file+error combinations — Svelte 8, TypeScript 1172, CSS 433.
 
 **Per-benchmark skip counts:**
 - parse/typescript: acorn-typescript: 678
-- parse/typescript: tsv-json: 244
-- parse/typescript: tsv_wasm-json: 244
-- parse/typescript: tsv-internal: 244
-- parse/typescript: tsv_wasm-internal: 244
-- parse/typescript: oxc-parser: 243
+- parse/typescript: tsv-json: 249
+- parse/typescript: tsv-json-no-locations: 249
+- parse/typescript: tsv_wasm-json: 249
+- parse/typescript: tsv_wasm-json-no-locations: 249
+- parse/typescript: tsv-internal: 249
+- parse/typescript: tsv_wasm-internal: 249
+- parse/typescript: oxc-parser: 245
 - parse/css: svelte/compiler: 239
 - parse/css: tsv-json: 194
 - parse/css: tsv_wasm-json: 194
 - parse/css: tsv-internal: 194
 - parse/css: tsv_wasm-internal: 194
 - parse/svelte: tsv-json: 8
+- parse/svelte: tsv-json-no-locations: 8
 - parse/svelte: tsv_wasm-json: 8
+- parse/svelte: tsv_wasm-json-no-locations: 8
 - parse/svelte: tsv-internal: 8
 - parse/svelte: tsv_wasm-internal: 8
 

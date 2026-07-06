@@ -1077,13 +1077,16 @@ via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
 cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (32 checks)
+deno task smoke           # confirm every impl still loads + formats (36 checks)
+deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
 
 These packages are free to bump independently — they're measured against, not
-baked into fixtures.
+baked into fixtures. A **major** bump (e.g. `@biomejs/js-api` 4→6) can change a
+package's *type* surface without breaking the runtime path smoke exercises, so
+the `deno check` step above is the guard for those.
 
 ⚠ **The oxc wasm binding is not a regular dep.** It's pure-wasm but its metadata
 declares `cpu: wasm32`, so it lives in neither `dependencies` nor
@@ -1417,7 +1420,7 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
   subsequent timers indefinitely. Repro:
   `await import('oxfmt').then((m) => m.format('file.ts', 'x=1', {useTabs:true}))` followed by
   two `new Promise((r) => setTimeout(r, 50))` — first resolves, second never does.
-  Independent of oxfmt version (reproduced with 0.28.0, 0.50.0, and 0.53.0 on Deno 2.8.3)
+  Independent of oxfmt version (reproduced with 0.28.0, 0.50.0, 0.53.0, and 0.57.0 on Deno 2.8.3)
   so the regression is on the Deno / napi-rs side; re-test the repro before ever removing
   the workaround. In `bench.ts` oxfmt is invoked per-iteration during the `format/*` measurement
   loops; the leak shows up at the next inter-task `await wait(cooldown_ms)`, which never
