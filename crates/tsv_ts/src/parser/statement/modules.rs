@@ -732,6 +732,72 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok((local, exported, spec_end))
     }
 
+    /// Parse a plain named-import specifier's names — the `imported`
+    /// `ModuleExportName`, the `local` binding, and the specifier's end offset.
+    /// The import-side counterpart of [`Parser::parse_export_specifier_names`];
+    /// the `type`-modifier path is handled separately by
+    /// [`Parser::parse_type_specifier_parts`]. Grammar:
+    ///
+    ///   ImportSpecifier : ImportedBinding
+    ///                   | ModuleExportName as ImportedBinding
+    ///
+    /// With `as`, the imported name is a `ModuleExportName` — a string (arbitrary
+    /// module namespace name) or any `IdentifierName` including reserved words
+    /// (`import { class as C }`). Without `as`, it is an `ImportedBinding` (a
+    /// `BindingIdentifier`), so reserved words are rejected (`import { class }` is a
+    /// syntax error, see `input_invalid_keyword_no_binding`).
+    fn parse_import_specifier_names(
+        &mut self,
+    ) -> Result<(ModuleExportName<'arena>, Identifier<'arena>, u32), ParseError> {
+        let (imp_start, imp_end) = self.current_pos();
+        let imported = if matches!(self.current_kind(), TokenKind::String) {
+            ModuleExportName::Literal(self.parse_string_literal()?)
+        } else {
+            let imported_name = if self.peek_kind() == TokenKind::Keyword(KeywordKind::As) {
+                self.try_identifier_name()
+            } else {
+                self.try_ident_or_keyword_name()
+            };
+            let Some(imported_name) = imported_name else {
+                return Err(self.error_expected("identifier in import specifier"));
+            };
+            self.advance()?;
+            ModuleExportName::Identifier(Identifier::simple(
+                imported_name,
+                Span::new(imp_start as u32, imp_end as u32),
+            ))
+        };
+
+        // Check for 'as' rename → local binding (always an identifier)
+        let (local, spec_end) =
+            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
+                self.advance()?;
+
+                let (local_start, local_end) = self.current_pos();
+                let Some(local_name) = self.try_binding_name() else {
+                    return Err(self.error_expected_after("identifier", "as"));
+                };
+                self.advance()?;
+
+                (
+                    Identifier::simple(local_name, Span::new(local_start as u32, local_end as u32)),
+                    local_end,
+                )
+            } else {
+                // No `as`: the local binding is the imported identifier itself.
+                // A string imported name has no valid binding without `as` —
+                // reject (matches acorn).
+                match &imported {
+                    ModuleExportName::Identifier(id) => (id.clone(), imp_end),
+                    ModuleExportName::Literal(_) => {
+                        return Err(self.error_expected_after("'as'", "string import name"));
+                    }
+                }
+            };
+
+        Ok((imported, local, spec_end as u32))
+    }
+
     /// Parse import declaration:
     /// - `import x from "y"` (default)
     /// - `import { a, b } from "y"` (named)
@@ -958,72 +1024,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         span: Span::new(spec_start as u32, parts.end as u32),
                     }));
                 } else {
-                    // Parse imported name. Grammar:
-                    //   ImportSpecifier : ImportedBinding
-                    //                   | ModuleExportName as ImportedBinding
-                    // With `as`, the first name is a `ModuleExportName` — a string
-                    // (arbitrary module namespace name) or any `IdentifierName`
-                    // including reserved words (`import { class as C }`). Without
-                    // `as`, it is an `ImportedBinding` (a `BindingIdentifier`), so
-                    // reserved words are rejected (`import { class }` is a syntax
-                    // error, see `input_invalid_keyword_no_binding`).
-                    let (imp_start, imp_end) = self.current_pos();
-                    let imported = if matches!(self.current_kind(), TokenKind::String) {
-                        ModuleExportName::Literal(self.parse_string_literal()?)
-                    } else {
-                        let imported_name =
-                            if self.peek_kind() == TokenKind::Keyword(KeywordKind::As) {
-                                self.try_identifier_name()
-                            } else {
-                                self.try_ident_or_keyword_name()
-                            };
-                        let Some(imported_name) = imported_name else {
-                            return Err(self.error_expected("identifier in import specifier"));
-                        };
-                        self.advance()?;
-                        ModuleExportName::Identifier(Identifier::simple(
-                            imported_name,
-                            Span::new(imp_start as u32, imp_end as u32),
-                        ))
-                    };
-
-                    // Check for 'as' rename → local binding (always an identifier)
-                    let (local, spec_end) =
-                        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::As)) {
-                            self.advance()?;
-
-                            let (local_start, local_end) = self.current_pos();
-                            let Some(local_name) = self.try_binding_name() else {
-                                return Err(self.error_expected_after("identifier", "as"));
-                            };
-                            self.advance()?;
-
-                            (
-                                Identifier::simple(
-                                    local_name,
-                                    Span::new(local_start as u32, local_end as u32),
-                                ),
-                                local_end,
-                            )
-                        } else {
-                            // No `as`: the local binding is the imported identifier itself.
-                            // A string imported name has no valid binding without `as` —
-                            // reject (matches acorn).
-                            match &imported {
-                                ModuleExportName::Identifier(id) => (id.clone(), imp_end),
-                                ModuleExportName::Literal(_) => {
-                                    return Err(
-                                        self.error_expected_after("'as'", "string import name")
-                                    );
-                                }
-                            }
-                        };
-
+                    let (imported, local, spec_end) = self.parse_import_specifier_names()?;
                     specifiers.push(ImportSpecifier::Named(ImportNamedSpecifier {
                         imported,
                         local,
                         import_kind: ImportKind::Value,
-                        span: Span::new(spec_start as u32, spec_end as u32),
+                        span: Span::new(spec_start as u32, spec_end),
                     }));
                 }
 
