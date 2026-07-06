@@ -84,6 +84,12 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
   Svelte 5's modern AST with acorn and acorn-typescript
   (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
   and tsv has its own internal optimal AST
+- the parser can also emit an opt-in span-only wire (`parse --no-locations`,
+  or the `parse_*_no_locations` bindings) that drops the per-node `loc` object
+  (Svelte also `name_loc`) for a ~46% smaller, faster-to-materialize AST;
+  line/column stays derivable from the `start`/`end` offsets plus source (a
+  pure-JS `reconstruct_locations` helper ships in the parse packages), mirroring
+  acorn's `locations: false`
 - `tsv format` discovery is gitignore-aware,
   honoring `.gitignore` and `.formatignore` (original to tsv),
   hierarchically supporting nested files like git and unlike `.prettierignore`,
