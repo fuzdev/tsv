@@ -63,12 +63,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 KeywordKind::Let | KeywordKind::Var => self.parse_variable_declaration(),
                 KeywordKind::Return => self.parse_return_statement(),
                 KeywordKind::Function => {
-                    // In ambient context (declare namespace), parse as TSDeclareFunction
-                    if self.in_ambient_context {
-                        self.parse_ambient_function_declaration()
-                    } else {
-                        self.parse_function_declaration()
-                    }
+                    // A `function` inside a `declare namespace`/`module` body carries no
+                    // `declare` keyword of its own, so it is an ordinary function statement:
+                    // `parse_function_or_overload` yields a `FunctionDeclaration` for a body
+                    // and a `TSDeclareFunction` for a bodiless overload signature, exactly as
+                    // at the top level. An ambient body is a static-semantic early-error (tsc
+                    // TS1183) deferred to diagnostics — prettier formats it, so tsv parses it.
+                    // (A *top-level* `declare function` is dispatched separately, in
+                    // `parse_declare_statement_kind`, and keeps forcing a bodiless signature.)
+                    self.parse_function_declaration()
                 }
                 KeywordKind::Class => self.parse_class_declaration(),
                 KeywordKind::Enum => self.parse_enum_declaration(false, false),

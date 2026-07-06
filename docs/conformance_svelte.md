@@ -174,6 +174,17 @@ inputs, so the corpus AST differential is the regression oracle.
 
 Svelte uses acorn + acorn-typescript, which lags behind TypeScript's parser. tsv implements the full spec.
 
+**Oracle note.** acorn-typescript is tsv's AST-**shape** drop-in target, *not* its
+correctness oracle — it is both over-lenient and over-strict versus the real
+compiler. For **validity** (what is or isn't a TS error) the oracle is **tsc**, and
+tsv's parser is deliberately **permissive**: it accepts the full syntactic grammar
+and defers static-semantic early-errors (e.g. the ambient-context rules — a `declare`
+member body, initializer, or decorator) to a future diagnostics layer. The practical
+test for accept-vs-reject is **whether prettier formats it** — if prettier formats
+it, tsv accepts it (and defers any error), because tsv is first a formatter and must
+format everything well-formed. So a "correction" below is tsv matching **tsc/spec**
+(and prettier), not acorn.
+
 Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
 - `using` declarations (ES2024) — [basic](../tests/fixtures/typescript/typescript_specific/using/basic_svelte_divergence/)

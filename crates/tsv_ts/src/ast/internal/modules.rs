@@ -67,7 +67,8 @@ pub enum ExportDefaultValue<'arena> {
     // (which holds the same structs inline).
     Expression(Expression<'arena>),
     FunctionDeclaration(FunctionDeclaration<'arena>),
-    /// For ambient function declarations (no body)
+    /// A bodiless function declaration: a `declare function`, an overload
+    /// signature, or a bodiless signature inside a `declare namespace`.
     TSDeclareFunction(TSDeclareFunction<'arena>),
     ClassDeclaration(ClassDeclaration<'arena>),
     /// `export default interface Foo {}` (TypeScript)

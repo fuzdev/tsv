@@ -6,7 +6,13 @@
 
 Depends only on `tsv_lang` (see [`tsv_lang/CLAUDE.md`](../tsv_lang/CLAUDE.md)). Consumed top-level by `tsv_cli`, `tsv_wasm`, `tsv_ffi`, and as an embedding dependency by `tsv_svelte` for `<script>` blocks and template expressions `{expr}`. Also handles `.svelte.ts` rune modules.
 
-**Sources of truth**: acorn + acorn-typescript for parsing, Prettier for formatting. Read `../../../prettier/src/language-js/` before guessing layout behavior. See [../../CLAUDE.md §Canonical References](../../CLAUDE.md#canonical-references).
+**Sources of truth** — three distinct oracles, deliberately not conflated:
+
+- **acorn + acorn-typescript** — the **AST-shape** drop-in target (the wire-JSON contract). *Not* the correctness oracle: acorn-ts is both over-lenient (accepts invalid TS) and over-strict (rejects valid TS) vs the real compiler. tsv matches its tree *shape*, not its accept/reject verdict.
+- **tsc (the TypeScript compiler)** — the **correctness / validity oracle** (what is and isn't an error). tsv's parser is deliberately **permissive**: it accepts the full syntactic grammar and **defers static-semantic early-errors** (ambient-context rules like `declare` member bodies / initializers / decorators, duplicate params, invalid assignment targets, …) to a future diagnostics layer, so the formatter keeps formatting everything well-formed. The practical test for "defer vs reject": **if prettier formats it, tsv accepts it** (and defers any error); a construct prettier also rejects, tsv rejects inline.
+- **Prettier** — the formatting guide. Read `../../../prettier/src/language-js/` before guessing layout behavior.
+
+See [../../CLAUDE.md §Canonical References](../../CLAUDE.md#canonical-references) and [../../CLAUDE.md §Strict Mode Only](../../CLAUDE.md#strict-mode-only).
 
 Standard `ast/` (internal + convert), `lexer/`, `parser/`, `printer/` layout — see [../../CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure). Module catalog lives in the root.
 

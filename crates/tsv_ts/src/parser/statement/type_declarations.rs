@@ -305,32 +305,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(decl)
     }
 
-    /// Parse declare function: `declare function foo(): void`
-    ///
-    /// Called from `parse_declare_statement` where `declare` keyword is already consumed.
+    /// Parse a top-level `declare function` — always a **bodiless** signature
+    /// (`declare function foo(x: number): void;`). Called from `parse_declare_statement`
+    /// where the `declare` keyword is already consumed. The `declare` keyword
+    /// grammatically forbids a body (tsc/prettier reject one), so `semicolon_end`
+    /// requires `;`/ASI. A `function` *inside* a `declare namespace` body is NOT parsed
+    /// here — it has no `declare` keyword of its own and goes through the ordinary
+    /// function-statement path (`parse_statement`), which allows a body (deferring the
+    /// ambient TS1183).
     fn parse_declare_function(&mut self, start: usize) -> Result<Statement<'arena>, ParseError> {
-        self.parse_declare_function_inner(start, true)
-    }
-
-    /// Parse function declaration in ambient context (inside `declare namespace`)
-    ///
-    /// These functions don't have bodies: `function foo(x: number): void;`
-    pub(super) fn parse_ambient_function_declaration(
-        &mut self,
-    ) -> Result<Statement<'arena>, ParseError> {
-        let start = self.current_pos().0;
-        self.parse_declare_function_inner(start, false)
-    }
-
-    /// Inner helper for parsing declare/ambient functions
-    ///
-    /// - `start`: span start position
-    /// - `print_declare`: whether to print `declare` keyword (true for top-level, false inside `declare namespace`)
-    fn parse_declare_function_inner(
-        &mut self,
-        start: usize,
-        print_declare: bool,
-    ) -> Result<Statement<'arena>, ParseError> {
         // Consume 'function' keyword
         self.advance()?;
 
@@ -361,7 +344,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             type_parameters,
             params,
             return_type,
-            declare: print_declare,
+            declare: true,
             r#async: false,   // declare async function is a separate feature
             generator: false, // generators not allowed in declare context
             span: Span::new(start as u32, end),
@@ -799,8 +782,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a module block: `{ statements }`
     ///
-    /// If `is_ambient` is true (for `declare namespace`), functions inside
-    /// don't have bodies and are parsed as `TSDeclareFunction`.
+    /// When `is_ambient` (a `declare namespace`/`module`), the body parses with
+    /// `in_ambient_context` set; a non-ambient nested block instead inherits any
+    /// enclosing ambient context (never clears it). This relaxes ambient-only grammar
+    /// (e.g. rest-parameter trailing commas) but does NOT force functions bodiless — a
+    /// plain `function f() {}` here is an ordinary `FunctionDeclaration`, while a
+    /// `;`-terminated `function f();` is a bodiless `TSDeclareFunction` overload.
     fn parse_module_block(
         &mut self,
         is_ambient: bool,

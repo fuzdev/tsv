@@ -114,8 +114,13 @@ pub struct Parser<'a, 'arena> {
     /// `preserveParens: true` and skips `remove_parens`. Set via
     /// [`crate::parse_with_interner_preserve_parens`].
     pub(crate) preserve_parens: bool,
-    /// True when parsing inside `declare namespace` or `declare module`.
-    /// Functions inside ambient contexts don't have bodies (end with `;`).
+    /// True when parsing inside `declare namespace`/`declare module` (acorn/babel
+    /// `inAmbientContext`). Relaxes a few ambient-only grammar rules — notably a
+    /// single trailing comma after a rest parameter is tolerated throughout the
+    /// subtree (see the rest-comma checks in `parameters.rs`/`types.rs`). It does NOT
+    /// force functions bodiless — a plain `function f() {}` inside a `declare
+    /// namespace` is an ordinary function declaration (its ambient implementation
+    /// error is deferred to diagnostics).
     in_ambient_context: bool,
     /// Stored lexer error from peek_kind(). Returned on next advance() call.
     /// This ensures lexer errors propagate even when peek swallows them.
