@@ -89,12 +89,6 @@ const KNOWN_GAPS: KnownGap[] = [
 	// Gap C — accessor WITH A BODY in a `declare` class (parse_declare_class_member).
 	{ pattern: 'parserAccessors5.ts', category: 'declare-accessor-body', reason: 'declare class { get foo() { return 0 } }' },
 	{ pattern: 'parserAccessors6.ts', category: 'declare-accessor-body', reason: 'declare class { set foo(v) {} }' },
-	// Gap D — contextual type keyword as the HEAD of a qualified TYPE name
-	// (`var x: string.X`, `number.A.B`). Distinct from the now-fixed Gap A
-	// (decl-name positions): this is the type parser, which emits a primitive
-	// `TSStringKeyword` and can't qualify it, where acorn/tsc read `string.X` as a
-	// `TSTypeReference`/`TSQualifiedName`. A tail keyword (`A.string`) already works.
-	{ pattern: 'parserModuleDeclaration11.ts', category: 'type-keyword-qualified-type', reason: 'var x: string.X' },
 ];
 
 const flags = new Set(Deno.args.filter((a) => a.startsWith('-')));

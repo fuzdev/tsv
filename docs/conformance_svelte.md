@@ -283,6 +283,25 @@ reject); pinned by `tests/import_phase.rs`
 (`legacy_assert_clause_rejected`) and the parse-parity gate's sanctioned
 list (`benches/js/diagnostics/skip_triage.ts`).
 
+**Reserved-keyword qualified type head (`void.X` / `null.X`, rejected)**: a type
+keyword immediately followed by `.` is the HEAD of a qualified type name
+(`string.X` → `TSTypeReference` over a `TSQualifiedName`). acorn-typescript's
+`tsParseNonArrayType` accepts this for every keyword-type name *plus* the
+reserved `void`/`null`, so `void.X` / `null.X` parse as a `TSQualifiedName`.
+tsc and prettier reject them — `void`/`null` are reserved operators, not
+entity-name heads — so tsv qualifies only the *contextual* type keywords
+(`string`/`number`/`any`/`undefined`/…, matching tsc + prettier) and rejects the
+reserved heads (`Expected ';'`). `true`/`false` are literal types on both sides,
+so `true.X` rejects everywhere (the
+[type_keyword_qualified_head](../tests/fixtures/typescript/types/type_keyword_qualified_head/)
+fixture pins the accept direction, and its `input_invalid_true_qualified_head`
+pins the both-reject `true.X`). This is deliberate tsc-over-acorn strictness, the
+same reverse direction as the legacy import-assertions entry above. The
+reserved-head rejection can't be an `input_invalid_*` fixture (acorn accepts it),
+so it is pinned by `tests/type_keyword_qualified_head.rs`. **Upstream candidate**:
+acorn-typescript `tsParseNonArrayType` — `void`/`null` accepted as qualified-name
+heads.
+
 #### Import-phase proposals
 
 The Stage-3 **source-phase imports** and **import defer** proposals add a phase to

@@ -1,0 +1,398 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 248,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A catch binding may be a contextual type keyword (not a reserved word)",
+			"start": 20,
+			"end": 93,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Contextual keyword binding with a type annotation",
+			"start": 150,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 53
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 247,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 238,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TryStatement",
+					"start": 95,
+					"end": 118,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 17
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 99,
+						"end": 103,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 5
+							},
+							"end": {
+								"line": 4,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 104,
+						"end": 118,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 3
+							},
+							"end": {
+								"line": 4,
+								"column": 17
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 111,
+							"end": 114,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 10
+								},
+								"end": {
+									"line": 4,
+									"column": 13
+								}
+							},
+							"name": "any"
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 116,
+							"end": 118,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 15
+								},
+								"end": {
+									"line": 4,
+									"column": 17
+								}
+							},
+							"body": []
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A catch binding may be a contextual type keyword (not a reserved word)",
+							"start": 20,
+							"end": 93
+						}
+					]
+				},
+				{
+					"type": "TryStatement",
+					"start": 121,
+					"end": 147,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 20
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 125,
+						"end": 129,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 5
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 130,
+						"end": 147,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 3
+							},
+							"end": {
+								"line": 7,
+								"column": 20
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 137,
+							"end": 143,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 10
+								},
+								"end": {
+									"line": 7,
+									"column": 16
+								}
+							},
+							"name": "string"
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 145,
+							"end": 147,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 18
+								},
+								"end": {
+									"line": 7,
+									"column": 20
+								}
+							},
+							"body": []
+						}
+					},
+					"finalizer": null
+				},
+				{
+					"type": "TryStatement",
+					"start": 204,
+					"end": 237,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 27
+						}
+					},
+					"block": {
+						"type": "BlockStatement",
+						"start": 208,
+						"end": 212,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 5
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"body": []
+					},
+					"handler": {
+						"type": "CatchClause",
+						"start": 213,
+						"end": 237,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 3
+							},
+							"end": {
+								"line": 11,
+								"column": 27
+							}
+						},
+						"param": {
+							"type": "Identifier",
+							"start": 220,
+							"end": 233,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 10
+								},
+								"end": {
+									"line": 11,
+									"column": 23
+								}
+							},
+							"name": "object",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 226,
+								"end": 233,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 16
+									},
+									"end": {
+										"line": 11,
+										"column": 23
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 228,
+									"end": 233,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 18
+										},
+										"end": {
+											"line": 11,
+											"column": 23
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 228,
+										"end": 233,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 18
+											},
+											"end": {
+												"line": 11,
+												"column": 23
+											}
+										},
+										"name": "Error"
+									}
+								}
+							}
+						},
+						"body": {
+							"type": "BlockStatement",
+							"start": 235,
+							"end": 237,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 25
+								},
+								"end": {
+									"line": 11,
+									"column": 27
+								}
+							},
+							"body": []
+						}
+					},
+					"finalizer": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Contextual keyword binding with a type annotation",
+							"start": 150,
+							"end": 202
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

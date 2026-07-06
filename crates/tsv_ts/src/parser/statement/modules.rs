@@ -596,11 +596,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // vs `import type from "y"` (importing a default export named "type").
             // Skip comments so `import type /* c */ {}` isn't misread as a default
             // import named `type` (the comment is collected for the printer).
+            //
+            // A type-only default binding is a `BindingIdentifier`, so a contextual
+            // type keyword is a valid name (`import type any from "y"`) — the
+            // binding-name set after `type` therefore includes `can_be_binding_name`
+            // keywords, not just plain identifiers. `from` is a binding name too, but
+            // stays excluded (the `!From` guard): `import type from "y"` is instead a
+            // *value* import of a default binding named `type`.
             let next_kind = self.peek_kind();
-            if matches!(
-                next_kind,
-                TokenKind::BraceOpen | TokenKind::Star | TokenKind::Identifier
-            ) && !matches!(next_kind, TokenKind::Keyword(KeywordKind::From))
+            let next_starts_type_import =
+                matches!(next_kind, TokenKind::BraceOpen | TokenKind::Star)
+                    || next_kind.is_binding_name_word();
+            if next_starts_type_import
+                && !matches!(next_kind, TokenKind::Keyword(KeywordKind::From))
             {
                 self.advance()?; // consume 'type'
                 ImportKind::Type
