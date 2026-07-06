@@ -285,7 +285,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Parse class body
-        let body = self.parse_class_body(false)?;
+        let body = self.parse_class_body()?;
         let end = body.span.end;
 
         Ok(Expression::ClassExpression(ClassExpression {
@@ -317,13 +317,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a class declaration from the `class` keyword. `declare` marks an
-    /// ambient (`declare class`) declaration: it sets the `declare` field. Member
-    /// *bodies* are parsed like a concrete class (see `finish_method_member`); only
-    /// decorators are currently skipped in ambient context.
-    // TODO: parsing ambient member decorators is a known over-rejection under tsv's
-    // defer-early-errors policy — tsc rejects them (TS1206) but prettier formats the
-    // `@dec method() {}` body form, so tsv should parse the decorator and defer the
-    // "not valid here" early-error to diagnostics. Its own fixtures-first change.
+    /// ambient (`declare class`) declaration: it sets the `declare` field. Members
+    /// (bodies, decorators, static blocks) are parsed exactly like a concrete class
+    /// (see `finish_method_member`); their ambient-context early-errors (a body's
+    /// TS1183, a decorator's TS1206) are deferred to the diagnostics layer — the same
+    /// permissive posture tsv takes on ambient field initializers (TS1039).
     pub(super) fn parse_class_declaration_inner_with_start(
         &mut self,
         name_required: bool,
@@ -360,8 +358,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             &[]
         };
 
-        // Parse class body (ambient when this is a `declare class`)
-        let body = self.parse_class_body(declare)?;
+        // Parse class body (ambient members share the concrete grammar; see `parse_class_body`)
+        let body = self.parse_class_body()?;
         let end = body.span.end;
 
         Ok(ClassDeclaration {
@@ -378,14 +376,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    /// Parse a class body. When `ambient` is true (a `declare class`), members are
-    /// bodiless signatures and decorators are forbidden; otherwise members are
-    /// concrete (method bodies, property initializers). The member grammar — keys,
-    /// modifiers, type parameters, return types, index/accessor signatures — is shared.
-    pub(super) fn parse_class_body(
-        &mut self,
-        ambient: bool,
-    ) -> Result<ClassBody<'arena>, ParseError> {
+    /// Parse a class body. Concrete and ambient (`declare class`) bodies share one
+    /// grammar — keys, modifiers, decorators, type parameters, return types, method
+    /// bodies, index/accessor signatures, static blocks. An ambient member's
+    /// forbidden constructs (a method body, a decorator, an initializer) parse
+    /// structurally; their early-errors are deferred to diagnostics (see
+    /// `parse_class_declaration_inner_with_start`).
+    pub(super) fn parse_class_body(&mut self) -> Result<ClassBody<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?;
 
@@ -401,7 +398,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if p.eat(TokenKind::Semicolon) {
                     continue;
                 }
-                let member = p.parse_class_member(ambient)?;
+                let member = p.parse_class_member()?;
                 body.push(member);
             }
             Ok(body)
@@ -449,21 +446,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Parse a single class member. When `ambient` is true (a `declare class`
-    /// member), decorators are currently not parsed (a known over-rejection — see the
-    /// TODO on `parse_class_declaration_inner_with_start`). Member *bodies* are parsed
-    /// exactly as in a concrete class, deferring their ambient-context TS1183
-    /// early-error to diagnostics (see `finish_method_member`). All other member
-    /// grammar is shared.
-    fn parse_class_member(&mut self, ambient: bool) -> Result<ClassMember<'arena>, ParseError> {
+    /// Parse a single class member. Concrete and ambient (`declare class`) members
+    /// share this one parser: decorators, method bodies, and static blocks all parse
+    /// structurally in either context, deferring their ambient-context early-errors
+    /// (a decorator's TS1206, a body's TS1183) to diagnostics — see
+    /// `parse_class_declaration_inner_with_start` and `finish_method_member`.
+    fn parse_class_member(&mut self) -> Result<ClassMember<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
-        // Parse any decorators on this member (forbidden in ambient context)
-        let decorators: &'arena [Decorator<'arena>] = if ambient {
-            &[]
-        } else {
-            self.parse_decorators()?.into_bump_slice()
-        };
+        // Parse any decorators on this member. Ambient (`declare class`) members parse
+        // decorators too — acorn accepts them and prettier formats the body form; the
+        // TS1206 ("Decorators are not valid here") ambient early-error is deferred to
+        // the diagnostics layer.
+        let decorators = self.parse_decorators()?.into_bump_slice();
 
         // Handle 'declare' contextual keyword - only if followed by a class member name or another modifier
         // Otherwise `declare` itself is the property name: `declare = 1;`
