@@ -13,9 +13,13 @@ TypeScript (and Babel) instead read a type assertion in JSX-free `.ts`:
 assertion in both parsers.
 
 The sibling forms acorn also reads as generic arrows — `<T>x => x` and
-`<T,>(() => {})`, both TypeScript parse errors tsv rejects — are pinned in
-`tests/type_assertion_arrow.rs` (a rejection can't be an `input_invalid_*`
-fixture when the canonical parser accepts).
+`<T,>(() => {})`, both TypeScript parse errors tsv rejects — are pinned by the
+sibling `tsv_rejects.txt` fixtures
+[type_assertion_arrow/operand](../type_assertion_arrow/operand_svelte_divergence/)
+and
+[type_assertion_arrow/type_params](../type_assertion_arrow/type_params_svelte_divergence/)
+(a rejection can't be an `input_invalid_*` fixture when the canonical parser
+accepts).
 
 **Upstream**: @sveltejs/acorn-typescript — the `expr.extra?.parenthesized`
 abort in `parseMaybeAssign`'s arrow `tryParse` never fires.

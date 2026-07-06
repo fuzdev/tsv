@@ -9,7 +9,7 @@ mod parser;
 
 pub(super) use parser::{
     validate_invalid_syntax, validate_parser_external, validate_parser_ours,
-    validate_parser_ours_matches_expected,
+    validate_parser_ours_matches_expected, validate_tsv_rejects, validate_tsv_rejects_canonical,
 };
 
 pub(super) use formatter::{

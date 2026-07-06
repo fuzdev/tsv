@@ -3,7 +3,7 @@
 use crate::fixtures::Fixture;
 use crate::fixtures::{
     AUDIT_SIGNATURE_FILENAME, GOAL_FILENAME, PRETTIER_NONCONVERGENT_FILENAME,
-    PRETTIER_REJECTS_FILENAME,
+    PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME,
 };
 use std::fs;
 
@@ -57,6 +57,12 @@ pub struct FixtureFiles {
     /// rules are replaced by the live rejection check (F6). The file's trimmed
     /// content is the expected-error substring.
     pub prettier_rejects: bool,
+    /// `tsv_rejects.txt` marker present: tsv rejects this input while the
+    /// canonical parser accepts it. The tsv-side parser/formatter phases and the
+    /// prettier-formatter side are replaced by the live rejection check (F7) —
+    /// tsv must fail with the marker's trimmed substring, and `expected_svelte.json`
+    /// must still match the canonical parser.
+    pub tsv_rejects: bool,
     /// Files matching no known fixture pattern — catches typos like
     /// "unformated_*.svelte" (missing 't') or accidental additions.
     /// Variant-prefixed files with the wrong extension land here too.
@@ -84,6 +90,10 @@ impl FixtureFiles {
             }
             if filename == PRETTIER_REJECTS_FILENAME {
                 files.prettier_rejects = true;
+                continue;
+            }
+            if filename == TSV_REJECTS_FILENAME {
+                files.tsv_rejects = true;
                 continue;
             }
             if is_static_fixture_file(filename) {

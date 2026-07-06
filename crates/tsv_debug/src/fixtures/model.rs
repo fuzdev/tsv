@@ -37,6 +37,25 @@ pub const PRETTIER_NONCONVERGENT_FILENAME: &str = "prettier_nonconvergent.txt";
 /// with `prettier_nonconvergent.txt` (prettier either throws or oscillates).
 pub const PRETTIER_REJECTS_FILENAME: &str = "prettier_rejects.txt";
 
+/// Marker file asserting **tsv** rejects the fixture's input while the canonical
+/// parser (Svelte / acorn-typescript / `parseCss`) *accepts* it — a deliberate
+/// tsv over-rejection (e.g. a spec-stricter parse than acorn's). Such a
+/// divergence cannot be an `input_invalid_*` fixture (which requires *both*
+/// parsers to reject) nor a plain fixture (which requires tsv to parse+format
+/// the input). The validator replaces the tsv-side parser/formatter phases with
+/// a live rejection check (rule F7): `tsv::parse(input)` must fail with a message
+/// containing this file's trimmed content (the position-stripped error text,
+/// matched with `contains`), while `expected_svelte.json` pins the canonical AST
+/// (the canonical parser must still accept — a dead divergence, where the
+/// canonical parser starts rejecting too, surfaces here and in
+/// `fixtures:update:parsed`). tsv produces no AST, so there is no
+/// `expected.json` / `expected_ours.json`; the fixture makes no formatting claim,
+/// so it is mutually exclusive with every format-claim file, `input_invalid_*`,
+/// and the prettier no-oracle markers. Requires the `_svelte_divergence` suffix +
+/// a README; the marker holds exactly the expected-error substring — prose lives
+/// in README.md.
+pub const TSV_REJECTS_FILENAME: &str = "tsv_rejects.txt";
+
 /// Marker file selecting the parse goal for a standalone-script fixture. When
 /// present (containing `script`), the fixture's `input.ts` is parsed as a
 /// strict **Script** (`tsv_ts::Goal::Script`) rather than the default
@@ -205,6 +224,11 @@ impl Fixture {
     /// Get the full path to the prettier-rejects marker file
     pub fn prettier_rejects_path(&self) -> PathBuf {
         self.path.join(PRETTIER_REJECTS_FILENAME)
+    }
+
+    /// Get the full path to the tsv-rejects marker file
+    pub fn tsv_rejects_path(&self) -> PathBuf {
+        self.path.join(TSV_REJECTS_FILENAME)
     }
 
     /// Get the full path to the parse-goal marker file
