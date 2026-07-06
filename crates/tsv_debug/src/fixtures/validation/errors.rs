@@ -98,6 +98,26 @@ pub enum ValidationError {
     #[error("prettier_rejects.txt is empty on {0} — it must hold the expected-error substring")]
     RejectsMarkerEmpty(String),
 
+    // tsv-rejects marker (F7): tsv over-rejects an input the canonical parser accepts
+    #[error(
+        "tsv_rejects.txt is stale: tsv accepts {0} now (the over-rejection is gone). If the canonical parser still accepts it, retire the marker (the fixture is no longer a divergence); if both now reject, convert to an input_invalid_* fixture."
+    )]
+    TsvRejectsMarkerButTsvAccepts(String),
+    #[error(
+        "tsv_rejects.txt is stale: tsv still rejects {input}, but the message no longer contains the pinned substring.\n  pinned:   {expected}\n  actual:   {actual}\nUpdate tsv_rejects.txt if the error moved, or re-examine."
+    )]
+    TsvRejectsMarkerWrongMessage {
+        input: String,
+        expected: String,
+        actual: String,
+    },
+    #[error("tsv_rejects.txt is empty on {0} — it must hold the expected tsv-error substring")]
+    TsvRejectsMarkerEmpty(String),
+    #[error(
+        "tsv_rejects.txt fixture {0}: the canonical parser now REJECTS this input too (the divergence is dead). Both parsers agree — convert to an input_invalid_* fixture, or fix the canonical regression."
+    )]
+    TsvRejectsCanonicalRejects(String),
+
     // Normalization
     #[error("{0} not preserved by prettier")]
     NormalizationPrettierVariantNotPreserved(String),
@@ -311,6 +331,18 @@ impl ValidationError {
             Self::RejectsMarkerEmpty(_) => {
                 "Write the expected prettier-error substring (position-stripped) into prettier_rejects.txt"
             }
+            Self::TsvRejectsMarkerButTsvAccepts(_) => {
+                "tsv no longer over-rejects. Delete the fixture if the divergence is gone, or convert to input_invalid_* if the canonical parser also rejects now"
+            }
+            Self::TsvRejectsMarkerWrongMessage { .. } => {
+                "Update tsv_rejects.txt with the new error substring (the tsv rejection moved), or re-examine whether the fixture still belongs"
+            }
+            Self::TsvRejectsMarkerEmpty(_) => {
+                "Write the expected tsv-error substring (position-stripped) into tsv_rejects.txt"
+            }
+            Self::TsvRejectsCanonicalRejects(_) => {
+                "The canonical parser stopped accepting this input — the divergence is dead. Convert to input_invalid_* (both parsers now reject) or investigate the canonical regression"
+            }
             Self::NormalizationPrettierVariantNotPreserved(_) => {
                 "Prettier doesn't preserve this file - rename to unformatted_*.svelte"
             }
@@ -434,7 +466,11 @@ impl ValidationError {
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated
             | Self::ParserError(_)
-            | Self::ParserErrorInDivergence(_) => "Parser",
+            | Self::ParserErrorInDivergence(_)
+            | Self::TsvRejectsMarkerButTsvAccepts(_)
+            | Self::TsvRejectsMarkerWrongMessage { .. }
+            | Self::TsvRejectsMarkerEmpty(_)
+            | Self::TsvRejectsCanonicalRejects(_) => "Parser",
 
             Self::FormatterInputNotIdempotent(_)
             | Self::FormatterOutputPrettierOutdated
@@ -523,6 +559,7 @@ pub enum ValidationSuccess {
     PrettierOutputsPinned(usize),                  // N10
     PrettierNonconvergenceVerified,                // F5
     PrettierRejectionVerified,                     // F6
+    TsvRejectionVerified,                          // F7
 }
 
 impl fmt::Display for ValidationSuccess {
@@ -592,6 +629,9 @@ impl fmt::Display for ValidationSuccess {
             }
             Self::PrettierRejectionVerified => {
                 write!(f, "prettier rejection verified live (F6)")
+            }
+            Self::TsvRejectionVerified => {
+                write!(f, "tsv over-rejection verified live (F7)")
             }
         }
     }

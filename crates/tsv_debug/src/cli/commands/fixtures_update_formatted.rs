@@ -62,11 +62,13 @@ async fn run(filters: &[String]) -> Result<(), CliError> {
             intermediates,
         } = outcome
         else {
-            // A prettier no-oracle marker is present: prettier_nonconvergent.txt (no
-            // fixed point) or prettier_rejects.txt (prettier throws). Either way there
-            // is no output_prettier.* to regenerate; the validator live-verifies the
-            // claim (F5 / F6).
-            let (marker, reason) = if fixture.prettier_rejects_path().exists() {
+            // A no-output-claim marker is present: prettier_nonconvergent.txt (no fixed
+            // point), prettier_rejects.txt (prettier throws), or tsv_rejects.txt (tsv
+            // rejects the input, so the fixture makes no formatting claim). None has an
+            // output_prettier.* to regenerate; the validator live-verifies each (F5/F6/F7).
+            let (marker, reason) = if fixture.tsv_rejects_path().exists() {
+                (fixtures::TSV_REJECTS_FILENAME, "tsv rejects input")
+            } else if fixture.prettier_rejects_path().exists() {
                 (
                     fixtures::PRETTIER_REJECTS_FILENAME,
                     "prettier rejects input",
@@ -246,9 +248,10 @@ enum FormattedResult {
 /// Per-fixture results computed in a spawned task and printed by the driver in
 /// fixture order — tasks never print, so concurrent fixtures can't interleave output.
 enum FixtureOutcome {
-    /// A prettier no-oracle marker (`prettier_nonconvergent.txt`, F5; or
-    /// `prettier_rejects.txt`, F6) is present — prettier cannot format this
-    /// input, so there is nothing to regenerate.
+    /// A no-output-claim marker is present — `prettier_nonconvergent.txt` (F5) or
+    /// `prettier_rejects.txt` (F6), where prettier cannot format this input, or
+    /// `tsv_rejects.txt` (F7), where tsv rejects the input so the fixture makes no
+    /// formatting claim. Either way there is nothing to regenerate.
     Skipped,
     Processed {
         /// Result for `output_prettier.*`.
@@ -273,7 +276,14 @@ enum IntermediateOutput {
 /// Run all per-fixture update work (output_prettier, audit signature, intermediates).
 /// Pure compute + fixture-dir-local file IO — safe to run concurrently across fixtures.
 async fn process_fixture(fixture: &fixtures::Fixture) -> FixtureOutcome {
-    if fixture.prettier_nonconvergent_path().exists() || fixture.prettier_rejects_path().exists() {
+    // Skip the no-output-claim fixtures. prettier_nonconvergent.txt / prettier_rejects.txt:
+    // prettier can't format the input. tsv_rejects.txt: the fixture makes NO formatting
+    // claim (tsv rejects the input), so regenerating output_prettier.* would fabricate a
+    // spurious claim from prettier's own acceptance of an input tsv rejects.
+    if fixture.prettier_nonconvergent_path().exists()
+        || fixture.prettier_rejects_path().exists()
+        || fixture.tsv_rejects_path().exists()
+    {
         return FixtureOutcome::Skipped;
     }
 

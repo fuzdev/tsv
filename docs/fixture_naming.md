@@ -508,6 +508,21 @@ Add the fixed-name marker file instead:
 - The input must be valid by tsv's parse oracle (Svelte / acorn-typescript). Hand-author it (`fixture_init` runs prettier, which throws), then `deno task fixtures:update:parsed` for `expected.json`
 - Rare — use only for genuine upstream prettier parser/printer bugs (see ./fixture_overview.md rules F6/S19)
 
+**For documenting tsv over-rejection** (`tsv_rejects.txt`):
+
+When **tsv** rejects an input the canonical parser (Svelte / acorn-typescript /
+`parseCss`) *accepts* — a spec-stricter parse than acorn's — the divergence cannot
+be an `input_invalid_*` fixture (which requires *both* parsers to reject) nor a
+plain fixture (which requires tsv to parse+format the input). Add the fixed-name
+marker instead:
+
+- Fixed filename `tsv_rejects.txt` (not a variant pattern; its trimmed content is the position-stripped expected **tsv**-error substring, matched with `contains` — all prose lives in README.md)
+- Must be in a `_svelte_divergence` directory with README.md and `expected_svelte.json` (the canonical AST)
+- No `expected.json` / `expected_ours.json` — tsv produces no AST. Mutually exclusive with every format-claim file, `input_invalid_*`, and the prettier no-oracle markers (`prettier_rejects.txt` / `prettier_nonconvergent.txt`)
+- The validator live-verifies the claim (F7): `tsv::parse(input)` errors with a message containing the pinned substring, AND the canonical parser accepts and matches `expected_svelte.json` (a canonical rejection means the divergence is dead → convert to `input_invalid_*`)
+- Hand-author `input.*` (prettier is not consulted), then `deno task fixtures:update:parsed` generates `expected_svelte.json` from the canonical parser (failing loudly if it rejects)
+- Rare — use only for a deliberate, cataloged tsv over-rejection (see ./fixture_overview.md rules F7/S20 and the catalog in ./conformance_svelte.md §TypeScript Corrections)
+
 ---
 
 ## Line Wrapping Tests (`long` / `_long`)

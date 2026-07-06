@@ -30,7 +30,7 @@ use phases::{
     validate_formatter_idempotent, validate_formatter_prettier, validate_invalid_syntax,
     validate_normalization_ours, validate_normalization_prettier, validate_parser_external,
     validate_parser_ours, validate_parser_ours_matches_expected, validate_prettier_nonconvergent,
-    validate_prettier_rejects,
+    validate_prettier_rejects, validate_tsv_rejects, validate_tsv_rejects_canonical,
 };
 
 /// Result of validating a single fixture
@@ -174,6 +174,21 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
 
     let input_type = fixture.input_type();
     let input_ext = input_type.extension();
+
+    // tsv_rejects fixtures (F7): tsv over-rejects an input the canonical parser
+    // accepts. tsv produces no AST and the fixture makes no formatting claim, so
+    // the whole tsv-side (parse-for-AST, idempotency, normalization) and the
+    // prettier-formatter side are inexpressible — all replaced by two live checks:
+    // tsv must reject with the pinned substring, and the canonical parser must
+    // still accept and match expected_svelte.json. Structure validation (S20)
+    // already enforced the file layout, so this branch owns the rest.
+    if files.tsv_rejects {
+        if !prettier_only {
+            validate_tsv_rejects(&mut result, fixture, &input, input_type);
+        }
+        validate_tsv_rejects_canonical(&mut result, fixture, &input, input_type).await;
+        return result;
+    }
 
     // Phases 2-4: Our parser/formatter validation (skip in prettier_only mode)
     if !prettier_only {

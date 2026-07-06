@@ -187,7 +187,7 @@ The `_ours` suffix means "validated against our implementation only, not externa
 
 **Input file ALWAYS formats to itself (idempotent)**
 
-No exceptions. The input file must be formatted with **prettier** (not our formatter) when our formatter doesn't match prettier yet.
+No exceptions — save one deliberate opt-out: a `tsv_rejects.txt` fixture, whose input tsv *rejects* (the canonical parser accepts it), so F1 doesn't apply at all (see F7/S20). For every other fixture the input file must be formatted with **prettier** (not our formatter) when our formatter doesn't match prettier yet.
 
 **If the formatter doesn't implement a feature yet:**
 
@@ -205,7 +205,8 @@ No exceptions. The input file must be formatted with **prettier** (not our forma
 ```
 Need to test parser?
 ├─ Our parser matches Svelte → use expected.json (default)
-└─ Intentional difference → use expected_ours.json + expected_svelte.json
+├─ Intentional AST difference (both parsers accept) → use expected_ours.json + expected_svelte.json
+└─ tsv REJECTS but the canonical parser ACCEPTS (a tsv over-rejection) → tsv_rejects.txt + expected_svelte.json (F7/S20)
 ```
 
 **Formatter patterns:**
@@ -239,6 +240,9 @@ Special case: prettier NEVER converges (every pass changes the output — no fix
 Special case: prettier THROWS on the input (parse rejection or printer crash — no oracle)
    └─> input.* + prettier_rejects.txt + README.md, no prettier-claim files (F6/S19)
 
+Special case: tsv REJECTS the input but the canonical parser ACCEPTS it (a tsv over-rejection)
+   └─> input.* + tsv_rejects.txt + expected_svelte.json + README.md, no tsv-side expected/format files (F7/S20)
+
 Note: in _prettier_divergence dirs, use unformatted_ours_*.svelte when only our formatter
 normalizes to input; plain unformatted_*.svelte is allowed (and N3-validated) when the dir
 has no output_prettier.* and prettier also normalizes the variant to input
@@ -258,6 +262,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 - `audit_signature.txt` — Pins prettier's multi-pass chain from `output_prettier.*` to fixed point (auto-generated; see F4)
 - `prettier_nonconvergent.txt` — Prettier never reaches a fixed point on input (no oracle exists); claim live-verified (see F5/S18)
 - `prettier_rejects.txt` — Prettier throws on the input (parse rejection or printer crash; no oracle exists); the file's trimmed content is the expected-error substring, claim live-verified (see F6/S19)
+- `tsv_rejects.txt` — tsv over-rejects an input the canonical parser accepts (a tsv-rejects/canonical-accepts divergence the fixture path can otherwise not express); the file's trimmed content is the expected tsv-error substring, `expected_svelte.json` holds the canonical AST, claim live-verified (see F7/S20)
 - `unformatted_*.svelte` — Normalization tests - both formatters normalize to `input.svelte`
 - `unformatted_ours_*.svelte` — Normalization tests - only our formatter normalizes to `input.svelte`
 - `unformatted_prettier_*.svelte` — Normalization tests - prettier normalizes to `output_prettier.svelte`
@@ -307,9 +312,9 @@ All fixtures use `input.svelte` as canonical source.
 
 1. **S1**: Input file exists (`input.svelte`, `input.ts`, `input.css`, or `input.svelte.ts`)
 2. **S2**: Input has correct extension (`.svelte` preferred, `.ts`/`.css` for file-level features, `.svelte.ts` for runes)
-3. **S3**: `expected.json` OR (`expected_ours.json` + `expected_svelte.json`) exists
+3. **S3**: `expected.json` OR (`expected_ours.json` + `expected_svelte.json`) exists (or, for a `tsv_rejects.txt` fixture, `expected_svelte.json` alone — the canonical AST, tsv having none; S20)
 4. **S4**: `expected.json` cannot coexist with `expected_*.json` files
-5. **S5**: Both `expected_ours.json` + `expected_svelte.json` exist (if either exists)
+5. **S5**: Both `expected_ours.json` + `expected_svelte.json` exist (if either exists) — except a `tsv_rejects.txt` fixture, which carries `expected_svelte.json` *without* `expected_ours.json` (S20)
 6. **S6**: `unformatted_*` has same extension as input file
 7. **S7**: `prettier_variant_*` has same extension as input file
 8. **S8**: Directory name ends with `_prettier_divergence` when ANY of these exist:
@@ -335,6 +340,7 @@ All fixtures use `input.svelte` as canonical source.
 13. **S12**: `_svelte_divergence` or `_svelte_prettier_divergence` suffix required when `expected_ours.json`/`expected_svelte.json` exist
 14. **S18**: `prettier_nonconvergent.txt` CANNOT coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`, `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`, `prettier_intermediate_*`) — prettier has no fixed point, so no prettier-anchored claim is expressible. `unformatted_ours_*` stays allowed (it claims only our formatter's normalization)
 15. **S19**: `prettier_rejects.txt` follows the same claim-file rules as S18 (prettier throws, so no prettier-anchored claim is expressible; `unformatted_ours_*` stays allowed) AND is mutually exclusive with `prettier_nonconvergent.txt` (prettier either throws or oscillates, never both)
+16. **S20**: `tsv_rejects.txt` (tsv over-rejects an input the canonical parser accepts) requires the `_svelte_divergence` suffix + a README + `expected_svelte.json` (the canonical AST); FORBIDS `expected.json` / `expected_ours.json` (tsv emits no AST); and is mutually exclusive with every format-claim file, `input_invalid_*`, and the prettier no-oracle markers (`prettier_rejects.txt` / `prettier_nonconvergent.txt`). An `expected_svelte.json` holding the parse-failure marker is rejected (the canonical parser must *accept* — else convert to `input_invalid_*`)
 
 **TypeScript fixture rules** (`input.ts`):
 
@@ -401,6 +407,7 @@ on real codebases.
 - **F4**: `audit_signature.txt`, when present, byte-matches the live prettier chain from `output_prettier.*` to its fixed point. Pins multi-pass non-idempotent behavior so the audit doesn't flag it as novel, and catches pass-2+ drift that F2 alone (pass-1 only) would miss
 - **F5**: when `prettier_nonconvergent.txt` exists, F2/F3/F4 and the prettier-side N rules are replaced by a live check of the claim: `prettier(input) != input` AND `prettier²(input) != prettier(input)`. If prettier converges (either check fails), validation fails with a hint to delete the marker and re-document the divergence normally
 - **F6**: when `prettier_rejects.txt` exists, F2/F3/F4 and the prettier-side N rules are replaced by a live check of the claim: `prettier(input)` must return an error whose message contains the marker's trimmed content (the position-stripped error substring). If prettier accepts the input (bug fixed) or throws a different message (bug morphed), validation fails with a hint to re-document or update the marker
+- **F7**: when `tsv_rejects.txt` exists (tsv over-rejects an input the canonical parser accepts), the tsv-side parser/formatter phases (P2/P2b, F1, the ours-side normalization) *and* the entire prettier-formatter side are inexpressible — tsv produces no AST and the fixture makes no formatting claim — and are replaced by two live checks: (a) `tsv::parse(input)` must FAIL with a message containing the marker's trimmed substring (tsv accepts now → stale; a different message → the rejection moved); (b) the canonical parser must SUCCEED and its serialized AST equal `expected_svelte.json` (canonical rejects now → the divergence is dead, convert to `input_invalid_*`)
 
 **Normalization validations (N)** - Variants normalize correctly:
 
@@ -758,6 +765,18 @@ nth_child_of_svelte_prettier_divergence/
 
 When Svelte's parser is expected to fail: `expected_svelte.json` contains `{ "error": "failed to parse" }`.
 
+**tsv over-rejection (`tsv_rejects.txt`)**: the *inverse* case — tsv rejects an
+input the canonical parser **accepts** (a spec-stricter parse than acorn's). tsv
+produces no AST, so this can't use `expected_ours.json`, and it isn't an
+`input_invalid_*` (which requires *both* parsers to reject). Instead, a
+`_svelte_divergence` dir carries `input.*` + `tsv_rejects.txt` (the expected
+tsv-error substring) + `expected_svelte.json` (the canonical AST) + README — no
+`expected.json` / `expected_ours.json`, and no format-claim files. The validator
+live-verifies that tsv still rejects (with the pinned substring) and the canonical
+parser still accepts and matches `expected_svelte.json` (F7/S20). This self-heals:
+a canonical-parser bump that starts rejecting the input surfaces the dead
+divergence.
+
 Never use for in-progress features or temporary gaps — let the test fail normally. See ./conformance_svelte.md.
 
 ---
@@ -1036,6 +1055,8 @@ When `output_prettier.*` exists, certain validations are **automatically skipped
 - Prettier baseline (F2, F3, F5, or F6 - exactly one of these always runs; F5 replaces F2/F3 when `prettier_nonconvergent.txt` declares prettier has no fixed point, F6 when `prettier_rejects.txt` declares prettier throws on the input)
 - Prettier normalization on `unformatted_*` files (N3) — S9 only allows them where input is prettier-stable, including `prettier_variant_*`-style divergence dirs
 
+> **Exception — `tsv_rejects.txt` (F7).** A tsv-over-rejection fixture short-circuits this entire flow: tsv produces no AST and makes no formatting claim, so the tsv-side (F1 + the parser phases) *and* every prettier baseline are replaced by two checks — tsv must reject with the pinned substring, and the canonical parser must accept and match `expected_svelte.json`. None of the three "always runs" bullets apply to it.
+
 **Key invariant:** Every `_prettier_divergence` directory must document divergence with one of:
 
 - `output_prettier.*` (what prettier produces when different from input)
@@ -1137,6 +1158,7 @@ Pattern → validation applied — notes:
 - (no output_prettier) → F3: prettier(input) must = input — Always checked, even in `_prettier_divergence` dirs
 - `prettier_nonconvergent.txt` → F5: prettier(input) ≠ input AND prettier²(input) ≠ prettier(input) — Replaces F2/F3/F4 + prettier-side N rules (no fixed point exists)
 - `prettier_rejects.txt` → F6: prettier(input) errors with the pinned substring — Replaces F2/F3/F4 + prettier-side N rules (prettier throws on the input)
+- `tsv_rejects.txt` → F7: tsv(input) rejects with the pinned substring AND the canonical parser accepts & matches expected_svelte.json — Replaces the tsv-side P/F/N rules + the entire prettier-formatter side (tsv over-rejects; no AST, no formatting claim)
 - `prettier_variant_*.*` → Rule 1 (prettier idempotent) — Rule 3 (differs from input)
 - `unformatted_*.*` → Both formatters validated — N3 (prettier → input) + N4 (ours → input)
 - `input_invalid_*` → Must fail to parse — Both our parser and canonical
@@ -1153,6 +1175,7 @@ Pattern → validation applied — notes:
 - **`fixtures_update_parsed`** - Updates parser expectations
   - Generates `expected.json` using Svelte parser (default)
   - Generates `expected_ours.json` + `expected_svelte.json` when divergence exists
+  - Generates `expected_svelte.json` alone for a `tsv_rejects.txt` fixture (canonical parser only — tsv emits no AST; fails loudly if the canonical parser rejects, i.e. the divergence is dead)
 
 - **`fixtures_update_formatted`** - Updates formatter outputs
   - Generates `output_prettier.*` when prettier differs from input

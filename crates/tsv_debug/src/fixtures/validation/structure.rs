@@ -2,9 +2,10 @@
 //! expected-JSON patterns, and divergence-suffix naming.
 
 use crate::fixtures::{
-    AUDIT_SIGNATURE_FILENAME, Fixture, FixtureFiles, PRETTIER_NONCONVERGENT_FILENAME,
-    PRETTIER_REJECTS_FILENAME, determine_required_suffix, has_prettier_divergence_suffix,
-    has_svelte_divergence_suffix, read_file,
+    AUDIT_SIGNATURE_FILENAME, EXPECTED_SVELTE_ERROR_JSON, Fixture, FixtureFiles,
+    PRETTIER_NONCONVERGENT_FILENAME, PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME,
+    determine_required_suffix, has_prettier_divergence_suffix, has_svelte_divergence_suffix,
+    read_file,
 };
 
 /// Validate fixture structure and conventions
@@ -35,6 +36,11 @@ use crate::fixtures::{
 /// S19: `prettier_rejects.txt` — same divergence-dir + claim-file rules as S18
 ///      (prettier throws, so no prettier-anchored claim is expressible), AND it is
 ///      mutually exclusive with `prettier_nonconvergent.txt`
+/// S20: `tsv_rejects.txt` (tsv over-rejects, canonical accepts) requires the
+///      `_svelte_divergence` suffix + README + `expected_svelte.json` (the canonical
+///      AST), forbids `expected.json`/`expected_ours.json` (tsv emits no AST), and is
+///      mutually exclusive with every format-claim file, `input_invalid_*`, and the
+///      prettier no-oracle markers — handled entirely by `validate_tsv_rejects_structure`
 /// D1:  README.md required for divergences
 pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Result<(), String> {
     let fixture_dir = &fixture.path;
@@ -59,6 +65,21 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     let has_expected = expected_path.exists();
     let has_expected_ours = expected_ours_path.exists();
     let has_expected_svelte = expected_svelte_path.exists();
+
+    // S20: a tsv_rejects.txt fixture has a structure unlike every other fixture
+    // (canonical AST only, no tsv AST, no formatting claim). Validate it in its own
+    // branch and return — bypasses the expected_ours/expected_svelte pairing rules
+    // (S13) and the prettier-claim logic below, which don't apply.
+    if files.tsv_rejects {
+        return validate_tsv_rejects_structure(
+            fixture,
+            files,
+            dir_name,
+            has_expected,
+            has_expected_ours,
+            has_expected_svelte,
+        );
+    }
 
     // S12-S16: Svelte divergence suffix rules
     if has_expected_ours || has_expected_svelte {
@@ -667,6 +688,115 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             README.md should document WHY we differ and provide context.\n\
             See docs/fixture_overview.md for README requirements.",
             reasons.join("\n")
+        ));
+    }
+
+    Ok(())
+}
+
+/// S20: structure rules for a `tsv_rejects.txt` fixture — tsv over-rejects an
+/// input the canonical parser accepts.
+///
+/// tsv produces no AST and the fixture makes no formatting claim, so its layout is
+/// unlike every other fixture: a `_svelte_divergence` dir with `expected_svelte.json`
+/// (the canonical AST) + README + the marker, and nothing else. This validates that
+/// shape and is the sole structure check for such fixtures (called before the normal
+/// expected_ours/expected_svelte pairing rules, which don't apply).
+fn validate_tsv_rejects_structure(
+    fixture: &Fixture,
+    files: &FixtureFiles,
+    dir_name: &str,
+    has_expected: bool,
+    has_expected_ours: bool,
+    has_expected_svelte: bool,
+) -> Result<(), String> {
+    // Exactly the pure `_svelte_divergence` suffix — not the combined
+    // `_svelte_prettier_divergence` (there is no prettier claim here).
+    if !dir_name.ends_with("_svelte_divergence") {
+        return Err(format!(
+            "{TSV_REJECTS_FILENAME} requires the '_svelte_divergence' suffix.\n\
+            The marker asserts tsv over-rejects an input the canonical (Svelte/acorn)\n\
+            parser accepts. Rename directory '{dir_name}' to end with '_svelte_divergence'."
+        ));
+    }
+
+    // expected_svelte.json required — the canonical AST is the self-heal oracle.
+    if !has_expected_svelte {
+        return Err(format!(
+            "{TSV_REJECTS_FILENAME} fixture is missing expected_svelte.json (the canonical AST).\n\
+            The canonical parser must accept this input; run: deno task fixtures:update:parsed"
+        ));
+    }
+
+    // A dead-divergence guard: expected_svelte.json holding the parse-failure marker
+    // means the canonical parser rejects too — both agree, so this belongs as an
+    // input_invalid_* fixture, not a tsv_rejects divergence.
+    let expected_svelte_content = read_file(&fixture.expected_svelte_path())?;
+    if expected_svelte_content == EXPECTED_SVELTE_ERROR_JSON {
+        return Err(format!(
+            "{TSV_REJECTS_FILENAME} fixture's expected_svelte.json records a canonical parse failure.\n\
+            A tsv_rejects fixture requires the canonical parser to ACCEPT the input (tsv over-rejects).\n\
+            If both parsers reject it, convert to an input_invalid_* fixture instead."
+        ));
+    }
+
+    // expected.json / expected_ours.json forbidden — tsv produces no AST.
+    if has_expected || has_expected_ours {
+        return Err(format!(
+            "{TSV_REJECTS_FILENAME} fixture cannot have expected.json or expected_ours.json.\n\
+            tsv rejects this input, so it produces no AST — only expected_svelte.json (the\n\
+            canonical parser's AST) is meaningful. Remove the tsv-side expected file(s)."
+        ));
+    }
+
+    // README required (D1 + the conformance back-link the audit enforces).
+    if !fixture.path.join("README.md").exists() {
+        return Err(format!(
+            "{TSV_REJECTS_FILENAME} fixture requires a README.md documenting the divergence\n\
+            (why tsv rejects while the canonical parser accepts), with a back-link to\n\
+            docs/conformance_svelte.md."
+        ));
+    }
+
+    // Mutually exclusive with the prettier no-oracle markers.
+    if files.prettier_rejects || files.prettier_nonconvergent {
+        return Err(format!(
+            "{TSV_REJECTS_FILENAME} cannot coexist with {PRETTIER_REJECTS_FILENAME} or {PRETTIER_NONCONVERGENT_FILENAME}.\n\
+            A tsv-rejects fixture makes no prettier claim; keep only the tsv_rejects marker."
+        ));
+    }
+
+    // Mutually exclusive with every format-claim file, audit_signature.txt, and
+    // input_invalid_* — the fixture makes no formatting claim (tsv can't format its
+    // input) and no both-reject claim (the canonical parser accepts it).
+    let mut conflicts: Vec<String> = Vec::new();
+    if fixture.output_prettier_path().exists() {
+        conflicts.push(fixture.output_prettier_filename().to_string());
+    }
+    if fixture.audit_signature_path().exists() {
+        conflicts.push(AUDIT_SIGNATURE_FILENAME.to_string());
+    }
+    for name in files
+        .unformatted
+        .iter()
+        .chain(&files.unformatted_ours)
+        .chain(&files.unformatted_prettier)
+        .chain(&files.prettier_variant)
+        .chain(&files.variant)
+        .chain(&files.divergent_variant)
+        .chain(&files.prettier_intermediate)
+        .chain(&files.prettier_intermediate_to_variant)
+        .chain(&files.input_invalid)
+    {
+        conflicts.push(name.clone());
+    }
+    if !conflicts.is_empty() {
+        return Err(format!(
+            "{TSV_REJECTS_FILENAME} cannot coexist with format-claim or input_invalid_* files.\n\
+            tsv rejects this input (no formatting claim), and the canonical parser accepts it\n\
+            (not a both-reject input_invalid_* case).\n\
+            Conflicting file(s): {}",
+            conflicts.join(", ")
         ));
     }
 
