@@ -7,11 +7,13 @@
  * Why tsc baselines, not acorn: acorn-typescript is tsv's drop-in *target* but is
  * itself over-lenient (it accepts invalid TS the real compiler rejects), so it's
  * an imperfect *validity* oracle. tsc is authoritative. The TS test harness writes
- * `tests/baselines/reference/<name>.errors.txt` iff a compile produces diagnostics;
- * a `TS1xxx` code there is a **syntax/grammar** error (tsc's parser rejects), while
- * `TS2xxx`+ are semantic (tsc's parser accepted). So:
+ * `tests/baselines/reference/<name>.errors.txt` iff a compile produces diagnostics
+ * (a multi-setting test writes per-variant `<name>(target=es5).errors.txt` instead —
+ * see `errors_baselines_by_test`, which indexes every variant); a `TS1xxx` code there
+ * is a **syntax/grammar** error (tsc's parser rejects), while `TS2xxx`+ are semantic
+ * (tsc's parser accepted). So:
  *
- *   tsc-syntax-valid(file)  ⇔  no `<name>.errors.txt`, or none of its codes is TS1xxx.
+ *   tsc-syntax-valid(file)  ⇔  no `.errors.txt` in any variant, or none of their codes is TS1xxx.
  *
  * Buckets (tsv verdict × tsc validity), with acorn's verdict as a sub-label:
  *
@@ -83,9 +85,9 @@ const DEFAULT_ROOT = `${TS_REPO}/tests/cases/conformance/parser`;
  * (`…Declaration1` vs `…Declaration11`).
  */
 const KNOWN_GAPS: KnownGap[] = [
-	// Gap C — accessor WITH A BODY in a `declare` class (parse_declare_class_member).
-	{ pattern: 'parserAccessors5.ts', category: 'declare-accessor-body', reason: 'declare class { get foo() { return 0 } }' },
-	{ pattern: 'parserAccessors6.ts', category: 'declare-accessor-body', reason: 'declare class { set foo(v) {} }' },
+	// Empty: Gap C (accessor/method bodies in a `declare` class) fixed — ambient
+	// members now parse a `{` body like concrete members (acorn/tsc accept). A new
+	// tsc-accepted over-rejection surfaces here as an untracked `gap` (exits 1).
 ];
 
 const flags = new Set(Deno.args.filter((a) => a.startsWith('-')));
@@ -93,17 +95,36 @@ const json_mode = flags.has('--json');
 const verbose = flags.has('--verbose') || flags.has('-v');
 const root = Deno.args.find((a) => !a.startsWith('-')) ?? DEFAULT_ROOT;
 
-/** tsc's parser verdict for a test, read from its baseline. `null` = baseline unreadable. */
+/**
+ * Index of every `*.errors.txt` baseline, keyed by its **un-suffixed** test name.
+ * A test compiled under multiple settings (`// @target: es5, es2015`, `@module`, …)
+ * writes per-variant baselines `<name>(target=es5).errors.txt` rather than a plain
+ * `<name>.errors.txt` — ~700 of the ~768 corpus files carry such a directive. Reading
+ * only `<name>.errors.txt` therefore MISSES the suffixed baselines and mis-reads a
+ * tsc grammar rejection as a clean compile (e.g. `parserAccessors5` → TS1183 lives in
+ * `parserAccessors5(target=es5).errors.txt`). Index once so a lookup gathers every
+ * variant. Key = filename minus the trailing `(…)` group(s) and `.errors.txt`.
+ */
+const errors_baselines_by_test = new Map<string, string[]>();
+for (const name of await readdir(BASELINE_DIR)) {
+	if (!name.endsWith('.errors.txt')) continue;
+	const key = name.replace(/\.errors\.txt$/, '').replace(/\(.*\)$/, '');
+	(errors_baselines_by_test.get(key) ?? errors_baselines_by_test.set(key, []).get(key)!).push(name);
+}
+
+/** tsc's parser verdict for a test, read from its baseline(s) (all target/module variants). */
 async function tsc_syntax_valid(file_path: string): Promise<boolean> {
 	const base = basename(file_path).replace(/\.ts$/, '');
-	try {
-		const errors = await readFile(join(BASELINE_DIR, `${base}.errors.txt`), 'utf8');
-		// A TS1xxx code = a syntax/grammar diagnostic → tsc's parser rejects.
-		return !/error TS1\d{3}:/.test(errors);
-	} catch {
-		// No baseline → the compile was clean → tsc accepts.
-		return true;
+	const baselines = errors_baselines_by_test.get(base);
+	// No `.errors.txt` in any variant → the compile was clean → tsc accepts.
+	if (!baselines?.length) return true;
+	// A TS1xxx code = a syntax/grammar diagnostic → tsc's parser rejects. If ANY
+	// variant carries one, tsc rejects (grammar errors are target-independent).
+	for (const name of baselines) {
+		const errors = await readFile(join(BASELINE_DIR, name), 'utf8');
+		if (/error TS1\d{3}:/.test(errors)) return false;
 	}
+	return true;
 }
 
 async function* discover(dir: string): AsyncGenerator<string> {

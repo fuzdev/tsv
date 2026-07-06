@@ -317,9 +317,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a class declaration from the `class` keyword. `declare` marks an
-    /// ambient (`declare class`) declaration: it sets the `declare` field and makes
-    /// the body ambient (bodiless signatures, no decorators). Heritage, type
-    /// parameters, name, and `implements` are parsed identically to a concrete class.
+    /// ambient (`declare class`) declaration: it sets the `declare` field. Member
+    /// *bodies* are parsed like a concrete class (see `finish_method_member`); only
+    /// decorators are currently skipped in ambient context.
+    // TODO: parsing ambient member decorators is a known over-rejection under tsv's
+    // defer-early-errors policy — tsc rejects them (TS1206) but prettier formats the
+    // `@dec method() {}` body form, so tsv should parse the decorator and defer the
+    // "not valid here" early-error to diagnostics. Its own fixtures-first change.
     pub(super) fn parse_class_declaration_inner_with_start(
         &mut self,
         name_required: bool,
@@ -446,9 +450,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a single class member. When `ambient` is true (a `declare class`
-    /// member), the result is a bodiless signature and decorators are not parsed
-    /// (TypeScript forbids both in ambient context). All other member grammar is
-    /// shared with concrete classes.
+    /// member), decorators are currently not parsed (a known over-rejection — see the
+    /// TODO on `parse_class_declaration_inner_with_start`). Member *bodies* are parsed
+    /// exactly as in a concrete class, deferring their ambient-context TS1183
+    /// early-error to diagnostics (see `finish_method_member`). All other member
+    /// grammar is shared.
     fn parse_class_member(&mut self, ambient: bool) -> Result<ClassMember<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
@@ -500,9 +506,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let is_declare = is_declare || self.eat_modifier_keyword("declare");
 
         // Check for static initialization block: `static { ... }` (ES2022).
-        // A static block is a body, so it's forbidden in ambient context — there
-        // `static {` falls through to the member-name parse and errors, as before.
-        if is_static && !ambient && matches!(self.current_kind(), TokenKind::BraceOpen) {
+        // Parsed in ambient (`declare class`) context too, as a `StaticBlock` — the
+        // same defer-the-early-error posture as a `declare class` method body below
+        // (tsc rejects an ambient implementation with TS1183; tsv defers it to
+        // diagnostics rather than failing to parse/format).
+        if is_static && matches!(self.current_kind(), TokenKind::BraceOpen) {
             // Parse the block body. A class static initialization block is a
             // `[+Await]` context (`await` is allowed inside it).
             let block = self.with_in_await(true, Self::parse_block_statement)?;
@@ -669,7 +677,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Detect if this is a method (has `(`) or property (has `=` or `;` or end of class)
         if matches!(self.current_kind(), TokenKind::ParenOpen) {
-            self.finish_method_member(header, ambient)
+            self.finish_method_member(header)
         } else {
             self.finish_property_member(header)
         }
@@ -677,11 +685,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Finish a method member (the `(`-led branch of `parse_class_member`):
     /// parameter list, optional return type, and body — or a bodiless signature
-    /// for ambient / abstract / overload methods.
+    /// for abstract methods and overload signatures (`;`/ASI-terminated, including
+    /// ambient signatures).
     fn finish_method_member(
         &mut self,
         header: ClassMemberHeader<'arena>,
-        ambient: bool,
     ) -> Result<ClassMember<'arena>, ParseError> {
         let ClassMemberHeader {
             start,
@@ -727,9 +735,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Method overloads: `parse(x: string): object;` followed by implementation
         // Note: ASI can insert semicolon on line terminator, but NOT if next token is `{`
         // (a method with body on next line: `fn()\n{` is valid)
-        // Ambient (`declare class`) methods are always bodiless signatures.
-        let is_overload_or_abstract = ambient
-            || is_abstract
+        // Ambient (`declare class`) members are NOT forced bodiless: a `{` body parses
+        // like a concrete method. tsc rejects an ambient implementation with the
+        // grammar-level TS1183 ("An implementation cannot be declared in ambient
+        // contexts"), but tsv *defers* that early-error to the future diagnostics layer
+        // — the same posture it takes on ambient field initializers (TS1039) — so the
+        // formatter stays complete on inputs prettier also formats. Only a `;`/ASI
+        // member stays a bodiless signature, exactly as in a concrete class.
+        let is_overload_or_abstract = is_abstract
             || self.check(&TokenKind::Semicolon)
             || (self.can_insert_semicolon() && !self.check(&TokenKind::BraceOpen));
         let (body_block, end) = if is_overload_or_abstract {
