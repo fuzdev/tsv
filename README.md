@@ -48,16 +48,17 @@ npx @fuzdev/tsv_wasm format src   # or without installing first
 ```
 
 ```typescript
-import {format_svelte} from '@fuzdev/tsv_format_wasm';
+import {format_svelte} from '@fuzdev/tsv_wasm';
 const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 ```
 
 ```typescript
-import {parse_svelte, type Root} from '@fuzdev/tsv_parse_wasm';
+import {parse_svelte, type Root} from '@fuzdev/tsv_wasm';
 const ast: Root = parse_svelte('<script>const x = 1;</script>');
 ```
 
-Both `parse_svelte` and `format_svelte` import the same way from `@fuzdev/tsv_wasm`.
+Both `parse_svelte` and `format_svelte` import the same way
+from `@fuzdev/tsv_format_wasm` and `@fuzdev/tsv_parse_wasm`.
 As with other WASM packages, it works without setup in Node.js/Bun/Deno,
 but browsers must call `await init()`.
 See the [website docs](https://tsv.fuz.dev/docs)
