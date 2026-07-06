@@ -536,9 +536,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// The current token's name channel from its RAW source text, ignoring any
-    /// decoded escape value. For keyword tokens (never escaped — the lexer
-    /// re-classifies escaped keywords as `Identifier`) and for property names,
-    /// which deliberately use the raw text (`current_property_name`).
+    /// decoded escape value. For keyword tokens, which are never escaped — the
+    /// lexer re-classifies an escaped keyword as an `Identifier`, so its decoded
+    /// value flows through `current_ident_name` instead (property/member and
+    /// class/interface/type-member keys decode via that path — acorn parity).
     pub(super) fn current_raw_ident_name(&self) -> IdentName {
         let len = self.current.end - self.current.start;
         if len > u16::MAX as u32 {

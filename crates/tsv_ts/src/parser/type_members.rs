@@ -196,8 +196,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             (true, expr)
         } else if self.current_is_identifier_or_keyword() {
             let (key_start, key_end) = self.current_pos();
-            // Property keys deliberately use the raw token text.
-            let key_name = self.current_raw_ident_name();
+            // Member keys decode `\u` escapes (span-identity otherwise) — acorn parity.
+            let key_name = self.current_ident_name();
             self.advance()?;
             (
                 false,
