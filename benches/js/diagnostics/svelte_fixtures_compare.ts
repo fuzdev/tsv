@@ -24,7 +24,10 @@
  * or a tracked `KNOWN_GAP`, else exit 1) and AST-shape (report-only; the
  * adversarial tree exposes edge divergences to triage into the shared
  * `DOCUMENTED_MATCHERS` or fix as writer bugs). Periodic (non-`check`) gate — needs
- * the FFI + the `svelte/compiler` oracle.
+ * the FFI + the `svelte/compiler` oracle. Strict about setup: a missing `../svelte`
+ * checkout (0 scanned) FAILS — publish Step 3b's preflight probe is the tolerance
+ * point. Full-suite runs freshness-check the ledgers, enforce the exact pinned
+ * counts (`lib/gate_counts.ts`), and warn on checkout↔npm-pin version skew.
  *
  * Run (from the repo root):
  *   deno task conformance:svelte-fixtures             # builds corpus FFI, then runs
@@ -34,6 +37,7 @@
  */
 
 import { type FixturesGateConfig, run_fixtures_gate } from '../lib/fixtures_gate.ts';
+import { SVELTE_FIXTURES_PINS } from '../lib/gate_counts.ts';
 import { type KnownGap, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
 
 /**
@@ -49,7 +53,8 @@ const KNOWN_GAPS: KnownGap[] = [
 	// deliberately track a gap while its fix is pending, and delete it once fixed.
 ];
 
-const config: FixturesGateConfig = {
+/** The gate's config — exported for the `conformance.ts` single-process driver. */
+export const SVELTE_FIXTURES_GATE: FixturesGateConfig = {
 	title: 'Svelte-fixtures',
 	language: 'svelte',
 	default_root: '../svelte/packages/svelte/tests',
@@ -67,6 +72,13 @@ const config: FixturesGateConfig = {
 	sanctioned_note: 'tsv correctly stricter',
 	known_gaps: KNOWN_GAPS,
 	oracle_name: 'the modern Svelte parser',
+	oracle_pin: {
+		checkout_package_json: '../svelte/packages/svelte/package.json',
+		npm_package: 'svelte',
+	},
+	pins: SVELTE_FIXTURES_PINS,
 };
 
-await run_fixtures_gate(config);
+if (import.meta.main) {
+	await run_fixtures_gate(SVELTE_FIXTURES_GATE);
+}

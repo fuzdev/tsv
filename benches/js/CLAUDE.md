@@ -67,7 +67,12 @@ binding is pure-wasm but its metadata declares `cpu: wasm32`, so npm skips it on
 any non-wasm host and reconciles away a `--no-save` add. `install_deps.ts` runs
 `npm install` then force-fetches it at the `oxc-parser` version (oxc ships all
 bindings in lockstep). After a bump or a stray `npm install`, re-run
-`bench:install`.
+`bench:install`. Every harness entry point (bench, smoke, the corpus/conformance
+tools) preflights `node_modules` via `lib/check_node_modules.ts`: missing is
+fatal with the installer hint, and **stale** — `package.json` newer than npm's
+`.package-lock.json` install stamp, i.e. pins bumped without a reinstall — is
+fatal too (`BENCH_STALE_OK=1` downgrades stale to a warning), so a run can't
+silently measure old installed versions under new labels.
 
 **oxc-parser-wasm runs under Deno and Node.** Its binding ships two entries — a
 fetch-based browser entry (`parser.wasi-browser.js`) that Deno needs, and the
@@ -110,6 +115,19 @@ echoed when the embedded formatter throws) surfaces as a per-file **error**
 with a code frame instead of fake-stable prettier output that would land in
 `unknown`. Same posture as the tsv_debug sidecar; see
 `docs/conformance_prettier.md` §Triage caveat.
+
+**Prettier-output cache.** The format comparison's dominant cost is prettier
+over ~6k mostly-unchanged files, so its oracle calls go through a
+content-addressed cache (`lib/prettier_cache.ts`, `.cache/prettier/`): keyed on
+the source content + parser/filepath routing + the full options + the
+canonical-5 pins (incl. svelte, the plugin's peer) + `PRETTIER_DEBUG` + a
+schema constant — a hit is exactly equivalent to a live run. Success-only
+(errors and empty outputs never cached, so the sidecar-miss heisenbug can't
+poison it — and cached hits remove the prettier-side flake from repeat runs
+entirely; the tsv/FFI side stays live). The run reports `prettier cache: N
+hits / M misses`. Scope: this tool + the conformance driver only — never the
+bench (it times prettier), never the fixture validator (live by design).
+`TSV_PRETTIER_CACHE=0` disables; `deno task bench:clean` wipes.
 
 ### Machine-readable output (`--json`)
 
@@ -311,11 +329,24 @@ reasoning as the Svelte gate: a committed artifact can drift from the pinned
 version that defines fixture correctness, and the live parser is exactly what
 `corpus:compare:parse` diffs against, so the two stay consistent by construction.
 
+**Shared gate hygiene (both fixtures gates, `lib/fixtures_gate.ts`).** The suite
+INPUTS come from the sibling checkout while the grading parser is the pinned npm
+oracle, so full-suite runs compare the checkout's `package.json` version against
+the pin and **warn on skew** (non-fatal — a checkout tracking upstream main is
+legitimate, but silent divergence isn't). Full-suite runs also **freshness-check
+the ledgers**: a `SANCTIONED`/`KNOWN_GAPS` entry that matched no over-rejection
+fails the run (delete it when its gap is fixed; update the pattern on an upstream
+rename) — the same mirror-the-live-corpus discipline as `scan_audit`'s ALLOW list.
+Subtree runs skip both checks.
+
 **Scope**: every `input.ts` under the suite root (the `*.test.ts` / `utils.ts`
 harness files are excluded by basename). `.tsx`/JSX fixtures parse as ordinary
 `.ts` here — tsv and acorn (module mode, no JSX plugin) both reject them, so they
-land in `parity`. Fail-open on a missing `../acorn-typescript` checkout (0 scanned
-→ green), matching the publish gate's tolerance for absent oracles.
+land in `parity`. Strict about setup: a missing `../acorn-typescript` checkout
+(0 scanned) **FAILS** — a run that graded nothing must not read as a pass. The
+tolerance point for machines without the checkout is `publish.ts` Step 3b's
+preflight probe, which skips the whole aggregate before the gates run (warn on
+dry-run, **blocking on `--wetrun`** — only `--no-check` releases without gates).
 
 Two comparisons per input, same structure as the Svelte gate:
 
@@ -340,22 +371,116 @@ with a `TS1xxx` code = tsc's parser rejects (→ tsv correctly stricter), no `TS
 (tsv's *target*) is itself over-lenient; using tsc's baselines auto-resolves those
 leniency cases to reject-parity (no sanction needed), and acorn's verdict sub-labels
 each gap (`gap` = acorn-confirmed → gates; `gap_beyond_acorn` = acorn also rejects, a
-mixed acorn-gap / early-error-timing surface → reported, not gated). Standalone triage
-tool (**not** in the blocking aggregate — large, growing corpus), tracked SEPARATELY
-from the acorn-suite gate (own `KNOWN_GAPS`). `.tsx` and `@filename` multi-file tests
-are skipped. Baseline: 768 scanned, 0 untracked gaps (12 tracked: Gaps A–C).
+mixed acorn-gap / early-error-timing surface → reported, not gated). **In the blocking
+`conformance` aggregate** (promoted once its baseline hit 0 untracked gaps), tracked
+SEPARATELY from the acorn-suite gate (own `KNOWN_GAPS`). `.tsx` and `@filename`
+multi-file tests are skipped. Baseline: 768 scanned, 0 untracked gaps.
+Setup posture: strict — a missing `../typescript` checkout, a partial checkout
+(baselines or corpus subtree missing), or an empty scan all FAIL rather than
+green-skipping (the baselines are the oracle; publish Step 3b's probe is the
+tolerance point). Full-corpus runs freshness-check `KNOWN_GAPS` (stale entries fail).
 
-**Pre-release aggregate — `deno task conformance`.** These two gates, plus
+**Pre-release aggregate — `deno task conformance`.** The three parse-conformance
+gates (svelte-fixtures, ts-fixtures, ts-repo), plus
 `corpus:compare:parse --all` and `corpus:compare:format --all`, are the
 release-cadence correctness gates that run against external oracles (and so can't
-live in `deno task check`). `deno task conformance` runs all four in one pass
-(building the corpus FFI once) and is wired into `scripts/publish.ts` **Step 3b**
-(skipped by `--no-check`; warn-and-skipped when `../svelte` or this dir's
-`node_modules` is absent). `corpus:compare:format` there gates only on **SAFETY**
+live in `deno task check`). `deno task conformance` builds the corpus FFI once and
+runs all five legs in **ONE process** (`conformance.ts`, the driver): the canonical
+oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) load
+once via the module cache instead of once per leg, each leg gets a timing line, and
+failure semantics match a `&&` chain exactly (every leg exits the process on a
+finding — fail-fast). The driver takes no arguments; the per-leg tasks remain the
+scoped/triage entries. It is wired into `scripts/publish.ts` **Step 3b**
+(skipped by `--no-check`). Step 3b preflights the oracles (`../svelte`,
+`../acorn-typescript`, `../typescript`, this dir's `node_modules`): a missing one
+**FAILS a `--wetrun`** (only the explicit `--no-check` releases without gates),
+warn-and-skips a dry-run, and any skip is re-warned in the run's final summary.
+The gates themselves fail closed on a missing checkout (0 scanned = FAIL), so a
+manual `deno task conformance` can't green-skip a leg. `corpus:compare:format` there gates on **SAFETY**
 (data loss) — the ~8% intentional style divergences are non-blocking WARNs, and a
 `--all` SAFETY hit may be the known FFI heisenbug (§Known Issues), so confirm on
-the single repo before treating it as real. `test262` (needs `../test262`) and the
+the single repo before treating it as real. Both corpus tools also fail (exit 1)
+on a run that compared nothing: an empty scope (`No files found`) or an
+every-file-errored / every-file-parse-fail-skipped run is a systemic failure —
+sidecar/FFI down or a wrong corpus — never a pass. `test262` (needs `../test262`) and the
 CSS-WPT harvest stay manual, outside the automated step.
+
+## Pinned gate counts
+
+The gates and harvests enforce **committed expected counts** so any change in
+what gets graded — a gutted or refreshed suite checkout, a discovery bug, a tsv
+behavior change, a systemic sidecar/FFI failure eating a whole language — fails
+loudly instead of shifting inside a green run. This is
+`scripts/validate_artifacts.ts`'s tight-bounds philosophy applied to counts:
+every real move in a number is a deliberate, visible edit.
+
+**Where the numbers live:**
+
+- `lib/gate_counts.ts` — every Deno-side count, one per consumer: the fixtures
+  gates (`scanned` + `both_accept`), ts-repo (`scanned` + `accept_parity`),
+  `corpus:compare:parse --all` (minimum per-language `compared` + EXACT
+  per-language tsv-side parse-failure counts), `corpus:compare:format --all`
+  (minimum per-language `match` + EXACT per-language `unknown`/`partial`
+  counts — the un-triaged divergence backlog is pinned, so a new unexplained
+  divergence fails until fixed/cataloged, and a shrink is re-pinned to record
+  the win), and the three harvests (wpt block count, test262 positive count,
+  svelte-rejects count).
+- Rust-side counts are consts in their commands — grep `REGRESSION PIN`:
+  test262 (discovered + graded-manifest), `fixtures_validate` (total fixtures —
+  protects the primary gate against a discovery collapse), and `swallow_audit`
+  (formatted files — closes its vacuous-pass).
+
+**Semantics — three pin categories, chosen per surface:**
+
+- **Exact pins** (mismatch in either direction fails): the fixtures gates,
+  ts-repo, test262, and the harvests. Their inputs are pinned checkouts
+  (version-gated by `pins:audit`) or deliberately-updated ones, so the counts
+  are deterministic — a drop is a regression or gutted input, a rise is a suite
+  refresh or behavior change; both must be re-pinned deliberately. No slack:
+  slack lets small regressions creep and silently widens after every refresh.
+- **Minimums at the exact measured value** (shrink fails, growth passes): the
+  two non-deterministic-growth cases. (1) The `corpus:compare:* --all` corpus is
+  LIVE dev repos that grow with ordinary work — re-pin to current when touching
+  the corpus (e.g. at release) so the minimum stays tight. (2) The
+  committed-fixtures audits (`fixtures_validate`, `swallow_audit`): additions
+  are ordinary reviewed diffs (a per-fixture-PR counter bump in `deno task
+  check` would be pure ceremony), while shrinkage is the discovery regression
+  the pin guards.
+- **Failure-bucket pins** (exact `!==`, but on the live corpus rather than a
+  deterministic input): the `corpus:compare:* --all` triage buckets —
+  per-language `unknown`/`partial` divergences and tsv-side parse failures. A
+  rise fails until triaged (fix it, add a divergence detector/sanction, or
+  consciously re-pin a legitimately-unsupported new corpus file); a drop also
+  fails, so a fixed divergence ratchets the pin DOWN deliberately and the win
+  stays recorded.
+
+Pins apply only to FULL runs (default suite root, `--all`, default harvest
+source) — subtree and filtered runs legitimately grade a slice. Harvest pins
+fail **before** writing, so a wrong cache never replaces a good one. CI runs
+only the committed-tree pins (`check.yml` is a clean checkout — no sibling
+clones); the rest are dev-machine gates at conformance/publish cadence.
+
+**Update ritual** (same as the artifact size bounds): the failure message
+prints expected vs got — update the constant + its measured-on comment in the
+same change, and say why in the commit. Record the checkout **commit** in the
+comment (`git -C ../<repo> rev-parse --short HEAD`) — upstream version files
+only bump at release, so the commit is the only precise statement of what a
+pin was measured against. When re-pinning after a suite refresh, glance at the
+full bucket table, not just the changed number — a count move can mask
+offsetting changes (the per-file gates — unexpected over-rejections, stale
+ledgers, SAFETY — catch tsv-side regressions independently, but the glance is
+cheap). Never re-pin to absorb an unexplained move — that is the regression
+the pin exists to catch.
+
+**Why both the pins AND pins:audit's checkout alignment exist:** they guard
+different granularities. Checkout alignment compares `package.json` versions —
+but an upstream repo's version only bumps at release, so commits landing
+between releases change the SUITE without changing the version (proven on day
+one: a `../svelte` pull added one test fixture at the same `5.56.4` version —
+the count pin caught it; the version check couldn't). Conversely the count
+pins can't tell 5.56.1 from 5.56.4 if the counts happen to coincide. Version
+alignment catches release-level skew; count pins catch commit-level suite
+drift within a version window.
 
 ## Divergence Detection
 
@@ -491,9 +616,14 @@ deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
 # after to restore the committed coverage report.
 
 # Harvest the derived suite caches for the conformance corpus (idempotent;
-# warn-and-skip when the source checkout is absent). Chained into the
+# warn-and-skip when the source checkout is absent). FRESHNESS-STAMPED
+# (lib/harvest_stamp.ts): a harvest whose stamped inputs — the source checkout
+# COMMIT(s) + the pinned count + oracle pins — are unchanged skips instantly
+# (the test262 leg saves a ~1 min release-mode grade); pass --force after
+# changing harvest/grading LOGIC, which the stamp can't see. Chained into the
 # bench:conformance build tasks; run standalone after a ../wpt or ../test262
-# update.
+# update — EXPECT the pinned harvest count to trip after a source pull
+# (§Pinned gate counts): re-pin in lib/gate_counts.ts deliberately.
 deno task bench:harvest            # all three harvests
 deno task bench:harvest:wpt        # ../wpt/css <style> blocks → .cache/wpt_css
 deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
@@ -839,6 +969,7 @@ benches/js/
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
 ├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache/test262_files.json (Deno-only)
 ├── bench.ts               # Benchmark entry point (runtime-neutral — runs under Deno AND Node)
+├── conformance.ts         # Single-process pre-release aggregate driver (deno task conformance): all five legs, one module cache
 ├── smoke.ts               # Smoke test for formatters and parsers (runtime-neutral: smoke / smoke:node / smoke:bun)
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md} (bench:compose)
 ├── corpus_compare_format.ts  # Formatting comparison vs prettier (Deno-only entry point)
@@ -848,7 +979,7 @@ benches/js/
 │   ├── skip_triage.ts        # parse-parity gate (tsv vs canonical; allowlisted over-rejections)
 │   ├── svelte_fixtures_compare.ts  # Svelte-fixtures parse-conformance gate: docstring + config over lib/fixtures_gate.ts (task: conformance:svelte-fixtures)
 │   ├── ts_fixtures_compare.ts  # TypeScript-fixtures parse-conformance gate: same, vs acorn-typescript's test/ suite (task: conformance:ts-fixtures)
-│   ├── ts_repo_compare.ts    # TypeScript-repo parse triage vs the official tsc corpus, tsc-baselines validity oracle (task: conformance:ts-repo; standalone, not in aggregate)
+│   ├── ts_repo_compare.ts    # TypeScript-repo parse gate vs the official tsc corpus, tsc-baselines validity oracle (task: conformance:ts-repo; in the blocking aggregate)
 │   ├── test262_compare.ts    # test262 differential (tsv vs oxc-parser, from the Rust manifest)
 │   ├── wpt_css_harvest.ts    # wpt <style> blocks → .cache/wpt_css (task: bench:harvest:wpt)
 │   ├── svelte_reject_harvest.ts  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json (task: bench:harvest:svelte-rejects; conformance view excludes these)
@@ -861,8 +992,12 @@ benches/js/
 │   ├── binary_sizes.ts    # Binary/WASM size collection and reporting
 │   ├── biome.ts           # Biome WASM wrapper (Svelte, TypeScript, CSS)
 │   ├── canonical.ts       # Prettier + Svelte parser wrappers
+│   ├── check_node_modules.ts # node_modules preflight: exists + not stale vs package.json (all entry points)
 │   ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
 │   ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
+│   ├── gate_counts.ts     # Pinned gate counts (exact pins + live-corpus minimums + negative-bucket pins) — see §Pinned gate counts
+│   ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins) — skip unchanged re-harvests
+│   ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
 │   ├── diff.ts            # Line-based diff utilities (LCS algorithm)
 │   ├── fixtures_gate.ts   # Shared per-language parse-conformance gate engine (run_fixtures_gate; svelte + ts fixtures scripts are docstring+config over it)
 │   ├── ffi.ts             # Deno.dlopen bindings (NativeImplementation — Deno native, runtime-specific)
@@ -929,7 +1064,16 @@ canonical packages (`prettier`, `svelte`, `acorn`, `@sveltejs/acorn-typescript`,
 `crates/tsv_debug/src/deno/sidecar.ts` — the sidecar that generates every
 fixture's `expected.json` and `output_prettier.svelte`. The two pin sets **must
 stay identical**: the bench has to measure against the same parser/formatter
-that defines fixture correctness. Bumping any of the five is therefore not a
+that defines fixture correctness. Agreement across all the pin sites (sidecar
+`VERSIONS` + its `npm:` imports, this dir's `package.json`, actor.rs's acorn
+import-map pin) is enforced by `deno task pins:audit`
+(`scripts/check_canonical_pins.ts`, gated in `deno task check`) — which also
+gates **checkout alignment**: a present `../svelte` / `../acorn-typescript`
+checkout whose version differs from its pin FAILS `deno task check` (absent
+checkouts are skipped, so clean machines/CI still pass). Align the checkout to
+the pinned tag, or bump the pins deliberately. `../prettier` is not gated (its
+suites' oracle output is computed live per file and the checkout rides `-dev`
+versions); `deno task doctor` reports it. Bumping any of the five is therefore not a
 benchmark refresh — it re-baselines the entire fixture corpus. Do it
 deliberately: edit `package.json` and `sidecar.ts` in lockstep (the
 `//canonical-sync` note in package.json restates this), run

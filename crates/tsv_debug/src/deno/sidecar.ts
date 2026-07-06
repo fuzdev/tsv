@@ -7,6 +7,9 @@
 // and (3) benches/js/package.json (read by benches/js/lib/versions.ts).
 // These can't be DRYed: the release binary embeds this file as a string and runs it
 // WITHOUT that package.json, so it can't read the bench's pins at runtime.
+// Agreement across all the pin sites (these three + actor.rs's acorn import-map
+// pin) is enforced by `deno task pins:audit` (scripts/check_canonical_pins.ts,
+// gated in `deno task check`).
 //
 // Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte
 // is NOT a routine refresh — it re-baselines the entire fixture corpus (these tools define
@@ -19,7 +22,7 @@
 const VERSIONS = {
 	prettier: '3.9.0',
 	'prettier-plugin-svelte': '4.1.1',
-	svelte: '5.56.1',
+	svelte: '5.56.4',
 	acorn: '8.16.0',
 	'@sveltejs/acorn-typescript': '1.0.10',
 } as const;
@@ -31,7 +34,7 @@ import * as prettier from 'npm:prettier@3.9.0';
 // deno-lint-ignore no-import-prefix
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@4.1.1';
 // deno-lint-ignore no-import-prefix
-import { parse as svelteParse, parseCss } from 'npm:svelte@5.56.1/compiler';
+import { parse as svelteParse, parseCss } from 'npm:svelte@5.56.4/compiler';
 // deno-lint-ignore no-import-prefix
 import * as acorn from 'npm:acorn@8.16.0';
 // deno-lint-ignore no-import-prefix
