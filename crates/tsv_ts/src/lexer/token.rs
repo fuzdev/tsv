@@ -348,6 +348,22 @@ pub enum TokenKind {
     Eof,
 }
 
+impl TokenKind {
+    /// Whether this token is a *binding-name word* — a plain identifier or a
+    /// contextual keyword valid as a binding name (`string`, `any`, …; see
+    /// [`KeywordKind::can_be_binding_name`]). Excludes `await` (a binding name
+    /// only at Script `[~Await]`, handled at the sites that care) and the
+    /// non-word binding starters (`[`, `{`, `...`, `this`).
+    #[inline]
+    pub fn is_binding_name_word(&self) -> bool {
+        match self {
+            TokenKind::Identifier => true,
+            TokenKind::Keyword(kw) => kw.can_be_binding_name(),
+            _ => false,
+        }
+    }
+}
+
 // TODO: Consider refining Display implementation for better error messages
 // Current approach: Quoted tokens like '=', lowercase for others
 // Alternative: Could match TypeScript/JS terminology more closely

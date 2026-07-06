@@ -980,15 +980,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// keyword (`override`, `readonly`) from a parameter that happens to be
     /// named the same.
     pub(super) fn peek_starts_parameter_binding(&mut self) -> bool {
-        match self.peek_kind() {
-            TokenKind::Identifier
-            | TokenKind::BracketOpen
-            | TokenKind::BraceOpen
-            | TokenKind::DotDotDot
-            | TokenKind::Keyword(KeywordKind::This) => true,
-            TokenKind::Keyword(kw) => kw.can_be_binding_name(),
-            _ => false,
-        }
+        let kind = self.peek_kind();
+        kind.is_binding_name_word()
+            || matches!(
+                kind,
+                TokenKind::BracketOpen
+                    | TokenKind::BraceOpen
+                    | TokenKind::DotDotDot
+                    | TokenKind::Keyword(KeywordKind::This)
+            )
     }
 
     /// Get the start position of the peek token (cache must be populated via peek_kind() first)
@@ -1029,12 +1029,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// identifier. Mirrors the `try_binding_name` name-capture predicate the
     /// declaration parsers use for the name itself.
     pub(super) fn peek_is_same_line_name_word(&mut self) -> bool {
-        let is_name = match self.peek_kind() {
-            TokenKind::Identifier => true,
-            TokenKind::Keyword(kw) => kw.can_be_binding_name(),
-            _ => false,
-        };
-        is_name && !self.peek_preceded_by_line_terminator()
+        self.peek_kind().is_binding_name_word() && !self.peek_preceded_by_line_terminator()
     }
 
     /// Whether the peeked token is a same-line *binding word* for a `using`
