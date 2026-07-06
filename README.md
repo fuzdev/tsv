@@ -14,7 +14,6 @@ so the focus is web standards and there's no support for JSX/SCSS/etc,
 beyond Svelte as the only JS framework.
 The extensibility story is currently limited to using its Rust crates as libraries;
 bridging to JS or WASM plugins is an open question, but may not be supported.
-For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
 tsv prioritizes, in order:
 
@@ -23,6 +22,9 @@ tsv prioritizes, in order:
 3. binary size
 4. memory usage
 5. and lastly, extensibility (deprioritized compared to Oxc/Biome/SWC)
+
+See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
+Compared to Oxc and Biome, tsv is significantly faster, smaller, and uses less memory.
 
 This is an early release, and reports and feedback are appreciated -
 see the [issues](https://github.com/fuzdev/tsv/issues)
