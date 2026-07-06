@@ -87,12 +87,9 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
   Svelte 5's modern AST with acorn and acorn-typescript
   (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
   and tsv has its own internal optimal AST
-- the parser can also emit an opt-in span-only wire (`parse --no-locations`,
-  or the `parse_*_no_locations` bindings) that drops the per-node `loc` object
-  (Svelte also `name_loc`) for a ~46% smaller, faster-to-materialize AST;
-  line/column stays derivable from the `start`/`end` offsets plus source (a
-  pure-JS `reconstruct_locations` helper ships in the parse packages), mirroring
-  acorn's `locations: false`
+- the parser can also emit optimal location-less JSON (`parse --no-locations`,
+  or the `parse_*_no_locations` bindings) that drops the per-node `loc` and
+  Svelte `name_loc` objects, mirroring acorn's `locations: false` for improved performance
 - `tsv format` discovery is gitignore-aware,
   honoring `.gitignore` and `.formatignore` (original to tsv),
   hierarchically supporting nested files like git and unlike `.prettierignore`,
@@ -102,16 +99,16 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
 - Rust-only implementation that currently does not call or embed a JS runtime
   (open for discussion, needs research into the tradeoffs);
   JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
-- architected to output optimal artifacts: runtime speed and compiled
-  code size are first-class goals for every shipped artifact, and heavier future
-  layers (incremental parsing, CST for LSP) will be feature-gated so they
+- ships optimal binary artifacts: runtime speed and compiled
+  code size are priorities, and heavier future layers
+  (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the focused artifacts
 - JS and TS parse in strict mode only - sloppy-mode-only syntax like `with` is
   rejected, while strict-mode early errors (e.g. duplicate params, reserved-word
   bindings) still parse for now, with enforcement deferred to a future
   diagnostics layer. The parse goal defaults to Module, with an opt-in Script
   goal (`--goal script`); since Svelte and TypeScript are inherently strict
-  modules, the goal and strictness only matter for standalone JS scripts
+  modules, this affects only standalone JS scripts to force modern patterns
 - pushes complexity and mess to the printer and JSON conversion,
   out of the parser and internal AST,
   keeping the model clean for the other planned tools
@@ -122,7 +119,7 @@ central `Language` trait, registry, or dynamic dispatch ("closed scope, open con
 That means the builds tree-shake at the link level:
 the parse build excludes the printers, and the format build excludes the JSON-AST conversion layer.
 Languages tree-shake the same way - a build binding only TypeScript would exclude
-Svelte and CSS entirely - though currently the published packages include all three.
+Svelte and CSS entirely - though there are no such minimal builds published yet.
 Future LSP/incremental features will be later feature-gated layers that don't bloat
 these artifacts - see [docs/architecture.md](docs/architecture.md)
 
