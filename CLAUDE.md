@@ -277,6 +277,12 @@ deno task conformance:ts-fixtures      # tsv's TS parser vs acorn-typescript's o
 # (over-rejections SANCTIONED or a tracked KNOWN_GAP, else exit 1), AST-shape is report-only. Fail-open
 # on a missing ../acorn-typescript checkout (0 scanned → green). Options: -v, --json, <subtree>.
 
+deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../typescript conformance/parser tests)
+# Standalone triage tool, NOT in the blocking aggregate: oracle = tsc's own error baselines
+# (tests/baselines/reference/*.errors.txt; a TS1xxx code = tsc's parser rejects). Buckets accept/reject
+# parity, over-acceptances (the deferred-early-error surface), and tracked gaps. Fail-open on a missing
+# ../typescript checkout. Options: -v, --json, <subtree>. See ./benches/js/CLAUDE.md.
+
 deno task conformance                  # the pre-release aggregate: svelte-fixtures + ts-fixtures +
 # corpus:compare:parse --all + corpus:compare:format --all in one run (builds the corpus FFI once). The
 # release-cadence correctness gates across Svelte/CSS/TS that need external oracles (svelte/compiler,
@@ -943,7 +949,7 @@ dispatch, no workspace-level language registry. Full discussion:
 
 tsv parses the syntactic grammar and rejects only the constructs that are *lexically* sloppy-mode — the `with` statement and legacy octal literals (`010`). Strict-mode **early errors** (duplicate parameter names, reserved words as identifiers, octal string escapes, `delete` of a plain name) still parse for now; enforcement is deferred to a future diagnostics layer. These leaks only matter for standalone JS — Svelte/TS module context is strict, so the real compiler would still flag them.
 
-This is one instance of a broader stance: **the parser is deliberately permissive and defers static-semantic early-errors** (the above, plus the TypeScript ambient-context rules — a `declare` member body, initializer, or decorator, etc.) to the diagnostics layer, so the formatter keeps formatting everything well-formed. The **correctness oracle for what's actually an error is tsc**, not acorn-typescript (which tsv matches only for AST *shape*); the practical accept-vs-reject test is **whether prettier formats it**. See [crates/tsv_ts/CLAUDE.md §Distinctives](crates/tsv_ts/CLAUDE.md) and [docs/conformance_svelte.md §TypeScript Corrections](docs/conformance_svelte.md#typescript-corrections).
+This is one instance of a broader stance: **the parser is deliberately permissive and defers static-semantic early-errors** (the above, plus the TypeScript ambient-context rules — a `declare` member body, initializer, or decorator, etc.) to the diagnostics layer, so the formatter keeps formatting everything well-formed. The **correctness oracle for what's actually an error is tsc**, not acorn-typescript (which tsv matches only for AST *shape*); the practical accept-vs-reject test is **whether prettier formats it**. See [crates/tsv_ts/CLAUDE.md §Architecture Position ("Sources of truth")](crates/tsv_ts/CLAUDE.md#architecture-position) and [docs/conformance_svelte.md §TypeScript Corrections](docs/conformance_svelte.md#typescript-corrections).
 
 **Strict ≠ module-only — there is an orthogonal *goal* axis.** Both goals are strict (no sloppy mode, no `"use strict"` detection). A parse runs against `tsv_ts::Goal::{Module, Script}`, exposed as `parse_with_goal` and `tsv parse|format --goal script|module`, **defaulting to `Module`** (correct for Svelte `<script>` and ~all real TS; Svelte hard-wires it). The goal toggles only the four goal-specific constructs: at `Script` goal `await` is an ordinary identifier (`[~Await]` context tracked via the parser's `in_await` flag, save/restored at every function-like scope), and `import`/`export` declarations + `import.meta` are syntax errors (dynamic `import(...)` stays valid). `sourceType` in the public AST follows the goal. See [docs/conformance_test262.md §Strict Mode Only, Explicit Goal Axis](docs/conformance_test262.md).
 

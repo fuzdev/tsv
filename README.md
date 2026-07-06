@@ -152,7 +152,7 @@ tsv currently supports:
 
 - [x] formatter matching Prettier + prettier-plugin-svelte (with intentional divergences)
 - [x] parser, drop-in for Svelte+acorn+acorn-typescript
-- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_plugin_tsv_format) - fuzdev.tsv-format
+- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - fuzdev.tsv-format
 - [ ] ts->js conversion (types-to-whitespace only)
 - [ ] module lexer
 
