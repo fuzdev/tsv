@@ -162,8 +162,7 @@ Future features (unknown order):
 - JSON support
 - HTML support (formatting as Svelte isn't correct e.g. with whitespace and `{`,
   but the lift to support it is small)
-- CSS error recovery (recover past invalid CSS per the spec instead of
-  failing the parse - doesn't add dialect support)
+- CSS error recovery (recover past invalid CSS per the spec)
 - later:
   - TypeScript 7 integration (the Go impl), unlocking:
     - svelte-check replacement
