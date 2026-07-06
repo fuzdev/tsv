@@ -100,8 +100,8 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
   (open for discussion, needs research into the tradeoffs);
   JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
 - ships optimal binary artifacts: runtime speed and compiled
-  code size are priorities, and heavier future layers
-  (incremental parsing, CST for LSP) will be feature-gated so they
+  code size are priorities, so if all you need is a formatter, a minimal build is available,
+  and heavier future layers (incremental parsing, CST for LSP) will be feature-gated so they
   don't regress the focused artifacts
 - JS and TS parse in strict mode only - sloppy-mode-only syntax like `with` is
   rejected, while strict-mode early errors (e.g. duplicate params, reserved-word
