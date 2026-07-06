@@ -19,8 +19,7 @@ tsv prioritizes, in order:
 
 1. correctness (Svelte and TypeScript conformance, spec adherence for HTML/CSS/JS)
 2. speed
-3. binary size
-4. memory usage
+3. binary size and memory usage
 5. extensibility (valued but deprioritized)
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
