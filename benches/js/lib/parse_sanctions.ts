@@ -70,7 +70,7 @@ export const SVELTE_FIXTURE_SANCTIONS: Sanction[] = [
 export const TS_FIXTURE_SANCTIONS: Sanction[] = [
 	// Deprecated import assertions (`assert { type: 'json' }`) — superseded by
 	// import attributes (`with { … }`, which tsv parses). Deliberate non-support,
-	// not a gap: see grimoire TODO_CORPUS_FORMATTING §Reference "Expected errors".
+	// not a gap.
 	{
 		pattern: 'assert_import_assert/',
 		reason: "deprecated import assertions (`assert {…}`) — tsv supports the successor `with {…}` only",

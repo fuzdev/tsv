@@ -136,6 +136,19 @@ export class WasmImplementation implements TsvImplementation {
 			parse_svelte_no_locations: module.parse_svelte_no_locations,
 			parse_typescript_no_locations: module.parse_typescript_no_locations,
 		};
+
+		// Fairness guard for the parse rows: the wasm parse fns must return a
+		// js_sys-materialized OBJECT (the engine runs the host's JSON.parse from
+		// Rust). If a glue/build regression ever handed back the raw JSON string
+		// instead, the timed `tsv_wasm-json` rows would silently skip
+		// materialization and read artificially fast vs `tsv-json`. Probe once
+		// here, outside any timed loop.
+		const probe = this._module.parse_typescript('const x = 1;');
+		if (typeof probe !== 'object' || probe === null) {
+			throw new Error(
+				`tsv_wasm parse returned a ${typeof probe} — expected a materialized AST object`,
+			);
+		}
 	}
 
 	parse(source: string, language: Language): unknown {

@@ -36,7 +36,7 @@ All return-pointer functions share the signature `(source_ptr: *const u8, source
 
 - **Allocation**: tsv allocates returned buffers as `Box<[u8]>` and leaks them via `Box::into_raw`. Length is written to `*out_len`.
 - **Free**: Caller MUST call `tsv_free(ptr, *out_len)` exactly once per returned pointer. `tsv_free` no-ops on null or zero length.
-- **UTF-8 input**: `source_ptr`/`source_len` must point to valid UTF-8. Invalid UTF-8 returns an error JSON (`{"error": "Invalid UTF-8: ..."}`), not a crash.
+- **UTF-8 input**: `source_ptr`/`source_len` must point to valid UTF-8. Invalid UTF-8 returns an error JSON (`{"error": "Invalid UTF-8: ..."}`), not a crash. A null `source_ptr` with `source_len == 0` is accepted as the empty source (FFI hosts commonly pass (null, 0) for an empty buffer); null with a non-zero length returns an error JSON.
 - **Errors**: All errors surface as JSON-shaped output (`{"error": "..."}`) with a valid pointer the caller still must free. There is no separate error channel.
 - **Panic safety**: Every entry point wraps the work in `std::panic::catch_unwind`. Panics are caught (when built with `panic = "unwind"`) and converted to `{"error": "panic: ..."}`. Under `panic = "abort"` profiles, panics still abort — the catch is profile-dependent.
 

@@ -21,11 +21,19 @@ mod protocol;
 pub use error::DenoError;
 
 use actor::DenoActor;
+use serde_json::Value;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::sync::OnceCell;
+use tokio::sync::{OnceCell, RwLock, oneshot};
+
+/// One healable pool slot. The actor is respawned **in place** when a dispatch
+/// finds its event loop gone (see [`call_tool`]), so a transient death can't
+/// permanently poison the slot's share of the round-robin.
+struct ActorSlot {
+    actor: RwLock<DenoActor>,
+}
 
 /// Global lazy-initialized Deno actor pool
-static DENO_POOL: OnceCell<Vec<DenoActor>> = OnceCell::const_new();
+static DENO_POOL: OnceCell<Vec<ActorSlot>> = OnceCell::const_new();
 
 /// Requested pool size, read once when the pool is first spawned
 static POOL_SIZE: AtomicUsize = AtomicUsize::new(1);
@@ -34,8 +42,9 @@ static POOL_SIZE: AtomicUsize = AtomicUsize::new(1);
 static NEXT_ACTOR: AtomicUsize = AtomicUsize::new(0);
 
 /// Pool size for bulk workloads, given the caller's task concurrency: a few
-/// sidecars well below the task count. Each sidecar multiplexes many in-flight
-/// requests, and beyond ~3 processes extra sidecars just pay their own
+/// sidecars well below the task count. Each sidecar queues many in-flight
+/// requests (the JS side processes them serially — the pool is the only
+/// parallelism), and beyond ~3 processes extra sidecars just pay their own
 /// module-load cost and memory without improving wall time.
 pub fn bulk_pool_size(concurrency: usize) -> usize {
     (concurrency / 4).clamp(1, 4)
@@ -68,21 +77,68 @@ pub fn init_bulk_pool() -> usize {
     concurrency
 }
 
-/// Get a Deno actor from the pool, spawning the pool on first use.
+/// Get a pool slot, spawning the pool on first use.
 ///
-/// Requests dispatch round-robin: each actor already multiplexes concurrent
-/// requests (pending-map + per-request oneshot), so distribution by call count
-/// is enough to spread load.
-async fn get_actor() -> Result<&'static DenoActor, DenoError> {
+/// Requests dispatch round-robin: each actor queues concurrent requests
+/// (pending-map + per-request oneshot; the JS side processes them serially),
+/// so distribution by call count is enough to spread load.
+async fn get_slot() -> Result<&'static ActorSlot, DenoError> {
     let pool = DENO_POOL
         .get_or_try_init(|| async {
             (0..POOL_SIZE.load(Ordering::Relaxed))
-                .map(|_| DenoActor::spawn())
-                .collect::<Result<Vec<_>, _>>()
+                .map(|_| {
+                    Ok(ActorSlot {
+                        actor: RwLock::new(DenoActor::spawn()?),
+                    })
+                })
+                .collect::<Result<Vec<_>, DenoError>>()
         })
         .await?;
     let i = NEXT_ACTOR.fetch_add(1, Ordering::Relaxed) % pool.len();
     Ok(&pool[i])
+}
+
+/// Dispatch a tool call to the pool, healing a dead slot in place.
+///
+/// Healing is **dispatch-level only**: a request that an actor's queue never
+/// accepted has provably not reached a sidecar, so completing the dispatch on
+/// a fresh actor cannot re-run (and thus cannot mask) failed work. A request
+/// that WAS delivered and then failed — crash, timeout, tool error, empty
+/// output — fails hard to its caller, deliberately without retry, so a flaky
+/// oracle stays loud; the respawn only benefits future calls.
+async fn call_tool(tool: &str, content: &str, options: Option<Value>) -> Result<Value, DenoError> {
+    let slot = get_slot().await?;
+
+    // Fast path: dispatch on the slot's live actor.
+    {
+        let actor = slot.actor.read().await;
+        if let Some(rx) = actor.dispatch(tool, content, options.as_ref()).await {
+            return await_response(rx).await;
+        }
+    }
+
+    // The actor's event loop is gone (a prior crash/timeout/shutdown killed
+    // it). Respawn the slot in place — unless another caller already did while
+    // we waited for the write lock — then complete THIS dispatch on the fresh
+    // actor (safe: the request never left, see above).
+    let mut actor = slot.actor.write().await;
+    if actor.is_closed() {
+        eprintln!("[deno] respawning dead sidecar actor");
+        *actor = DenoActor::spawn()?;
+    }
+    match actor.dispatch(tool, content, options.as_ref()).await {
+        Some(rx) => await_response(rx).await,
+        // The fresh actor died before accepting a request — hard error.
+        None => Err(DenoError::ActorShutdown),
+    }
+}
+
+/// Await a dispatched request's response; a dropped sender means the actor's
+/// event loop vanished without failing its pending map (e.g. a panic).
+async fn await_response(
+    rx: oneshot::Receiver<Result<Value, DenoError>>,
+) -> Result<Value, DenoError> {
+    rx.await.map_err(|_| DenoError::ActorShutdown)?
 }
 
 /// Specifies how prettier should determine the parser
@@ -101,22 +157,33 @@ pub enum PrettierParser<'a> {
 /// * `parser` - How to determine the parser (explicit name or infer from filepath)
 ///
 /// # Errors
-/// Returns an error if Deno is not available or formatting fails.
+/// Returns an error if Deno is not available, formatting fails, or prettier
+/// returns empty output for non-empty input (the under-load miss — see below).
 pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<String, DenoError> {
     let options = match parser {
         PrettierParser::Parser(p) => serde_json::json!({ "parser": p }),
         PrettierParser::Filepath(f) => serde_json::json!({ "filepath": f }),
     };
 
-    let result = get_actor()
-        .await?
-        .call("prettier", content, Some(options))
-        .await?;
+    let result = call_tool("prettier", content, Some(options)).await?;
 
-    result
+    let output = result
         .as_str()
         .map(ToString::to_string)
-        .ok_or(DenoError::MissingOutput)
+        .ok_or(DenoError::MissingOutput)?;
+
+    // A (semantically) empty format of non-empty input is a prettier
+    // malfunction — the documented under-load miss — never a real result.
+    // Surface it as a hard, accurately-named error instead of returning
+    // fake-empty output that downstream consumers (fixture validation, corpus
+    // comparison) would treat as truth. Deliberately NO retry: a flaky oracle
+    // must stay loud. Mirrors the corpus compare's own guard
+    // (`benches/js/corpus_compare_format.ts`).
+    if output.trim().is_empty() && !content.trim().is_empty() {
+        return Err(DenoError::EmptyOutput);
+    }
+
+    Ok(output)
 }
 
 /// Parse Svelte source code using the official Svelte compiler
@@ -129,8 +196,8 @@ pub async fn run_prettier(content: &str, parser: PrettierParser<'_>) -> Result<S
 ///
 /// # Errors
 /// Returns an error if Deno is not available or parsing fails.
-pub async fn parse_svelte(source: &str) -> Result<serde_json::Value, DenoError> {
-    get_actor().await?.call("svelte-parse", source, None).await
+pub async fn parse_svelte(source: &str) -> Result<Value, DenoError> {
+    call_tool("svelte-parse", source, None).await
 }
 
 /// Parse TypeScript source code using acorn with TypeScript plugin
@@ -143,7 +210,7 @@ pub async fn parse_svelte(source: &str) -> Result<serde_json::Value, DenoError> 
 ///
 /// # Errors
 /// Returns an error if Deno is not available or parsing fails.
-pub async fn parse_typescript(source: &str) -> Result<serde_json::Value, DenoError> {
+pub async fn parse_typescript(source: &str) -> Result<Value, DenoError> {
     parse_typescript_with_goal(source, tsv_ts::Goal::Module).await
 }
 
@@ -157,12 +224,9 @@ pub async fn parse_typescript(source: &str) -> Result<serde_json::Value, DenoErr
 pub async fn parse_typescript_with_goal(
     source: &str,
     goal: tsv_ts::Goal,
-) -> Result<serde_json::Value, DenoError> {
+) -> Result<Value, DenoError> {
     let options = serde_json::json!({ "sourceType": goal.source_type() });
-    get_actor()
-        .await?
-        .call("acorn-typescript-parse", source, Some(options))
-        .await
+    call_tool("acorn-typescript-parse", source, Some(options)).await
 }
 
 /// Parse CSS source code using Svelte's `parseCss`
@@ -175,8 +239,8 @@ pub async fn parse_typescript_with_goal(
 ///
 /// # Errors
 /// Returns an error if Deno is not available or parsing fails.
-pub async fn parse_css(source: &str) -> Result<serde_json::Value, DenoError> {
-    get_actor().await?.call("css-parse", source, None).await
+pub async fn parse_css(source: &str) -> Result<Value, DenoError> {
+    call_tool("css-parse", source, None).await
 }
 
 /// Parse `content` with the canonical external parser for `parser`
@@ -185,7 +249,7 @@ pub async fn parse_css(source: &str) -> Result<serde_json::Value, DenoError> {
 pub async fn parse_by_type(
     content: &str,
     parser: tsv_cli::cli::input::ParserType,
-) -> Result<serde_json::Value, DenoError> {
+) -> Result<Value, DenoError> {
     use tsv_cli::cli::input::ParserType;
     match parser {
         ParserType::Svelte => parse_svelte(content).await,
@@ -221,7 +285,7 @@ pub struct VersionInfo {
 /// # Errors
 /// Returns an error if Deno is not installed or the sidecar fails to start.
 pub async fn check() -> Result<VersionInfo, DenoError> {
-    let result = get_actor().await?.call("__version_info", "", None).await?;
+    let result = call_tool("__version_info", "", None).await?;
 
     let info = result.as_object().ok_or(DenoError::MissingOutput)?;
     let deps = info
@@ -229,7 +293,7 @@ pub async fn check() -> Result<VersionInfo, DenoError> {
         .and_then(|d| d.as_object())
         .ok_or(DenoError::MissingOutput)?;
 
-    let get_str = |obj: &serde_json::Map<String, serde_json::Value>, key: &str| {
+    let get_str = |obj: &serde_json::Map<String, Value>, key: &str| {
         obj.get(key)
             .and_then(|v| v.as_str())
             .unwrap_or("?")
@@ -286,6 +350,26 @@ mod tests {
         assert_eq!(
             ast.get("type").and_then(|v| v.as_str()),
             Some("StyleSheetFile")
+        );
+
+        // Pool heal: kill the pooled actor's event loop, then verify the next
+        // call finds the dead slot, respawns it in place, and completes the
+        // dispatch on the fresh actor. This is the guard against the
+        // poisoned-pool failure mode (a dead actor permanently failing its
+        // round-robin share). Runs inside this single test because the pool is
+        // a process-global static shared across the test binary.
+        let slot = get_slot().await.expect("pool must be initialized");
+        slot.actor.read().await.shutdown_and_wait().await;
+        assert!(
+            slot.actor.read().await.is_closed(),
+            "actor must be dead before the heal is exercised"
+        );
+        let result = run_prettier("<div>healed</div>", PrettierParser::Parser("svelte")).await;
+        assert!(result.is_ok(), "heal respawn failed: {result:?}");
+        assert_eq!(result.unwrap(), "<div>healed</div>\n");
+        assert!(
+            !slot.actor.read().await.is_closed(),
+            "slot must hold a live actor after the heal"
         );
     }
 

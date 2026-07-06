@@ -29,6 +29,9 @@ type ParserFn = (source: string) => unknown;
  * correctness — tsv ships no prettier config file, so the corpus oracle reads
  * none either. Keep these two option sets identical.
  */
+/** Shared empty plugins array — hoisted so the timed loop doesn't allocate one per call. */
+const NO_PLUGINS: unknown[] = [];
+
 const PRETTIER_OPTIONS = {
 	useTabs: true,
 	printWidth: 100,
@@ -44,6 +47,8 @@ export class CanonicalImplementation implements TsvImplementation {
 	#format_cache: PrettierCache | null = null;
 	// deno-lint-ignore no-explicit-any
 	#prettier_svelte: any = null;
+	/** The svelte plugin wrapped in its plugins array, hoisted out of the per-call path. */
+	#svelte_plugins: unknown[] = [];
 	// deno-lint-ignore no-explicit-any
 	#svelte_compiler: any = null;
 	// deno-lint-ignore no-explicit-any
@@ -82,6 +87,9 @@ export class CanonicalImplementation implements TsvImplementation {
 		]);
 		this.#prettier = prettier_mod as PrettierModule;
 		this.#prettier_svelte = prettier_svelte_mod;
+		// Hoisted once so the bench's timed loop doesn't allocate a fresh plugins
+		// array per format call (the other option fields vary per call and stay inline).
+		this.#svelte_plugins = [prettier_svelte_mod];
 		this.#svelte_compiler = svelte_mod;
 		// Create TypeScript parser once (acorn.Parser.extend is expensive)
 		// deno-lint-ignore no-explicit-any
@@ -144,7 +152,7 @@ export class CanonicalImplementation implements TsvImplementation {
 	): Promise<string> {
 		if (!this.#prettier_svelte) throw new Error('Prettier Svelte plugin not initialized');
 
-		const plugins = language === 'svelte' ? [this.#prettier_svelte] : [];
+		const plugins = language === 'svelte' ? this.#svelte_plugins : NO_PLUGINS;
 
 		// Real prettier keys its parser off the file extension. The corpus collapses `.js`
 		// and `.ts` into one `typescript` Language (tsv formats both through its TS path), but

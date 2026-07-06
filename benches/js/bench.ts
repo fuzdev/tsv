@@ -160,6 +160,11 @@ const args = {
 	verbose: parsed.data.verbose,
 };
 
+// Baseline statistics requested — raises the sample floors in the timed suite
+// (see `min_iterations` in `run_benchmark_group`) so the Welch comparisons run
+// on usable sample sizes. Costs wall clock only on baseline runs.
+const baselining = args.save_baseline || args.compare_baseline;
+
 // In JSON/markdown mode, progress goes to stderr so stdout is clean structured output
 const structured_output = args.json || args.markdown;
 
@@ -729,7 +734,14 @@ async function run_benchmark_group(
 		// tasks duration-bound (they hit BENCH_DURATION long before any floor)
 		// while ensuring even the very slow ones don't fall to a degenerate
 		// n=3 where p99 collapses to `max` and Welch's t-test has unstable DOF.
-		min_iterations: 5,
+		// When a baseline is being saved or compared, the floors rise (5→10,
+		// slow-task 7→12 below): the Welch p-values feeding regression verdicts
+		// need the samples (n≈4-7 sits in the unstable-DOF regime the timing
+		// library's own n=30 floor exists to avoid), and the extra wall clock is
+		// only paid on runs that asked for statistics. Plain runs keep the cheap
+		// floors — their headline (per-sweep mean / MB/s) is intrinsically
+		// low-variance.
+		min_iterations: baselining ? 10 : 5,
 		// oxfmt's async napi binding leaks state into Deno's timer wheel:
 		// after the first oxfmt.format call, exactly one further setTimeout
 		// fires and then all subsequent timers stall forever. The default
@@ -751,20 +763,21 @@ async function run_benchmark_group(
 			const throughput = effective_bytes === 0
 				? '—'
 				: format_throughput(result.stats.ops_per_second * effective_bytes);
-			log(`  [${index + 1}/${total}] ${result.name}: ${ops_per_sec} ops/sec (${throughput})`);
+			log(`  [${index + 1}/${total}] ${result.name}: ${ops_per_sec} sweeps/sec (${throughput})`);
 		},
 	});
 
 	for (const task of tasks) {
 		const task_files = filtered_files_by_task.get(task.tracking_key)!;
 		// Tier per-task `min_iterations` based on preflight pass time. The
-		// suite floor (5) handles most cases; very slow tasks (>5s/pass —
-		// prettier on the full TS corpus, oxfmt full passes) get a bump to 7
-		// because at n=5 their p75/p90 still sit too close to max and the
-		// Welch DOF is on the edge. Above that we don't keep climbing: each
-		// extra iteration on a 14s/pass task costs another 14s of wall clock.
+		// suite floor (5; 10 when baselining) handles most cases; very slow
+		// tasks (>5s/pass — prettier on the full TS corpus, oxfmt full passes)
+		// get a bump (7; 12 when baselining) because at n=5 their p75/p90
+		// still sit too close to max and the Welch DOF is on the edge. Above
+		// that we don't keep climbing: each extra iteration on a 14s/pass task
+		// costs another 14s of wall clock.
 		const preflight_ms = preflight_elapsed_ms.get(task.tracking_key) ?? 0;
-		const min_iter = preflight_ms > 5000 ? 7 : undefined;
+		const min_iter = preflight_ms > 5000 ? (baselining ? 12 : 7) : undefined;
 		const base_task = { name: task.name, min_iterations: min_iter };
 		if (task.is_async) {
 			bench.add({
@@ -1123,8 +1136,11 @@ function generate_markdown_report(
 
 	lines.push(
 		'**Methodology:** Single-threaded — every implementation formats/parses one file at a time, ' +
-			'measured sequentially with no cross-file parallelism. The numbers are per-file, single-core ' +
-			'latency/throughput, not the multi-core batch throughput a CLI gets formatting many files at once.\n',
+			'measured sequentially with no cross-file parallelism. One timed iteration is one full sweep ' +
+			'over the group\u2019s iterated file set, so the absolute columns (sweeps/sec, p50\u2013p99, min/max) ' +
+			'are per-sweep, not per-file — divide by the group\u2019s file count (the Files lines / `(Mf)` ' +
+			'annotations) for per-file figures; ratios and MB/s are denominated consistently either way. ' +
+			'This is single-core throughput, not the multi-core batch throughput a CLI gets formatting many files at once.\n',
 	);
 
 	// Coverage-only run: no timed groups exist, so render the per-tool coverage

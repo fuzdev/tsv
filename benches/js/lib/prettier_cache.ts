@@ -89,6 +89,12 @@ export class PrettierCache {
 	async get(source: string, parser: string, filepath: string): Promise<string | null> {
 		try {
 			const output = await readFile(this.#entry(source, parser, filepath).path, 'utf8');
+			if (output.trim() === '') {
+				// semantically-empty entry (predates the put() trim guard) — treat as
+				// a miss so a poisoned entry can never freeze a bad oracle
+				this.misses++;
+				return null;
+			}
 			this.hits++;
 			return output;
 		} catch {
@@ -97,9 +103,14 @@ export class PrettierCache {
 		}
 	}
 
-	/** Record a SUCCESSFUL, NON-EMPTY output (both guards enforced here too). */
+	/**
+	 * Record a SUCCESSFUL, semantically NON-EMPTY output (guards enforced here
+	 * too). Whitespace-only counts as empty: the safety differential strips
+	 * whitespace, so caching such an output would freeze exactly the
+	 * prettier-miss shape the empty guard exists to reject.
+	 */
 	async put(source: string, parser: string, filepath: string, output: string): Promise<void> {
-		if (output === '') return;
+		if (output.trim() === '') return;
 		const { dir, path } = this.#entry(source, parser, filepath);
 		await mkdir(dir, { recursive: true });
 		await writeFile(path, output);

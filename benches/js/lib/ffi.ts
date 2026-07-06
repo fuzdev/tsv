@@ -4,26 +4,33 @@
  * Uses Deno.dlopen to call the Rust library directly for maximum performance.
  */
 
+import { native_library_filename } from './runtime.ts';
 import type { Language, TsvImplementation } from './types.ts';
 
 // FFI symbol definitions.
 //
 // The source and out-length arguments are passed as explicit `pointer`s
-// (`Deno.UnsafePointer.of(...)` in `call_ffi`) rather than the `buffer`
-// parameter type. Deno 2.8's `buffer` fast-call marshalling intermittently
-// hands the native side a stale/wrong source pointer under memory pressure
-// (e.g. mid a long corpus/benchmark run with prettier and other WASM modules
-// active), so the formatter reads corrupted input and silently drops content —
-// a non-deterministic false data-loss signal. The native `.so` is correct
-// (verified byte-for-byte from
-// Python ctypes, which passes immovable `bytes`); the bug is in Deno's buffer
-// path. ArrayBuffer backing stores are off-heap and not relocated by GC, so an
-// explicit `UnsafePointer.of` pointer is stable for the synchronous call — but
-// only as long as the backing typed array stays reachable. `UnsafePointer.of`
-// returns an opaque `PointerValue` that does NOT keep the source array alive,
-// so V8 could otherwise collect it the moment the pointer is taken. `call_ffi`
-// pins `source_bytes` with an explicit liveness read after the native call
-// returns (`out_len_buffer` is already pinned by reading its result below).
+// rather than the `buffer` parameter type. Deno 2.8's `buffer` fast-call
+// marshalling intermittently handed the native side a stale/wrong source
+// pointer under memory pressure (e.g. mid a long corpus/benchmark run with
+// prettier and other WASM modules active), so the formatter read corrupted
+// input and silently dropped content — a non-deterministic false data-loss
+// signal. The native `.so` is correct (verified byte-for-byte from Python
+// ctypes, which passes immovable `bytes`); the bug is in Deno's buffer path.
+//
+// The pointers come from persistent marshalling buffers created in `init()`
+// and grown (source/result) only when a larger file arrives: taking a pointer
+// with `Deno.UnsafePointer.of` externalizes the array's backing store, and V8
+// never relocates an externalized backing store (probe-verified stable across
+// forced full GCs, including for sub-64-byte arrays whose stores start
+// on-heap). So each pointer is taken once per (re)allocation, warm calls do no
+// per-call allocation or pointer-taking, and there is no per-call GC interplay
+// left for the buffer bug to exploit. The original `buffer`-path corruption no
+// longer reproduces on current Deno under synthetic pressure (50k+ calls,
+// churn + ballast + resident WASM); the explicit-pointer path is retained as
+// defense-in-depth, and the corpus compare independently self-verifies any
+// SAFETY finding by re-running the native format (see
+// `corpus_compare_format.ts`).
 const symbols = {
 	tsv_parse_svelte: {
 		parameters: ['pointer', 'usize', 'pointer'],
@@ -88,24 +95,36 @@ type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
  * The corpus comparison task sets this to "corpus" for panic recovery.
  */
 export function get_library_path(): string {
-	const lib_name = Deno.build.os === 'linux'
-		? 'libtsv_ffi.so'
-		: Deno.build.os === 'darwin'
-		? 'libtsv_ffi.dylib'
-		: Deno.build.os === 'windows'
-		? 'tsv_ffi.dll'
-		: (() => {
-			throw new Error(`Unsupported platform: ${Deno.build.os}`);
-		})();
-
 	const profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';
 	const target_dir = new URL('../../../target', import.meta.url).pathname;
-	return `${target_dir}/${profile}/${lib_name}`;
+	return `${target_dir}/${profile}/${native_library_filename('tsv_ffi')}`;
 }
+
+/** Persistent marshalling buffers + their externalized pointers (see the `symbols` comment). */
+interface MarshalState {
+	/** Receives the output byte length; written by the native side through `out_len_ptr`. */
+	out_len_buffer: BigUint64Array;
+	out_len_ptr: Deno.PointerValue;
+	/** Grow-only UTF-8 staging for the source; re-pointed only on growth. */
+	source_buffer: Uint8Array;
+	source_ptr: Deno.PointerValue;
+	/** Grow-only staging for the result copy-out (no pointer needed — `copyInto` takes the view). */
+	result_buffer: Uint8Array;
+}
+
+/** Grow-only sizing: double `current` until it holds `needed`. */
+const next_capacity = (needed: number, current: number): number => {
+	let cap = current;
+	while (cap < needed) cap *= 2;
+	return cap;
+};
+
+const INITIAL_BUFFER_CAPACITY = 1 << 16;
 
 export class NativeImplementation implements TsvImplementation {
 	name = 'native' as const;
 	private _lib: Deno.DynamicLibrary<typeof symbols> | null = null;
+	private _marshal: MarshalState | null = null;
 	private encoder = new TextEncoder();
 	private decoder = new TextDecoder();
 
@@ -142,44 +161,59 @@ export class NativeImplementation implements TsvImplementation {
 		}
 
 		this._lib = Deno.dlopen(lib_path, symbols);
+
+		// Explicit `ArrayBuffer` backing so the stores are materialized off-heap
+		// up front; the `UnsafePointer.of` calls externalize them, after which V8
+		// never relocates them (see the `symbols` comment). The buffers live on
+		// the instance, so they stay trivially reachable across every call.
+		const out_len_buffer = new BigUint64Array(new ArrayBuffer(8));
+		const source_buffer = new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY));
+		this._marshal = {
+			out_len_buffer,
+			out_len_ptr: Deno.UnsafePointer.of(out_len_buffer),
+			source_buffer,
+			source_ptr: Deno.UnsafePointer.of(source_buffer),
+			result_buffer: new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY)),
+		};
 	}
 
 	private call_ffi(fn: FfiFn, source: string): string {
-		const source_bytes = this.encoder.encode(source);
-		const out_len_buffer = new BigUint64Array(1);
+		const m = this._marshal;
+		if (!m) throw new Error('Native library not initialized');
 
-		// Pass explicit pointers (see the `symbols` comment for why). `source_bytes`
-		// and `out_len_buffer` must stay alive across the synchronous call.
-		// `Deno.UnsafePointer.of(...)` returns an opaque `PointerValue` that does NOT
-		// keep its backing typed array reachable, so we hold a named reference and add
-		// an explicit liveness read below to pin `source_bytes` past the call.
-		const source_ptr = Deno.UnsafePointer.of(source_bytes);
-		const result_ptr = fn(
-			source_ptr,
-			source_bytes.length,
-			Deno.UnsafePointer.of(out_len_buffer),
-		);
+		// Worst-case UTF-8 length is 3 bytes per UTF-16 code unit (astral chars
+		// are 2 units → 4 bytes, still ≤ 3 per unit), so one capacity check
+		// guarantees `encodeInto` consumes the whole source.
+		const max_bytes = source.length * 3;
+		if (max_bytes > m.source_buffer.length) {
+			m.source_buffer = new Uint8Array(
+				new ArrayBuffer(next_capacity(max_bytes, m.source_buffer.length)),
+			);
+			m.source_ptr = Deno.UnsafePointer.of(m.source_buffer);
+		}
+		const {read, written} = this.encoder.encodeInto(source, m.source_buffer);
+		if (read !== source.length) {
+			throw new Error(`encodeInto consumed ${read} of ${source.length} source units`);
+		}
 
-		// Keep `source_bytes` provably reachable until AFTER the native call returns.
-		// The condition is always false (a `Uint8Array`'s `byteLength` is never
-		// negative), but the optimizer cannot prove that without reading the array, so
-		// it forces `source_bytes` to stay live across the `fn(...)` call above — which
-		// is exactly what defeats the GC-collection class of corruption. `out_len_buffer`
-		// is pinned the same way by the result read below.
-		if (source_bytes.byteLength < 0) throw new Error('unreachable');
+		const result_ptr = fn(m.source_ptr, written, m.out_len_ptr);
 
 		if (result_ptr === null) {
 			throw new Error('FFI function returned null pointer');
 		}
 
-		const result_len = out_len_buffer[0];
+		const result_len = m.out_len_buffer[0];
+		const result_byte_count = Number(result_len);
+		if (result_byte_count > m.result_buffer.length) {
+			m.result_buffer = new Uint8Array(
+				new ArrayBuffer(next_capacity(result_byte_count, m.result_buffer.length)),
+			);
+		}
 
-		// Read the result
-		const result_view = new Deno.UnsafePointerView(result_ptr);
-		const result_bytes = new Uint8Array(Number(result_len));
-		result_view.copyInto(result_bytes);
-
-		// Free the allocated memory (keep as bigint throughout)
+		// Read the result into the staging buffer, then free the native allocation
+		// (length stays bigint through the free call).
+		const result_bytes = m.result_buffer.subarray(0, result_byte_count);
+		new Deno.UnsafePointerView(result_ptr).copyInto(result_bytes);
 		this.symbols.tsv_free(result_ptr, result_len);
 
 		return this.decoder.decode(result_bytes);
@@ -281,5 +315,6 @@ export class NativeImplementation implements TsvImplementation {
 			this._lib.close();
 			this._lib = null;
 		}
+		this._marshal = null;
 	}
 }
