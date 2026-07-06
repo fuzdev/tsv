@@ -134,8 +134,11 @@ impl<'arena> ParsedExpr<'arena> {
 /// `ClassHeritage` is the `extends <expr>` clause — a `LeftHandSideExpression` that
 /// deviates from a normal subscript chain in two ways: a bare `<T>` (type args NOT
 /// followed by a call) stops the chain so the class can split it into
-/// `super_type_parameters`, and a postfix `++`/`--` stops too (acorn rejects
-/// `class C extends a++ {}`).
+/// `super_type_parameters`, and a postfix `++`/`--` is left UNCONSUMED (the arm is
+/// `Normal`-only), so `class C extends a++ {}` parses the heritage as `a` and the
+/// stray `++` is rejected. In `Normal` mode a postfix `++`/`--` IS consumed as an
+/// `UpdateExpression`, which then ends the chain — an update expression is not a
+/// `LeftHandSideExpression`, so no further subscript can apply.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SubscriptMode {
     Normal,
@@ -374,7 +377,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 match self.current_kind() {
                     TokenKind::Keyword(KeywordKind::As) => {
                         self.advance()?; // consume 'as'
-                        let type_annotation = arena.alloc(self.parse_type_no_asi_bracket()?);
+                        let type_annotation = arena.alloc(self.parse_type()?);
                         let span = Span::new(expr_start as u32, type_annotation.span().end);
                         left = ParsedExpr {
                             expr: arena.alloc(Expression::TSAsExpression(TSAsExpression {
@@ -390,7 +393,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                     TokenKind::Keyword(KeywordKind::Satisfies) => {
                         self.advance()?; // consume 'satisfies'
-                        let type_annotation = arena.alloc(self.parse_type_no_asi_bracket()?);
+                        let type_annotation = arena.alloc(self.parse_type()?);
                         let span = Span::new(expr_start as u32, type_annotation.span().end);
                         left = ParsedExpr {
                             expr: arena.alloc(Expression::TSSatisfiesExpression(
@@ -1092,6 +1095,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         }),
                         op_end,
                     );
+                    // A postfix `++`/`--` yields an UpdateExpression, which is not a
+                    // `LeftHandSideExpression` — no further member/call subscript can
+                    // apply (`a++[b]` / `a++.c` / `a++()` are grammar errors; acorn
+                    // stops here). Break so a following `[`/`.`/`(` starts a new
+                    // construct (e.g. the next member in a class body, across ASI).
+                    break;
                 }
                 TokenKind::LessThan | TokenKind::LeftShift => {
                     // Might be TSInstantiationExpression: f<T>, expr<Type>
