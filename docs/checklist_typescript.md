@@ -596,13 +596,19 @@ Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 
   named `type` renamed to `age`; `import { type as as age }` is a type-only
   import of `as` renamed; `import { type as }` a type-only import of `as`;
   bare `import { type }` a value import of `type`. Same rules for `export { … }`.
+- A doubled `type` modifier is rejected: `import type { type A }` /
+  `export type { type A }` are syntax errors (tsc TS2206 / TS2207), matching
+  acorn — the inner `type` disambiguation only runs inside a *value*
+  `import { … }` / `export { … }`.
 - `export type { T }`
 - `export type * from 'mod'`
 - `import X = require('mod')`
 - `import X = Namespace.Name`
 - `import type X = require('mod')` (valid — external module reference); the
   `type` modifier is rejected on an **entity-name** import-equals alias
-  (`import type X = A.B` is a syntax error, tsc TS1392)
+  (`import type X = A.B` is a syntax error, tsc TS1392). The `export import`
+  re-export form mirrors this: `export import type X = require('mod')` is valid,
+  `export import type X = A.B` is rejected.
 - `export = expr`
 
 ### Generics

@@ -67,16 +67,36 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }))
             }
             // export import X = ... (TypeScript import-equals re-export). The only
-            // valid `export import` form is import-equals — `export import X from`,
-            // `export import { … }`, and `export import type X =` are all rejected by
-            // acorn-typescript, so the binding must be followed by `=`.
+            // valid `export import` form is import-equals, so the binding (after an
+            // optional `type` modifier) must be followed by `=`. `export import X
+            // from` / `export import { … }` are rejected. `export import type X =
+            // require('m')` is valid; the entity-name form (`export import type X =
+            // A.B`) is rejected in `parse_import_equals_declaration`, exactly as for
+            // a plain `import type X = …`.
             TokenKind::Keyword(KeywordKind::Import) => {
                 self.advance()?; // consume 'import'
-                if !matches!(self.current_kind(), TokenKind::Identifier) {
+
+                // Optional `type` modifier: `type` is the modifier only when a
+                // binding name follows (the alias); a bare `export import type =
+                // require('m')` is a *value* re-export of a binding named `type` —
+                // the same name-vs-modifier disambiguation the plain import path uses.
+                let import_kind = if matches!(self.current_kind(), TokenKind::Identifier)
+                    && self.current_value() == "type"
+                    && self.peek_kind().is_binding_name_word()
+                {
+                    self.advance()?; // consume `type`
+                    ImportKind::Type
+                } else {
+                    ImportKind::Value
+                };
+
+                // The binding is a `BindingIdentifier`, so a contextual type keyword
+                // is a valid name (`export import string = N.M`), matching the plain
+                // import-equals path.
+                let Some(name) = self.try_binding_name() else {
                     return Err(self.error_expected_after("an identifier", "export import"));
-                }
+                };
                 let (id_start, id_end) = self.current_pos();
-                let name = self.current_ident_name();
                 self.advance()?;
                 if !matches!(self.current_kind(), TokenKind::Equals) {
                     return Err(self.error_expected("'=' in import-equals declaration"));
@@ -86,7 +106,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     id_start,
                     id_end,
                     name,
-                    ImportKind::Value,
+                    import_kind,
                     true, // is_export
                 )
             }
@@ -904,17 +924,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // (`import { type A }`) or the imported name itself
                 // (`import { type as age }` — a value import of a binding named
                 // `type`, renamed). The two-token lookahead lives in the shared
-                // helper; every other specifier is a plain value import.
-                if matches!(self.current_kind(), TokenKind::Identifier)
+                // helper; every other specifier is a plain value import. Not
+                // recognized inside `import type { … }` (TS rejects doubled type
+                // modifiers), so there `type A` falls to the plain path and errors
+                // at `A` — mirroring the `export type { … }` guard below.
+                if matches!(import_kind, ImportKind::Value)
+                    && matches!(self.current_kind(), TokenKind::Identifier)
                     && self.current_value() == "type"
                 {
                     let parts = self.parse_type_specifier_parts(/* is_import */ true)?;
                     // An import's rename target is a `BindingIdentifier`, so `right`
-                    // is always an identifier here (never a string).
+                    // is always an identifier here (never a string) — every
+                    // import-side assignment in `parse_type_specifier_parts` goes
+                    // through `try_binding_name` or the `as` keyword token.
                     let local = match parts.right {
                         Some(ModuleExportName::Identifier(id)) => id,
+                        // Unreachable: import-side `right` is only ever set from
+                        // `try_binding_name` or an `as` keyword token.
+                        #[allow(clippy::unreachable)] // import rename target is never a string
                         Some(ModuleExportName::Literal(_)) => {
-                            return Err(self.error_msg("an import binding must be an identifier"));
+                            unreachable!("import rename target is never a string literal")
                         }
                         None => parts.left.clone(),
                     };
@@ -1219,8 +1248,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // module reference (`import type A = require('m')`); on an entity-name
         // alias (`import type A = B.C`) tsc rejects it at parse time (TS1392), and
         // acorn raises when `importKind === 'type'` and the reference is not a
-        // `TSExternalModuleReference`. (`export import X = …` always passes
-        // `ImportKind::Value`, so this never fires there.)
+        // `TSExternalModuleReference`. This governs both `import type X = …` and the
+        // `export import type X = …` re-export form, which reach here with
+        // `ImportKind::Type` alike.
         if matches!(import_kind, ImportKind::Type)
             && !matches!(
                 module_reference,
