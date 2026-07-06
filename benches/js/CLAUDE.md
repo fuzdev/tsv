@@ -1173,6 +1173,14 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
   `deno run --allow-read --allow-env --allow-net --allow-sys --config benches/js/deno.json benches/js/diagnostics/acorn_dup_fuzz.ts`
 - `diagnostics/wasm_json_probe.ts` — split parse cost into pure-parse vs materialization for
   native + WASM, isolating JS-side `JSON.parse`.
+- `diagnostics/no_locations_parity.ts` — prove the `no-locations` wire is losslessly
+  reconstructible: parse each corpus file the full (loc-bearing) way as the oracle, rebuild
+  `loc` from `start`/`end` (UTF-16 offsets) + source via the ECMAScript (TS) / LF-only
+  (Svelte) line rules, and assert equality. TS is 100% exact; the two Svelte non-derivable
+  cases (the `<script>` `Program` tag-position override, the destructure `+1`-column quirk)
+  are classified, not failed. Exits 1 on any unexplained mismatch. The reference
+  reconstruction a `no-locations` consumer would use. Run:
+  `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/no_locations_parity.ts`
 - `diagnostics/wasm_format_probe.ts` — measure WASM **format** wall-time at the resolution
   the full bench folds into noise (single-digit-% changes). A/Bs two WASM builds
   (copy `pkg/all/deno` aside before editing, rebuild, pass `--baseline

@@ -97,12 +97,15 @@ pub(crate) fn write_root_bytes_no_locations(root: &internal::Root<'_>, source: &
 
 fn write_root_bytes_variant(root: &internal::Root<'_>, source: &str, emit_loc: bool) -> Vec<u8> {
     // LF-only tracker (Svelte's `locate-character` convention) + byte→UTF-16 map
-    // in one source scan; the identity map short-circuits on ASCII.
-    // TODO: when `!emit_loc` no writer emits line/column (loc, name_loc, and
-    // root-comment loc are all gated), so the tracker's LF line scan is dead work
-    // — a map-only path would skip it for the no-locations variant. Deferred as a
-    // parse-side follow-on (the wire-size / JSON.parse win already lands).
-    let (tracker, map) = LocationTracker::new_with_map(source);
+    // in one source scan; the identity map short-circuits on ASCII. The
+    // `no-locations` path emits no line/column at all (loc, name_loc, and
+    // root-comment loc are all gated off), so it skips the LF line scan entirely
+    // (`new_map_only` builds just the byte→char map) — once per file, no per-node cost.
+    let (tracker, map) = if emit_loc {
+        LocationTracker::new_with_map(source)
+    } else {
+        LocationTracker::new_map_only(source)
+    };
     let interner = root.interner.borrow();
 
     // Template comments (outside `<script>` content spans) are the only comments

@@ -212,14 +212,15 @@ pub fn convert_ast_json_bytes_no_locations(program: &Program<'_>, source: &str) 
 
 #[cfg(feature = "convert")]
 fn convert_ast_json_bytes_variant(program: &Program<'_>, source: &str, locations: bool) -> Vec<u8> {
-    // One fused source scan builds both; ASCII sources take a byte-level
-    // line scan and get the identity map.
-    // TODO: when `!locations` the writer never queries the line table (only the
-    // byte→char `map`), so the tracker's `line_starts` scan is dead work — a
-    // map-only constructor + a tracker-less `LocationMapper` would skip it for
-    // the no-locations path. Deferred: the main win (fewer bytes / cheaper
-    // JSON.parse) already lands; this is a smaller parse-side follow-on.
-    let (tracker, map) = tsv_lang::LocationTracker::new_ecmascript_with_map(source);
+    // One fused source scan builds both; ASCII sources take a byte-level line
+    // scan and get the identity map. The `no-locations` path emits no line/column,
+    // so it skips the line-start scan entirely (`new_map_only` builds just the
+    // byte→char map) — a once-per-file entry branch, no per-node cost.
+    let (tracker, map) = if locations {
+        tsv_lang::LocationTracker::new_ecmascript_with_map(source)
+    } else {
+        tsv_lang::LocationTracker::new_map_only(source)
+    };
     ast::convert::write_program_json(
         program,
         source,

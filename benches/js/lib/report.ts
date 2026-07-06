@@ -133,10 +133,9 @@ export function generate_summary_report(
 		return `(${ratio.toFixed(2)}x)`;
 	}
 
-	// Parse performance comparison
-	// The `*-json-no-locations` rows render here as ordinary bars (they're not
-	// INTERNAL_PARSE_VARIANTS). TODO: add a curated "no-locations vs oxc-parser"
-	// summary line — that's the payload-matched comparison (same span-only shape),
+	// Parse performance comparison. The `*-json-no-locations` rows render as
+	// ordinary bars; a curated "no-locations vs oxc" line is appended per language
+	// (see below) — that's the payload-matched comparison (same span-only shape),
 	// where plain `tsv-json` carries the richer loc-bearing drop-in AST.
 	lines.push('');
 	lines.push('Parse Performance:');
@@ -185,6 +184,27 @@ export function generate_summary_report(
 					fmt(result.stats.mean_ns)
 				} ${comparison}`,
 			);
+		}
+
+		// Curated payload-matched line: tsv's span-only `no-locations` wire is the
+		// apples-to-apples comparison with oxc's span-only default AST (plain
+		// `tsv-json` carries the richer loc-bearing drop-in AST oxc omits). Emitted
+		// only where both rows exist (TS/JS — oxc doesn't parse svelte/css).
+		for (
+			const [noloc, oxc] of [
+				['tsv-json-no-locations', 'oxc-parser'],
+				['tsv_wasm-json-no-locations', 'oxc-parser-wasm'],
+			] as const
+		) {
+			const noloc_result = results.find((r) => r.name === noloc);
+			const oxc_result = results.find((r) => r.name === oxc);
+			if (noloc_result && oxc_result) {
+				lines.push(
+					`      ↳ ${noloc} vs ${oxc}: ${
+						format_comparison(oxc_result.stats.mean_ns, noloc_result.stats.mean_ns)
+					} (payload-matched, span-only)`,
+				);
+			}
 		}
 
 		// Show internal variants (JSON overhead measurement)

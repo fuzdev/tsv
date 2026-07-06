@@ -369,6 +369,22 @@ pub fn parse_typescript_json_no_locations(source: &str) -> Result<String, JsErro
     })
 }
 
+/// `parse_typescript_json_no_locations` against an explicit goal — the parse
+/// goal and the no-locations wire are orthogonal (goal drives the parser, no-loc
+/// the writer), so the two combine, mirroring `tsv_cli`'s `--goal` + `--no-locations`.
+#[cfg(feature = "parse")]
+#[wasm_bindgen]
+pub fn parse_typescript_json_with_goal_no_locations(
+    source: &str,
+    goal: &str,
+) -> Result<String, JsError> {
+    let goal = goal_from_str(goal)?;
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
+        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, source))
+    })
+}
+
 /// `parse_typescript` without per-node `loc`, materialized in Rust. Untyped
 /// (`any`) return — the shape omits the `loc` that `tsv_ast.d.ts` requires.
 #[cfg(feature = "parse")]
