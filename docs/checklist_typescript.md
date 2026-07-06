@@ -437,8 +437,11 @@ ES2015 module syntax with ES2024 additions.
 - Accessor decorators
 - Decorator factories (`@decorator()`)
 - Parameter decorators (`fn(@dec x: T)`)
+- Decorators on ambient class members (`declare class C { @dec m() {} }`)
 
 Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 decorator standard), but tsv parses them — the parser attaches them to the parameter's `decorators`, covered by `tests/fixtures/typescript/typescript_specific/decorators/parameter/`.
+
+Note: An ambient (`declare class`) member parses decorators exactly like a concrete member — TS's "decorators are not valid here" (TS1206) is a config-dependent early-error (tsc accepts `@dec declare field` under `experimentalDecorators`, rejects it under ES decorators), so the parser accepts structurally and defers the check to the diagnostics layer. Covered by `tests/fixtures/typescript/typescript_specific/declare/class/member_decorators/`.
 
 **Other Features**:
 
