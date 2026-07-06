@@ -84,34 +84,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             false
         };
 
-        // Check for `abstract` before `class`
-        let is_abstract = if *self.current_kind() == TokenKind::Identifier
-            && self.current_value() == "abstract"
-            && self.peek_kind() == TokenKind::Keyword(KeywordKind::Class)
-        {
-            self.advance()?; // consume 'abstract'
-            true
-        } else {
-            false
-        };
-
-        // Expect `class` keyword
-        if *self.current_kind() != TokenKind::Keyword(KeywordKind::Class) {
-            return Err(self.error_expected_after("'class'", "decorator"));
-        }
-
-        // Parse the class (name optional for export default)
-        let mut class = self.parse_class_declaration_inner(!is_default, is_abstract)?;
-
-        // Attach decorators to the class
-        class.decorators = if decorators.is_empty() {
-            None
-        } else {
-            Some(decorators.into_bump_slice())
-        };
-
-        // Update span to include decorators
-        class.span = Span::new(start as u32, class.span.end);
+        // Optional `abstract`, then the `class` declaration with the decorators
+        // attached (name optional for `export default`).
+        let class = self.finish_decorated_class(start, decorators, !is_default)?;
 
         // Wrap in export if needed
         if is_export {
@@ -138,6 +113,38 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             Ok(Statement::ClassDeclaration(class))
         }
+    }
+
+    /// With leading `decorators` (starting at `deco_start`) already parsed, consume the
+    /// optional `abstract` modifier, expect and parse the `class` declaration, attach
+    /// the decorators, and extend the class span back over them. Shared by
+    /// `parse_decorated_class` (decorator-first `@dec [export] class`) and the
+    /// `export @dec class` arm of `parse_export_declaration` (decorator-after-`export`).
+    pub(super) fn finish_decorated_class(
+        &mut self,
+        deco_start: usize,
+        decorators: bumpalo::collections::Vec<'arena, Decorator<'arena>>,
+        name_required: bool,
+    ) -> Result<ClassDeclaration<'arena>, ParseError> {
+        let is_abstract = matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "abstract"
+            && self.peek_kind() == TokenKind::Keyword(KeywordKind::Class);
+        if is_abstract {
+            self.advance()?; // consume 'abstract'
+        }
+
+        if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Class)) {
+            return Err(self.error_expected_after("'class'", "decorator"));
+        }
+
+        let mut class = self.parse_class_declaration_inner(name_required, is_abstract)?;
+        class.decorators = if decorators.is_empty() {
+            None
+        } else {
+            Some(decorators.into_bump_slice())
+        };
+        class.span = Span::new(deco_start as u32, class.span.end);
+        Ok(class)
     }
 
     /// Parse a decorated class expression: `@dec class {}`.

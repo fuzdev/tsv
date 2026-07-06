@@ -175,6 +175,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let decl = self.parse_class_declaration()?;
                 Ok(self.export_named(start, decl, ExportKind::Value))
             }
+            // export @dec class C {} — decorators positioned *after* `export`. Only a
+            // class (optionally `abstract`) can follow. The decorator-first orderings
+            // (`@dec export class`, `@dec export default class`) go through
+            // `parse_decorated_class`; here `export` is already consumed, so this arm
+            // mirrors its decorator+abstract+class handling. acorn emits
+            // `ExportNamedDeclaration → ClassDeclaration` with the decorators on the
+            // class and the class span covering them (`export default @dec class` is a
+            // separate shape — a decorated class *expression* — handled by the fall-
+            // through expression arm of `parse_export_default_declaration`).
+            TokenKind::At => {
+                let deco_start = self.current_pos().0;
+                let decorators = self.parse_decorators()?;
+                // Optional `abstract` + `class`, decorators attached and the span
+                // extended over them — shared with `parse_decorated_class`.
+                let class = self.finish_decorated_class(deco_start, decorators, true)?;
+                Ok(self.export_named(start, Statement::ClassDeclaration(class), ExportKind::Value))
+            }
             // export type X = T or export interface X { } or export declare function/class
             TokenKind::Identifier => {
                 // `&'a str` (source-bound) — no `.to_string()` needed to hold it
