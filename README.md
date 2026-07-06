@@ -33,6 +33,39 @@ AI disclosure: this codebase is mostly LLM-generated, and the usual caveats appl
 The first release took 7 months and ~1800 manual commits.
 It's a high-effort project that prioritizes quality.
 
+## Status
+
+tsv is derived from:
+
+- Svelte
+- TypeScript
+- Prettier and prettier-plugin-svelte
+- HTML/CSS/JS
+
+tsv currently supports:
+
+- [x] formatter matching Prettier + prettier-plugin-svelte (with intentional divergences)
+- [x] parser, drop-in for Svelte+acorn+acorn-typescript
+- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - fuzdev.tsv-format
+- [ ] ts->js conversion (types-to-whitespace only)
+- [ ] module lexer
+
+Future features (unknown order):
+
+- minifier
+- JSON support
+- HTML support (formatting as Svelte isn't correct e.g. with whitespace and `{`,
+  but the lift to support it is small)
+- CSS error recovery (recover past invalid CSS per the spec)
+- later:
+  - TypeScript 7 integration (the Go impl), unlocking:
+    - svelte-check replacement
+    - LSP
+    - linter - type aware, initially focused on serializable data-only plugins for extensibility
+  - Svelte compiler (exact mirror, maybe out of scope, see [rsvelte](https://github.com/baseballyama/rsvelte))
+  - bundling is probably out of scope 
+  - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
+
 ## Install
 
 tsv ships three WASM packages to npm (native builds will arrive with the v0.2 release):
@@ -115,13 +148,19 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
 
 Each language is a self-contained Rust crate exposing the same
 `parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - there's no
-central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention").
-That means the builds tree-shake at the link level:
-the parse build excludes the printers, and the format build excludes the JSON-AST conversion layer.
+central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention and crates").
+That means builds tree-shake, so the parse build excludes the printers,
+and the formatter build excludes the JSON-AST conversion layer.
 Languages tree-shake the same way - a build binding only TypeScript would exclude
-Svelte and CSS entirely - though there are no such minimal builds published yet.
+Svelte and CSS entirely (publishing minimal builds is a TODO).
 Future LSP/incremental features will be later feature-gated layers that don't bloat
 these artifacts - see [docs/architecture.md](docs/architecture.md)
+
+tsv currently has no support JS plugins or JS/WASM runtime integration.
+JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
+but the current lean is against, mainly for performance and simplicity.
+Forks could maintain custom extensible APIs on some of tsv's crates today
+(please share any friction you experience with these cases).
 
 tsv's goal is to be an optimal toolchain for TypeScript and Svelte.
 Consumers can use tsv's crates ([not yet published](https://github.com/fuzdev/tsv/issues/140) to crates.io)
@@ -136,41 +175,6 @@ Hard non-goals:
 - no strict Prettier conformance -
   see the [conformance doc](https://github.com/fuzdev/tsv/blob/main/docs/conformance_prettier.md)
   and [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
-
-tsv currently does not support JS plugins or JS runtime integration.
-JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
-but the current lean is against, mainly for performance and simplicity reasons.
-
-tsv is derived from:
-
-- Svelte
-- TypeScript
-- Prettier and prettier-plugin-svelte
-- HTML/CSS/JS
-
-tsv currently supports:
-
-- [x] formatter matching Prettier + prettier-plugin-svelte (with intentional divergences)
-- [x] parser, drop-in for Svelte+acorn+acorn-typescript
-- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - fuzdev.tsv-format
-- [ ] ts->js conversion (types-to-whitespace only)
-- [ ] module lexer
-
-Future features (unknown order):
-
-- minifier
-- JSON support
-- HTML support (formatting as Svelte isn't correct e.g. with whitespace and `{`,
-  but the lift to support it is small)
-- CSS error recovery (recover past invalid CSS per the spec)
-- later:
-  - TypeScript 7 integration (the Go impl), unlocking:
-    - svelte-check replacement
-    - LSP
-    - linter - type aware, initially focused on serializable data-only plugins for extensibility
-  - Svelte compiler (exact mirror, maybe out of scope, see [rsvelte](https://github.com/baseballyama/rsvelte))
-  - bundling is probably out of scope 
-  - discussion welcome
 
 ## Docs
 
