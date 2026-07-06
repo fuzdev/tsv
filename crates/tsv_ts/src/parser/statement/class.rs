@@ -594,13 +594,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 (false, Expression::PrivateIdentifier(private_id), false)
             } else if self.current_is_identifier_or_keyword() {
                 // Identifier or keyword as key - keywords are valid as class member names.
-                // `current_property_name()` is `&'a str` (source/static), so it interns
-                // and compares without a borrow-escape allocation.
-                let name = self.current_property_name();
-                let name_is_constructor = name == "constructor";
+                // The constructor is matched by decoded StringValue, so an escaped
+                // `constructor` is the constructor too (ecma262 ClassElementName) — acorn parity.
+                let name_is_constructor = self
+                    .current_decoded()
+                    .unwrap_or_else(|| self.current_property_name())
+                    == "constructor";
                 let (key_start, key_end) = self.current_pos();
-                // Property keys deliberately use the raw token text.
-                let key_name = self.current_raw_ident_name();
+                // Member keys decode `\u` escapes (span-identity otherwise) — acorn parity.
+                let key_name = self.current_ident_name();
                 self.advance()?;
                 (
                     false,

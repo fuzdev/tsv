@@ -826,8 +826,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Ok((Expression::PrivateIdentifier(private_id), end))
         } else if self.current_is_identifier_or_keyword() {
             let (prop_start, prop_end) = self.current_pos();
-            // Property names deliberately use the raw token text (`current_property_name`).
-            let name = self.current_raw_ident_name();
+            // Property names are span-identity but decode `\u` escapes (`x.a` →
+            // name `a`; ecma262 IdentifierName StringValue) — acorn parity.
+            let name = self.current_ident_name();
             self.advance()?;
             Ok((
                 Expression::Identifier(Identifier::simple(
@@ -1948,8 +1949,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         return Err(self.error_expected_after("property name", "."));
                     }
                     let (prop_start, prop_end) = self.current_pos();
-                    // Property names deliberately use the raw token text.
-                    let name = self.current_raw_ident_name();
+                    // Property names decode `\u` escapes (span-identity otherwise) — acorn parity.
+                    let name = self.current_ident_name();
                     self.advance()?;
 
                     // actual_start covers a parenthesized callee's `(` (`new (a()).b`)
