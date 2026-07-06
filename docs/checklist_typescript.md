@@ -305,7 +305,7 @@ Foundation for all parsing.
 - Before EOF
 - After line terminator
 - Restricted productions (`return`, `throw`, `break`, `continue`)
-- Postfix `++`/`--` restrictions
+- Postfix `++`/`--` restrictions (no line terminator before; and no subscript after — an update expression is not a `LeftHandSideExpression`, so `a++[b]`/`a++.c`/`a++()` are rejected)
 - Arrow function handling
 - Hazardous patterns (`[`, `(`, `/`, `+`, `-`)
 
@@ -476,6 +476,7 @@ Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 
 ### Array & Tuple Types
 
 - Array type (`T[]`)
+- Postfix array/indexed `[` respects `[no LineTerminator here]` — `T⏎[K]` splits via ASI (`T` then a `[K]` statement), never a `T[K]` suffix (acorn `tsParseArrayTypeOrHigher`)
 - Generic array (`Array<T>`)
 - Readonly array (`readonly T[]`)
 - Tuple types (`[T, U]`)

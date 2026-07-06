@@ -83,9 +83,6 @@ const DEFAULT_ROOT = `${TS_REPO}/tests/cases/conformance/parser`;
  * (`…Declaration1` vs `…Declaration11`).
  */
 const KNOWN_GAPS: KnownGap[] = [
-	// Gap B — consecutive computed class members across ASI (no `;` between them).
-	{ pattern: 'parserComputedPropertyName29.ts', category: 'computed-member-asi', reason: 'class { [e] = id++⏎[e2]: number }' },
-	{ pattern: 'parserComputedPropertyName31.ts', category: 'computed-member-asi', reason: 'class { [e]: number⏎[e2]: number }' },
 	// Gap C — accessor WITH A BODY in a `declare` class (parse_declare_class_member).
 	{ pattern: 'parserAccessors5.ts', category: 'declare-accessor-body', reason: 'declare class { get foo() { return 0 } }' },
 	{ pattern: 'parserAccessors6.ts', category: 'declare-accessor-body', reason: 'declare class { set foo(v) {} }' },
