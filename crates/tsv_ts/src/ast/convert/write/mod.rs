@@ -215,9 +215,13 @@ pub fn write_pattern_embedded(
     match expr {
         internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => {
             // Destructure: `+1`-column adjustment on the start line (when `> 1`).
-            let line = loc.pos_and_position(expr.span().start).1.line;
-            if line > 1 {
-                ctx.pattern_line = line;
+            // Only affects column output, so skip the line lookup entirely on the
+            // no-locations path (where it would only hit the stub `[0]` table).
+            if emit_loc {
+                let line = loc.pos_and_position(expr.span().start).1.line;
+                if line > 1 {
+                    ctx.pattern_line = line;
+                }
             }
             expressions::write_expression(w, expr, &ctx);
         }

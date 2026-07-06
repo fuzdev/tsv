@@ -20,8 +20,11 @@
  * scanned off the source string is directly comparable — no byte handling.
  * Column is 0-based UTF-16 code units; line is 1-based.
  *
- * **TypeScript is exact.** For a `.ts`/`.js` (`Program`) tree, the reconstructed
- * `loc` is byte-for-byte the acorn `loc` the loc-bearing wire would have emitted.
+ * **TypeScript is exact.** For a `.ts`/`.js` (`Program`) tree, each node's
+ * reconstructed `loc` *value* equals the acorn `loc` the loc-bearing wire would
+ * have emitted, exactly. (The key is *appended last* on each node rather than
+ * placed after `start`/`end`, so an object consumer — or `deepEqual` — sees
+ * identical data, but a re-serialized tree won't byte-match the wire's key order.)
  *
  * **Svelte is approximate** — reconstruct where you have the source, but be aware
  * of three deliberate divergences from Svelte's own wire (this module does NOT

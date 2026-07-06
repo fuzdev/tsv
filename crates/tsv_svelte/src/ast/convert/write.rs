@@ -1488,10 +1488,18 @@ fn write_script_program_fused(
             ) as usize,
         }
     };
-    let loc_override = (
-        position_at(script.span.start, program.span.start),
-        position_at(script.span.end, program.span.end),
-    );
+    // The override is only consumed when `loc` is emitted; on the no-locations
+    // path it's discarded, so skip the two `get_line_column` line-table lookups
+    // (which would only hit the stub `[0]` table anyway — see `new_map_only`).
+    let loc_override = if ctx.emit_loc {
+        (
+            position_at(script.span.start, program.span.start),
+            position_at(script.span.end, program.span.end),
+        )
+    } else {
+        let dummy = Position { line: 1, column: 0 };
+        (dummy, dummy)
+    };
     write_program_embedded(
         w,
         program,

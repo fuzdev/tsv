@@ -190,7 +190,6 @@ pub fn convert_ast_json_string(stylesheet: &CssStyleSheet<'_>, source: &str) -> 
 /// The `String` form of `convert_ast_json_bytes_no_locations` (an alias — CSS
 /// has no `loc`).
 #[cfg(feature = "convert")]
-#[allow(clippy::expect_used)]
 pub fn convert_ast_json_string_no_locations(
     stylesheet: &CssStyleSheet<'_>,
     source: &str,

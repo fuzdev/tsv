@@ -47,7 +47,7 @@ const ast = reconstruct_locations(parse_typescript_no_locations(src), src);
 // every node now carries loc: {start: {line, column}, end: {line, column}}
 ```
 
-`reconstruct_locations(ast, source)` walks the tree and adds `loc` to every node, **mutating in place** and returning it (`structuredClone(ast)` first if you need the input untouched). It's **exact for TypeScript** (byte-for-byte the acorn `loc`) and **approximate for Svelte** — it doesn't recover `name_loc` and doesn't replicate Svelte's `<script>` tag-position or destructure `+1`-column parser quirks; everything else reconstructs exactly. CSS is a no-op (there's no `loc` to rebuild).
+`reconstruct_locations(ast, source)` walks the tree and adds `loc` to every node, **mutating in place** and returning it (`structuredClone(ast)` first if you need the input untouched). It's **exact for TypeScript** — each node's `loc` value equals acorn's exactly (the key is appended last, so an object consumer matches but a re-serialized tree won't byte-match the wire's key order) — and **approximate for Svelte**: it doesn't recover `name_loc` and doesn't replicate Svelte's `<script>` tag-position or destructure `+1`-column parser quirks; everything else reconstructs exactly. CSS is a no-op (there's no `loc` to rebuild).
 
 For sparse or repeated lookups, `create_locator(source, opts?)` holds the prebuilt line-start table and exposes `loc_of(node)` and `reconstruct(ast)`; pass `{language: 'svelte'}` for a `.svelte` document (LF-only line rule). A one-shot `loc_of(node, source)` is also exported for the occasional single lookup (it rebuilds the table each call).
 
