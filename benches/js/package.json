@@ -4,10 +4,14 @@
 	"private": true,
 	"type": "module",
 	"description": "tsv benchmark harness deps — the single source of truth for the npm package versions the bench measures against. Consumed by BOTH runtimes: Deno reads it via `nodeModulesDir: \"manual\"` in deno.json, Node reads it directly. Install with `npm install` (the one installer). The jsr-only `@std/*` packages, if any, stay in deno.json.",
-	"//canonical-sync": "⚠ The 5 canonical packages (prettier, svelte, acorn, @sveltejs/acorn-typescript, prettier-plugin-svelte) are ALSO pinned as literals in crates/tsv_debug/src/deno/sidecar.ts and MUST match. Bumping any re-baselines the whole fixture corpus — see benches/js/CLAUDE.md §'Canonical baseline is coupled'. The other deps (oxc, oxfmt, biome, etc.) are free to bump independently.",
+	"//canonical-sync": "⚠ The 5 canonical packages (prettier, svelte, acorn, @sveltejs/acorn-typescript, prettier-plugin-svelte) are ALSO pinned as literals in crates/tsv_debug/src/deno/sidecar.ts and MUST match — agreement (and ../svelte / ../acorn-typescript checkout alignment, when present) is enforced by `deno task pins:audit` (scripts/check_canonical_pins.ts, in `deno task check`). Bumping any re-baselines the whole fixture corpus — see benches/js/CLAUDE.md §'Canonical baseline is coupled'. The other deps (oxc, oxfmt, biome, etc.) are free to bump independently.",
+	"engines": {
+		"node": ">=22.18"
+	},
+	"//engines": "Node ≥ 22.18 is the native TS type-stripping floor — the harness entries (bench.ts, install_deps.ts) run as TypeScript directly under `node`. Advisory (npm warns without engine-strict); an older Node fails with an opaque parse error before any runtime guard could fire.",
 	"dependencies": {
 		"acorn": "8.16.0",
-		"svelte": "5.56.1",
+		"svelte": "5.56.4",
 		"@sveltejs/acorn-typescript": "1.0.10",
 		"prettier": "3.9.0",
 		"prettier-plugin-svelte": "4.1.1",

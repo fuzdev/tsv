@@ -923,7 +923,8 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
 ///
 /// The `declaration` `VariableDeclaration` is hand-built the way Svelte's
 /// parser builds it: single declarator, `start = tag.span.start + 2` (past
-/// `{@`), declarator `end = init.end`, declaration `end = tag.span.end - 1`
+/// `{@`), declarator `end = parser.index` after `read_expression` (see
+/// `const_declarator_end`), declaration `end = tag.span.end - 1`
 /// (`parser.index - 1`, the byte before the closing `}`). The comment-free
 /// document fuses directly; a document with template comments precomputes a
 /// `WriterComments` map covering both the id pattern and the init (canonical
@@ -938,8 +939,9 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
     // The declaration `end` is always `tag.span.end - 1` — canonical Svelte
     // hard-codes `parser.index - 1` (the byte before the closing `}`).
     let decl_end = ctx.pos(tag.span.end - 1);
+    let declarator_end = ctx.pos(const_declarator_end(tag, ctx));
     if ctx.comments.is_empty() {
-        write_const_declaration(w, tag, decl_end, CommentMode::Off, ctx);
+        write_const_declaration(w, tag, decl_end, declarator_end, CommentMode::Off, ctx);
     } else {
         // The document has template comments: precompute the init-subtree
         // attach map (comments attach to the init only).
@@ -950,19 +952,71 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
             ctx.loc.tracker,
             ctx.interner,
         );
-        write_const_declaration(w, tag, decl_end, CommentMode::Emit(&wc), ctx);
+        write_const_declaration(
+            w,
+            tag,
+            decl_end,
+            declarator_end,
+            CommentMode::Emit(&wc),
+            ctx,
+        );
         wc.debug_assert_consumed();
     }
     w.raw("}");
 }
 
+/// The `{@const}` declarator `end`: canonical Svelte sets it to `parser.index`
+/// after `read_expression` (svelte#18436) — past the init's wrapping parens
+/// (acorn's pre-`remove_parens` node end), and past the last comment the
+/// expression parse consumed (`read_expression` extends the index to the last
+/// collected comment's end when it lies beyond the expression, which a
+/// trailing comment always does). Replicated by walking from the
+/// (paren-stripped) internal init end toward the closing `}`, skipping
+/// whitespace silently and recording the end of each `)` closer / comment —
+/// the last recorded end is the declarator end. Comment-aware by construction
+/// (positions come from the parsed comment list, never a substring scan).
+fn const_declarator_end(tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
+    let close = (tag.span.end - 1) as usize; // the closing `}`
+    let mut end = tag.init.span().end;
+    let mut i = end as usize;
+    loop {
+        while let Some(ch) = ctx.source[i..close].chars().next() {
+            if !ch.is_whitespace() {
+                break;
+            }
+            i += ch.len_utf8();
+        }
+        if i >= close {
+            break;
+        }
+        if ctx.source.as_bytes()[i] == b')' {
+            i += 1;
+            end = i as u32;
+            continue;
+        }
+        let idx = ctx
+            .comments
+            .partition_point(|c| (c.span.start as usize) < i);
+        match ctx.comments.get(idx) {
+            Some(c) if c.span.start as usize == i => {
+                i = c.span.end as usize;
+                end = c.span.end;
+            }
+            _ => break,
+        }
+    }
+    end
+}
+
 /// Emit a `{@const}`'s hand-built `VariableDeclaration`. `decl_end` is the
-/// already-mapped declaration `end` (`tag.span.end - 1`); an `Emit` mode
-/// feeds the id/init subtrees' fused per-node attach.
+/// already-mapped declaration `end` (`tag.span.end - 1`) and `declarator_end`
+/// the already-mapped declarator `end` (`const_declarator_end`); an `Emit`
+/// mode feeds the id/init subtrees' fused per-node attach.
 fn write_const_declaration(
     w: &mut JsonWriter,
     tag: &internal::ConstTag<'_>,
     decl_end: u32,
+    declarator_end: u32,
     mode: CommentMode<'_>,
     ctx: &Ctx<'_>,
 ) {
@@ -991,7 +1045,7 @@ fn write_const_declaration(
     w.raw(",\"start\":");
     w.u32(ctx.pos(tag.id.span().start));
     w.raw(",\"end\":");
-    w.u32(ctx.pos(tag.init.span().end));
+    w.u32(declarator_end);
     w.raw("}],\"start\":");
     w.u32(ctx.pos(tag.span.start + 2));
     w.raw(",\"end\":");

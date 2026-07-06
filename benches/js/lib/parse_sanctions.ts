@@ -47,10 +47,6 @@ export const SVELTE_FIXTURE_SANCTIONS: Sanction[] = [
 		reason: 'HTML comment (`<!-- -->`) in a CSS selector — Svelte lenient, tsv follows the CSS grammar',
 	},
 	{
-		pattern: 'css/samples/supports-import/',
-		reason: '`@import` inside `@supports` prelude — Svelte lenient, tsv grammar-stricter',
-	},
-	{
 		pattern: 'validator/samples/css-invalid-combinator-selector',
 		reason: 'invalid leading combinator (`>`/`+`) — Svelte parser accepts, its validator rejects',
 	},

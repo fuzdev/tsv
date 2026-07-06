@@ -33,8 +33,6 @@
  * diagnostics/skip_triage.ts is the dedicated tool for parse-gap triage.
  */
 
-import process from 'node:process';
-
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import { z } from 'zod';
 
@@ -49,6 +47,7 @@ import {
 	resolve_compare_base_path,
 	run_compare_main,
 } from './lib/compare_cli.ts';
+import { CORPUS_PARSE_COMPARED_MIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 
 const CorpusCompareParseArgs = z.object({
@@ -750,8 +749,14 @@ function build_json_report(
 	};
 }
 
-async function main(): Promise<void> {
-	const parsed = args_parse(argv_parse(process.argv.slice(2)), CorpusCompareParseArgs);
+/**
+ * The tool's entry, importable by the `conformance.ts` driver (which passes
+ * `['--all']`); the CLI wrapper at the bottom feeds it the real argv. Failure
+ * semantics are process-level (`Deno.exit(1)` at each gate), matching the old
+ * `&&`-chain aggregate exactly.
+ */
+export async function run_corpus_compare_parse(argv: string[] = Deno.args): Promise<void> {
+	const parsed = args_parse(argv_parse(argv), CorpusCompareParseArgs);
 	if (!parsed.success) {
 		console.error(z.prettifyError(parsed.error));
 		print_usage();
@@ -894,11 +899,13 @@ async function main(): Promise<void> {
 
 	const total_processed = Object.values(lang_counts).reduce((a, b) => a + b, 0);
 	if (total_processed === 0) {
-		console.log('No files found.');
+		// An empty scope is a failed comparison run, not a pass — an existing-but-
+		// source-empty path (typo, moved src/) must not read as green.
+		console.log('No files found — nothing was compared.');
 		if (json_mode) emit_json_stdout(build_json_report(results, stats, [], base_path));
 		canonical.dispose();
 		native.dispose();
-		return;
+		Deno.exit(1);
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
@@ -957,6 +964,49 @@ async function main(): Promise<void> {
 	const documented_groups = groups.filter((g) => g.documented !== null);
 
 	if (json_mode) emit_json_stdout(build_json_report(results, stats, groups, base_path));
+
+	// Floor: a run where NOTHING was compared (every file parse-fail-skipped on
+	// one side) is a systemic failure, not a pass — without this, an FFI or
+	// sidecar breakage would zero out `compared` and sail through green.
+	if (totals.compared === 0) {
+		console.log(
+			`\x1b[31mFAIL: 0 of ${total_processed} files compared (all parse-fail-skipped) — systemic failure or wrong corpus?\x1b[0m`,
+		);
+		canonical.dispose();
+		native.dispose();
+		Deno.exit(1);
+	}
+
+	// Pinned counts (--all only — see lib/gate_counts.ts): per-language MINIMUM
+	// `compared` (the corpus is LIVE dev repos, so growth passes; a drop means a
+	// one-language parse collapse that can't hide under the cross-language
+	// total), and EXACT per-language tsv-side parse-failure counts (up = a new
+	// over-rejection on real code — triage with diagnostics/skip_triage.ts;
+	// down = a gap closed, re-pin to record the win).
+	if (use_all_repos) {
+		const pin_failures = [
+			...LANGUAGES.filter(
+				(lang) => stats.get(lang)!.compared < CORPUS_PARSE_COMPARED_MIN[lang],
+			).map(
+				(lang) =>
+					`${lang} compared ${stats.get(lang)!.compared} < pinned minimum ${CORPUS_PARSE_COMPARED_MIN[lang]}`,
+			),
+			...LANGUAGES.filter(
+				(lang) => stats.get(lang)!.tsv_errors !== CORPUS_PARSE_TSV_ERRORS_PIN[lang],
+			).map(
+				(lang) =>
+					`${lang} tsv-parse-failures ${stats.get(lang)!.tsv_errors} ≠ pinned ${CORPUS_PARSE_TSV_ERRORS_PIN[lang]}`,
+			),
+		];
+		if (pin_failures.length > 0) {
+			console.log(
+				`\x1b[31mFAIL: pinned counts — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
+			);
+			canonical.dispose();
+			native.dispose();
+			Deno.exit(1);
+		}
+	}
 
 	// Undocumented groups — the actionable output
 	if (undocumented_groups.length > 0) {
@@ -1040,5 +1090,5 @@ function build_error_json_report(message: string): Record<string, unknown> {
 // `DiffEntry`, `MatchContext`) — e.g. by diagnostics/svelte_fixtures_compare.ts —
 // without running the CLI on import.
 if (import.meta.main) {
-	run_compare_main(main, CorpusCompareParseArgs, build_error_json_report);
+	run_compare_main(run_corpus_compare_parse, CorpusCompareParseArgs, build_error_json_report);
 }

@@ -5,6 +5,7 @@
  */
 
 import { extname } from 'node:path';
+import { PrettierCache, prettier_cache_enabled } from './prettier_cache.ts';
 import {
 	type Language,
 	LANGUAGE_EXTENSIONS,
@@ -40,6 +41,7 @@ export class CanonicalImplementation implements TsvImplementation {
 	readonly versions: CanonicalVersions;
 
 	#prettier: PrettierModule | null = null;
+	#format_cache: PrettierCache | null = null;
 	// deno-lint-ignore no-explicit-any
 	#prettier_svelte: any = null;
 	// deno-lint-ignore no-explicit-any
@@ -84,6 +86,19 @@ export class CanonicalImplementation implements TsvImplementation {
 		// Create TypeScript parser once (acorn.Parser.extend is expensive)
 		// deno-lint-ignore no-explicit-any
 		this.#acorn_ts_parser = acorn_mod.Parser.extend(acorn_ts_mod.tsPlugin() as any);
+	}
+
+	/**
+	 * Opt into the content-addressed prettier-output cache (`lib/prettier_cache.ts`)
+	 * for `format_async` — used by `corpus:compare:format` and the conformance
+	 * driver ONLY (never the bench, which times prettier; never the fixture
+	 * validator, which live-verifies by design). Returns the cache so the caller
+	 * can report hit/miss stats, or null when `TSV_PRETTIER_CACHE=0` disables it.
+	 */
+	enable_format_cache(): PrettierCache | null {
+		if (!prettier_cache_enabled()) return null;
+		this.#format_cache = new PrettierCache(this.versions, JSON.stringify(PRETTIER_OPTIONS));
+		return this.#format_cache;
 	}
 
 	/** Check if parsing is supported for this language */
@@ -151,12 +166,21 @@ export class CanonicalImplementation implements TsvImplementation {
 		// it, prettier can't tell a `.ts` file from `.tsx` and force-adds the JSX-disambiguating
 		// trailing comma to single-type-param arrows (`<T,>`) that a real `.ts` run never emits —
 		// see prettier's `shouldForceTrailingComma` in src/language-js/print/type-parameters.js.
-		return await this.#prettier_checked.format(source, {
+		const filepath = `file${ext}`;
+
+		if (this.#format_cache) {
+			const cached = await this.#format_cache.get(source, parser, filepath);
+			if (cached !== null) return cached;
+		}
+		const output = await this.#prettier_checked.format(source, {
 			parser,
-			filepath: `file${ext}`,
+			filepath,
 			plugins,
 			...PRETTIER_OPTIONS,
 		});
+		// Success-only put (a throw above skips it; `put` itself rejects '').
+		if (this.#format_cache) await this.#format_cache.put(source, parser, filepath, output);
+		return output;
 	}
 
 	dispose(): void {

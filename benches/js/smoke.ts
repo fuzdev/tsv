@@ -10,10 +10,9 @@
  * Exit codes: 0 = all pass, 1 = any failure.
  */
 
-import { stat } from 'node:fs/promises';
 import { env, exit } from 'node:process';
-import { fileURLToPath } from 'node:url';
 import { check_artifact_freshness, wasm_artifact_path } from './lib/check_artifact_freshness.ts';
+import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
 import { get_napi_library_path } from './lib/napi.ts';
 import {
@@ -87,17 +86,9 @@ await check_artifact_freshness([
 ]);
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
-// from the harness node_modules; without it, init fails opaquely. (Cheap check.)
-const node_modules_path = fileURLToPath(new URL('./node_modules', import.meta.url));
-try {
-	await stat(node_modules_path);
-} catch {
-	console.error(
-		`\n✗ Harness dependencies not installed (${node_modules_path} missing).\n` +
-			`  Run 'deno task bench:install' first.\n`,
-	);
-	exit(1);
-}
+// from the harness node_modules; without it, init fails opaquely. Missing or
+// stale is fatal — see lib/check_node_modules.ts (BENCH_STALE_OK=1 for stale).
+await check_node_modules();
 
 const impls = await init_implementations({ logger: () => {} });
 

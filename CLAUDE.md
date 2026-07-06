@@ -150,6 +150,7 @@ cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # forma
 
 ```bash
 deno task check          # typecheck + test + lint + fmt (full validation)
+deno task doctor         # one-pass setup check: runtimes, canonical pins + checkout alignment, node_modules freshness, oracle checkouts, corpus entries, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes warnings to failures)
 deno task typecheck      # cargo check
 deno task test           # cargo test
 deno task lint           # cargo clippy
@@ -176,6 +177,7 @@ deno task fixtures:update:parsed     # regenerate expected.json only (run when p
 deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
 deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves + each divergence README back-links its sanctioning doc + no stray READMEs on matching fixtures (gated in `deno task check`)
+deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
 ```
@@ -236,7 +238,7 @@ Package shape: built from the wasm-pack `web` target, then `scripts/patch_npm_pa
 
 `scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → conformance → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). The user keeps it updated as work lands — agents don't touch `CHANGELOG.md` (see [Committing](#committing)). A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
 
-**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`, and skipped-with-a-warning when the `../svelte` checkout or the `benches/js` `node_modules` sidecar (`deno task bench:install`) is absent (a clean machine / resumed wetrun). Run `deno task conformance` manually before a release if the step was skipped. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit under `--all` can be the known FFI heisenbug — re-run it on the single repo to confirm before treating it as real (see ./benches/js/CLAUDE.md §Known Issues).
+**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`) and the tsc corpus (`conformance:ts-repo`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript` checkouts + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit under `--all` can be the known FFI heisenbug — re-run it on the single repo to confirm before treating it as real (see ./benches/js/CLAUDE.md §Known Issues).
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation
@@ -256,7 +258,11 @@ See ./crates/tsv_wasm/CLAUDE.md §TS type maintenance for the per-field checklis
 ### Corpus Comparison
 
 Compare formatting against Prettier, and parse output against the canonical
-parsers, on real codebases:
+parsers, on real codebases. The gates, corpus tools, and harvests enforce
+**pinned expected counts** on full runs (exact for pinned-checkout suites,
+minimums for the live corpus + committed fixtures; the Rust-side
+test262/fixtures/swallow gates carry their own) — see
+`benches/js/lib/gate_counts.ts` and ./benches/js/CLAUDE.md §Pinned gate counts:
 
 ```bash
 deno task corpus:compare:format ~/dev/some-project  # single project (or --all for the gates corpus view: real repos + prettier suites)
@@ -274,19 +280,25 @@ deno task conformance:svelte-fixtures  # tsv's Svelte parser vs Svelte's own tes
 deno task conformance:ts-fixtures      # tsv's TS parser vs acorn-typescript's own test suite (../acorn-typescript/test)
 # The TS analog of the above (and of test262/wpt): the adversarial TS edge-case corpus real-world code
 # can't reach. Oracle = the live @sveltejs/acorn-typescript parser. Same shape — verdict parity gates
-# (over-rejections SANCTIONED or a tracked KNOWN_GAP, else exit 1), AST-shape is report-only. Fail-open
-# on a missing ../acorn-typescript checkout (0 scanned → green). Options: -v, --json, <subtree>.
+# (over-rejections SANCTIONED or a tracked KNOWN_GAP, else exit 1), AST-shape is report-only. Strict
+# setup: a missing ../acorn-typescript checkout (0 scanned) FAILS — publish Step 3b's preflight probe is
+# the tolerance point. Both fixtures gates also freshness-check their ledgers on full-suite runs (a stale
+# sanction/known-gap entry fails) and warn on checkout↔npm-oracle version skew. Options: -v, --json, <subtree>.
 
 deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../typescript conformance/parser tests)
-# Standalone triage tool, NOT in the blocking aggregate: oracle = tsc's own error baselines
+# In the blocking pre-release aggregate (promoted at 0 untracked gaps): oracle = tsc's own error baselines
 # (tests/baselines/reference/*.errors.txt; a TS1xxx code = tsc's parser rejects). Buckets accept/reject
-# parity, over-acceptances (the deferred-early-error surface), and tracked gaps. Fail-open on a missing
-# ../typescript checkout. Options: -v, --json, <subtree>. See ./benches/js/CLAUDE.md.
+# parity, over-acceptances (the deferred-early-error surface), and tracked gaps. Strict setup: a missing
+# or PARTIAL ../typescript checkout, or an empty scan, FAILS (publish Step 3b's probe is the tolerance
+# point). Options: -v, --json, <subtree>. See ./benches/js/CLAUDE.md.
 
-deno task conformance                  # the pre-release aggregate: svelte-fixtures + ts-fixtures +
-# corpus:compare:parse --all + corpus:compare:format --all in one run (builds the corpus FFI once). The
+deno task conformance                  # the pre-release aggregate: svelte-fixtures + ts-fixtures + ts-repo +
+# corpus:compare:parse --all + corpus:compare:format --all — ONE process (benches/js/conformance.ts;
+# oracle modules load once, per-leg timings, fail-fast like a && chain), corpus FFI built once. The
 # release-cadence correctness gates across Svelte/CSS/TS that need external oracles (svelte/compiler,
-# acorn-ts/parseCss, prettier) so they can't live in `deno task check`. Wired into `publish.ts` Step 3b;
+# acorn-ts/parseCss, tsc baselines, prettier) so they can't live in `deno task check`. The format leg's
+# prettier calls ride a content-addressed output cache (benches/js/lib/prettier_cache.ts — repeat runs
+# skip re-formatting unchanged files; TSV_PRETTIER_CACHE=0 disables). Wired into `publish.ts` Step 3b;
 # test262 (../test262) + CSS-WPT harvest stay manual.
 
 deno task divergence:audit         # audit divergence pattern coverage (--json for machine-readable)
@@ -357,7 +369,7 @@ deno task bench:bun:run
 # by design (see "Perf vs conformance surfaces" above): entries carry null timing.
 deno task bench:conformance        # harvest + build:bench:node + coverage run
 deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
-deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject caches
+deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject caches (freshness-stamped: skips when the source commits + pins match; --force after harvest-logic changes)
 
 # Per-file skip detail (off by default — counts always shown, paths/errors opt-in)
 deno task bench:deno:run -- --verbose

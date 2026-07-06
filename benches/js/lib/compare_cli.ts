@@ -18,6 +18,7 @@ import { DevReposLoader, DirectoryLoader } from './corpus.ts';
 import { CanonicalImplementation } from './canonical.ts';
 import { get_library_path, NativeImplementation } from './ffi.ts';
 import { check_artifact_freshness } from './check_artifact_freshness.ts';
+import { check_node_modules } from './check_node_modules.ts';
 import { type Language, LANGUAGES } from './types.ts';
 import { load_all_versions } from './versions.ts';
 
@@ -91,6 +92,11 @@ export async function init_compare_implementations(): Promise<{
 	canonical: CanonicalImplementation;
 	native: NativeImplementation;
 }> {
+	// The canonical impls resolve from benches/js/node_modules — check it exists
+	// (and isn't stale) up front so the failure is the installer hint, not an
+	// opaque module-resolution error mid-init.
+	await check_node_modules();
+
 	// Refuse to measure a stale binary (the `:run` task variants skip the
 	// rebuild). See lib/check_artifact_freshness.ts; override with BENCH_STALE_OK=1.
 	const ffi_profile = Deno.env.get('TSV_FFI_PROFILE') ?? 'release';

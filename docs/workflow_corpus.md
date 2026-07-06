@@ -8,6 +8,19 @@ parse ASTs against the canonical parsers — is documented in
 ../benches/js/CLAUDE.md §Parse Comparison; its diffs are triaged with the
 fixture-first TDD flow rather than this file's hunk workflow.
 
+Exit-code notes for `--all` runs: besides SAFETY (which always gates), the
+tools fail on an empty scope, an all-errored / zero-compared run (systemic
+sidecar/FFI failure), and on the **pinned per-language counts**
+(`benches/js/lib/gate_counts.ts` — see ../benches/js/CLAUDE.md §Pinned gate
+counts): minimums on `compared`/`match` (live corpus — growth passes, drops
+fail) and exact pins on the negative buckets (`unknown`/`partial`/tsv parse
+failures — a new one fails until triaged; fixing some means re-pinning to
+record the win, which is exactly the loop this document drives).
+
+Repeat runs are cheap: prettier outputs are served from a content-addressed
+cache (../benches/js/CLAUDE.md §Prettier-output cache), so the
+one-file-at-a-time loop below re-formats only files whose content changed.
+
 ## First Step: Load Conformance Doc
 
 **ALWAYS start by reading the conformance documentation:**

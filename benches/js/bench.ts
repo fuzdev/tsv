@@ -66,7 +66,7 @@ import {
 	benchmark_baseline_save,
 } from '@fuzdev/fuz_util/benchmark_baseline.ts';
 import { spawn_out } from '@fuzdev/fuz_util/process.ts';
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { type CorpusSource, DevReposLoader, group_by_language } from './lib/corpus.ts';
@@ -102,6 +102,7 @@ import {
 } from './lib/binary_sizes.ts';
 import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
 import { check_artifact_freshness, wasm_artifact_path } from './lib/check_artifact_freshness.ts';
+import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
 import { get_napi_library_path } from './lib/napi.ts';
 import { current_runtime, type Runtime } from './lib/runtime.ts';
@@ -477,18 +478,10 @@ await check_artifact_freshness([
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
 // from the harness `node_modules`; without it, init fails with an opaque
-// module-resolution error. Point the user at the one installer instead. (Cheap
-// existence check — `bench:install` populates the tree both runtimes consume.)
-const node_modules_path = fileURLToPath(new URL('./node_modules', import.meta.url));
-try {
-	await stat(node_modules_path);
-} catch {
-	console.error(
-		`\n✗ Harness dependencies not installed (${node_modules_path} missing).\n` +
-			`  Run 'deno task bench:install' first — it installs the npm deps + the oxc wasi binding.\n`,
-	);
-	exit(1);
-}
+// module-resolution error. Missing is fatal with the installer hint; stale
+// (package.json newer than npm's install stamp) is fatal too, with
+// BENCH_STALE_OK=1 as the escape — see lib/check_node_modules.ts.
+await check_node_modules();
 
 // Initialize implementations
 const impls = await init_implementations({ logger: log });
