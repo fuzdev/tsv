@@ -2,40 +2,51 @@
  * Pinned gate counts — committed EXPECTED numbers for the diagnostic gates and
  * harvests, so a change in what gets graded (a gutted or refreshed suite
  * checkout, a discovery bug, a tsv behavior change, a systemic sidecar/FFI
- * failure) fails loudly instead of shifting inside a green run. This is
- * `scripts/validate_artifacts.ts`'s tight-bounds philosophy applied to counts:
- * every real move in a number is a deliberate, visible edit here.
+ * failure eating a whole language) fails loudly instead of shifting inside a
+ * green run. This is `scripts/validate_artifacts.ts`'s tight-bounds philosophy
+ * applied to counts: every real move in a number is a deliberate, visible edit.
  *
- * Two semantics, chosen per surface by whether its inputs are deterministic:
+ * Three pin categories, chosen per surface:
  *
  * - **Exact pins** (`*_PINS` / `*_PIN`) — surfaces whose inputs are pinned or
- *   committed: the fixtures gates and harvests (suite checkouts are
- *   version-gated by `deno task pins:audit`; `tests/fixtures` is committed) and
- *   ts-repo/test262/wpt (checkouts updated deliberately). Any mismatch — up or
- *   down — fails: a drop is a regression or a gutted input; a rise is a suite
- *   refresh or behavior change that must be re-pinned deliberately. No slack:
- *   slack would let small regressions creep, and after a suite refresh it
- *   silently widens.
- * - **Minimums** (`*_MIN`) — the one non-deterministic surface: the
- *   `corpus:compare:* --all` gates corpus includes LIVE dev repos (zzz, the fuz
- *   ecosystem, svelte/kit source) that grow with ordinary work. Growth passes
- *   silently; any drop below the pinned current value fails. Re-pin to the
- *   current value whenever you touch these (e.g. at release) so the minimum
- *   stays tight — a long-unpinned minimum slowly re-accumulates slack.
+ *   committed: the fixtures gates and harvests (suite checkouts version-gated
+ *   by `deno task pins:audit`) and ts-repo/test262/wpt (checkouts updated
+ *   deliberately). Any mismatch — up or down — fails. No slack: slack lets
+ *   small regressions creep and silently widens after every refresh.
+ * - **Minimums** (`*_MIN`) — success counts on the live `corpus:compare:*
+ *   --all` corpus (dev repos that grow with ordinary work) and the
+ *   committed-fixtures audits (additions are ordinary reviewed diffs). Growth
+ *   passes; any drop below the pinned current value fails.
+ * - **Failure-bucket pins** (`*_PIN`, exact — the same two-sided `!==` as the
+ *   exact pins above, but on the live corpus rather than a deterministic
+ *   input): the triage buckets on `corpus:compare:* --all` (unknown/partial
+ *   divergences, tsv-side parse failures). A rise fails until triaged — fix
+ *   it, add a divergence detector/sanction, or consciously re-pin (a
+ *   legitimately-unsupported new corpus file); a drop (bucket shrank —
+ *   divergences fixed) also fails, so the pin ratchets DOWN deliberately and
+ *   wins stay recorded.
  *
  * Pins are enforced only on FULL runs (default suite root, `--all`, default
  * harvest source) — a subtree or filtered run legitimately grades a slice.
- * Harvest pins fail BEFORE writing, so a broken cache never replaces a good
- * one. CI note: `.github/workflows/check.yml` runs `deno task check` on a
- * clean checkout (no sibling clones), so of these only the committed-tree Rust
- * pins (fixtures_validate, swallow_audit) execute in CI — the rest are
- * dev-machine gates at conformance/publish cadence.
+ * Harvest pins fail BEFORE writing, so a wrong cache never replaces a good
+ * one. CI note: `.github/workflows/check.yml` runs on a clean checkout (no
+ * sibling clones), so of these only the committed-tree Rust pins
+ * (fixtures_validate via the integration test, swallow_audit) execute in CI —
+ * the rest are dev-machine gates at conformance/publish cadence.
  *
- * Update ritual: when a pin fails after a deliberate change (canonical bump,
- * checkout refresh, tsv behavior change, corpus restructure), the failure
- * message prints expected vs got — update the constant + its measured-on
- * comment in the same change, and say why in the commit. Never re-pin to
- * absorb an unexplained move: that is the regression the pin exists to catch.
+ * Update ritual: the failure message prints expected vs got — update the
+ * constant + its measured-on comment (INCLUDING the checkout commit, `git -C
+ * ../<repo> rev-parse --short HEAD` — upstream version files only bump at
+ * release, so the commit is the only precise statement of what a pin was
+ * measured against) in the same change, and say why in the commit message.
+ * When re-pinning after a suite refresh, glance at the full bucket table, not
+ * just the changed number — a count move can mask offsetting changes (the
+ * per-file gates — unexpected over-rejections, stale ledgers, SAFETY — catch
+ * tsv-side regressions independently, but the glance is cheap). A
+ * failure-bucket-pin trip on a single `--all` run can be the known FFI/sidecar
+ * heisenbug (see
+ * benches/js/CLAUDE.md §Known Issues) — confirm on the single repo before
+ * treating it as real. Never re-pin to absorb an unexplained move.
  *
  * The Rust-side pins (test262 discovery + graded manifest, `fixtures_validate`
  * fixture count, `swallow_audit` formatted-file count) live as consts in their
@@ -53,25 +64,19 @@ export interface GatePins {
 	both_accept: number;
 }
 
-/**
- * conformance:svelte-fixtures — measured 2026-07-06 on the ../svelte checkout at
- * `svelte@5.56.4-3` (main; drifted past the pinned 5.56.1 — `pins:audit` fails
- * until it's aligned). ⚠ RE-PIN these when aligning the checkout to the pinned
- * tag; at a tag-aligned checkout they become stable.
- */
+/** conformance:svelte-fixtures — measured 2026-07-06: ../svelte at 8fb7ceeba (svelte@5.56.4-3), oracle svelte@5.56.4. */
 export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3273 };
 
-/** conformance:ts-fixtures — measured 2026-07-06 (../acorn-typescript at 1.0.10). */
+/** conformance:ts-fixtures — measured 2026-07-06: ../acorn-typescript at 13c49a7 (v1.0.10), oracle @sveltejs/acorn-typescript@1.0.10. */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 201, both_accept: 181 };
 
-/** conformance:ts-repo — measured 2026-07-06 (../typescript checkout; re-pin on deliberate pulls). */
+/** conformance:ts-repo — measured 2026-07-06: ../typescript at 637d5746b. */
 export const TS_REPO_PINS = { scanned: 768, accept_parity: 424 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
  * parsed and the ASTs diffed); the corpus is live dev repos, so growth passes
- * and any drop fails. Pinned at the exact 2026-07-06 measured values — re-pin
- * to current when touching the corpus so the minimum stays tight.
+ * and any drop fails. Measured 2026-07-06 (oracle svelte@5.56.4).
  */
 export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
 	svelte: 1213,
@@ -80,9 +85,21 @@ export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
 };
 
 /**
+ * corpus:compare:parse --all — EXACT per-language tsv-side parse-failure
+ * count. Up = tsv newly rejects real corpus code (a drop-in regression — or a
+ * legitimately-unsupported new corpus file: triage with
+ * `diagnostics/skip_triage.ts`, then re-pin consciously). Down = a parse gap
+ * closed; re-pin so the win stays recorded. Measured 2026-07-06.
+ */
+export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
+	svelte: 1,
+	typescript: 16,
+	css: 5,
+};
+
+/**
  * corpus:compare:format --all — MINIMUM per-language exact `match` count (same
- * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`). Pinned at the exact
- * 2026-07-06 measured values.
+ * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`). Measured 2026-07-06.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 978,
@@ -90,17 +107,37 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	css: 107,
 };
 
-/** bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured 2026-07-06. */
+/**
+ * corpus:compare:format --all — EXACT per-language `unknown` + `partial`
+ * divergence counts (the un-triaged surface the WARN line reports). Up = a new
+ * unexplained divergence landed — fix it, catalog a detector
+ * (`lib/divergence/patterns.ts`), or consciously re-pin for a new corpus file.
+ * Down = the backlog shrank; re-pin to record it. A single-run trip can be the
+ * FFI/sidecar heisenbug — confirm on the single repo first. Measured
+ * 2026-07-06.
+ */
+export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
+	svelte: 7,
+	typescript: 180,
+	css: 23,
+};
+export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
+	svelte: 3,
+	typescript: 63,
+	css: 8,
+};
+
+/** bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured 2026-07-06: ../wpt at 7437c7bc. */
 export const WPT_CSS_HARVEST_PIN = 22_310;
 
-/** bench:harvest:test262 — exact expected-positive files in the cache list. Measured 2026-07-06 (of 46,544 graded). */
+/** bench:harvest:test262 — exact expected-positive files in the cache list. Measured 2026-07-06: ../test262 at 7153986f (46,544 graded). */
 export const TEST262_POSITIVES_PIN = 42_113;
 
 /**
- * bench:harvest:svelte-rejects — exact reject count. Measured 2026-07-06
- * (142 of 5488 conformance-view Svelte files). Exact and two-sided by nature:
- * fewer means the svelte/compiler oracle stopped rejecting (broken
- * import/config), more means it started rejecting wholesale — either way the
- * cache would corrupt the published coverage number.
+ * bench:harvest:svelte-rejects — exact reject count. Measured 2026-07-06:
+ * ../svelte at 8fb7ceeba, oracle svelte@5.56.4 (142 of 5489 conformance-view
+ * Svelte files). Fewer = the svelte/compiler oracle stopped rejecting (broken
+ * import/config); more = it started rejecting wholesale — either way the cache
+ * would corrupt the published coverage number.
  */
 export const SVELTE_REJECTS_PIN = 142;

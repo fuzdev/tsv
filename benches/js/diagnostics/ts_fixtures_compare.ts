@@ -52,7 +52,8 @@ import { type KnownGap, TS_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
  */
 const KNOWN_GAPS: KnownGap[] = [];
 
-const config: FixturesGateConfig = {
+/** The gate's config — exported for the `conformance.ts` single-process driver. */
+export const TS_FIXTURES_GATE: FixturesGateConfig = {
 	title: 'TypeScript-fixtures',
 	language: 'typescript',
 	default_root: '../acorn-typescript/test',
@@ -71,4 +72,6 @@ const config: FixturesGateConfig = {
 	pins: TS_FIXTURES_PINS,
 };
 
-await run_fixtures_gate(config);
+if (import.meta.main) {
+	await run_fixtures_gate(TS_FIXTURES_GATE);
+}

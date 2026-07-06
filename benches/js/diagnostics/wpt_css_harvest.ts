@@ -25,7 +25,9 @@
  * Flags: `--if-present` tolerates a missing wpt checkout (warn + exit 0) — for
  * the `bench:conformance` task chain, where an absent `../wpt` should produce
  * a smaller corpus (disclosed via the report's `corpus_sources`), not a failed
- * bench.
+ * bench. `--force` re-harvests despite a fresh stamp (default runs skip when
+ * the ../wpt commit + pin match the stamp — see `lib/harvest_stamp.ts`; needed
+ * after changing this script's extraction logic).
  *
  * Run from the repo root:
  *   deno run --allow-read --allow-write benches/js/diagnostics/wpt_css_harvest.ts
@@ -36,13 +38,22 @@ import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative } from 'node:path';
 
 import { WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
+import {
+	git_head,
+	harvest_up_to_date,
+	short_commit,
+	type StampInputs,
+	write_stamp,
+} from '../lib/harvest_stamp.ts';
 
 const OUT_DEFAULT = 'benches/js/.cache/wpt_css';
 const SOURCE_DEFAULT = '../wpt/css';
+const STAMP_PATH = 'benches/js/.cache/wpt_css.stamp.json';
 
 const out_flag_index = Deno.args.indexOf('--out');
 const out_dir = out_flag_index === -1 ? OUT_DEFAULT : Deno.args[out_flag_index + 1];
 const if_present = Deno.args.includes('--if-present');
+const force = Deno.args.includes('--force');
 const source_root = Deno.args.find(
 	(a, i) => !a.startsWith('-') && (out_flag_index === -1 || i !== out_flag_index + 1),
 ) ?? SOURCE_DEFAULT;
@@ -56,6 +67,26 @@ try {
 	}
 	console.error(`wpt source root not found: ${source_root}`);
 	Deno.exit(1);
+}
+
+// Freshness stamp (default source + out only — a custom run is an experiment,
+// not the cache): skip when the ../wpt commit and the pinned count match.
+const stamped_run = source_root === SOURCE_DEFAULT && out_dir === OUT_DEFAULT;
+const source_commit = git_head(source_root);
+const stamp_inputs: StampInputs = {
+	harvest: 'wpt-css',
+	source_commit,
+	pin: WPT_CSS_HARVEST_PIN,
+};
+if (
+	stamped_run && !force && source_commit !== null &&
+	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [out_dir]))
+) {
+	console.error(
+		`wpt harvest up to date (../wpt at ${short_commit(source_commit)}, ` +
+			`pin ${WPT_CSS_HARVEST_PIN}) — skipping; --force to re-harvest.`,
+	);
+	Deno.exit(0);
 }
 
 const STYLE_BLOCK_RE = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
@@ -138,5 +169,8 @@ if (source_root === SOURCE_DEFAULT && stats.blocks_written !== WPT_CSS_HARVEST_P
 	Deno.exit(1);
 }
 
+if (stamped_run && source_commit !== null) {
+	await write_stamp(STAMP_PATH, stamp_inputs);
+}
 console.error(`done: ${stats.blocks_written} blocks from ${stats.files_with_blocks} files → ${out_dir}`);
 console.log(JSON.stringify(stats, null, '\t'));

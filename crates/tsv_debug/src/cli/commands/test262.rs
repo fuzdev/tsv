@@ -48,13 +48,14 @@ pub struct Test262Command {
 /// REGRESSION PIN (exact): discovered test files on an unfiltered run — the
 /// checkout is updated deliberately, so any move (a discovery bug shrinking
 /// the suite, or a test262 pull growing it) must be re-pinned, never absorbed.
-/// Measured 2026-07-06; same ritual as `benches/js/lib/gate_counts.ts`.
+/// Measured 2026-07-06, ../test262 at 7153986f; same ritual as
+/// `benches/js/lib/gate_counts.ts`.
 const DISCOVERED_PIN: usize = 49_136;
 
 /// REGRESSION PIN (exact): graded strict-subset size for an unfiltered
 /// `--emit-manifest` run — a frontmatter/feature-filter change moving the
 /// graded set silently shifts the differential and the bench corpus.
-/// Measured 2026-07-06.
+/// Measured 2026-07-06, ../test262 at 7153986f.
 const GRADED_MANIFEST_PIN: usize = 46_544;
 
 impl Test262Command {

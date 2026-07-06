@@ -16,7 +16,7 @@
 {#key expr}
 	text
 {/key}
-{#each list as it}{@const y = it}{it}{/each}
+{#each list as it}{@const y = it)}{it}{/each} // c
 <div {...expr}></div>
 <input bind:value={val} />
 <div {@attach fn}></div>

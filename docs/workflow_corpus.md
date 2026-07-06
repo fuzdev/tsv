@@ -10,11 +10,16 @@ fixture-first TDD flow rather than this file's hunk workflow.
 
 Exit-code notes for `--all` runs: besides SAFETY (which always gates), the
 tools fail on an empty scope, an all-errored / zero-compared run (systemic
-sidecar/FFI failure), and on the **pinned per-language minimums**
+sidecar/FFI failure), and on the **pinned per-language counts**
 (`benches/js/lib/gate_counts.ts` — see ../benches/js/CLAUDE.md §Pinned gate
-counts). The corpus is live dev repos, so growth passes; a drop below the
-pinned current value means a language collapsed (or the corpus genuinely
-shrank — re-pin deliberately).
+counts): minimums on `compared`/`match` (live corpus — growth passes, drops
+fail) and exact pins on the negative buckets (`unknown`/`partial`/tsv parse
+failures — a new one fails until triaged; fixing some means re-pinning to
+record the win, which is exactly the loop this document drives).
+
+Repeat runs are cheap: prettier outputs are served from a content-addressed
+cache (../benches/js/CLAUDE.md §Prettier-output cache), so the
+one-file-at-a-time loop below re-formats only files whose content changed.
 
 ## First Step: Load Conformance Doc
 

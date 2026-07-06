@@ -22,7 +22,7 @@
 const VERSIONS = {
 	prettier: '3.9.0',
 	'prettier-plugin-svelte': '4.1.1',
-	svelte: '5.56.1',
+	svelte: '5.56.4',
 	acorn: '8.16.0',
 	'@sveltejs/acorn-typescript': '1.0.10',
 } as const;
@@ -34,7 +34,7 @@ import * as prettier from 'npm:prettier@3.9.0';
 // deno-lint-ignore no-import-prefix
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@4.1.1';
 // deno-lint-ignore no-import-prefix
-import { parse as svelteParse, parseCss } from 'npm:svelte@5.56.1/compiler';
+import { parse as svelteParse, parseCss } from 'npm:svelte@5.56.4/compiler';
 // deno-lint-ignore no-import-prefix
 import * as acorn from 'npm:acorn@8.16.0';
 // deno-lint-ignore no-import-prefix

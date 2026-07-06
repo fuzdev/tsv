@@ -12,8 +12,6 @@
  *   deno task corpus:compare:format --all                          # All default corpus repos
  */
 
-import process from 'node:process';
-
 import { args_parse, argv_parse } from '@fuzdev/fuz_util/args.ts';
 import { z } from 'zod';
 
@@ -35,7 +33,11 @@ import {
 	filter_diff_context,
 	format_diff_for_terminal,
 } from './lib/diff.ts';
-import { CORPUS_FORMAT_MATCH_MIN } from './lib/gate_counts.ts';
+import {
+	CORPUS_FORMAT_MATCH_MIN,
+	CORPUS_FORMAT_PARTIAL_PIN,
+	CORPUS_FORMAT_UNKNOWN_PIN,
+} from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
 	check_expected_error,
@@ -299,8 +301,14 @@ function build_json_report(
 	};
 }
 
-async function main(): Promise<void> {
-	const parsed = args_parse(argv_parse(process.argv.slice(2)), CorpusCompareArgs);
+/**
+ * The tool's entry, importable by the `conformance.ts` driver (which passes
+ * `['--all']`); the CLI wrapper at the bottom feeds it the real argv. Failure
+ * semantics are process-level (`Deno.exit(1)` at each gate), matching the old
+ * `&&`-chain aggregate exactly.
+ */
+export async function run_corpus_compare_format(argv: string[] = Deno.args): Promise<void> {
+	const parsed = args_parse(argv_parse(argv), CorpusCompareArgs);
 	if (!parsed.success) {
 		console.error(z.prettifyError(parsed.error));
 		print_usage();
@@ -353,6 +361,11 @@ async function main(): Promise<void> {
 
 	const loader = create_compare_loader(use_all_repos, base_path);
 	const { canonical, native } = await init_compare_implementations();
+	// Content-addressed prettier-output cache (lib/prettier_cache.ts) — the
+	// dominant cost here is prettier over ~6k mostly-unchanged files. Keyed on
+	// content + routing + options + the canonical-5 pins + PRETTIER_DEBUG;
+	// success-only. TSV_PRETTIER_CACHE=0 disables.
+	const prettier_cache = canonical.enable_format_cache();
 
 	// Initialize per-language tracking
 	const results: Map<Language, CompareResult[]> = new Map();
@@ -877,22 +890,40 @@ async function main(): Promise<void> {
 		}
 	}
 
-	// Pinned minimums (--all only — the corpus is LIVE dev repos, so growth
-	// passes; any drop below the pinned current value fails): per-language
-	// minimum exact-match count, so a one-language formatter/oracle collapse
-	// (matches draining into unknown/error) can't hide under the cross-language
-	// total or below the SAFETY/all-errored gates. See lib/gate_counts.ts
-	// (re-pin to current when touching the corpus, so the minimum stays tight).
+	// Disclose cache participation so a triage reader knows which side was live
+	// (cached hits remove the prettier-side flake from repeat runs; the tsv/FFI
+	// side is always live).
+	if (prettier_cache) console.log(`\n${prettier_cache.stats()}`);
+
+	// Pinned counts (--all only — see lib/gate_counts.ts): per-language MINIMUM
+	// exact-match count (live corpus: growth passes; a drop means a one-language
+	// formatter/oracle collapse hiding under the total or below the
+	// SAFETY/all-errored gates), and EXACT per-language `unknown`/`partial`
+	// counts (up = a new unexplained divergence — fix or catalog a detector;
+	// down = backlog shrank, re-pin to record it). A single-run trip can be the
+	// FFI/sidecar heisenbug — confirm on the single repo before treating as real.
 	if (use_all_repos) {
-		const pin_failures = LANGUAGES.filter(
-			(lang) => stats.get(lang)!.match < CORPUS_FORMAT_MATCH_MIN[lang],
-		).map(
-			(lang) =>
-				`${lang} match ${stats.get(lang)!.match} < pinned minimum ${CORPUS_FORMAT_MATCH_MIN[lang]}`,
-		);
+		const pin_failures = [
+			...LANGUAGES.filter((lang) => stats.get(lang)!.match < CORPUS_FORMAT_MATCH_MIN[lang]).map(
+				(lang) =>
+					`${lang} match ${stats.get(lang)!.match} < pinned minimum ${CORPUS_FORMAT_MATCH_MIN[lang]}`,
+			),
+			...LANGUAGES.filter(
+				(lang) => stats.get(lang)!.unknown_diff !== CORPUS_FORMAT_UNKNOWN_PIN[lang],
+			).map(
+				(lang) =>
+					`${lang} unknown ${stats.get(lang)!.unknown_diff} ≠ pinned ${CORPUS_FORMAT_UNKNOWN_PIN[lang]}`,
+			),
+			...LANGUAGES.filter(
+				(lang) => stats.get(lang)!.partial_divergence !== CORPUS_FORMAT_PARTIAL_PIN[lang],
+			).map(
+				(lang) =>
+					`${lang} partial ${stats.get(lang)!.partial_divergence} ≠ pinned ${CORPUS_FORMAT_PARTIAL_PIN[lang]}`,
+			),
+		];
 		if (pin_failures.length > 0) {
 			console.log(
-				`\n\x1b[31mFAIL: pinned minimum — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
+				`\n\x1b[31mFAIL: pinned counts — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
 			);
 			canonical.dispose();
 			native.dispose();
@@ -967,4 +998,6 @@ function build_error_json_report(message: string): Record<string, unknown> {
 	};
 }
 
-run_compare_main(main, CorpusCompareArgs, build_error_json_report);
+if (import.meta.main) {
+	run_compare_main(run_corpus_compare_format, CorpusCompareArgs, build_error_json_report);
+}

@@ -116,6 +116,19 @@ with a code frame instead of fake-stable prettier output that would land in
 `unknown`. Same posture as the tsv_debug sidecar; see
 `docs/conformance_prettier.md` §Triage caveat.
 
+**Prettier-output cache.** The format comparison's dominant cost is prettier
+over ~6k mostly-unchanged files, so its oracle calls go through a
+content-addressed cache (`lib/prettier_cache.ts`, `.cache/prettier/`): keyed on
+the source content + parser/filepath routing + the full options + the
+canonical-5 pins (incl. svelte, the plugin's peer) + `PRETTIER_DEBUG` + a
+schema constant — a hit is exactly equivalent to a live run. Success-only
+(errors and empty outputs never cached, so the sidecar-miss heisenbug can't
+poison it — and cached hits remove the prettier-side flake from repeat runs
+entirely; the tsv/FFI side stays live). The run reports `prettier cache: N
+hits / M misses`. Scope: this tool + the conformance driver only — never the
+bench (it times prettier), never the fixture validator (live by design).
+`TSV_PRETTIER_CACHE=0` disables; `deno task bench:clean` wipes.
+
 ### Machine-readable output (`--json`)
 
 `--json` emits a single buffered JSON object to **stdout** and routes all
@@ -371,8 +384,13 @@ tolerance point). Full-corpus runs freshness-check `KNOWN_GAPS` (stale entries f
 gates (svelte-fixtures, ts-fixtures, ts-repo), plus
 `corpus:compare:parse --all` and `corpus:compare:format --all`, are the
 release-cadence correctness gates that run against external oracles (and so can't
-live in `deno task check`). `deno task conformance` runs all five in one pass
-(building the corpus FFI once) and is wired into `scripts/publish.ts` **Step 3b**
+live in `deno task check`). `deno task conformance` builds the corpus FFI once and
+runs all five legs in **ONE process** (`conformance.ts`, the driver): the canonical
+oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) load
+once via the module cache instead of once per leg, each leg gets a timing line, and
+failure semantics match a `&&` chain exactly (every leg exits the process on a
+finding — fail-fast). The driver takes no arguments; the per-leg tasks remain the
+scoped/triage entries. It is wired into `scripts/publish.ts` **Step 3b**
 (skipped by `--no-check`). Step 3b preflights the oracles (`../svelte`,
 `../acorn-typescript`, `../typescript`, this dir's `node_modules`): a missing one
 **FAILS a `--wetrun`** (only the explicit `--no-check` releases without gates),
@@ -400,15 +418,19 @@ every real move in a number is a deliberate, visible edit.
 
 - `lib/gate_counts.ts` — every Deno-side count, one per consumer: the fixtures
   gates (`scanned` + `both_accept`), ts-repo (`scanned` + `accept_parity`),
-  `corpus:compare:parse --all` (per-language `compared`),
-  `corpus:compare:format --all` (per-language exact `match`), and the three
-  harvests (wpt block count, test262 positive count, svelte-rejects count).
+  `corpus:compare:parse --all` (minimum per-language `compared` + EXACT
+  per-language tsv-side parse-failure counts), `corpus:compare:format --all`
+  (minimum per-language `match` + EXACT per-language `unknown`/`partial`
+  counts — the un-triaged divergence backlog is pinned, so a new unexplained
+  divergence fails until fixed/cataloged, and a shrink is re-pinned to record
+  the win), and the three harvests (wpt block count, test262 positive count,
+  svelte-rejects count).
 - Rust-side counts are consts in their commands — grep `REGRESSION PIN`:
   test262 (discovered + graded-manifest), `fixtures_validate` (total fixtures —
   protects the primary gate against a discovery collapse), and `swallow_audit`
   (formatted files — closes its vacuous-pass).
 
-**Semantics — chosen per surface by whether its inputs are deterministic:**
+**Semantics — three pin categories, chosen per surface:**
 
 - **Exact pins** (mismatch in either direction fails): the fixtures gates,
   ts-repo, test262, and the harvests. Their inputs are pinned checkouts
@@ -424,6 +446,13 @@ every real move in a number is a deliberate, visible edit.
   are ordinary reviewed diffs (a per-fixture-PR counter bump in `deno task
   check` would be pure ceremony), while shrinkage is the discovery regression
   the pin guards.
+- **Failure-bucket pins** (exact `!==`, but on the live corpus rather than a
+  deterministic input): the `corpus:compare:* --all` triage buckets —
+  per-language `unknown`/`partial` divergences and tsv-side parse failures. A
+  rise fails until triaged (fix it, add a divergence detector/sanction, or
+  consciously re-pin a legitimately-unsupported new corpus file); a drop also
+  fails, so a fixed divergence ratchets the pin DOWN deliberately and the win
+  stays recorded.
 
 Pins apply only to FULL runs (default suite root, `--all`, default harvest
 source) — subtree and filtered runs legitimately grade a slice. Harvest pins
@@ -433,8 +462,15 @@ clones); the rest are dev-machine gates at conformance/publish cadence.
 
 **Update ritual** (same as the artifact size bounds): the failure message
 prints expected vs got — update the constant + its measured-on comment in the
-same change, and say why in the commit. Never re-pin to absorb an unexplained
-move — that is the regression the pin exists to catch.
+same change, and say why in the commit. Record the checkout **commit** in the
+comment (`git -C ../<repo> rev-parse --short HEAD`) — upstream version files
+only bump at release, so the commit is the only precise statement of what a
+pin was measured against. When re-pinning after a suite refresh, glance at the
+full bucket table, not just the changed number — a count move can mask
+offsetting changes (the per-file gates — unexpected over-rejections, stale
+ledgers, SAFETY — catch tsv-side regressions independently, but the glance is
+cheap). Never re-pin to absorb an unexplained move — that is the regression
+the pin exists to catch.
 
 **Why both the pins AND pins:audit's checkout alignment exist:** they guard
 different granularities. Checkout alignment compares `package.json` versions —
@@ -580,7 +616,11 @@ deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
 # after to restore the committed coverage report.
 
 # Harvest the derived suite caches for the conformance corpus (idempotent;
-# warn-and-skip when the source checkout is absent). Chained into the
+# warn-and-skip when the source checkout is absent). FRESHNESS-STAMPED
+# (lib/harvest_stamp.ts): a harvest whose stamped inputs — the source checkout
+# COMMIT(s) + the pinned count + oracle pins — are unchanged skips instantly
+# (the test262 leg saves a ~1 min release-mode grade); pass --force after
+# changing harvest/grading LOGIC, which the stamp can't see. Chained into the
 # bench:conformance build tasks; run standalone after a ../wpt or ../test262
 # update — EXPECT the pinned harvest count to trip after a source pull
 # (§Pinned gate counts): re-pin in lib/gate_counts.ts deliberately.
@@ -929,6 +969,7 @@ benches/js/
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
 ├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache/test262_files.json (Deno-only)
 ├── bench.ts               # Benchmark entry point (runtime-neutral — runs under Deno AND Node)
+├── conformance.ts         # Single-process pre-release aggregate driver (deno task conformance): all five legs, one module cache
 ├── smoke.ts               # Smoke test for formatters and parsers (runtime-neutral: smoke / smoke:node / smoke:bun)
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md} (bench:compose)
 ├── corpus_compare_format.ts  # Formatting comparison vs prettier (Deno-only entry point)
@@ -951,8 +992,12 @@ benches/js/
 │   ├── binary_sizes.ts    # Binary/WASM size collection and reporting
 │   ├── biome.ts           # Biome WASM wrapper (Svelte, TypeScript, CSS)
 │   ├── canonical.ts       # Prettier + Svelte parser wrappers
+│   ├── check_node_modules.ts # node_modules preflight: exists + not stale vs package.json (all entry points)
 │   ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
 │   ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
+│   ├── gate_counts.ts     # Pinned gate counts (exact pins + live-corpus minimums + negative-bucket pins) — see §Pinned gate counts
+│   ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins) — skip unchanged re-harvests
+│   ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
 │   ├── diff.ts            # Line-based diff utilities (LCS algorithm)
 │   ├── fixtures_gate.ts   # Shared per-language parse-conformance gate engine (run_fixtures_gate; svelte + ts fixtures scripts are docstring+config over it)
 │   ├── ffi.ts             # Deno.dlopen bindings (NativeImplementation — Deno native, runtime-specific)

@@ -53,7 +53,8 @@ const KNOWN_GAPS: KnownGap[] = [
 	// deliberately track a gap while its fix is pending, and delete it once fixed.
 ];
 
-const config: FixturesGateConfig = {
+/** The gate's config — exported for the `conformance.ts` single-process driver. */
+export const SVELTE_FIXTURES_GATE: FixturesGateConfig = {
 	title: 'Svelte-fixtures',
 	language: 'svelte',
 	default_root: '../svelte/packages/svelte/tests',
@@ -78,4 +79,6 @@ const config: FixturesGateConfig = {
 	pins: SVELTE_FIXTURES_PINS,
 };
 
-await run_fixtures_gate(config);
+if (import.meta.main) {
+	await run_fixtures_gate(SVELTE_FIXTURES_GATE);
+}

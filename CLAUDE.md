@@ -293,10 +293,13 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../t
 # point). Options: -v, --json, <subtree>. See ./benches/js/CLAUDE.md.
 
 deno task conformance                  # the pre-release aggregate: svelte-fixtures + ts-fixtures + ts-repo +
-# corpus:compare:parse --all + corpus:compare:format --all in one run (builds the corpus FFI once). The
+# corpus:compare:parse --all + corpus:compare:format --all — ONE process (benches/js/conformance.ts;
+# oracle modules load once, per-leg timings, fail-fast like a && chain), corpus FFI built once. The
 # release-cadence correctness gates across Svelte/CSS/TS that need external oracles (svelte/compiler,
-# acorn-ts/parseCss, tsc baselines, prettier) so they can't live in `deno task check`. Wired into
-# `publish.ts` Step 3b; test262 (../test262) + CSS-WPT harvest stay manual.
+# acorn-ts/parseCss, tsc baselines, prettier) so they can't live in `deno task check`. The format leg's
+# prettier calls ride a content-addressed output cache (benches/js/lib/prettier_cache.ts — repeat runs
+# skip re-formatting unchanged files; TSV_PRETTIER_CACHE=0 disables). Wired into `publish.ts` Step 3b;
+# test262 (../test262) + CSS-WPT harvest stay manual.
 
 deno task divergence:audit         # audit divergence pattern coverage (--json for machine-readable)
 ```
@@ -366,7 +369,7 @@ deno task bench:bun:run
 # by design (see "Perf vs conformance surfaces" above): entries carry null timing.
 deno task bench:conformance        # harvest + build:bench:node + coverage run
 deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
-deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject caches
+deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject caches (freshness-stamped: skips when the source commits + pins match; --force after harvest-logic changes)
 
 # Per-file skip detail (off by default — counts always shown, paths/errors opt-in)
 deno task bench:deno:run -- --verbose

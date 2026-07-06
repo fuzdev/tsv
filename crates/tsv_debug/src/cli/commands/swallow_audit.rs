@@ -38,9 +38,11 @@ struct Violation {
 /// the audit would pass vacuously ("0 swallows across 0 files"). A minimum,
 /// not a two-sided pin, because the fixtures tree is COMMITTED and grows with
 /// ordinary fixture PRs (`deno task check` must not fail per added fixture);
-/// shrinkage/collapse fails. Re-pin to current when it trips. Measured 5,744
-/// on 2026-07-06; same ritual as `benches/js/lib/gate_counts.ts`.
-const FORMATTED_MIN: usize = 5_744;
+/// shrinkage/collapse fails. Re-pin to current when it trips. Measured 5,742
+/// on 2026-07-06 (after the `index_signature_close_bracket_line_comment` F5
+/// reclassification deleted its two prettier-claim files); same ritual as
+/// `benches/js/lib/gate_counts.ts`.
+const FORMATTED_MIN: usize = 5_742;
 
 impl SwallowAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {

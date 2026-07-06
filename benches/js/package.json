@@ -11,7 +11,7 @@
 	"//engines": "Node ≥ 22.18 is the native TS type-stripping floor — the harness entries (bench.ts, install_deps.ts) run as TypeScript directly under `node`. Advisory (npm warns without engine-strict); an older Node fails with an opaque parse error before any runtime guard could fire.",
 	"dependencies": {
 		"acorn": "8.16.0",
-		"svelte": "5.56.1",
+		"svelte": "5.56.4",
 		"@sveltejs/acorn-typescript": "1.0.10",
 		"prettier": "3.9.0",
 		"prettier-plugin-svelte": "4.1.1",

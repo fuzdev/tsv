@@ -21,7 +21,13 @@
  * `bench:harvest:svelte-rejects` task) warn-and-skips when `../svelte` or the
  * `node_modules` sidecar is absent, leaving no cache — the loader then fails
  * open to the un-filtered corpus (disclosed in its log). A manual run WITHOUT
- * the flag fails closed instead, matching the wpt/test262 harvests.
+ * the flag fails closed instead, matching the wpt/test262 harvests. `--force`
+ * re-harvests despite a fresh stamp (default runs skip when the ../svelte +
+ * ../prettier commits, the svelte oracle pin, and the rejects pin all match —
+ * see `lib/harvest_stamp.ts`). The stamp deliberately ignores the live dev
+ * repos in the conformance view: their Svelte is valid by assumption (rejects
+ * come from the suite trees), and the exact rejects pin re-validates whenever
+ * the harvest does run.
  *
  * Run (from repo root):
  *   deno run --allow-read --allow-write=benches/js/.cache --allow-env --allow-net \
@@ -35,13 +41,44 @@ import { dirname, relative, resolve } from 'node:path';
 import { DevReposLoader } from '../lib/corpus.ts';
 import { CanonicalImplementation } from '../lib/canonical.ts';
 import { SVELTE_REJECTS_PIN } from '../lib/gate_counts.ts';
+import {
+	git_head,
+	harvest_up_to_date,
+	short_commit,
+	type StampInputs,
+	write_stamp,
+} from '../lib/harvest_stamp.ts';
 import { load_all_versions } from '../lib/versions.ts';
 
 const CACHE_PATH = 'benches/js/.cache/svelte_parse_rejects.json';
+const STAMP_PATH = 'benches/js/.cache/svelte_parse_rejects.stamp.json';
 const if_present = Deno.args.includes('--if-present');
+const force = Deno.args.includes('--force');
 
 async function main(): Promise<void> {
 	const versions = await load_all_versions();
+
+	// Freshness stamp: the graded suite trees come from ../svelte (+ prettier's
+	// html suite from ../prettier) and the oracle is the pinned npm svelte —
+	// skip the grade when all of those plus the rejects pin match the stamp.
+	const svelte_commit = git_head('../svelte');
+	const stamp_inputs: StampInputs = {
+		harvest: 'svelte-rejects',
+		svelte_commit,
+		prettier_commit: git_head('../prettier'),
+		svelte_oracle: versions.canonical.svelte,
+		rejects_pin: SVELTE_REJECTS_PIN,
+	};
+	if (
+		!force && svelte_commit !== null &&
+		(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [CACHE_PATH]))
+	) {
+		console.error(
+			`svelte-rejects harvest up to date (../svelte at ${short_commit(svelte_commit)}, ` +
+				`oracle svelte@${versions.canonical.svelte}, pin ${SVELTE_REJECTS_PIN}) — skipping; --force to re-harvest.`,
+		);
+		return;
+	}
 	const canonical = new CanonicalImplementation(versions.canonical);
 	try {
 		await canonical.init();
@@ -103,6 +140,9 @@ async function main(): Promise<void> {
 	const out = resolve(CACHE_PATH);
 	await mkdir(dirname(out), { recursive: true });
 	await writeFile(out, JSON.stringify(rejects, null, '\t') + '\n');
+	if (svelte_commit !== null) {
+		await write_stamp(STAMP_PATH, stamp_inputs);
+	}
 
 	const cwd = resolve('.');
 	console.error(

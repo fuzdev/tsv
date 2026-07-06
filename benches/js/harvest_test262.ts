@@ -23,7 +23,12 @@
  * Flags: `--if-present` tolerates a missing `../test262` checkout (warn +
  * exit 0) — for the `bench:conformance` task chain, where an absent suite
  * should produce a smaller corpus (disclosed via the report's
- * `corpus_sources`), not a failed bench.
+ * `corpus_sources`), not a failed bench. `--force` re-grades despite a fresh
+ * stamp (default runs skip the ~1 min release-mode grade when the ../test262
+ * commit + pin match — see `lib/harvest_stamp.ts`). ⚠ The stamp can't see the
+ * Rust grading logic: after changing the runner's skip/feature filters, run
+ * with `--force` (the graded-manifest pin in `test262.rs` still guards the
+ * result either way).
  *
  * Run from the repo root:
  *   deno run --allow-read --allow-write --allow-run=cargo benches/js/harvest_test262.ts
@@ -33,13 +38,22 @@ import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { TEST262_POSITIVES_PIN } from './lib/gate_counts.ts';
+import {
+	git_head,
+	harvest_up_to_date,
+	short_commit,
+	type StampInputs,
+	write_stamp,
+} from './lib/harvest_stamp.ts';
 
 const TEST262_ROOT = '../test262';
 const CACHE_DIR = 'benches/js/.cache';
 const MANIFEST_PATH = `${CACHE_DIR}/test262_manifest.json`;
 const FILES_PATH = `${CACHE_DIR}/test262_files.json`;
+const STAMP_PATH = `${CACHE_DIR}/test262.stamp.json`;
 
 const if_present = Deno.args.includes('--if-present');
+const force = Deno.args.includes('--force');
 
 try {
 	await stat(join(TEST262_ROOT, 'test'));
@@ -55,6 +69,25 @@ try {
 }
 
 await mkdir(CACHE_DIR, { recursive: true });
+
+// Freshness stamp: skip the release-mode grade when the checkout commit and
+// pin match and both cache files exist.
+const source_commit = git_head(TEST262_ROOT);
+const stamp_inputs: StampInputs = {
+	harvest: 'test262',
+	source_commit,
+	positives_pin: TEST262_POSITIVES_PIN,
+};
+if (
+	!force && source_commit !== null &&
+	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [FILES_PATH, MANIFEST_PATH]))
+) {
+	console.error(
+		`test262 harvest up to date (../test262 at ${short_commit(source_commit)}, ` +
+			`pin ${TEST262_POSITIVES_PIN}) — skipping; --force to re-grade.`,
+	);
+	Deno.exit(0);
+}
 
 // --release: the harness parses the whole ~51k-file tree to grade it; a debug
 // build is an order of magnitude slower.
@@ -113,6 +146,9 @@ if (files.length !== TEST262_POSITIVES_PIN) {
 	Deno.exit(1);
 }
 await writeFile(FILES_PATH, JSON.stringify(files, null, '\t'));
+if (source_commit !== null) {
+	await write_stamp(STAMP_PATH, stamp_inputs);
+}
 
 const module_count = positives.filter((t) => t.module).length;
 console.error(
