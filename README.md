@@ -30,7 +30,7 @@ This is an early release, and reports and feedback are appreciated -
 see the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
-AI disclosure: this codebase was generated with machine agents and the usual LLM caveats apply.
+AI disclosure: this codebase is mostly LLM-generated, and the usual caveats apply.
 The first release took 7 months and ~1800 manual commits.
 It's a high-effort project that prioritizes quality.
 
