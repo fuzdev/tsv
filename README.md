@@ -10,7 +10,7 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
 
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
-so the focus is web standards and there's no JSX or SCSS support or the like,
+so the focus is web standards and there's no support for JSX/SCSS/etc,
 beyond Svelte as the only JS framework.
 The extensibility story is currently limited to using its Rust crates as libraries;
 bridging to JS or WASM plugins is an open question, but may not be supported.
