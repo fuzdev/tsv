@@ -1181,6 +1181,18 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
   are classified, not failed. Exits 1 on any unexplained mismatch. The reference
   reconstruction a `no-locations` consumer would use. Run:
   `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/no_locations_parity.ts`
+- `diagnostics/reconstruct_vs_materialize.ts` — the **perf** sibling of the parity
+  check above: for a consumer that needs full `loc`, is it faster to (A) get the
+  full loc-bearing wire (materialized in Rust) or (B) get the smaller `no-locations`
+  wire and reconstruct `loc` in JS? Times A / B (dogfoods the shipped
+  `create_locator().reconstruct()` helper) / B' (no-loc parse only) end-to-end over
+  the `perf` corpus (TS exact, Svelte approximate) and prints sum-of-medians + the
+  A/B, A/B' ratios. Finding: B beats A (the full wire's `loc` bytes cost real
+  `JSON.parse`), so pre-materializing `loc` in Rust isn't optimal for JS consumers.
+  Feeds the committed report's consumer-side note (`report.ts`
+  `generate_reconstruct_note`). `BENCH_LIMIT` (files/lang) + `BENCH_FILTER` (path
+  substring) tune it. Run:
+  `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/reconstruct_vs_materialize.ts`
 - `diagnostics/wasm_format_probe.ts` — measure WASM **format** wall-time at the resolution
   the full bench folds into noise (single-digit-% changes). A/Bs two WASM builds
   (copy `pkg/all/deno` aside before editing, rebuild, pass `--baseline

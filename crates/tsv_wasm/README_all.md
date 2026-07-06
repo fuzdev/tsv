@@ -37,6 +37,8 @@ const root: Root = parse_svelte('<script>const x = 1;</script>');
 
 Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a source `string` and return the formatted `string`. Three parsers (`parse_svelte`, `parse_typescript`, `parse_css`) return a Svelte-compatible JSON AST; the `parse_*_json` variants return the AST as a compact JSON string instead (faster when writing to disk or the wire). For TypeScript and Svelte, `parse_{typescript,svelte}_no_locations` (and `_json_no_locations`) emit a **span-only** wire — `start`/`end` offsets, no per-node `loc` (Svelte also no `name_loc`) — ~46% smaller and faster to materialize, with line/column derivable from offsets + source. All throw on a parse error.
 
+To turn a span-only wire back into a loc-bearing one, `reconstruct_locations(ast, source)` adds `loc` to every node (mutating in place; `structuredClone` first to keep the input) — **exact for TypeScript**, **approximate for Svelte** (no `name_loc`, and it skips Svelte's `<script>`/destructure position quirks), a no-op for CSS. For sparse lookups, `create_locator(source, opts?)` reuses one line table across `loc_of(node)` / `reconstruct(ast)` calls (pass `{language: 'svelte'}` for `.svelte`); a bare `loc_of(node, source)` is also exported.
+
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
 tsv is non-configurable: formatter settings are fixed at Prettier's defaults except `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and `trailingComma: 'none'` — no options, like `gofmt` and Black.

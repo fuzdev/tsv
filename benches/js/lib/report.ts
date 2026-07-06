@@ -966,6 +966,31 @@ export function generate_json_overhead_note(results: BenchmarkResult[]): string 
 }
 
 /**
+ * Measured ratios for the reconstruct-vs-materialize note below. NOT computed
+ * from bench rows (there is no reconstruct benchmark row) — the source of truth
+ * is `benches/js/diagnostics/reconstruct_vs_materialize.ts`. Refresh these when
+ * that diagnostic's number moves materially. `full` = reconstruct ALL `loc` in
+ * JS; `loc_free` = the loc-sparse/free ceiling. TypeScript (exact), perf corpus.
+ */
+const RECONSTRUCT_VS_MATERIALIZE = { full: '~1.7x', loc_free: '~2.2x' } as const;
+
+/**
+ * One-line consumer-side note: for a JS consumer that needs full `loc`, fetching
+ * the span-only `no-locations` wire and reconstructing `loc` in JS (via the
+ * shipped `reconstruct_locations` helper) beats fetching the full loc-bearing
+ * `tsv-json` wire end-to-end — the full wire's `loc` bytes cost real `JSON.parse`
+ * tokenization, while a line-start table + binary search is cheaper. So
+ * pre-materializing `loc` in Rust is not optimal for JS consumers.
+ *
+ * Not a tsv impl row (there's no reconstruct benchmark) — a curated cross-ref to
+ * the diagnostic that measures it; see `RECONSTRUCT_VS_MATERIALIZE`.
+ */
+export function generate_reconstruct_note(): string {
+	const { full, loc_free } = RECONSTRUCT_VS_MATERIALIZE;
+	return `_Consumer-side: for full \`loc\`, fetching the span-only \`no-locations\` wire and reconstructing \`loc\` in JS (\`reconstruct_locations\`, shipped in \`@fuzdev/tsv_parse_wasm\` / \`@fuzdev/tsv_wasm\`) beats the full loc-bearing \`tsv-json\` wire end-to-end — ${full} faster reconstructing every node, ${loc_free} loc-free (TypeScript, exact; measured by \`diagnostics/reconstruct_vs_materialize.ts\`). Pre-materializing \`loc\` in Rust is not optimal for JS consumers._`;
+}
+
+/**
  * Generate the skipped files list as a markdown section.
  *
  * Splits the file list into per-language buckets so that one noisy language
