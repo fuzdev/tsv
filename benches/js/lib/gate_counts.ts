@@ -79,9 +79,9 @@ export const TS_REPO_PINS = { scanned: 768, accept_parity: 424 };
  * and any drop fails. Measured 2026-07-06 (oracle svelte@5.56.4).
  */
 export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
-	svelte: 1213,
-	typescript: 4174,
-	css: 147,
+	svelte: 1372,
+	typescript: 4250,
+	css: 150,
 };
 
 /**
@@ -89,11 +89,16 @@ export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
  * count. Up = tsv newly rejects real corpus code (a drop-in regression — or a
  * legitimately-unsupported new corpus file: triage with
  * `diagnostics/skip_triage.ts`, then re-pin consciously). Down = a parse gap
- * closed; re-pin so the win stays recorded. Measured 2026-07-06.
+ * closed; re-pin so the win stays recorded. Measured 2026-07-06 after adding
+ * the ryanatkn.com + webdevladder.net + mdz entries (all parse clean).
+ * typescript 16→15: the departed error was live-corpus drift (../svelte.dev
+ * worktree reset to HEAD + tsv.fuz.dev wip churn the same day); all 15
+ * remaining are the sanctioned prettier-suite classes (import assertions ×9,
+ * decorators ×4, comment-in-args ×2) — no live-repo errors.
  */
 export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 16,
+	typescript: 15,
 	css: 5,
 };
 
@@ -102,9 +107,9 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`). Measured 2026-07-06.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	svelte: 978,
-	typescript: 3906,
-	css: 107,
+	svelte: 1111,
+	typescript: 3983,
+	css: 110,
 };
 
 /**
@@ -114,15 +119,24 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * (`lib/divergence/patterns.ts`), or consciously re-pin for a new corpus file.
  * Down = the backlog shrank; re-pin to record it. A single-run trip can be the
  * FFI/sidecar heisenbug — confirm on the single repo first. Measured
- * 2026-07-06.
+ * 2026-07-06 after adding the ryanatkn.com + webdevladder.net + mdz entries.
+ * svelte 7→8: +1 = tsv.fuz.dev BenchmarksCrossRuntime.svelte, the sanctioned
+ * inline-element expansion class (render-safe; flagged unknown only because no
+ * detector pattern claims it yet). typescript 180→179: +1 mdz
+ * mdz.benchmark.ts (needs-triage class, recorded in internal notes —
+ * param-list explosion before an unbreakable-overflow arrow body, where
+ * prettier keeps the params inline and accepts the overflow), −2 live-corpus
+ * drift (same-day svelte.dev worktree reset + tsv.fuz.dev wip churn). The
+ * svelte partial 3→4 below is mdz's docs introduction page (fill-boundary
+ * family, residual hunks unexplained — pattern-extension candidate).
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
-	svelte: 7,
-	typescript: 180,
+	svelte: 8,
+	typescript: 179,
 	css: 23,
 };
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
-	svelte: 3,
+	svelte: 4,
 	typescript: 63,
 	css: 8,
 };
@@ -135,8 +149,9 @@ export const TEST262_POSITIVES_PIN = 42_113;
 
 /**
  * bench:harvest:svelte-rejects — exact reject count. Measured 2026-07-06:
- * ../svelte at 8fb7ceeba, oracle svelte@5.56.4 (142 of 5489 conformance-view
- * Svelte files). Fewer = the svelte/compiler oracle stopped rejecting (broken
+ * ../svelte at 8fb7ceeba, oracle svelte@5.56.4 (142 of 5648 conformance-view
+ * Svelte files, re-verified after the ryanatkn.com + webdevladder.net + mdz
+ * corpus additions — all their Svelte is valid). Fewer = the svelte/compiler oracle stopped rejecting (broken
  * import/config); more = it started rejecting wholesale — either way the cache
  * would corrupt the published coverage number.
  */

@@ -929,9 +929,10 @@ One tagged entry list (`lib/corpus.ts` `CORPUS_ENTRIES`, paths relative to the
 project root). Every entry carries a tier — `real`, `prettier_fixture`, or
 `suite` — and each consumer selects a **view**:
 
-- **`perf`** (~2,900 files) — `real` entries only: application & library
+- **`perf`** (~3,100 files) — `real` entries only: application & library
   source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
-  svelte-docinfo, tsv.fuz.dev) plus upstream framework source
+  svelte-docinfo, tsv.fuz.dev — plus the author's public SvelteKit sites:
+  ryanatkn.com, webdevladder.net) plus upstream framework source
   (kit/packages/kit, svelte/packages/svelte, and the svelte.dev subpaths).
   Fixture subtrees inside those repos are pruned (`fixtures` segments
   anywhere; `samples` segments under a `test` segment) while `*.test.ts`

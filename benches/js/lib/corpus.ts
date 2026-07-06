@@ -348,10 +348,14 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 	{ path: '../fuz_template/src', tier: 'real' },
 	{ path: '../fuz_ui/src', tier: 'real' },
 	{ path: '../fuz_util/src', tier: 'real' },
+	{ path: '../mdz/src', tier: 'real' },
 	// Build tooling
 	{ path: '../gro/src', tier: 'real' },
 	{ path: '../svelte-docinfo/src', tier: 'real' },
 	{ path: '../tsv.fuz.dev/src', tier: 'real' },
+	// Personal sites (public repos beyond the fuz ecosystem)
+	{ path: '../ryanatkn.com/src', tier: 'real' },
+	{ path: '../webdevladder.net/src', tier: 'real' },
 	// External projects (monorepo subpaths)
 	{ path: '../kit/packages/kit/src', tier: 'real' },
 	{ path: '../svelte/packages/svelte/src', tier: 'real' },
@@ -370,7 +374,9 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 	{ path: '../prettier/tests/format/js', tier: 'prettier_fixture' },
 	{ path: '../prettier/tests/format/css', tier: 'prettier_fixture' },
 	{ path: '../prettier/tests/format/html', tier: 'prettier_fixture', extensions: ['html'] },
-	// TODO: '../prettier/tests/format/jsx' (91 files — JSX formatting edge cases)
+	// '../prettier/tests/format/jsx' is deliberately absent: tsv rejects JSX by design
+	// (drop-in for Svelte's parser; acorn without the JSX plugin rejects it too), so the
+	// suite's 91 files would grade as always-reject noise, not conformance signal.
 	// Parse-conformance suites (`conformance` view only)
 	{ path: '../svelte/packages/svelte/tests', tier: 'suite', skip: svelte_tests_skip },
 	{

@@ -4,11 +4,11 @@
 
 **Corpus kind:** conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-07-06T20:30:33.457Z — tsv 0.1.0 (1970e001)
+**Date:** 2026-07-06T21:59:12.381Z — tsv 0.1.0 (a7e0b6a3)
 
-**Corpus:** 5351 Svelte (2.7 MB), 46773 TypeScript (78.9 MB), 22673 CSS (7.8 MB) — 74797 files, 89.4 MB total
+**Corpus:** 5507 Svelte (2.9 MB), 46847 TypeScript (79.5 MB), 22676 CSS (7.8 MB) — 75030 files, 90.3 MB total
 
-**Sources:** ../zzz/src (325), ../fuz_app/src (664), ../fuz_blog/src (32), ../fuz_code/src (68), ../fuz_css/src (124), ../fuz_docs/src (64), ../fuz_gitops/src (203), ../fuz_mastodon/src (24), ../fuz_template/src (15), ../fuz_ui/src (215), ../fuz_util/src (144), ../gro/src (187), ../svelte-docinfo/src (297), ../tsv.fuz.dev/src (27), ../kit/packages/kit/src (381), ../svelte/packages/svelte/src (380), ../svelte.dev/apps/svelte.dev/src (138), ../svelte.dev/packages/repl/src (48), ../svelte.dev/packages/site-kit/src (65), ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
+**Sources:** ../zzz/src (325), ../fuz_app/src (664), ../fuz_blog/src (32), ../fuz_code/src (68), ../fuz_css/src (124), ../fuz_docs/src (64), ../fuz_gitops/src (203), ../fuz_mastodon/src (24), ../fuz_template/src (15), ../fuz_ui/src (215), ../fuz_util/src (144), ../mdz/src (144), ../gro/src (187), ../svelte-docinfo/src (297), ../tsv.fuz.dev/src (27), ../ryanatkn.com/src (51), ../webdevladder.net/src (38), ../kit/packages/kit/src (381), ../svelte/packages/svelte/src (380), ../svelte.dev/apps/svelte.dev/src (138), ../svelte.dev/packages/repl/src (48), ../svelte.dev/packages/site-kit/src (65), ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
 
 **Versions:** svelte@5.56.4, acorn@8.16.0, acorn-typescript@1.0.10, prettier@3.9.0, prettier-plugin-svelte@4.1.1, oxc-parser@0.139.0, oxfmt@0.57.0, @biomejs/wasm-bundler@2.5.2
 
@@ -16,15 +16,15 @@
 
 ## parse/svelte
 
-**Coverage:** svelte/compiler 5351/5351 (100%), tsv-json 5343/5351 (99%), tsv-json-no-locations 5343/5351 (99%), tsv_wasm-json 5343/5351 (99%), tsv_wasm-json-no-locations 5343/5351 (99%), tsv-internal 5343/5351 (99%), tsv_wasm-internal 5343/5351 (99%)
+**Coverage:** svelte/compiler 5507/5507 (100%), tsv-json 5499/5507 (99%), tsv-json-no-locations 5499/5507 (99%), tsv_wasm-json 5499/5507 (99%), tsv_wasm-json-no-locations 5499/5507 (99%), tsv-internal 5499/5507 (99%), tsv_wasm-internal 5499/5507 (99%)
 
 ## parse/typescript
 
-**Coverage:** acorn-typescript 46095/46773 (98%), tsv-json 46524/46773 (99%), tsv-json-no-locations 46524/46773 (99%), tsv_wasm-json 46524/46773 (99%), tsv_wasm-json-no-locations 46524/46773 (99%), tsv-internal 46524/46773 (99%), tsv_wasm-internal 46524/46773 (99%), oxc-parser 46528/46773 (99%), oxc-parser-wasm 46773/46773 (100%)
+**Coverage:** acorn-typescript 46169/46847 (98%), tsv-json 46598/46847 (99%), tsv-json-no-locations 46598/46847 (99%), tsv_wasm-json 46598/46847 (99%), tsv_wasm-json-no-locations 46598/46847 (99%), tsv-internal 46598/46847 (99%), tsv_wasm-internal 46598/46847 (99%), oxc-parser 46602/46847 (99%), oxc-parser-wasm 46847/46847 (100%)
 
 ## parse/css
 
-**Coverage:** svelte/compiler 22434/22673 (98%), tsv-json 22479/22673 (99%), tsv_wasm-json 22479/22673 (99%), tsv-internal 22479/22673 (99%), tsv_wasm-internal 22479/22673 (99%)
+**Coverage:** svelte/compiler 22437/22676 (98%), tsv-json 22482/22676 (99%), tsv_wasm-json 22482/22676 (99%), tsv-internal 22482/22676 (99%), tsv_wasm-internal 22482/22676 (99%)
 
 ## Binary Sizes
 

@@ -2,12 +2,12 @@
 	"version": 6,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-06T20:30:33.457Z",
-	"git_commit": "1970e001",
+	"timestamp": "2026-07-06T21:59:12.381Z",
+	"git_commit": "a7e0b6a3",
 	"corpus": {
-		"svelte": 5351,
-		"typescript": 46773,
-		"css": 22673
+		"svelte": 5507,
+		"typescript": 46847,
+		"css": 22676
 	},
 	"corpus_sources": [
 		{
@@ -110,6 +110,15 @@
 			}
 		},
 		{
+			"path": "../mdz/src",
+			"files": 144,
+			"by_language": {
+				"svelte": 101,
+				"typescript": 42,
+				"css": 1
+			}
+		},
+		{
 			"path": "../gro/src",
 			"files": 187,
 			"by_language": {
@@ -133,6 +142,24 @@
 			"by_language": {
 				"svelte": 16,
 				"typescript": 10,
+				"css": 1
+			}
+		},
+		{
+			"path": "../ryanatkn.com/src",
+			"files": 51,
+			"by_language": {
+				"svelte": 31,
+				"typescript": 19,
+				"css": 1
+			}
+		},
+		{
+			"path": "../webdevladder.net/src",
+			"files": 38,
+			"by_language": {
+				"svelte": 24,
+				"typescript": 13,
 				"css": 1
 			}
 		},
@@ -349,9 +376,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5351,
-			"files_total": 5351,
-			"files_iterated": 5343,
+			"files_processed": 5507,
+			"files_total": 5507,
+			"files_iterated": 5499,
 			"runtime": "node"
 		},
 		{
@@ -369,9 +396,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5343,
-			"files_total": 5351,
-			"files_iterated": 5343,
+			"files_processed": 5499,
+			"files_total": 5507,
+			"files_iterated": 5499,
 			"runtime": "node"
 		},
 		{
@@ -389,9 +416,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5343,
-			"files_total": 5351,
-			"files_iterated": 5343,
+			"files_processed": 5499,
+			"files_total": 5507,
+			"files_iterated": 5499,
 			"runtime": "node"
 		},
 		{
@@ -409,9 +436,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5343,
-			"files_total": 5351,
-			"files_iterated": 5343,
+			"files_processed": 5499,
+			"files_total": 5507,
+			"files_iterated": 5499,
 			"runtime": "node"
 		},
 		{
@@ -429,9 +456,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5343,
-			"files_total": 5351,
-			"files_iterated": 5343,
+			"files_processed": 5499,
+			"files_total": 5507,
+			"files_iterated": 5499,
 			"runtime": "node"
 		},
 		{
@@ -449,9 +476,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5343,
-			"files_total": 5351,
-			"files_iterated": 5343,
+			"files_processed": 5499,
+			"files_total": 5507,
+			"files_iterated": 5499,
 			"runtime": "node"
 		},
 		{
@@ -469,9 +496,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5343,
-			"files_total": 5351,
-			"files_iterated": 5343,
+			"files_processed": 5499,
+			"files_total": 5507,
+			"files_iterated": 5499,
 			"runtime": "node"
 		},
 		{
@@ -489,9 +516,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46095,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46169,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -509,9 +536,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46524,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46598,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -529,9 +556,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46524,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46598,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -549,9 +576,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46524,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46598,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -569,9 +596,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46524,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46598,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -589,9 +616,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46524,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46598,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -609,9 +636,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46524,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46598,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -629,9 +656,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46528,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46602,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -649,9 +676,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46773,
-			"files_total": 46773,
-			"files_iterated": 46025,
+			"files_processed": 46847,
+			"files_total": 46847,
+			"files_iterated": 46099,
 			"runtime": "node"
 		},
 		{
@@ -669,9 +696,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22434,
-			"files_total": 22673,
-			"files_iterated": 22410,
+			"files_processed": 22437,
+			"files_total": 22676,
+			"files_iterated": 22413,
 			"runtime": "node"
 		},
 		{
@@ -689,9 +716,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22479,
-			"files_total": 22673,
-			"files_iterated": 22410,
+			"files_processed": 22482,
+			"files_total": 22676,
+			"files_iterated": 22413,
 			"runtime": "node"
 		},
 		{
@@ -709,9 +736,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22479,
-			"files_total": 22673,
-			"files_iterated": 22410,
+			"files_processed": 22482,
+			"files_total": 22676,
+			"files_iterated": 22413,
 			"runtime": "node"
 		},
 		{
@@ -729,9 +756,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22479,
-			"files_total": 22673,
-			"files_iterated": 22410,
+			"files_processed": 22482,
+			"files_total": 22676,
+			"files_iterated": 22413,
 			"runtime": "node"
 		},
 		{
@@ -749,9 +776,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22479,
-			"files_total": 22673,
-			"files_iterated": 22410,
+			"files_processed": 22482,
+			"files_total": 22676,
+			"files_iterated": 22413,
 			"runtime": "node"
 		}
 	],
