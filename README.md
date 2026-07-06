@@ -128,7 +128,8 @@ Consumers can use tsv's crates ([not yet published](https://github.com/fuzdev/ts
 to build custom tools independently.
 Hard non-goals:
 
-- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends)
+- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends) -
+  but note that you can use tsv's crates and patterns to vibe your own thing
 - standard CSS and Svelte extensions only - no SCSS, CSS Modules, LESS, etc
 - no style config settings, so on-disk state and caller params
   never change the output for a given input
