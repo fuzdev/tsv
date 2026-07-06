@@ -526,13 +526,20 @@ fn build_long_chain_doc<'a, P: ChainPrinter>(
     printer: &P,
 ) -> DocId {
     let d = printer.arena();
-    // Check if any group except the last will break
+    // Print every group's flat doc once. Both the "any non-last group breaks" scan
+    // just below and the oneLine variant (`on_line_doc`) consume these flat group
+    // docs, so one build feeds both. A member chain builds the same group flat across
+    // `conditional_group` candidates, and the arg-doc share (see `build_chain_doc`)
+    // makes each flat rebuild byte-identical to the first — so reusing this single
+    // build is byte-identical to the prior discard-then-rebuild.
+    let on_line: DocBuf = groups.iter().map(|g| print_group(g, printer)).collect();
+
+    // Check if any group except the last will break.
     // Use will_break_deep to see through IsolatedGroup wrappers — chain break
     // detection is a doc analysis concern, not a rendering isolation concern.
-    let any_non_last_breaks = groups[..groups.len() - 1].iter().any(|g| {
-        let doc = print_group(g, printer);
-        d.will_break_deep(doc)
-    });
+    let any_non_last_breaks = on_line[..on_line.len() - 1]
+        .iter()
+        .any(|&doc| d.will_break_deep(doc));
 
     // Check if this chain ends with member access (not a call)
     let chain_ends_with_member = ends_with_member(rest_groups, first_groups);
@@ -556,8 +563,7 @@ fn build_long_chain_doc<'a, P: ChainPrinter>(
         return expanded;
     }
 
-    // Print all groups inline (for oneLine variant)
-    let on_line: DocBuf = groups.iter().map(|g| print_group(g, printer)).collect();
+    // oneLine variant (reuses the flat group docs built above)
     let on_line_doc = d.concat(&on_line);
 
     // Handle chains ending with member access with exactly one call in rest
