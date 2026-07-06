@@ -2,17 +2,18 @@
 
 > a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS - [tsv.fuz.dev](https://tsv.fuz.dev/)
 
-tsv is a toolchain for Svelte, TypeScript, and CSS, written in Rust.
-The first release has a near-[Prettier](https://prettier.io/) formatter,
-similar to [prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
+tsv is a toolchain for Svelte, TypeScript/JS, and CSS, written in Rust.
+The first release has a formatter that closely follows [Prettier](https://prettier.io/) +
+[prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
 and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 [acorn](https://github.com/acornjs/acorn) +
 [acorn-typescript](https://github.com/sveltejs/acorn-typescript).
 
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
-with Svelte as the only JS framework. 
+so the focus is web standards and there's no JSX or SCSS support or the like,
+beyond Svelte as the only JS framework.
 The extensibility story is currently limited to using its Rust crates as libraries;
-bridging to JS and/or WASM plugins is an open question (currently leaning against for performance and simplicity).
+bridging to JS or WASM plugins is an open question, but may not be supported.
 For benchmarks including performance and binary size, visit [tsv.fuz.dev](https://tsv.fuz.dev/).
 
 tsv prioritizes, in order:
@@ -136,8 +137,9 @@ Hard non-goals:
   see the [conformance doc](https://github.com/fuzdev/tsv/blob/main/docs/conformance_prettier.md)
   and [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
 
-Currently tsv does not support or plan for JS plugins or JS runtime integration.
-JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals.
+tsv currently does not support JS plugins or JS runtime integration.
+JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
+but the current lean is against, mainly for performance and simplicity reasons.
 
 tsv is derived from:
 
@@ -150,6 +152,7 @@ tsv currently supports:
 
 - [x] formatter matching Prettier + prettier-plugin-svelte (with intentional divergences)
 - [x] parser, drop-in for Svelte+acorn+acorn-typescript
+- [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_plugin_tsv_format) - fuzdev.tsv-format
 
 Future features (unknown order):
 
