@@ -33,6 +33,8 @@ AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `im
 
 Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) returning the AST as a compact JSON string — faster when you're writing it to disk or sending it over the wire, since it skips materializing the JS object tree.
 
+For TypeScript and Svelte there are also **span-only** variants — `parse_typescript_no_locations` / `parse_svelte_no_locations` (and their `_json_no_locations` string forms) — that emit `start`/`end` offsets but drop the per-node `loc` (line/column) object (Svelte also drops `name_loc`). This mirrors acorn's `locations: false`: the wire is ~46% smaller and materializes much faster, and line/column stays derivable from the offsets plus your source, so nothing is lost if you have the source. (CSS has no `loc`, so no variant is needed.)
+
 ## Status
 
 v0.1 — pre-release. API may change.

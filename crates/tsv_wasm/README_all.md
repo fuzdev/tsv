@@ -19,7 +19,7 @@ npx @fuzdev/tsv_wasm parse file.svelte # JSON AST to stdout (--pretty to indent)
 
 Installed (`npm i -D @fuzdev/tsv_wasm`), the bin is `tsv`. Directories recurse over `.ts`/`.svelte`/`.css` with gitignore-aware discovery. **Inside a git repo** it honors `.gitignore`, `.formatignore` (both hierarchical, like git), and a repo-root `.prettierignore`, scoped to the repo so results are reproducible. **Outside a repo** it honors only `.formatignore`, falling back to skipping hidden directories and `dist`/`build`/`target`. `node_modules` and VCS directories are always skipped; an explicitly named file is always formatted.
 
-`format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--goal script|module` (default `module`; `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier and `import`/`export`/`import.meta` are errors. Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
+`format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--goal script|module` (default `module`; `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier and `import`/`export`/`import.meta` are errors. `parse --no-locations` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`; no-op for CSS). Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 
 This CLI runs the single-threaded WASM build — plenty fast for most trees. A future native `tsv` binary will be the high-performance path.
 
@@ -35,7 +35,7 @@ const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 const root: Root = parse_svelte('<script>const x = 1;</script>');
 ```
 
-Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a source `string` and return the formatted `string`. Three parsers (`parse_svelte`, `parse_typescript`, `parse_css`) return a Svelte-compatible JSON AST; the `parse_*_json` variants return the AST as a compact JSON string instead (faster when writing to disk or the wire). All throw on a parse error.
+Three formatters (`format_svelte`, `format_typescript`, `format_css`) take a source `string` and return the formatted `string`. Three parsers (`parse_svelte`, `parse_typescript`, `parse_css`) return a Svelte-compatible JSON AST; the `parse_*_json` variants return the AST as a compact JSON string instead (faster when writing to disk or the wire). For TypeScript and Svelte, `parse_{typescript,svelte}_no_locations` (and `_json_no_locations`) emit a **span-only** wire — `start`/`end` offsets, no per-node `loc` (Svelte also no `name_loc`) — ~46% smaller and faster to materialize, with line/column derivable from offsets + source. All throw on a parse error.
 
 AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly.
 
