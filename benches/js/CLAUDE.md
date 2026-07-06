@@ -96,7 +96,7 @@ number, regardless.)
 Compare formatting output against Prettier on arbitrary codebases:
 
 ```bash
-# The gates corpus view (~6,000 files: real repos + prettier suites — see §Corpus)
+# The gates corpus view (~6,200 files: real repos + prettier suites — see §Corpus)
 deno task corpus:compare:format --all
 deno task corpus:compare:format --all --explain
 deno task corpus:compare:format --all --summary
@@ -435,8 +435,9 @@ every real move in a number is a deliberate, visible edit.
   (minimum per-language `match` + EXACT per-language `unknown`/`partial`
   counts — the un-triaged divergence backlog is pinned, so a new unexplained
   divergence fails until fixed/cataloged, and a shrink is re-pinned to record
-  the win), and the three harvests (wpt block count, test262 positive count,
-  svelte-rejects count).
+  the win), and the four harvests (wpt block count, test262 positive count,
+  svelte-rejects count — exact; svelte-styles block count — a live-corpus
+  MINIMUM, since its source is the perf-view dev repos).
 - Rust-side counts are consts in their commands — grep `REGRESSION PIN`:
   test262 (discovered + graded-manifest), `fixtures_validate` (total fixtures —
   protects the primary gate against a discovery collapse), and `swallow_audit`
@@ -945,13 +946,16 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   svelte-docinfo, tsv.fuz.dev — plus the author's public SvelteKit sites:
   ryanatkn.com, webdevladder.net) plus upstream framework source
   (kit/packages/kit, svelte/packages/svelte, and the svelte.dev subpaths).
+  The CSS set additionally carries the `svelte_styles` per-repo concats
+  harvested from those repos' `.svelte` `<style>` blocks (see
+  `bench:harvest:svelte-styles` + §Fairness Caveats).
   Fixture subtrees inside those repos are pruned (`fixtures` segments
   anywhere; `samples` segments under a `test` segment) while `*.test.ts`
   files stay — tests are real code. This is what `deno task bench` measures,
   so throughput reflects real code, not formatter edge-case suites. This
   framing is the source of truth for the public benchmark page's "What's
   measured" prose — keep them in sync.
-- **`gates`** (~6,000 files) — `real` + `prettier_fixture`, no perf prune:
+- **`gates`** (~6,200 files) — `real` + `prettier_fixture`, no perf prune:
   adds Prettier's `tests/format/{typescript,js,css,html}` suites and
   prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a
   companion `options.json` skipped) — deliberately tricky edge cases.
@@ -998,10 +1002,12 @@ Each entry is `{path|files_from, tier, extensions?, skip?, optional?}`.
 **Missing entries fail fast** — the loader checks every entry up front and
 throws listing the missing paths, so a partial checkout can't silently shrink
 a perf number or let a correctness gate pass while grading less than it
-claims. The only exceptions: the two derived harvest caches are `optional`
-(warn-and-skip — their source checkouts `../wpt`/`../test262` are legitimately
-machine-dependent, matching the harvests' own `--if-present` posture), and
-`BENCH_ALLOW_MISSING=1` opts the bench into a partial corpus explicitly.
+claims. The only exceptions: the three derived harvest caches are `optional`
+(warn-and-skip — wpt/test262 because their source checkouts are legitimately
+machine-dependent, matching those harvests' `--if-present` posture;
+svelte_styles because it's generated from the always-required dev repos and
+just may not have been harvested yet), and `BENCH_ALLOW_MISSING=1` opts the
+bench into a partial corpus explicitly.
 Reports carry `corpus_sources` (per-entry loaded file counts) so any tolerated
 gap is disclosed rather than invisible.
 

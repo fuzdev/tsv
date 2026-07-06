@@ -268,10 +268,12 @@ interface CorpusEntryBase {
 	skip?: SkipFn;
 	/**
 	 * Tolerate absence with a warning instead of failing the run. Only for the
-	 * derived harvest caches, whose source checkouts (`../wpt`, `../test262`)
-	 * are legitimately machine-dependent — the harvest tasks warn-and-skip the
-	 * same way, and `corpus_sources` disclosure covers the smaller corpus.
-	 * Everything else is required: a missing repo fails fast (see `stream`).
+	 * derived harvest caches: wpt/test262 because their source checkouts are
+	 * legitimately machine-dependent (their harvest tasks warn-and-skip the same
+	 * way), svelte_styles because it's generated from the always-required dev
+	 * repos and just may not have been harvested yet. `corpus_sources`
+	 * disclosure covers the smaller corpus. Everything else is required: a
+	 * missing repo fails fast (see `stream`).
 	 */
 	optional?: boolean;
 	/** Remedy appended to the missing-entry warning/error (e.g. the harvest task to run). */
