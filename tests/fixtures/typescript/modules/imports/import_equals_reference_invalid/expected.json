@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 158,
+	"end": 338,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -25,24 +25,56 @@
 					"column": 79
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " `import type X = ...` is valid ONLY for an external module reference;",
+			"start": 150,
+			"end": 222,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an entity-name alias is rejected (see input_invalid_type_modifier).",
+			"start": 224,
+			"end": 294,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 71
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 157,
+		"end": 337,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 148,
+			"end": 328,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 5,
+					"line": 9,
 					"column": 9
 				}
 			},
@@ -230,6 +262,85 @@
 							"name": "C"
 						}
 					}
+				},
+				{
+					"type": "TSImportEqualsDeclaration",
+					"start": 296,
+					"end": 327,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 32
+						}
+					},
+					"importKind": "type",
+					"isExport": false,
+					"id": {
+						"type": "Identifier",
+						"start": 308,
+						"end": 311,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 13
+							},
+							"end": {
+								"line": 8,
+								"column": 16
+							}
+						},
+						"name": "ext"
+					},
+					"moduleReference": {
+						"type": "TSExternalModuleReference",
+						"start": 314,
+						"end": 326,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 19
+							},
+							"end": {
+								"line": 8,
+								"column": 31
+							}
+						},
+						"expression": {
+							"type": "Literal",
+							"start": 322,
+							"end": 325,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 27
+								},
+								"end": {
+									"line": 8,
+									"column": 30
+								}
+							},
+							"value": "z",
+							"raw": "'z'"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `import type X = ...` is valid ONLY for an external module reference;",
+							"start": 150,
+							"end": 222
+						},
+						{
+							"type": "Line",
+							"value": " an entity-name alias is rejected (see input_invalid_type_modifier).",
+							"start": 224,
+							"end": 294
+						}
+					]
 				}
 			],
 			"sourceType": "module"

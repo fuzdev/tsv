@@ -43,15 +43,7 @@ import { type KnownGap, TS_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
  * fail it. This set must only SHRINK: when a gap is fixed, delete its entry (the
  * input then parses → parity).
  */
-const KNOWN_GAPS: KnownGap[] = [
-	{
-		pattern: 'normal_syntax_import_type_specifier_with_as/',
-		category: 'import-type-specifier',
-		reason:
-			"`import { type as age }` — `type` is the imported name, `as age` the rename; tsv reads " +
-			'`type` as the type-modifier keyword and over-rejects. (`import { type as as x }` already parses.)',
-	},
-];
+const KNOWN_GAPS: KnownGap[] = [];
 
 const config: FixturesGateConfig = {
 	title: 'TypeScript-fixtures',
