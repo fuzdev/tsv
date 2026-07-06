@@ -492,9 +492,13 @@ export function generate_group_bench_table_markdown(
 	const baseline_ops = results[baseline_index].stats.ops_per_second;
 
 	const rows: string[][] = [];
+	// "sweeps/sec", not "ops/sec": one timed iteration is one full pass over the
+	// group's iterated file set, so every absolute column here (rate, percentiles,
+	// min/max) is per-SWEEP — a reader wanting per-file figures divides by the
+	// group's file count. Ratios and MB/s are denominated consistently either way.
 	rows.push([
 		'Task Name',
-		'ops/sec',
+		'sweeps/sec',
 		'n',
 		`p50 (${unit_str})`,
 		`p75 (${unit_str})`,
@@ -750,6 +754,12 @@ export function generate_comparison_summary(
 		);
 	}
 	lines.push('  (format groups include parse time — each formatter parses internally)');
+	lines.push(
+		'  (oxfmt formats JS/TS natively; its css/svelte rows route through its BUNDLED',
+	);
+	lines.push(
+		'   prettier — native-vs-native reads apply to the typescript group only)',
+	);
 
 	return lines.join('\n');
 }
@@ -817,6 +827,9 @@ export function generate_comparison_markdown(
 		);
 	}
 	notes.push('Format groups include parse time — each formatter parses internally');
+	notes.push(
+		'oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only',
+	);
 
 	lines.push('_' + notes.join('. ') + '._');
 

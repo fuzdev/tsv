@@ -27,6 +27,15 @@ delta on the same row is the detector.
   the end of `deno task bench:perf`) then folds the siblings into a compact combined
   `results/report.{json,md}` — the cross-runtime view tsv.fuz.dev consumes
   (`compose_reports.ts`; a per-runtime delta on a row is the headline). The
+  composer records per-source provenance (runtime, commit, timestamp, tsv
+  version — in the JSON `sources[]` and the md header) and flags **mixed
+  vintages** loudly (md banner + stderr + `mixed_vintage` in the JSON) when the
+  siblings come from different commits/versions — it folds whatever exists, so
+  a fresh `report.deno.*` next to a stale `report.node.*` would otherwise read
+  as a runtime effect. It also annotates any row whose per-runtime
+  intersections differ (`⚠ files a/b/c`) — each runtime times the files *its*
+  impls passed preflight on, so unequal counts mean a sliver of the ratio is
+  file-set, not runtime. The
   conformance surface (`BENCH_CORPUS=conformance`) writes its own
   `report.conformance.node.*` (coverage-only + node-only — see §Corpus), outside
   the compose glob.
@@ -122,9 +131,11 @@ content-addressed cache (`lib/prettier_cache.ts`, `.cache/prettier/`): keyed on
 the source content + parser/filepath routing + the full options + the
 canonical-5 pins (incl. svelte, the plugin's peer) + `PRETTIER_DEBUG` + a
 schema constant — a hit is exactly equivalent to a live run. Success-only
-(errors and empty outputs never cached, so the sidecar-miss heisenbug can't
-poison it — and cached hits remove the prettier-side flake from repeat runs
-entirely; the tsv/FFI side stays live). The run reports `prettier cache: N
+(errors and semantically-empty outputs never cached — `put` rejects
+whitespace-only, and `get` treats a stored whitespace-only entry as a miss —
+so the prettier-miss heisenbug can't poison it, and cached hits remove the
+prettier-side flake from repeat runs entirely; the tsv/FFI side stays live).
+The run reports `prettier cache: N
 hits / M misses`. Scope: this tool + the conformance driver only — never the
 bench (it times prettier), never the fixture validator (live by design).
 `TSV_PRETTIER_CACHE=0` disables; `deno task bench:clean` wipes.
@@ -397,9 +408,10 @@ scoped/triage entries. It is wired into `scripts/publish.ts` **Step 3b**
 warn-and-skips a dry-run, and any skip is re-warned in the run's final summary.
 The gates themselves fail closed on a missing checkout (0 scanned = FAIL), so a
 manual `deno task conformance` can't green-skip a leg. `corpus:compare:format` there gates on **SAFETY**
-(data loss) — the ~8% intentional style divergences are non-blocking WARNs, and a
-`--all` SAFETY hit may be the known FFI heisenbug (§Known Issues), so confirm on
-the single repo before treating it as real. Both corpus tools also fail (exit 1)
+(data loss) — the ~8% intentional style divergences are non-blocking WARNs, and
+every SAFETY finding is self-verified in-run (the native format is re-run and
+must reproduce byte-identically; nondeterminism surfaces as a loud per-file
+error instead — see §Known Issues). Both corpus tools also fail (exit 1)
 on a run that compared nothing: an empty scope (`No files found`) or an
 every-file-errored / every-file-parse-fail-skipped run is a systemic failure —
 sidecar/FFI down or a wrong corpus — never a pass. `test262` (needs `../test262`) and the
@@ -718,21 +730,33 @@ Things the published numbers measure that aren't quite what they look like:
   absent from every `Cargo.toml`, and the workspace's `tokio` is dev/debug-only —
   not in the shipped `tsv_ffi`/`tsv_wasm` chain); prettier, `svelte/compiler`, and
   `oxc-parser.parseSync` are single-threaded JS. The lone nuance is `oxfmt`,
-  whose async API bundles `tinypool` and may run a call on a worker thread —
-  still one thread of compute per file, and each call is fully awaited before
-  the next, so no fan-out is exploited. This deliberately excludes the
+  whose programmatic `format` is an async napi call that may run the native
+  work off the JS thread (its `tinypool` dep is CLI-only — `dist/cli.js` —
+  not in the `format()` path) — still one thread of compute per file, and
+  each call is fully awaited before the next, so no fan-out is exploited. This deliberately excludes the
   multi-core batch throughput a CLI gets formatting many files at once (which
   most of these tools, tsv included, could provide) — that's a different
   benchmark.
 - **Different tools produce different output — speed is not conditioned on
   correctness.** The timed work is "produce _this tool's own_ formatting," not
   "produce the same bytes," and no two of these tools emit identical output.
+  Every formatter IS configured to the same layout targets to the extent its
+  options allow — printWidth/lineWidth 100, tabs, single quotes, no trailing
+  commas — for prettier (`canonical.ts` `PRETTIER_OPTIONS`), oxfmt
+  (`oxc.ts` `format_async`), and biome (`biome.ts` `applyConfiguration`),
+  matching tsv's fixed config; unmatched defaults (biome's width is 80; oxfmt
+  and biome default to double quotes) would make the rows wrap/rewrite
+  different amounts of code, conflating config with engine speed. (oxfmt's own
+  width default is already 100 — pinned anyway so a default change can't
+  silently skew the rows. The options provably reach oxfmt's bundled-prettier
+  fallback for css/svelte too.)
   `prettier` is the reference; `oxfmt` also targets prettier conformance, so
   `prettier` vs `oxfmt` is the closest to a same-output, same-work race. `tsv`
   tracks prettier closely but _intentionally diverges_ in documented cases (the
   `_prettier_divergence` fixtures / `conformance_prettier.md`; ~92%
   `corpus:compare:format` match, measured separately — not here). `biome` formats to
-  its own style. Because layout decisions differ, a format ratio is partly an
+  its own style. Because residual layout decisions still differ, a format ratio
+  is partly an
   output-shape difference, not pure engine speed — and nothing here verifies
   output validity, so a formatter emitting subtly wrong output fast would still
   "win."
@@ -775,11 +799,16 @@ Things the published numbers measure that aren't quite what they look like:
   this surface measures coverage, it doesn't replace them.
 - **Measurement-shape asymmetries (small, mostly self-cancelling).** (a) Every
   `tsv` FFI format call UTF-8-encodes the input and decodes the output back to a
-  JS string (`lib/ffi.ts`); `tsv_wasm` marshals strings across the JS↔WASM
+  JS string (`lib/ffi.ts` — through persistent grow-only staging buffers, so the
+  boundary cost is the encode/copy itself, not per-call allocation);
+  `tsv_wasm` marshals strings across the JS↔WASM
   boundary. prettier pays no such boundary tax — so the published `tsv` /
   `tsv_wasm` format numbers are _conservative_ (the raw engine is faster than
   the FFI/WASM figure; the parse analogue is the `tsv-internal` vs `tsv-json`
-  gap). (b) The async impls (`prettier`, `oxfmt`) are `await`ed per file
+  gap). One nuance cuts the other way: the persistent buffers amortize across
+  the warm loop, so a cold one-shot consumer (format one file, exit) pays a
+  first-call allocation the warm per-call figure doesn't include — negligible
+  next to process/module startup, but the warm number is a warm number. (b) The async impls (`prettier`, `oxfmt`) are `await`ed per file
   (`process_corpus_async`), carrying a per-file microtask cost the sync impls
   skip — swamped by their actual format time, but real. The opt-in
   **`tsv-forced-async`** control row (`BENCH_FORCED_ASYNC=1` — the same native
@@ -787,7 +816,13 @@ Things the published numbers measure that aren't quite what they look like:
   directly: the `tsv` vs `tsv-forced-async` delta is within the run-to-run noise
   floor even on a fast sub-ms-per-file engine, so the per-file await does **not**
   materially inflate the async impls' numbers — their gaps vs `tsv` are engine
-  differences, not harness tax. It's **off by default**: a noise-level delta would
+  differences, not harness tax. Scope caveat: the control models a
+  *microtask* await (prettier's shape — sync compute behind a resolved
+  promise). `oxfmt`'s async is a napi promise whose native work may hop off
+  the JS thread (its `tinypool` dep is CLI-only, not in the `format()` path);
+  any such hop is part of oxfmt's binding boundary — the same way tsv's row
+  includes its FFI boundary — not engine time, and this control doesn't
+  isolate it. It's **off by default**: a noise-level delta would
   only add a confusing duplicate-`tsv` row to the published report and feed
   spurious flags to the regression baseline, so it's an on-demand re-confirmation
   tool, not a standing row. (Why a control and not a real sync row: `prettier` and
@@ -1129,10 +1164,23 @@ prettier. This is load-bearing, not cosmetic, on two axes:
 
 **oxfmt** (version pinned in `package.json`) ships native bindings only:
 
-- **Main** (`oxfmt`): JS wrapper bundling Prettier internals. Depends on `tinypool`.
+- **Main** (`oxfmt`): JS wrapper bundling Prettier internals. Depends on `tinypool`
+  (CLI-only — `dist/cli.js`; the programmatic `format()` the bench calls is a direct
+  async napi call, no worker pool).
 - **Native bindings** (`@oxfmt/{platform}`): 8 platform variants. **No WASM variant exists.**
 - **Svelte support** is experimental (added in v0.49 via oxc-project/oxc#21700);
   we enable it and let the per-file try/catch + effective-corpus report quantify coverage.
+- **Language composition (what each oxfmt format row measures).** The native Rust
+  formatter handles **JS/TS only**. Everything else routes through JS-side fallback
+  callbacks into oxfmt's **bundled prettier** (`dist/apis-*.js` `formatFile` →
+  `prettier.format`): the **css** row is bundled-prettier(postcss) work, and the
+  **svelte** row is bundled-prettier + a bundled svelte plugin with
+  `prettier-plugin-oxfmt` formatting the embedded `<script>` through the native
+  `jsTextToDoc`. So `tsv` vs `oxfmt` is a native-vs-native engine race **on
+  TypeScript only**; on css/svelte the oxfmt row is (mostly) a prettier-pipeline
+  number in oxfmt packaging — which is what an oxfmt user gets, but read the
+  ratios accordingly. The report ratios corroborate: oxfmt ≈ prettier on
+  css/svelte, ~20× prettier on TS.
 
 **Deprecated**: `@oxc-parser/wasm` exists on npm but is deprecated. The correct WASM
 package is `@oxc-parser/binding-wasm32-wasi`.
@@ -1214,40 +1262,49 @@ Implementation: `lib/binary_sizes.ts`
 
 ## Known Issues
 
-- **Corpus SAFETY counts are flaky under `--all` load (two heisenbugs).** A
-  `corpus:compare:format --all` run can disagree with a clean, small-scope run — the
-  count is **not** reliable from a single `--all` run. Because the safety check
-  is differential vs prettier — it iterates the characters _ours_ deviates on and
-  uses prettier only as a subtrahend — the two sides fail in **opposite**
-  directions:
-  1. **FFI buffer marshalling (false positive — fabricates a violation).** Deno's
-     `buffer` fast-call path intermittently hands the native `.so` a stale/wrong
-     source pointer under memory pressure, so **ours** reads corrupted input and
-     genuinely (but spuriously) drops content — a real-looking `content_lost`.
-     Hardened in `lib/ffi.ts` via `Deno.UnsafePointer.of` (see the comment there),
-     but timing-sensitive. This is what re-flags
-     `prettier/tests/format/css/numbers/numbers.css` (a documented `@include`
-     divergence, deterministically `known`) as SAFETY under `--all`. **This is the
-     only source of spurious SAFETY violations** — only `ours`-side corruption can
-     fake a loss.
-  2. **Prettier sidecar miss (false _negative_ — masks a violation).** The prettier
-     Deno sidecar intermittently returns empty output for a file under load.
-     Prettier-side corruption can **never fabricate** a `content_lost`: an empty
-     `prettier` inflates `prettier_excess` to the whole source, which only cancels
-     `ours`'s deltas, so the file surfaces as a large **unknown diff**, not SAFETY.
-     The real danger is the reverse — if `ours` _also_ drops content in that same
-     file, the empty prettier subtracts the loss away and hides it. `corpus_compare_format.ts`
-     guards this by erroring out when prettier returns empty for non-empty source,
-     so the sidecar miss is surfaced rather than silently suppressing a verdict.
+- **Corpus SAFETY flakiness under `--all` load (two historical heisenbugs, both
+  now guarded in-harness).** Because the safety check is differential vs
+  prettier — it iterates the characters _ours_ deviates on and uses prettier
+  only as a subtrahend — the two sides fail in **opposite** directions:
+  1. **FFI marshalling (false positive — fabricates a violation).** Deno's
+     `buffer` fast-call path intermittently handed the native `.so` a
+     stale/wrong source pointer under memory pressure, so **ours** read
+     corrupted input and genuinely (but spuriously) dropped content — a
+     real-looking `content_lost` (historically re-flagging
+     `prettier/tests/format/css/numbers/numbers.css`, a documented `@include`
+     divergence, as SAFETY under `--all`). Only `ours`-side corruption can fake
+     a loss. Hardened twice over in `lib/ffi.ts` (explicit `pointer` params +
+     persistent externalized marshalling buffers — pointers probe-verified
+     stable across forced full GCs, and the original `buffer`-path corruption
+     no longer reproduces on current Deno under synthetic pressure), and
+     **self-verified at the verdict**: before recording any SAFETY finding,
+     `corpus_compare_format.ts` re-runs the native format and requires
+     byte-identity — corruption surfaces as a loud per-file
+     `native format nondeterminism` error, never as a silent SAFETY count.
+  2. **Prettier empty-output miss (false _negative_ — masks a violation).** The
+     in-process prettier (`lib/canonical.ts` — NOT the `tsv_debug` Rust
+     sidecar, a separate prettier host with the same symptom) can intermittently
+     return empty output under load. That can **never fabricate** a
+     `content_lost`: an empty `prettier` inflates `prettier_excess` to the whole
+     source, which only cancels `ours`'s deltas — the danger is masking a real
+     loss in the same file. Guarded three ways: `corpus_compare_format.ts`
+     errors out on semantically-empty (whitespace-only counts) prettier output
+     for non-empty source; the prettier cache neither stores nor returns
+     semantically-empty entries; and the Rust sidecar's `run_prettier` returns
+     a hard `DenoError::EmptyOutput` instead of `Ok("")`, so the fixture
+     validator reports the miss accurately rather than as a spurious F2/F3
+     content mismatch. Deliberately **no retry** anywhere: a flaky oracle must
+     stay loud.
 
-  **Triage — never trust one `--all` run for a SAFETY verdict:** (a) re-run the
-  single file/dir cleanly (`corpus:compare:format ~/dev/.../that-dir`) — a real loss
-  reproduces, a heisenbug doesn't; (b) confirm with the **native CLI** (`tsv
-  format <file>` is deterministic) and diff semantic chars vs prettier; (c) for
-  "did my change regress?", diff the sorted `.safety[].path` lists before/after
-  (a real regression is a _new path_, not a count bump). A change scoped to one
-  printer/crate can't lose content in unrelated languages. See `lib/ffi.ts` for
-  the Deno-FFI corpus heisenbug.
+  **Triage:** a SAFETY finding now reproduces by construction (two in-run
+  native runs agreed), so treat it as real; confirm root cause with the
+  **native CLI** (`tsv format <file>` is deterministic) and diff semantic chars
+  vs prettier. A `native format nondeterminism` or prettier-miss **error**
+  is the heisenbug surfacing — re-run to clear it, and investigate the
+  environment if it persists. For "did my change regress?", diff the sorted
+  `.safety[].path` lists before/after (a real regression is a _new path_, not
+  a count bump); a change scoped to one printer/crate can't lose content in
+  unrelated languages.
 - **Parse benchmark overhead**: JSON materialization, not parsing, dominates
   the `-json` rows (see `results/report.<runtime>.md` for the current per-language
   ratios). Use `tsv-internal` for raw parse speed. Both the native and WASM rows go through
@@ -1361,8 +1418,9 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
   subsequent timers indefinitely. Repro:
   `await import('oxfmt').then((m) => m.format('file.ts', 'x=1', {useTabs:true}))` followed by
   two `new Promise((r) => setTimeout(r, 50))` — first resolves, second never does.
-  Independent of oxfmt version (reproduced with 0.28.0 and 0.50.0) so the regression is on
-  the Deno / napi-rs side. In `bench.ts` oxfmt is invoked per-iteration during the `format/*` measurement
+  Independent of oxfmt version (reproduced with 0.28.0, 0.50.0, and 0.53.0 on Deno 2.8.3)
+  so the regression is on the Deno / napi-rs side; re-test the repro before ever removing
+  the workaround. In `bench.ts` oxfmt is invoked per-iteration during the `format/*` measurement
   loops; the leak shows up at the next inter-task `await wait(cooldown_ms)`, which never
   fires. Workaround: `cooldown_ms: 0` in `run_benchmark_group`'s `Benchmark` config — runs
   tasks back-to-back without the cooldown await. Async measurement loops (`prettier`,

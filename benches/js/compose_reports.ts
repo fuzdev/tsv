@@ -100,18 +100,27 @@ for (const r of present) {
 	}
 }
 
+// Provenance per source, plus a loud flag when the siblings come from
+// different commits/versions. The composer folds whatever reports exist, so a
+// fresh `report.deno.json` can otherwise sit silently next to a stale
+// `report.node.json` — and cross-runtime ratios are only meaningful on
+// same-vintage siblings.
+const sources = present.map((r) => ({
+	runtime: r,
+	timestamp: reports.get(r)!.timestamp,
+	git_commit: reports.get(r)!.git_commit,
+	tsv: reports.get(r)!.versions?.tsv ?? null,
+}));
+const mixed_vintage = new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}`)).size > 1;
+
 // JSON: metadata + provenance per source + the comparison rows.
 const combined = {
-	version: 5,
+	version: 6,
 	kind: 'combined' as const,
 	generated: new Date().toISOString(),
 	runtimes: present,
-	sources: present.map((r) => ({
-		runtime: r,
-		timestamp: reports.get(r)!.timestamp,
-		git_commit: reports.get(r)!.git_commit,
-		tsv: reports.get(r)!.versions?.tsv ?? null,
-	})),
+	mixed_vintage,
+	sources,
 	rows: order.map((key) => {
 		const row = rows.get(key)!;
 		return {
@@ -143,10 +152,27 @@ md.push(
 	`**Runtimes:** ${present.join(', ')} ` +
 		'— each runtime’s full report is its `report.<runtime>.{json,md}` sibling.\n',
 );
+for (const s of sources) {
+	md.push(
+		`- \`${s.runtime}\`: ${s.git_commit ?? 'unknown commit'} @ ${s.timestamp}` +
+			`${s.tsv ? ` (tsv ${s.tsv})` : ''}`,
+	);
+}
+md.push('');
+if (mixed_vintage) {
+	md.push(
+		'⚠ **Mixed vintages** — the sibling reports above come from different ' +
+			'commits/versions, so the cross-runtime ratios are unreliable; re-run the ' +
+			'stale runtimes (`deno task bench:perf` refreshes all three).\n',
+	);
+}
 md.push(
 	'A per-runtime delta on the same row is the signal: same engine, different ' +
 		'runtime + binding boundary (Deno → FFI, Node/Bun → N-API). Ratios are vs ' +
-		`\`${base_runtime}\` (> 1 = faster than ${base_runtime}).\n`,
+		`\`${base_runtime}\` (> 1 = faster than ${base_runtime}). A group (or row) ` +
+		'flagged `⚠ files …` iterated *different per-runtime intersections* (each ' +
+		'runtime times the files all its impls passed preflight on), so a sliver ' +
+		'of the ratio can be file-set difference rather than runtime effect.\n',
 );
 
 const groups: string[] = [];
@@ -155,20 +181,45 @@ for (const key of order) {
 	if (!groups.includes(g)) groups.push(g);
 }
 
+/** `deno 1214 / node 1215 / bun 1217` — the per-runtime iterated counts. */
+function fmt_file_counts(fi: Row['files_iterated']): string {
+	return present.map((r) => `${r} ${fi[r] ?? '—'}`).join(' / ');
+}
+
+/** Whether a row's per-runtime iterated counts differ (nulls ignored). */
+function files_unequal(fi: Row['files_iterated']): boolean {
+	const counts = present.map((r) => fi[r]).filter((v) => typeof v === 'number');
+	return new Set(counts).size > 1;
+}
+
 for (const group of groups) {
+	const group_rows = order.map((key) => rows.get(key)!).filter((row) => row.group === group);
+
+	// Disclose unequal per-runtime intersections (see the header note). In
+	// intersection mode every row in a group iterates the same set, so the
+	// annotation lifts to ONE group-level line; per-row markers only remain for
+	// rows that deviate from the group pattern (union mode).
+	const signatures = new Set(group_rows.map((row) => fmt_file_counts(row.files_iterated)));
+	const uniform = signatures.size === 1;
+	const group_flagged = uniform && files_unequal(group_rows[0].files_iterated);
+
 	md.push(`## ${group}\n`);
+	if (group_flagged) {
+		md.push(`⚠ files ${fmt_file_counts(group_rows[0].files_iterated)}\n`);
+	}
 	const header = [
 		'Impl',
-		...present.map((r) => `${r} ops/sec`),
+		...present.map((r) => `${r} sweeps/sec`),
 		...others.map((r) => `${r}/${base_runtime}`),
 	];
 	md.push(`| ${header.join(' | ')} |`);
 	md.push(`| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`);
-	for (const key of order) {
-		const row = rows.get(key)!;
-		if (row.group !== group) continue;
+	for (const row of group_rows) {
+		const name_cell = !uniform && files_unequal(row.files_iterated)
+			? `${row.name} ⚠ files ${fmt_file_counts(row.files_iterated)}`
+			: row.name;
 		const cells = [
-			row.name,
+			name_cell,
 			...present.map((r) => fmt_ops(row.ops[r])),
 			...others.map((r) => fmt_ratio(row.ops[r], row.ops[base_runtime])),
 		];
@@ -180,6 +231,13 @@ for (const group of groups) {
 await writeFile(`${results_dir}report.json`, JSON.stringify(combined, null, '\t'));
 await writeFile(`${results_dir}report.md`, md.join('\n'));
 
+if (mixed_vintage) {
+	console.error(
+		'⚠ compose: sibling reports have MIXED VINTAGES (' +
+			sources.map((s) => `${s.runtime}=${(s.git_commit ?? '?').slice(0, 8)}`).join(' ') +
+			') — cross-runtime ratios unreliable; re-run the stale runtimes.',
+	);
+}
 console.log(`Composed cross-runtime report from: ${present.join(', ')}`);
 console.log(`  ${results_dir}report.json`);
 console.log(`  ${results_dir}report.md`);

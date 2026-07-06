@@ -1,14 +1,20 @@
 # tsv benchmark results — cross-runtime
 
-**Generated:** 2026-07-04T17:17:03.572Z
+**Generated:** 2026-07-06T17:49:40.203Z
 
 **Runtimes:** deno, node, bun — each runtime’s full report is its `report.<runtime>.{json,md}` sibling.
 
-A per-runtime delta on the same row is the signal: same engine, different runtime + binding boundary (Deno → FFI, Node/Bun → N-API). Ratios are vs `deno` (> 1 = faster than deno).
+- `deno`: ad1c91b6 @ 2026-07-04T16:57:37.990Z (tsv 0.1.0)
+- `node`: ad1c91b6 @ 2026-07-04T17:07:43.168Z (tsv 0.1.0)
+- `bun`: ad1c91b6 @ 2026-07-04T17:17:03.227Z (tsv 0.1.0)
+
+A per-runtime delta on the same row is the signal: same engine, different runtime + binding boundary (Deno → FFI, Node/Bun → N-API). Ratios are vs `deno` (> 1 = faster than deno). A group (or row) flagged `⚠ files …` iterated *different per-runtime intersections* (each runtime times the files all its impls passed preflight on), so a sliver of the ratio can be file-set difference rather than runtime effect.
 
 ## parse/svelte
 
-| Impl | deno ops/sec | node ops/sec | bun ops/sec | node/deno | bun/deno |
+⚠ files deno 1215 / node 1216 / bun 1216
+
+| Impl | deno sweeps/sec | node sweeps/sec | bun sweeps/sec | node/deno | bun/deno |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | svelte/compiler | 2.3 | 2.2 | 1.2 | 0.94x | 0.50x |
 | tsv-json | 4.8 | 4.5 | 4.6 | 0.94x | 0.95x |
@@ -18,17 +24,17 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 
 ## format/svelte
 
-| Impl | deno ops/sec | node ops/sec | bun ops/sec | node/deno | bun/deno |
+| Impl | deno sweeps/sec | node sweeps/sec | bun sweeps/sec | node/deno | bun/deno |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| prettier | 0.2 | 0.2 | 0.2 | 0.94x | 0.90x |
-| tsv | 11.5 | 12.9 | 11.9 | 1.12x | 1.03x |
-| tsv_wasm | 8.0 | 7.2 | 6.5 | 0.90x | 0.81x |
-| oxfmt | 0.2 | 0.2 | 0.2 | 0.99x | 0.76x |
-| biome-wasm | 1.3 | 1.4 | — | 1.13x | — |
+| prettier ⚠ files deno 1214 / node 1215 / bun 1217 | 0.2 | 0.2 | 0.2 | 0.94x | 0.90x |
+| tsv ⚠ files deno 1214 / node 1215 / bun 1217 | 11.5 | 12.9 | 11.9 | 1.12x | 1.03x |
+| tsv_wasm ⚠ files deno 1214 / node 1215 / bun 1217 | 8.0 | 7.2 | 6.5 | 0.90x | 0.81x |
+| oxfmt ⚠ files deno 1214 / node 1215 / bun 1217 | 0.2 | 0.2 | 0.2 | 0.99x | 0.76x |
+| biome-wasm ⚠ files deno 1214 / node 1215 / bun — | 1.3 | 1.4 | — | 1.13x | — |
 
 ## parse/typescript
 
-| Impl | deno ops/sec | node ops/sec | bun ops/sec | node/deno | bun/deno |
+| Impl | deno sweeps/sec | node sweeps/sec | bun sweeps/sec | node/deno | bun/deno |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | acorn-typescript | 0.3 | 0.3 | 0.2 | 0.93x | 0.45x |
 | tsv-json | 0.5 | 0.5 | 0.7 | 0.93x | 1.43x |
@@ -40,7 +46,7 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 
 ## format/typescript
 
-| Impl | deno ops/sec | node ops/sec | bun ops/sec | node/deno | bun/deno |
+| Impl | deno sweeps/sec | node sweeps/sec | bun sweeps/sec | node/deno | bun/deno |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | prettier | 0.1 | 0.1 | 0.1 | 0.93x | 0.82x |
 | tsv | 1.6 | 1.7 | 1.7 | 1.06x | 1.06x |
@@ -50,7 +56,7 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 
 ## parse/css
 
-| Impl | deno ops/sec | node ops/sec | bun ops/sec | node/deno | bun/deno |
+| Impl | deno sweeps/sec | node sweeps/sec | bun sweeps/sec | node/deno | bun/deno |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | svelte/compiler | 197.1 | 170.3 | 134.8 | 0.86x | 0.68x |
 | tsv-json | 104.4 | 106.1 | 125.4 | 1.02x | 1.20x |
@@ -60,7 +66,7 @@ A per-runtime delta on the same row is the signal: same engine, different runtim
 
 ## format/css
 
-| Impl | deno ops/sec | node ops/sec | bun ops/sec | node/deno | bun/deno |
+| Impl | deno sweeps/sec | node sweeps/sec | bun sweeps/sec | node/deno | bun/deno |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | prettier | 3.2 | 2.2 | 3.0 | 0.70x | 0.95x |
 | tsv | 143.5 | 106.2 | 160.6 | 0.74x | 1.12x |

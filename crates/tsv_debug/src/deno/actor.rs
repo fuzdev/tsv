@@ -24,8 +24,11 @@ const READ_TIMEOUT: Duration = Duration::from_secs(30);
 /// Embedded sidecar script
 const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
 
-/// Deno config for import map (ensures acorn-typescript uses same acorn instance)
-const DENO_CONFIG: &str = r#"{"imports":{"acorn":"npm:acorn@8.16.0"}}"#;
+/// Deno config for import map (ensures acorn-typescript uses same acorn
+/// instance). `"lock": false` keeps concurrent sidecars (e.g. several test
+/// binaries under `cargo test --workspace`) from contending on a shared
+/// `deno.lock` next to the tempdir config files.
+const DENO_CONFIG: &str = r#"{"imports":{"acorn":"npm:acorn@8.16.0"},"lock":false}"#;
 
 /// Request ID counter
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -49,8 +52,8 @@ fn sidecar_runtime() -> &'static Runtime {
     static SIDECAR_RT: OnceLock<Runtime> = OnceLock::new();
     SIDECAR_RT.get_or_init(|| {
         // One worker thread is plenty: the sidecars are I/O-bound and each
-        // multiplexes its own requests; this thread only drives the actor loops
-        // and the stdout/stderr readers.
+        // queues its own requests (the JS side processes them serially); this
+        // thread only drives the actor loops and the stdout/stderr readers.
         #[allow(clippy::expect_used)]
         // runtime build fails only on catastrophic OS resource exhaustion, with no recovery path
         Builder::new_multi_thread()
@@ -198,13 +201,21 @@ impl DenoActor {
         Ok(Self { tx })
     }
 
-    /// Call a tool on the Deno sidecar
-    pub async fn call(
+    /// Enqueue a request on this actor's event loop.
+    ///
+    /// Returns the response receiver on success, or `None` when the loop has
+    /// already exited (its command channel is closed) — in that case the
+    /// request provably never left the caller, so the caller may dispatch it
+    /// to another (e.g. freshly respawned) actor without ever re-running work
+    /// a sidecar might have seen. That distinction is what makes the pool's
+    /// dispatch-level heal in `mod.rs` safe: delivered-then-failed requests
+    /// surface as hard errors, never as silent retries.
+    pub(super) async fn dispatch(
         &self,
         tool: &str,
         content: &str,
-        options: Option<Value>,
-    ) -> Result<Value, DenoError> {
+        options: Option<&Value>,
+    ) -> Option<oneshot::Receiver<Result<Value, DenoError>>> {
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let (response_tx, response_rx) = oneshot::channel();
 
@@ -212,16 +223,27 @@ impl DenoActor {
             id,
             tool: tool.to_string(),
             content: content.to_string(),
-            options,
+            options: options.cloned(),
             response_tx,
         };
 
-        self.tx
-            .send(ActorCommand::Request(request))
-            .await
-            .map_err(|_| DenoError::ActorShutdown)?;
+        (self.tx.send(ActorCommand::Request(request)).await).ok()?;
+        Some(response_rx)
+    }
 
-        response_rx.await.map_err(|_| DenoError::ActorShutdown)?
+    /// Whether this actor's event loop has exited (its command channel closed).
+    pub(super) fn is_closed(&self) -> bool {
+        self.tx.is_closed()
+    }
+
+    /// Send a shutdown and wait for the event loop to exit (test-only — lets
+    /// the pool-heal test kill an actor deterministically).
+    #[cfg(test)]
+    pub(super) async fn shutdown_and_wait(&self) {
+        let _ = self.tx.send(ActorCommand::Shutdown).await;
+        while !self.tx.is_closed() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
     }
 }
 
@@ -367,7 +389,15 @@ async fn run_actor(mut state: ActorState, mut rx: mpsc::Receiver<ActorCommand>) 
                 match cmd {
                     Some(ActorCommand::Request(req)) => {
                         if let Err(e) = state.send_request(req).await {
+                            // A stdin-write failure means the sidecar died. Fail
+                            // every pending request (including the one whose write
+                            // just failed — it's already in the map) with the
+                            // accurate error BEFORE breaking; dropping the map
+                            // instead would surface as a misleading ActorShutdown.
+                            // A partially-written request may or may not have
+                            // reached the sidecar, so it must NOT be re-dispatched.
                             eprintln!("Failed to send request to deno: {e}");
+                            state.fail_all_pending(|| DenoError::SidecarCrashed);
                             break;
                         }
                     }
