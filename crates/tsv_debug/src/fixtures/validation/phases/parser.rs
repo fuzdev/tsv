@@ -259,6 +259,135 @@ pub(in crate::fixtures::validation) async fn validate_parser_external(
     }
 }
 
+/// F7 (tsv side): live-verify a `tsv_rejects.txt` claim — tsv must REJECT the
+/// input with an error message containing the marker's trimmed substring.
+///
+/// The marker asserts tsv over-rejects an input the canonical parser accepts, so
+/// tsv produces no AST: the tsv-side parser/formatter phases (P2/P2b, F1, the
+/// ours-side normalization) are inexpressible and replaced by this check.
+/// Catches the over-rejection being fixed (tsv accepts now →
+/// `TsvRejectsMarkerButTsvAccepts`) and the rejection moving to a different
+/// message (→ `TsvRejectsMarkerWrongMessage`), each with a remediation hint.
+/// Pure Rust — the tsv parser runs in-process, no sidecar.
+pub(in crate::fixtures::validation) fn validate_tsv_rejects(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input: &str,
+    input_type: InputType,
+) {
+    let expected = match read_file(&fixture.tsv_rejects_path()) {
+        Ok(s) => s.trim().to_string(),
+        Err(e) => {
+            result.add_error(ValidationError::ParserError(format!(
+                "reading tsv_rejects.txt for {}: {e}",
+                fixture.input_file
+            )));
+            return;
+        }
+    };
+    if expected.is_empty() {
+        result.add_error(ValidationError::TsvRejectsMarkerEmpty(
+            fixture.input_file.clone(),
+        ));
+        return;
+    }
+
+    let arena = bumpalo::Bump::new();
+    let parse_result: Result<(), String> = match input_type {
+        InputType::Svelte => tsv_svelte::parse(input, &arena)
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
+        InputType::SvelteTs | InputType::TypeScript => {
+            tsv_ts::parse_with_goal(input, fixture.goal(), &arena)
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        }
+        InputType::Css => tsv_css::parse(input, &arena)
+            .map(|_| ())
+            .map_err(|e| e.to_string()),
+    };
+
+    match parse_result {
+        Ok(()) => {
+            result.add_error(ValidationError::TsvRejectsMarkerButTsvAccepts(
+                fixture.input_file.clone(),
+            ));
+        }
+        Err(actual) => {
+            if actual.contains(&expected) {
+                result.add_success(ValidationSuccess::TsvRejectionVerified);
+            } else {
+                result.add_error(ValidationError::TsvRejectsMarkerWrongMessage {
+                    input: fixture.input_file.clone(),
+                    expected,
+                    actual,
+                });
+            }
+        }
+    }
+}
+
+/// F7 (canonical side): the canonical parser must still ACCEPT a `tsv_rejects.txt`
+/// input, and its serialized AST must equal `expected_svelte.json`.
+///
+/// This is the self-heal that the retired Rust-test pins lacked: if the canonical
+/// parser starts rejecting too, the divergence is dead (both parsers agree now)
+/// and this fails with `TsvRejectsCanonicalRejects` — convert the fixture to
+/// `input_invalid_*`. Otherwise the canonical AST is pinned byte-strict against
+/// `expected_svelte.json` (refreshed by `fixtures:update:parsed`), so a canonical
+/// parser bump that changes the shape surfaces too. Dispatches on input type
+/// (`.svelte` → Svelte, `.ts`/`.svelte.ts` → acorn-typescript, `.css` →
+/// parseCss), always comparing to `expected_svelte.json` (the canonical AST).
+pub(in crate::fixtures::validation) async fn validate_tsv_rejects_canonical(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input: &str,
+    input_type: InputType,
+) {
+    let expected = match read_file(&fixture.expected_svelte_path()) {
+        Ok(c) => c,
+        Err(e) => {
+            result.add_error(ValidationError::FileReadError(e));
+            return;
+        }
+    };
+
+    // Parse with the canonical parser for this input type, then serialize with the
+    // same tabbed format expected_svelte.json stores (matches fixtures_update_parsed).
+    let canonical: Result<String, String> = match input_type {
+        InputType::Svelte => parse_svelte(input).await.map_err(|e| e.to_string()),
+        InputType::SvelteTs | InputType::TypeScript => {
+            parse_typescript_with_goal(input, fixture.goal())
+                .await
+                .map_err(|e| e.to_string())
+        }
+        InputType::Css => parse_css(input).await.map_err(|e| e.to_string()),
+    }
+    .and_then(|ast| {
+        to_json_with_tabs(&ast)
+            .map(|json| format!("{json}\n"))
+            .map_err(|e| format!("Failed to serialize canonical AST: {e}"))
+    });
+
+    match canonical {
+        Ok(actual) => {
+            if actual == expected {
+                result.add_success(ValidationSuccess::ParserExpectedSvelteMatches);
+            } else {
+                result.add_error(ValidationError::ParserExpectedSvelteOutdated);
+            }
+        }
+        // A serialization failure is impossible in practice (the canonical AST is
+        // already JSON), so a hard error here means the canonical parser rejected —
+        // the divergence is dead.
+        Err(_) => {
+            result.add_error(ValidationError::TsvRejectsCanonicalRejects(
+                fixture.input_file.clone(),
+            ));
+        }
+    }
+}
+
 /// Validate input_invalid_* files: must fail to parse with both our parser and canonical parser
 ///
 /// For Svelte files: both our parser and Svelte's parser must fail

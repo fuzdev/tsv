@@ -1,0 +1,167 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 41,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 40,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 31,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 3,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 20,
+					"end": 30,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 11
+						}
+					},
+					"expression": {
+						"type": "ArrowFunctionExpression",
+						"start": 20,
+						"end": 29,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 1
+							},
+							"end": {
+								"line": 2,
+								"column": 10
+							}
+						},
+						"id": null,
+						"expression": true,
+						"generator": false,
+						"async": false,
+						"params": [
+							{
+								"type": "Identifier",
+								"start": 23,
+								"end": 24,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 4
+									},
+									"end": {
+										"line": 2,
+										"column": 5
+									}
+								},
+								"name": "x"
+							}
+						],
+						"body": {
+							"type": "Identifier",
+							"start": 28,
+							"end": 29,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 9
+								},
+								"end": {
+									"line": 2,
+									"column": 10
+								}
+							},
+							"name": "x"
+						},
+						"typeParameters": {
+							"type": "TSTypeParameterDeclaration",
+							"start": 20,
+							"end": 23,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 1
+								},
+								"end": {
+									"line": 2,
+									"column": 4
+								}
+							},
+							"params": [
+								{
+									"type": "TSTypeParameter",
+									"start": 21,
+									"end": 22,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 2
+										},
+										"end": {
+											"line": 2,
+											"column": 3
+										}
+									},
+									"name": "T"
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

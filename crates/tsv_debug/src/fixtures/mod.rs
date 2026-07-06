@@ -10,8 +10,8 @@ pub use audit_signature::{AUDIT_SIGNATURE_FILENAME, AuditSignature};
 pub use discovery::{find_input_file, walk_fixtures};
 pub use model::{
     EXPECTED_SVELTE_ERROR_JSON, Fixture, GOAL_FILENAME, InputType, PRETTIER_NONCONVERGENT_FILENAME,
-    PRETTIER_REJECTS_FILENAME, determine_required_suffix, has_prettier_divergence_suffix,
-    has_svelte_divergence_suffix,
+    PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME, determine_required_suffix,
+    has_prettier_divergence_suffix, has_svelte_divergence_suffix,
 };
 pub use variants::FixtureFiles;
 

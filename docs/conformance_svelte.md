@@ -206,10 +206,14 @@ JSX-free `.ts`. tsv follows TypeScript, in three forms: `<any>(() => {})` is a
 also corpus-enforced via the `type_assertion_paren_arrow` matcher — the
 divergent reading shows up in real code, e.g. prettier's own test corpus);
 `<T>x => x` and `<T,>(() => {})` are parse errors tsv rejects while acorn
-accepts (pinned in `tests/type_assertion_arrow.rs` — a rejection can't be an
-`input_invalid_*` fixture when the canonical parser accepts). The ordinary
-generic-arrow forms (`<T>(x: T) => x`) and assertion forms whose type can't
-parse as type parameters (`<any[]>(() => {})`) agree in both parsers.
+accepts — a rejection can't be an `input_invalid_*` fixture when the canonical
+parser accepts, so each is a `tsv_rejects.txt` fixture pinning both halves:
+[type_assertion_arrow/operand](../tests/fixtures/typescript/expressions/type_assertion_arrow/operand_svelte_divergence/)
+and
+[type_assertion_arrow/type_params](../tests/fixtures/typescript/expressions/type_assertion_arrow/type_params_svelte_divergence/).
+The ordinary generic-arrow forms (`<T>(x: T) => x`) and assertion forms whose
+type can't parse as type parameters (`<any[]>(() => {})`) agree in both parsers
+(standalone-TS accept boundaries pinned by `tests/type_assertion_arrow.rs`).
 **Upstream candidate**: @sveltejs/acorn-typescript — the dead
 `extra.parenthesized` abort in `parseMaybeAssign`'s arrow `tryParse`.
 
@@ -277,11 +281,12 @@ the final grammar is `WithClause : with { … }`
 have since removed it. acorn-typescript still accepts it; tsv rejects it
 (`Expected ';'`), parsing only the spec's `with` form. This is deliberate
 spec-over-acorn strictness in the reverse direction of most entries here (tsv
-stricter, not broader). No fixture: the fixture pipeline can't pin a
-tsv-rejects/acorn-accepts input (`input_invalid_*` requires both parsers to
-reject); pinned by `tests/import_phase.rs`
-(`legacy_assert_clause_rejected`) and the parse-parity gate's sanctioned
-list (`benches/js/diagnostics/skip_triage.ts`).
+stricter, not broader). A tsv-rejects/acorn-accepts input can't be an
+`input_invalid_*` fixture (which requires both parsers to reject), so it is
+pinned by the
+[legacy_import_assert](../tests/fixtures/typescript/modules/imports/legacy_import_assert_svelte_divergence/)
+`tsv_rejects.txt` fixture and the parse-parity gate's sanctioned list
+(`benches/js/diagnostics/skip_triage.ts`).
 
 **Reserved-keyword qualified type head (`void.X` / `null.X`, rejected)**: a type
 keyword immediately followed by `.` is the HEAD of a qualified type name
@@ -298,9 +303,10 @@ fixture pins the accept direction, and its `input_invalid_true_qualified_head`
 pins the both-reject `true.X`). This is deliberate tsc-over-acorn strictness, the
 same reverse direction as the legacy import-assertions entry above. The
 reserved-head rejection can't be an `input_invalid_*` fixture (acorn accepts it),
-so it is pinned by `tests/type_keyword_qualified_head.rs`. **Upstream candidate**:
-acorn-typescript `tsParseNonArrayType` — `void`/`null` accepted as qualified-name
-heads.
+so it is pinned by the
+[reserved_keyword_qualified_head](../tests/fixtures/typescript/types/reserved_keyword_qualified_head_svelte_divergence/)
+`tsv_rejects.txt` fixture. **Upstream candidate**: acorn-typescript
+`tsParseNonArrayType` — `void`/`null` accepted as qualified-name heads.
 
 #### Import-phase proposals
 
