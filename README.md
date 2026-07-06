@@ -128,11 +128,11 @@ Consumers can use tsv's crates ([not yet published](https://github.com/fuzdev/ts
 to build custom tools independently.
 Hard non-goals:
 
-- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends) -
-  but note that you can use tsv's crates and patterns to vibe your own thing
-- standard CSS and Svelte extensions only - no SCSS, CSS Modules, LESS, etc
 - no style config settings, so on-disk state and caller params
   never change the output for a given input
+- no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends) -
+  but note that you can use tsv's crates and patterns to vibe your own thing
+- standard CSS with Svelte extensions only - no SCSS, CSS Modules, LESS, etc
 - no strict Prettier conformance -
   see the [conformance doc](https://github.com/fuzdev/tsv/blob/main/docs/conformance_prettier.md)
   and [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
@@ -153,14 +153,15 @@ tsv currently supports:
 - [x] formatter matching Prettier + prettier-plugin-svelte (with intentional divergences)
 - [x] parser, drop-in for Svelte+acorn+acorn-typescript
 - [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_plugin_tsv_format) - fuzdev.tsv-format
+- [ ] ts->js conversion (types-to-whitespace only)
+- [ ] module lexer
 
 Future features (unknown order):
 
-- ts->js conversion (easy, probably soon)
-- module lexer (easy, probably soon)
 - minifier
 - JSON support
-- HTML support (assuming Svelte mostly works, but isn't correct e.g. with `{`)
+- HTML support (formatting as Svelte isn't correct e.g. with whitespace and `{`,
+  but the lift to support it is small)
 - CSS error recovery (recover past invalid CSS per the spec instead of
   failing the parse - doesn't add dialect support)
 - later:
