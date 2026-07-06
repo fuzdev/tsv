@@ -172,7 +172,7 @@ Hard non-goals:
   never change the output for a given input
 - no markup for frameworks besides Svelte - no JSX/TSX, Vue, Astro, etc (unlike Biome+Oxc+SWC+friends) -
   but note that you can use tsv's crates and patterns to vibe your own thing
-- standard CSS with Svelte extensions only - no SCSS, CSS Modules, LESS, etc
+- no SCSS, CSS Modules, LESS, etc - standard CSS with Svelte extensions only
 - no strict Prettier conformance -
   see the [conformance doc](https://github.com/fuzdev/tsv/blob/main/docs/conformance_prettier.md)
   and [discussion #1](https://github.com/fuzdev/tsv/discussions/1)
