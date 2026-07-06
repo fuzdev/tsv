@@ -108,6 +108,18 @@ async fn test_all_fixtures() {
     // Print results
     validation::print_validation_results(&summary, verbose);
 
+    // REGRESSION PIN — this test walks the FULL fixtures tree, so a discovery
+    // collapse (validating almost nothing) must fail here too, not just in the
+    // fixtures_validate command; this is the form CI runs. See
+    // `validation::FIXTURES_MIN` for the semantics + update ritual.
+    assert!(
+        summary.total_fixtures >= validation::FIXTURES_MIN,
+        "pinned minimum: validated {} fixtures < pinned {} — fixture discovery shrank; \
+         if deliberate (fixtures deleted), re-pin FIXTURES_MIN",
+        summary.total_fixtures,
+        validation::FIXTURES_MIN
+    );
+
     // Assert all fixtures passed
     assert!(
         summary.is_valid(),

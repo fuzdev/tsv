@@ -7,6 +7,9 @@
 // and (3) benches/js/package.json (read by benches/js/lib/versions.ts).
 // These can't be DRYed: the release binary embeds this file as a string and runs it
 // WITHOUT that package.json, so it can't read the bench's pins at runtime.
+// Agreement across all the pin sites (these three + actor.rs's acorn import-map
+// pin) is enforced by `deno task pins:audit` (scripts/check_canonical_pins.ts,
+// gated in `deno task check`).
 //
 // Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte
 // is NOT a routine refresh — it re-baselines the entire fixture corpus (these tools define

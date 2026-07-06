@@ -53,9 +53,16 @@
  * track different gaps against different oracles, so their KNOWN_GAPS lists are
  * deliberately kept apart.
  *
- * Standalone triage tool (like `skip_triage.ts`), NOT in the blocking `conformance`
- * aggregate — the corpus is large and grows; promote to a gate once curated. Exits
- * 1 on an un-tracked `gap` so it CAN gate. Summary to stderr, full JSON to stdout.
+ * In the blocking `conformance` aggregate (publish Step 3b) since its baseline
+ * hit 0 untracked gaps — exits 1 on an un-tracked `gap`. Summary to stderr,
+ * full JSON to stdout.
+ *
+ * Setup posture: strict — a missing `../typescript` checkout, a PARTIAL checkout
+ * (baselines or the corpus subtree missing), or an empty scan all FAIL rather
+ * than green-skipping (the baselines are the oracle; publish Step 3b's preflight
+ * probe is the tolerance point for machines without the checkout). Full-corpus
+ * runs also freshness-check KNOWN_GAPS (an entry matching nothing fails — delete
+ * it when its gap is fixed).
  *
  * Run (from the repo root):
  *   deno task conformance:ts-repo            # builds corpus FFI, then runs
@@ -64,10 +71,11 @@
  *   deno task conformance:ts-repo:run ../typescript/tests/cases/conformance/parser/ecmascript6
  */
 
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 import { init_compare_implementations } from '../lib/compare_cli.ts';
+import { TS_REPO_PINS } from '../lib/gate_counts.ts';
 import type { KnownGap } from '../lib/parse_sanctions.ts';
 
 /** The official TypeScript checkout (baselines live at a fixed path under it). */
@@ -95,6 +103,20 @@ const json_mode = flags.has('--json');
 const verbose = flags.has('--verbose') || flags.has('-v');
 const root = Deno.args.find((a) => !a.startsWith('-')) ?? DEFAULT_ROOT;
 
+// A run that can't grade anything is a failure, not a pass — checked before
+// any other work so the error is this message, not a raw ENOENT stack trace.
+// The tolerance point for machines without the checkout is publish Step 3b's
+// preflight probe, which skips the whole aggregate with a warning.
+try {
+	await stat(TS_REPO);
+} catch {
+	console.error(
+		`FAIL: ${TS_REPO} checkout not found — nothing can be graded. ` +
+			`Clone microsoft/TypeScript at ${TS_REPO}.`,
+	);
+	Deno.exit(1);
+}
+
 /**
  * Index of every `*.errors.txt` baseline, keyed by its **un-suffixed** test name.
  * A test compiled under multiple settings (`// @target: es5, es2015`, `@module`, …)
@@ -106,7 +128,18 @@ const root = Deno.args.find((a) => !a.startsWith('-')) ?? DEFAULT_ROOT;
  * variant. Key = filename minus the trailing `(…)` group(s) and `.errors.txt`.
  */
 const errors_baselines_by_test = new Map<string, string[]>();
-for (const name of await readdir(BASELINE_DIR)) {
+let baseline_names: string[];
+try {
+	baseline_names = await readdir(BASELINE_DIR);
+} catch (e) {
+	console.error(
+		`FAIL: cannot read ${BASELINE_DIR} (${e instanceof Error ? e.message : e}) — ` +
+			`the ${TS_REPO} checkout exists but its baselines are missing (partial/sparse checkout?). ` +
+			`The baselines ARE the oracle, so this run cannot grade anything.`,
+	);
+	Deno.exit(1);
+}
+for (const name of baseline_names) {
 	if (!name.endsWith('.errors.txt')) continue;
 	const key = name.replace(/\.errors\.txt$/, '').replace(/\(.*\)$/, '');
 	(errors_baselines_by_test.get(key) ?? errors_baselines_by_test.set(key, []).get(key)!).push(name);
@@ -166,6 +199,8 @@ const buckets = {
 	gap_beyond_acorn: [] as { path: string; tsv_error: string }[],
 };
 const skipped = { tsx: 0, multi_file: 0, unreadable: 0 };
+// Ledger-freshness tracking (see the stale check at the end).
+const used_gaps = new Set<string>();
 
 for await (const path of discover(root)) {
 	if (path.endsWith('.tsx')) {
@@ -216,6 +251,7 @@ for await (const path of discover(root)) {
 	}
 	const gap = KNOWN_GAPS.find((g) => path.includes(g.pattern));
 	if (gap) {
+		used_gaps.add(gap.pattern);
 		buckets.gap_known.push({ path, tsv_error: tsv_err, category: gap.category, reason: gap.reason });
 	} else {
 		buckets.gap_unexpected.push({ path, tsv_error: tsv_err });
@@ -234,6 +270,13 @@ for (const g of buckets.gap_known) {
 
 const scanned = buckets.accept_parity + buckets.reject_parity + buckets.over_acceptance.length +
 	buckets.gap_known.length + buckets.gap_unexpected.length + buckets.gap_beyond_acorn.length;
+
+// The checkout exists (guarded above), so an empty scan means a wrong subtree
+// path or a gutted corpus — a broken invocation, not a pass.
+if (scanned === 0) {
+	console.error(`FAIL: 0 single-file .ts scanned under ${root} — wrong path? Nothing was graded.`);
+	Deno.exit(1);
+}
 
 console.error(`\nTypeScript-repo parse-conformance triage — root: ${root}`);
 console.error(`  oracle: tsc baselines (${BASELINE_DIR})`);
@@ -284,4 +327,38 @@ if (buckets.gap_unexpected.length > 0) {
 	);
 	Deno.exit(1);
 }
+
+// Full-corpus-only hygiene (a subtree run legitimately grades a slice):
+if (root === DEFAULT_ROOT) {
+	// Ledger freshness: a KNOWN_GAPS entry matching nothing means its gap was
+	// fixed (delete it) or upstream renamed the test (update it) — the list must
+	// mirror the live corpus, like scan_audit's ALLOW list.
+	const stale = KNOWN_GAPS.filter((g) => !used_gaps.has(g.pattern));
+	if (stale.length > 0) {
+		console.error(
+			`\nFAIL: ${stale.length} stale KNOWN_GAPS entr${stale.length === 1 ? 'y' : 'ies'} — matched no over-rejection:\n` +
+				stale.map((g) => `    · ${g.pattern}`).join('\n'),
+		);
+		Deno.exit(1);
+	}
+
+	// Pinned counts (exact): the corpus is a deliberately-updated checkout, so any
+	// move — a shrunken corpus, a collapsed oracle (accept-parity draining into
+	// reject-parity/over-acceptance), or a tsv behavior change — must be re-pinned
+	// deliberately, never absorbed.
+	const pin_failures = [
+		scanned !== TS_REPO_PINS.scanned ? `scanned ${scanned} ≠ pinned ${TS_REPO_PINS.scanned}` : null,
+		buckets.accept_parity !== TS_REPO_PINS.accept_parity
+			? `accept-parity ${buckets.accept_parity} ≠ pinned ${TS_REPO_PINS.accept_parity}`
+			: null,
+	].filter((f): f is string => f !== null);
+	if (pin_failures.length > 0) {
+		console.error(
+			`\nFAIL: pinned count mismatch — ${pin_failures.join('; ')}. If this move is deliberate ` +
+				`(checkout pull, behavior change), re-pin in lib/gate_counts.ts (see its update ritual).`,
+		);
+		Deno.exit(1);
+	}
+}
+
 console.error(`\nOK: no untracked gaps (all tsv over-rejections are tracked or acorn-confirmed-invalid).`);

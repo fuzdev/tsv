@@ -32,6 +32,8 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { TEST262_POSITIVES_PIN } from './lib/gate_counts.ts';
+
 const TEST262_ROOT = '../test262';
 const CACHE_DIR = 'benches/js/.cache';
 const MANIFEST_PATH = `${CACHE_DIR}/test262_manifest.json`;
@@ -96,6 +98,20 @@ interface Manifest {
 const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8')) as Manifest;
 const positives = manifest.tests.filter((t) => t.expected === 'accept');
 const files = positives.map((t) => join(manifest.test262_root, t.relative_path)).sort();
+
+// Pinned count (exact): the test262 checkout is updated deliberately, so any
+// move in the positive set — a grading/frontmatter bug shrinking it, tsv
+// feature-filter changes, or a checkout pull — must be re-pinned, not
+// absorbed. Fail BEFORE writing the cache so a wrong list never replaces a
+// good one. (The Rust runner separately pins its discovery + graded-manifest
+// counts.) See lib/gate_counts.ts.
+if (files.length !== TEST262_POSITIVES_PIN) {
+	console.error(
+		`FAIL: pinned count mismatch — ${files.length} expected-positive ≠ pinned ${TEST262_POSITIVES_PIN}; ` +
+			`cache not written. If the move is deliberate, re-pin in lib/gate_counts.ts.`,
+	);
+	Deno.exit(1);
+}
 await writeFile(FILES_PATH, JSON.stringify(files, null, '\t'));
 
 const module_count = positives.filter((t) => t.module).length;

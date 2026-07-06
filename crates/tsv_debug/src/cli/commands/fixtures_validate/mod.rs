@@ -66,6 +66,18 @@ impl FixturesValidateCommand {
         // Print results with verbose mode
         validation::print_validation_results(&summary, self.verbose);
 
+        // REGRESSION PIN — see `validation::FIXTURES_MIN` (shared with the
+        // fixtures_tests integration test, the form CI runs).
+        if self.filters.is_empty() && summary.total_fixtures < validation::FIXTURES_MIN {
+            eprintln!(
+                "Error: pinned minimum — validated {} fixtures < pinned {}. \
+                 Fixture discovery shrank; if deliberate (fixtures deleted), re-pin FIXTURES_MIN.",
+                summary.total_fixtures,
+                validation::FIXTURES_MIN
+            );
+            return Err(CliError::Failed);
+        }
+
         // Exit with appropriate code
         if summary.is_valid() {
             Ok(())

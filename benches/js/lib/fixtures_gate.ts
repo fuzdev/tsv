@@ -24,8 +24,10 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { init_compare_implementations } from './compare_cli.ts';
-import { type KnownGap, type Sanction, sanction_for } from './parse_sanctions.ts';
+import type { GatePins } from './gate_counts.ts';
+import type { KnownGap, Sanction } from './parse_sanctions.ts';
 import type { Language } from './types.ts';
+import { type CanonicalVersions, load_all_versions } from './versions.ts';
 import { bigint_replacer, type DiffEntry, diff_asts, type MatchContext } from '../corpus_compare_parse.ts';
 
 export interface FixturesGateConfig {
@@ -49,6 +51,16 @@ export interface FixturesGateConfig {
 	known_gaps: KnownGap[];
 	/** Canonical parser name for the FAIL message, e.g. `acorn-typescript`. */
 	oracle_name: string;
+	/**
+	 * Oracle version-skew probe: the suite INPUTS come from a sibling checkout while
+	 * the grading parser is the pinned npm oracle — the two can silently diverge.
+	 * Compares the checkout's `package.json` version against the benches/js pin and
+	 * warns on mismatch (non-fatal: a checkout tracking upstream main is legitimate,
+	 * but the skew must be visible, not silent).
+	 */
+	oracle_pin?: { checkout_package_json: string; npm_package: keyof CanonicalVersions };
+	/** Exact pinned counts (from `lib/gate_counts.ts`), enforced on full-suite runs only. */
+	pins: GatePins;
 }
 
 interface OverRejection {
@@ -115,6 +127,10 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 
 	const ast_groups = new Map<string, AstGroup>();
 	let ast_clean = 0;
+	// Ledger-freshness tracking: which sanction / known-gap patterns actually
+	// matched an over-rejection this run (see the stale check at the end).
+	const used_sanctions = new Set<string>();
+	const used_gaps = new Set<string>();
 
 	function record_ast(path: string, diffs: DiffEntry[]): void {
 		if (diffs.length === 0) {
@@ -158,11 +174,13 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 			buckets.parity++;
 		} else if (tsv_err && !canon_err) {
 			// Over-rejection — classify sanctioned / known-gap / unexpected.
-			const reason = sanction_for(config.sanctioned, file.path);
+			const sanction = config.sanctioned.find((s) => file.path.includes(s.pattern));
 			const gap = config.known_gaps.find((g) => file.path.includes(g.pattern));
-			if (reason) {
-				buckets.sanctioned.push({ path: file.path, error: tsv_err, reason });
+			if (sanction) {
+				used_sanctions.add(sanction.pattern);
+				buckets.sanctioned.push({ path: file.path, error: tsv_err, reason: sanction.reason });
 			} else if (gap) {
+				used_gaps.add(gap.pattern);
 				buckets.known_gap.push({ path: file.path, error: tsv_err, category: gap.category, reason: gap.reason });
 			} else {
 				buckets.unexpected.push({ path: file.path, error: tsv_err });
@@ -181,6 +199,46 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 
 	canonical.dispose();
 	native.dispose();
+
+	// A run that graded nothing is a failure, not a pass — a missing suite
+	// checkout (or a typo'd subtree path) exits 1. The tolerance point for
+	// machines without the sibling checkouts is publish Step 3b's preflight
+	// probe, which skips the whole aggregate with a warning BEFORE the gates
+	// run; each gate itself is strict so a manual `deno task conformance`
+	// can't green-skip a leg.
+	if (scanned === 0) {
+		if (json_mode) {
+			Deno.stdout.writeSync(
+				new TextEncoder().encode(JSON.stringify({ root, scanned: 0 }, null, '\t') + '\n'),
+			);
+		}
+		console.error(
+			`\n${config.title} parse-conformance gate — root: ${root}\n` +
+				`FAIL: 0 ${config.input_noun} found — nothing was graded. ` +
+				`Clone the suite checkout (expected at ${config.default_root}), or fix the path argument.`,
+		);
+		Deno.exit(1);
+	}
+
+	// Oracle version-skew probe (the scan above proved the checkout exists).
+	if (config.oracle_pin) {
+		try {
+			const checkout_pkg = JSON.parse(
+				await readFile(config.oracle_pin.checkout_package_json, 'utf8'),
+			) as { version?: string };
+			const pinned = (await load_all_versions()).canonical[config.oracle_pin.npm_package];
+			if (checkout_pkg.version && checkout_pkg.version !== pinned) {
+				console.error(
+					`\n⚠ oracle version skew: ${config.oracle_pin.checkout_package_json} is v${checkout_pkg.version} but the ` +
+						`${config.oracle_pin.npm_package} oracle is pinned v${pinned} — the suite INPUTS and the grading parser ` +
+						`come from different versions. Align the checkout, or bump the canonical pins deliberately (see ` +
+						`benches/js/CLAUDE.md §"Canonical baseline is coupled").`,
+				);
+			}
+		} catch {
+			// Checkout package.json unreadable — skew unknowable; not a gate concern.
+		}
+	}
 
 	// --- Report -----------------------------------------------------------------
 
@@ -277,5 +335,46 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		);
 		Deno.exit(1);
 	}
+
+	// Full-suite-only hygiene (a subtree run legitimately grades a slice):
+	if (root === config.default_root) {
+		// Ledger freshness: every sanction / known-gap entry must still match a live
+		// over-rejection, mirroring scan_audit's ALLOW-list discipline. Otherwise a
+		// fixed gap's entry rots dormant, an upstream fixture rename orphans it
+		// silently, and a too-broad pattern can mask a NEW regression.
+		const stale = [
+			...config.sanctioned.filter((s) => !used_sanctions.has(s.pattern)).map((s) => `sanction: ${s.pattern}`),
+			...config.known_gaps.filter((g) => !used_gaps.has(g.pattern)).map((g) => `known-gap: ${g.pattern}`),
+		];
+		if (stale.length > 0) {
+			console.error(
+				`\nFAIL: ${stale.length} stale ledger entr${stale.length === 1 ? 'y' : 'ies'} — matched no over-rejection in this full-suite run:\n` +
+					stale.map((s) => `    · ${s}`).join('\n') +
+					`\n  Delete the entry if its gap/leniency was fixed; update the pattern if upstream renamed the fixture.`,
+			);
+			Deno.exit(1);
+		}
+
+		// Pinned counts (exact — the suite checkout is version-gated by pins:audit
+		// and the oracle is pinned, so these are deterministic): any move, up or
+		// down, is a suite refresh or a behavior change and must be re-pinned
+		// deliberately. Down = regression/gutted input; up = new inputs graded.
+		const pin_failures = [
+			scanned !== config.pins.scanned
+				? `scanned ${scanned} ≠ pinned ${config.pins.scanned}`
+				: null,
+			buckets.both_accept !== config.pins.both_accept
+				? `both-accept ${buckets.both_accept} ≠ pinned ${config.pins.both_accept}`
+				: null,
+		].filter((f): f is string => f !== null);
+		if (pin_failures.length > 0) {
+			console.error(
+				`\nFAIL: pinned count mismatch — ${pin_failures.join('; ')}. ` +
+					`If this move is deliberate (suite refresh, behavior change), re-pin in lib/gate_counts.ts (see its update ritual).`,
+			);
+			Deno.exit(1);
+		}
+	}
+
 	console.error(`\nOK: verdict parity holds (no unexpected over-rejections).`);
 }

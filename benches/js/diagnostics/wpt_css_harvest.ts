@@ -35,14 +35,17 @@
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative } from 'node:path';
 
+import { WPT_CSS_HARVEST_PIN } from '../lib/gate_counts.ts';
+
 const OUT_DEFAULT = 'benches/js/.cache/wpt_css';
+const SOURCE_DEFAULT = '../wpt/css';
 
 const out_flag_index = Deno.args.indexOf('--out');
 const out_dir = out_flag_index === -1 ? OUT_DEFAULT : Deno.args[out_flag_index + 1];
 const if_present = Deno.args.includes('--if-present');
 const source_root = Deno.args.find(
 	(a, i) => !a.startsWith('-') && (out_flag_index === -1 || i !== out_flag_index + 1),
-) ?? '../wpt/css';
+) ?? SOURCE_DEFAULT;
 
 try {
 	await stat(source_root);
@@ -118,6 +121,21 @@ for (const entry of entries) {
 	if (stats.html_files_scanned % 5000 === 0) {
 		console.error(`scanned ${stats.html_files_scanned} files, ${stats.blocks_written} blocks…`);
 	}
+}
+
+// Pinned count (exact, default source only): the wpt checkout is updated
+// deliberately, so any move — a gutted sparse-checkout harvesting a tiny cache,
+// or a pull growing it — must be re-pinned, not absorbed. On mismatch the cache
+// is removed so downstream loaders see "absent" (disclosed) rather than a
+// wrong-sized cache. Applies regardless of --if-present (that flag tolerates a
+// MISSING source, not a changed harvest). See ../lib/gate_counts.ts.
+if (source_root === SOURCE_DEFAULT && stats.blocks_written !== WPT_CSS_HARVEST_PIN) {
+	console.error(
+		`FAIL: pinned count mismatch — harvested ${stats.blocks_written} blocks ≠ pinned ${WPT_CSS_HARVEST_PIN}. ` +
+			`Removing ${out_dir}; if the move is deliberate (wpt pull), re-pin in lib/gate_counts.ts.`,
+	);
+	await rm(out_dir, { recursive: true, force: true });
+	Deno.exit(1);
 }
 
 console.error(`done: ${stats.blocks_written} blocks from ${stats.files_with_blocks} files → ${out_dir}`);

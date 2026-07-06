@@ -21,6 +21,18 @@ mod summary;
 pub use errors::{ValidationError, ValidationSuccess};
 pub use summary::{ValidationSummary, print_validation_results};
 
+/// REGRESSION PIN (minimum, at the exact measured value): fixtures validated
+/// on an unfiltered run — a discovery collapse must not let the PRIMARY
+/// correctness gate pass while validating (almost) nothing. Enforced by BOTH
+/// the `fixtures_validate` command and the `fixtures_tests` integration test
+/// (the form CI runs via `cargo test`). A minimum, not a two-sided pin,
+/// because the fixtures tree is COMMITTED: additions are ordinary reviewed
+/// diffs (a counter bump per fixture PR would be pure ceremony), while
+/// shrinkage is either a deliberate deletion (re-pin) or the discovery
+/// regression this guards. Re-pin to current when it trips. Measured 2,899 on
+/// 2026-07-06; same ritual as `benches/js/lib/gate_counts.ts`.
+pub const FIXTURES_MIN: usize = 2_899;
+
 use parsed_input::{input_ast_paths, parse_input};
 use structure::validate_fixture_structure;
 

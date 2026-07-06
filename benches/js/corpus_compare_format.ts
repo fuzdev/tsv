@@ -35,6 +35,7 @@ import {
 	filter_diff_context,
 	format_diff_for_terminal,
 } from './lib/diff.ts';
+import { CORPUS_FORMAT_MATCH_MIN } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
 	check_expected_error,
@@ -607,11 +608,13 @@ async function main(): Promise<void> {
 
 	const total_processed = Object.values(lang_counts).reduce((a, b) => a + b, 0);
 	if (total_processed === 0) {
-		console.log('No files found.');
+		// An empty scope is a failed comparison run, not a pass — an existing-but-
+		// source-empty path (typo, moved src/) must not read as green.
+		console.log('No files found — nothing was compared.');
 		if (json_mode) emit_json_stdout(build_json_report(results, stats, base_path));
 		canonical.dispose();
 		native.dispose();
-		return;
+		Deno.exit(1);
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
@@ -874,6 +877,29 @@ async function main(): Promise<void> {
 		}
 	}
 
+	// Pinned minimums (--all only — the corpus is LIVE dev repos, so growth
+	// passes; any drop below the pinned current value fails): per-language
+	// minimum exact-match count, so a one-language formatter/oracle collapse
+	// (matches draining into unknown/error) can't hide under the cross-language
+	// total or below the SAFETY/all-errored gates. See lib/gate_counts.ts
+	// (re-pin to current when touching the corpus, so the minimum stays tight).
+	if (use_all_repos) {
+		const pin_failures = LANGUAGES.filter(
+			(lang) => stats.get(lang)!.match < CORPUS_FORMAT_MATCH_MIN[lang],
+		).map(
+			(lang) =>
+				`${lang} match ${stats.get(lang)!.match} < pinned minimum ${CORPUS_FORMAT_MATCH_MIN[lang]}`,
+		);
+		if (pin_failures.length > 0) {
+			console.log(
+				`\n\x1b[31mFAIL: pinned minimum — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
+			);
+			canonical.dispose();
+			native.dispose();
+			Deno.exit(1);
+		}
+	}
+
 	// Final status
 	console.log();
 	if (total_safety_violation > 0) {
@@ -896,6 +922,19 @@ async function main(): Promise<void> {
 		console.log(
 			`\x1b[33mWARN: ${parts.join(', ')} differences (may need investigation)\x1b[0m`,
 		);
+	} else if (
+		total_errors > 0 &&
+		total_match + total_known_divergence + total_expected_errors === 0
+	) {
+		// Every file errored — a systemic failure (sidecar/FFI down, wrong corpus),
+		// NOT a graded run. Without this floor the SAFETY differential never runs
+		// on any file and the gate would WARN + exit 0 having compared nothing.
+		console.log(
+			`\x1b[31mFAIL: all ${total_errors} files errored — nothing was compared (systemic sidecar/FFI failure?)\x1b[0m`,
+		);
+		canonical.dispose();
+		native.dispose();
+		Deno.exit(1);
 	} else if (total_errors > 0) {
 		console.log(`\x1b[33mWARN: ${total_errors} errors occurred\x1b[0m`);
 	} else {

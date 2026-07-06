@@ -8,6 +8,14 @@ parse ASTs against the canonical parsers — is documented in
 ../benches/js/CLAUDE.md §Parse Comparison; its diffs are triaged with the
 fixture-first TDD flow rather than this file's hunk workflow.
 
+Exit-code notes for `--all` runs: besides SAFETY (which always gates), the
+tools fail on an empty scope, an all-errored / zero-compared run (systemic
+sidecar/FFI failure), and on the **pinned per-language minimums**
+(`benches/js/lib/gate_counts.ts` — see ../benches/js/CLAUDE.md §Pinned gate
+counts). The corpus is live dev repos, so growth passes; a drop below the
+pinned current value means a language collapsed (or the corpus genuinely
+shrank — re-pin deliberately).
+
 ## First Step: Load Conformance Doc
 
 **ALWAYS start by reading the conformance documentation:**

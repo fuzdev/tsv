@@ -24,8 +24,13 @@
  * (over-rejections must be a `TS_FIXTURE_SANCTIONS` sanction or a tracked
  * `KNOWN_GAPS` entry, else exit 1), AST-shape is a report-only triage surface.
  * Periodic (non-`check`) gate — needs the FFI + the acorn-typescript oracle
- * (node_modules) + the `../acorn-typescript/test` checkout; fail-open on a missing
- * root (0 scanned → green).
+ * (node_modules) + the `../acorn-typescript/test` checkout. Strict about setup:
+ * a missing root (0 scanned) FAILS — the tolerance point for machines without
+ * the checkout is publish Step 3b's preflight probe, which skips the whole
+ * aggregate (warn on dry-run, blocking on --wetrun). Full-suite runs also
+ * freshness-check the ledgers (a sanction/known-gap entry matching nothing
+ * fails), enforce the exact pinned counts (`lib/gate_counts.ts`), and warn on
+ * version skew between the checkout and the pinned npm oracle.
  *
  * Run (from the repo root):
  *   deno task conformance:ts-fixtures                # builds corpus FFI, then runs
@@ -35,6 +40,7 @@
  */
 
 import { type FixturesGateConfig, run_fixtures_gate } from '../lib/fixtures_gate.ts';
+import { TS_FIXTURES_PINS } from '../lib/gate_counts.ts';
 import { type KnownGap, TS_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
 
 /**
@@ -58,6 +64,11 @@ const config: FixturesGateConfig = {
 	sanctioned_note: 'deliberate; see TS_FIXTURE_SANCTIONS',
 	known_gaps: KNOWN_GAPS,
 	oracle_name: 'acorn-typescript',
+	oracle_pin: {
+		checkout_package_json: '../acorn-typescript/package.json',
+		npm_package: '@sveltejs/acorn-typescript',
+	},
+	pins: TS_FIXTURES_PINS,
 };
 
 await run_fixtures_gate(config);

@@ -49,6 +49,7 @@ import {
 	resolve_compare_base_path,
 	run_compare_main,
 } from './lib/compare_cli.ts';
+import { CORPUS_PARSE_COMPARED_MIN } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 
 const CorpusCompareParseArgs = z.object({
@@ -894,11 +895,13 @@ async function main(): Promise<void> {
 
 	const total_processed = Object.values(lang_counts).reduce((a, b) => a + b, 0);
 	if (total_processed === 0) {
-		console.log('No files found.');
+		// An empty scope is a failed comparison run, not a pass — an existing-but-
+		// source-empty path (typo, moved src/) must not read as green.
+		console.log('No files found — nothing was compared.');
 		if (json_mode) emit_json_stdout(build_json_report(results, stats, [], base_path));
 		canonical.dispose();
 		native.dispose();
-		return;
+		Deno.exit(1);
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
@@ -957,6 +960,40 @@ async function main(): Promise<void> {
 	const documented_groups = groups.filter((g) => g.documented !== null);
 
 	if (json_mode) emit_json_stdout(build_json_report(results, stats, groups, base_path));
+
+	// Floor: a run where NOTHING was compared (every file parse-fail-skipped on
+	// one side) is a systemic failure, not a pass — without this, an FFI or
+	// sidecar breakage would zero out `compared` and sail through green.
+	if (totals.compared === 0) {
+		console.log(
+			`\x1b[31mFAIL: 0 of ${total_processed} files compared (all parse-fail-skipped) — systemic failure or wrong corpus?\x1b[0m`,
+		);
+		canonical.dispose();
+		native.dispose();
+		Deno.exit(1);
+	}
+
+	// Pinned minimums (--all only — the corpus is LIVE dev repos, so growth
+	// passes; any drop below the pinned current value fails): per-language
+	// minimum `compared`, so a one-language parse collapse can't hide under the
+	// cross-language total. See lib/gate_counts.ts (re-pin to current when
+	// touching the corpus, so the minimum stays tight).
+	if (use_all_repos) {
+		const pin_failures = LANGUAGES.filter(
+			(lang) => stats.get(lang)!.compared < CORPUS_PARSE_COMPARED_MIN[lang],
+		).map(
+			(lang) =>
+				`${lang} compared ${stats.get(lang)!.compared} < pinned minimum ${CORPUS_PARSE_COMPARED_MIN[lang]}`,
+		);
+		if (pin_failures.length > 0) {
+			console.log(
+				`\x1b[31mFAIL: pinned minimum — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
+			);
+			canonical.dispose();
+			native.dispose();
+			Deno.exit(1);
+		}
+	}
 
 	// Undocumented groups — the actionable output
 	if (undocumented_groups.length > 0) {

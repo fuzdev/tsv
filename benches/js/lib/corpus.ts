@@ -436,6 +436,28 @@ export interface CorpusSource {
 }
 
 /**
+ * Check-only probe of a view's entries: the paths `stream()` would fail fast on
+ * (non-optional, absent) plus the optional ones currently absent. Used by
+ * `scripts/doctor.ts` — kept here so the doctor and the loader can't drift.
+ */
+export async function corpus_missing_entries(
+	view: CorpusView,
+): Promise<{ missing: string[]; optional_missing: string[]; total: number }> {
+	const tiers = TIERS_BY_VIEW[view];
+	const entries = CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier));
+	const missing: string[] = [];
+	const optional_missing: string[] = [];
+	for (const entry of entries) {
+		const entry_path = entry_source(entry);
+		if (await fs_exists(resolve(entry_path))) continue;
+		(entry.optional ? optional_missing : missing).push(
+			entry_path + (entry.hint ? ` (${entry.hint})` : ''),
+		);
+	}
+	return { missing, optional_missing, total: entries.length };
+}
+
+/**
  * Loads one view of `CORPUS_ENTRIES`.
  * Paths are relative to cwd. Missing entries FAIL FAST (before any file is
  * yielded) unless the entry is `optional` (the derived harvest caches, warned)

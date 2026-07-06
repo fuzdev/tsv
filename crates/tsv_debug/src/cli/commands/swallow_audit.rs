@@ -33,9 +33,19 @@ struct Violation {
     report: SwallowReport,
 }
 
+/// REGRESSION PIN (minimum, at the exact measured value): files formatted on a
+/// default (`tests/fixtures`) run — with an empty or all-parse-failing corpus
+/// the audit would pass vacuously ("0 swallows across 0 files"). A minimum,
+/// not a two-sided pin, because the fixtures tree is COMMITTED and grows with
+/// ordinary fixture PRs (`deno task check` must not fail per added fixture);
+/// shrinkage/collapse fails. Re-pin to current when it trips. Measured 5,744
+/// on 2026-07-06; same ritual as `benches/js/lib/gate_counts.ts`.
+const FORMATTED_MIN: usize = 5_744;
+
 impl SwallowAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let paths = if self.paths.is_empty() {
+        let default_paths = self.paths.is_empty();
+        let paths = if default_paths {
             vec!["tests/fixtures".to_string()]
         } else {
             self.paths
@@ -91,6 +101,14 @@ impl SwallowAuditCommand {
             print_json(&violations, formatted, parse_errors);
         } else {
             print_report(&violations, formatted, parse_errors);
+        }
+
+        if default_paths && formatted < FORMATTED_MIN {
+            eprintln!(
+                "Error: pinned minimum — formatted {formatted} files < pinned {FORMATTED_MIN}. \
+                 The fixtures walk shrank (or parsing collapsed); if deliberate, re-pin FORMATTED_MIN."
+            );
+            return Err(CliError::Failed);
         }
 
         if violations.is_empty() {

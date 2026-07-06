@@ -25,7 +25,9 @@
  *                    <level> -->` marker (also required). A fresh wetrun needs
  *                    both, plus a non-empty `## Unreleased` section; a sentinel
  *                    retry runs without either.
- *   --no-check       skip `deno task check` AND the Step 3b conformance gates (faster retries)
+ *   --no-check       skip `deno task check` AND the Step 3b conformance gates (faster
+ *                    retries; also the only way to --wetrun on a machine missing the
+ *                    Step 3b oracle checkouts — a missing oracle otherwise FAILS a wetrun)
  *   --no-git         skip the git commit + tag + push finalization
  *
  * Retry: a failed wetrun leaves the bump in place plus a sentinel file; re-run
@@ -316,22 +318,38 @@ if (no_check) {
 // them here means a release can't ship a parse/format regression the in-repo gate
 // is structurally blind to. Skipped by --no-check alongside Step 3.
 //
-// Tolerant of a missing oracle: these need the ../svelte checkout + the
-// benches/js `node_modules` sidecar (`deno task bench:install`), which a clean
-// machine or a resumed wetrun may lack — warn + skip rather than block the
-// release. test262 (needs ../test262) and the CSS-WPT harvest stay manual.
+// The gates need the ../svelte + ../acorn-typescript + ../typescript checkouts
+// and the benches/js `node_modules` sidecar (`deno task bench:install`). The
+// probe must cover every oracle the aggregate's legs need — the gates
+// themselves fail closed on a missing checkout, so the probe is the ONE
+// tolerance point: a dry-run warn-and-skips (clean machines can still
+// validate), but a --wetrun BLOCKS — releasing with the gates never run
+// requires the explicit --no-check. Any skip is re-warned in the final summary
+// so it can't scroll away. test262 (needs ../test262) and the CSS-WPT harvest
+// stay manual.
+let conformance_skip_reason: string | null = null;
 if (no_check) {
 	console.log('\n=== Step 3b: Conformance gates — SKIPPED (--no-check) ===');
+	conformance_skip_reason = '--no-check';
 } else {
 	console.log('\n=== Step 3b: Conformance gates (deno task conformance) ===');
 	const missing = [
 		exists('../svelte/packages/svelte/tests') ? null : '../svelte checkout',
+		exists('../acorn-typescript/test') ? null : '../acorn-typescript checkout',
+		exists('../typescript/tests') ? null : '../typescript checkout',
 		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)',
 	].filter((m): m is string => m !== null);
-	if (missing.length > 0) {
+	if (missing.length > 0 && wetrun) {
+		console.error(
+			`  FAIL: missing ${missing.join(' + ')} — the conformance gates cannot run. ` +
+				'Clone/install the missing pieces, or pass --no-check to release without gates (explicitly).',
+		);
+		Deno.exit(1);
+	} else if (missing.length > 0) {
+		conformance_skip_reason = `missing ${missing.join(' + ')}`;
 		console.warn(
-			`  WARN: skipping — missing ${missing.join(' + ')}. ` +
-				'Run `deno task conformance` manually before release.',
+			`  WARN: skipping — ${conformance_skip_reason}. ` +
+				'A --wetrun would FAIL here; run `deno task conformance` on a machine with the oracles.',
 		);
 	} else {
 		run(
@@ -487,6 +505,13 @@ for (const { label, dir } of packages) {
 			? `  Published ${label}@${version} — ${size_note}`
 			: `  ${label}@${version} — ${size_note}`,
 	);
+}
+if (conformance_skip_reason !== null) {
+	// Re-warn at the very end — the Step 3b warning is a single line buried in
+	// build output, and a release whose conformance gates never ran must be the
+	// last thing on screen, not a scrolled-away footnote.
+	console.warn(`\n  ⚠ Step 3b conformance gates did NOT run (${conformance_skip_reason}).`);
+	console.warn('    Run `deno task conformance` and verify it passes for this release.');
 }
 if (!wetrun) {
 	console.log(`\n  Dry-run complete for v${version} — all checks passed.`);

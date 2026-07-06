@@ -45,6 +45,18 @@ pub struct Test262Command {
     filters: Vec<String>,
 }
 
+/// REGRESSION PIN (exact): discovered test files on an unfiltered run — the
+/// checkout is updated deliberately, so any move (a discovery bug shrinking
+/// the suite, or a test262 pull growing it) must be re-pinned, never absorbed.
+/// Measured 2026-07-06; same ritual as `benches/js/lib/gate_counts.ts`.
+const DISCOVERED_PIN: usize = 49_136;
+
+/// REGRESSION PIN (exact): graded strict-subset size for an unfiltered
+/// `--emit-manifest` run — a frontmatter/feature-filter change moving the
+/// graded set silently shifts the differential and the bench corpus.
+/// Measured 2026-07-06.
+const GRADED_MANIFEST_PIN: usize = 46_544;
+
 impl Test262Command {
     pub(crate) fn run(self) -> Result<(), CliError> {
         println!("test262 validation");
@@ -80,6 +92,14 @@ impl Test262Command {
         let total_count = all_tests.len();
         println!("Found {total_count} test files");
 
+        if self.filters.is_empty() && total_count != DISCOVERED_PIN {
+            eprintln!(
+                "Error: pinned count mismatch — discovered {total_count} test files ≠ pinned {DISCOVERED_PIN}. \
+                 If deliberate (test262 pull, discovery change), re-pin DISCOVERED_PIN."
+            );
+            return Err(CliError::Failed);
+        }
+
         // Apply filters
         let filtered_tests: Vec<_> = all_tests
             .into_iter()
@@ -111,6 +131,16 @@ impl Test262Command {
             eprintln!("Grading {} tests for manifest…", filtered_tests.len());
             let manifest =
                 Manifest::build(self.path.to_string_lossy().into_owned(), &filtered_tests);
+
+            // Pin BEFORE writing, so a wrong manifest never replaces a good one.
+            if self.filters.is_empty() && manifest.count != GRADED_MANIFEST_PIN {
+                eprintln!(
+                    "Error: pinned count mismatch — graded {} tests ≠ pinned {GRADED_MANIFEST_PIN}; \
+                     manifest not written. If deliberate, re-pin GRADED_MANIFEST_PIN.",
+                    manifest.count
+                );
+                return Err(CliError::Failed);
+            }
 
             let file = std::fs::File::create(manifest_path).map_err(|e| {
                 eprintln!("Error creating manifest {}: {e}", manifest_path.display());

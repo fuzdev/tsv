@@ -17,9 +17,11 @@
  * validity oracle. So neither gets a reject cache; only Svelte does.
  *
  * Machine-local, regenerable (like the wpt/test262 harvest caches): paths are
- * absolute and the cache is gitignored. `--if-present` (default) warn-and-skips
- * when `../svelte` or the `node_modules` sidecar is absent, leaving no cache —
- * the loader then fails open to the un-filtered corpus (disclosed in its log).
+ * absolute and the cache is gitignored. `--if-present` (passed by the
+ * `bench:harvest:svelte-rejects` task) warn-and-skips when `../svelte` or the
+ * `node_modules` sidecar is absent, leaving no cache — the loader then fails
+ * open to the un-filtered corpus (disclosed in its log). A manual run WITHOUT
+ * the flag fails closed instead, matching the wpt/test262 harvests.
  *
  * Run (from repo root):
  *   deno run --allow-read --allow-write=benches/js/.cache --allow-env --allow-net \
@@ -32,6 +34,7 @@ import { dirname, relative, resolve } from 'node:path';
 
 import { DevReposLoader } from '../lib/corpus.ts';
 import { CanonicalImplementation } from '../lib/canonical.ts';
+import { SVELTE_REJECTS_PIN } from '../lib/gate_counts.ts';
 import { load_all_versions } from '../lib/versions.ts';
 
 const CACHE_PATH = 'benches/js/.cache/svelte_parse_rejects.json';
@@ -82,6 +85,20 @@ async function main(): Promise<void> {
 		}
 	}
 	rejects.sort();
+
+	// Pinned count (exact): fewer rejects means the svelte/compiler oracle
+	// stopped rejecting (broken import/config); more means it started rejecting
+	// wholesale — either way the cache would corrupt the published coverage
+	// number. Fail BEFORE writing so a wrong cache never replaces a good one;
+	// applies regardless of --if-present (that tolerates a MISSING oracle, not a
+	// broken one). See ../lib/gate_counts.ts.
+	if (rejects.length !== SVELTE_REJECTS_PIN) {
+		console.error(
+			`FAIL: pinned count mismatch — ${rejects.length} rejects ≠ pinned ${SVELTE_REJECTS_PIN}; ` +
+				`cache not written. If the move is deliberate (suite refresh), re-pin in lib/gate_counts.ts.`,
+		);
+		Deno.exit(1);
+	}
 
 	const out = resolve(CACHE_PATH);
 	await mkdir(dirname(out), { recursive: true });
