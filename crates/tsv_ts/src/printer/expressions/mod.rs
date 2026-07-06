@@ -60,6 +60,22 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Wrap `inner` in parens that break open and indent: `(⏎\t<inner>⏎)`. Used for a
+    /// parenthesized *decorated* class expression, where the decorators force the
+    /// break so prettier opens the parens — unlike an undecorated `(class {})`, which
+    /// stays flat. Shared by the bare-statement form (`build_expression_statement_doc`)
+    /// and the self-wrapping member/call form (`(@dec class {}).foo` / `()`, via the
+    /// `ClassExpression` arm of `build_expression_doc`).
+    pub(in crate::printer) fn build_break_open_parens(&self, inner: DocId) -> DocId {
+        let d = self.d();
+        d.concat(&[
+            d.text("("),
+            d.indent(d.concat(&[d.hardline(), inner])),
+            d.hardline(),
+            d.text(")"),
+        ])
+    }
+
     /// Build a Doc for an expression (for use in object/array contexts and statements)
     pub(crate) fn build_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
@@ -109,10 +125,20 @@ impl<'a> Printer<'a> {
             Expression::FunctionExpression(func) => {
                 self.maybe_wrap_expr_stmt_paren(func.span, self.build_function_doc(func))
             }
-            Expression::ClassExpression(class_expr) => self.maybe_wrap_expr_stmt_paren(
-                class_expr.span,
-                self.build_class_expression_doc(class_expr),
-            ),
+            Expression::ClassExpression(class_expr) => {
+                let doc = self.build_class_expression_doc(class_expr);
+                // A decorated class expression that self-wraps at an expression-statement
+                // start (`(@dec class {}).foo`, `(@dec class {})()`) breaks its parens
+                // open + indents, like the bare-statement form; an undecorated
+                // `(class {}).foo` keeps the flat wrap.
+                if self.expr_stmt_paren_target.get() == Some(class_expr.span)
+                    && class_expr.decorators.is_some_and(|dec| !dec.is_empty())
+                {
+                    self.build_break_open_parens(doc)
+                } else {
+                    self.maybe_wrap_expr_stmt_paren(class_expr.span, doc)
+                }
+            }
             Expression::SpreadElement(spread) => self.build_spread_doc(spread),
             Expression::TemplateLiteral(template) => self.build_template_literal_doc(template),
             Expression::TaggedTemplateExpression(tagged) => self.build_tagged_template_doc(tagged),

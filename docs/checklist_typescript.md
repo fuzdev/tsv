@@ -438,6 +438,7 @@ ES2015 module syntax with ES2024 additions.
 - Decorator factories (`@decorator()`)
 - Parameter decorators (`fn(@dec x: T)`)
 - Decorators on ambient class members (`declare class C { @dec m() {} }`)
+- Decorators after `export` (`export @dec class C {}`) — position preserved relative to `export`
 
 Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 decorator standard), but tsv parses them — the parser attaches them to the parameter's `decorators`, covered by `tests/fixtures/typescript/typescript_specific/decorators/parameter/`.
 
