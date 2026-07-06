@@ -170,11 +170,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
-        // Parse the single parameter: a plain identifier, or `await` as a
-        // `BindingIdentifier` at Script `[~Await]` (`await => …`).
-        debug_assert!(
-            matches!(self.current_kind(), TokenKind::Identifier) || self.at_await_identifier()
-        );
+        // Parse the single parameter: a plain identifier, a contextual type keyword
+        // (`any => …`), or `await` as a `BindingIdentifier` at Script `[~Await]`
+        // (`await => …`) — the dispatcher gates every reachable case through the
+        // `try_binding_name` binding-name predicate.
+        debug_assert!(self.try_binding_name().is_some());
         let (id_start, id_end) = self.current_pos();
         let name = self.current_ident_name_or_await();
         self.advance()?;

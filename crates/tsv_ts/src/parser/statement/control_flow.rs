@@ -505,40 +505,41 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse optional parameter: (param) or (param: type) or ({destructuring}) or ({destructuring}: Type)
         let param = if self.eat(TokenKind::ParenOpen) {
-            let param = match self.current_kind() {
-                // Simple identifier: catch (e) or catch (e: Error). Also `await`
-                // as a `BindingIdentifier`, valid only at Script goal in a
-                // `[~Await]` context (`at_await_identifier`).
-                k if matches!(k, TokenKind::Identifier) || self.at_await_identifier() => {
-                    let (id_start, id_end) = self.current_pos();
-                    let name = self.current_ident_name_or_await();
-                    self.advance()?;
+            // A catch binding is a `BindingIdentifier` — a plain identifier, a
+            // contextual type keyword (`catch (any)`), or `await` at Script
+            // `[~Await]` (all covered by `try_binding_name`) — with an optional
+            // `: type` annotation; or a destructuring pattern.
+            let param = if let Some(name) = self.try_binding_name() {
+                let (id_start, id_end) = self.current_pos();
+                self.advance()?;
 
-                    // Check for type annotation: param: type
-                    let (extra, param_end) = if self.check(&TokenKind::Colon) {
-                        let ta = self.parse_type_annotation()?;
-                        let end = ta.span.end as usize;
-                        (Some(self.typed_extra(ta)), end)
-                    } else {
-                        (None, id_end)
-                    };
+                // Check for type annotation: param: type
+                let (extra, param_end) = if self.check(&TokenKind::Colon) {
+                    let ta = self.parse_type_annotation()?;
+                    let end = ta.span.end as usize;
+                    (Some(self.typed_extra(ta)), end)
+                } else {
+                    (None, id_end)
+                };
 
-                    Expression::Identifier(Identifier {
-                        escaped_name: name.escaped,
-                        name_len: name.raw_len,
-                        optional: false,
-                        extra,
-                        span: Span::new(id_start as u32, param_end as u32),
-                    })
-                }
-                // Destructuring binding with an optional type annotation:
-                // catch ({message}) / catch ([x, y]) / catch ({message}: ErrorType).
-                // A catch binding takes no optional `?` marker.
-                TokenKind::BraceOpen | TokenKind::BracketOpen => {
-                    self.parse_destructured_binding(false)?
-                }
-                _ => {
-                    return Err(self.error_expected("catch parameter"));
+                Expression::Identifier(Identifier {
+                    escaped_name: name.escaped,
+                    name_len: name.raw_len,
+                    optional: false,
+                    extra,
+                    span: Span::new(id_start as u32, param_end as u32),
+                })
+            } else {
+                match self.current_kind() {
+                    // Destructuring binding with an optional type annotation:
+                    // catch ({message}) / catch ([x, y]) / catch ({message}: ErrorType).
+                    // A catch binding takes no optional `?` marker.
+                    TokenKind::BraceOpen | TokenKind::BracketOpen => {
+                        self.parse_destructured_binding(false)?
+                    }
+                    _ => {
+                        return Err(self.error_expected("catch parameter"));
+                    }
                 }
             };
 

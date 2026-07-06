@@ -535,6 +535,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let expr = self.parse_unary_keyword_expression()?;
                 ParsedExpr::from_expr(self.arena, expr)
             }
+            // A single unparenthesized arrow parameter may be a contextual keyword
+            // that is a valid `BindingIdentifier` (`any => x`, `async => x`,
+            // `from => x`). The byte scan requires `=>` *immediately* after the word,
+            // so `async x => …` / `async () => …` (a real async arrow) fall through to
+            // the `async` arm, and non-binding reserved words (`yield =>`, `await =>`
+            // at Module) are excluded by `can_be_binding_name` and reject downstream.
+            // This mirrors the plain-`Identifier` arrow check below; `await` at Script
+            // `[~Await]` keeps its dedicated handling in the `Await` arm.
+            TokenKind::Keyword(kw)
+                if kw.can_be_binding_name() && self.is_single_param_arrow_start() =>
+            {
+                let expr = self.parse_single_param_arrow_function()?;
+                ParsedExpr::from_expr(self.arena, expr)
+            }
             TokenKind::Keyword(KeywordKind::Await) => {
                 if self.in_await {
                     // `[+Await]` context: a real await expression.

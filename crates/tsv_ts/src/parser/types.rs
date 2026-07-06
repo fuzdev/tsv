@@ -278,6 +278,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if let TokenKind::Keyword(kw) = self.current_kind()
             && let Some(ts_kind) = TSKeywordKind::from_lexer_keyword(*kw)
         {
+            // A *contextual* type keyword (`string`, `number`, `any`, `undefined`, …)
+            // immediately followed by `.` is the HEAD of a qualified type name
+            // (`string.X`, `number.A.B`), not the primitive keyword — tsc, prettier,
+            // and acorn all read it as a `TSTypeReference` / `TSQualifiedName`. Gated on
+            // `can_be_binding_name` so only the non-reserved contextual keywords
+            // qualify: `true`/`false`/`void`/`null` are reserved (never entity-name
+            // heads for tsc/prettier), so `true.X` stays primitive and rejects the
+            // trailing `.X`, matching the formatter oracle.
+            if kw.can_be_binding_name() && matches!(self.peek_kind(), TokenKind::Dot) {
+                return self.parse_type_reference();
+            }
             self.advance()?;
             return Ok(TSType::Keyword(TSKeywordType::new(ts_kind, span)));
         }
