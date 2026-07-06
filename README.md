@@ -21,7 +21,7 @@ tsv prioritizes, in order:
 2. speed
 3. binary size
 4. memory usage
-5. and lastly, extensibility (deprioritized compared to Oxc/Biome/SWC)
+5. extensibility (valued but deprioritized)
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
 Compared to Oxc and Biome, tsv is significantly faster, smaller, and uses less memory.
