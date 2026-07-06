@@ -2,8 +2,8 @@
 	"version": 6,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-06T22:11:05.872Z",
-	"git_commit": "f672d035",
+	"timestamp": "2026-07-06T22:46:27.675Z",
+	"git_commit": "a99ef299",
 	"corpus": {
 		"svelte": 5507,
 		"typescript": 46847,
