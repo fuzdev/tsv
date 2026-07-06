@@ -295,8 +295,11 @@ pub fn heuristic_shadow_warning(d: &str) -> String {
 /// The caller invokes this **once, at the target root**. An ancestor
 /// `.prettierignore` of a subdirectory target is deliberately *not* this case
 /// (outside a repo there is no boundary to bound an upward search), and a nested
-/// `.prettierignore` below the root is unread by prettier too (so not a
-/// divergence to flag). Presence-only — an empty or comments-only
+/// `.prettierignore` below the target root is not scanned either: outside a repo
+/// tsv's regime is `.formatignore`-only at every depth, so this is one courtesy
+/// heads-up at the entry point rather than a per-directory warning. (Inside a repo
+/// the warning never fires — there tsv *does* read `.prettierignore`,
+/// hierarchically.) Presence-only — an empty or comments-only
 /// `.prettierignore` still warns (rare, and the message still points at the right
 /// fix); the caller learns presence from the directory listing it already holds,
 /// so this costs no extra filesystem access. Produced **once**, here, like

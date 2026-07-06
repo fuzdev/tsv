@@ -124,11 +124,12 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
   Svelte `name_loc` objects, mirroring acorn's `locations: false` for improved performance
   (`parse --no-locations` or the `parse_*_no_locations` bindings) 
 - `tsv format` discovery is gitignore-aware,
-  honoring `.gitignore` and `.formatignore` (original to tsv),
-  hierarchically supporting nested files like git and unlike `.prettierignore`,
-  plus a compatible `.prettierignore`
-  (but relative to repo root if available, not cwd like Prettier's default)
-  (also, all 3 files use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
+  honoring `.gitignore`, `.formatignore` (original to tsv),
+  and a compatible `.prettierignore` —
+  all three supporting nested files hierarchically like git
+  (`.prettierignore` too, unlike Prettier's single cwd-relative file),
+  and in a git repo scoped to the repo root, not the cwd like Prettier's default
+  (all 3 use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
 - Rust-only implementation that currently does not call or embed a JS runtime
   (open for discussion, needs research into the tradeoffs);
   JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2

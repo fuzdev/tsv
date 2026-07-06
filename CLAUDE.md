@@ -4,7 +4,7 @@
 
 High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript), paired with a formatter that took Prettier as its initial guide and still tracks it for the common case — while making deliberate, cataloged choices to diverge where tsv's own judgment is more defensible.
 
-**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and trailingComma='none' — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). The one carve-out is file *scope*, not style: `tsv format` honors `.gitignore` (hierarchically, in a git tree) plus a repo-root `.formatignore` / `.prettierignore`. See [Configuration](#configuration).
+**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and trailingComma='none' — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). The one carve-out is file *scope*, not style: `tsv format` honors `.gitignore` (hierarchically, in a git tree) plus hierarchical `.formatignore` / `.prettierignore`. See [Configuration](#configuration).
 
 ## Committing
 
@@ -429,7 +429,7 @@ Inside a repo, discovery honors, relative to the repo root:
 
 - **`.gitignore`**, hierarchically and repo-rooted exactly like git ([gitignore(5) syntax](https://git-scm.com/docs/gitignore#_pattern_format); matched against `git check-ignore` on case-sensitive filesystems);
 - **`.formatignore`** (tsv's native file), **hierarchically** — one per directory from the repo root down, deeper wins — applied after `.gitignore`, so its `!` can re-include a gitignore'd path (subject to git's parent-directory rule);
-- a single repo-root **`.prettierignore`** (drop-in compat; a repo-root `.formatignore` shadows it), never hierarchical;
+- **`.prettierignore`** (drop-in compat), **hierarchically** as well — one per directory from the repo root down, deeper wins — read as the tsv-layer fallback in any directory that has no `.formatignore` of its own (a *sibling* `.formatignore` shadows it, per-directory);
 - always-skipped **safety nets**: `.git`, `node_modules`, `.hg`, `.svn`, `.jj`.
 
 Outside a repo, `.gitignore` and `.prettierignore` are **not read** (matching git, which honors `.gitignore` only in a worktree); `.formatignore` is honored hierarchically from the filesystem root down, so a `~/.formatignore` acts as global config for loose files. Because the boundary is derived by walking up, the repo-root ignore files apply even from a subdirectory invocation, and formatting a subdirectory directly gives the same result as formatting it via an ancestor.

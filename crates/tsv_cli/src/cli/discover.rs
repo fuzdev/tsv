@@ -11,11 +11,12 @@ use tsv_ignore::IgnoreStack;
 /// repo from the repo root down, outside a repo from the filesystem root down).
 const FORMATIGNORE_FILE: &str = ".formatignore";
 
-/// Prettier's ignore file — read only at the repo root for drop-in compat, and
-/// **shadowed by presence** of a repo-root `.formatignore`: when both exist the
-/// `.formatignore` is used alone, even if it's present-but-unreadable (so a read
-/// error can't silently demote tsv's native file to prettier's — see
-/// [`read_ignore_file`]). Never hierarchical, and never read outside a git repo —
+/// Prettier's ignore file — read hierarchically **inside a git repo** (one per
+/// directory, from the repo root down, like `.formatignore`) for drop-in compat,
+/// and **shadowed by presence** of a *sibling* `.formatignore`: when both sit in
+/// one directory the `.formatignore` is used alone for that directory, even if
+/// it's present-but-unreadable (so a read error can't silently demote tsv's native
+/// file to prettier's — see [`read_ignore_file`]). Never read outside a git repo —
 /// there a target-root `.prettierignore` triggers a heads-up warning instead (see
 /// [`prettierignore_outside_repo_warning`]).
 const PRETTIERIGNORE_FILE: &str = ".prettierignore";
@@ -64,9 +65,10 @@ pub struct Discovered {
 ///   **repo root** — a hard stop, nothing above it is read, so `tsv format
 ///   --check` is reproducible across machines. Discovery honors `.gitignore`
 ///   hierarchically and repo-rooted like git (`git check-ignore` parity on a
-///   case-sensitive filesystem); `.formatignore` hierarchically from the repo
-///   root down; and a repo-root `.prettierignore` (shadowed by a repo-root
-///   `.formatignore`) as drop-in compat. The tsv files override `.gitignore`.
+///   case-sensitive filesystem); `.formatignore` and `.prettierignore` both
+///   hierarchically from the repo root down (each `.prettierignore` shadowed by a
+///   sibling `.formatignore`) as drop-in compat. The tsv files override
+///   `.gitignore`.
 /// - **outside a git repo**, the format root is the **filesystem root**:
 ///   `.gitignore` is not consulted at all (as git itself does), and
 ///   `.formatignore` is honored hierarchically from the filesystem root down — so
@@ -76,9 +78,10 @@ pub struct Discovered {
 ///   since prettier would have honored it
 ///   ([`prettierignore_outside_repo_warning`]).
 ///
-/// `.formatignore` is hierarchical (a file in any directory governs its subtree,
-/// deeper wins); `.prettierignore` is single and repo-root-only. The
-/// **safety nets** (`tsv_discover::SAFETY_NET_DIRS`) are always pruned.
+/// Inside a repo both `.formatignore` and `.prettierignore` are hierarchical (a
+/// file in any directory governs its subtree, deeper wins; a `.prettierignore` is
+/// shadowed by a sibling `.formatignore`). The **safety nets**
+/// (`tsv_discover::SAFETY_NET_DIRS`) are always pruned.
 ///
 /// When a `.gitignore` governs a directory, that is the authority and the
 /// `tsv_discover::HEURISTIC_DIRS` + hidden-directory **heuristic is off** — so a real source
@@ -153,8 +156,8 @@ pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
 /// Resolves the **format root** — the repo root inside a git tree, else the
 /// filesystem root — and preloads the [`IgnoreStack`] for the ancestors *above*
 /// `root` (format root down to `root`'s parent): `.formatignore` at each level
-/// (with a repo-root `.prettierignore` shadow), and `.gitignore` at each level
-/// when in a repo. `root` itself, and everything below it, reads its own ignore
+/// (and, inside a repo, a `.prettierignore` it shadows per-directory), and
+/// `.gitignore` at each level when in a repo. `root` itself, and everything below it, reads its own ignore
 /// files in [`collect_recursive`] from the directory listing it already fetches,
 /// so an ignore-file-free subtree costs no speculative opens. The heuristic is
 /// seeded off once any `.gitignore` above `root` is in scope. `root`'s display
@@ -184,13 +187,13 @@ fn collect_root(root: &Path, cwd: &Path, out: &mut Discovered) {
     let chain = ancestor_chain(&format_root, &root_abs);
     for ancestor in &chain[..chain.len() - 1] {
         let anchor = rel_to(&format_root, ancestor);
-        // tsv layer: `.formatignore` everywhere; at the repo root only, a
-        // `.prettierignore` it shadows (drop-in compat, never hierarchical). No
-        // listing for ancestors, so the read outcome stands in for presence: a
-        // present-but-unreadable `.formatignore` (`Unreadable`, warned) shadows
-        // `.prettierignore` just as in the listed case — only a genuinely `Absent`
-        // one falls through.
-        let tsv_content = if in_repo && anchor.is_empty() {
+        // tsv layer: `.formatignore` everywhere; inside a repo, a `.prettierignore`
+        // it shadows per-directory (hierarchical, like `.formatignore` — deeper
+        // wins). No listing for ancestors, so the read outcome stands in for
+        // presence: a present-but-unreadable `.formatignore` (`Unreadable`, warned)
+        // shadows `.prettierignore` just as in the listed case — only a genuinely
+        // `Absent` one falls through.
+        let tsv_content = if in_repo {
             match read_ignore_file(&ancestor.join(FORMATIGNORE_FILE), &mut out.warnings) {
                 IgnoreRead::Content(content) => Some(content),
                 IgnoreRead::Unreadable => None,
@@ -301,14 +304,15 @@ fn collect_recursive(
         }
     }
     // tsv layer: `.formatignore` whenever present (every level, in or out of a
-    // repo); at the repo root only, a `.prettierignore` is the drop-in fallback,
-    // used solely when no `.formatignore` is *present*. Precedence is by presence
-    // (the listing), not readability — a present-but-unreadable `.formatignore`
-    // still shadows: `read_ignore_file` warns and yields no rules rather than
-    // silently falling through to `.prettierignore`.
+    // repo); inside a repo, a `.prettierignore` is the drop-in fallback at every
+    // level (hierarchical, like `.formatignore`), used solely when no *sibling*
+    // `.formatignore` is present. Precedence is by presence (the listing), not
+    // readability — a present-but-unreadable `.formatignore` still shadows:
+    // `read_ignore_file` warns and yields no rules rather than silently falling
+    // through to `.prettierignore`.
     let tsv_content = if has_formatignore {
         read_ignore_file(&dir.join(FORMATIGNORE_FILE), &mut out.warnings).content()
-    } else if in_repo && dir_rel.is_empty() && has_prettierignore {
+    } else if in_repo && has_prettierignore {
         read_ignore_file(&dir.join(PRETTIERIGNORE_FILE), &mut out.warnings).content()
     } else {
         None
@@ -322,8 +326,10 @@ fn collect_recursive(
     // outside a git repo a target-root `.prettierignore` is silently skipped (tsv
     // reads `.formatignore` there) — warn, from the listing already in hand (no
     // extra stat), pointing at the rename / `git init` fixes. Bounded to the
-    // target root: a nested `.prettierignore` is unread by prettier too, and an
-    // ancestor of a subdir target has no boundary to anchor on outside a repo.
+    // target root: outside a repo tsv's regime is `.formatignore`-only at every
+    // depth (the hierarchical `.prettierignore` read is repo-only), so this is a
+    // courtesy heads-up at the entry point, not a per-directory scan — and a subdir
+    // target has no `.git` boundary to anchor an upward walk on.
     if is_target_root
         && let Some(warning) = prettierignore_outside_repo_warning(
             &dir.to_string_lossy(),

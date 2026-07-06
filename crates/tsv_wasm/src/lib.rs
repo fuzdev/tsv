@@ -89,7 +89,7 @@ impl IgnoreStack {
     /// Push one directory's tsv file, applied after every `.gitignore`. `anchor`
     /// is the directory relative to the format root (`""` = root). The caller
     /// resolves which file's content this is — `.formatignore` hierarchically, or
-    /// a repo-root `.prettierignore` shadowed by a repo-root `.formatignore`.
+    /// a `.prettierignore` (also hierarchical) shadowed by a sibling `.formatignore`.
     pub fn push_tsv(&mut self, anchor: &str, content: &str) {
         self.inner.push_tsv(anchor, content);
     }

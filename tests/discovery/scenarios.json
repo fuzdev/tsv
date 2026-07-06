@@ -208,8 +208,8 @@
 			"cases": [{"target": "", "expected": ["src/keep.gen.ts", "src/main.ts"]}]
 		},
 		{
-			"name": "prettierignore_is_repo_root_only",
-			"note": "a repo-root .prettierignore is honored; a nested one is NOT (only .formatignore is hierarchical)",
+			"name": "prettierignore_is_hierarchical",
+			"note": "a nested .prettierignore governs its subtree, like .formatignore (both are hierarchical tsv layers); the repo-root one applies too, and a subdir invocation still walks up to the .git root and picks up the nested one",
 			"tree": {
 				".git/": null,
 				".prettierignore": "rootskip.ts\n",
@@ -218,7 +218,39 @@
 				"sub/subskip.ts": "x",
 				"sub/keep.ts": "x"
 			},
-			"cases": [{"target": "", "expected": ["sub/keep.ts", "sub/subskip.ts"]}]
+			"cases": [
+				{"target": "", "expected": ["sub/keep.ts"]},
+				{"target": "sub", "expected": ["sub/keep.ts"]}
+			]
+		},
+		{
+			"name": "prettierignore_shadow_is_per_directory",
+			"note": "a directory's .formatignore shadows only its OWN sibling .prettierignore (per-directory); a .prettierignore in another directory is unaffected and still applies (a/.formatignore does not disable b/.prettierignore)",
+			"tree": {
+				".git/": null,
+				"a/.formatignore": "af.ts\n",
+				"a/.prettierignore": "ap.ts\n",
+				"b/.prettierignore": "bp.ts\n",
+				"a/af.ts": "x",
+				"a/ap.ts": "x",
+				"a/keep.ts": "x",
+				"b/bp.ts": "x",
+				"b/keep.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["a/ap.ts", "a/keep.ts", "b/keep.ts"]}]
+		},
+		{
+			"name": "prettierignore_deeper_reincludes",
+			"note": "hierarchical .prettierignore layers are last-match-wins by depth like .formatignore: a deeper .prettierignore `!` re-includes a file a shallower tsv layer ignored",
+			"tree": {
+				".git/": null,
+				".prettierignore": "*.gen.ts\n",
+				"src/.prettierignore": "!keep.gen.ts\n",
+				"a.gen.ts": "x",
+				"src/skip.gen.ts": "x",
+				"src/keep.gen.ts": "x"
+			},
+			"cases": [{"target": "", "expected": ["src/keep.gen.ts"]}]
 		},
 		{
 			"name": "no_borrowed_ignores_outside_repo",
