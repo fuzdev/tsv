@@ -572,9 +572,9 @@ The conformance surface (`BENCH_CORPUS=conformance`, coverage-only + node-only)
 writes `report.conformance.node.{json,md}` instead — a separate committed
 surface that never clobbers the perf reports and is invisible to
 `bench:compose` (which globs the exact perf filenames). To publish benchmarks
-to tsv.fuz.dev, run `npm run update-benchmarks` in ~/dev/tsv.fuz.dev (it reads
-the per-runtime files — see the cross-repo note in the lore when renaming from
-the old single `report.json`).
+to tsv.fuz.dev, run `npm run update-benchmarks` in ~/dev/tsv.fuz.dev — its copy
+list names these report files exactly, so renaming a report artifact means
+updating that script in the same change.
 
 The committed `report.<runtime>.json` (baseline `version: 6`) carries, beyond
 timing stats: a top-level `runtime`, `corpus_kind` (`perf` | `conformance` —
@@ -965,8 +965,7 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   non-Svelte HTML (prettier's `tests/format/html`), so a raw parse-**coverage**
   number scores those intentional rejects as failures — and makes tsv's *higher*
   coverage read as superiority when it's really tsv's deferred-early-error
-  *permissiveness* (see grimoire `TODO_NODE_BENCHMARKS.md` §"Reading the Svelte
-  conformance-coverage number"). So the conformance view excludes the Svelte
+  *permissiveness*. So the conformance view excludes the Svelte
   files `svelte/compiler` rejects — the `svelte_parse_rejects.json` cache from
   `deno task bench:harvest:svelte-rejects` (`diagnostics/svelte_reject_harvest.ts`),
   loaded by `DevReposLoader` only when `view === 'conformance'`. Coverage then
