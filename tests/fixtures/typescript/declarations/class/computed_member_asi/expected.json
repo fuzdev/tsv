@@ -1,0 +1,471 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 251,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Computed class members separated by ASI (no semicolon between them)",
+			"start": 20,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Computed field with initializer, then a computed member",
+			"start": 138,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 59
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 250,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 241,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 92,
+					"end": 135,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 98,
+						"end": 99,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 7
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 100,
+						"end": 135,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 104,
+								"end": 116,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 14
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "Identifier",
+									"start": 105,
+									"end": 106,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 3
+										},
+										"end": {
+											"line": 4,
+											"column": 4
+										}
+									},
+									"name": "e"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 107,
+									"end": 115,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 5
+										},
+										"end": {
+											"line": 4,
+											"column": 13
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 109,
+										"end": 115,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 7
+											},
+											"end": {
+												"line": 4,
+												"column": 13
+											}
+										}
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 119,
+								"end": 132,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 15
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "Identifier",
+									"start": 120,
+									"end": 122,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"name": "e2"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 123,
+									"end": 131,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 6
+										},
+										"end": {
+											"line": 5,
+											"column": 14
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 125,
+										"end": 131,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 8
+											},
+											"end": {
+												"line": 5,
+												"column": 14
+											}
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Computed class members separated by ASI (no semicolon between them)",
+							"start": 20,
+							"end": 90
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 198,
+					"end": 240,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 204,
+						"end": 205,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 7
+							},
+							"end": {
+								"line": 9,
+								"column": 8
+							}
+						},
+						"name": "D"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 206,
+						"end": 240,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 9
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 210,
+								"end": 221,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 13
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "Identifier",
+									"start": 211,
+									"end": 212,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 3
+										},
+										"end": {
+											"line": 10,
+											"column": 4
+										}
+									},
+									"name": "e"
+								},
+								"value": {
+									"type": "UpdateExpression",
+									"start": 216,
+									"end": 220,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 8
+										},
+										"end": {
+											"line": 10,
+											"column": 12
+										}
+									},
+									"operator": "++",
+									"prefix": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 216,
+										"end": 218,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 10,
+												"column": 10
+											}
+										},
+										"name": "id"
+									}
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 224,
+								"end": 237,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 15
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "Identifier",
+									"start": 225,
+									"end": 227,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 3
+										},
+										"end": {
+											"line": 11,
+											"column": 5
+										}
+									},
+									"name": "e2"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 228,
+									"end": 236,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 6
+										},
+										"end": {
+											"line": 11,
+											"column": 14
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 230,
+										"end": 236,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 8
+											},
+											"end": {
+												"line": 11,
+												"column": 14
+											}
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Computed field with initializer, then a computed member",
+							"start": 138,
+							"end": 196
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

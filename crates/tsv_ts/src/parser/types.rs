@@ -45,34 +45,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         })
     }
 
-    /// Parse a complete type expression (handles unions and conditional types at top level)
+    /// Parse a complete type expression (handles unions and conditional types at
+    /// top level). This is the full-type entry, where function/constructor types
+    /// are grammatically allowed — clear both type-context restrictions
+    /// (`with_full_type_context`) so nested full-type positions (type arguments,
+    /// tuple members, object-type members, conditional branches, parenthesized
+    /// inners) parse them greedily even when reached from a constituent/operand
+    /// parse. The postfix-`[` ASI rule (a newline before `[` ends the type — see
+    /// `parse_array_type`) applies uniformly, so the `as`/`satisfies` expression
+    /// context needs no separate entry.
     pub(in crate::parser) fn parse_type(&mut self) -> Result<TSType<'arena>, ParseError> {
-        self.parse_type_inner(false)
-    }
-
-    /// Parse a type in expression context (after `as` or `satisfies`).
-    /// Does not consume `[` across a line terminator to respect ASI.
-    /// Example: `x as A\n[B]` → ASI splits into `x as A;` and `[B];`
-    pub(in crate::parser) fn parse_type_no_asi_bracket(
-        &mut self,
-    ) -> Result<TSType<'arena>, ParseError> {
-        self.parse_type_inner(true)
-    }
-
-    /// Internal type parsing with ASI control. This is the full-type entry, where
-    /// function/constructor types are grammatically allowed — clear both
-    /// type-context restrictions (`with_full_type_context`) so nested full-type
-    /// positions (type arguments, tuple members, object-type members,
-    /// conditional branches, parenthesized inners) parse them greedily even when
-    /// reached from a constituent/operand parse.
-    fn parse_type_inner(
-        &mut self,
-        respect_asi_bracket: bool,
-    ) -> Result<TSType<'arena>, ParseError> {
         debug_assert!(self.pending_conditional_extends.is_none());
         self.with_full_type_context(|p| {
             let start = p.current_pos().0;
-            let check_type = p.parse_union_type_inner(respect_asi_bracket)?;
+            let check_type = p.parse_union_type()?;
 
             // A constrained infer inside `check_type` hit `?` directly after its
             // constraint at this allow-conditional position: the constraint
@@ -124,14 +110,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse union type: `A | B | C` or `| A | B | C`
     fn parse_union_type(&mut self) -> Result<TSType<'arena>, ParseError> {
-        self.parse_union_type_inner(false)
-    }
-
-    /// Internal union type parsing with ASI control
-    fn parse_union_type_inner(
-        &mut self,
-        respect_asi_bracket: bool,
-    ) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Handle leading pipe: `| A | B`
@@ -146,18 +124,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // still the full-type position itself (a function type here is greedy:
         // `([a]) => x | B` is a function type returning `x | B`).
         let first = if has_leading_pipe {
-            self.with_fn_type_disallowed(true, |p| {
-                p.parse_intersection_type_inner(respect_asi_bracket)
-            })?
+            self.with_fn_type_disallowed(true, Self::parse_intersection_type)?
         } else {
-            self.parse_intersection_type_inner(respect_asi_bracket)?
+            self.parse_intersection_type()?
         };
 
         if !has_leading_pipe && !self.check(&TokenKind::Pipe) {
             return Ok(first);
         }
 
-        // After the first type, ASI no longer applies (we're in a union context)
         let mut types = self.bvec();
         types.push(first);
         while self.eat(TokenKind::Pipe) {
@@ -173,14 +148,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse intersection type: `A & B & C` or `& A & B & C`
     fn parse_intersection_type(&mut self) -> Result<TSType<'arena>, ParseError> {
-        self.parse_intersection_type_inner(false)
-    }
-
-    /// Internal intersection type parsing with ASI control
-    fn parse_intersection_type_inner(
-        &mut self,
-        respect_asi_bracket: bool,
-    ) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
 
         // Handle leading ampersand: `& A & B`
@@ -193,16 +160,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // union counterpart above. The no-leading-`&` first parse inherits the
         // caller's position (full-type, or a union constituent's).
         let first = if has_leading_amp {
-            self.with_fn_type_disallowed(true, |p| p.parse_array_type_inner(respect_asi_bracket))?
+            self.with_fn_type_disallowed(true, Self::parse_array_type)?
         } else {
-            self.parse_array_type_inner(respect_asi_bracket)?
+            self.parse_array_type()?
         };
 
         if !has_leading_amp && !self.check(&TokenKind::Ampersand) {
             return Ok(first);
         }
 
-        // After the first type, ASI no longer applies (we're in an intersection context)
         let mut types = self.bvec();
         types.push(first);
         while self.eat(TokenKind::Ampersand) {
@@ -216,31 +182,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    /// Parse array type suffix `T[]` or indexed access type `T[K]`
+    /// Parse array type suffix `T[]` or indexed access type `T[K]`.
+    ///
+    /// The postfix `[` is a `[no LineTerminator here]` position (acorn's
+    /// `tsParseArrayTypeOrHigher`: `while (!hasPrecedingLineBreak() && eat('['))`):
+    /// a newline before `[` ends the type, so the `[` starts a new statement (ASI
+    /// inserts the `;`), never an array/indexed-access suffix. `T⏎[K]` is thus `T`
+    /// then a fresh `[K]`, not `T[K]`. Checked per bracket in the loop condition —
+    /// every context, not just the `as`/`satisfies` expression position.
     fn parse_array_type(&mut self) -> Result<TSType<'arena>, ParseError> {
-        self.parse_array_type_inner(false)
-    }
-
-    /// Internal array type parsing with ASI control.
-    /// When `respect_asi_bracket` is true, we don't consume `[` if there's a line terminator
-    /// before it (ASI would insert a semicolon there in expression context).
-    fn parse_array_type_inner(
-        &mut self,
-        respect_asi_bracket: bool,
-    ) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         let mut result = self.parse_primary_type()?;
 
-        // ASI check: In expression context (after `as`/`satisfies`), if there's a
-        // line terminator before `[`, ASI would insert a semicolon, so the `[`
-        // starts a new statement (array literal), not an indexed access type.
-        // Only matters for the first `[` - subsequent brackets are unambiguous.
-        if respect_asi_bracket && self.check(&TokenKind::BracketOpen) && self.had_line_terminator {
-            return Ok(result);
-        }
-
-        // Check for array type suffix [] or indexed access T[K]
-        while self.check(&TokenKind::BracketOpen) {
+        // Array type suffix [] or indexed access T[K], stopping at a newline-`[`.
+        while !self.had_line_terminator && self.check(&TokenKind::BracketOpen) {
             if matches!(self.peek_kind(), TokenKind::BracketClose) {
                 // Array type: T[]
                 self.advance()?; // consume '['
@@ -468,14 +423,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // nested conditional. Parens re-enable conditionals
         // (`infer U extends (A ? B : C)`), since the parenthesized-type parser
         // recurses into the full type grammar. Mirrors how a conditional's
-        // `extends_type` is parsed (`parse_type_inner`).
+        // `extends_type` is parsed (`parse_type`).
         //
         // At an allow-conditional position, a `?` directly after the
         // constraint means it was never a constraint at all:
         // `infer U extends C ? T : F` is a conditional whose check is the bare
         // `infer U` and whose extends clause is `C` (acorn rolls back its
         // constraint tryParse and re-parses at the conditional level; the
-        // already-parsed type is handed to `parse_type_inner` via
+        // already-parsed type is handed to `parse_type` via
         // `pending_conditional_extends` instead of re-lexing). The re-bound
         // `extends` honors the conditional's no-line-terminator rule: after a
         // newline the constraint is kept, and the enclosing context then

@@ -166,14 +166,14 @@ pub struct Parser<'a, 'arena> {
     /// its explicit signature wrapper — function/constructor-type params and
     /// returns).
     conditional_type_disallowed: bool,
-    /// Hand-off from the constrained-infer parse to `parse_type_inner`: when
+    /// Hand-off from the constrained-infer parse to `parse_type`: when
     /// `infer U extends C` at an allow-conditional position is directly
     /// followed by `?`, the already-parsed `C` re-binds as the extends clause
     /// of a conditional whose check is the bare `infer U` (acorn rolls back
     /// its constraint tryParse and re-parses `extends C` at the conditional
     /// level; this hand-off reproduces that without re-lexing). Set only when
     /// the current token is `?`; consumed by the innermost enclosing
-    /// `parse_type_inner`, which nothing can precede (every intermediate
+    /// `parse_type`, which nothing can precede (every intermediate
     /// union/intersection/array/operand loop breaks on `?`).
     pending_conditional_extends: Option<TSType<'arena>>,
 }
@@ -734,7 +734,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`fn_type_disallowed`, `conditional_type_disallowed`) cleared, each
     /// restored afterward — so nested full-type positions parse function and
     /// conditional types greedily even when reached from a constituent/operand
-    /// parse. Wraps the full-type entry (`parse_type_inner`).
+    /// parse. Wraps the full-type entry (`parse_type`).
     pub(super) fn with_full_type_context<T>(
         &mut self,
         f: impl FnOnce(&mut Self) -> Result<T, ParseError>,
