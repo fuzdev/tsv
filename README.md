@@ -1,5 +1,7 @@
 # tsv
 
+[<img src="static/logo.svg" alt="a pixelated orange quill drawing a straight line" align="right" width="192" height="192">](https://tsv.fuz.dev/)
+
 > a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS - [tsv.fuz.dev](https://tsv.fuz.dev/)
 
 tsv is a toolchain for Svelte, TypeScript/JS, and CSS, written in Rust.
