@@ -1242,8 +1242,8 @@ fn test_format_prettierignore_outside_repo_no_warn_with_formatignore() {
 
 #[test]
 fn test_format_prettierignore_in_repo_no_warn() {
-    // inside a repo the repo-root `.prettierignore` IS read (drop-in compat) and
-    // honored, so there is nothing to warn about.
+    // inside a repo `.prettierignore` IS read (drop-in compat, hierarchically)
+    // and honored, so there is nothing to warn about.
     let dir = git_repo("prettierignore_in_repo_no_warn");
     fs::write(dir.join(".prettierignore"), "ignored.ts\n").unwrap();
     fs::write(dir.join("ignored.ts"), UNFORMATTED_TS).unwrap();
@@ -1256,6 +1256,67 @@ fn test_format_prettierignore_in_repo_no_warn() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     // honored: ignored.ts pruned, keep.ts in scope
     assert!(!stdout.contains("ignored.ts"), "honored: {stdout}");
+    assert!(stdout.contains("keep.ts"), "stdout: {stdout}");
+}
+
+#[test]
+fn test_format_prettierignore_shadowed_by_sibling_formatignore_warns() {
+    // inside a repo, a `.formatignore` beside a `.prettierignore` shadows it (one
+    // tsv layer per directory) — the `.prettierignore`'s rules go unread there.
+    // That's a silent surprise for a prettier migration, so tsv warns (non-fatal),
+    // pointing at merging the patterns into `.formatignore`. Discovery follows the
+    // `.formatignore`: `af.ts` pruned, `pf.ts` (only in the shadowed prettierignore)
+    // stays in scope.
+    let dir = git_repo("prettierignore_shadowed_warns");
+    fs::write(dir.join(".formatignore"), "af.ts\n").unwrap();
+    fs::write(dir.join(".prettierignore"), "pf.ts\n").unwrap();
+    fs::write(dir.join("af.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("pf.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    // non-fatal: exit stays 0, the --list set follows the .formatignore
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!stdout.contains("af.ts"), ".formatignore applied: {stdout}");
+    assert!(
+        stdout.contains("pf.ts"),
+        "shadowed prettierignore unread: {stdout}"
+    );
+    assert!(stdout.contains("keep.ts"), "stdout: {stdout}");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("warning:"), "stderr: {stderr}");
+    assert!(
+        stderr.contains(".prettierignore in")
+            && stderr.contains("shadowed by a sibling .formatignore"),
+        "stderr: {stderr}"
+    );
+}
+
+#[test]
+fn test_format_prettierignore_alone_in_repo_not_shadowed_no_warn() {
+    // control: a `.prettierignore` with NO sibling `.formatignore` is read (honored)
+    // and there is nothing to shadow — no warning.
+    let dir = git_repo("prettierignore_alone_no_shadow_warn");
+    fs::write(dir.join(".prettierignore"), "pf.ts\n").unwrap();
+    fs::write(dir.join("pf.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("keep.ts"), UNFORMATTED_TS).unwrap();
+
+    let output = tsv(&["format", "--list", dir.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(0));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!stderr.contains("shadowed"), "no shadow warning: {stderr}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("pf.ts"),
+        "prettierignore honored: {stdout}"
+    );
     assert!(stdout.contains("keep.ts"), "stdout: {stdout}");
 }
 

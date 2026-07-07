@@ -41,9 +41,9 @@ const FORMATIGNORE_FILE = '.formatignore';
 /** Prettier's ignore file — read hierarchically inside a git repo (one per
  * directory, like `.formatignore`) for drop-in compat, and shadowed by *presence*
  * of a *sibling* `.formatignore` (used alone for that directory when present, even
- * if present-but-unreadable). Never read outside a repo — there a target-root
- * `.prettierignore` triggers a heads-up warning instead. Mirrors
- * `PRETTIERIGNORE_FILE`. */
+ * if present-but-unreadable); the shadow is flagged by a heads-up. Never read
+ * outside a repo — there a target-root `.prettierignore` triggers a heads-up
+ * warning instead. Mirrors `PRETTIERIGNORE_FILE`. */
 const PRETTIERIGNORE_FILE = '.prettierignore';
 
 /** The git ignore file, discovered hierarchically (one per directory) and only
@@ -772,6 +772,20 @@ function collect_recursive(dir, dir_rel, is_target_root, in_repo, stack, heurist
 	if (tsv !== null) {
 		stack.push_tsv(dir_rel, tsv);
 		tsv_pushed = true;
+	}
+	// inside a repo, a sibling `.formatignore` shadows this dir's `.prettierignore`
+	// (one tsv layer per directory) — its rules go unread here. Warn (decision +
+	// text from Rust, single source of truth with the native CLI), pointing at
+	// merging the patterns into `.formatignore`. Fires at every directory (a shadow
+	// is per-directory, not target-root like the outside-repo warning below).
+	{
+		const warning = stack.prettierignore_shadowed_warning(
+			dir,
+			in_repo,
+			has_prettierignore,
+			has_formatignore,
+		);
+		if (warning != null) warnings.push(warning);
 	}
 	// outside a git repo a target-root `.prettierignore` is silently skipped (tsv
 	// reads `.formatignore` there) — warn (decision + text from Rust, single source

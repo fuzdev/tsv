@@ -24,8 +24,9 @@
 //!
 //! Locating the files, resolving paths relative to them, and walking directories
 //! are the callers' jobs. The crate is layer-agnostic: the caller decides which
-//! files become layers (tsv reads `.formatignore` hierarchically and, at the repo
-//! root only, a `.prettierignore` shadowed by a `.formatignore`).
+//! files become layers (tsv reads `.formatignore` hierarchically and, inside a git
+//! repo, `.prettierignore` hierarchically too — each shadowed by a sibling
+//! `.formatignore`).
 //!
 //! ```
 //! use tsv_ignore::IgnoreStack;

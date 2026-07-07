@@ -180,6 +180,30 @@ impl IgnoreStack {
         )
     }
 
+    /// The heads-up when, inside a git repo, a directory holds both a
+    /// `.formatignore` and a `.prettierignore` — the sibling `.formatignore`
+    /// shadows the `.prettierignore`, so its rules go unread there. Thin wrapper
+    /// over `tsv_discover::prettierignore_shadowed_warning`. Returns `undefined`
+    /// (the JS view of `None`) unless both files are present inside a repo. A
+    /// method (not a free function) so it rides the `IgnoreStack` class re-export;
+    /// the receiver is unused. The JS CLI calls this per directory and pushes any
+    /// returned string into its warnings channel — single source of truth with the
+    /// native CLI, never templated in JS.
+    pub fn prettierignore_shadowed_warning(
+        &self,
+        dir: &str,
+        in_repo: bool,
+        has_prettierignore: bool,
+        has_formatignore: bool,
+    ) -> Option<String> {
+        tsv_discover::prettierignore_shadowed_warning(
+            dir,
+            in_repo,
+            has_prettierignore,
+            has_formatignore,
+        )
+    }
+
     /// Whether no layer carries any rule — callers skip per-path matching.
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()

@@ -98,13 +98,14 @@
 		},
 		{
 			"name": "skips_other_vcs_dirs",
-			"note": ".hg/.svn/.jj are safety nets, pruned even in a git tree whose authoritative .gitignore (heuristic off) doesn't mention them",
+			"note": ".hg/.svn/.jj/.sl (Sapling — prettier parity) are safety nets, pruned even in a git tree whose authoritative .gitignore (heuristic off) doesn't mention them",
 			"tree": {
 				".git/": null,
 				".gitignore": "*.log\n",
 				".hg/x.ts": "x",
 				".svn/x.ts": "x",
 				".jj/x.ts": "x",
+				".sl/x.ts": "x",
 				"a.ts": "x"
 			},
 			"cases": [{"target": "", "expected": ["a.ts"]}]

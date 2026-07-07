@@ -3,7 +3,8 @@ use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use tsv_discover::{
-    DirVerdict, classify_dir, prettierignore_outside_repo_warning, should_format_file,
+    DirVerdict, classify_dir, prettierignore_outside_repo_warning, prettierignore_shadowed_warning,
+    should_format_file,
 };
 use tsv_ignore::IgnoreStack;
 
@@ -16,7 +17,8 @@ const FORMATIGNORE_FILE: &str = ".formatignore";
 /// and **shadowed by presence** of a *sibling* `.formatignore`: when both sit in
 /// one directory the `.formatignore` is used alone for that directory, even if
 /// it's present-but-unreadable (so a read error can't silently demote tsv's native
-/// file to prettier's — see [`read_ignore_file`]). Never read outside a git repo —
+/// file to prettier's — see [`read_ignore_file`]); the shadow is flagged by a
+/// heads-up ([`prettierignore_shadowed_warning`]). Never read outside a git repo —
 /// there a target-root `.prettierignore` triggers a heads-up warning instead (see
 /// [`prettierignore_outside_repo_warning`]).
 const PRETTIERIGNORE_FILE: &str = ".prettierignore";
@@ -35,10 +37,12 @@ pub struct Discovered {
     /// Non-fatal diagnostics — reported to stderr by the caller but **not**
     /// counted as errors (no effect on the exit code or stdout): the
     /// heuristic-shadow warning ([`tsv_discover::heuristic_shadow_warning`]), the
-    /// `.prettierignore`-outside-a-repo warning
-    /// ([`prettierignore_outside_repo_warning`]), and the unreadable-ignore-file
-    /// warning (a present `.gitignore`/`.formatignore`/`.prettierignore` whose read
-    /// failed; see [`read_ignore_file`]).
+    /// `.prettierignore`-shadowed-by-a-sibling-`.formatignore` warning
+    /// ([`prettierignore_shadowed_warning`]), the `.prettierignore`-outside-a-repo
+    /// warning ([`prettierignore_outside_repo_warning`]), and the
+    /// unreadable-ignore-file warning (a present
+    /// `.gitignore`/`.formatignore`/`.prettierignore` whose read failed; see
+    /// [`read_ignore_file`]).
     pub warnings: Vec<String>,
 }
 
@@ -323,6 +327,19 @@ fn collect_recursive(
     } else {
         false
     };
+    // inside a repo, a sibling `.formatignore` shadows this dir's `.prettierignore`
+    // (one tsv layer per directory) — its rules go unread here. Warn from the
+    // listing already in hand (presence-only, no extra read), pointing at merging
+    // the patterns into `.formatignore`. Unlike the outside-repo warning below,
+    // this fires at every directory (a shadow is per-directory, not target-root).
+    if let Some(warning) = prettierignore_shadowed_warning(
+        &dir.to_string_lossy(),
+        in_repo,
+        has_prettierignore,
+        has_formatignore,
+    ) {
+        out.warnings.push(warning);
+    }
     // outside a git repo a target-root `.prettierignore` is silently skipped (tsv
     // reads `.formatignore` there) — warn, from the listing already in hand (no
     // extra stat), pointing at the rename / `git init` fixes. Bounded to the
