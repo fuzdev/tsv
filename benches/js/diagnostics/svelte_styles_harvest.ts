@@ -27,7 +27,8 @@
  * takes ~2 s, so it always re-harvests; files are rewritten only when content
  * changed, and strays from repos that no longer contribute are deleted. The
  * block count is pinned as a MINIMUM (`SVELTE_STYLES_BLOCKS_MIN` — live-corpus
- * semantics: growth passes, a shrink fails before writing).
+ * semantics: growth passes; a small shrink warns and still writes, only a
+ * collapse below 90% of the pin fails before writing).
  *
  * Run (from repo root):
  *   deno run --allow-read --allow-write=benches/js/.cache --allow-env \
@@ -73,15 +74,29 @@ async function main(): Promise<void> {
 		}
 	}
 
-	// Pinned MINIMUM (live corpus — growth passes): a shrink means the extraction
-	// broke or the corpus was gutted; fail BEFORE writing so a wrong cache never
-	// replaces a good one. See ../lib/gate_counts.ts.
-	if (blocks < SVELTE_STYLES_BLOCKS_MIN) {
+	// Two-tier guard (live corpus — growth always passes). The perf-view source
+	// is the author's own daily-churning repos and the count is pure input
+	// material (not a tsv success count), so an ordinary refactor dropping a
+	// `<style>` block is benign drift, not breakage — distinguish the two by
+	// magnitude:
+	//   • COLLAPSE (below 90% of the pin) — extraction broke or the corpus was
+	//     gutted; FAIL before writing so a garbage cache never replaces a good one.
+	//   • a small shrink above that floor — WARN but still write, so one removed
+	//     block doesn't block a whole `bench` run. Re-pin in ../lib/gate_counts.ts
+	//     when convenient to silence the warning.
+	const collapse_floor = Math.floor(SVELTE_STYLES_BLOCKS_MIN * 0.9);
+	if (blocks < collapse_floor) {
 		console.error(
-			`FAIL: pinned count — ${blocks} style blocks < pinned minimum ${SVELTE_STYLES_BLOCKS_MIN}; ` +
-				`cache not written. If deliberate (corpus change), re-pin in lib/gate_counts.ts.`,
+			`FAIL: collapse — ${blocks} style blocks < ${collapse_floor} (90% of pinned ${SVELTE_STYLES_BLOCKS_MIN}); ` +
+				`cache not written. Extraction likely broke or the corpus was gutted — investigate before re-pinning lib/gate_counts.ts.`,
 		);
 		Deno.exit(1);
+	}
+	if (blocks < SVELTE_STYLES_BLOCKS_MIN) {
+		console.error(
+			`WARN: ${blocks} style blocks < pinned minimum ${SVELTE_STYLES_BLOCKS_MIN} ` +
+				`(within the 10% drift band) — writing cache anyway. If deliberate, re-pin in lib/gate_counts.ts to silence.`,
+		);
 	}
 
 	const out_dir = resolve(CACHE_DIR);

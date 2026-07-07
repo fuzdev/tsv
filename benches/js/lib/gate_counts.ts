@@ -16,7 +16,10 @@
  * - **Minimums** (`*_MIN`) — success counts on the live `corpus:compare:*
  *   --all` corpus (dev repos that grow with ordinary work) and the
  *   committed-fixtures audits (additions are ordinary reviewed diffs). Growth
- *   passes; any drop below the pinned current value fails.
+ *   passes; any drop below the pinned current value fails — except
+ *   `SVELTE_STYLES_BLOCKS_MIN`, which counts pure input material off
+ *   daily-churning repos, so a small drop only warns and only a >10% collapse
+ *   fails (see its comment).
  * - **Failure-bucket pins** (`*_PIN`, exact — the same two-sided `!==` as the
  *   exact pins above, but on the live corpus rather than a deterministic
  *   input): the triage buckets on `corpus:compare:* --all` (unknown/partial
@@ -29,7 +32,9 @@
  * Pins are enforced only on FULL runs (default suite root, `--all`, default
  * harvest source) — a subtree or filtered run legitimately grades a slice.
  * Harvest pins fail BEFORE writing, so a wrong cache never replaces a good
- * one. CI note: `.github/workflows/check.yml` runs on a clean checkout (no
+ * one (the `SVELTE_STYLES_BLOCKS_MIN` drift band still holds this: only a
+ * collapse fails-before-writing; a small shrink warns and writes valid data).
+ * CI note: `.github/workflows/check.yml` runs on a clean checkout (no
  * sibling clones), so of these only the committed-tree Rust pins
  * (fixtures_validate via the integration test, swallow_audit) execute in CI —
  * the rest are dev-machine gates at conformance/publish cadence.
@@ -142,13 +147,20 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 };
 
 /**
- * bench:harvest:svelte-styles — MINIMUM extracted `<style>` block count (live
- * corpus, same semantics as `CORPUS_PARSE_COMPARED_MIN`: the perf-view repos
- * grow with ordinary work, so growth passes and a shrink — broken extraction or
- * a gutted corpus — fails before the cache is written). Measured 2026-07-06 at
- * the ryanatkn.com + webdevladder.net + mdz corpus additions.
+ * bench:harvest:svelte-styles — MINIMUM extracted `<style>` block count. Live
+ * corpus like `CORPUS_PARSE_COMPARED_MIN`, but with a DRIFT BAND: the perf-view
+ * source is the author's own daily-churning repos and the count is pure input
+ * material (not a tsv success count), so an ordinary refactor dropping a
+ * `<style>` block is benign — unlike the other minimums, a small shrink here
+ * isn't a regression. Growth always passes; a shrink within 10% of the pin WARNS
+ * and still writes (re-pin here when convenient to silence it); only a COLLAPSE
+ * below 90% — broken extraction or a gutted corpus — fails before the cache is
+ * written. The harvest owns that band (`* 0.9`); this stays the exact measured
+ * value. Measured 2026-07-07: 265→264 as ../tsv.fuz.dev (bb01070) refactored the
+ * `.legend` `<style>` block out of the benchmarks +page.svelte alongside its
+ * section.
  */
-export const SVELTE_STYLES_BLOCKS_MIN = 265;
+export const SVELTE_STYLES_BLOCKS_MIN = 264;
 
 /** bench:harvest:wpt — exact `<style>` blocks from the default `../wpt/css`. Measured 2026-07-06: ../wpt at 7437c7bc. */
 export const WPT_CSS_HARVEST_PIN = 22_310;

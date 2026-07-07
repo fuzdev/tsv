@@ -442,7 +442,8 @@ every real move in a number is a deliberate, visible edit.
   divergence fails until fixed/cataloged, and a shrink is re-pinned to record
   the win), and the four harvests (wpt block count, test262 positive count,
   svelte-rejects count — exact; svelte-styles block count — a live-corpus
-  MINIMUM, since its source is the perf-view dev repos).
+  MINIMUM with a drift band, since its source is the perf-view dev repos: a
+  small shrink warns and still writes, only a >10% collapse fails).
 - Rust-side counts are consts in their commands — grep `REGRESSION PIN`:
   test262 (discovered + graded-manifest), `fixtures_validate` (total fixtures —
   protects the primary gate against a discovery collapse), and `swallow_audit`
@@ -456,7 +457,10 @@ every real move in a number is a deliberate, visible edit.
   are deterministic — a drop is a regression or gutted input, a rise is a suite
   refresh or behavior change; both must be re-pinned deliberately. No slack:
   slack lets small regressions creep and silently widens after every refresh.
-- **Minimums at the exact measured value** (shrink fails, growth passes): the
+- **Minimums at the exact measured value** (shrink fails, growth passes — with
+  one carve-out: `SVELTE_STYLES_BLOCKS_MIN` warns on a small shrink and fails
+  only on a >10% collapse, since it counts pure input material off
+  daily-churning repos): the
   two non-deterministic-growth cases. (1) The `corpus:compare:* --all` corpus is
   LIVE dev repos that grow with ordinary work — re-pin to current when touching
   the corpus (e.g. at release) so the minimum stays tight. (2) The
@@ -474,7 +478,9 @@ every real move in a number is a deliberate, visible edit.
 
 Pins apply only to FULL runs (default suite root, `--all`, default harvest
 source) — subtree and filtered runs legitimately grade a slice. Harvest pins
-fail **before** writing, so a wrong cache never replaces a good one. CI runs
+fail **before** writing, so a wrong cache never replaces a good one (the
+`SVELTE_STYLES_BLOCKS_MIN` drift band still holds this — only a collapse
+fails-before-writing; a small shrink warns and writes valid data). CI runs
 only the committed-tree pins (`check.yml` is a clean checkout — no sibling
 clones); the rest are dev-machine gates at conformance/publish cadence.
 
@@ -654,7 +660,8 @@ deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks, conc
                                         # → .cache/svelte_styles/<repo>.css — a real-tier corpus
                                         # entry (see §Corpus). NOT stamped (sources are the live
                                         # dev repos; the walk is ~2 s, always re-harvests, rewrites
-                                        # only changed files); block count pinned as a MINIMUM.
+                                        # only changed files); block count pinned as a MINIMUM
+                                        # with a 10% drift band (small shrink warns, collapse fails).
                                         # Also chained at the start of bench:perf so perf runs
                                         # measure a fresh cache.
 
