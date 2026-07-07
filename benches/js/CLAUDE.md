@@ -602,8 +602,12 @@ see [Corpus](#corpus)), `versions`, and `binary_sizes` (each with
 `files_processed`/`files_total` (per-impl preflight coverage — the `Coverage:`
 line) and `files_iterated` (the timed set — the `Files (intersection):`
 count). A top-level `suppressed_noise` map records silenced third-party stderr
-crashes as `{pattern: count}`. `report.<runtime>.md` renders coverage/iterated
-as prose; the per-entry numbers and `suppressed_noise` are JSON-only.
+crashes as `{pattern: count}`, and a top-level `variant_parity` array records
+any same-engine native/wasm pair whose pre-flight accept sets disagreed
+(`[]` when healthy — see `warn_variant_parity` in bench.ts; a non-empty list
+in a committed report is a binding-boundary bug surfacing in the diff).
+`report.<runtime>.md` renders coverage/iterated as prose; the per-entry
+numbers, `suppressed_noise`, and `variant_parity` are JSON-only.
 
 ```bash
 deno task bench:install   # one-time: install harness npm deps (see Cross-Runtime above)
@@ -711,9 +715,28 @@ stale `.so` that should have been `155/183`). `lib/check_artifact_freshness.ts`
 guards against this: before a run touches the executed artifacts (the runtime's
 native binding + WASM bundle — Deno: FFI + `pkg/all/deno`; Node: N-API +
 `pkg/all/nodejs`), it compares their mtimes against the crate sources feeding them
+(plus the workspace `Cargo.lock`, so dependency bumps trip it too)
 and **aborts (exit 1)** if any is stale, or missing. The build-first tasks
 (`bench`, `bench:deno`, `bench:node`, `corpus:compare:format`) rebuild first, so
 they pass the guard for free.
+
+**The build-side sibling: fresh builds SKIP.** The four wasm-pack bench build
+tasks (`build:wasm:deno`, `build:wasm:parse:deno`, `build:wasm:all:deno`,
+`build:wasm:all:nodejs`) ride `scripts/run_if_stale.ts`, which skips wasm-pack
+when the bundle's `.wasm` is already newer than every source that feeds it
+(the guard's `CORE_CRATES` + `tsv_wasm` — imported, so the two sides can't
+drift; dev-tooling crates deliberately excluded so `tsv_debug` edits don't
+force wasm rebuilds — plus the workspace `Cargo.toml` + `Cargo.lock`, and
+`deno.json` — so editing a build task's flags re-triggers
+it). Rationale: wasm-pack re-runs wasm-opt (~8–27s per bundle) even when cargo
+is a fully-cached no-op, so a source-unchanged `deno task bench` used to pay
+~90s of pure wasm-opt. Same mtime discipline as the run-side guard, opposite
+end. What the check CANNOT see is a toolchain change (wasm-pack / wasm-opt /
+rustc upgrade) — after one of those, force a rebuild with `TSV_BUILD_FORCE=1`
+(the build-side analog of the harvest stamps' `--force`). The publish path
+never skips: `scripts/publish.ts` sets `TSV_BUILD_FORCE=1` around its
+`build:packages` step. The npm build tasks (`build:npm:*`) are deliberately
+unwrapped.
 
 **Escape hatch:** `BENCH_STALE_OK=1` downgrades a _stale_ artifact to a `⚠`
 warning and proceeds (a _missing_ one stays fatal). See the module doc for the
@@ -956,11 +979,16 @@ One tagged entry list (`lib/corpus.ts` `CORPUS_ENTRIES`, paths relative to the
 project root). Every entry carries a tier — `real`, `prettier_fixture`, or
 `suite` — and each consumer selects a **view**:
 
-- **`perf`** (~3,100 files) — `real` entries only: application & library
+- **`perf`** (~3,200 files) — `real` entries only: application & library
   source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
   svelte-docinfo, tsv.fuz.dev — plus the author's public SvelteKit sites:
   ryanatkn.com, webdevladder.net) plus upstream framework source
   (kit/packages/kit, svelte/packages/svelte, and the svelte.dev subpaths).
+  `.d.ts` files are IN scope (the product formats them; declaration-heavy
+  shapes carry real divergence signal), and the curated entries skip the
+  `/build/`+`/dist/` build-output pruning (a `build/` segment inside a
+  reviewed `src/` tree is real source, e.g. kit's `src/exports/vite/build/`;
+  `DirectoryLoader`'s arbitrary-path scans still prune both).
   The CSS set additionally carries the `svelte_styles` per-repo concats
   harvested from those repos' `.svelte` `<style>` blocks (see
   `bench:harvest:svelte-styles` + §Fairness Caveats).
@@ -972,9 +1000,12 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   measured" prose — keep them in sync. Because it's code that ships, every
   in-scope tool must process every file: after the perf pre-flight, `bench.ts`
   HARD-FAILS on any per-file failure not excused by `lib/perf_omit.ts`
-  (`PERF_OMITS`, empty by default) — a silent skip would let coverage quietly
-  erode. That invariant is what makes the perf/conformance split meaningful:
-  perf is 100% by construction, conformance is where sub-100% coverage is the metric.
+  (`PERF_OMITS` — kept minimal; the current entries all tolerate third-party
+  limitations on declaration-file-only syntax, e.g. acorn-typescript has no
+  `.d.ts` mode) — a silent skip would let coverage quietly erode. That
+  invariant is what makes the perf/conformance split meaningful: perf is 100%
+  by construction (modulo the reviewed omits), conformance is where sub-100%
+  coverage is the metric.
 - **`gates`** (~6,200 files) — `real` + `prettier_fixture`, no perf prune:
   adds Prettier's `tests/format/{typescript,js,css,html}` suites and
   prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a

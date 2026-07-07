@@ -52,14 +52,16 @@ function detect_language(path: string): Language | null {
 	}
 }
 
-/** Default exclusion patterns */
+/**
+ * Exclusion patterns applied to EVERY walk. `.d.ts` is deliberately NOT here:
+ * the product formats declaration files (`tsv format` discovers them like any
+ * `.ts`), so the corpus must exercise them — declaration-heavy shapes (overload
+ * chains, huge unions, `declare` blocks) demonstrably carry divergence signal.
+ */
 const DEFAULT_EXCLUSIONS = [
-	'.d.ts', // Declaration files
 	'/node_modules/',
 	'/.svelte-kit/',
 	'/.gro/',
-	'/build/',
-	'/dist/',
 	// Prettier test fixtures that aren't representative of standard parsing:
 	// `_errors_/` contains intentionally-malformed inputs prettier tracks for
 	// error-recovery testing, `front-matter/` files embed YAML front-matter
@@ -73,10 +75,21 @@ const DEFAULT_EXCLUSIONS = [
 	'/cursor/',
 ];
 
+/**
+ * Build-output patterns, applied only to UNCURATED walks (`DirectoryLoader` —
+ * arbitrary project scans that may contain compiled artifacts). The curated
+ * `CORPUS_ENTRIES` point at reviewed `src/` trees where a `build/` segment is
+ * real source (kit's `src/exports/vite/build/`), so `DevReposLoader` opts out.
+ */
+const BUILD_OUTPUT_EXCLUSIONS = ['/build/', '/dist/'];
+
+/** The uncurated-walk pattern set, precomposed once (`should_exclude` runs per file). */
+const UNCURATED_EXCLUSIONS = [...DEFAULT_EXCLUSIONS, ...BUILD_OUTPUT_EXCLUSIONS];
+
 const DEFAULT_EXTENSIONS = ['svelte', 'ts', 'js', 'css'];
 
-/** Check if file should be excluded */
-function should_exclude(path: string): boolean {
+/** Check if file should be excluded. `prune_build_output` adds the `/build/`+`/dist/` patterns (uncurated walks only). */
+function should_exclude(path: string, prune_build_output: boolean): boolean {
 	const name = basename(path);
 	const segments = path.split('/');
 	// The `multiparser*` family — prettier's embedded-language tests. The bare
@@ -94,7 +107,8 @@ function should_exclude(path: string): boolean {
 	if (segments.some((s) => s === 'multiparser' || s.startsWith('multiparser-'))) {
 		return true;
 	}
-	for (const pattern of DEFAULT_EXCLUSIONS) {
+	const patterns = prune_build_output ? UNCURATED_EXCLUSIONS : DEFAULT_EXCLUSIONS;
+	for (const pattern of patterns) {
 		if (pattern.startsWith('/')) {
 			// Directory patterns (`/node_modules/`) anchor on path SEGMENTS, not raw
 			// substring — otherwise any absolute path that merely contains the text
@@ -144,6 +158,8 @@ type SkipFn = (path: string, relative: string) => boolean | Promise<boolean>;
 interface WalkOptions {
 	extensions?: string[];
 	skip?: SkipFn;
+	/** Apply `BUILD_OUTPUT_EXCLUSIONS` (default true — curated entry walks opt out). */
+	prune_build_output?: boolean;
 }
 
 /** Walk a directory and yield source files one at a time.
@@ -168,7 +184,7 @@ async function* walk_corpus(
 	for (const relative of relative_paths) {
 		const path = join(dir_path, relative);
 		if (!ext_set.has(extname(path).toLowerCase())) continue;
-		if (should_exclude(path)) continue;
+		if (should_exclude(path, options.prune_build_output ?? true)) continue;
 
 		const language = detect_language(path);
 		if (!language) continue;
@@ -604,7 +620,11 @@ export class DevReposLoader {
 					}
 					: base_skip;
 				for await (
-					const file of walk_corpus(resolved_path, { extensions: entry.extensions, skip })
+					const file of walk_corpus(resolved_path, {
+						extensions: entry.extensions,
+						skip,
+						prune_build_output: false,
+					})
 				) {
 					count++;
 					by_language[file.language]++;

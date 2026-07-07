@@ -2,8 +2,8 @@
 	"version": 7,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-07T20:45:21.409Z",
-	"git_commit": "5e65967d",
+	"timestamp": "2026-07-07T21:24:55.476Z",
+	"git_commit": "2cc5035d",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -12,7 +12,7 @@
 	},
 	"corpus": {
 		"svelte": 4535,
-		"typescript": 44220,
+		"typescript": 44224,
 		"css": 22641
 	},
 	"corpus_sources": [
@@ -27,10 +27,10 @@
 		},
 		{
 			"path": "../prettier/tests/format/typescript",
-			"files": 789,
+			"files": 793,
 			"by_language": {
 				"svelte": 0,
-				"typescript": 789,
+				"typescript": 793,
 				"css": 0
 			}
 		},
@@ -324,9 +324,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43542,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43544,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -344,9 +344,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43971,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43975,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -364,9 +364,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43971,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43975,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -384,9 +384,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43971,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43975,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -404,9 +404,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43971,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43975,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -424,9 +424,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43971,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43975,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -444,9 +444,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43971,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43975,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -464,9 +464,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43975,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43977,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -484,9 +484,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 43975,
-			"files_total": 44220,
-			"files_iterated": 43472,
+			"files_processed": 43977,
+			"files_total": 44224,
+			"files_iterated": 43474,
 			"runtime": "node"
 		},
 		{
@@ -590,5 +590,6 @@
 			"runtime": "node"
 		}
 	],
-	"suppressed_noise": {}
+	"suppressed_noise": {},
+	"variant_parity": []
 }

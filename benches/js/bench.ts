@@ -239,8 +239,9 @@ const MAX_FILES_PER_LANGUAGE = env_int('BENCH_LIMIT');
 /** Filter files by path pattern (default: none) */
 const FILE_FILTER = env.BENCH_FILTER;
 
-/** Number of warmup iterations (default: 3) */
-const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
+/** Number of warmup iterations (default: 3; slow tasks tier down to 1 unless explicitly set) */
+const BENCH_WARMUP_EXPLICIT = env_int('BENCH_WARMUP');
+const BENCH_WARMUP = BENCH_WARMUP_EXPLICIT ?? 3;
 
 /**
  * Enable the per-iteration forced-GC hook (default: off — measures realistic
@@ -338,7 +339,8 @@ const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5
  * Coverage-only mode (`BENCH_COVERAGE_ONLY=1`): run pre-flight — which fully
  * determines per-tool parse coverage — and emit the report straight from it,
  * SKIPPING the timed benchmark phase entirely. That phase costs a fixed floor
- * of ≥8 full-corpus sweeps per row (3 warmup + ≥5 measured) no matter how low
+ * of ≥8 full-corpus sweeps per row (3 warmup + ≥5 measured; slow tasks tier to
+ * 1 warmup + ≥7 measured) no matter how low
  * `BENCH_DURATION` goes, yet the conformance surface's coverage consumers (the
  * site's per-engine table, `derive_conformance_groups`) read only the
  * pre-flight counts — so on a coverage refresh the whole timing cost is wasted.
@@ -588,6 +590,20 @@ const wasm_sibling_name = (name: string): string | null => {
 	return null;
 };
 
+/** One same-engine native/wasm pair whose pre-flight accept sets disagree. */
+interface VariantParityFinding {
+	group: string;
+	native: string;
+	wasm: string;
+	/** Files only the native variant accepted. */
+	native_only: number;
+	/** Files only the wasm variant accepted. */
+	wasm_only: number;
+}
+
+/** Populated by `warn_variant_parity()` after pre-flight; lands in the report as `variant_parity`. */
+const variant_parity_findings: VariantParityFinding[] = [];
+
 /**
  * Warn when a same-engine native/wasm variant pair diverges in its pre-flight
  * accept set. Both bindings run the identical engine, so their accept sets
@@ -597,7 +613,9 @@ const wasm_sibling_name = (name: string): string | null => {
  * every file and fabricated a 100% coverage row while native oxc-parser
  * correctly rejected 245 (see lib/oxc_wasm.ts + CLAUDE.md §Known Issues).
  * Warning only (never fatal): the coverage numbers themselves are the product
- * in conformance mode, and perf mode has its own hard-fail.
+ * in conformance mode, and perf mode has its own hard-fail. Findings also land
+ * in the report JSON (`variant_parity`), so a divergence shows up in the
+ * committed diff at review time, not just the terminal scroll.
  */
 function warn_variant_parity(): void {
 	for (const [group_name, task_tracking] of task_tracking_by_group) {
@@ -613,6 +631,13 @@ function warn_variant_parity(): void {
 			let wasm_only = 0;
 			for (const path of wasm_set) if (!native_set.has(path)) wasm_only++;
 			if (native_only === 0 && wasm_only === 0) continue;
+			variant_parity_findings.push({
+				group: group_name,
+				native: name,
+				wasm: sibling_name,
+				native_only,
+				wasm_only,
+			});
 			console.error(
 				`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
 					`(${native_only} ${name}-only, ${wasm_only} ${sibling_name}-only). Same engine — a ` +
@@ -851,7 +876,13 @@ async function run_benchmark_group(
 		// costs another 14s of wall clock.
 		const preflight_ms = preflight_elapsed_ms.get(task.tracking_key) ?? 0;
 		const min_iter = preflight_ms > 5000 ? (baselining ? 12 : 7) : undefined;
-		const base_task = { name: task.name, min_iterations: min_iter };
+		// Slow tasks also tier WARMUP down (3 → 1): a multi-second sweep over
+		// thousands of files fully warms the JIT in one pass, so the 2nd and 3rd
+		// warmups are pure wall clock (~25s/runtime on prettier's TS row alone).
+		// An explicit `BENCH_WARMUP` wins — it's the knob for deliberately
+		// studying warmup effects, so tiering must not silently override it.
+		const warmup_iter = preflight_ms > 5000 && BENCH_WARMUP_EXPLICIT === undefined ? 1 : undefined;
+		const base_task = { name: task.name, min_iterations: min_iter, warmup_iterations: warmup_iter };
 		if (task.is_async) {
 			bench.add({
 				...base_task,
@@ -1019,6 +1050,13 @@ interface Baseline {
 	 * report). Empty `{}` when nothing was suppressed.
 	 */
 	suppressed_noise: Record<string, number>;
+	/**
+	 * Same-engine native/wasm variant pairs whose pre-flight accept sets
+	 * disagreed (see `warn_variant_parity`). Empty `[]` when every pair agrees
+	 * — the healthy state. JSON-only, like `suppressed_noise`: a non-empty list
+	 * in a committed report is a binding-boundary bug surfacing at review time.
+	 */
+	variant_parity: VariantParityFinding[];
 }
 
 /**
@@ -1161,6 +1199,7 @@ async function build_results_data(
 		binary_sizes: binary_sizes,
 		entries,
 		suppressed_noise: Object.fromEntries(suppressed_noise),
+		variant_parity: variant_parity_findings,
 	};
 }
 

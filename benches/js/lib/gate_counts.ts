@@ -81,11 +81,13 @@ export const TS_REPO_PINS = { scanned: 768, accept_parity: 424 };
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
  * parsed and the ASTs diffed); the corpus is live dev repos, so growth passes
- * and any drop fails. Measured 2026-07-06 (oracle svelte@5.56.4).
+ * and any drop fails. Measured 2026-07-07 after admitting `.d.ts` files and
+ * the curated-entry `/build/` dirs to the corpus (typescript 4250→4356; svelte
+ * and css unchanged). Oracle svelte@5.56.4.
  */
 export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
 	svelte: 1372,
-	typescript: 4250,
+	typescript: 4356,
 	css: 168,
 };
 
@@ -109,11 +111,12 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 
 /**
  * corpus:compare:format --all — MINIMUM per-language exact `match` count (same
- * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`). Measured 2026-07-06.
+ * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`). Measured 2026-07-07
+ * after the `.d.ts` corpus admission (typescript 3983→4086; svelte/css unchanged).
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 1111,
-	typescript: 3983,
+	typescript: 4086,
 	css: 126,
 };
 
@@ -134,15 +137,25 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * drift (same-day svelte.dev worktree reset + tsv.fuz.dev wip churn). The
  * svelte partial 3→4 below is mdz's docs introduction page (fill-boundary
  * family, residual hunks unexplained — pattern-extension candidate).
+ *
+ * typescript unknown 179→184 + partial 63→65 (2026-07-07): the `.d.ts` corpus
+ * admission — all 7 new entries are declaration files, 0 errors, 0 SAFETY.
+ * Unknown +5: svelte/src/index.d.ts (the tracked `?`-position conditional-type
+ * comment merge bug), kit/src/types/private.d.ts (the tracked union `{}`
+ * spacing bug), kit/src/runtime/app/paths/types.d.ts +
+ * svelte/src/ambient.d.ts + svelte/src/server/index.d.ts (the needs-triage
+ * generic-param / conditional-type break-strategy classes). Partial +2:
+ * kit/src/exports/public.d.ts + kit/src/types/internal.d.ts
+ * (tabs_only_alignment family, residual hunks unexplained).
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 8,
-	typescript: 179,
+	typescript: 184,
 	css: 23,
 };
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 4,
-	typescript: 63,
+	typescript: 65,
 	css: 8,
 };
 

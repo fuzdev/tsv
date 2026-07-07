@@ -6,11 +6,11 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-07-07T20:45:21.409Z — tsv 0.1.0 (5e65967d)
+**Date:** 2026-07-07T21:24:55.476Z — tsv 0.1.0 (2cc5035d)
 
-**Corpus:** 4535 Svelte (1.1 MB), 44220 TypeScript (63.3 MB), 22641 CSS (7.7 MB) — 71396 files, 72.0 MB total
+**Corpus:** 4535 Svelte (1.1 MB), 44224 TypeScript (63.3 MB), 22641 CSS (7.7 MB) — 71400 files, 72.0 MB total
 
-**Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
+**Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (793), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
 
 **Versions:** svelte@5.56.4, acorn@8.16.0, acorn-typescript@1.0.10, prettier@3.9.0, prettier-plugin-svelte@4.1.1, oxc-parser@0.139.0, oxfmt@0.57.0, @biomejs/wasm-bundler@2.5.2
 
@@ -22,7 +22,7 @@
 
 ## parse/typescript
 
-**Coverage:** acorn-typescript 43542/44220 (98%), tsv-json 43971/44220 (99%), tsv-json-no-locations 43971/44220 (99%), tsv_wasm-json 43971/44220 (99%), tsv_wasm-json-no-locations 43971/44220 (99%), tsv-internal 43971/44220 (99%), tsv_wasm-internal 43971/44220 (99%), oxc-parser 43975/44220 (99%), oxc-parser-wasm 43975/44220 (99%)
+**Coverage:** acorn-typescript 43544/44224 (98%), tsv-json 43975/44224 (99%), tsv-json-no-locations 43975/44224 (99%), tsv_wasm-json 43975/44224 (99%), tsv_wasm-json-no-locations 43975/44224 (99%), tsv-internal 43975/44224 (99%), tsv_wasm-internal 43975/44224 (99%), oxc-parser 43977/44224 (99%), oxc-parser-wasm 43977/44224 (99%)
 
 ## parse/css
 
@@ -49,18 +49,18 @@ _Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (g
 
 ## Skipped Files
 
-1613 unique file+error combinations — Svelte 8, TypeScript 1172, CSS 433.
+1617 unique file+error combinations — Svelte 8, TypeScript 1176, CSS 433.
 
 **Per-benchmark skip counts:**
-- parse/typescript: acorn-typescript: 678
+- parse/typescript: acorn-typescript: 680
 - parse/typescript: tsv-json: 249
 - parse/typescript: tsv-json-no-locations: 249
 - parse/typescript: tsv_wasm-json: 249
 - parse/typescript: tsv_wasm-json-no-locations: 249
 - parse/typescript: tsv-internal: 249
 - parse/typescript: tsv_wasm-internal: 249
-- parse/typescript: oxc-parser: 245
-- parse/typescript: oxc-parser-wasm: 245
+- parse/typescript: oxc-parser: 247
+- parse/typescript: oxc-parser-wasm: 247
 - parse/css: svelte/compiler: 239
 - parse/css: tsv-json: 194
 - parse/css: tsv_wasm-json: 194

@@ -381,7 +381,7 @@ deno task bench:deno:run -- --verbose
 BENCH_LIMIT=10 deno task bench:deno:run        # Limit files per language (default: all)
 BENCH_FILTER=zzz deno task bench:deno:run      # Filter by path pattern (default: none)
 BENCH_DURATION=10000 deno task bench:deno:run  # Duration per benchmark in ms (default: 5000; conformance mode: 15000)
-BENCH_WARMUP=10 deno task bench:deno:run       # Set warmup iterations (default: 3)
+BENCH_WARMUP=10 deno task bench:deno:run       # Set warmup iterations (default: 3; slow >5s-per-sweep tasks tier to 1 unless set explicitly)
 BENCH_MODE=union deno task bench:deno:run      # Per-impl iteration (default: intersection)
 BENCH_CORPUS=conformance deno task bench:deno:run  # Corpus/surface selector (default: perf)
 BENCH_STALE_OK=1 deno task bench:deno:run      # Run despite stale artifacts (default: off)

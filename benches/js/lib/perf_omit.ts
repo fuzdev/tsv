@@ -35,11 +35,50 @@ export interface PerfOmit {
 }
 
 /**
- * The reviewed perf-corpus failures. Empty by design: the perf corpus is real-world
- * code every in-scope tool should handle. Add an entry only for a deliberately-tolerated
- * failure, each with a reason (see the module doc).
+ * The reviewed perf-corpus failures. Keep this as close to empty as it can be:
+ * the perf corpus is real-world code every in-scope tool should handle. Add an
+ * entry only for a deliberately-tolerated failure, each with a reason (see the
+ * module doc).
+ *
+ * The current entries all date from admitting `.d.ts` files to the corpus
+ * (which tsv and prettier fully handle) and tolerate third-party limitations
+ * on declaration-file-only syntax:
  */
-export const PERF_OMITS: PerfOmit[] = [];
+export const PERF_OMITS: PerfOmit[] = [
+	// kit's runtime/app/{env,environment}/types.d.ts declare ambient consts with
+	// no initializer (`export const browser: boolean;`) — valid ONLY in a
+	// declaration file. acorn-typescript has no .d.ts mode at all, and the bench
+	// hands oxc/oxfmt a synthetic `file.ts` name (impl calls don't thread the
+	// real path), so they grade the content as invalid plain TS. `path:
+	// 'src/runtime/app/env'` matches both files (`env/` and `environment/`).
+	// Threading real filenames would fix oxc/oxfmt here but not acorn, and would
+	// also flip prettier's `.js` parser routing (babel vs typescript) — a
+	// measurement-semantics change deliberately not bundled into this tolerance.
+	{
+		task: 'typescript/canonical',
+		path: 'kit/packages/kit/src/runtime/app/env',
+		reason: 'acorn-typescript cannot parse ambient const declarations (no .d.ts mode)',
+	},
+	{
+		task: 'typescript/oxc',
+		path: 'kit/packages/kit/src/runtime/app/env',
+		reason:
+			'oxc (native + wasm) rejects ambient consts under the synthetic file.ts name (no path threading in the bench)',
+	},
+	{
+		task: 'typescript/oxfmt',
+		path: 'kit/packages/kit/src/runtime/app/env',
+		reason:
+			'oxfmt rejects ambient consts under the synthetic file.ts name (no path threading in the bench)',
+	},
+	// acorn-typescript enforces the `arguments`-in-class-field-initializer early
+	// error; tsv (permissive / defer-diagnostics policy) and prettier accept it.
+	{
+		task: 'typescript/canonical',
+		path: 'svelte/packages/svelte/src/ambient.d.ts',
+		reason: 'acorn-typescript enforces an early error tsv defers (arguments in class field init)',
+	},
+];
 
 /** First matching omit reason for `(tracking_key, path)`, or `null` when the failure is unlisted. */
 export function perf_omit_reason(
