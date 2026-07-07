@@ -4,7 +4,7 @@
 
 High-performance Rust parser as a drop-in replacement for Svelte's modern parser (acorn + acorn-typescript), paired with a formatter that took Prettier as its initial guide and still tracks it for the common case — while making deliberate, cataloged choices to diverge where tsv's own judgment is more defensible.
 
-**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and trailingComma='none' — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). The one carve-out is file *scope*, not style: `tsv format` honors `.gitignore` (hierarchically, in a git tree) plus a repo-root `.formatignore` / `.prettierignore`. See [Configuration](#configuration).
+**Non-configurable by design**: formatting options are fixed at Prettier's defaults except printWidth=100, useTabs=true, singleQuote=true, and trailingComma='none' — no config files, CLI flags, or runtime options, ever (opinionated like `gofmt` and Black). The one carve-out is file *scope*, not style: `tsv format` honors `.gitignore` (hierarchically, in a git tree) plus hierarchical `.formatignore` / `.prettierignore`. See [Configuration](#configuration).
 
 ## Committing
 
@@ -132,7 +132,7 @@ cargo install cargo-watch  # optional, for `deno task dev`
 
 Parser auto-detected from extension (`.ts`/`.svelte`/`.css`). `--content` and `--stdin` modes require `--parser svelte|typescript|css`.
 
-`format` writes paths **in place** (only when output differs) and prints changed paths to stdout; `--content`/`--stdin` print formatted source to stdout. Directories recurse over `.ts`/`.svelte`/`.css`, honoring `.gitignore`/`.formatignore`/`.prettierignore` and always skipping the safety nets (`.git`, `node_modules`, `.hg`/`.svn`/`.jj`); an explicitly named file argument bypasses the ignore files. Discovery is gitignore-aware and reproducible, scoped to a cwd-independent **format root** (the repo root in a git tree, else the filesystem root) — see [Configuration](#configuration) for the full two-regime rules. `--list` prints the discovered in-scope files (one per line) without formatting — a read-only view of what `format` would touch (path mode only; an empty scope still exits 0). Files format in parallel (`--jobs N` overrides the thread count; path mode only). Exit codes: 0 clean, 1 would-change (`--check`, which also works with `--content`/`--stdin`), 2 errors; missing path args fail the run upfront, while per-file and traversal errors report and continue.
+`format` writes paths **in place** (only when output differs) and prints changed paths to stdout; `--content`/`--stdin` print formatted source to stdout. Directories recurse over `.ts`/`.svelte`/`.css`, honoring `.gitignore`/`.formatignore`/`.prettierignore` and always skipping the safety nets (`.git`, `node_modules`, `.sl`/`.hg`/`.svn`/`.jj`); an explicitly named file argument bypasses the ignore files. Discovery is gitignore-aware and reproducible, scoped to a cwd-independent **format root** (the repo root in a git tree, else the filesystem root) — see [Configuration](#configuration) for the full two-regime rules. `--list` prints the discovered in-scope files (one per line) without formatting — a read-only view of what `format` would touch (path mode only; an empty scope still exits 0). Files format in parallel (`--jobs N` overrides the thread count; path mode only). Exit codes: 0 clean, 1 would-change (`--check`, which also works with `--content`/`--stdin`), 2 errors; missing path args fail the run upfront, while per-file and traversal errors report and continue.
 
 ```bash
 cargo run -p tsv_cli parse file.ts                                       # compact JSON
@@ -432,8 +432,8 @@ Inside a repo, discovery honors, relative to the repo root:
 
 - **`.gitignore`**, hierarchically and repo-rooted exactly like git ([gitignore(5) syntax](https://git-scm.com/docs/gitignore#_pattern_format); matched against `git check-ignore` on case-sensitive filesystems);
 - **`.formatignore`** (tsv's native file), **hierarchically** — one per directory from the repo root down, deeper wins — applied after `.gitignore`, so its `!` can re-include a gitignore'd path (subject to git's parent-directory rule);
-- a single repo-root **`.prettierignore`** (drop-in compat; a repo-root `.formatignore` shadows it), never hierarchical;
-- always-skipped **safety nets**: `.git`, `node_modules`, `.hg`, `.svn`, `.jj`.
+- **`.prettierignore`** (drop-in compat), **hierarchically** as well — one per directory from the repo root down, deeper wins — read as the tsv-layer fallback in any directory that has no `.formatignore` of its own (a *sibling* `.formatignore` shadows it, per-directory — tsv emits a non-fatal warning where that happens, since the `.prettierignore`'s rules go unread there; as a tsv layer its `!` can also re-include a gitignore'd path, unlike Prettier's independent-OR handling of the two files);
+- always-skipped **safety nets**: `.git`, `node_modules`, `.sl`, `.hg`, `.svn`, `.jj`.
 
 Outside a repo, `.gitignore` and `.prettierignore` are **not read** (matching git, which honors `.gitignore` only in a worktree); `.formatignore` is honored hierarchically from the filesystem root down, so a `~/.formatignore` acts as global config for loose files. Because the boundary is derived by walking up, the repo-root ignore files apply even from a subdirectory invocation, and formatting a subdirectory directly gives the same result as formatting it via an ancestor.
 

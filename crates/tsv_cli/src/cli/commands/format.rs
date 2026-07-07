@@ -16,8 +16,8 @@ use std::thread;
 /// Paths are formatted in place (written only when the output differs);
 /// `--content`/`--stdin` print to stdout. Exit codes: 0 clean, 1 would
 /// change (`--check`), 2 errors. Directory discovery is gitignore-aware:
-/// inside a git repo it honors `.gitignore` (hierarchically, like git) plus a
-/// repo-root `.formatignore` / `.prettierignore`; outside one, only
+/// inside a git repo it honors `.gitignore` (hierarchically, like git) plus
+/// hierarchical `.formatignore` / `.prettierignore`; outside one, only
 /// `.formatignore`. An explicitly named file is always formatted. `--list`
 /// prints the discovered in-scope files without formatting (path mode only).
 #[derive(FromArgs, Debug)]
