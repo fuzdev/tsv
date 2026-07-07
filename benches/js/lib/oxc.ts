@@ -79,8 +79,12 @@ export class OxcImplementation implements TsvImplementation {
 
 		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source);
 
-		if (result.errors && result.errors.length > 0) {
-			throw new Error(`Parse errors: ${JSON.stringify(result.errors)}`);
+		// Read `errors` once into a local: the WASI sibling's getter is consume-once
+		// (see oxc_wasm.ts / benches/js/CLAUDE.md §Known Issues); the native package
+		// caches today, but the single-read form costs nothing and can't rot.
+		const errors = result.errors;
+		if (errors && errors.length > 0) {
+			throw new Error(`Parse errors: ${JSON.stringify(errors)}`);
 		}
 
 		// Accessing `.program` runs the package's `wrap()` getter, which `JSON.parse`s
@@ -124,8 +128,9 @@ export class OxcImplementation implements TsvImplementation {
 			options,
 		);
 
-		if (result.errors && result.errors.length > 0) {
-			throw new Error(`Format errors: ${JSON.stringify(result.errors)}`);
+		const errors = result.errors;
+		if (errors && errors.length > 0) {
+			throw new Error(`Format errors: ${JSON.stringify(errors)}`);
 		}
 
 		return result.code;

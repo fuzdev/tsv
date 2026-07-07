@@ -581,6 +581,47 @@ function enforce_perf_coverage(): void {
 	exit(1);
 }
 
+/** The wasm-variant task name paired with a native task name, or `null` when no pairing exists. */
+const wasm_sibling_name = (name: string): string | null => {
+	if (name === 'oxc-parser') return 'oxc-parser-wasm';
+	if (name === 'tsv' || name.startsWith('tsv-')) return name.replace(/^tsv/, 'tsv_wasm');
+	return null;
+};
+
+/**
+ * Warn when a same-engine native/wasm variant pair diverges in its pre-flight
+ * accept set. Both bindings run the identical engine, so their accept sets
+ * should agree file-for-file; a divergence usually means one binding's error
+ * surface is broken, not that the engines disagree — the concrete case being
+ * the oxc WASI binding's consume-once `errors` getter, which silently accepted
+ * every file and fabricated a 100% coverage row while native oxc-parser
+ * correctly rejected 245 (see lib/oxc_wasm.ts + CLAUDE.md §Known Issues).
+ * Warning only (never fatal): the coverage numbers themselves are the product
+ * in conformance mode, and perf mode has its own hard-fail.
+ */
+function warn_variant_parity(): void {
+	for (const [group_name, task_tracking] of task_tracking_by_group) {
+		for (const [name, tracking_key] of task_tracking) {
+			const sibling_name = wasm_sibling_name(name);
+			if (sibling_name === null) continue;
+			const sibling_key = task_tracking.get(sibling_name);
+			if (sibling_key === undefined) continue;
+			const native_set = successful_files.get(tracking_key) ?? new Set<string>();
+			const wasm_set = successful_files.get(sibling_key) ?? new Set<string>();
+			let native_only = 0;
+			for (const path of native_set) if (!wasm_set.has(path)) native_only++;
+			let wasm_only = 0;
+			for (const path of wasm_set) if (!native_set.has(path)) wasm_only++;
+			if (native_only === 0 && wasm_only === 0) continue;
+			console.error(
+				`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
+					`(${native_only} ${name}-only, ${wasm_only} ${sibling_name}-only). Same engine — a ` +
+					`divergence usually means one binding's error surface is broken, not an engine difference.`,
+			);
+		}
+	}
+}
+
 /**
  * Iterate files and run `process_fn` for each. The iteration list is
  * pre-filtered to files this task succeeded on during pre-flight (or the
@@ -844,6 +885,10 @@ for (const lang of LANGUAGES) {
 		await run_preflight_group(operation, lang);
 	}
 }
+
+// Same-engine native/wasm variant pairs should accept identical file sets — a
+// divergence is a binding-boundary bug masquerading as coverage (see the fn doc).
+warn_variant_parity();
 
 // Perf corpus is real-world code every in-scope tool must fully process, so a
 // per-file pre-flight failure that isn't an explicitly-reviewed `PERF_OMITS`

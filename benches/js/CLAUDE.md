@@ -1362,6 +1362,23 @@ Implementation: `lib/binary_sizes.ts`
   `serde_wasm_bindgen`-built object graph). The Rust-side parse-vs-write timing
   is measured by `cargo run --release -p tsv_debug -- json_profile <paths>` —
   `wasm_json_probe.ts` covers the end-to-end view including the JS boundary.
+- **The oxc WASI binding's `errors` getter is CONSUME-ONCE.** On
+  `@oxc-parser/binding-wasm32-wasi`, the first access to `result.errors`
+  returns the real error array; every later access returns `[]` (the native
+  `oxc-parser` package caches, so only the WASI path behaves this way). Any
+  double-access check (`result.errors && result.errors.length`) therefore
+  never fires — invalid input silently yields an empty `Program` (`end: 0`
+  inside the `{node, fixes}` wrapper) and counts as parsed, which once
+  fabricated a 100% `oxc-parser-wasm` conformance-coverage row while native
+  oxc-parser correctly rejected 245 files. Rule: read getter-backed
+  napi-WASI result fields **once into a local** (`lib/oxc_wasm.ts` does;
+  `lib/oxc.ts` mirrors the form defensively). Two guards exist: the
+  single-read pattern at the wrappers, and `bench.ts`'s `warn_variant_parity`
+  — after pre-flight, same-engine native/wasm pairs (tsv↔tsv_wasm variants,
+  oxc-parser↔oxc-parser-wasm) are compared file-for-file and any accept-set
+  divergence prints a `⚠ variant parity` warning (same engine ⇒ a divergence
+  is a binding-boundary bug, not an engine difference). Candidate upstream
+  report (oxc-parser / napi-rs wasm-runtime) — tracked in internal notes.
 - **TypeScript canonical parser**: acorn-typescript fails on some modern syntax
   (files skipped) — and the reverse, files tsv fails that acorn accepts, is a
   known parse gap.

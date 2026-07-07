@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-07-07T20:21:10.208Z — tsv 0.1.0 (3ee86763)
+**Date:** 2026-07-07T20:45:21.409Z — tsv 0.1.0 (5e65967d)
 
 **Corpus:** 4535 Svelte (1.1 MB), 44220 TypeScript (63.3 MB), 22641 CSS (7.7 MB) — 71396 files, 72.0 MB total
 
@@ -22,7 +22,7 @@
 
 ## parse/typescript
 
-**Coverage:** acorn-typescript 43542/44220 (98%), tsv-json 43971/44220 (99%), tsv-json-no-locations 43971/44220 (99%), tsv_wasm-json 43971/44220 (99%), tsv_wasm-json-no-locations 43971/44220 (99%), tsv-internal 43971/44220 (99%), tsv_wasm-internal 43971/44220 (99%), oxc-parser 43975/44220 (99%), oxc-parser-wasm 44220/44220 (100%)
+**Coverage:** acorn-typescript 43542/44220 (98%), tsv-json 43971/44220 (99%), tsv-json-no-locations 43971/44220 (99%), tsv_wasm-json 43971/44220 (99%), tsv_wasm-json-no-locations 43971/44220 (99%), tsv-internal 43971/44220 (99%), tsv_wasm-internal 43971/44220 (99%), oxc-parser 43975/44220 (99%), oxc-parser-wasm 43975/44220 (99%)
 
 ## parse/css
 
@@ -60,6 +60,7 @@ _Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (g
 - parse/typescript: tsv-internal: 249
 - parse/typescript: tsv_wasm-internal: 249
 - parse/typescript: oxc-parser: 245
+- parse/typescript: oxc-parser-wasm: 245
 - parse/css: svelte/compiler: 239
 - parse/css: tsv-json: 194
 - parse/css: tsv_wasm-json: 194

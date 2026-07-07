@@ -70,8 +70,16 @@ export class OxcWasmImplementation implements TsvImplementation {
 
 		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source);
 
-		if (result.errors && result.errors.length > 0) {
-			throw new Error(`Parse errors: ${JSON.stringify(result.errors)}`);
+		// Read `errors` exactly ONCE: on the WASI binding it's a CONSUME-ONCE getter —
+		// the first access returns the real error array, every later access returns
+		// `[]`. A double-access check (`result.errors && result.errors.length`) eats
+		// the real array in the truthiness test and always sees length 0, silently
+		// accepting every file (invalid input yields an empty Program with end 0) —
+		// which fabricated a 100% conformance-coverage row. See
+		// benches/js/CLAUDE.md §Known Issues.
+		const errors = result.errors;
+		if (errors && errors.length > 0) {
+			throw new Error(`Parse errors: ${JSON.stringify(errors)}`);
 		}
 
 		// Unlike the native `oxc-parser` package (whose `index.js` `wrap()` runs

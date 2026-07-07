@@ -2,8 +2,8 @@
 	"version": 7,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-07T20:21:10.208Z",
-	"git_commit": "3ee86763",
+	"timestamp": "2026-07-07T20:45:21.409Z",
+	"git_commit": "5e65967d",
 	"machine": {
 		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
 		"os": "linux",
@@ -484,7 +484,7 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 44220,
+			"files_processed": 43975,
 			"files_total": 44220,
 			"files_iterated": 43472,
 			"runtime": "node"
