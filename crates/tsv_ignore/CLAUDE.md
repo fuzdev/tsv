@@ -90,9 +90,11 @@ holds two parallel per-directory layer stacks (`.gitignore` and tsv):
 - `IgnoreStack::is_empty()` — callers skip per-path matching when true.
 
 **Which** files feed the stack is the caller's choice. tsv reads `.formatignore`
-hierarchically (one tsv layer per directory) and, at the repo root only, a
-`.prettierignore` shadowed by a `.formatignore`; `.gitignore` layers are pushed
-only inside a git repo. The crate itself is layer-agnostic.
+hierarchically (one tsv layer per directory) and, inside a git repo,
+`.prettierignore` hierarchically too — each shadowed by a *sibling* `.formatignore`
+in the same directory; `.gitignore` layers are pushed only inside a git repo. The
+crate itself is layer-agnostic — a tsv layer is a tsv layer, whichever file it came
+from.
 
 ## Distinctives
 

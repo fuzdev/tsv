@@ -45,7 +45,7 @@ tsv is non-configurable: settings are fixed at Prettier's defaults except `print
 
 ### File scoping (`IgnoreStack`)
 
-For tooling that needs tsv's exact file scoping, this package also exports an `IgnoreStack` class — the same hierarchical, git-faithful matcher (per-directory `.gitignore` and `.formatignore` layers, plus a repo-root `.prettierignore`) the `tsv` CLI uses to decide which files it formats. Build it from a repo's ignore files (one layer per directory, anchored at that directory), then query per path; locating the files and walking directories is the caller's job.
+For tooling that needs tsv's exact file scoping, this package also exports an `IgnoreStack` class — the same hierarchical, git-faithful matcher (per-directory `.gitignore`, `.formatignore`, and `.prettierignore` layers) the `tsv` CLI uses to decide which files it formats. Build it from a repo's ignore files (one layer per directory, anchored at that directory), then query per path; locating the files and walking directories is the caller's job.
 
 ```javascript
 import {IgnoreStack} from '@fuzdev/tsv_format_wasm';

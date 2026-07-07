@@ -24,8 +24,9 @@
 //!
 //! Locating the files, resolving paths relative to them, and walking directories
 //! are the callers' jobs. The crate is layer-agnostic: the caller decides which
-//! files become layers (tsv reads `.formatignore` hierarchically and, at the repo
-//! root only, a `.prettierignore` shadowed by a `.formatignore`).
+//! files become layers (tsv reads `.formatignore` hierarchically and, inside a git
+//! repo, `.prettierignore` hierarchically too — each shadowed by a sibling
+//! `.formatignore`).
 //!
 //! ```
 //! use tsv_ignore::IgnoreStack;
@@ -148,8 +149,9 @@ impl IgnoreRules {
 pub struct IgnoreStack {
     /// `.gitignore` layers in shallow→deep push order.
     gitignore: Vec<Layer>,
-    /// tsv layers (`.formatignore`, plus a repo-root `.prettierignore` the caller
-    /// may resolve) in shallow→deep push order, evaluated after every `.gitignore`.
+    /// tsv layers (`.formatignore`, plus a `.prettierignore` the caller may
+    /// resolve — both hierarchical) in shallow→deep push order, evaluated after
+    /// every `.gitignore`.
     tsv: Vec<Layer>,
 }
 
@@ -203,7 +205,7 @@ impl IgnoreStack {
     /// Push one directory's tsv file, applied after every `.gitignore`. `anchor`
     /// is the directory relative to the format root, `/`-separated (empty string
     /// = the root). The caller resolves which file's content this is (e.g.
-    /// `.formatignore`, or a repo-root `.prettierignore` it shadows).
+    /// `.formatignore`, or a `.prettierignore` a sibling `.formatignore` shadows).
     pub fn push_tsv(&mut self, anchor: &str, content: &str) {
         self.tsv.push(Layer {
             anchor: split_path(anchor),
