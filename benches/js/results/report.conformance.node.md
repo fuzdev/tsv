@@ -2,13 +2,15 @@
 
 **Runtime:** node
 
-**Corpus kind:** conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
+**Machine:** AMD Ryzen 5 PRO 7530U with Radeon Graphics · linux/x86_64 · node 24.14.1
 
-**Date:** 2026-07-06T22:46:27.675Z — tsv 0.1.0 (a99ef299)
+**Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Corpus:** 5507 Svelte (2.9 MB), 46847 TypeScript (79.5 MB), 22694 CSS (8.0 MB) — 75048 files, 90.5 MB total
+**Date:** 2026-07-07T20:21:10.208Z — tsv 0.1.0 (3ee86763)
 
-**Sources:** ../zzz/src (325), ../fuz_app/src (664), ../fuz_blog/src (32), ../fuz_code/src (68), ../fuz_css/src (124), ../fuz_docs/src (64), ../fuz_gitops/src (203), ../fuz_mastodon/src (24), ../fuz_template/src (15), ../fuz_ui/src (215), ../fuz_util/src (144), ../mdz/src (144), ../gro/src (187), ../svelte-docinfo/src (297), ../tsv.fuz.dev/src (27), ../ryanatkn.com/src (51), ../webdevladder.net/src (38), benches/js/.cache/svelte_styles (18), ../kit/packages/kit/src (381), ../svelte/packages/svelte/src (380), ../svelte.dev/apps/svelte.dev/src (138), ../svelte.dev/packages/repl/src (48), ../svelte.dev/packages/site-kit/src (65), ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
+**Corpus:** 4535 Svelte (1.1 MB), 44220 TypeScript (63.3 MB), 22641 CSS (7.7 MB) — 71396 files, 72.0 MB total
+
+**Sources:** ../prettier-plugin-svelte/test (318), ../prettier/tests/format/typescript (789), ../prettier/tests/format/js (1103), ../prettier/tests/format/css (228), ../prettier/tests/format/html (84), ../svelte/packages/svelte/tests (4451), benches/js/.cache/wpt_css (22310), benches/js/.cache/test262_files.json (42113)
 
 **Versions:** svelte@5.56.4, acorn@8.16.0, acorn-typescript@1.0.10, prettier@3.9.0, prettier-plugin-svelte@4.1.1, oxc-parser@0.139.0, oxfmt@0.57.0, @biomejs/wasm-bundler@2.5.2
 
@@ -16,23 +18,23 @@
 
 ## parse/svelte
 
-**Coverage:** svelte/compiler 5507/5507 (100%), tsv-json 5499/5507 (99%), tsv-json-no-locations 5499/5507 (99%), tsv_wasm-json 5499/5507 (99%), tsv_wasm-json-no-locations 5499/5507 (99%), tsv-internal 5499/5507 (99%), tsv_wasm-internal 5499/5507 (99%)
+**Coverage:** svelte/compiler 4535/4535 (100%), tsv-json 4527/4535 (99%), tsv-json-no-locations 4527/4535 (99%), tsv_wasm-json 4527/4535 (99%), tsv_wasm-json-no-locations 4527/4535 (99%), tsv-internal 4527/4535 (99%), tsv_wasm-internal 4527/4535 (99%)
 
 ## parse/typescript
 
-**Coverage:** acorn-typescript 46169/46847 (98%), tsv-json 46598/46847 (99%), tsv-json-no-locations 46598/46847 (99%), tsv_wasm-json 46598/46847 (99%), tsv_wasm-json-no-locations 46598/46847 (99%), tsv-internal 46598/46847 (99%), tsv_wasm-internal 46598/46847 (99%), oxc-parser 46602/46847 (99%), oxc-parser-wasm 46847/46847 (100%)
+**Coverage:** acorn-typescript 43542/44220 (98%), tsv-json 43971/44220 (99%), tsv-json-no-locations 43971/44220 (99%), tsv_wasm-json 43971/44220 (99%), tsv_wasm-json-no-locations 43971/44220 (99%), tsv-internal 43971/44220 (99%), tsv_wasm-internal 43971/44220 (99%), oxc-parser 43975/44220 (99%), oxc-parser-wasm 44220/44220 (100%)
 
 ## parse/css
 
-**Coverage:** svelte/compiler 22455/22694 (98%), tsv-json 22500/22694 (99%), tsv_wasm-json 22500/22694 (99%), tsv-internal 22500/22694 (99%), tsv_wasm-internal 22500/22694 (99%)
+**Coverage:** svelte/compiler 22402/22641 (98%), tsv-json 22447/22641 (99%), tsv_wasm-json 22447/22641 (99%), tsv-internal 22447/22641 (99%), tsv_wasm-internal 22447/22641 (99%)
 
 ## Binary Sizes
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv_format_wasm | 2.2 MB | 762.6 KB | 0.9x | 0.9x |
+| tsv_format_wasm | 2.2 MB | 762.0 KB | 0.9x | 0.9x |
 | tsv_parse_wasm | 1.0 MB | 381.0 KB | 0.4x | 0.5x |
-| tsv_wasm | 2.4 MB | 841.8 KB | — | — |
+| tsv_wasm | 2.4 MB | 841.9 KB | — | — |
 | biome (wasm) | 37.5 MB | 9.0 MB | 15.4x | 10.7x |
 | oxc-parser (wasm) | 1.6 MB | 501.4 KB | 0.7x | 0.6x |
 | tsv (ffi) | 3.3 MB | 1.4 MB | 1.0x | 1.0x |
