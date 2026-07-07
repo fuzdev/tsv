@@ -119,9 +119,10 @@ package; `tsv_ignore` **and** `tsv_discover` are **optional** deps pulled in by
 same matcher *and* prune decision as the native CLI, so all three agree by
 construction. The caller builds it up: `new IgnoreStack()`, then
 `push_gitignore(anchor, content)` per discovered `.gitignore` and
-`push_tsv(anchor, content)` per discovered `.formatignore` (both shallowest-first;
-`pop_gitignore()`/`pop_tsv()` to unwind a DFS — tsv layers are hierarchical),
-then queries:
+`push_tsv(anchor, content)` per discovered `.formatignore` (and, inside a repo,
+`.prettierignore` — each shadowed by a sibling `.formatignore`) (both
+shallowest-first; `pop_gitignore()`/`pop_tsv()` to unwind a DFS — tsv layers are
+hierarchical), then queries:
 
 - `classify_dir(name, child_rel, heuristic_active) -> 'descend' | 'prune' |
   'prune_warn'` — the shared per-directory verdict (`tsv_discover::classify_dir`:
