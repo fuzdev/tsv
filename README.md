@@ -1,10 +1,10 @@
 # tsv
 
-[<img src="static/logo.svg" alt="a pixelated orange quill drawing a straight line" align="right" width="192" height="192">](https://tsv.fuz.dev/)
+[<img src="static/logo.svg" alt="a pixelated orange quill drawing a precise line" align="right" width="192" height="192">](https://tsv.fuz.dev/)
 
-> a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS - [tsv.fuz.dev](https://tsv.fuz.dev/)
+> precise language tools for TypeScript/JS, CSS, and Svelte in Rust - [tsv.fuz.dev](https://tsv.fuz.dev/)
 
-tsv is a toolchain for Svelte, TypeScript/JS, and CSS, written in Rust.
+tsv is a toolchain for TypeScript/JS, CSS, and Svelte in Rust.
 The first release has a formatter that closely follows [Prettier](https://prettier.io/) +
 [prettier-plugin-svelte](https://github.com/sveltejs/prettier-plugin-svelte),
 and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
