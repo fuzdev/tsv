@@ -35,8 +35,12 @@
  *   BENCH_WARMUP        Warmup iterations (default: 3)
  *   BENCH_MODE          'intersection' (default) | 'union' — iteration corpus mode
  *   BENCH_CORPUS        'perf' (default) | 'conformance' — corpus + surface selector:
- *                       perf = real-world corpus view, parse + format groups;
- *                       conformance = fixtures-included view (Svelte minus canonical-rejects), parse groups only
+ *                       perf = real-world corpus, parse + format groups (every in-scope
+ *                         tool must fully process it — unlisted pre-flight failures hard-fail;
+ *                         see lib/perf_omit.ts);
+ *                       conformance = fixtures-only view (the prettier + parse-conformance
+ *                         suites, excluding the perf/real corpus; Svelte minus canonical-rejects),
+ *                         parse groups only
  *                       (see benches/js/CLAUDE.md §Corpus)
  *   BENCH_COVERAGE_ONLY Set to 1 to emit coverage from pre-flight and SKIP the
  *                       timed phase (requires BENCH_CORPUS=conformance). Default off
@@ -70,6 +74,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { type CorpusSource, DevReposLoader, group_by_language } from './lib/corpus.ts';
+import { PERF_OMITS, perf_omit_reason } from './lib/perf_omit.ts';
 import {
 	canonical_parser_label,
 	get_alternative_versions,
@@ -281,9 +286,9 @@ type CorpusKind = 'perf' | 'conformance';
 /**
  * Corpus + surface selector. Default `perf`: the real-world corpus view, parse
  * + format groups, writing `report.<runtime>.*` — the throughput headline.
- * `BENCH_CORPUS=conformance`: the fixtures-included corpus view (real
- * repos + prettier suites + the parse-conformance suites, minus the Svelte
- * files svelte/compiler rejects — see `lib/corpus.ts` `SVELTE_REJECT_CACHE`),
+ * `BENCH_CORPUS=conformance`: the fixtures-only corpus view (prettier suites +
+ * the parse-conformance suites, disjoint from the perf/real corpus, minus the
+ * Svelte files svelte/compiler rejects — see `lib/corpus.ts` `SVELTE_REJECT_CACHE`),
  * parse groups ONLY, writing `report.conformance.<runtime>.*` — the per-tool
  * parse coverage/throughput surface. Format impls are deliberately excluded there:
  * grading formatter behavior on the fixture suites is the correctness gates'
@@ -324,7 +329,7 @@ const REPORT_TAG = IS_CONFORMANCE ? `conformance.${RUNTIME}` : RUNTIME;
 /**
  * Duration per benchmark in ms. The default is surface-dependent: 5000 for
  * perf, 15000 in conformance mode — there each iteration is a full sweep of
- * the much larger fixtures-included corpus, so the slow rows need the longer
+ * the much larger conformance corpus, so the slow rows need the longer
  * window for a usable sample count. `BENCH_DURATION` overrides either.
  */
 const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5000);
@@ -547,6 +552,33 @@ function record_skip(bench_name: string, file_path: string, error: unknown): voi
 	if (bench_map.has(file_path)) return;
 	const error_msg = error instanceof Error ? error.message : String(error);
 	bench_map.set(file_path, error_msg);
+}
+
+/**
+ * Fail the run if the perf pre-flight skipped any file for an in-scope task that
+ * `PERF_OMITS` doesn't excuse. `skipped_files` is keyed by tracking_key and only
+ * ever holds in-scope failures (a task exists only for the languages its impl
+ * declares), so every unlisted entry is a real regression. Sorted, one line per
+ * violation, so a reviewer can transcribe a genuine tolerance straight into
+ * `PERF_OMITS`.
+ */
+function enforce_perf_coverage(): void {
+	const violations: string[] = [];
+	for (const [tracking_key, files] of skipped_files) {
+		for (const [path, error] of files) {
+			if (perf_omit_reason(PERF_OMITS, tracking_key, path) === null) {
+				violations.push(`  ${tracking_key}  ${path}: ${error}`);
+			}
+		}
+	}
+	if (violations.length === 0) return;
+	violations.sort();
+	console.error(
+		`Perf corpus: ${violations.length} unlisted pre-flight failure(s). Every in-scope tool must ` +
+			`process every real-world file — fix the tool, or add a reviewed entry (with a reason) to ` +
+			`PERF_OMITS in lib/perf_omit.ts:\n${violations.join('\n')}`,
+	);
+	exit(1);
 }
 
 /**
@@ -813,6 +845,15 @@ for (const lang of LANGUAGES) {
 	}
 }
 
+// Perf corpus is real-world code every in-scope tool must fully process, so a
+// per-file pre-flight failure that isn't an explicitly-reviewed `PERF_OMITS`
+// entry is a hard error — not the silent skip that would quietly erode coverage.
+// Conformance mode measures coverage (sub-100% is the metric), so this is
+// perf-only. Runs before the timed phase, so a regression fails in seconds.
+if (CORPUS_MODE === 'perf') {
+	enforce_perf_coverage();
+}
+
 if (COVERAGE_ONLY) {
 	log('\nCoverage-only mode: skipping the timed benchmark phase (coverage is a pre-flight product).');
 } else {
@@ -897,8 +938,8 @@ interface Baseline {
 	/**
 	 * Which corpus/surface produced this report: `perf` (real-world corpus,
 	 * parse + format groups — `report.<runtime>.*`) or `conformance`
-	 * (fixtures-included corpus, Svelte set minus canonical-rejects, parse
-	 * groups only — `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
+	 * (fixtures-only corpus, disjoint from perf, Svelte set minus canonical-rejects,
+	 * parse groups only — `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
 	 */
 	corpus_kind: CorpusKind;
 	timestamp: string;
@@ -1098,8 +1139,8 @@ function generate_markdown_report(
 	const commit_str = git_commit ? ` (${git_commit})` : '';
 	lines.push(`**Runtime:** ${RUNTIME}\n`);
 	const conformance_note = COVERAGE_ONLY
-		? 'conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
-		: 'conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; the headline is the per-tool Coverage lines (parse success over the valid set), with throughput measured on the all-tools-pass intersection';
+		? 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
+		: 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; the headline is the per-tool Coverage lines (parse success over the valid set), with throughput measured on the all-tools-pass intersection';
 	lines.push(
 		`**Corpus kind:** ${
 			IS_CONFORMANCE ? conformance_note : 'perf — real-world code only (fixture suites excluded)'

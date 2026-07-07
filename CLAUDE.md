@@ -320,9 +320,12 @@ shared code using `node:` builtins.
 
 **Perf vs conformance surfaces.** The perf surface (`deno task bench:perf`) measures a
 **real-world-only** corpus (app + framework source; fixture suites excluded) — the
-throughput headline. The conformance surface (`deno task bench:conformance`) measures
-per-tool **parse coverage** over the fixtures-included corpus (prettier suites +
-svelte compiler tests + the wpt-css/test262 harvests), writing
+throughput headline. It's held to a hard invariant: every in-scope tool must fully
+process every file or the run fails (unlisted pre-flight failures hard-fail; see
+`benches/js/lib/perf_omit.ts`), so its coverage is 100% by construction. The conformance
+surface (`deno task bench:conformance`) measures per-tool **parse coverage** over a
+**disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the
+wpt-css/test262 harvests — the real-world code is deliberately excluded), writing
 `report.conformance.node.{json,md}`. Its **Svelte** set excludes the files
 `svelte/compiler` rejects (the `bench:harvest:svelte-rejects` cache) so coverage
 measures fidelity on *valid* Svelte rather than permissiveness over the suite's
@@ -364,7 +367,7 @@ deno task bench:deno:run
 deno task bench:node:run
 deno task bench:bun:run
 
-# Conformance surface: per-tool parse COVERAGE, fixtures-included corpus (Svelte set
+# Conformance surface: per-tool parse COVERAGE, fixtures-only corpus disjoint from perf (Svelte set
 # minus canonical-rejects) (parse groups only) → report.conformance.node.{json,md}. Coverage-only + node-only
 # by design (see "Perf vs conformance surfaces" above): entries carry null timing.
 deno task bench:conformance        # harvest + build:bench:node + coverage run

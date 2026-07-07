@@ -10,9 +10,13 @@
  *   corpus. The correctness gates (`corpus:compare:*` `--all`, `skip_triage`,
  *   `wasm_json_probe`) keep this scope — their sanction lists and coverage were
  *   reviewed against it.
- * - `conformance` — everything: `gates` plus the parse-conformance suites
- *   (Svelte's compiler tests, the wpt-css harvest cache, test262 graded
- *   positives). The per-tool parse coverage/throughput measurement surface
+ * - `conformance` — the hard parse cases only: the prettier fixture suites plus
+ *   the parse-conformance suites (Svelte's compiler tests, the wpt-css harvest
+ *   cache, test262 graded positives). Deliberately EXCLUDES the `real` perf tier,
+ *   so the conformance coverage surface and the perf corpus are mutually exclusive:
+ *   `perf` is the "every in-scope tool must fully process it" corpus (`bench.ts`
+ *   hard-fails an unlisted failure there — see `perf_omit.ts`), `conformance` is
+ *   where sub-100% coverage is the metric. The per-tool parse coverage surface
  *   (`deno task bench:conformance`).
  *
  * - DevReposLoader: loads one view of CORPUS_ENTRIES (hardcoded ~/dev/ repos)
@@ -412,7 +416,11 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
 	perf: ['real'],
 	gates: ['real', 'prettier_fixture'],
-	conformance: ['real', 'prettier_fixture', 'suite'],
+	// deliberately NO `real`: the conformance coverage surface and the perf corpus
+	// are mutually exclusive sets. perf is the "every in-scope tool must fully
+	// process it" corpus (bench.ts hard-fails an unlisted failure); conformance is
+	// the hard-cases-only surface where sub-100% coverage is the measurement.
+	conformance: ['prettier_fixture', 'suite'],
 };
 
 /**

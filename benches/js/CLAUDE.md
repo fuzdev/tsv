@@ -611,8 +611,8 @@ deno task bench:node      # Node only (needs node)
 deno task bench:bun       # Bun only (needs bun; reuses the Node artifacts — N-API + nodejs-target WASM)
 deno task bench:compose   # Fold whatever report.{deno,node,bun}.json exist → combined report.{json,md}
 
-# Conformance measurement — per-tool PARSE COVERAGE over the full
-# fixtures-included corpus (the `conformance` view; parse groups only, no format
+# Conformance measurement — per-tool PARSE COVERAGE over the fixtures-only
+# conformance corpus (the `conformance` view, disjoint from perf; parse groups only, no format
 # impls) → report.conformance.node.{json,md}. COVERAGE-ONLY + NODE-ONLY by design
 # (BENCH_COVERAGE_ONLY=1): coverage is a pre-flight product, so the timed phase is
 # skipped, and it's runtime-invariant (same parser engine — the site folds a tool's
@@ -790,7 +790,7 @@ Things the published numbers measure that aren't quite what they look like:
   per-file ratios remain the noisiest in the report.
 - **Conformance-surface semantics (`BENCH_CORPUS=conformance`).** Parse-only
   by design, and the committed surface is **coverage-only** (per-tool preflight
-  parse success over the fixtures-included corpus) — the timed phase is
+  parse success over the fixtures-only conformance corpus) — the timed phase is
   skipped, so there is no committed throughput. The **Svelte** set has the
   `svelte/compiler`-rejected files removed (the `bench:harvest:svelte-rejects`
   cache, see §Corpus), so Svelte coverage reads as fidelity on *valid* Svelte
@@ -954,7 +954,12 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   files stay — tests are real code. This is what `deno task bench` measures,
   so throughput reflects real code, not formatter edge-case suites. This
   framing is the source of truth for the public benchmark page's "What's
-  measured" prose — keep them in sync.
+  measured" prose — keep them in sync. Because it's code that ships, every
+  in-scope tool must process every file: after the perf pre-flight, `bench.ts`
+  HARD-FAILS on any per-file failure not excused by `lib/perf_omit.ts`
+  (`PERF_OMITS`, empty by default) — a silent skip would let coverage quietly
+  erode. That invariant is what makes the perf/conformance split meaningful:
+  perf is 100% by construction, conformance is where sub-100% coverage is the metric.
 - **`gates`** (~6,200 files) — `real` + `prettier_fixture`, no perf prune:
   adds Prettier's `tests/format/{typescript,js,css,html}` suites and
   prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a
@@ -965,15 +970,18 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   reviewed against it. The `DevReposLoader` view is required at every
   construction site — the view decides what a number or gate verdict means,
   so there's no implicit default to inherit by accident.
-- **`conformance`** — everything: `gates` + the parse-conformance `suite`
-  entries — Svelte's compiler tests (`../svelte/packages/svelte/tests`, with
-  the gate-aligned skips: `_`-prefixed segments, `migrate/`, `output.svelte`
-  snapshots), the wpt-css harvest cache (`benches/js/.cache/wpt_css`, from
-  `deno task bench:harvest:wpt`), and the test262 graded-positive path list
-  (`benches/js/.cache/test262_files.json`, a `files_from` entry from
-  `deno task bench:harvest:test262`). This is what
-  `deno task bench:conformance` measures — the per-tool parse
-  coverage surface (coverage-only + node-only).
+- **`conformance`** — the hard parse cases only: the `prettier_fixture` suites +
+  the parse-conformance `suite` entries — Svelte's compiler tests
+  (`../svelte/packages/svelte/tests`, with the gate-aligned skips: `_`-prefixed
+  segments, `migrate/`, `output.svelte` snapshots), the wpt-css harvest cache
+  (`benches/js/.cache/wpt_css`, from `deno task bench:harvest:wpt`), and the
+  test262 graded-positive path list (`benches/js/.cache/test262_files.json`, a
+  `files_from` entry from `deno task bench:harvest:test262`). Deliberately
+  **excludes the `real` perf tier**, so the conformance coverage surface and the
+  perf corpus are mutually exclusive sets: perf is the "every in-scope tool must
+  fully process it" corpus (the hard-fail above), conformance is where sub-100%
+  coverage is the metric. This is what `deno task bench:conformance` measures —
+  the per-tool parse coverage surface (coverage-only + node-only).
 
   **Canonical-reject exclusion (Svelte only, conformance view only).** The
   suite deliberately bundles deliberately-invalid fixtures (svelte's own
