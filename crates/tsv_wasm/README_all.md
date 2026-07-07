@@ -1,6 +1,6 @@
 # @fuzdev/tsv_wasm
 
-> a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS
+> precise language tools for TypeScript/JS, CSS, and Svelte in Rust
 
 Rust-based formatter + parser compiled to WASM — the full tool in one package, with a `tsv` CLI. A near-Prettier formatter that tracks **Prettier** + **prettier-plugin-svelte** closely (with documented divergences), plus a drop-in replacement parser for **Svelte's parser** + **acorn** + **acorn-typescript**.
 

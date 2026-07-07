@@ -1,7 +1,7 @@
 //! CSS parsing and formatting library
 //!
 //! Provides CSS parsing, formatting, and AST conversion functionality.
-//! Part of the tsv (a formatter, parser, and future linter + more for Svelte, TypeScript, and CSS) project.
+//! Part of the tsv (precise language tools for TypeScript/JS, CSS, and Svelte in Rust) project.
 
 pub mod ast;
 mod escapes;
