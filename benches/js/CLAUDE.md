@@ -23,16 +23,21 @@ delta on the same row is the detector.
 - **Runtime-labeled sibling reports.** Each runtime writes its own
   `results/report.<runtime>.{json,md}` (+ a timestamped `…_<commit>.<runtime>.*`
   pair), same schema, never merged. Every row carries a `runtime` field; the JSON
-  has a top-level `runtime` and `version: 6`. `deno task bench:compose` (run at
+  has a top-level `runtime`, a top-level `machine` block (CPU model, OS/arch,
+  runtime version — the numbers are machine-relative, so this travels with
+  them), and `version: 7`. `deno task bench:compose` (run at
   the end of `deno task bench:perf`) then folds the siblings into a compact combined
   `results/report.{json,md}` — the cross-runtime view tsv.fuz.dev consumes
   (`compose_reports.ts`; a per-runtime delta on a row is the headline). The
   composer records per-source provenance (runtime, commit, timestamp, tsv
-  version — in the JSON `sources[]` and the md header) and flags **mixed
+  version, machine — in the JSON `sources[]` and the md header) and flags **mixed
   vintages** loudly (md banner + stderr + `mixed_vintage` in the JSON) when the
   siblings come from different commits/versions — it folds whatever exists, so
   a fresh `report.deno.*` next to a stale `report.node.*` would otherwise read
-  as a runtime effect. It also annotates any row whose per-runtime
+  as a runtime effect. It flags **mixed machines** the same way
+  (`mixed_machine`) when the siblings' hardware identity (CPU/OS/arch, not the
+  per-runtime version) disagrees — cross-runtime ratios are only meaningful on
+  same-box siblings. It also annotates any row whose per-runtime
   intersections differ (`⚠ files a/b/c`) — each runtime times the files *its*
   impls passed preflight on, so unequal counts mean a sliver of the ratio is
   file-set, not runtime. The
@@ -577,8 +582,11 @@ to tsv.fuz.dev, run `npm run update-benchmarks` in ~/dev/tsv.fuz.dev — its cop
 list names these report files exactly, so renaming a report artifact means
 updating that script in the same change.
 
-The committed `report.<runtime>.json` (baseline `version: 6`) carries, beyond
-timing stats: a top-level `runtime`, `corpus_kind` (`perf` | `conformance` —
+The committed `report.<runtime>.json` (baseline `version: 7`) carries, beyond
+timing stats: a top-level `runtime`, a top-level `machine` block
+(`cpu_model` + `os`/`arch` + `runtime_version` — the hardware/runtime the
+numbers were measured on; excludes hostname and volatile fields so it doesn't
+churn), `corpus_kind` (`perf` | `conformance` —
 which corpus/surface produced it), per-language `corpus` totals,
 `corpus_sources` (per-entry loaded file counts + a `by_language`
 svelte/typescript/css split summing to `files` — the composition disclosure;

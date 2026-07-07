@@ -110,7 +110,7 @@ import { check_artifact_freshness, wasm_artifact_path } from './lib/check_artifa
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
 import { get_napi_library_path } from './lib/napi.ts';
-import { current_runtime, type Runtime } from './lib/runtime.ts';
+import { current_machine, current_runtime, type Machine, type Runtime } from './lib/runtime.ts';
 
 /** The JS runtime executing this bench — labels the report siblings
  * (`report.deno.*` / `report.node.*`) and every row's `runtime` field, and
@@ -944,6 +944,13 @@ interface Baseline {
 	corpus_kind: CorpusKind;
 	timestamp: string;
 	git_commit: string | null;
+	/**
+	 * The machine that produced this report — CPU model, OS/arch, and the
+	 * runtime's own version. The throughput numbers are machine-relative, so
+	 * without this a report copied to the site (or diffed against an older one)
+	 * can't distinguish a code change from a different box. See `Machine`.
+	 */
+	machine: Machine;
 	corpus: {
 		svelte: number;
 		typescript: number;
@@ -1094,13 +1101,15 @@ async function build_results_data(
 	}
 
 	return {
-		// Bumped 5 → 6 for the added `corpus_kind` + `corpus_sources` fields
-		// (4 → 5 added the `runtime` field, top-level + per row).
-		version: 6,
+		// Bumped 6 → 7 for the added top-level `machine` block (CPU model, OS/arch,
+		// runtime version). 5 → 6 added `corpus_kind` + `corpus_sources`; 4 → 5
+		// added the `runtime` field, top-level + per row.
+		version: 7,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
 		timestamp: new Date().toISOString(),
 		git_commit: await get_git_commit(),
+		machine: current_machine(),
 		corpus,
 		corpus_sources: corpus_loader.sources,
 		versions,
@@ -1124,6 +1133,7 @@ function generate_markdown_report(
 	versions: BaselineVersions,
 	timestamp: string,
 	git_commit: string | null,
+	machine: Machine,
 	task_tracking: Map<string, Map<string, string>>,
 	effective_size: Map<string, EffectiveCorpusEntry>,
 	effective_bytes: Map<string, number>,
@@ -1138,6 +1148,10 @@ function generate_markdown_report(
 	);
 	const commit_str = git_commit ? ` (${git_commit})` : '';
 	lines.push(`**Runtime:** ${RUNTIME}\n`);
+	lines.push(
+		`**Machine:** ${machine.cpu_model} · ${machine.os}/${machine.arch} · ` +
+			`${RUNTIME} ${machine.runtime_version}\n`,
+	);
 	const conformance_note = COVERAGE_ONLY
 		? 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
 		: 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; the headline is the per-tool Coverage lines (parse success over the valid set), with throughput measured on the all-tools-pass intersection';
@@ -1311,6 +1325,7 @@ async function save_results(
 		data.versions,
 		data.timestamp,
 		data.git_commit,
+		data.machine,
 		task_tracking_by_group,
 		effective_corpus_size,
 		effective_corpus_bytes,
@@ -1485,6 +1500,7 @@ if (args.json) {
 			versions,
 			results_data.timestamp,
 			results_data.git_commit,
+			results_data.machine,
 			task_tracking_by_group,
 			effective_corpus_size,
 			effective_corpus_bytes,
