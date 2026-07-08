@@ -149,15 +149,20 @@ impl<'a> Printer<'a> {
             Expression::ThisExpression(_) => d.text("this"),
             Expression::Super(_) => d.text("super"),
             Expression::AssignmentExpression(assign) => self.build_assignment_doc(assign),
-            Expression::ObjectPattern(obj) => {
-                self.with_param_decorators(obj.decorators, self.build_object_pattern_doc(obj))
-            }
-            Expression::ArrayPattern(arr) => {
-                self.with_param_decorators(arr.decorators, self.build_array_pattern_doc(arr))
-            }
+            Expression::ObjectPattern(obj) => self.with_param_decorators(
+                obj.decorators,
+                self.build_object_pattern_doc(obj),
+                obj.span.start,
+            ),
+            Expression::ArrayPattern(arr) => self.with_param_decorators(
+                arr.decorators,
+                self.build_array_pattern_doc(arr),
+                arr.span.start,
+            ),
             Expression::AssignmentPattern(pattern) => self.with_param_decorators(
                 pattern.decorators,
                 self.build_assignment_pattern_doc(pattern),
+                pattern.span.start,
             ),
             Expression::RestElement(rest) => self.build_rest_element_doc(rest),
             Expression::TSTypeAssertion(type_assert) => {
@@ -270,6 +275,7 @@ impl<'a> Printer<'a> {
             Expression::ObjectPattern(obj) => self.with_param_decorators(
                 obj.decorators,
                 self.build_object_pattern_doc_with_context(obj, PatternContext::FunctionParameter),
+                obj.span.start,
             ),
             // For other expressions, use normal doc building
             _ => self.build_expression_doc(expr),
@@ -1070,6 +1076,9 @@ impl<'a> Printer<'a> {
         };
         parts.push(inner_doc);
 
-        self.with_param_decorators(decorators, self.d().concat(&parts))
+        // `param_prop.span.start` is the first modifier (decorators render before it
+        // but sit earlier in source) — the boundary for a `@dec /* c */ readonly x`
+        // comment between the decorator and the modifier.
+        self.with_param_decorators(decorators, self.d().concat(&parts), param_prop.span.start)
     }
 }

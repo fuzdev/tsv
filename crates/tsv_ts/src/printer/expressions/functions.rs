@@ -1295,7 +1295,7 @@ impl<'a> Printer<'a> {
                 };
                 inner_parts.push(self.build_leading_param_comments(
                     search_start,
-                    param_start,
+                    self.param_start_with_decorators(param),
                     prev_comma_pos,
                 ));
             }
@@ -1471,14 +1471,23 @@ impl<'a> Printer<'a> {
     /// Build doc for leading comments before a parameter
     /// Handles line comments on their own line with proper hardlines
     /// `prev_comma_pos`: if Some, filter out trailing comments for the previous param
+    ///
+    /// `param_render_start` is where the param's rendered form begins — its first
+    /// decorator when it carries parameter decorators, else the binding itself. It
+    /// bounds the collection on **both** ends of the concern: only comments *before*
+    /// the first decorator are leading param comments (anything interleaved with the
+    /// decorators is emitted in place by `with_param_decorators`), and the final
+    /// own-line/blank decision measures against it so an own-line decorator between
+    /// the last comment and the binding isn't miscounted as an author blank line.
+    /// Same decorator-aware anchor as `has_blank_line_between_params`.
     fn build_leading_param_comments(
         &self,
         start: u32,
-        end: u32,
+        param_render_start: u32,
         prev_comma_pos: Option<u32>,
     ) -> DocId {
         let d = self.d();
-        let comments: CommentVec<'_> = comments_in_range(self.comments, start, end)
+        let comments: CommentVec<'_> = comments_in_range(self.comments, start, param_render_start)
             .filter(|c| {
                 let Some(comma) = prev_comma_pos else {
                     return true; // First param - keep all comments
@@ -1515,13 +1524,16 @@ impl<'a> Printer<'a> {
             parts.push(self.build_comment_doc(comment));
         }
 
-        // Check if the param itself is on its own line after the last comment
+        // Check if the param itself is on its own line after the last comment.
+        // Measure to the param's rendered start (its first own-line decorator, if
+        // any) so a decorator between the comment and the binding isn't miscounted
+        // as an author blank line.
         let last_comment_end = comments.last().map_or(start, |c| c.span.end);
-        let param_on_own_line = !self.is_same_line(last_comment_end, end);
+        let param_on_own_line = !self.is_same_line(last_comment_end, param_render_start);
 
         if param_on_own_line {
             // Preserve a blank line between the last leading comment and the param.
-            self.push_blank_preserving_hardline(&mut parts, last_comment_end, end);
+            self.push_blank_preserving_hardline(&mut parts, last_comment_end, param_render_start);
         } else {
             // Inline - add space after comment
             parts.push(d.text(" "));
