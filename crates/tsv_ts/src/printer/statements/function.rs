@@ -8,7 +8,7 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
-use super::super::types::function_types::should_group_function_parameters;
+use super::super::types::function_types::group_params_if_should;
 
 impl<'a> Printer<'a> {
     /// Build doc for a callable signature (params + return type) with comment handling.
@@ -19,12 +19,11 @@ impl<'a> Printer<'a> {
     /// are wrapped in their own inner group so they can stay flat even when the outer
     /// group breaks due to the return type's hardlines.
     ///
-    /// One depth-tracked scan locates the params' close `)`; every boundary derived
-    /// from it (the params-trailing bound, the `)`→return-type comment range, the
-    /// signature end) shares that scan. Returns the doc plus the signature end —
-    /// where comments before the body begin: the return type's end when present,
-    /// otherwise just past the `)` (falling back to `body_start` if the paren can't
-    /// be located).
+    /// Delegates the params + return-type core to `build_signature_params_return` and
+    /// wraps it (with no type-parameter prefix — the caller builds those separately)
+    /// in the signature group. Returns the doc plus the signature end — where comments
+    /// before the body begin: the return type's end when present, otherwise just past
+    /// the `)` (falling back to `body_start` if the paren can't be located).
     pub(in crate::printer) fn build_callable_signature_doc(
         &self,
         params: &[internal::Expression<'_>],
@@ -34,14 +33,38 @@ impl<'a> Printer<'a> {
         body_start: u32,
     ) -> (DocId, u32) {
         let d = self.d();
+        let (params_doc, return_type_doc, sig_end) =
+            self.build_signature_params_return(params, type_parameters, return_type, params_start, body_start);
 
+        let mut sig_parts: DocBuf = smallvec![params_doc];
+        if let Some(rt_doc) = return_type_doc {
+            sig_parts.push(rt_doc);
+        }
+
+        (d.group(d.concat(&sig_parts)), sig_end)
+    }
+
+    /// Build the params + return-type core shared by `build_callable_signature_doc`
+    /// (function declarations, class methods) and
+    /// `build_function_expression_signature_doc` (function expressions, object methods)
+    /// — the two builders differ only in the type-parameter prefix the caller prepends.
+    ///
+    /// One depth-tracked close-`)` scan feeds every derived boundary: the params doc
+    /// (trailing comments bounded at `)` — a comment past it belongs to the `)`→return
+    /// gap or the signature→body gap), the combined `)`→`:` return-type doc (the comment
+    /// prefix folded into `: T` so the single-param hug sees a will-break comment there),
+    /// the hug itself (`group_params_if_should`), and the signature end (the return
+    /// type's end, else just past `)`). Returns `(params_doc, return_type_doc, sig_end)`.
+    pub(in crate::printer) fn build_signature_params_return(
+        &self,
+        params: &[internal::Expression<'_>],
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        return_type: Option<&internal::TSTypeAnnotation<'_>>,
+        params_start: u32,
+        body_start: u32,
+    ) -> (DocId, Option<DocId>, u32) {
         let close_paren_after = self.find_closing_paren(params_start, body_start);
 
-        // Params trailing comments are bounded at the close paren: a comment after
-        // `)` is not param-trailing — it belongs to the `)`→return-type gap (emitted
-        // via build_close_paren_to_return_type_comments) or the signature→body gap.
-        // Bounding here keeps the params scan from consuming (and duplicating, or
-        // mis-positioning) either.
         let trailing_comments_end =
             Some(close_paren_after.map_or(body_start, |after_paren| after_paren - 1));
 
@@ -49,40 +72,23 @@ impl<'a> Printer<'a> {
             self.build_params_doc_with_comments(params, Some(params_start), trailing_comments_end);
 
         let return_type_doc =
-            return_type.map(|rt| self.build_type_annotation_doc_for_return_type(rt));
+            return_type.map(|rt| self.build_function_return_type_doc(close_paren_after, rt));
 
-        let params_doc = if should_group_function_parameters(
+        let params_doc = group_params_if_should(
+            params_doc,
             params,
             type_parameters,
             return_type,
             return_type_doc,
-            d,
-        ) {
-            d.group(params_doc)
-        } else {
-            params_doc
-        };
-
-        let mut sig_parts: DocBuf = smallvec![params_doc];
-        if let Some(rt_doc) = return_type_doc {
-            // Preserve a comment between `)` and the return type `:` in place.
-            if let Some(rt) = return_type {
-                sig_parts.push(
-                    self.build_close_paren_to_return_type_comments(
-                        close_paren_after,
-                        rt.span.start,
-                    ),
-                );
-            }
-            sig_parts.push(rt_doc);
-        }
+            self.d(),
+        );
 
         let sig_end = match return_type {
             Some(rt) => rt.span.end,
             None => close_paren_after.unwrap_or(body_start),
         };
 
-        (d.group(d.concat(&sig_parts)), sig_end)
+        (params_doc, return_type_doc, sig_end)
     }
 
     /// Build a Doc for a function declaration

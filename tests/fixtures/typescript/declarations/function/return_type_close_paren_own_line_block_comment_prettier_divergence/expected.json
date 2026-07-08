@@ -1,0 +1,824 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 467,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A single-line block comment in the `)`→return-type-`:` gap. tsv collapses it",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inline; prettier relocates it into the parameter list. See README for the full",
+			"start": 101,
+			"end": 182,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " normalization graph.",
+			"start": 184,
+			"end": 207,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " function declaration",
+			"start": 210,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 257,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 23
+				},
+				"end": {
+					"line": 7,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " class method",
+			"start": 293,
+			"end": 308,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 335,
+			"end": 342,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 15
+				},
+				"end": {
+					"line": 13,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " type-member method signature",
+			"start": 376,
+			"end": 407,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 435,
+			"end": 442,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 15
+				},
+				"end": {
+					"line": 20,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 466,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 457,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 235,
+					"end": 290,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 244,
+						"end": 245,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 11
+							}
+						},
+						"name": "f"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "Identifier",
+							"start": 246,
+							"end": 255,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 12
+								},
+								"end": {
+									"line": 7,
+									"column": 21
+								}
+							},
+							"name": "a",
+							"typeAnnotation": {
+								"type": "TSTypeAnnotation",
+								"start": 247,
+								"end": 255,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 13
+									},
+									"end": {
+										"line": 7,
+										"column": 21
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSStringKeyword",
+									"start": 249,
+									"end": 255,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 15
+										},
+										"end": {
+											"line": 7,
+											"column": 21
+										}
+									}
+								}
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 257,
+									"end": 264
+								}
+							]
+						}
+					],
+					"returnType": {
+						"type": "TSTypeAnnotation",
+						"start": 265,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 31
+							},
+							"end": {
+								"line": 7,
+								"column": 39
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSStringKeyword",
+							"start": 267,
+							"end": 273,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 33
+								},
+								"end": {
+									"line": 7,
+									"column": 39
+								}
+							}
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 274,
+						"end": 290,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 40
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 278,
+								"end": 287,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 11
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 285,
+									"end": 286,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 9
+										},
+										"end": {
+											"line": 8,
+											"column": 10
+										}
+									},
+									"name": "a"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A single-line block comment in the `)`→return-type-`:` gap. tsv collapses it",
+							"start": 20,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " inline; prettier relocates it into the parameter list. See README for the full",
+							"start": 101,
+							"end": 182
+						},
+						{
+							"type": "Line",
+							"value": " normalization graph.",
+							"start": 184,
+							"end": 207
+						},
+						{
+							"type": "Line",
+							"value": " function declaration",
+							"start": 210,
+							"end": 233
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 310,
+					"end": 373,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 316,
+						"end": 317,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 7
+							},
+							"end": {
+								"line": 12,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 318,
+						"end": 373,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 9
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 322,
+								"end": 370,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 3
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 322,
+									"end": 323,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 3
+										}
+									},
+									"name": "m"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 323,
+									"end": 370,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 3
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 324,
+											"end": 333,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 4
+												},
+												"end": {
+													"line": 13,
+													"column": 13
+												}
+											},
+											"name": "a",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 325,
+												"end": 333,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 5
+													},
+													"end": {
+														"line": 13,
+														"column": 13
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSStringKeyword",
+													"start": 327,
+													"end": 333,
+													"loc": {
+														"start": {
+															"line": 13,
+															"column": 7
+														},
+														"end": {
+															"line": 13,
+															"column": 13
+														}
+													}
+												}
+											},
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 335,
+													"end": 342
+												}
+											]
+										}
+									],
+									"returnType": {
+										"type": "TSTypeAnnotation",
+										"start": 343,
+										"end": 351,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 23
+											},
+											"end": {
+												"line": 13,
+												"column": 31
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSStringKeyword",
+											"start": 345,
+											"end": 351,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 25
+												},
+												"end": {
+													"line": 13,
+													"column": 31
+												}
+											}
+										}
+									},
+									"body": {
+										"type": "BlockStatement",
+										"start": 352,
+										"end": 370,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 32
+											},
+											"end": {
+												"line": 15,
+												"column": 3
+											}
+										},
+										"body": [
+											{
+												"type": "ReturnStatement",
+												"start": 357,
+												"end": 366,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 3
+													},
+													"end": {
+														"line": 14,
+														"column": 12
+													}
+												},
+												"argument": {
+													"type": "Identifier",
+													"start": 364,
+													"end": 365,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 10
+														},
+														"end": {
+															"line": 14,
+															"column": 11
+														}
+													},
+													"name": "a"
+												}
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " class method",
+							"start": 293,
+							"end": 308
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 409,
+					"end": 456,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 414,
+						"end": 415,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 418,
+						"end": 455,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 10
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"members": [
+							{
+								"type": "TSMethodSignature",
+								"start": 422,
+								"end": 452,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 32
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 422,
+									"end": 423,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 3
+										}
+									},
+									"name": "m"
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 424,
+										"end": 433,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 4
+											},
+											"end": {
+												"line": 20,
+												"column": 13
+											}
+										},
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 425,
+											"end": 433,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 5
+												},
+												"end": {
+													"line": 20,
+													"column": 13
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 427,
+												"end": 433,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 7
+													},
+													"end": {
+														"line": 20,
+														"column": 13
+													}
+												}
+											}
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 435,
+												"end": 442
+											}
+										]
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 443,
+									"end": 451,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 23
+										},
+										"end": {
+											"line": 20,
+											"column": 31
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSStringKeyword",
+										"start": 445,
+										"end": 451,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 25
+											},
+											"end": {
+												"line": 20,
+												"column": 31
+											}
+										}
+									}
+								},
+								"kind": "method"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " type-member method signature",
+							"start": 376,
+							"end": 407
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
