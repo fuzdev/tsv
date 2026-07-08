@@ -50,7 +50,10 @@ fn comment_from_token(
             (content_end + base_offset) as u32,
         ),
         is_block,
-        multiline: content.contains('\n'),
+        // Line comments end at the first line terminator, so their content never
+        // contains `\n` — gate the scan on `is_block` (value unchanged, scan skipped
+        // for every `//` comment).
+        multiline: is_block && content.contains('\n'),
         span: Span::new(
             (token_start + base_offset) as u32,
             (token_end + base_offset) as u32,

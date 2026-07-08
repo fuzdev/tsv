@@ -132,10 +132,6 @@ pub struct Printer<'a> {
     /// only nested assignments (where parent is another assignment) use chain formatting
     /// Uses Cell for interior mutability so doc builders (&self) can set this
     pub(crate) in_top_level_assignment: Cell<bool>,
-    /// Whether to force chain expressions to expand (break at every method call)
-    /// Set when inside template expressions with original breaks, where the chain
-    /// would exceed print width if kept flat.
-    pub(crate) force_chain_expand: Cell<bool>,
     /// Whether we're inside a curried arrow function with return type.
     /// When true, nested arrows always break after `=>` regardless of their own return type.
     /// Used for: const f = (x: T): H => (y) => expr - ALL arrows break, not just the typed ones.
@@ -231,7 +227,6 @@ impl<'a> Printer<'a> {
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
             in_top_level_assignment: Cell::new(false),
-            force_chain_expand: Cell::new(false),
             in_curried_typed_arrow: Cell::new(false),
             skip_arrow_chain: Cell::new(false),
             expand_last_arg_flat_params: Cell::new(false),
