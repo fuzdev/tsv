@@ -702,10 +702,12 @@ async function run_preflight(
 		const start_ms = performance.now();
 		for (const file of files) {
 			try {
+				// `file.goal` is set only for test262 (conformance surface); every
+				// other corpus leaves it undefined → the default module parse.
 				if (task.is_async) {
-					await task.run_async!(file.content, language);
+					await task.run_async!(file.content, language, file.goal);
 				} else {
-					task.run(file.content, language);
+					task.run(file.content, language, file.goal);
 				}
 				success.add(file.path);
 				bytes += file.bytes;
@@ -892,7 +894,7 @@ async function run_benchmark_group(
 				...base_task,
 				fn: async () => {
 					await process_corpus_async(task_files, async (f) => {
-						await task.run_async!(f.content, language);
+						await task.run_async!(f.content, language, f.goal);
 					});
 				},
 				async: true,
@@ -901,7 +903,7 @@ async function run_benchmark_group(
 			bench.add({
 				...base_task,
 				fn: () => {
-					process_corpus(task_files, (f) => task.run(f.content, language));
+					process_corpus(task_files, (f) => task.run(f.content, language, f.goal));
 				},
 				async: false,
 			});

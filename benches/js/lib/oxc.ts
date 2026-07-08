@@ -5,12 +5,16 @@
  * oxfmt: Fast TypeScript/JS/CSS/Svelte formatter (Svelte is experimental as of 0.49)
  */
 
-import { type Language, LANGUAGE_EXTENSIONS, type TsvImplementation } from './types.ts';
+import { type Language, LANGUAGE_EXTENSIONS, type ParseGoal, type TsvImplementation } from './types.ts';
 import type { OxcVersions } from './versions.ts';
 
 /** oxc-parser module types */
 interface OxcParserModule {
-	parseSync: (filename: string, source: string) => { program: unknown; errors: unknown[] };
+	parseSync: (
+		filename: string,
+		source: string,
+		options?: { sourceType?: 'script' | 'module' },
+	) => { program: unknown; errors: unknown[] };
 }
 
 /** oxfmt module types (the subset of oxfmt's real option surface the bench sets) */
@@ -71,13 +75,16 @@ export class OxcImplementation implements TsvImplementation {
 		return OxcImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
-	parse(source: string, language: Language): unknown {
+	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		if (!this._parser) throw new Error('OXC parser not initialized');
 		if (!this.supports_parse_language(language)) {
 			throw new Error(`OXC parser does not support ${language}`);
 		}
 
-		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source);
+		// A test262 goal pins oxc's `sourceType` so it's scored at the declared
+		// goal like tsv/acorn, instead of oxc's filename-based inference.
+		const options = goal ? {sourceType: goal} : undefined;
+		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source, options);
 
 		// Read `errors` once into a local: the WASI sibling's getter is consume-once
 		// (see oxc_wasm.ts / benches/js/CLAUDE.md §Known Issues); the native package

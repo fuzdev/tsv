@@ -30,7 +30,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
 import { clone_hint } from './corpus_repos.ts';
-import type { Language, Logger, SourceFile } from './types.ts';
+import type { Language, Logger, ParseGoal, SourceFile } from './types.ts';
 
 //
 // Shared Utilities
@@ -214,15 +214,18 @@ async function* walk_corpus(
  * still dropped.
  */
 async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
-	let paths: string[];
+	let raw: Array<string | { path: string; goal?: ParseGoal }>;
 	try {
-		paths = JSON.parse(await readFile(list_path, 'utf8'));
+		raw = JSON.parse(await readFile(list_path, 'utf8'));
 	} catch (e) {
 		console.warn(`Warning: Could not read file list ${list_path}: ${e}`);
 		return;
 	}
-	paths.sort();
-	for (const relative of paths) {
+	// Accept both the `{path, goal}` shape (test262, goal-aware) and a bare
+	// `string[]` (older caches / other file lists — goal defaults to module).
+	const entries = raw.map((e) => (typeof e === 'string' ? {path: e} : e));
+	entries.sort((a, b) => a.path.localeCompare(b.path));
+	for (const {path: relative, goal} of entries) {
 		const path = resolve(relative);
 		const language = detect_language(path);
 		if (!language) continue;
@@ -233,6 +236,7 @@ async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
 				content,
 				language,
 				bytes: new TextEncoder().encode(content).length,
+				goal,
 			};
 		} catch (e) {
 			console.warn(`Warning: Could not read ${path}: ${e}`);

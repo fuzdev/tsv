@@ -838,15 +838,19 @@ Things the published numbers measure that aren't quite what they look like:
   neither is a validity oracle). If you run the ad-hoc timed
   variant (coverage flag unset), its throughput is over the all-tools-pass
   intersection — an adversarial corpus that's the "easy" subset
-  (`BENCH_MODE=union` audits what it hides). test262 files are
-  parsed at every tool's default **module** goal: none of the tsv bindings
-  take a goal parameter, the canonical acorn wrapper hardcodes
-  `sourceType: 'module'`, and oxc infers module from the synthetic `.ts`
-  filename — so strict-script-only constructs (e.g. `await` as an
-  identifier) count against every tool equally. The goal-aware per-test
-  differential is `diagnostics/test262_compare.ts`, and the graded pass/fail
-  conformance gates remain `tsv_debug test262` / `conformance:svelte-fixtures` —
-  this surface measures coverage, it doesn't replace them.
+  (`BENCH_MODE=union` audits what it hides). test262 files are parsed at the
+  goal test262 **declares** (`SourceFile.goal`, from the harvest's per-file
+  `module` flag → `module`, else strict `script`): tsv routes through its
+  goal-aware bindings (`parse_*_typescript*_with_goal`), acorn takes
+  `sourceType: goal`, and oxc takes an explicit `sourceType` — so a script-goal
+  `await`-identifier test is scored as valid against every tool, not counted as a
+  module-goal failure. (Before this, everything parsed at module goal and those
+  tests depressed the TS coverage of tsv/acorn alike; oxc's filename inference
+  hid it, making tsv read ~2 files behind when it was really a goal artifact.)
+  Only the conformance-coverage preflight is goal-aware — the perf surface has no
+  test262. The goal-aware per-test differential is `diagnostics/test262_compare.ts`,
+  and the graded pass/fail conformance gates remain `tsv_debug test262` /
+  `conformance:svelte-fixtures` — this surface measures coverage, it doesn't replace them.
 - **Measurement-shape asymmetries (small, mostly self-cancelling).** (a) Every
   `tsv` FFI format call UTF-8-encodes the input and decodes the output back to a
   JS string (`lib/ffi.ts` — through persistent grow-only staging buffers, so the

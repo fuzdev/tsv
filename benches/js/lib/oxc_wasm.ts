@@ -8,13 +8,17 @@
  * Supports: Parse only (TypeScript, JS). No formatting (oxfmt has no WASM variant).
  */
 
-import { type Language, LANGUAGE_EXTENSIONS, type TsvImplementation } from './types.ts';
+import { type Language, LANGUAGE_EXTENSIONS, type ParseGoal, type TsvImplementation } from './types.ts';
 import type { OxcVersions } from './versions.ts';
 import { current_runtime } from './runtime.ts';
 
 /** oxc-parser WASM module types (same API as native) */
 interface OxcParserWasmModule {
-	parseSync: (filename: string, source: string) => { program: unknown; errors: unknown[] };
+	parseSync: (
+		filename: string,
+		source: string,
+		options?: { sourceType?: 'script' | 'module' },
+	) => { program: unknown; errors: unknown[] };
 }
 
 /**
@@ -62,13 +66,14 @@ export class OxcWasmImplementation implements TsvImplementation {
 		return false;
 	}
 
-	parse(source: string, language: Language): unknown {
+	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		if (!this._parser) throw new Error('OXC WASM parser not initialized');
 		if (!this.supports_parse_language(language)) {
 			throw new Error(`OXC WASM parser does not support ${language}`);
 		}
 
-		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source);
+		const options = goal ? {sourceType: goal} : undefined;
+		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source, options);
 
 		// Read `errors` exactly ONCE: on the WASI binding it's a CONSUME-ONCE getter —
 		// the first access returns the real error array, every later access returns

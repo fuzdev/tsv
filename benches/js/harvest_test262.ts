@@ -9,15 +9,15 @@
  * test262's own metadata decides, never tsv's verdict, so the subset can't
  * bias per-tool coverage toward tsv.
  *
- * The bench parses these files at every tool's default (module) goal — the
- * manifest's per-file `module` flag is not threaded (none of the tsv bindings
- * take a goal parameter, and the canonical acorn wrapper hardcodes
- * `sourceType: 'module'`), so strict-script-only constructs (e.g. `await` as
- * an identifier) count against every tool equally. The goal-aware differential
- * is `diagnostics/test262_compare.ts`.
+ * Each emitted entry carries its declared parse **goal** (from the manifest's
+ * per-file `module` flag: `flags: [module]` → `module`, else strict `script`),
+ * so the conformance-coverage surface parses every tool at the goal test262
+ * declares — a script-goal `await`-identifier test is no longer scored as a
+ * failure against a module parse. (The `diagnostics/test262_compare.ts`
+ * differential remains the deeper per-tool goal-aware view.)
  *
  * Output:
- * - benches/js/.cache/test262_files.json — sorted array of project-root-relative paths
+ * - benches/js/.cache/test262_files.json — sorted `{path, goal}` array (project-root-relative paths)
  * - benches/js/.cache/test262_manifest.json — the raw manifest (kept for inspection)
  *
  * Flags: `--if-present` tolerates a missing `../test262` checkout (warn +
@@ -130,7 +130,14 @@ interface Manifest {
 
 const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8')) as Manifest;
 const positives = manifest.tests.filter((t) => t.expected === 'accept');
-const files = positives.map((t) => join(manifest.test262_root, t.relative_path)).sort();
+// Emit `{path, goal}` — the goal is the manifest's `module` flag (a
+// `flags: [module]` test parses as a module, everything else as a strict script).
+const files = positives
+	.map((t) => ({
+		path: join(manifest.test262_root, t.relative_path),
+		goal: (t.module ? 'module' : 'script') as 'module' | 'script',
+	}))
+	.sort((a, b) => a.path.localeCompare(b.path));
 
 // Pinned count (exact): the test262 checkout is updated deliberately, so any
 // move in the positive set — a grading/frontmatter bug shrinking it, tsv
