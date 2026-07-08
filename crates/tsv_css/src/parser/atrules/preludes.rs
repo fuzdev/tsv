@@ -76,7 +76,7 @@ pub(super) fn parse_condition_query<'arena>(
         // Parse a condition part (may start with `not`, then parenthesized content)
         let part_start = parser.span_pos(parser.current_start);
         // One growable buffer instead of a `Vec<String>` of per-token / per-space pieces
-        // joined at the end (mirrors `parse_raw_prelude_content` and perf10's
+        // joined at the end (mirrors `parse_raw_prelude_content` and
         // `parse_declaration`): tokens `push_str` straight in, separators are a single
         // `push(' ')`. `trailing_spaces` counts the trailing programmatic spaces (the
         // collapse unit) so `truncate` strips exactly those, never a token's own

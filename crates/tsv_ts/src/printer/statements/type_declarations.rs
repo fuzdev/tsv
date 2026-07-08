@@ -665,6 +665,16 @@ impl<'a> Printer<'a> {
         let mut parts = d.pooled_docbuf();
         let mut prev_end = body_start + 1; // after opening brace
 
+        // Zero-comment fast gate: one binary search over the whole
+        // body span short-circuits every per-member comment sub-query (leading
+        // collect, format-ignore lookup, trailing-comment scan, trailing-body
+        // comments). Sound because comments are disjoint + start-sorted and every
+        // sub-range lies within `[body_start, body_end)`. Blank-line preservation
+        // is comment-independent and stays outside the gate; `prev_end` here is
+        // `member.span().end` (no comma / trailing-comment walk), so it needs no
+        // gating either.
+        let body_has_comments = self.has_comments_between(body_start, body_end);
+
         for (i, member) in members.iter().enumerate() {
             let member_start = member.span().start;
             let is_first = i == 0;
@@ -672,33 +682,37 @@ impl<'a> Printer<'a> {
             // Find comments between previous element and this one
             // Filter out trailing same-line comments from the previous member
             // BUT keep multi-line block comments even if they start on the same line
-            let all_comments: CommentVec<'_> =
-                comments_in_range(self.comments, prev_end, member_start).collect();
-            let leading_comments: CommentVec<'_> = if !is_first {
-                all_comments
-                    .iter()
-                    .filter(|c| {
-                        // Keep if not on same line as prev_end
-                        if !self.is_same_line(prev_end, c.span.start) {
-                            return true;
-                        }
-                        // Also keep multi-line block comments (they're always leading, never trailing)
-                        if c.multiline {
-                            return true;
-                        }
-                        // An inline comment that hugs this member on its line leads it
-                        // (`a: 1, /* c */ b`), even though it shares the previous
-                        // member's line — keep it here rather than letting it trail the
-                        // previous member. (A comment with a newline after it instead
-                        // trails the previous member: the `is_same_line` is false.)
-                        self.is_same_line(c.span.end, member_start)
-                    })
-                    .copied()
-                    .collect()
+            let leading_comments: CommentVec<'_> = if !body_has_comments {
+                CommentVec::new()
             } else {
-                // First member: drop comments pulled onto the `{` line (emitted
-                // as the brace-line prefix by the caller).
-                self.first_member_leading_comments(all_comments, delimiter_pull_pos)
+                let all_comments: CommentVec<'_> =
+                    comments_in_range(self.comments, prev_end, member_start).collect();
+                if !is_first {
+                    all_comments
+                        .iter()
+                        .filter(|c| {
+                            // Keep if not on same line as prev_end
+                            if !self.is_same_line(prev_end, c.span.start) {
+                                return true;
+                            }
+                            // Also keep multi-line block comments (they're always leading, never trailing)
+                            if c.multiline {
+                                return true;
+                            }
+                            // An inline comment that hugs this member on its line leads it
+                            // (`a: 1, /* c */ b`), even though it shares the previous
+                            // member's line — keep it here rather than letting it trail the
+                            // previous member. (A comment with a newline after it instead
+                            // trails the previous member: the `is_same_line` is false.)
+                            self.is_same_line(c.span.end, member_start)
+                        })
+                        .copied()
+                        .collect()
+                } else {
+                    // First member: drop comments pulled onto the `{` line (emitted
+                    // as the brace-line prefix by the caller).
+                    self.first_member_leading_comments(all_comments, delimiter_pull_pos)
+                }
             };
 
             // Add separator before this member
@@ -724,35 +738,38 @@ impl<'a> Printer<'a> {
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
-            let member_doc = if self.has_format_ignore_in_range(prev_end, member_start) {
-                self.raw_source_doc(member.span())
-            } else {
-                self.build_type_element_doc(member)
-            };
+            let member_doc =
+                if body_has_comments && self.has_format_ignore_in_range(prev_end, member_start) {
+                    self.raw_source_doc(member.span())
+                } else {
+                    self.build_type_element_doc(member)
+                };
             parts.push(member_doc);
 
             // Handle trailing inline comments on same line after member
             // Skip multi-line block comments - they should be leading comments for the next element
-            let upper_bound = members
-                .get(i + 1)
-                .map_or(body_end, |next| next.span().start);
-            let next_start = members.get(i + 1).map(|next| next.span().start);
-            for comment in comments_in_range(self.comments, member.span().end, upper_bound) {
-                if self.is_same_line(member.span().end, comment.span.start) {
-                    // Skip multi-line block comments (they're leading comments for next element)
-                    if comment.multiline {
-                        continue;
+            if body_has_comments {
+                let upper_bound = members
+                    .get(i + 1)
+                    .map_or(body_end, |next| next.span().start);
+                let next_start = members.get(i + 1).map(|next| next.span().start);
+                for comment in comments_in_range(self.comments, member.span().end, upper_bound) {
+                    if self.is_same_line(member.span().end, comment.span.start) {
+                        // Skip multi-line block comments (they're leading comments for next element)
+                        if comment.multiline {
+                            continue;
+                        }
+                        // An inline comment that hugs the next member on its line leads that
+                        // member (`a: 1, /* c */ b`) — the leading filter emits it — so it
+                        // must not also trail this one (which would duplicate it). A comment
+                        // with a newline after it (next member on a later line) trails here.
+                        if next_start.is_some_and(|ns| self.is_same_line(comment.span.end, ns)) {
+                            break;
+                        }
+                        parts.push(self.build_trailing_comment_doc(comment));
+                    } else {
+                        break; // Only same-line comments
                     }
-                    // An inline comment that hugs the next member on its line leads that
-                    // member (`a: 1, /* c */ b`) — the leading filter emits it — so it
-                    // must not also trail this one (which would duplicate it). A comment
-                    // with a newline after it (next member on a later line) trails here.
-                    if next_start.is_some_and(|ns| self.is_same_line(comment.span.end, ns)) {
-                        break;
-                    }
-                    parts.push(self.build_trailing_comment_doc(comment));
-                } else {
-                    break; // Only same-line comments
                 }
             }
 
@@ -760,7 +777,11 @@ impl<'a> Printer<'a> {
         }
 
         // Handle trailing comments after the last member (before closing `}`)
-        parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end.saturating_sub(1)));
+        if body_has_comments {
+            parts.extend(
+                self.build_trailing_body_comments_doc(prev_end, body_end.saturating_sub(1)),
+            );
+        }
 
         d.concat(&parts)
     }
@@ -847,7 +868,7 @@ impl<'a> Printer<'a> {
             let mut member_parts = DocBuf::new();
             let mut prev_end = body_start;
 
-            // Zero-comment fast gate (idiom 8): one binary search over the whole
+            // Zero-comment fast gate: one binary search over the whole
             // enum-body span short-circuits every per-member comment sub-query
             // (leading collect, format-ignore lookup, both trailing-comment
             // scans, the trailing-end walk, and the trailing-body comments).

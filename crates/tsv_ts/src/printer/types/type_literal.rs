@@ -44,8 +44,8 @@ impl<'a> Printer<'a> {
         comments_present: bool,
     ) -> DocBuf {
         let d = self.d();
-        // `comments_present` is the caller's whole-construct existence gate
-        // (idiom 8): when false, `[prev_end, member_start]` is provably empty,
+        // `comments_present` is the caller's whole-construct existence gate:
+        // when false, `[prev_end, member_start]` is provably empty,
         // so skip the collect/filter machinery.
         let all_comments: CommentVec<'_> = if comments_present {
             comments_in_range(self.comments, prev_end, member_start).collect()
@@ -527,7 +527,7 @@ impl<'a> Printer<'a> {
         closing: &'static str,
     ) -> DocId {
         let d = self.d();
-        // Idiom-8 whole-construct gate: one existence check over the literal's
+        // Zero-comment whole-construct gate: one existence check over the literal's
         // span; every comment sub-query below is bounded within it.
         let comments_present = self.has_comments_between(obj.span.start, obj.span.end);
         let force_multiline = self.type_literal_force_multiline(obj, comments_present);
@@ -589,7 +589,7 @@ impl<'a> Printer<'a> {
     fn build_type_literal_doc_inner(&self, t: &TSTypeLiteral<'_>, mode: TypeLiteralMode) -> DocId {
         let d = self.d();
         let wrap_in_group = matches!(mode, TypeLiteralMode::Standard);
-        // Idiom-8 whole-construct gate: one existence check over the literal's
+        // Zero-comment whole-construct gate: one existence check over the literal's
         // span skips every per-member comment query below on the comment-free
         // common case — each sub-range lies within [span.start, span.end].
         let comments_present = self.has_comments_between(t.span.start, t.span.end);

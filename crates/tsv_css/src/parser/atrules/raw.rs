@@ -22,7 +22,7 @@ pub(super) fn parse_raw_prelude_content<'arena>(
     // Add spaces around boolean operators (and, or, not) and after ':' for prettier compatibility
     let prelude_start = parser.span_pos(parser.current_start);
     // One growable buffer rather than a `Vec<String>` of per-token / per-space pieces
-    // joined at the end (the perf10 `parse_declaration` idiom, extended to the at-rule
+    // joined at the end (the `parse_declaration` raw-buffer idiom, extended to the at-rule
     // prelude siblings): each token value is `push_str`ed directly and each normalized
     // separator is a single `push(' ')`, so a `@media (min-width: …) and (…)` prelude
     // no longer allocs a heap `String` per token and per space.
