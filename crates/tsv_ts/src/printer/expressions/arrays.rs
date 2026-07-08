@@ -228,13 +228,20 @@ impl<'a> Printer<'a> {
             return self.build_empty_brackets_inline_with_comments_doc(arr.span);
         }
 
+        // Whole-array comment-presence flag (one binary search over the `[…]` span).
+        // A false gate is exact: every per-element comment sub-range — the
+        // expanding-comment checks below, and the inline leading/trailing lookups in
+        // the fill/group builders — lies within [span.start, span.end], so when the
+        // array holds no comment, none can lie in any of them (canonical reference:
+        // build_params_doc_with_comments).
+        let has_comments = self.has_comments_between(arr.span.start, arr.span.end);
+
         // Check for comments that force expansion: line comments (can't be inline),
         // multi-line block comments (contain hardlines that must propagate),
         // or own-line single-line block comments (on a separate line from adjacent tokens).
-        // One whole-window existence gate skips all three sub-queries — and
-        // sub-query 3's eager element collect — on the comment-free common case; each
-        // sub-query's range lies within [span.start, span.end], so a false gate is exact.
-        let has_expanding_comments = self.has_comments_between(arr.span.start, arr.span.end)
+        // The gate skips all three sub-queries — and sub-query 3's eager element
+        // collect — on the comment-free common case.
+        let has_expanding_comments = has_comments
             && (self.has_line_comments_between(arr.span.start, arr.span.end)
                 || has_multiline_block_comments_in_range(
                     self.comments,
@@ -263,10 +270,10 @@ impl<'a> Printer<'a> {
             self.build_array_group_doc_forced(arr)
         } else if is_numbers_only {
             // Use fill for greedy packing of numbers
-            self.build_array_fill_doc(arr)
+            self.build_array_fill_doc(arr, has_comments)
         } else {
             // Use group with one-per-line for other content
-            self.build_array_group_doc(arr)
+            self.build_array_group_doc(arr, has_comments)
         }
     }
 
@@ -303,23 +310,35 @@ impl<'a> Printer<'a> {
     ///
     /// Includes inline block comments between elements.
     /// Uses binary search to find comments: O(log n + k)
-    fn build_array_fill_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
+    fn build_array_fill_doc(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        has_comments: bool,
+    ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
 
         for (i, elem) in arr.elements.iter().enumerate() {
             // Handle comments and element (skip comment collection for elisions)
             if let Some(expr) = elem {
-                let elem_start = expr.span().start;
-                let elem_end = expr.span().end;
-
-                let search_start = self.leading_comment_search_start_for(arr, i);
-                self.add_inline_leading_block_comments(search_start, elem_start, &mut parts);
+                // Zero-comment fast gate: with no comments anywhere in the array,
+                // no comment can lie in this element's leading/trailing gap, so skip
+                // the inline block-comment collection (and its comma scan).
+                if has_comments {
+                    let search_start = self.leading_comment_search_start_for(arr, i);
+                    self.add_inline_leading_block_comments(
+                        search_start,
+                        expr.span().start,
+                        &mut parts,
+                    );
+                }
 
                 parts.push(self.build_expression_doc(expr));
 
-                // Trailing block comments (before comma only)
-                self.add_trailing_array_comments(arr, elem_end, i, &mut parts);
+                if has_comments {
+                    // Trailing block comments (before comma only)
+                    self.add_trailing_array_comments(arr, expr.span().end, i, &mut parts);
+                }
             }
 
             if i < arr.elements.len() - 1 {
@@ -339,7 +358,11 @@ impl<'a> Printer<'a> {
     /// Uses binary search to find comments: O(log n + k)
     ///
     /// Note: Arrays with expanding comments use build_array_doc_with_expanding_comments instead.
-    fn build_array_group_doc(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
+    fn build_array_group_doc(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        has_comments: bool,
+    ) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
 
@@ -355,16 +378,26 @@ impl<'a> Printer<'a> {
 
             // Handle comments and element (skip comment collection for elisions)
             if let Some(expr) = elem {
-                let elem_start = expr.span().start;
-
-                let search_start = self.leading_comment_search_start_for(arr, i);
-                self.add_inline_leading_block_comments(search_start, elem_start, &mut parts);
+                // Zero-comment fast gate: with no comments anywhere in the array, no
+                // comment can lie in this element's leading/trailing gap, so skip the
+                // inline block-comment collection (and its comma scan). The blank-line
+                // detection below is comment-independent and stays outside the gate.
+                if has_comments {
+                    let search_start = self.leading_comment_search_start_for(arr, i);
+                    self.add_inline_leading_block_comments(
+                        search_start,
+                        expr.span().start,
+                        &mut parts,
+                    );
+                }
 
                 // Add element (templates wrapped in isolated_group)
                 parts.push(self.build_array_element_doc(expr));
 
-                // Trailing block comments (before comma only)
-                self.add_trailing_array_comments(arr, elem_end, i, &mut parts);
+                if has_comments {
+                    // Trailing block comments (before comma only)
+                    self.add_trailing_array_comments(arr, elem_end, i, &mut parts);
+                }
             }
 
             let is_last = i == arr.elements.len() - 1;
