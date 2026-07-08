@@ -1,0 +1,176 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 527,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 266,
+					"end": 279,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 266,
+							"end": 279,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "is",
+											"args": {
+												"type": "SelectorList",
+												"start": 272,
+												"end": 278,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 272,
+														"end": 278,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "class",
+																		"start": 272,
+																		"end": 278
+																	}
+																],
+																"start": 272,
+																"end": 278
+															}
+														]
+													}
+												]
+											},
+											"start": 266,
+											"end": 279
+										}
+									],
+									"start": 266,
+									"end": 279
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 280,
+					"end": 298,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 284,
+							"end": 294,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 266,
+				"end": 298
+			},
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 474,
+					"end": 498,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 474,
+							"end": 498,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "PseudoClassSelector",
+											"name": "nth-child",
+											"args": {
+												"type": "SelectorList",
+												"start": 491,
+												"end": 497,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 491,
+														"end": 497,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "Nth",
+																		"value": "2n + 1",
+																		"start": 491,
+																		"end": 497
+																	}
+																],
+																"start": 491,
+																"end": 497
+															}
+														]
+													}
+												]
+											},
+											"start": 474,
+											"end": 498
+										}
+									],
+									"start": 474,
+									"end": 498
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 499,
+					"end": 518,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 503,
+							"end": 514,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				},
+				"start": 474,
+				"end": 518
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 519,
+			"styles": "\n\t/* An escaped pseudo-class name dispatches to its argument grammar by the DECODED\n\t   name, not the raw source: \\69s decodes to `is`, so the argument is a forgiving\n\t   selector list. The escape is preserved in the printed name (recovered from source). */\n\t:\\69s(.class) {\n\t\tcolor: red;\n\t}\n\t/* \\6e\\74\\68-child decodes to `nth-child`, so the argument parses as an An+B `Nth`\n\t   (not a selector list) — the observable proof that dispatch reads the decoded name. */\n\t:\\6e\\74\\68-child(2n + 1) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 528,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
