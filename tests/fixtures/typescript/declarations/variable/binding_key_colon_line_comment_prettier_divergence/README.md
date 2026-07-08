@@ -12,7 +12,7 @@ let x // c                      let x // c
 ```
 
 The variable-binding face of the cross-construct
-[before-`:` continuation indent](../../../types/type_members/index_signature_key_colon_line_comment_svelte_prettier_divergence/)
+[before-`:` continuation indent](../../../types/type_members/index_signature_key_colon_line_comment_prettier_divergence/)
 (index signatures, property signatures, class properties, function parameters).
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
 §Uniform Forced-Continuation Indent and §Comment Position Philosophy.

@@ -6,12 +6,12 @@ The tsv parser aims for **exact AST compatibility** with Svelte's parser. This d
 
 **Matched**: tsv produces identical AST to Svelte (the goal). This includes replicating Svelte's quirky behaviors for tool compatibility.
 
-**Unmatched**: tsv produces different AST. The suffix `_svelte_divergence` marks these fixtures. tsv differs when Svelte or acorn-typescript is wrong — a spec violation, a missing feature, or a bug tsv corrects (e.g. acorn's double-fired `onComment` duplicating comments). One exception isn't a correction: a lone UTF-16 surrogate can't survive tsv's UTF-8 strings (→ U+FFFD), so tsv differs there despite acorn being right.
+**Unmatched**: tsv produces different AST. The suffix `_svelte_divergence` marks these fixtures. tsv differs when Svelte or acorn-typescript is wrong — a spec violation, a missing feature, or a bug tsv corrects (e.g. Svelte's comment glue duplicating a comment across `<script>` boundaries). One exception isn't a correction: a lone UTF-16 surrogate can't survive tsv's UTF-8 strings (→ U+FFFD), so tsv differs there despite acorn being right.
 
 ## Classification
 
 - Compat behavior — Svelte has quirky but harmless behavior. tsv action: tsv replicates it in AST output
-- Correction — Svelte/acorn violates spec, lacks a feature, or has a bug (e.g. acorn's duplicate `onComment` firing). tsv action: tsv produces correct/complete AST
+- Correction — Svelte/acorn violates spec, lacks a feature, or has a bug (e.g. acorn dropping all params from an `async <T>()` arrow). tsv action: tsv produces correct/complete AST
 - Representation limit — a value acorn keeps can't round-trip tsv's UTF-8 strings (lone surrogate → U+FFFD; `raw` unaffected). Rare, not a correction
 
 **Critical distinction**: Compat behaviors apply ONLY to **AST/JSON output** for tool compatibility. The tsv **formatter** always produces clean, standards-compliant code.
@@ -452,69 +452,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 
 ### Comment Attachment Differences
 
-Acorn-typescript speculatively re-parses many TypeScript constructs (a backtrack-and-reparse), and its `onComment` callback fires **twice** for any comment inside the re-parsed region — duplicating that comment in the root `comments` array (and in any `leadingComments`/`trailingComments` attachment). **tsv emits each comment once everywhere**: it corrects this duplication rather than replicating it. The set of distinct comments is identical, only multiplicity differs, `ast_diff` confirms semantic equivalence, and the formatter is unaffected (it locates comments by position, not by their count). Fixtures carry `expected_ours.json` + `expected_svelte.json`; one that also diverges from prettier on the comment's placement additionally carries the `_svelte_prettier_divergence` suffix.
-
-The constructs acorn re-parses (root `comments` duplication tsv corrects):
-
-- **Type literal `{ … }` body — a comment between `{` and the first member (or on a member key):**
-  - [type_literal_open_brace_comment_svelte_divergence](../tests/fixtures/typescript/types/type_literal_open_brace_comment_svelte_divergence/)
-  - [type_literal_open_brace_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_literal_open_brace_comment_svelte_prettier_divergence/)
-  - [type_literal_property_keys_svelte_divergence](../tests/fixtures/typescript/types/type_literal_property_keys_svelte_divergence/)
-  - [type_literal_member_trailing_comment_long_svelte_divergence](../tests/fixtures/typescript/types/type_literal_member_trailing_comment_long_svelte_divergence/)
-  - [optional_marker_before_comment_svelte_divergence](../tests/fixtures/typescript/types/type_literal/optional_marker_before_comment_svelte_divergence/)
-  - [optional_marker_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_literal/optional_marker_comment_svelte_prettier_divergence/)
-  - [literal_body_empty_svelte_divergence](../tests/fixtures/typescript/types/comments/literal_body_empty_svelte_divergence/)
-  - [type_literal_jsdoc_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_jsdoc_svelte_divergence/)
-  - [type_literal_leading_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_leading_svelte_divergence/)
-  - [type_literal_leading_mixed_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_leading_mixed_svelte_divergence/)
-  - [type_literal_line_before_block_svelte_divergence](../tests/fixtures/typescript/types/comments/type_literal_line_before_block_svelte_divergence/)
-  - [union_hug_object_interior_comment_svelte_divergence](../tests/fixtures/typescript/types/union_hug_object_interior_comment_svelte_divergence/)
-  - [union_nonhug_object_interior_comment_svelte_divergence](../tests/fixtures/typescript/types/union_nonhug_object_interior_comment_svelte_divergence/)
-  - [index_signature_union_intersection_value_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_union_intersection_value_svelte_divergence/) — index-signature value formatting; the divergence is the first label comment after `{`
-  - [call_type_arg_empty_comment_svelte_prettier_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_svelte_prettier_divergence/) — empty object type literal as a call type argument (`fn<{ /* … */ }>()`); the comment is inside the empty `{ }` body (also a formatting divergence — see conformance_prettier.md §Single curly type-argument hug)
-  - [call_type_arg_member_comment_svelte_prettier_divergence](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_member_comment_svelte_prettier_divergence/) — populated object type literal **and** mapped type as a call type argument (`fn<{ // … \n a: V }>()`, `fn<{ // … \n [K in keyof T]: V }>()`); a leading comment in the body/mapped header duplicates, a trailing member comment does not (control) (also a formatting divergence — see conformance_prettier.md §Single curly type-argument hug)
-  - [prettier_ignore_members_svelte_divergence](../tests/fixtures/typescript/syntax/comments/prettier_ignore_members_svelte_divergence/)
-
-- **Mapped type `{ [K in … ] }` header — a comment from `{` up to `in`:**
-  - [mapped_bracket_comment_svelte_divergence](../tests/fixtures/typescript/types/mapped_bracket_comment_svelte_divergence/)
-  - [mapped_leading_comment_svelte_divergence](../tests/fixtures/typescript/types/mapped_leading_comment_svelte_divergence/)
-
-- **Function type parameter list — a comment in the parens before the param colon (the `tsIsUnambiguouslyStartOfFunctionType` lookahead; typed params are not exempt):**
-  - [function_type_empty_param_comment_svelte_divergence](../tests/fixtures/typescript/types/function_type_empty_param_comment_svelte_divergence/)
-  - [empty_param_line_comment_svelte_divergence](../tests/fixtures/typescript/types/function_type/empty_param_line_comment_svelte_divergence/)
-  - [typed_param_comment_positions_svelte_divergence](../tests/fixtures/typescript/types/function_type/typed_param_comment_positions_svelte_divergence/)
-  - [function_type_param_trailing_svelte_divergence](../tests/fixtures/typescript/types/comments/function_type_param_trailing_svelte_divergence/)
-
-- **Index signature `[k: T]` — a comment inside the brackets, before the key or after the key (type-member and class):**
-  - [index_signature_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_comment_svelte_divergence/)
-  - [index_signature_bracket_comment_positions_svelte_divergence](../tests/fixtures/typescript/types/type_members/index_signature_bracket_comment_positions_svelte_divergence/)
-  - [index_signature_key_colon_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_members/index_signature_key_colon_line_comment_svelte_prettier_divergence/)
-  - [index_signature_key_type_line_comments_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_members/index_signature_key_type_line_comments_svelte_prettier_divergence/)
-  - [index_signature_open_bracket_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_members/index_signature_open_bracket_line_comment_svelte_prettier_divergence/)
-  - [index_signature_bracket_comment_positions_svelte_divergence](../tests/fixtures/typescript/declarations/class/index_signature_bracket_comment_positions_svelte_divergence/)
-  - [index_signature_bracket_line_comment_positions_svelte_prettier_divergence](../tests/fixtures/typescript/declarations/class/index_signature_bracket_line_comment_positions_svelte_prettier_divergence/)
-
-- **Computed key `[ … ]` — a class computed method or a type-member computed method:**
-  - [computed_key_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/computed_key_comment_svelte_divergence/)
-  - [computed_key_open_bracket_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/statements/class/computed_key_open_bracket_line_comment_svelte_prettier_divergence/)
-
-- **Angle-bracket type assertion `<T>x` — a block or line comment anywhere in the cast (inside `<…>`, after the type before `>`, or after `>` before the expression); a comment before `<` sits outside the reparse window and is not duplicated:**
-  - [type_assertion_comment_svelte_divergence](../tests/fixtures/typescript/types/type_assertion_comment_svelte_divergence/)
-  - [type_assertion_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_assertion_line_comment_svelte_prettier_divergence/)
-  - [type_assertion_close_own_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_assertion_close_own_line_comment_svelte_prettier_divergence/)
-  - [type_assertion_expr_own_line_comment_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_assertion_expr_own_line_comment_svelte_prettier_divergence/)
-  - [type_assertion_line_comment_robustness_svelte_prettier_divergence](../tests/fixtures/typescript/types/type_assertion_line_comment_robustness_svelte_prettier_divergence/)
-
-- **Arrow return type — a comment between the return type and `=>`:**
-  - [after_return_type_comment_svelte_divergence](../tests/fixtures/typescript/expressions/arrow/after_return_type_comment_svelte_divergence/)
-  - [return_type_untyped_param_comment_svelte_divergence](../tests/fixtures/typescript/expressions/arrow/return_type_untyped_param_comment_svelte_divergence/)
-
-A comment on a return/property type annotation immediately followed by `;` (the
-member-type reparse) — root `comments` duplication, same mechanism as above:
-
-- [trailing_semicolon_comment_svelte_divergence](../tests/fixtures/typescript/types/type_members/trailing_semicolon_comment_svelte_divergence/)
-
-Beyond acorn-typescript's per-parse duplication, **Svelte's own comment glue duplicates or drops comments at `<script>` and template boundaries**. tsv attaches each comment once, in its source region — the same anti-duplication stance as above. In every case below the distinct-comment set is identical (the comment is preserved on its source node and/or in the root `comments` array), `ast_diff` confirms semantic equivalence, and the formatter — which locates comments by position — is unaffected.
+**Svelte's comment glue duplicates or drops comments at `<script>` and template boundaries.** tsv attaches each comment once, in its source region. In every case below the distinct-comment set is identical (the comment is preserved on its source node and/or in the root `comments` array), `ast_diff` confirms semantic equivalence, and the formatter — which locates comments by position — is unaffected.
 
 - **Module-script comment duplicated onto the instance script.** Svelte parses the `<script module>` and instance `<script>` against one shared `root.comments` array, and the instance parse's `add_comments` walk is not given a fresh queue, so every module-script comment (leading *or* trailing) is also shifted into the instance script's first statement (`instance.content.body[0].leadingComments`). tsv keeps each module comment only on the module body.
   - [module_comment_instance_duplication_svelte_divergence](../tests/fixtures/svelte/script/module_comment_instance_duplication_svelte_divergence/)
@@ -534,7 +472,7 @@ Beyond acorn-typescript's per-parse duplication, **Svelte's own comment glue dup
 ### Known Acorn-TypeScript Bugs (Not Corrections)
 
 These are bugs in **upstream/standalone `acorn-typescript`** — the non-fork npm
-package, distinct from the `@sveltejs/acorn-typescript@1.0.10` fork this project
+package, distinct from the `@sveltejs/acorn-typescript@1.0.11` fork this project
 pins (`crates/tsv_debug/src/deno/sidecar.ts`) and that every other
 "acorn-typescript" mention in this doc refers to. They **don't affect Svelte
 users** (Svelte's fork handles them):
