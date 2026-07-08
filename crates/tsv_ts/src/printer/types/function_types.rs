@@ -104,6 +104,26 @@ pub(in crate::printer) fn should_group_function_parameters(
     return_type.is_some_and(|rt| return_type_triggers_grouping(rt, rt_doc, d))
 }
 
+/// Wrap `params_doc` in its own group when `should_group_function_parameters` holds,
+/// else return it unchanged. The four signature builders (function declarations /
+/// class methods, function expressions / object methods, type-member / bodyless
+/// signatures, and function/constructor types) share this guard so a single param
+/// hugs (stays flat) while a will-break return type breaks.
+pub(in crate::printer) fn group_params_if_should(
+    params_doc: DocId,
+    params: &[internal::Expression<'_>],
+    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+    return_type: Option<&internal::TSTypeAnnotation<'_>>,
+    return_type_doc: Option<DocId>,
+    d: &DocArena,
+) -> DocId {
+    if should_group_function_parameters(params, type_parameters, return_type, return_type_doc, d) {
+        d.group(params_doc)
+    } else {
+        params_doc
+    }
+}
+
 impl<'a> Printer<'a> {
     //
     // Function Type Return Types
@@ -330,8 +350,11 @@ impl<'a> Printer<'a> {
 
         // A line comment in the `)`→`=>` gap can't stay inline — it would swallow
         // `=> void` (`() // c => void`). Keep it trailing `)` and force `=>` onto
-        // the next line flush (`() // c\n=> void`), matching prettier. A block
-        // comment stays inline (`() /* c */ => void`).
+        // the next line flush (`() // c\n=> void`). With no params (as here) prettier
+        // agrees — there is no param to move it onto; with params it relocates the
+        // comment onto the last param and breaks the list (a divergence — see
+        // pre_arrow_param_line_comment_prettier_divergence, mirrored by the `)`→`:`
+        // return-type gap). A block comment stays inline (`() /* c */ => void`).
         let pre_arrow_line_close =
             after_close.filter(|&ac| self.has_line_comments_between(ac, arrow_start));
         let return_type_doc =
@@ -348,17 +371,14 @@ impl<'a> Printer<'a> {
         };
 
         let params_doc = d.concat(&self.build_function_params_doc(params, paren_search_start));
-        let params_doc = if should_group_function_parameters(
+        let params_doc = group_params_if_should(
+            params_doc,
             params,
             type_parameters,
             Some(return_type),
             Some(return_type_doc),
             d,
-        ) {
-            d.group(params_doc)
-        } else {
-            params_doc
-        };
+        );
 
         [params_doc, return_type_doc]
     }
@@ -409,10 +429,13 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Emit any block comments in the `)`→return-type gap, with a trailing space.
+    /// Emit any comments in the `)`→return-type gap, so the caller can append the
+    /// `: type` after this prefix.
     ///
-    /// Prettier adds a space before `:` when a comment precedes it
-    /// (`m(a) /* c */ : void`), so the caller appends the `: type` after this prefix.
+    /// A **block** comment stays inline with a trailing space, and prettier adds a
+    /// space before `:` when one precedes it (`m(a) /* c */ : void`). A **line**
+    /// comment forces the return-type `:` onto the next line (`m(a) // c⏎: void`)
+    /// so it isn't swallowed — see `build_close_paren_to_return_type_comments`.
     /// Returns an empty doc when there is no such comment.
     pub(in crate::printer) fn build_paren_to_return_type_comments(
         &self,
@@ -437,14 +460,25 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = smallvec![];
+        let mut last_is_line = false;
         if let Some(close_after) = close_paren_after {
             for comment in comments_in_range(self.comments, close_after, return_type_start) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
+                // A `//` line comment can't stay inline — it would swallow the
+                // return type (`) // c : T`). Force the following `:` onto the next
+                // line, keeping the comment trailing `)` (preserve-position;
+                // prettier relocates it onto the last param). Mirrors the
+                // function-type `)`→`=>` gap's line-comment handling.
+                if !comment.is_block {
+                    parts.push(d.hardline());
+                }
+                last_is_line = !comment.is_block;
             }
         }
-        // Prettier adds space before `:` when there's a preceding comment
-        if !parts.is_empty() {
+        // Prettier adds a space before `:` when a block comment precedes it; after a
+        // line comment the hardline already placed `:` flush on the next line.
+        if !parts.is_empty() && !last_is_line {
             parts.push(d.text(" "));
         }
         d.concat(&parts)
@@ -499,17 +533,8 @@ impl<'a> Printer<'a> {
         // shouldGroupFunctionParameters: a single param whose return type is an
         // object/mapped type (or otherwise will-breaks) hugs — the params stay flat
         // and the return type breaks, instead of the params breaking.
-        let params_doc = if should_group_function_parameters(
-            params,
-            type_parameters,
-            return_type,
-            return_type_doc,
-            d,
-        ) {
-            d.group(params_doc)
-        } else {
-            params_doc
-        };
+        let params_doc =
+            group_params_if_should(params_doc, params, type_parameters, return_type, return_type_doc, d);
 
         let mut sig_parts: DocBuf = smallvec![params_doc];
         if let Some(rt_doc) = return_type_doc {
