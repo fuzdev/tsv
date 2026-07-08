@@ -555,7 +555,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_enum_member(&mut self) -> Result<TSEnumMember<'arena>, ParseError> {
         let start = self.current_pos().0;
 
-        // Parse member id: can be identifier or string literal
+        // Parse member id: a `PropertyName` — identifier, keyword, or string
+        // literal. Reserved words (`class`, `enum`, `function`, `default`, …) are
+        // valid member names, same as object property keys (see
+        // `expression_literals.rs`); the keyword token is never escaped, so its
+        // name comes from the raw source (`current_raw_ident_name`).
         let id = match self.current_kind() {
             TokenKind::Identifier => {
                 let (id_start, id_end) = self.current_pos();
@@ -566,9 +570,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     Span::new(id_start as u32, id_end as u32),
                 ))
             }
+            TokenKind::Keyword(_) => {
+                let (id_start, id_end) = self.current_pos();
+                let name = self.current_raw_ident_name();
+                self.advance()?;
+                TSEnumMemberId::Identifier(Identifier::simple(
+                    name,
+                    Span::new(id_start as u32, id_end as u32),
+                ))
+            }
             TokenKind::String => TSEnumMemberId::String(self.parse_string_literal()?),
             _ => {
-                return Err(self.error_expected("enum member name (identifier or string)"));
+                return Err(
+                    self.error_expected("enum member name (identifier, keyword, or string)")
+                );
             }
         };
 
