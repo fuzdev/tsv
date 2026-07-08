@@ -108,47 +108,52 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
 
 ## Design
 
-- supports Svelte, TypeScript/JS, CSS (and planned HTML/JSON)
-- non-configurable: formatter settings are fixed at Prettier's defaults except
-  `printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
-  `trailingComma: 'none'` (no trailing comma on multiline lists, matching the
-  Svelte project's own Prettier config),
-  and there are no config files or CLI options for formatting style;
-  tsv is opinionated like `gofmt` and Python's Black,
-  see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
-- formatting is similar Prettier and prettier-plugin-svelte for the common case,
-  but intentionally diverges in some cases and fixes numerous bugs
-  (see [docs/conformance_prettier.md](docs/conformance_prettier.md))
-- tsv can generate a public JSON AST that should exactly match
-  Svelte 5's modern AST with acorn and acorn-typescript
-  (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
-  and tsv has its own internal optimal AST
-- the parser can also emit optimized JSON that drops the per-node `loc` and
-  Svelte `name_loc` objects, mirroring acorn's `locations: false` for improved performance
-  (`parse --no-locations` or the `parse_*_no_locations` bindings) 
-- `tsv format` discovery is gitignore-aware,
-  honoring `.gitignore`, `.formatignore` (original to tsv),
-  and a compatible `.prettierignore` —
-  all three supporting nested files hierarchically like git
-  (`.prettierignore` too, unlike Prettier's single cwd-relative file),
-  and in a git repo scoped to the repo root, not the cwd like Prettier's default
-  (all 3 use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
-- Rust-only implementation that currently does not call or embed a JS runtime
-  (open for discussion, needs research into the tradeoffs);
-  JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
-- ships optimal binary artifacts: runtime speed and compiled
-  code size are priorities, so if all you need is a formatter, a minimal build is available,
-  and heavier future layers (incremental parsing, CST for LSP) will be feature-gated so they
-  don't regress the focused artifacts
-- JS and TS parse in strict mode only - sloppy-mode-only syntax like `with` is
-  rejected, while strict-mode early errors (e.g. duplicate params, reserved-word
-  bindings) still parse for now, with enforcement deferred to a future
-  diagnostics layer. The parse goal defaults to Module, with an opt-in Script
-  goal (`--goal script`); since Svelte and TypeScript are inherently strict
-  modules, this affects only standalone JS scripts to force modern patterns
-- pushes complexity and mess to the printer and JSON conversion,
-  out of the parser and internal AST,
-  keeping the model clean for the other planned tools
+- focused on reducing complexity
+  - supports Svelte, TypeScript/JS, CSS and planned HTML/JSON - but no JSX/SCSS/etc
+  - formater is non-configurable: formatting style is hardcoded to
+    Prettier's defaults with Svelte's official repo config
+    (`printWidth: 100`, `useTabs: true`, `singleQuote: true`, and
+    `trailingComma: 'none'`),
+    and there are no config files or CLI options for formatting style;
+    i.e. `tsv format` is opinionated like `gofmt` and Python's Black,
+    see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
+  - pushes complexity and mess to the printer and JSON conversion,
+    out of the parser and internal AST,
+    keeping the model clean for the other planned tools
+- drop-in for Svelte's JS tools
+  - tsv can generate a public JSON AST that should exactly match
+    Svelte 5's modern AST with acorn and acorn-typescript
+    (see [docs/conformance_svelte.md](docs/conformance_svelte.md)),
+    and tsv has its own internal optimal AST
+  - the parser can also emit optimized JSON that drops the per-node `loc` and
+    Svelte `name_loc` objects, mirroring acorn's `locations: false` for improved performance
+    (`parse --no-locations` or the `parse_*_no_locations` bindings)
+- compatible with Prettier, with generic rethought APIs
+  - formatting is similar Prettier and prettier-plugin-svelte for the common case,
+    but intentionally diverges in some cases and fixes numerous bugs
+    (see [docs/conformance_prettier.md](docs/conformance_prettier.md))
+  - `tsv format` discovery honors `.gitignore`, `.prettierignore`, `.formatignore`
+    (original to tsv)
+    (all 3 use [gitignore syntax](https://git-scm.com/docs/gitignore#_pattern_format))
+- Rust-only
+  - implementation currently does not call or embed a JS runtime
+    (open for discussion, needs research into the tradeoffs);
+    JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
+  - no C compiler needed to build tsv
+- optimal
+  - ships optimal binary artifacts: runtime speed and compiled
+    code size are priorities, so if all you need is a formatter or parser,
+    a minimal build is available (with lang-specific artifacts likely coming),
+    and heavier future layers (incremental parsing, CST for LSP) will be feature-gated so they
+    don't regress the focused artifacts
+- modern and Web-conformant
+  - up-to-date with web specs (roughly aiming for stage 3+ proposals)
+  - JS and TS parse in strict mode only - sloppy-mode-only syntax like `with` is
+    rejected, while strict-mode early errors (e.g. duplicate params, reserved-word
+    bindings) still parse for now, with enforcement deferred to a future
+    diagnostics layer. The parse goal defaults to Module, with an opt-in Script
+    goal (`--goal script`); since Svelte and TypeScript are inherently strict
+    modules, this affects only standalone JS scripts to force modern patterns
 
 Each language is a self-contained Rust crate exposing the same
 `parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - there's no
