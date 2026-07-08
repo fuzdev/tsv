@@ -18,10 +18,9 @@ use super::arg_predicates::{
     preceding_args_allow_expand_last,
 };
 use super::arg_wrapping::{
-    ChainArgKind, arrow_has_type_annotations, build_args_split_last, build_arrow_inline_signature,
-    build_arrow_sig_doc, build_break_body_state, build_chain_expand_all_args, classify_chain_arg,
-    last_two_args_same_type, prepend_arrow_body_comments, wrap_args_with_soft_breaks,
-    wrap_huggable_arg,
+    ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
+    build_chain_expand_all_args, classify_chain_arg, last_two_args_same_type,
+    prepend_arrow_body_comments, wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
 use smallvec::smallvec;
@@ -1032,6 +1031,9 @@ fn build_chain_args_multi(
     // Expression arrow with call/conditional expression body
     // Prettier keeps preceding args inline and breaks after =>
     // e.g., `a.b(c, (x) =>\n  fn(x, ...),\n);`
+    // couldExpandArg keys only on the body type — param/return type annotations
+    // don't disable the hug, so a typed arrow expands the same way (its full
+    // signature is emitted via build_arrow_sig_doc).
     if call.arguments.len() >= 2
         && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
@@ -1042,7 +1044,6 @@ fn build_chain_args_multi(
             &**body_expr,
             Expression::CallExpression(_) | Expression::ConditionalExpression(_)
         )
-        && !arrow_has_type_annotations(arrow)
     {
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(call.arguments, printer, paren_open);
@@ -1053,7 +1054,7 @@ fn build_chain_args_multi(
             return d.concat(&parts);
         }
 
-        let inline_sig = build_arrow_inline_signature(printer, arrow);
+        let sig_doc = build_arrow_sig_doc(printer, arrow);
         let body_doc = printer.build_expression_doc(body_expr);
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
@@ -1061,7 +1062,7 @@ fn build_chain_args_multi(
         // State 1: hug - head inline, arrow body breaks after =>
         let prefix_doc = d.text(prefix);
         let state_break_body =
-            build_break_body_state(d, prefix_doc, &head_parts, inline_sig, body_doc);
+            build_break_body_state(d, prefix_doc, &head_parts, sig_doc, body_doc);
 
         // State 2: expand all args
         let state_expand_all = build_chain_expand_all_args(d, prefix, all_args_broken);
@@ -1089,6 +1090,8 @@ fn build_chain_args_multi(
     // Expression arrow with object/array body
     // Prettier keeps preceding args inline and expands object/array internally
     // e.g., `a.b(c, (x) => ({\n  y: x,\n}));`
+    // couldExpandArg keys only on the body type — a typed arrow expands the same
+    // way (its full signature is emitted via build_arrow_sig_doc).
     if call.arguments.len() >= 2
         && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
@@ -1099,7 +1102,6 @@ fn build_chain_args_multi(
             &**body_expr,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         )
-        && !arrow_has_type_annotations(arrow)
     {
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(call.arguments, printer, paren_open);
@@ -1110,7 +1112,7 @@ fn build_chain_args_multi(
             return d.concat(&parts);
         }
 
-        let inline_sig = build_arrow_inline_signature(printer, arrow);
+        let sig_doc = build_arrow_sig_doc(printer, arrow);
         // Object/array in arrow body needs parens: (x) => ({ ... })
         let body_doc = d.parens(printer.build_expression_doc(body_expr));
         let body_doc =
@@ -1128,7 +1130,7 @@ fn build_chain_args_multi(
         let state_hug = d.concat(&[
             d.text(prefix),
             d.concat(&head_parts),
-            inline_sig,
+            sig_doc,
             d.text(" => "),
             d.group_break(body_doc),
             d.text(")"),
