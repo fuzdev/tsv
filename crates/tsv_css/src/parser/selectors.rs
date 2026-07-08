@@ -49,12 +49,18 @@ pub(crate) fn parse_complex_selector_list<'arena>(
 
     // Parse additional selectors separated by commas
     loop {
+        // Selector-list boundaries (`read_selector_list`'s `allow_comment_or_whitespace`):
+        // legacy `<!-- ... -->` markers are allowed after a complete selector (before
+        // `{`/`,`) and after a comma — but NOT between compounds, so `h1 <!-- --> p`
+        // still rejects (parse_combinator already stops at `<`, leaving the marker here).
+        parser.skip_html_comment_markers()?;
         skip_comments_before_comma(parser)?;
         if !parser.check(TokenKind::Comma) {
             break;
         }
         parser.advance()?; // consume comma
         parser.skip_whitespace_registering_comments()?; // register after-comma comments
+        parser.skip_html_comment_markers()?;
         let sel = parse_complex_selector(parser)?;
         end = sel.span.end;
         selectors.push(sel);
@@ -250,12 +256,16 @@ pub(crate) fn parse_relative_selector_list<'arena>(
 
     // Parse additional selectors separated by commas
     loop {
+        // Selector-list boundaries (see `parse_complex_selector_list`): `<!-- ... -->`
+        // after a complete selector (before `{`/`,`) and after a comma, not between compounds.
+        parser.skip_html_comment_markers()?;
         skip_comments_before_comma(parser)?;
         if !parser.check(TokenKind::Comma) {
             break;
         }
         parser.advance()?; // consume comma
         parser.skip_whitespace_registering_comments()?; // register after-comma comments
+        parser.skip_html_comment_markers()?;
         let sel = parse_relative_complex_selector(parser)?;
         end = sel.span.end;
         selectors.push(sel);

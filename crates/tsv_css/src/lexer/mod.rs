@@ -79,6 +79,17 @@ impl<'a> Lexer<'a> {
         self.decoded.take()
     }
 
+    /// Reposition the cursor to an absolute byte offset (a char boundary of
+    /// `source`) and drop any parked decode. Used by the parser to skip past a
+    /// legacy `<!-- ... -->` HTML-comment span (CDO/CDC) it scanned raw — the
+    /// only construct where Svelte's `parseCss` consumes a token range the
+    /// context-free `next_token` dispatch does not.
+    #[inline]
+    pub(crate) fn seek(&mut self, pos: usize) {
+        self.pos = pos;
+        self.decoded = None;
+    }
+
     #[inline]
     fn current_char(&self) -> Option<char> {
         self.source[self.pos..].chars().next()

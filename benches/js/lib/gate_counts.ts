@@ -70,11 +70,16 @@ export interface GatePins {
 }
 
 /**
- * conformance:svelte-fixtures — measured 2026-07-06: ../svelte at 8fb7ceeba (svelte@5.56.4-3), oracle svelte@5.56.4.
+ * conformance:svelte-fixtures — measured 2026-07-07: ../svelte at 8fb7ceeba (svelte@5.56.4-3), oracle svelte@5.56.4.
+ * both_accept 3276→3277: legacy `<!-- -->` HTML comments (CDO/CDC) in `<style>` now parse (css-cdo-cdc gap
+ * fixed — parseCss swallows the marker span; tsv matches), so `css/samples/comment-html` moved from
+ * over-rejection to both-accept.
+ * both_accept 3274→3276: whitespace after `{` before a block/tag marker (`{ #if}`) now parses
+ * (svelte-block-ws gap fixed — the `if-block-whitespace-{legacy,runes}` pair moves to both-accept).
  * both_accept 3273→3274: leading-symbol attribute names (`<p }>`) now parse (svelte-attr-name gap fixed),
  * so `validator/samples/attribute-invalid-name` moved from over-rejection to both-accept.
  */
-export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3274 };
+export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3277 };
 
 /** conformance:ts-fixtures — measured 2026-07-06: ../acorn-typescript at 13c49a7 (v1.0.10), oracle @sveltejs/acorn-typescript@1.0.10. */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 201, both_accept: 181 };

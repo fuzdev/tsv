@@ -127,6 +127,14 @@ pub(crate) fn parse_rule<'arena>(
 
     // Parse declarations, comments, and nested rules
     while !parser.check(TokenKind::RightBrace) && !parser.check(TokenKind::Eof) {
+        // `read_block` boundary: discard legacy `<!-- ... -->` markers between items
+        // (matches parseCss's `allow_comment_or_whitespace`); a marker may sit right
+        // before the closing `}`, so re-check the terminators after skipping.
+        parser.skip_html_comment_markers()?;
+        if parser.check(TokenKind::RightBrace) || parser.check(TokenKind::Eof) {
+            break;
+        }
+
         if matches!(&parser.current_kind, TokenKind::Comment) {
             let comment = parser.parse_block_comment()?;
             declarations.push(CssBlockChild::Comment(comment));
