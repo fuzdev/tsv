@@ -63,6 +63,27 @@ pub(crate) fn parse_pseudo_selector<'arena>(
     }
 }
 
+/// The selector-list grammar a pseudo-class/element argument uses (CSS Selectors 4).
+/// `parse_pseudo_args` maps each selector-list pseudo to one of these once, so
+/// `parse_selector_list_args` dispatches on an exhaustive enum rather than re-matching the
+/// pseudo name (no stringly-typed `unreachable!` fallback).
+#[derive(Clone, Copy)]
+enum SelectorListGrammar {
+    /// `:has()` — relative selectors, which may lead with a combinator (`:has(> img)`).
+    Relative,
+    /// `:is()`/`:where()` — forgiving: invalid items are kept as `Invalid` and the list
+    /// never fails to parse.
+    Forgiving,
+    /// `:not()`/`:global()` and the identifier-arg pseudos `:dir()`/`:lang()`/
+    /// `::highlight()`/`::slotted()` — a strict complex-real-selector list. The
+    /// identifier-arg pseudos live here because Svelte parses their argument as a selector
+    /// list too (`:lang(en, fr)` is two `TypeSelector`s, and a non-selector arg like
+    /// `:lang("en")` is a parse error the strict grammar reproduces); `::slotted()` because
+    /// parseCss models its arg as a `<complex-selector-list>` (see the `is_pseudo_element`
+    /// dispatch note) and drops it from the wire AST.
+    Complex,
+}
+
 /// Parse a pseudo-class/element argument list `( … )`, dispatching to a per-family
 /// helper by the (lowercased) pseudo name. Returns `(Option<PseudoClassArgs>,
 /// end_position_of_closing_paren)`; `None` args are unknown pseudo-classes whose
@@ -123,23 +144,23 @@ fn parse_pseudo_args<'arena>(
     // wide-list breaking) and Svelte's rejection of non-selector args like
     // `:lang("en")`. `::highlight`'s args are dropped at the pseudo-element convert
     // boundary; the selector list only feeds the formatter.
-    // The two arms that read a general selector list from pseudo-class args run with
-    // `in_pseudo_args` set, so a bare `<number>`/`<an+b>` term parses as an `Nth`
-    // simple selector (Svelte's `inside_pseudo_class` gate). `nth-*` scans its own An+B
-    // grammar (`parse_nth_args`), so its leading term needs no flag — but its optional
-    // `of S` selector list sets `in_pseudo_args` locally (a bare `<an+b>` term in `S`
-    // reads as an `Nth`, matching `:not()`'s strict list). `::slotted` runs with
-    // `in_pseudo_args` set too (so `::slotted(0)`/`::slotted(2n+1)` read as `Nth`);
-    // `::part` takes a bare ident list and never needs it.
+    // The selector-list arms all run with `in_pseudo_args` set (via `selector_list_args` →
+    // `with_pseudo_args`), so a bare `<number>`/`<an+b>` term parses as an `Nth` simple
+    // selector (Svelte's `inside_pseudo_class` gate) — including `::slotted` (so
+    // `::slotted(0)`/`::slotted(2n+1)` read as `Nth`). `nth-*` scans its own An+B grammar
+    // (`parse_nth_args`), so its leading term needs no flag — but its optional `of S`
+    // selector list sets `in_pseudo_args` locally (a bare `<an+b>` term in `S` reads as an
+    // `Nth`, matching `:not()`'s strict list). `::part` takes a bare ident list and never
+    // needs it.
     match pseudo_name {
-        "slotted" if is_pseudo_element => with_pseudo_args(parser, |p| {
-            parse_selector_list_args(p, args_start, pseudo_name)
-        }),
+        "slotted" if is_pseudo_element => {
+            selector_list_args(parser, args_start, SelectorListGrammar::Complex)
+        }
         "part" if is_pseudo_element => parse_part_args(parser, args_start),
-        "is" | "not" | "where" | "has" | "global" | "dir" | "lang" | "highlight" => {
-            with_pseudo_args(parser, |p| {
-                parse_selector_list_args(p, args_start, pseudo_name)
-            })
+        "has" => selector_list_args(parser, args_start, SelectorListGrammar::Relative),
+        "is" | "where" => selector_list_args(parser, args_start, SelectorListGrammar::Forgiving),
+        "not" | "global" | "dir" | "lang" | "highlight" => {
+            selector_list_args(parser, args_start, SelectorListGrammar::Complex)
         }
         "nth-child" | "nth-of-type" | "nth-last-child" | "nth-last-of-type" | "nth-col"
         | "nth-last-col" => parse_nth_args(parser, args_start),
@@ -242,49 +263,34 @@ fn parse_part_args<'arena>(
     ))
 }
 
-/// Selector-list pseudo-classes, each with a different selector grammar per CSS
-/// Selectors 4:
-/// - `:has()` → relative selector list (can start with combinators: `:has(> img)`)
-/// - `:is()`, `:where()` → forgiving selector list (invalid selectors kept as
-///   `Invalid`, never fails)
-/// - `:not()`, `:global()`, `:dir()`, `:lang()`, `::highlight()`, `::slotted()` →
-///   complex real selector list (strict). The identifier-arg pseudos live here because
-///   Svelte parses their argument as a selector list too — `:lang(en, fr)` is two
-///   `TypeSelector`s, and a non-selector arg like `:lang("en")` is a parse error
-///   (which the strict grammar reproduces). `::slotted()` shares this grammar because
-///   parseCss models its arg as a `<complex-selector-list>` (spec says compound-only,
-///   but parseCss is lenient and drops the arg from the wire AST — see the
-///   `is_pseudo_element` dispatch note).
-///
+/// Parse a selector-list pseudo argument with `in_pseudo_args` set — so a bare
+/// `<number>`/`<an+b>` term reads as an `Nth` simple selector (Svelte's
+/// `inside_pseudo_class` gate) — wrapping the per-`grammar` `parse_selector_list_args`.
+/// Shared by the four selector-list pseudo families (`:has()`, `:is()`/`:where()`, the
+/// `:not()` group, `::slotted()`).
+fn selector_list_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    args_start: usize,
+    grammar: SelectorListGrammar,
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+    with_pseudo_args(parser, |p| parse_selector_list_args(p, args_start, grammar))
+}
+
+/// Parse the selector list inside a selector-list pseudo argument per its `grammar` (see
+/// `SelectorListGrammar`), then finish with the trailing-comment + `)` capture.
 /// Leading/trailing gap comments are registered so the printer interleaves them.
 fn parse_selector_list_args<'arena>(
     parser: &mut CssParser<'_, 'arena>,
     args_start: usize,
-    pseudo_name: &str,
+    grammar: SelectorListGrammar,
 ) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
     // Register a leading comment (`:is(/* c */ .a)`) so the printer interleaves it.
     parser.skip_whitespace_registering_comments()?;
 
-    let selector_list = match pseudo_name {
-        "has" => {
-            // :has() uses relative selectors (can start with combinators)
-            parse_relative_selector_list(parser)?
-        }
-        "is" | "where" => {
-            // :is() and :where() use forgiving selector lists
-            // Invalid selectors wrapped as SimpleSelector::Invalid (never fails)
-            parse_forgiving_selector_list(parser)?
-        }
-        "not" | "global" | "dir" | "lang" | "highlight" | "slotted" => {
-            // :not()/:global(), the identifier-arg pseudos, and ::slotted() use
-            // complex selectors (strict parsing)
-            parse_complex_selector_list(parser)?
-        }
-        // The dispatcher restricts `pseudo_name` to exactly these nine.
-        #[allow(clippy::unreachable)] // guarded by the dispatch matches!
-        _ => unreachable!(
-            "pseudo_name is is/not/where/has/global/dir/lang/highlight/slotted per the dispatch guard"
-        ),
+    let selector_list = match grammar {
+        SelectorListGrammar::Relative => parse_relative_selector_list(parser)?,
+        SelectorListGrammar::Forgiving => parse_forgiving_selector_list(parser)?,
+        SelectorListGrammar::Complex => parse_complex_selector_list(parser)?,
     };
 
     finish_selector_list_args(parser, args_start, selector_list)
