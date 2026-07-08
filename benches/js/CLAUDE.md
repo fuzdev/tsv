@@ -1018,9 +1018,7 @@ benches/js/
 │   ├── wpt_css_harvest.ts    # wpt <style> blocks → .cache/wpt_css (task: bench:harvest:wpt)
 │   ├── svelte_reject_harvest.ts  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json (task: bench:harvest:svelte-rejects; conformance view excludes these)
 │   ├── wasm_json_probe.ts    # WASM-vs-native JSON parse penalty attribution
-│   ├── wasm_format_probe.ts  # WASM format wall-time A/B
-│   ├── comment_dup_scan.ts   # comment-dup fixture-corpus completeness guard
-│   └── acorn_dup_fuzz.ts     # comment-dup fuzz over acorn-typescript's construct corpus
+│   └── wasm_format_probe.ts  # WASM format wall-time A/B
 ├── results/baseline.json  # Saved baseline for regression detection (gitignored; written by @fuzdev/fuz_util's benchmark_baseline module)
 ├── lib/
 │   ├── binary_sizes.ts    # Binary/WASM size collection and reporting
@@ -1329,11 +1327,11 @@ Implementation: `lib/binary_sizes.ts`
 
 ## Diagnostic scripts (ad-hoc, not wired into `deno task`)
 
-These live under `diagnostics/`. The parser-analysis ones (`comment_dup_scan`,
-`acorn_dup_fuzz`) import the canonical parser (`acorn`, `svelte/compiler`) by bare
-specifier, so pass `--config benches/js/deno.json` to resolve them from
-`node_modules` (`nodeModulesDir: manual`); all run from the repo root
-(corpus/artifact paths are CWD-relative).
+These live under `diagnostics/`. Some import the canonical parser / oracle
+(`acorn`, `svelte/compiler`, `oxc-parser`) by bare specifier, so pass
+`--config benches/js/deno.json` to resolve them from `node_modules`
+(`nodeModulesDir: manual`); all run from the repo root (corpus/artifact paths are
+CWD-relative).
 
 - `diagnostics/skip_triage.ts` — parse-**parity** gate. Parses every corpus file with tsv +
   the canonical parser and buckets by *asymmetry*, not raw error count: `parity` (both reject —
@@ -1357,20 +1355,6 @@ specifier, so pass `--config benches/js/deno.json` to resolve them from
   CI gate; numbers move with the pinned oxc version. No biome (its js-api has no parser to grade).
   See `docs/conformance_test262.md` §Differential. Run from the repo root:
   `cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json && deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys --config benches/js/deno.json benches/js/diagnostics/test262_compare.ts --manifest /tmp/t262.json`
-- `diagnostics/comment_dup_scan.ts` — comment-duplication fixture-corpus completeness guard.
-  Walks all fixtures with two oracles (live `svelte/compiler` parse + committed expected
-  JSON), flagging any comment span emitted ≥2× within one array (the acorn backtrack-reparse
-  signature tsv corrects to single). RED buckets must stay empty. Re-run after touching the
-  comment-convert layer or bumping `@sveltejs/acorn-typescript`.
-  Run:
-  `deno run --allow-read --allow-env --allow-net --allow-sys --config benches/js/deno.json benches/js/diagnostics/comment_dup_scan.ts`
-- `diagnostics/acorn_dup_fuzz.ts` — fuzzes a comment into every position of
-  acorn-typescript's own ~200 construct test inputs and flags any `onComment` double-fire;
-  the broadest net for an un-enumerated duplicating construct, and the upstream-fix
-  validation harness (a correct A+B patch drops the count to 0). Default reads
-  `~/dev/acorn-typescript-fork/test`; pass a path to override.
-  Run:
-  `deno run --allow-read --allow-env --allow-net --allow-sys --config benches/js/deno.json benches/js/diagnostics/acorn_dup_fuzz.ts`
 - `diagnostics/wasm_json_probe.ts` — split parse cost into pure-parse vs materialization for
   native + WASM, isolating JS-side `JSON.parse`.
 - `diagnostics/no_locations_parity.ts` — prove the `no-locations` wire is losslessly

@@ -67,8 +67,8 @@ export interface GatePins {
 /** conformance:svelte-fixtures — measured 2026-07-06: ../svelte at 8fb7ceeba (svelte@5.56.4-3), oracle svelte@5.56.4. */
 export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3273 };
 
-/** conformance:ts-fixtures — measured 2026-07-06: ../acorn-typescript at 13c49a7 (v1.0.10), oracle @sveltejs/acorn-typescript@1.0.10. */
-export const TS_FIXTURES_PINS: GatePins = { scanned: 201, both_accept: 181 };
+/** conformance:ts-fixtures — measured 2026-07-08: ../acorn-typescript at 312d079 (v1.0.11), oracle @sveltejs/acorn-typescript@1.0.11. */
+export const TS_FIXTURES_PINS: GatePins = { scanned: 207, both_accept: 186 };
 
 /** conformance:ts-repo — measured 2026-07-06: ../typescript at 637d5746b. */
 export const TS_REPO_PINS = { scanned: 768, accept_parity: 424 };
@@ -89,11 +89,12 @@ export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
  * count. Up = tsv newly rejects real corpus code (a drop-in regression — or a
  * legitimately-unsupported new corpus file: triage with
  * `diagnostics/skip_triage.ts`, then re-pin consciously). Down = a parse gap
- * closed; re-pin so the win stays recorded. Measured 2026-07-06.
+ * closed; re-pin so the win stays recorded. Measured 2026-07-08 (typescript
+ * dropped 16→9 as parser over-rejections closed).
  */
 export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 16,
+	typescript: 9,
 	css: 5,
 };
 
