@@ -15,6 +15,15 @@
  * count would otherwise report as a fabricated loss/addition. A genuine letter drop still
  * lowers the folded count, so real loss is unaffected.
  *
+ * The count also excludes **leading union-member pipes** — the `|` a union type
+ * grows when it breaks across lines (`A | B` → `| A⏎| B`). That extra pipe is pure
+ * break layout (`| A | B` ≡ `A | B`), so when tsv breaks a union that prettier keeps
+ * inline (the `return_type_generic_union` divergence, whose method-signature form
+ * shows up in dense declaration files) the added `|` would otherwise fake a
+ * `content_added` — and SAFETY is a gated bucket. Only the first, operand-less pipe
+ * of a break is dropped; the inter-member separators stay counted, so a genuinely
+ * dropped union member still lowers the count. See `is_leading_union_pipe`.
+ *
  * Safety violations are BUGS, not intentional divergences.
  *
  * The check is DIFFERENTIAL against prettier (`check_safety_vs_prettier`):
@@ -271,16 +280,81 @@ function normalize_for_comparison(text: string): string {
 }
 
 /**
+ * Whether an ASCII/`char` code point ends a type or value *operand* — an
+ * identifier char, a closing bracket, or a string quote. A `|` whose preceding
+ * non-whitespace char is an operand-ender is INFIX (a union separator between two
+ * members, or a bitwise-or) and carries content; a `|` preceded by anything else
+ * has no left operand and is a leading union-member pipe (pure break layout). Any
+ * non-ASCII code point counts as an operand char (a Unicode identifier letter).
+ */
+function is_operand_end_char(char: string): boolean {
+	if (char.charCodeAt(0) > 127) return true;
+	return /[\w)\]}'"`$]/.test(char);
+}
+
+/**
+ * Whether a `|` at this position is a **leading union-member pipe** — the
+ * separator tsv (and prettier) emit when a union type breaks across lines
+ * (`Resolvable<⏎| A⏎| B⏎>`, or the bracket-hugged `Resolvable<| A`). It is pure
+ * break layout, semantically identical to no leading pipe (`| A | B` ≡ `A | B`),
+ * so it must not count as a semantic char — otherwise tsv breaking a union that
+ * prettier keeps inline (the return-type-union divergence) reads as fabricated
+ * `content_added`. Decided from the previous non-whitespace char (`prev`, and
+ * `prev2` before it):
+ *   - no left operand (`prev` not an operand-ender) → leading (exclude);
+ *   - `||` (`prev === '|'` with the two pipes ADJACENT — `!ws_before`) → logical-or,
+ *     both pipes are content (count); a *space-separated* `| |` (`ws_before`) is two
+ *     leading union pipes (tsv can emit `| | | |` collapsing nested single-member
+ *     unions), so it falls through to the leading check and is excluded;
+ *   - `=>` (`prev === '>' && prev2 === '='`) → arrow has no operand, so a union
+ *     broken right after it is leading; a generic-close `>` (any other `prev2`)
+ *     DOES end an operand (count).
+ * Only the FIRST pipe of a broken union is leading; the subsequent `| B`, `| C`
+ * separators have the previous member as their left operand, so a broken union
+ * counts the SAME number of pipes as its inline form — a dropped member still
+ * removes a counted (infix) pipe and stays flagged.
+ */
+function is_leading_union_pipe(prev: string, prev2: string, ws_before: boolean): boolean {
+	if (prev === '') return true; // start of text
+	if (prev === '|' && !ws_before) return false; // adjacent `||` logical-or — count both
+	if (prev === '>') return prev2 === '='; // `=>` has no operand; generic-close `>` does
+	return !is_operand_end_char(prev);
+}
+
+/**
  * Count semantic (non-formatting) character frequencies in a string, folding ASCII
- * case (see the module doc — a case-only swap is canonicalization, never content loss).
+ * case (see the module doc — a case-only swap is canonicalization, never content
+ * loss) and excluding leading union-member pipes (see `is_leading_union_pipe` — a
+ * break-layout artifact, not content).
  */
 function count_semantic_chars(text: string): Map<string, number> {
 	const counts = new Map<string, number>();
+	// Last two non-whitespace chars, tracked across newlines so a broken union's
+	// `| B` line sees the previous member's last char as `prev` (an operand-ender).
+	// `ws_before` records whether whitespace intervened since `prev`, so an adjacent
+	// `||` is distinguished from a space-separated `| |` (two leading pipes).
+	let prev = '';
+	let prev2 = '';
+	let ws_before = false;
 
 	for (const char of text) {
-		if (FORMATTING_CHARS.has(char)) continue;
-		const key = fold_ascii_case(char);
-		counts.set(key, (counts.get(key) ?? 0) + 1);
+		if (char === ' ' || char === '\t' || char === '\n' || char === '\r') {
+			ws_before = true;
+			continue;
+		}
+		if (char === '|' && is_leading_union_pipe(prev, prev2, ws_before)) {
+			prev2 = prev;
+			prev = char;
+			ws_before = false;
+			continue;
+		}
+		if (!FORMATTING_CHARS.has(char)) {
+			const key = fold_ascii_case(char);
+			counts.set(key, (counts.get(key) ?? 0) + 1);
+		}
+		prev2 = prev;
+		prev = char;
+		ws_before = false;
 	}
 
 	return counts;
