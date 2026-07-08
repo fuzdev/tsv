@@ -847,6 +847,17 @@ impl<'a> Printer<'a> {
             let mut member_parts = DocBuf::new();
             let mut prev_end = body_start;
 
+            // Zero-comment fast gate (idiom 8): one binary search over the whole
+            // enum-body span short-circuits every per-member comment sub-query
+            // (leading collect, format-ignore lookup, both trailing-comment
+            // scans, the trailing-end walk, and the trailing-body comments).
+            // Sound because comments are disjoint + start-sorted and every
+            // sub-range lies within `body_span`, so when none sit inside the
+            // body all sub-queries are provably empty/false. The comma scan
+            // stays — it feeds `prev_end` for blank-line preservation, not
+            // comment placement.
+            let body_has_comments = self.has_comments_between(body_span.start, body_span.end);
+
             for (i, member) in decl.members.iter().enumerate() {
                 let member_start = member.span.start;
                 let is_first = i == 0;
@@ -855,7 +866,7 @@ impl<'a> Printer<'a> {
                 // Check for comments between previous position and this member.
                 // First member: drop comments pulled onto the `{` line (emitted
                 // as the brace-line prefix above).
-                let comments: CommentVec<'_> =
+                let comments: CommentVec<'_> = if body_has_comments {
                     comments_in_range(self.comments, prev_end, member_start)
                         .filter(|c| {
                             if is_first {
@@ -865,7 +876,10 @@ impl<'a> Printer<'a> {
                                 !self.is_same_line(prev_end, c.span.start)
                             }
                         })
-                        .collect();
+                        .collect()
+                } else {
+                    CommentVec::new()
+                };
 
                 // Check for blank lines
                 if !is_first {
@@ -883,7 +897,9 @@ impl<'a> Printer<'a> {
                 // A preceding format-ignore directive keeps the member's source
                 // verbatim. The member span excludes the
                 // trailing `,`, which the loop still appends below.
-                let member_doc = if self.has_format_ignore_in_range(prev_end, member_start) {
+                let member_doc = if body_has_comments
+                    && self.has_format_ignore_in_range(prev_end, member_start)
+                {
                     self.raw_source_doc(member.span)
                 } else {
                     self.build_enum_member_doc(member)
@@ -910,7 +926,10 @@ impl<'a> Printer<'a> {
                     // Trailing same-line comments before the comma (block comments
                     // inline, line comments in line_suffix) — same dispatch as the
                     // statement-list / class-member paths.
-                    member_parts.extend(self.build_trailing_same_line_comment_docs(member_end, cp));
+                    if body_has_comments {
+                        member_parts
+                            .extend(self.build_trailing_same_line_comment_docs(member_end, cp));
+                    }
 
                     // Separator comma between members; no trailing comma on the last
                     // member under `trailingComma: 'none'`.
@@ -919,26 +938,36 @@ impl<'a> Printer<'a> {
                     }
 
                     // Same-line trailing comments after comma (line comments)
-                    member_parts
-                        .extend(self.build_trailing_same_line_comment_docs(cp + 1, upper_bound));
-
-                    // Update prev_end past trailing comments
-                    prev_end = self.find_end_with_trailing_comments(cp + 1);
+                    // Update prev_end past trailing comments. With no comment in the
+                    // body, `find_end_with_trailing_comments(cp + 1) == cp + 1`.
+                    if body_has_comments {
+                        member_parts.extend(
+                            self.build_trailing_same_line_comment_docs(cp + 1, upper_bound),
+                        );
+                        prev_end = self.find_end_with_trailing_comments(cp + 1);
+                    } else {
+                        prev_end = cp + 1;
+                    }
                 } else {
                     // Fallback: no comma found (shouldn't happen in valid enum)
                     if !is_last {
                         member_parts.push(d.text(","));
                     }
-                    member_parts.extend(
-                        self.build_trailing_same_line_comment_docs(member_end, upper_bound),
-                    );
-
-                    prev_end = self.find_end_with_trailing_comments(member_end);
+                    if body_has_comments {
+                        member_parts.extend(
+                            self.build_trailing_same_line_comment_docs(member_end, upper_bound),
+                        );
+                        prev_end = self.find_end_with_trailing_comments(member_end);
+                    } else {
+                        prev_end = member_end;
+                    }
                 }
             }
 
             // Handle trailing comments after the last member
-            member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+            if body_has_comments {
+                member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+            }
 
             parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&member_parts)])));
             parts.push(d.hardline());
