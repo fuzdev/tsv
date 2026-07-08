@@ -231,7 +231,7 @@ impl<'a> Printer<'a> {
         // Check for comments that force expansion: line comments (can't be inline),
         // multi-line block comments (contain hardlines that must propagate),
         // or own-line single-line block comments (on a separate line from adjacent tokens).
-        // One whole-window existence gate (idiom 8) skips all three sub-queries — and
+        // One whole-window existence gate skips all three sub-queries — and
         // sub-query 3's eager element collect — on the comment-free common case; each
         // sub-query's range lies within [span.start, span.end], so a false gate is exact.
         let has_expanding_comments = self.has_comments_between(arr.span.start, arr.span.end)

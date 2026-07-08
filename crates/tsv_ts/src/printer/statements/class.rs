@@ -243,7 +243,7 @@ impl<'a> Printer<'a> {
         let mut member_parts = d.pooled_docbuf();
         let mut prev_end = body.span.start + 1; // Start after '{'
 
-        // Zero-comment fast gate (idiom 8): one binary search over the class-body
+        // Zero-comment fast gate: one binary search over the class-body
         // span short-circuits every per-member comment sub-query (leading
         // collect, format-ignore lookup, trailing-comment scan, trailing-end
         // walk, and trailing-body comments). Sound because comments are disjoint
