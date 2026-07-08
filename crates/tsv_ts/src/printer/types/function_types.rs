@@ -791,14 +791,29 @@ impl<'a> Printer<'a> {
                 let mut last_after_comma = DocBuf::new();
                 let mut prev_end = paren_pos.map_or(0, |p| p + 1); // After `(`
                 for (i, p) in params.iter().enumerate() {
+                    // Leading comments start after the previous comma (`prev_end`); a
+                    // stranded after-comma block (on the comma's line, newline before
+                    // this param) trails the comma instead of leading this param —
+                    // matching function params / call args (prettier relocates it before
+                    // the comma). See conformance_prettier.md §Comment relocation.
+                    let mut leading_start = prev_end;
                     if i > 0 {
                         param_parts.push(d.text(","));
+                        let comma = prev_end - 1;
+                        for comment in comments_in_range(self.comments, comma, p.span().start) {
+                            if !self.is_stranded_after_comma_block(comment, comma, p.span().start) {
+                                break; // stranded blocks are a contiguous prefix on the comma line
+                            }
+                            param_parts.push(d.text(" "));
+                            param_parts.push(self.build_comment_doc(comment));
+                            leading_start = comment.span.end;
+                        }
                         param_parts.push(d.line());
                     }
 
-                    // Leading block comments (after previous comma or `(`)
+                    // Leading block comments (after the previous comma / stranded blocks, or `(`)
                     param_parts.push(self.build_inline_comments_between_doc_trailing_space(
-                        prev_end,
+                        leading_start,
                         p.span().start,
                     ));
 
