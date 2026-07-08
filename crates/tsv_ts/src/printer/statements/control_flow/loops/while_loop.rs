@@ -28,12 +28,10 @@ impl<'a> Printer<'a> {
         let while_keyword_end = stmt.span.start + "while".len() as u32;
         let keyword_comments = self.build_keyword_paren_comments(while_keyword_end, open_paren);
 
-        // Build condition group (handles breaking within condition and comments)
-        let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
-            self.build_condition_group_with_comments(&stmt.test, open, close)
-        } else {
-            self.build_condition_group(&stmt.test)
-        };
+        // Build condition group (handles breaking within condition and comments,
+        // and the `!(logical)` inline-negation hug).
+        let condition_group =
+            self.build_statement_condition_doc(&stmt.test, open_paren, close_paren);
 
         if let Statement::BlockStatement(block) = stmt.body {
             // Block body: while (cond) { ... }
