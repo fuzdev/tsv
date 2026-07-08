@@ -1249,17 +1249,16 @@ prettier. This is load-bearing, not cosmetic, on two axes:
 - **Native bindings** (`@oxfmt/{platform}`): 8 platform variants. **No WASM variant exists.**
 - **Svelte support** is experimental (added in v0.49 via oxc-project/oxc#21700);
   we enable it and let the per-file try/catch + effective-corpus report quantify coverage.
-- **Language composition (what each oxfmt format row measures).** The native Rust
-  formatter handles **JS/TS only**. Everything else routes through JS-side fallback
-  callbacks into oxfmt's **bundled prettier** (`dist/apis-*.js` `formatFile` →
-  `prettier.format`): the **css** row is bundled-prettier(postcss) work, and the
-  **svelte** row is bundled-prettier + a bundled svelte plugin with
-  `prettier-plugin-oxfmt` formatting the embedded `<script>` through the native
-  `jsTextToDoc`. So `tsv` vs `oxfmt` is a native-vs-native engine race **on
-  TypeScript only**; on css/svelte the oxfmt row is (mostly) a prettier-pipeline
-  number in oxfmt packaging — which is what an oxfmt user gets, but read the
-  ratios accordingly. The report ratios corroborate: oxfmt ≈ prettier on
-  css/svelte, ~20× prettier on TS.
+- **Language composition (what each oxfmt format row measures).** As of `oxfmt`
+  0.57 the native Rust formatter handles **JS/TS *and* CSS**. Only **Svelte** still
+  routes through a JS-side fallback into oxfmt's **bundled prettier**
+  (`dist/apis-*.js` `formatFile` → `prettier.format`) + a bundled svelte plugin
+  with `prettier-plugin-oxfmt` formatting the embedded `<script>` through the
+  native `jsTextToDoc`. So `tsv` vs `oxfmt` is a native-vs-native engine race on
+  **TypeScript AND CSS**; only the **svelte** oxfmt row is (mostly) a
+  prettier-pipeline number in oxfmt packaging — read that one ratio accordingly.
+  The report ratios corroborate: oxfmt ≈ prettier on **svelte** (~1x, the bundled
+  path), but ~6x prettier on **css** and ~14x on **TS** (both native engines).
 
 **Deprecated**: `@oxc-parser/wasm` exists on npm but is deprecated. The correct WASM
 package is `@oxc-parser/binding-wasm32-wasi`.
