@@ -120,75 +120,32 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 
 /**
  * corpus:compare:format --all — MINIMUM per-language exact `match` count (same
- * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`). Measured 2026-07-07
- * after the `.d.ts` corpus admission (typescript 3983→4086; svelte/css unchanged).
- * Re-pinned 2026-07-08 (../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
- * oracle @sveltejs/acorn-typescript 1.0.11): typescript 4086→4082 as the live
- * framework/site repos shed ~12 TS files since 2026-07-07 (total 4708→4696) — a
- * float in the live-corpus floor, not a tsv change (SAFETY 0; parse side unmoved —
- * tsv_errors still 9, `compared` still ≥ its mins). svelte/css unchanged (1111 at
- * floor / 126).
- *
- * typescript 4082→4083 (2026-07-08, same checkouts): the typed-arrow last-arg hug
- * fix (a memberish/plain call whose last arg is a type-annotated arrow now hugs
- * like an untyped one, matching prettier's couldExpandArg) moved
- * prettier/tests/format/typescript/last-argument-expansion/edge_case.ts
- * unknown→match. A before/after --all diff on the identical corpus confirmed exactly
- * one file moved, 0 new unknowns/partials, SAFETY 0 (all other buckets exact vs the
- * prior pin ⇒ no drift). Paired with CORPUS_FORMAT_UNKNOWN_PIN typescript 183→182.
+ * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`): a shrink fails (a regression
+ * or a gutted corpus), a rise passes (re-pin to keep the floor tight). Measured
+ * 2026-07-08 against ../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
+ * oracle @sveltejs/acorn-typescript 1.0.11; SAFETY 0. When a fix moves a file or the
+ * live corpus grows, re-pin deliberately and put the why in the commit.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 1111,
-	typescript: 4083,
+	typescript: 4084,
 	css: 126,
 };
 
 /**
  * corpus:compare:format --all — EXACT per-language `unknown` + `partial`
- * divergence counts (the un-triaged surface the WARN line reports). Up = a new
- * unexplained divergence landed — fix it, catalog a detector
- * (`lib/divergence/patterns.ts`), or consciously re-pin for a new corpus file.
- * Down = the backlog shrank; re-pin to record it. A single-run trip can be the
- * FFI/sidecar heisenbug — confirm on the single repo first. Measured
- * 2026-07-06 after adding the ryanatkn.com + webdevladder.net + mdz entries.
- * svelte 7→8: +1 = tsv.fuz.dev BenchmarksCrossRuntime.svelte, the sanctioned
- * inline-element expansion class (render-safe; flagged unknown only because no
- * detector pattern claims it yet). typescript 180→179: +1 mdz
- * mdz.benchmark.ts (needs-triage class, recorded in internal notes —
- * param-list explosion before an unbreakable-overflow arrow body, where
- * prettier keeps the params inline and accepts the overflow), −2 live-corpus
- * drift (same-day svelte.dev worktree reset + tsv.fuz.dev wip churn). The
- * svelte partial 3→4 below is mdz's docs introduction page (fill-boundary
- * family, residual hunks unexplained — pattern-extension candidate).
- *
- * typescript unknown 179→184 + partial 63→65 (2026-07-07): the `.d.ts` corpus
- * admission — all 7 new entries are declaration files, 0 errors, 0 SAFETY.
- * Unknown +5: svelte/src/index.d.ts (the tracked `?`-position conditional-type
- * comment merge bug), kit/src/types/private.d.ts (the tracked union `{}`
- * spacing bug), kit/src/runtime/app/paths/types.d.ts +
- * svelte/src/ambient.d.ts + svelte/src/server/index.d.ts (the needs-triage
- * generic-param / conditional-type break-strategy classes). Partial +2:
- * kit/src/exports/public.d.ts + kit/src/types/internal.d.ts
- * (tabs_only_alignment family, residual hunks unexplained).
- *
- * Re-pinned 2026-07-08 (../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
- * ../prettier-plugin-svelte 7809486, oracle acorn-typescript 1.0.11): both buckets
- * ratchet DOWN on live-corpus churn — svelte 8→7 (the tsv.fuz.dev
- * BenchmarksCrossRuntime.svelte real-world file dropped out; the 7 remaining are all
- * prettier-plugin-svelte / prettier-html torture files) and typescript 184→183. No
- * bucket rose, SAFETY 0, partials unmoved (svelte 4 / ts 65 / css 8), css unknown
- * unchanged (23), and the parse side reports 0 undocumented AST diffs — so the move is
- * corpus churn + already-landed fixes, not a new divergence. @ryanatkn real-world tier
- * bug-clean.
- *
- * typescript 183→182 (2026-07-08, same checkouts): the typed-arrow last-arg hug fix
- * ratcheted the backlog down by one — edge_case.ts moved unknown→match (see the
- * CORPUS_FORMAT_MATCH_MIN 4082→4083 note; before/after --all diff confirmed one file,
- * 0 regressions, no drift). svelte/css unmoved.
+ * divergence counts (the un-triaged surface the WARN line reports). Both directions
+ * fail: a rise = a new unexplained divergence (fix it, catalog a detector in
+ * `lib/divergence/patterns.ts`, or consciously re-pin a legitimately-unsupported new
+ * corpus file); a drop = the backlog shrank, re-pin to record the win. A single-run
+ * trip can be the FFI/sidecar heisenbug — confirm on the single repo first. Measured
+ * 2026-07-08 against ../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
+ * ../prettier-plugin-svelte 7809486, oracle acorn-typescript 1.0.11; SAFETY 0. Put the
+ * why for each move in the commit.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 182,
+	typescript: 181,
 	css: 23,
 };
 // typescript 65→64 (2026-07-08): the single-object-type-param signature hug

@@ -16,7 +16,7 @@ mod try_jump;
 
 use smallvec::SmallVec;
 
-use crate::ast::internal::Expression;
+use crate::ast::internal::{Expression, UnaryOperator};
 use crate::printer::{CommentVec, Printer};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -243,6 +243,62 @@ impl<'a> Printer<'a> {
             parts.push(d.text(")"));
             parts.push(d.indent_line(body_doc));
             d.group(d.concat(&parts))
+        }
+    }
+
+    /// Prettier's `shouldInlineCondition` (miscellaneous.js): a `!` / `!!`-negated
+    /// parenthesized logical condition (`if (!(a || b))`, `while (!!(a && b))`) hugs
+    /// the `(` instead of breaking onto its own line, so the whole statement reads
+    /// `if (!(` … `)) {` rather than `if (⏎ !(…) ⏎) {`.
+    ///
+    /// True iff the test is `!X` or `!!X` (but not `!!!X`) where `X` is a *logical*
+    /// binary expression. This matches only the `printIfOrWhileConditionOrWithStatementObject`
+    /// callers (`if` / `while` / `do-while`), never `switch`. Comments on the condition
+    /// disable inlining upstream — the caller only reaches the bare-doc path when the
+    /// condition parens hold no comments.
+    fn condition_should_inline_negation(&self, test: &Expression<'_>) -> bool {
+        let Expression::UnaryExpression(outer) = test else {
+            return false;
+        };
+        if outer.operator != UnaryOperator::Bang {
+            return false;
+        }
+        // Peel one optional inner `!` (so `!` and `!!` qualify; a third `!` leaves a
+        // UnaryExpression here and fails the logical-binary check below).
+        let inner = match outer.argument {
+            Expression::UnaryExpression(u) if u.operator == UnaryOperator::Bang => u.argument,
+            other => other,
+        };
+        matches!(inner, Expression::BinaryExpression(b) if b.operator.is_logical())
+    }
+
+    /// Build the condition doc for `if` / `while`, honoring the negation-inline rule.
+    ///
+    /// Mirrors Prettier's `printIfOrWhileConditionOrWithStatementObject`: when
+    /// `condition_should_inline_negation` holds (and the parens carry no comments) the
+    /// test doc is emitted bare so `!(…)` hugs `(`; otherwise the standard condition
+    /// group wraps it. `switch` and the do-while comment-preservation path build their
+    /// condition group directly and are deliberately excluded.
+    fn build_statement_condition_doc(
+        &self,
+        test: &Expression<'_>,
+        open_paren: Option<u32>,
+        close_paren: Option<u32>,
+    ) -> DocId {
+        if self.condition_should_inline_negation(test) {
+            let no_comments = match (open_paren, close_paren) {
+                (Some(open), Some(close)) => !self.has_comments_between(open + 1, close),
+                _ => true,
+            };
+            if no_comments {
+                return self.build_condition_doc(test);
+            }
+        }
+        match (open_paren, close_paren) {
+            (Some(open), Some(close)) => {
+                self.build_condition_group_with_comments(test, open, close)
+            }
+            _ => self.build_condition_group(test),
         }
     }
 

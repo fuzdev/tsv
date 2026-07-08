@@ -188,12 +188,10 @@ impl<'a> Printer<'a> {
         let if_keyword_end = stmt.span.start + "if".len() as u32;
         let keyword_comments = self.build_keyword_paren_comments(if_keyword_end, open_paren);
 
-        // Build condition group (handles breaking within condition and comments)
-        let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
-            self.build_condition_group_with_comments(&stmt.test, open, close)
-        } else {
-            self.build_condition_group(&stmt.test)
-        };
+        // Build condition group (handles breaking within condition and comments,
+        // and the `!(logical)` inline-negation hug).
+        let condition_group =
+            self.build_statement_condition_doc(&stmt.test, open_paren, close_paren);
 
         if let Statement::BlockStatement(block) = stmt.consequent {
             // Block consequent: group(["if (" + condition + ") " + block])
@@ -302,11 +300,8 @@ impl<'a> Printer<'a> {
         let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
         let if_keyword_end = stmt.span.start + "if".len() as u32;
         let keyword_comments = self.build_keyword_paren_comments(if_keyword_end, open_paren);
-        let condition_group = if let (Some(open), Some(close)) = (open_paren, close_paren) {
-            self.build_condition_group_with_comments(&stmt.test, open, close)
-        } else {
-            self.build_condition_group(&stmt.test)
-        };
+        let condition_group =
+            self.build_statement_condition_doc(&stmt.test, open_paren, close_paren);
 
         let mut parts = smallvec![d.text("if")];
         if let Some(kc) = keyword_comments {
