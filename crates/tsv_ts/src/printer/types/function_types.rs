@@ -77,6 +77,33 @@ pub(in crate::printer) fn return_type_triggers_grouping(
     ) || d.will_break(return_type_doc)
 }
 
+/// Prettier's `shouldGroupFunctionParameters`: wrap params in their own group
+/// when there's 1 param and the return type is an object type or will break, so
+/// the params stay flat even when the outer signature group breaks.
+///
+/// Takes decomposed fields (return type + its already-built doc, both `Option`)
+/// so it serves every signature shape: `FunctionDeclaration` / `FunctionExpression`
+/// (function declarations, class methods), function/constructor TYPES, and the
+/// type-member / bodyless (`declare`, overload) signatures.
+pub(in crate::printer) fn should_group_function_parameters(
+    params: &[internal::Expression<'_>],
+    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+    return_type: Option<&internal::TSTypeAnnotation<'_>>,
+    return_type_doc: Option<DocId>,
+    d: &DocArena,
+) -> bool {
+    if params.len() != 1 {
+        return false;
+    }
+    let Some(rt_doc) = return_type_doc else {
+        return false;
+    };
+    if !type_params_allow_grouping(type_parameters) {
+        return false;
+    }
+    return_type.is_some_and(|rt| return_type_triggers_grouping(rt, rt_doc, d))
+}
+
 impl<'a> Printer<'a> {
     //
     // Function Type Return Types
@@ -321,10 +348,13 @@ impl<'a> Printer<'a> {
         };
 
         let params_doc = d.concat(&self.build_function_params_doc(params, paren_search_start));
-        let params_doc = if params.len() == 1
-            && type_params_allow_grouping(type_parameters)
-            && return_type_triggers_grouping(return_type, return_type_doc, d)
-        {
+        let params_doc = if should_group_function_parameters(
+            params,
+            type_parameters,
+            Some(return_type),
+            Some(return_type_doc),
+            d,
+        ) {
             d.group(params_doc)
         } else {
             params_doc
@@ -469,12 +499,13 @@ impl<'a> Printer<'a> {
         // shouldGroupFunctionParameters: a single param whose return type is an
         // object/mapped type (or otherwise will-breaks) hugs — the params stay flat
         // and the return type breaks, instead of the params breaking.
-        let params_doc = if params.len() == 1
-            && type_params_allow_grouping(type_parameters)
-            && return_type
-                .zip(return_type_doc)
-                .is_some_and(|(rt, rt_doc)| return_type_triggers_grouping(rt, rt_doc, d))
-        {
+        let params_doc = if should_group_function_parameters(
+            params,
+            type_parameters,
+            return_type,
+            return_type_doc,
+            d,
+        ) {
             d.group(params_doc)
         } else {
             params_doc
@@ -555,55 +586,12 @@ impl<'a> Printer<'a> {
             });
 
         if force_multiline {
-            // Multiline path with hardlines (same as build_function_params_doc_with_line_comments)
-            let mut inner_parts = DocBuf::new();
-            let open_paren = paren_pos.unwrap_or(0);
-            let mut prev_end = open_paren + 1;
-
-            // A line comment trailing `(` is kept on the `(` line. For a method
-            // signature prettier also keeps it there (match); for call/construct
-            // signatures prettier relocates it to its own line (divergence). tsv
-            // applies the open-delimiter rule uniformly. Same mechanism as the
-            // function/constructor-type params path.
-            let (paren_prefix, paren_pull_pos) = paren_pos.map_or_else(
-                || (DocBuf::new(), None),
-                |open| self.delimiter_line_comment_prefix(open, params[0].span().start),
-            );
-
-            for (i, p) in params.iter().enumerate() {
-                let param_start = p.span().start;
-                let param_end = p.span().end;
-                let is_last = i == params.len() - 1;
-
-                let skip_delim = if i == 0 { paren_pull_pos } else { None };
-                inner_parts.extend(self.build_leading_comments_multiline_opt(
-                    prev_end,
-                    param_start,
-                    skip_delim,
-                ));
-                inner_parts.push(self.build_function_type_param_expression_doc(p));
-
-                if !is_last {
-                    let next_start = params[i + 1].span().start;
-                    prev_end = self.emit_multiline_comma_with_comments(
-                        &mut inner_parts,
-                        param_end,
-                        next_start,
-                        true,
-                    );
-                } else {
-                    let close = close_paren_pos.unwrap_or(param_end);
-                    // No trailing comma after the last param (trailingComma: 'none').
-                    inner_parts.extend(self.build_trailing_comments_multiline(param_end, close));
-                }
-            }
-
-            let mut parts: DocBuf = smallvec![d.text("(")];
-            parts.push(d.concat(&paren_prefix));
-            parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
-            parts.push(d.hardline());
-            parts.push(d.text(")"));
-            return d.group(d.concat(&parts));
+            // Hardline params layout, shared with the function/constructor-type path.
+            // Wrapped in this signature's own group (a method signature keeps a
+            // trailing-`(` line comment in place, a call/construct signature relocates
+            // it — that divergence lives in `delimiter_line_comment_prefix`, inside the
+            // shared helper).
+            return d.group(d.concat(&self.build_type_params_multiline_parts(params, paren_pos)));
         }
 
         // Build params with width-based breaking
@@ -757,7 +745,7 @@ impl<'a> Printer<'a> {
                 || has_leading_gap_forcing
                 || self.has_blank_line_between_params(params)
             {
-                return self.build_function_params_doc_with_line_comments(params, paren_pos);
+                return self.build_type_params_multiline_parts(params, paren_pos);
             }
 
             // Check for huggable single param: (options: { ... })
@@ -910,8 +898,17 @@ impl<'a> Printer<'a> {
         parts
     }
 
-    /// Build function params with line comments between them (forces multiline)
-    fn build_function_params_doc_with_line_comments(
+    /// Emit the multiline (hardline) parameter layout shared by the two type-side
+    /// param paths: the type-member signature path (`build_signature_params_doc`, when
+    /// a comment / blank line forces multiline) and the function/constructor-type path
+    /// (`build_function_params_doc`). Renders `(⏎\t<param>,⏎\t…⏎)` — each param via
+    /// `build_function_type_param_expression_doc`, with comments preserved in every gap
+    /// (the `(`-line trailing-comment pull, inter-param commas, trailing before `)`).
+    ///
+    /// Returns the assembled parts **ungrouped**: the signature caller wraps them in
+    /// its own group; the function-type caller lets the outer function-type group
+    /// govern (a group around hardline-only content is a no-op, so both agree).
+    fn build_type_params_multiline_parts(
         &self,
         params: &[internal::Expression<'_>],
         paren_pos: Option<u32>,

@@ -11,6 +11,7 @@ use crate::printer::ArrowChainContext;
 use crate::printer::calls::arg_predicates::arrow_has_trailing_param_comments;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::needs_parens::leftmost_no_lookahead;
+use crate::printer::types::function_types::should_group_function_parameters;
 use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{CommentFilter, CommentSpacing, LeadingGlue};
 use crate::printer::{
@@ -1021,21 +1022,46 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Function parameters - NOT in their own group, just softlines.
-        // Params trailing comments are bounded at the close paren; a comment between
-        // `)` and the return type is emitted by the return-type path below.
+        // Function parameters - by default ungrouped (the outer signature group
+        // controls their softlines). Params trailing comments are bounded at the close
+        // paren; a comment between `)` and the return type is emitted by the
+        // return-type path below.
         let trailing_comments_end =
             Some(close_paren_after.map_or(body_start, |after_paren| after_paren - 1));
-        sig_parts.push(self.build_params_doc_with_comments(
+        let params_doc = self.build_params_doc_with_comments(
             func.params,
             Some(func.params_start),
             trailing_comments_end,
-        ));
+        );
 
         // Return type annotation (e.g., `: number`), preserving a comment between
         // `)` and `:` in place. Only wraps for complex type args (unions/intersections).
-        if let Some(return_type) = &func.return_type {
-            sig_parts.push(self.build_function_return_type_doc(close_paren_after, return_type));
+        let return_type_doc = func
+            .return_type
+            .as_ref()
+            .map(|rt| self.build_function_return_type_doc(close_paren_after, rt));
+
+        // shouldGroupFunctionParameters: a single param whose return type is an
+        // object/mapped type (or otherwise will-breaks) hugs — the params stay flat and
+        // the return type breaks, instead of the params breaking. Matches
+        // build_callable_signature_doc (class methods / function declarations); without
+        // it, object methods and function expressions break the params where prettier
+        // hugs them.
+        let params_doc = if should_group_function_parameters(
+            func.params,
+            func.type_parameters.as_ref(),
+            func.return_type.as_ref(),
+            return_type_doc,
+            d,
+        ) {
+            d.group(params_doc)
+        } else {
+            params_doc
+        };
+
+        sig_parts.push(params_doc);
+        if let Some(rt_doc) = return_type_doc {
+            sig_parts.push(rt_doc);
         }
 
         let sig_end = match &func.return_type {
