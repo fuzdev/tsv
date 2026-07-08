@@ -128,10 +128,18 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * float in the live-corpus floor, not a tsv change (SAFETY 0; parse side unmoved —
  * tsv_errors still 9, `compared` still ≥ its mins). svelte/css unchanged (1111 at
  * floor / 126).
+ *
+ * typescript 4082→4083 (2026-07-08, same checkouts): the typed-arrow last-arg hug
+ * fix (a memberish/plain call whose last arg is a type-annotated arrow now hugs
+ * like an untyped one, matching prettier's couldExpandArg) moved
+ * prettier/tests/format/typescript/last-argument-expansion/edge_case.ts
+ * unknown→match. A before/after --all diff on the identical corpus confirmed exactly
+ * one file moved, 0 new unknowns/partials, SAFETY 0 (all other buckets exact vs the
+ * prior pin ⇒ no drift). Paired with CORPUS_FORMAT_UNKNOWN_PIN typescript 183→182.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 1111,
-	typescript: 4082,
+	typescript: 4083,
 	css: 126,
 };
 
@@ -172,10 +180,15 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * unchanged (23), and the parse side reports 0 undocumented AST diffs — so the move is
  * corpus churn + already-landed fixes, not a new divergence. @ryanatkn real-world tier
  * bug-clean.
+ *
+ * typescript 183→182 (2026-07-08, same checkouts): the typed-arrow last-arg hug fix
+ * ratcheted the backlog down by one — edge_case.ts moved unknown→match (see the
+ * CORPUS_FORMAT_MATCH_MIN 4082→4083 note; before/after --all diff confirmed one file,
+ * 0 regressions, no drift). svelte/css unmoved.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 183,
+	typescript: 182,
 	css: 23,
 };
 // typescript 65→64 (2026-07-08): the single-object-type-param signature hug

@@ -16,13 +16,12 @@ use super::arg_predicates::{
     preceding_args_allow_expand_last,
 };
 use super::arg_wrapping::{
-    append_type_args_with_gap_comments, arg_needs_soft_wrap, arrow_has_type_annotations,
-    build_args_joined_with_comments, build_args_split_last, build_args_with_blank_lines,
-    build_arrow_call_body_states, build_arrow_inline_signature, build_arrow_sig_doc,
-    build_break_body_state, build_empty_args_doc, build_expand_all_args, build_inline_args,
-    build_inline_or_expand_all, could_expand_arrow_chain, last_two_args_same_type,
-    prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
-    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_joined_with_comments,
+    build_args_split_last, build_args_with_blank_lines, build_arrow_call_body_states,
+    build_arrow_sig_doc, build_break_body_state, build_empty_args_doc, build_expand_all_args,
+    build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
+    last_two_args_same_type, prepend_arrow_body_comments, should_expand_first_arg,
+    try_hug_multiline_template_arg, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
 use super::test_patterns::{build_test_callee_flat_doc, is_test_call};
@@ -928,6 +927,8 @@ fn try_expand_last_function_arg(
         // Special case: expression arrow with object/array body
         // Prettier keeps preceding args inline and expands object/array internally
         // e.g., fn(arg, (x) => ({\n  a: x,\n}));
+        // couldExpandArg keys only on the body type — a typed arrow expands the
+        // same way (its full signature is emitted via build_arrow_sig_doc).
         if let Some(internal::Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
             && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
             && matches!(
@@ -935,9 +936,8 @@ fn try_expand_last_function_arg(
                 internal::Expression::ObjectExpression(_)
                     | internal::Expression::ArrayExpression(_)
             )
-            && !arrow_has_type_annotations(arrow)
         {
-            let inline_sig = build_arrow_inline_signature(printer, arrow);
+            let sig_doc = build_arrow_sig_doc(printer, arrow);
             let body_doc = d.parens(printer.build_expression_doc(body_expr));
             let body_doc =
                 prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
@@ -948,7 +948,7 @@ fn try_expand_last_function_arg(
                 callee,
                 d.text("("),
                 d.concat(&head_parts),
-                inline_sig,
+                sig_doc,
                 d.text(" => "),
                 d.group_break(body_doc),
                 d.text(")"),
