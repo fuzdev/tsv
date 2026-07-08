@@ -24,20 +24,36 @@ pub(crate) fn parse_pseudo_selector<'arena>(
         return Err(parser.error_expected("pseudo-class or pseudo-element name"));
     }
 
-    // Decode the name only for parse-time argument dispatch (`:nth-child` → Nth,
-    // `:is`/`:not` → SelectorList). It is NOT stored on the node: the name is recovered
-    // from `span` at convert/print time (half-decoded to match Svelte — see convert/mod.rs),
-    // so storing a fully-decoded copy would be redundant and, for identity escapes, wrong.
-    // The arena copy is needed because `current_identifier()` borrows a buffer that
-    // `advance()` overwrites, and dispatch happens after the name token is consumed.
-    let name_ident = parser.current_identifier();
-    let name = parser.alloc_str_in(name_ident);
+    // Classify the argument grammar from the DECODED name (`:nth-child` → Nth,
+    // `:is`/`:not` → SelectorList) while the name token is still current, so
+    // `current_identifier()`'s decoded borrow is consumed immediately — the classify
+    // returns a `Copy` `PseudoArgKind` and no arena copy of the name is made. The
+    // decoded name (not the raw source slice) must drive dispatch: `:\69s(…)` decodes
+    // to `is` and must route to the forgiving grammar, so raw-source dispatch would
+    // regress escaped names. The name is NOT stored on the node either: it's recovered
+    // from `span` at convert/print time (half-decoded to match Svelte — see
+    // convert/mod.rs), so a fully-decoded copy would be redundant and, for identity
+    // escapes, wrong.
+    //
+    // Only classify when args actually follow, matching the prior post-advance
+    // `check(LeftParen)` exactly: a functional pseudo's `(` is glued to the name (any
+    // whitespace lexes as a separate token, so no args follow), so `peek_kind() ==
+    // LeftParen` is that same condition one token earlier. `peek_kind` parks the `(` in
+    // the lookahead slot without touching `current_decoded`, so `current_identifier()`
+    // still yields the name.
+    let arg_kind = if parser.peek_kind()? == TokenKind::LeftParen {
+        Some(classify_pseudo_args(
+            parser.current_identifier(),
+            is_pseudo_element,
+        ))
+    } else {
+        None
+    };
     let mut end = parser.span_pos(parser.current_end); // Capture end of name token
     parser.advance()?;
 
-    // Check for arguments: :nth-child(2n+1), :is(), :not(), etc.
-    let args = if parser.check(TokenKind::LeftParen) {
-        let (args_opt, args_end) = parse_pseudo_args(parser, name, is_pseudo_element)?;
+    let args = if let Some(arg_kind) = arg_kind {
+        let (args_opt, args_end) = parse_pseudo_args(parser, arg_kind)?;
         end = args_end; // Use end of closing paren
         args_opt
     } else {
@@ -64,7 +80,7 @@ pub(crate) fn parse_pseudo_selector<'arena>(
 }
 
 /// The selector-list grammar a pseudo-class/element argument uses (CSS Selectors 4).
-/// `parse_pseudo_args` maps each selector-list pseudo to one of these once, so
+/// `classify_pseudo_args` maps each selector-list pseudo to one of these once, so
 /// `parse_selector_list_args` dispatches on an exhaustive enum rather than re-matching the
 /// pseudo name (no stringly-typed `unreachable!` fallback).
 #[derive(Clone, Copy)]
@@ -84,35 +100,50 @@ enum SelectorListGrammar {
     Complex,
 }
 
-/// Parse a pseudo-class/element argument list `( … )`, dispatching to a per-family
-/// helper by the (lowercased) pseudo name. Returns `(Option<PseudoClassArgs>,
-/// end_position_of_closing_paren)`; `None` args are unknown pseudo-classes whose
-/// argument isn't a selector list.
-///
-/// `is_pseudo_element` distinguishes `::slotted`/`::part` (the real pseudo-elements,
-/// whose args are dropped from the public AST) from a single-colon `:slotted(.x)`/
-/// `:part(foo)`, which Svelte accepts as an ordinary pseudo-class with a selector-list
-/// argument. `::slotted` shares the strict complex-selector-list grammar with
-/// `:not()` — parseCss models its arg as a `<complex-selector-list>` (accepting
-/// `::slotted(0)`, `::slotted(.a > .b)`, `::slotted(.a, .b)`, rejecting garbage/empty)
-/// and drops it from the wire AST, so tsv reuses the same production and drops it at
-/// the pseudo-element convert boundary. `::part` builds the dedicated `Part` arg.
-/// Gating on the flag keeps these off pseudo-classes, so the single-colon forms fall
-/// through to the generic selector-list path and convert to a `PseudoClassSelector`
-/// matching Svelte — rather than reaching the convert layer, which exposes no
-/// pseudo-element args.
-///
-/// Every helper takes `args_start` — the source position just after `(`, where each
-/// family's `span` begins — and owns its own `)` capture.
-fn parse_pseudo_args<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    pseudo_name: &str,
-    is_pseudo_element: bool,
-) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
-    parser.expect(TokenKind::LeftParen)?;
+/// The argument grammar a pseudo-class/element uses, chosen once from the (lowercased)
+/// pseudo name by `classify_pseudo_args`. Threaded into `parse_pseudo_args` as a `Copy`
+/// descriptor so dispatch never re-consults the name string — which lets the name be
+/// classified while its token is still current, avoiding a per-pseudo arena copy of the
+/// never-stored name.
+#[derive(Clone, Copy)]
+enum PseudoArgKind {
+    /// A selector-list argument in one of the `SelectorListGrammar` flavors:
+    /// `:is()`/`:where()`/`:not()`/`:global()`/`:has()`, the identifier-arg pseudos
+    /// (`:dir()`/`:lang()`/`::highlight()`), and `::slotted()`.
+    SelectorList(SelectorListGrammar),
+    /// `::part( <ident>+ )` — a space-separated identifier run, not selectors.
+    Part,
+    /// The `:nth-child()` family — a `<An+B> [of S]?` argument.
+    Nth,
+    /// Any other pseudo — its argument is tried as a selector list, else skipped.
+    Unknown,
+}
 
-    let args_start = parser.current_start;
-
+/// Classify a pseudo-class/element's argument grammar from its name (see `PseudoArgKind`).
+/// A pure name → grammar mapping, split out of `parse_pseudo_args` so it can run against
+/// the still-current name token (its decoded borrow is consumed immediately, so no arena
+/// copy of the name is needed).
+///
+/// `is_pseudo_element` distinguishes `::slotted`/`::part` (the real pseudo-elements, whose
+/// args are dropped from the public AST) from a single-colon `:slotted(.x)`/`:part(foo)`,
+/// which Svelte accepts as an ordinary pseudo-class with a selector-list argument.
+/// `::slotted` shares the strict complex-selector-list grammar with `:not()` — parseCss
+/// models its arg as a `<complex-selector-list>` (accepting `::slotted(0)`,
+/// `::slotted(.a > .b)`, `::slotted(.a, .b)`, rejecting garbage/empty) and drops it from
+/// the wire AST, so tsv reuses the same production and drops it at the pseudo-element
+/// convert boundary. `::part` selects the dedicated `Part` arg. Gating on the flag keeps
+/// these off pseudo-classes, so the single-colon forms fall through to `Unknown`'s generic
+/// selector-list path and convert to a `PseudoClassSelector` matching Svelte — rather than
+/// reaching the convert layer, which exposes no pseudo-element args.
+///
+/// `:dir()`/`:lang()`/`::highlight()` take a single identifier per CSS spec, but Svelte
+/// parses their argument as an ordinary selector list (a comma-separated `:lang(en, fr)`
+/// becomes two `TypeSelector`s, not one `"en, fr"` name), so they share the strict
+/// complex-selector-list grammar with `:not()`/`:global()`. That also matches prettier's
+/// argument formatting (comma-spacing normalization and wide-list breaking) and Svelte's
+/// rejection of non-selector args like `:lang("en")`. `::highlight`'s args are dropped at
+/// the pseudo-element convert boundary; the selector list only feeds the formatter.
+fn classify_pseudo_args(pseudo_name: &str, is_pseudo_element: bool) -> PseudoArgKind {
     // CSS pseudo-class/element names are ASCII case-insensitive (Selectors 4
     // §"Case-Sensitivity"), and Svelte's parser accepts the uppercase forms
     // (`:NTH-CHILD(2n+1)`, `:IS(…)`, `:GLOBAL(…)`); dispatch on the lowercased name so
@@ -129,42 +160,48 @@ fn parse_pseudo_args<'arena>(
         pseudo_name
     };
 
-    // Dispatch by pseudo family.
-    //
-    // `::slotted` (strict complex-selector-list, like `:not()`) and `::part`
-    // (dedicated ident list) match only the `::` form; a single-colon `:slotted`/
-    // `:part` has no guard match and falls to `parse_unknown_args`' selector-list path
-    // (matching Svelte's PseudoClassSelector).
-    //
-    // `:dir()`/`:lang()`/`::highlight()` take a single identifier per CSS spec, but
-    // Svelte parses their argument as an ordinary selector list (a comma-separated
-    // `:lang(en, fr)` becomes two `TypeSelector`s, not one `"en, fr"` name), so they
-    // share the strict complex-selector-list grammar with `:not()`/`:global()`. That
-    // also matches prettier's argument formatting (comma-spacing normalization and
-    // wide-list breaking) and Svelte's rejection of non-selector args like
-    // `:lang("en")`. `::highlight`'s args are dropped at the pseudo-element convert
-    // boundary; the selector list only feeds the formatter.
-    // The selector-list arms all run with `in_pseudo_args` set (via `selector_list_args` →
-    // `with_pseudo_args`), so a bare `<number>`/`<an+b>` term parses as an `Nth` simple
-    // selector (Svelte's `inside_pseudo_class` gate) — including `::slotted` (so
-    // `::slotted(0)`/`::slotted(2n+1)` read as `Nth`). `nth-*` scans its own An+B grammar
-    // (`parse_nth_args`), so its leading term needs no flag — but its optional `of S`
-    // selector list sets `in_pseudo_args` locally (a bare `<an+b>` term in `S` reads as an
-    // `Nth`, matching `:not()`'s strict list). `::part` takes a bare ident list and never
-    // needs it.
     match pseudo_name {
-        "slotted" if is_pseudo_element => {
-            selector_list_args(parser, args_start, SelectorListGrammar::Complex)
-        }
-        "part" if is_pseudo_element => parse_part_args(parser, args_start),
-        "has" => selector_list_args(parser, args_start, SelectorListGrammar::Relative),
-        "is" | "where" => selector_list_args(parser, args_start, SelectorListGrammar::Forgiving),
+        "slotted" if is_pseudo_element => PseudoArgKind::SelectorList(SelectorListGrammar::Complex),
+        "part" if is_pseudo_element => PseudoArgKind::Part,
+        "has" => PseudoArgKind::SelectorList(SelectorListGrammar::Relative),
+        "is" | "where" => PseudoArgKind::SelectorList(SelectorListGrammar::Forgiving),
         "not" | "global" | "dir" | "lang" | "highlight" => {
-            selector_list_args(parser, args_start, SelectorListGrammar::Complex)
+            PseudoArgKind::SelectorList(SelectorListGrammar::Complex)
         }
         "nth-child" | "nth-of-type" | "nth-last-child" | "nth-last-of-type" | "nth-col"
-        | "nth-last-col" => parse_nth_args(parser, args_start),
-        _ => with_pseudo_args(parser, |p| parse_unknown_args(p, args_start)),
+        | "nth-last-col" => PseudoArgKind::Nth,
+        _ => PseudoArgKind::Unknown,
+    }
+}
+
+/// Parse a pseudo-class/element argument list `( … )` by its pre-classified
+/// `PseudoArgKind` (from `classify_pseudo_args`), dispatching to the per-family helper.
+/// Returns `(Option<PseudoClassArgs>, end_position_of_closing_paren)`; `None` args are
+/// unknown pseudo-classes whose argument isn't a selector list. Every helper takes
+/// `args_start` — the source position just after `(`, where each family's `span` begins —
+/// and owns its own `)` capture.
+///
+/// The selector-list arms all run with `in_pseudo_args` set (via `selector_list_args` →
+/// `with_pseudo_args`), so a bare `<number>`/`<an+b>` term parses as an `Nth` simple
+/// selector (Svelte's `inside_pseudo_class` gate) — including `::slotted` (so
+/// `::slotted(0)`/`::slotted(2n+1)` read as `Nth`). `nth-*` scans its own An+B grammar
+/// (`parse_nth_args`), so its leading term needs no flag — but its optional `of S`
+/// selector list sets `in_pseudo_args` locally (a bare `<an+b>` term in `S` reads as an
+/// `Nth`, matching `:not()`'s strict list). `::part` takes a bare ident list and never
+/// needs it.
+fn parse_pseudo_args<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    arg_kind: PseudoArgKind,
+) -> Result<(Option<PseudoClassArgs<'arena>>, u32), ParseError> {
+    parser.expect(TokenKind::LeftParen)?;
+
+    let args_start = parser.current_start;
+
+    match arg_kind {
+        PseudoArgKind::SelectorList(grammar) => selector_list_args(parser, args_start, grammar),
+        PseudoArgKind::Part => parse_part_args(parser, args_start),
+        PseudoArgKind::Nth => parse_nth_args(parser, args_start),
+        PseudoArgKind::Unknown => with_pseudo_args(parser, |p| parse_unknown_args(p, args_start)),
     }
 }
 
