@@ -32,6 +32,15 @@ impl<'a> Printer<'a> {
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> bool {
+        // Zero-comment window gate: one binary search over the whole `<…>` span.
+        // Every sub-query below is bounded within `[args.span.start, args.span.end]`,
+        // and `has_comments_between` only yields comments fully inside its range — so
+        // when no comment lies inside the `<…>`, all three are provably false. Skips
+        // them (and their delimited-list trivia scans) on the overwhelmingly common
+        // comment-free type argument (`Foo<T>`, `Map<K, V>`, …).
+        if !self.has_comments_between(args.span.start, args.span.end) {
+            return false;
+        }
         let has_leading_line_comment = args.params.first().is_some_and(|first| {
             self.has_line_comments_between(args.span.start + 1, first.span().start)
         });

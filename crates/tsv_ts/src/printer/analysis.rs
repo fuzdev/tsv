@@ -332,6 +332,16 @@ pub(crate) fn has_newline_after_position(source: &str, pos: u32) -> bool {
 /// multiline strings. Prettier expands ALL containing structures when a multiline
 /// string is found anywhere in the tree.
 pub(crate) fn has_multiline_content(expr: &internal::Expression<'_>, source: &str) -> bool {
+    // Necessary-condition fast bail: a legacy line continuation is a backslash
+    // immediately before a newline, so if the expression's source slice contains no
+    // backslash at all, no descendant string literal can carry one — return false
+    // without the recursive walk. This collapses the O(depth×size) re-scan on nested
+    // object/array/call data (each enclosing container re-walked the whole subtree) to
+    // one memchr-fast byte scan; a backslash anywhere (regex, string escape, path)
+    // falls through to the precise recursive check, so the result is unchanged.
+    if !expr.span().extract(source).contains('\\') {
+        return false;
+    }
     match expr {
         internal::Expression::Literal(_) => is_multiline_string_literal(expr, source),
         internal::Expression::ArrayExpression(arr) => arr

@@ -529,6 +529,14 @@ impl<'a> Printer<'a> {
     /// comments between member spans correspond to attached trailing/leading
     /// comments in prettier's AST.
     fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
+        // Zero-comment window gate: one binary search over the whole union span before
+        // the N-1 pairwise between-member searches. Each pairwise range lies within
+        // `[union.span.start, union.span.end]`, so with no comment inside the union
+        // every pairwise check is provably false — skip them on the common
+        // comment-free `A | B | C`.
+        if !self.has_comments_between(union.span.start, union.span.end) {
+            return false;
+        }
         union
             .types
             .windows(2)

@@ -228,7 +228,6 @@ fn should_force_chain_expand<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], pri
     // 1. Blank lines BETWEEN methods (not just before first) force expansion
     // 2. 3+ calls with complex args force expansion
     // 3. 2+ calls with callbacks, where any callback has a multiline body, force expansion
-    // 4. Inside template expressions with original breaks force expansion
     let has_blank_lines_between = has_blank_lines_between_methods(groups, printer);
 
     // Single pass: count calls and callbacks, and check if any callback breaks
@@ -253,7 +252,6 @@ fn should_force_chain_expand<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], pri
         || has_forcing_comments
         || (call_count > 2 && call_nodes().any(call_has_complex_args))
         || (calls_with_callbacks >= 2 && any_callback_breaks)
-        || printer.should_force_expand()
 }
 
 /// Build doc for short chains (groups.len() <= cutoff)

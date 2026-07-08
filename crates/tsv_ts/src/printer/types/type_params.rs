@@ -143,6 +143,14 @@ impl<'a> Printer<'a> {
         let Some(first) = decl.params.first() else {
             return false;
         };
+        // Zero-comment window gate: one binary search over the whole `<…>` span.
+        // Every sub-query below is bounded within `[decl.span.start, decl.span.end]`
+        // (the `<`→first-param gap, the delimited-list scan up to `end - 1`, and each
+        // per-param constraint/default gap), so with no comment inside the `<…>` all
+        // are provably false. Skips them on the common comment-free `<T, U>`.
+        if !self.has_comments_between(decl.span.start, decl.span.end) {
+            return false;
+        }
         // A line comment trailing the opening `<` (`<// c\n T>`) forces expansion;
         // `has_line_comments_in_delimited_list` only covers between/after params,
         // not the `<`→first-param gap, so check it explicitly. Without this the

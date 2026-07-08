@@ -584,31 +584,39 @@ impl<'a> Printer<'a> {
         let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
         let end_boundary =
             close_paren_pos.unwrap_or_else(|| params.last().map_or(0, |p| p.span().end));
-        // A line comment trailing `(` (`(// c\n p`), or an own-line block comment
-        // in the `(`→first-param gap, forces multiline. Without this it falls to
-        // the inline path below, where a line comment swallows the following tokens
-        // (`(// c p: T)`). Mirrors `build_function_params_doc`'s leading-gap check.
-        let has_leading_gap_forcing = paren_pos.is_some_and(|p| {
-            let first_start = params[0].span().start;
-            self.has_line_comments_between(p + 1, first_start)
-                || self.has_own_line_block_comment_after(p, p + 1, first_start)
-        });
-        // A blank line the author left between two params also forces multiline (and
-        // is preserved by the separator emission below) — same as regular function
-        // params; prettier keeps the blank in every parameter-list position.
-        let force_multiline = self.has_line_comments_in_delimited_list(
-            params,
-            internal::Expression::span,
-            end_boundary,
-        ) || has_leading_gap_forcing
-            || self.has_blank_line_between_params(params)
-            || params.last().is_some_and(|last| {
-                self.has_own_line_block_comment_after(
-                    last.span().end,
-                    last.span().end,
+        // Zero-comment window gate: one binary search over the whole params window.
+        // Every comment sub-query here (leading-gap / delimited-list / last-param) and
+        // in the fast-path build loop below is bounded within `[window_start,
+        // end_boundary]`, so with no comment inside the window all are provably
+        // empty/false — skip them on the common comment-free signature. The blank-line
+        // check is a source blank-line test independent of comments and stays outside
+        // the gate. Mirrors `build_params_doc_with_comments`'s fast gate.
+        let window_start = paren_pos.map_or_else(|| params[0].span().start, |p| p + 1);
+        let comments_present = self.has_comments_between(window_start, end_boundary);
+        // A line comment trailing `(` (`(// c\n p`), or an own-line block comment in
+        // the `(`→first-param gap, forces multiline (else the inline path below lets a
+        // line comment swallow the following tokens, `(// c p: T)`; mirrors
+        // `build_function_params_doc`'s leading-gap check). A blank line the author
+        // left between two params also forces multiline (preserved by the separator
+        // emission below) — same as regular function params; prettier keeps the blank
+        // in every parameter-list position.
+        let force_multiline = self.has_blank_line_between_params(params)
+            || (comments_present
+                && (self.has_line_comments_in_delimited_list(
+                    params,
+                    internal::Expression::span,
                     end_boundary,
-                )
-            });
+                ) || paren_pos.is_some_and(|p| {
+                    let first_start = params[0].span().start;
+                    self.has_line_comments_between(p + 1, first_start)
+                        || self.has_own_line_block_comment_after(p, p + 1, first_start)
+                }) || params.last().is_some_and(|last| {
+                    self.has_own_line_block_comment_after(
+                        last.span().end,
+                        last.span().end,
+                        end_boundary,
+                    )
+                })));
 
         if force_multiline {
             // Hardline params layout, shared with the function/constructor-type path.
@@ -622,8 +630,9 @@ impl<'a> Printer<'a> {
         // Build params with width-based breaking
         let mut param_parts = DocBuf::new();
 
-        // Handle comments before first param (e.g., `(/* comment */ a: T)`)
-        if let Some(paren_pos) = paren_pos {
+        // Handle comments before first param (e.g., `(/* comment */ a: T)`) — gated by
+        // the zero-comment window check above (the range is inside the window).
+        if comments_present && let Some(paren_pos) = paren_pos {
             let first_param_start = params[0].span().start;
             for comment in comments_in_range(self.comments, paren_pos + 1, first_param_start) {
                 param_parts.push(self.build_comment_doc(comment));
@@ -638,17 +647,20 @@ impl<'a> Printer<'a> {
             }
             param_parts.push(self.build_function_type_param_expression_doc(param));
 
-            // Handle trailing comments after this param
-            let param_end = param.span().end;
-            let next_boundary = if i + 1 < params.len() {
-                params[i + 1].span().start
-            } else {
-                close_paren_pos.unwrap_or(param_end)
-            };
+            // Handle trailing comments after this param — gated by the window check
+            // (each param→next-boundary gap is inside the window).
+            if comments_present {
+                let param_end = param.span().end;
+                let next_boundary = if i + 1 < params.len() {
+                    params[i + 1].span().start
+                } else {
+                    close_paren_pos.unwrap_or(param_end)
+                };
 
-            for comment in comments_in_range(self.comments, param_end, next_boundary) {
-                param_parts.push(d.text(" "));
-                param_parts.push(self.build_comment_doc(comment));
+                for comment in comments_in_range(self.comments, param_end, next_boundary) {
+                    param_parts.push(d.text(" "));
+                    param_parts.push(self.build_comment_doc(comment));
+                }
             }
         }
 
