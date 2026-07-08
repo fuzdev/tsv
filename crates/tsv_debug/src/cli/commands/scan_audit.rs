@@ -79,20 +79,20 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 /// - `non-source` — over an output buffer or rendered doc text, not source.
 /// - `number-literal` — content of an isolated numeric literal (no comments inside).
 /// - `css-value` — `(`/`)` or function name of a `url()`/color/function value token
-///   (per the lore's "url/color paren finds — not candidates").
+///   (url/color paren finds — not candidates).
 /// - `at-rule-range` — connector keyword in a normalized CSS at-rule range prelude.
 /// - `attr-name` — Svelte attribute-name `:` split (directive prefix).
 /// - `template-marker` — `${` of a template-literal type.
 /// - `jsdoc-tag` — scans a value/comment string for `@type`/`@satisfies` cast tags.
 ///
-/// Tracked delimiter-over-source scans (the real class, on the books in the lore's
-/// "Comment-Aware Delimiter Scans" stage-4 inventory):
+/// Tracked delimiter-over-source scans (the real "Comment-Aware Delimiter Scans"
+/// class):
 /// - `delimiter-deferred-bug` — a real comment-vulnerable scan that drops/mangles
 ///   comments on specific inputs. The audit **fails** on these (see [`DEFERRED_BUG`]):
 ///   a deferred bug must be fixed fixtures-first and its entry removed, not
 ///   allow-listed indefinitely. The category stays so the failure can name the class.
 /// - `delimiter-latent` — byte-correct today but comment-blind; migrate-or-keep
-///   tracked in the lore.
+///   tracked in the allow-list.
 ///
 /// Closure-pattern `.find(|…|)` (iterator/predicate finds) are excluded by the
 /// detector and never reach this list.

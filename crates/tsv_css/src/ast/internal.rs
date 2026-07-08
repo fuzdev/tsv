@@ -336,8 +336,8 @@ pub struct CssDeclaration<'arena> {
     /// Used internally for the `--`-prefix check, keyword matches (`grid*`), and inline-width
     /// math. The printer's *output* and the public AST both emit the **raw** property text from
     /// source instead (`extract_property_name` / convert), preserving escapes — a documented
-    /// Svelte quirk. So decoded(internal) / raw(output+public) is intentional; see the `(c)`
-    /// follow-up in the bumpalo arena lore for the spec-vs-Svelte encoding map.
+    /// Svelte quirk. So decoded(internal) / raw(output+public) is intentional (the
+    /// spec-vs-Svelte escape-encoding split).
     pub property: &'arena str,
     pub value: CssValue<'arena>, // Semantic representation (normalized)
     /// End position including !important (span.end excludes it for the formatter).
@@ -451,9 +451,8 @@ pub enum CssValue<'arena> {
     /// the value subtree is source-faithful, never re-serialized; see `convert/mod.rs`). It is a
     /// candidate for the span-for-verbatim idiom (a dedicated `name_span` would drop this
     /// copy), but the exact name span needs trim-aware arithmetic (`s[..paren].trim()`) plus
-    /// base-offset alignment across callers — deferred as a perf-neutral additive (see the
-    /// `(c)` follow-up in the bumpalo arena lore). Not a decoded identifier, unlike
-    /// `CssAtrule.name` / `CssDeclaration.property`.
+    /// base-offset alignment across callers — deferred as a perf-neutral additive. Not a
+    /// decoded identifier, unlike `CssAtrule.name` / `CssDeclaration.property`.
     Function {
         name: &'arena str,
         args: &'arena [CssValue<'arena>],
@@ -722,8 +721,7 @@ pub struct CssAtrule<'arena> {
     /// decoded form, matching Svelte + spec. Kept as an arena string, NOT recovered from
     /// `span`: the span covers `@name …` and holds the raw escaped bytes, so a span-drop would
     /// silently un-decode the name and diverge from Svelte/spec for escaped names. Same
-    /// category as `CssDeclaration.property` / `Container.name`; see the `(c)` follow-up in
-    /// the bumpalo arena lore.
+    /// category as `CssDeclaration.property` / `Container.name`.
     pub name: &'arena str,
 
     /// Prelude value (structured for @import, raw string for others)

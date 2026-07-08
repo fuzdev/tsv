@@ -11,7 +11,7 @@
 //! "render-aware safety check" behind `ast_diff --render`: it lets us confirm
 //! block-style inline content is render-equivalent at corpus scale.
 //!
-//! The Svelte 5 model (see `tsv` root CLAUDE.md and the inline-layout lore):
+//! The Svelte 5 model (see `tsv` root CLAUDE.md):
 //!
 //! - whitespace **between** nodes collapses to a single space (presence is
 //!   significant, kind — space vs newline — is not);

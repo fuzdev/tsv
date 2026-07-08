@@ -604,7 +604,7 @@ impl<'a> Printer<'a> {
         // whose `>` hugs the last attr when attrs fit and dedents to its own line when they wrap. The
         // attr group and the content group stay SEPARATE, so attr-wrapping and content-wrapping
         // decouple — the decoupling that makes the with-attrs case idempotent now that content no
-        // longer flows on the tag lines. See conformance_prettier.md + the inline-layout lore.
+        // longer flows on the tag lines. See conformance_prettier.md.
         let opening =
             self.build_opening_tag(tag_sym, attr_docs, false, false, ctx.has_multiline_attr);
 
