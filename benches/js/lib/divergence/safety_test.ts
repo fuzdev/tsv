@@ -36,18 +36,82 @@ Deno.test('vs_prettier: shared normalization + unrelated layout diff is still sa
 });
 
 Deno.test('vs_prettier: real loss beyond prettier is flagged', () => {
-	// Prettier strips one leading `|`; ours strips that one AND drops a second
-	// `|` that prettier keeps. Only the extra `|` is real.
+	// Ours drops the `| C` union member's infix pipe that prettier keeps. The
+	// source's own leading `= | B` pipe is excluded as break layout, so the only
+	// counted pipes are the infix separators: source 1, prettier 1, ours 0.
 	const source = 'type A = | B | C;\n';
 	const prettier = 'type A = B | C;\n';
 	const ours = 'type A = B C;\n';
 	const v = check_safety_vs_prettier(source, ours, prettier);
 	assertEquals(v.length, 1);
 	assertEquals(v[0].type, 'content_lost');
-	assertEquals(v[0].total, 1); // one `|` beyond prettier
-	// Per-char breakdown carries the shared context: ours dropped both pipes (2),
-	// prettier dropped one (1), so real = 1.
-	assertEquals(v[0].chars, [{ char: '|', real: 1, ours: 2, prettier: 1 }]);
+	assertEquals(v[0].total, 1); // one infix `|` beyond prettier
+	// ours dropped the one counted (infix) pipe, prettier dropped none → real = 1.
+	assertEquals(v[0].chars, [{ char: '|', real: 1, ours: 1, prettier: 0 }]);
+});
+
+Deno.test('vs_prettier: leading-pipe union break (ours breaks, prettier inline) is safe', () => {
+	// The `return_type_generic_union` divergence in method-signature position: tsv
+	// keeps the params inline and breaks the return-type union with leading pipes
+	// (`Resolvable<| A⏎| B⏎| C>`), where prettier breaks the params and keeps the
+	// union inline. Ours grows one `|` per broken union — pure break layout, NOT
+	// content. Excluding leading pipes cancels it (this is the gated SAFETY bug the
+	// language-tools corpus onboarding hit on `interfaces.ts`).
+	const source = 'foo(a: A, b: B): R<X | Y | Z>;\n';
+	const prettier = 'foo(\n\ta: A,\n\tb: B\n): R<X | Y | Z>;\n';
+	const ours = 'foo(a: A, b: B): R<\n\t| X\n\t| Y\n\t| Z\n>;\n';
+	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
+});
+
+Deno.test('vs_prettier: bracket-hugged leading union pipe (`R<| A`) is safe', () => {
+	// tsv also hugs the first member onto the `<` line with a leading pipe
+	// (`R<| A`); that operand-less pipe (prev is `<`) is excluded like a
+	// line-leading one, so no fabricated content_added.
+	const source = 'x: R<A | B | C>;\n';
+	const ours = 'x: R<| A\n\t| B\n\t| C>;\n';
+	const prettier = 'x: R<A | B | C>;\n';
+	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
+});
+
+Deno.test('vs_prettier: a dropped member in a broken union is still flagged', () => {
+	// Excluding the leading pipe must not blind the check: ours breaks the union
+	// AND drops the `C` member (identifier + its infix pipe). The infix-pipe drop
+	// and the `C` letter drop both register.
+	const source = 'x: R<A | B | C>;\n';
+	const prettier = 'x: R<A | B | C>;\n';
+	const ours = 'x: R<\n\t| A\n\t| B\n>;\n'; // dropped `| C`
+	const v = check_safety_vs_prettier(source, ours, prettier);
+	assertEquals(v.length, 1);
+	assertEquals(v[0].type, 'content_lost');
+	// counted pipes: source 2 (A|B, B|C), ours 1 (A|B) → 1 lost; plus the `C` and
+	// its identifier — here `C` is a lone letter, so total = 1 (pipe) + 1 (`c`).
+	assertEquals(v[0].total, 2);
+	const pipe = v[0].chars.find((c) => c.char === '|');
+	assertEquals(pipe, { char: '|', real: 1, ours: 1, prettier: 0 });
+});
+
+Deno.test('vs_prettier: space-separated leading pipes (`| | | |`) are all excluded', () => {
+	// tsv can collapse nested single-member unions to space-separated leading pipes
+	// (`type A = | ( | ( | X ))` → `type A = | | | X`). Every one of those pipes is
+	// operand-less break layout — a space-separated `| |` is NOT `||`. Prettier keeps
+	// the parens (its pipes are leading too), so both sides cancel: no fabricated
+	// content_added (the real bug hit `prettier/tests/.../union/.../single-type.ts`).
+	const source = 'type A = | ( | ( | X ) );\n';
+	const ours = 'type A = | | | X;\n';
+	const prettier = 'type A =\n\t| (\n\t\t| (\n\t\t\t| X\n\t\t)\n\t);\n';
+	assertEquals(check_safety_vs_prettier(source, ours, prettier), []);
+});
+
+Deno.test('vs_prettier: `||` logical-or is fully counted (both pipes)', () => {
+	// A `|` after `|` is `||`, not a leading union pipe — both pipes stay content,
+	// so turning `||` into a single `|` (a catastrophic bug) is still flagged.
+	const source = 'const x = a || b;\n';
+	const prettier = 'const x = a || b;\n';
+	const ours = 'const x = a | b;\n'; // dropped one `|` of `||`
+	const v = check_safety_vs_prettier(source, ours, prettier);
+	assertEquals(v.length, 1);
+	assertEquals(v[0].type, 'content_lost');
+	assertEquals(v[0].total, 1);
 });
 
 Deno.test('vs_prettier: dropped comment prettier keeps is flagged', () => {
