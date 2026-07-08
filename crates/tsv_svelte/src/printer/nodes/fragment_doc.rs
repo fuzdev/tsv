@@ -315,7 +315,7 @@ impl<'a> Printer<'a> {
                 // `multiline` — the convergence path (the multiline element arm) is the only
                 // caller that opts in; the legacy non-multiline callers keep routing blocks
                 // through handle_inline_child until the element-arm reroute lands (it is
-                // currently parked on a corpus parity gap — see TODO_REFACTORING §#1 Slice 2).
+                // currently parked on a corpus parity gap, tracked in internal notes).
                 self.handle_block_child(
                     trimmed_nodes,
                     i,
