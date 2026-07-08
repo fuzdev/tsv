@@ -219,13 +219,28 @@ impl<'a> Printer<'a> {
         let mut prev_end = body_start;
         let mut prev_stmt_end: Option<u32> = None;
 
+        // Zero-comment fast gate: one binary search over the whole statement-list
+        // window short-circuits every per-statement comment sub-query (leading
+        // collect, format-ignore lookup, trailing same-line scan, and the
+        // trailing-comment end walk). Sound because comments are disjoint +
+        // start-sorted and every sub-range lies within `[body_start, body_end]`,
+        // so when none sit inside the block all sub-queries are provably
+        // empty/false. Blank-line preservation and the `prev_end` cursor are
+        // comment-independent and stay outside the gate. Canonical reference:
+        // `build_params_doc_with_comments`.
+        let body_has_comments = self.has_comments_between(body_start, body_end);
+
         for (i, stmt) in body.iter().enumerate() {
             let stmt_start = stmt.span().start;
             let is_first = i == 0;
 
-            // Collect leading comments (skip trailing same-line from previous statement)
-            let mut leading_comments =
-                self.collect_leading_comments(prev_end, stmt_start, prev_stmt_end);
+            // Collect leading comments (skip trailing same-line from previous
+            // statement). Skipped entirely on a comment-free block.
+            let mut leading_comments = if body_has_comments {
+                self.collect_leading_comments(prev_end, stmt_start, prev_stmt_end)
+            } else {
+                CommentVec::new()
+            };
 
             // First statement: drop comments pulled onto the opening `{` line (they
             // are emitted as the brace-line prefix by the caller).
@@ -233,7 +248,7 @@ impl<'a> Printer<'a> {
                 leading_comments.retain(|c| !self.comment_on_delimiter_line(dpos, c));
             }
 
-            // Handle blank lines and separators
+            // Handle blank lines and separators (comment-independent)
             if is_first && has_leading {
                 // First statement after leading content - always need separator
                 body_parts.push(d.hardline());
@@ -256,23 +271,28 @@ impl<'a> Printer<'a> {
             );
 
             // format-ignore: emit raw source instead of formatting
-            if self.has_format_ignore_in_range(prev_end, stmt_start) {
+            if body_has_comments && self.has_format_ignore_in_range(prev_end, stmt_start) {
                 body_parts.push(self.raw_source_doc(stmt.span()));
             } else {
                 body_parts.push(self.build_statement_doc(stmt));
             }
 
-            // Handle trailing same-line comments after this statement. Bound the
-            // scan by the next statement's start so a comment only attaches to the
-            // statement it immediately follows — multiple statements on one source
-            // line (`a(); b(); // c`) must not each grab the trailing comment.
+            // Handle trailing same-line comments after this statement, and advance
+            // `prev_end` past them. Bound the scan by the next statement's start so
+            // a comment only attaches to the statement it immediately follows —
+            // multiple statements on one source line (`a(); b(); // c`) must not
+            // each grab the trailing comment. With no comment in the block,
+            // `find_end_with_trailing_comments(end) == end`.
             let stmt_end = stmt.span().end;
-            let next_start = body.get(i + 1).map_or(body_end, |s| s.span().start);
-            body_parts.extend(self.build_trailing_same_line_comment_docs(stmt_end, next_start));
-
-            // Update prev_end past trailing comments (including comments on the
-            // closing */ line of multi-line block comments)
-            prev_end = self.find_end_with_trailing_comments(stmt_end);
+            if body_has_comments {
+                let next_start = body.get(i + 1).map_or(body_end, |s| s.span().start);
+                body_parts.extend(self.build_trailing_same_line_comment_docs(stmt_end, next_start));
+                // Update prev_end past trailing comments (including comments on the
+                // closing */ line of multi-line block comments)
+                prev_end = self.find_end_with_trailing_comments(stmt_end);
+            } else {
+                prev_end = stmt_end;
+            }
             prev_stmt_end = Some(stmt_end);
         }
 
