@@ -53,21 +53,10 @@ const KNOWN_GAPS: KnownGap[] = [
 	// to fix. Each gets a fixtures-first fix; delete its entry once the input parses. See the
 	// sanction bar in `lib/parse_sanctions.ts`.
 	{
-		pattern: 'css/samples/comment-html/',
-		category: 'css-cdo-cdc',
-		reason:
-			'HTML comment `<!-- -->` in <style>: CSS Syntax defines <!-- / --> as ignorable CDO/CDC tokens; parseCss consumes them',
-	},
-	{
 		pattern: 'validator/samples/css-invalid-combinator-selector',
 		category: 'css-error-recovery',
 		reason:
 			'invalid top-level leading combinator `>`/`+` (no parent rule; tsv parses relative selectors where valid — nesting, @scope body): tsv is grammar-correct to reject the selector but hard-fails the whole file where the CSS spec recovers (drop the bad rule, keep the rest). Parity comes from error recovery, not from accepting invalid CSS. See docs/conformance_svelte.md §CSS Parser Scope & Error Model',
-	},
-	{
-		pattern: 'validator/samples/if-block-whitespace',
-		category: 'svelte-block-ws',
-		reason: 'whitespace after `{` in a block open (`{ #if}`): svelte skips it, deferring the warning to its validator',
 	},
 ];
 
