@@ -169,29 +169,21 @@ impl<'a> Printer<'a> {
                 d.concat(&parts)
             }
         } else if self.needs_parens(unary.argument, ParenContext::UnaryArgument) {
-            // Binary expressions need parens - use grouping for logical ops to allow line breaking
+            // Binary expressions need parens - grouping lets the parens expand when the arg is long
             if let Expression::BinaryExpression(binary) = unary.argument {
-                if binary.operator.is_logical() {
-                    // Use ungrouped binary chain in a single paren group.
-                    // Matches Prettier's `parent.type === "UnaryExpression"` path
-                    // (binaryish.js:88-91): `group([indent([softline, ...parts]), softline])`.
-                    // The chain's shouldGroup is computed normally: 2-operand chains
-                    // get a sub-group (can stay flat at inner indent when paren group
-                    // breaks), 3+ chained operands break together with the paren group.
-                    let inner = self.build_binary_chain_doc_ungrouped(binary);
-                    d.group(d.concat(&[
-                        d.text("("),
-                        d.indent_softline(inner),
-                        d.softline(),
-                        d.text(")"),
-                    ]))
-                } else {
-                    d.concat(&[
-                        d.text("("),
-                        self.build_expression_doc(unary.argument),
-                        d.text(")"),
-                    ])
-                }
+                // Wrap any binaryish arg (logical or not) in a single paren group.
+                // Matches Prettier's `parent.type === "UnaryExpression"` path
+                // (binaryish.js:88-91): `group([indent([softline, ...parts]), softline])`.
+                // The chain's shouldGroup is computed normally: 2-operand chains
+                // get a sub-group (can stay flat at inner indent when paren group
+                // breaks), 3+ chained operands break together with the paren group.
+                let inner = self.build_binary_chain_doc_ungrouped(binary);
+                d.group(d.concat(&[
+                    d.text("("),
+                    d.indent_softline(inner),
+                    d.softline(),
+                    d.text(")"),
+                ]))
             } else {
                 // Non-binary that needs parens (e.g., ternary or assignment in unary/assertion)
                 d.concat(&[
