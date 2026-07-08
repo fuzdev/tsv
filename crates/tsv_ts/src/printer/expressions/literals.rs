@@ -367,26 +367,6 @@ impl<'a> Printer<'a> {
 
         let mut parts = DocBuf::new();
 
-        // Handle decorators (for parameter decorators). Own-line in source → each
-        // on its own line and the parameter list expands (the hardline breaks the
-        // enclosing parameter group); inline → a single space. Matches prettier's
-        // `printDecorators`; same rule as `with_param_decorators`.
-        if render_decorators && let Some(decorators) = id.decorators() {
-            let sep = if self.has_newline_after_any_decorator(decorators) {
-                d.hardline()
-            } else {
-                d.text(" ")
-            };
-            for (i, decorator) in decorators.iter().enumerate() {
-                if i > 0 {
-                    parts.push(sep);
-                }
-                parts.push(d.text("@"));
-                parts.push(self.build_decorator_expression_doc(decorator));
-            }
-            parts.push(sep);
-        }
-
         // Add identifier name
         parts.push(self.identifier_name_doc(id));
 
@@ -417,7 +397,18 @@ impl<'a> Printer<'a> {
         }
 
         // `concat` short-circuits a single part (just the name) to that part.
-        d.concat(&parts)
+        let inner = d.concat(&parts);
+
+        // Prefix parameter decorators (own-line in source → each on its own line and
+        // the parameter list expands; inline → a single space), preserving any
+        // comment authored between a decorator and the binding (`@dec /* c */ x`).
+        // `id.span.start` is the name — the boundary for that after-decorator scan,
+        // since acorn stores the decorators before it.
+        if render_decorators && let Some(decorators) = id.decorators() {
+            self.with_param_decorators(Some(decorators), inner, id.span.start)
+        } else {
+            inner
+        }
     }
 
     /// Build a Doc for a regex literal
