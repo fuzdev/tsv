@@ -6,7 +6,7 @@
  * fidelity on *valid* Svelte, not permissiveness over an adversarial corpus that
  * deliberately bundles error fixtures (svelte's `compiler-errors/`, `loose-*`,
  * preprocess inputs) and non-Svelte HTML (prettier's `tests/format/html`). A file
- * `svelte/compiler` rejects "shouldn't pass" — see grimoire lore
+ * `svelte/compiler` rejects "shouldn't pass" — see internal notes,
  * `TODO_NODE_BENCHMARKS.md` §"Reading the Svelte conformance-coverage number".
  *
  * **Svelte only, by design.** `svelte/compiler` is the one canonical parser tsv is

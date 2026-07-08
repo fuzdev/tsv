@@ -35,8 +35,12 @@
  *   BENCH_WARMUP        Warmup iterations (default: 3)
  *   BENCH_MODE          'intersection' (default) | 'union' — iteration corpus mode
  *   BENCH_CORPUS        'perf' (default) | 'conformance' — corpus + surface selector:
- *                       perf = real-world corpus view, parse + format groups;
- *                       conformance = fixtures-included view (Svelte minus canonical-rejects), parse groups only
+ *                       perf = real-world corpus, parse + format groups (every in-scope
+ *                         tool must fully process it — unlisted pre-flight failures hard-fail;
+ *                         see lib/perf_omit.ts);
+ *                       conformance = fixtures-only view (the prettier + parse-conformance
+ *                         suites, excluding the perf/real corpus; Svelte minus canonical-rejects),
+ *                         parse groups only
  *                       (see benches/js/CLAUDE.md §Corpus)
  *   BENCH_COVERAGE_ONLY Set to 1 to emit coverage from pre-flight and SKIP the
  *                       timed phase (requires BENCH_CORPUS=conformance). Default off
@@ -70,6 +74,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { type CorpusSource, DevReposLoader, group_by_language } from './lib/corpus.ts';
+import { enrich_source_repos } from './lib/corpus_repos.ts';
+import { PERF_OMITS, perf_omit_reason } from './lib/perf_omit.ts';
 import {
 	canonical_parser_label,
 	get_alternative_versions,
@@ -105,7 +111,7 @@ import { check_artifact_freshness, wasm_artifact_path } from './lib/check_artifa
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
 import { get_napi_library_path } from './lib/napi.ts';
-import { current_runtime, type Runtime } from './lib/runtime.ts';
+import { current_machine, current_runtime, type Machine, type Runtime } from './lib/runtime.ts';
 
 /** The JS runtime executing this bench — labels the report siblings
  * (`report.deno.*` / `report.node.*`) and every row's `runtime` field, and
@@ -234,8 +240,9 @@ const MAX_FILES_PER_LANGUAGE = env_int('BENCH_LIMIT');
 /** Filter files by path pattern (default: none) */
 const FILE_FILTER = env.BENCH_FILTER;
 
-/** Number of warmup iterations (default: 3) */
-const BENCH_WARMUP = env_int('BENCH_WARMUP') ?? 3;
+/** Number of warmup iterations (default: 3; slow tasks tier down to 1 unless explicitly set) */
+const BENCH_WARMUP_EXPLICIT = env_int('BENCH_WARMUP');
+const BENCH_WARMUP = BENCH_WARMUP_EXPLICIT ?? 3;
 
 /**
  * Enable the per-iteration forced-GC hook (default: off — measures realistic
@@ -281,9 +288,9 @@ type CorpusKind = 'perf' | 'conformance';
 /**
  * Corpus + surface selector. Default `perf`: the real-world corpus view, parse
  * + format groups, writing `report.<runtime>.*` — the throughput headline.
- * `BENCH_CORPUS=conformance`: the fixtures-included corpus view (real
- * repos + prettier suites + the parse-conformance suites, minus the Svelte
- * files svelte/compiler rejects — see `lib/corpus.ts` `SVELTE_REJECT_CACHE`),
+ * `BENCH_CORPUS=conformance`: the fixtures-only corpus view (prettier suites +
+ * the parse-conformance suites, disjoint from the perf/real corpus, minus the
+ * Svelte files svelte/compiler rejects — see `lib/corpus.ts` `SVELTE_REJECT_CACHE`),
  * parse groups ONLY, writing `report.conformance.<runtime>.*` — the per-tool
  * parse coverage/throughput surface. Format impls are deliberately excluded there:
  * grading formatter behavior on the fixture suites is the correctness gates'
@@ -324,7 +331,7 @@ const REPORT_TAG = IS_CONFORMANCE ? `conformance.${RUNTIME}` : RUNTIME;
 /**
  * Duration per benchmark in ms. The default is surface-dependent: 5000 for
  * perf, 15000 in conformance mode — there each iteration is a full sweep of
- * the much larger fixtures-included corpus, so the slow rows need the longer
+ * the much larger conformance corpus, so the slow rows need the longer
  * window for a usable sample count. `BENCH_DURATION` overrides either.
  */
 const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5000);
@@ -333,7 +340,8 @@ const BENCH_DURATION = env_int('BENCH_DURATION') ?? (IS_CONFORMANCE ? 15_000 : 5
  * Coverage-only mode (`BENCH_COVERAGE_ONLY=1`): run pre-flight — which fully
  * determines per-tool parse coverage — and emit the report straight from it,
  * SKIPPING the timed benchmark phase entirely. That phase costs a fixed floor
- * of ≥8 full-corpus sweeps per row (3 warmup + ≥5 measured) no matter how low
+ * of ≥8 full-corpus sweeps per row (3 warmup + ≥5 measured; slow tasks tier to
+ * 1 warmup + ≥7 measured) no matter how low
  * `BENCH_DURATION` goes, yet the conformance surface's coverage consumers (the
  * site's per-engine table, `derive_conformance_groups`) read only the
  * pre-flight counts — so on a coverage refresh the whole timing cost is wasted.
@@ -386,6 +394,9 @@ const files: SourceFile[] = [];
 for await (const file of corpus_loader.stream(log)) {
 	files.push(file);
 }
+// Reify each loaded source's GitHub origin (URL + commit + subpath) so the
+// report links straight to the measured code — a few cheap `git` calls.
+await enrich_source_repos(corpus_loader.sources);
 const by_language = group_by_language(files);
 
 // Preserve total counts before limiting
@@ -550,6 +561,97 @@ function record_skip(bench_name: string, file_path: string, error: unknown): voi
 }
 
 /**
+ * Fail the run if the perf pre-flight skipped any file for an in-scope task that
+ * `PERF_OMITS` doesn't excuse. `skipped_files` is keyed by tracking_key and only
+ * ever holds in-scope failures (a task exists only for the languages its impl
+ * declares), so every unlisted entry is a real regression. Sorted, one line per
+ * violation, so a reviewer can transcribe a genuine tolerance straight into
+ * `PERF_OMITS`.
+ */
+function enforce_perf_coverage(): void {
+	const violations: string[] = [];
+	for (const [tracking_key, files] of skipped_files) {
+		for (const [path, error] of files) {
+			if (perf_omit_reason(PERF_OMITS, tracking_key, path) === null) {
+				violations.push(`  ${tracking_key}  ${path}: ${error}`);
+			}
+		}
+	}
+	if (violations.length === 0) return;
+	violations.sort();
+	console.error(
+		`Perf corpus: ${violations.length} unlisted pre-flight failure(s). Every in-scope tool must ` +
+			`process every real-world file — fix the tool, or add a reviewed entry (with a reason) to ` +
+			`PERF_OMITS in lib/perf_omit.ts:\n${violations.join('\n')}`,
+	);
+	exit(1);
+}
+
+/** The wasm-variant task name paired with a native task name, or `null` when no pairing exists. */
+const wasm_sibling_name = (name: string): string | null => {
+	if (name === 'oxc-parser') return 'oxc-parser-wasm';
+	if (name === 'tsv' || name.startsWith('tsv-')) return name.replace(/^tsv/, 'tsv_wasm');
+	return null;
+};
+
+/** One same-engine native/wasm pair whose pre-flight accept sets disagree. */
+interface VariantParityFinding {
+	group: string;
+	native: string;
+	wasm: string;
+	/** Files only the native variant accepted. */
+	native_only: number;
+	/** Files only the wasm variant accepted. */
+	wasm_only: number;
+}
+
+/** Populated by `warn_variant_parity()` after pre-flight; lands in the report as `variant_parity`. */
+const variant_parity_findings: VariantParityFinding[] = [];
+
+/**
+ * Warn when a same-engine native/wasm variant pair diverges in its pre-flight
+ * accept set. Both bindings run the identical engine, so their accept sets
+ * should agree file-for-file; a divergence usually means one binding's error
+ * surface is broken, not that the engines disagree — the concrete case being
+ * the oxc WASI binding's consume-once `errors` getter, which silently accepted
+ * every file and fabricated a 100% coverage row while native oxc-parser
+ * correctly rejected 245 (see lib/oxc_wasm.ts + CLAUDE.md §Known Issues).
+ * Warning only (never fatal): the coverage numbers themselves are the product
+ * in conformance mode, and perf mode has its own hard-fail. Findings also land
+ * in the report JSON (`variant_parity`), so a divergence shows up in the
+ * committed diff at review time, not just the terminal scroll.
+ */
+function warn_variant_parity(): void {
+	for (const [group_name, task_tracking] of task_tracking_by_group) {
+		for (const [name, tracking_key] of task_tracking) {
+			const sibling_name = wasm_sibling_name(name);
+			if (sibling_name === null) continue;
+			const sibling_key = task_tracking.get(sibling_name);
+			if (sibling_key === undefined) continue;
+			const native_set = successful_files.get(tracking_key) ?? new Set<string>();
+			const wasm_set = successful_files.get(sibling_key) ?? new Set<string>();
+			let native_only = 0;
+			for (const path of native_set) if (!wasm_set.has(path)) native_only++;
+			let wasm_only = 0;
+			for (const path of wasm_set) if (!native_set.has(path)) wasm_only++;
+			if (native_only === 0 && wasm_only === 0) continue;
+			variant_parity_findings.push({
+				group: group_name,
+				native: name,
+				wasm: sibling_name,
+				native_only,
+				wasm_only,
+			});
+			console.error(
+				`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
+					`(${native_only} ${name}-only, ${wasm_only} ${sibling_name}-only). Same engine — a ` +
+					`divergence usually means one binding's error surface is broken, not an engine difference.`,
+			);
+		}
+	}
+}
+
+/**
  * Iterate files and run `process_fn` for each. The iteration list is
  * pre-filtered to files this task succeeded on during pre-flight (or the
  * group's all-N intersection in `intersection` mode), so throws are real
@@ -600,10 +702,12 @@ async function run_preflight(
 		const start_ms = performance.now();
 		for (const file of files) {
 			try {
+				// `file.goal` is set only for test262 (conformance surface); every
+				// other corpus leaves it undefined → the default module parse.
 				if (task.is_async) {
-					await task.run_async!(file.content, language);
+					await task.run_async!(file.content, language, file.goal);
 				} else {
-					task.run(file.content, language);
+					task.run(file.content, language, file.goal);
 				}
 				success.add(file.path);
 				bytes += file.bytes;
@@ -778,13 +882,19 @@ async function run_benchmark_group(
 		// costs another 14s of wall clock.
 		const preflight_ms = preflight_elapsed_ms.get(task.tracking_key) ?? 0;
 		const min_iter = preflight_ms > 5000 ? (baselining ? 12 : 7) : undefined;
-		const base_task = { name: task.name, min_iterations: min_iter };
+		// Slow tasks also tier WARMUP down (3 → 1): a multi-second sweep over
+		// thousands of files fully warms the JIT in one pass, so the 2nd and 3rd
+		// warmups are pure wall clock (~25s/runtime on prettier's TS row alone).
+		// An explicit `BENCH_WARMUP` wins — it's the knob for deliberately
+		// studying warmup effects, so tiering must not silently override it.
+		const warmup_iter = preflight_ms > 5000 && BENCH_WARMUP_EXPLICIT === undefined ? 1 : undefined;
+		const base_task = { name: task.name, min_iterations: min_iter, warmup_iterations: warmup_iter };
 		if (task.is_async) {
 			bench.add({
 				...base_task,
 				fn: async () => {
 					await process_corpus_async(task_files, async (f) => {
-						await task.run_async!(f.content, language);
+						await task.run_async!(f.content, language, f.goal);
 					});
 				},
 				async: true,
@@ -793,7 +903,7 @@ async function run_benchmark_group(
 			bench.add({
 				...base_task,
 				fn: () => {
-					process_corpus(task_files, (f) => task.run(f.content, language));
+					process_corpus(task_files, (f) => task.run(f.content, language, f.goal));
 				},
 				async: false,
 			});
@@ -811,6 +921,19 @@ for (const lang of LANGUAGES) {
 	for (const operation of OPERATIONS) {
 		await run_preflight_group(operation, lang);
 	}
+}
+
+// Same-engine native/wasm variant pairs should accept identical file sets — a
+// divergence is a binding-boundary bug masquerading as coverage (see the fn doc).
+warn_variant_parity();
+
+// Perf corpus is real-world code every in-scope tool must fully process, so a
+// per-file pre-flight failure that isn't an explicitly-reviewed `PERF_OMITS`
+// entry is a hard error — not the silent skip that would quietly erode coverage.
+// Conformance mode measures coverage (sub-100% is the metric), so this is
+// perf-only. Runs before the timed phase, so a regression fails in seconds.
+if (CORPUS_MODE === 'perf') {
+	enforce_perf_coverage();
 }
 
 if (COVERAGE_ONLY) {
@@ -897,12 +1020,19 @@ interface Baseline {
 	/**
 	 * Which corpus/surface produced this report: `perf` (real-world corpus,
 	 * parse + format groups — `report.<runtime>.*`) or `conformance`
-	 * (fixtures-included corpus, Svelte set minus canonical-rejects, parse
-	 * groups only — `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
+	 * (fixtures-only corpus, disjoint from perf, Svelte set minus canonical-rejects,
+	 * parse groups only — `report.conformance.<runtime>.*`). See `BENCH_CORPUS`.
 	 */
 	corpus_kind: CorpusKind;
 	timestamp: string;
 	git_commit: string | null;
+	/**
+	 * The machine that produced this report — CPU model, OS/arch, and the
+	 * runtime's own version. The throughput numbers are machine-relative, so
+	 * without this a report copied to the site (or diffed against an older one)
+	 * can't distinguish a code change from a different box. See `Machine`.
+	 */
+	machine: Machine;
 	corpus: {
 		svelte: number;
 		typescript: number;
@@ -926,6 +1056,13 @@ interface Baseline {
 	 * report). Empty `{}` when nothing was suppressed.
 	 */
 	suppressed_noise: Record<string, number>;
+	/**
+	 * Same-engine native/wasm variant pairs whose pre-flight accept sets
+	 * disagreed (see `warn_variant_parity`). Empty `[]` when every pair agrees
+	 * — the healthy state. JSON-only, like `suppressed_noise`: a non-empty list
+	 * in a committed report is a binding-boundary bug surfacing at review time.
+	 */
+	variant_parity: VariantParityFinding[];
 }
 
 /**
@@ -1053,19 +1190,22 @@ async function build_results_data(
 	}
 
 	return {
-		// Bumped 5 → 6 for the added `corpus_kind` + `corpus_sources` fields
-		// (4 → 5 added the `runtime` field, top-level + per row).
-		version: 6,
+		// Bumped 6 → 7 for the added top-level `machine` block (CPU model, OS/arch,
+		// runtime version). 5 → 6 added `corpus_kind` + `corpus_sources`; 4 → 5
+		// added the `runtime` field, top-level + per row.
+		version: 7,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
 		timestamp: new Date().toISOString(),
 		git_commit: await get_git_commit(),
+		machine: current_machine(),
 		corpus,
 		corpus_sources: corpus_loader.sources,
 		versions,
 		binary_sizes: binary_sizes,
 		entries,
 		suppressed_noise: Object.fromEntries(suppressed_noise),
+		variant_parity: variant_parity_findings,
 	};
 }
 
@@ -1083,6 +1223,7 @@ function generate_markdown_report(
 	versions: BaselineVersions,
 	timestamp: string,
 	git_commit: string | null,
+	machine: Machine,
 	task_tracking: Map<string, Map<string, string>>,
 	effective_size: Map<string, EffectiveCorpusEntry>,
 	effective_bytes: Map<string, number>,
@@ -1097,9 +1238,13 @@ function generate_markdown_report(
 	);
 	const commit_str = git_commit ? ` (${git_commit})` : '';
 	lines.push(`**Runtime:** ${RUNTIME}\n`);
+	lines.push(
+		`**Machine:** ${machine.cpu_model} · ${machine.os}/${machine.arch} · ` +
+			`${RUNTIME} ${machine.runtime_version}\n`,
+	);
 	const conformance_note = COVERAGE_ONLY
-		? 'conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
-		: 'conformance — fixtures-included corpus (Svelte set minus svelte/compiler-rejected files), parse groups only; the headline is the per-tool Coverage lines (parse success over the valid set), with throughput measured on the all-tools-pass intersection';
+		? 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
+		: 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; the headline is the per-tool Coverage lines (parse success over the valid set), with throughput measured on the all-tools-pass intersection';
 	lines.push(
 		`**Corpus kind:** ${
 			IS_CONFORMANCE ? conformance_note : 'perf — real-world code only (fixture suites excluded)'
@@ -1270,6 +1415,7 @@ async function save_results(
 		data.versions,
 		data.timestamp,
 		data.git_commit,
+		data.machine,
 		task_tracking_by_group,
 		effective_corpus_size,
 		effective_corpus_bytes,
@@ -1444,6 +1590,7 @@ if (args.json) {
 			versions,
 			results_data.timestamp,
 			results_data.git_commit,
+			results_data.machine,
 			task_tracking_by_group,
 			effective_corpus_size,
 			effective_corpus_bytes,

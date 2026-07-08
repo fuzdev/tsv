@@ -9,7 +9,7 @@
  * enabling dynamic discovery and plugin-like architecture.
  */
 
-import type { Language, Logger, TsvImplementation } from './types.ts';
+import type { Language, Logger, ParseGoal, TsvImplementation } from './types.ts';
 import { CanonicalImplementation } from './canonical.ts';
 import { NativeImplementation } from './ffi.ts';
 import { NapiImplementation } from './napi.ts';
@@ -187,10 +187,12 @@ export interface BenchmarkTask {
 	tracking_key: string;
 	/** Whether this benchmark runs async */
 	is_async: boolean;
-	/** The benchmark function - processes all files once */
-	run: (source: string, language: Language) => unknown;
+	/** The benchmark function - processes all files once. `goal` (TS-only, from
+	 * the conformance surface's test262 files) selects the parse goal; parse tasks
+	 * forward it, format tasks ignore it. */
+	run: (source: string, language: Language, goal?: ParseGoal) => unknown;
 	/** Async version if is_async is true */
-	run_async?: (source: string, language: Language) => Promise<unknown>;
+	run_async?: (source: string, language: Language, goal?: ParseGoal) => Promise<unknown>;
 }
 
 /** Options controlling which optional/diagnostic tasks are included. */
@@ -227,7 +229,7 @@ export function get_benchmark_tasks(
 			name: canonical_parser_label(language),
 			tracking_key: `${group_name}/canonical`,
 			is_async: false,
-			run: (source) => impls.canonical.parse(source, language),
+			run: (source, _language, goal) => impls.canonical.parse(source, language, goal),
 		});
 
 		// Native parser (with JSON serialization)
@@ -236,7 +238,7 @@ export function get_benchmark_tasks(
 				name: 'tsv-json',
 				tracking_key: `${group_name}/native`,
 				is_async: false,
-				run: (source) => impls.native!.parse(source, language),
+				run: (source, _language, goal) => impls.native!.parse(source, language, goal),
 			});
 		}
 
@@ -249,7 +251,8 @@ export function get_benchmark_tasks(
 				name: 'tsv-json-no-locations',
 				tracking_key: `${group_name}/native-no-locations`,
 				is_async: false,
-				run: (source) => impls.native!.parse_no_locations!(source, language),
+				run: (source, _language, goal) =>
+					impls.native!.parse_no_locations!(source, language, goal),
 			});
 		}
 
@@ -259,7 +262,7 @@ export function get_benchmark_tasks(
 				name: 'tsv_wasm-json',
 				tracking_key: `${group_name}/wasm`,
 				is_async: false,
-				run: (source) => impls.wasm!.parse(source, language),
+				run: (source, _language, goal) => impls.wasm!.parse(source, language, goal),
 			});
 		}
 
@@ -270,7 +273,8 @@ export function get_benchmark_tasks(
 				name: 'tsv_wasm-json-no-locations',
 				tracking_key: `${group_name}/wasm-no-locations`,
 				is_async: false,
-				run: (source) => impls.wasm!.parse_no_locations!(source, language),
+				run: (source, _language, goal) =>
+					impls.wasm!.parse_no_locations!(source, language, goal),
 			});
 		}
 
@@ -280,7 +284,8 @@ export function get_benchmark_tasks(
 				name: 'tsv-internal',
 				tracking_key: `${group_name}/native-internal`,
 				is_async: false,
-				run: (source) => impls.native!.parse_internal!(source, language),
+				run: (source, _language, goal) =>
+					impls.native!.parse_internal!(source, language, goal),
 			});
 		}
 
@@ -289,7 +294,8 @@ export function get_benchmark_tasks(
 				name: 'tsv_wasm-internal',
 				tracking_key: `${group_name}/wasm-internal`,
 				is_async: false,
-				run: (source) => impls.wasm!.parse_internal!(source, language),
+				run: (source, _language, goal) =>
+					impls.wasm!.parse_internal!(source, language, goal),
 			});
 		}
 
@@ -303,7 +309,7 @@ export function get_benchmark_tasks(
 				name: 'oxc-parser',
 				tracking_key: `${group_name}/oxc`,
 				is_async: false,
-				run: (source) => impls.oxc!.parse(source, language),
+				run: (source, _language, goal) => impls.oxc!.parse(source, language, goal),
 			});
 		}
 
@@ -313,7 +319,7 @@ export function get_benchmark_tasks(
 				name: 'oxc-parser-wasm',
 				tracking_key: `${group_name}/oxc-wasm`,
 				is_async: false,
-				run: (source) => impls.oxc_wasm!.parse(source, language),
+				run: (source, _language, goal) => impls.oxc_wasm!.parse(source, language, goal),
 			});
 		}
 	} else {

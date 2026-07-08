@@ -91,7 +91,7 @@ const DEFAULT_ROOT = `${TS_REPO}/tests/cases/conformance/parser`;
  * tracked so the tool is green at baseline and a NEW gap surfaces. Must only
  * SHRINK: delete an entry when its gap is fixed. Kept SEPARATE from
  * `ts_fixtures_compare.ts` KNOWN_GAPS (different corpus + oracle). Full triage:
- * grimoire TODO_PARSE_COVERAGE.md §"Broadening — the official typescript repo".
+ * internal notes, TODO_PARSE_COVERAGE.md §"Broadening — the official typescript repo".
  * `pattern` uses `<basename>.ts` to avoid numeric-suffix collisions
  * (`…Declaration1` vs `…Declaration11`).
  */
