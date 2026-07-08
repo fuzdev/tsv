@@ -5,38 +5,10 @@ use crate::ast::internal;
 use crate::printer::CommentSpacing;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
-use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
-use super::super::types::function_types::{
-    return_type_triggers_grouping, type_params_allow_grouping,
-};
-
-/// Prettier's `shouldGroupFunctionParameters`: wrap params in their own group
-/// when there's 1 param and the return type is an object type or will break.
-///
-/// This lets params stay flat even when the outer signature group breaks
-/// due to a multiline return type. Takes decomposed fields so it serves both
-/// `FunctionDeclaration` (function declarations) and `FunctionExpression`
-/// (class methods) — their signature payloads are field-identical.
-fn should_group_function_parameters(
-    params: &[internal::Expression<'_>],
-    type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
-    return_type: Option<&internal::TSTypeAnnotation<'_>>,
-    return_type_doc: Option<DocId>,
-    d: &DocArena,
-) -> bool {
-    if params.len() != 1 {
-        return false;
-    }
-    let Some(rt_doc) = return_type_doc else {
-        return false;
-    };
-    if !type_params_allow_grouping(type_parameters) {
-        return false;
-    }
-    return_type.is_some_and(|rt| return_type_triggers_grouping(rt, rt_doc, d))
-}
+use super::super::types::function_types::should_group_function_parameters;
 
 impl<'a> Printer<'a> {
     /// Build doc for a callable signature (params + return type) with comment handling.
