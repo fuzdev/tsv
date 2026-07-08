@@ -70,6 +70,7 @@
 		"corpus:compare:format:run": "PRETTIER_DEBUG=1 deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys --allow-write=benches/js/.cache benches/js/corpus_compare_format.ts",
 		"corpus:compare:parse": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task corpus:compare:parse:run",
 		"corpus:compare:parse:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/corpus_compare_parse.ts",
+		"corpus:stats": "deno run --allow-read --allow-env --allow-sys --config benches/js/deno.json benches/js/diagnostics/corpus_stats.ts",
 		"conformance:svelte-fixtures": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task conformance:svelte-fixtures:run",
 		"conformance:svelte-fixtures:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/svelte_fixtures_compare.ts",
 		"conformance:ts-fixtures": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task conformance:ts-fixtures:run",

@@ -358,6 +358,22 @@ const should_prune_perf = (relative: string): boolean => {
 };
 
 /**
+ * Stream a directory exactly as the `perf` view would load it if the directory
+ * were a `real` corpus entry: the curated exclusions (no build-output prune, per
+ * `DevReposLoader`) plus the perf fixture/samples prune. This is the primitive
+ * for sizing a candidate subpath BEFORE adding it to `CORPUS_ENTRIES` — so the
+ * numbers a stats tool reports match what the bench would actually measure,
+ * rather than a `DirectoryLoader` walk (which applies the build-output prune and
+ * skips the perf fixture prune). See `diagnostics/corpus_stats.ts`.
+ */
+export async function* stream_perf_candidate(dir: string): AsyncGenerator<SourceFile> {
+	yield* walk_corpus(dir, {
+		prune_build_output: false,
+		skip: (_path, relative) => should_prune_perf(relative),
+	});
+}
+
+/**
  * The tagged corpus entry list, relative to project root (cwd).
  * A missing entry fails the load unless marked `optional` — see `DevReposLoader`.
  */
@@ -396,7 +412,9 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 		optional: true,
 		hint: 'run `deno task bench:harvest:svelte-styles`',
 	},
-	// External projects (monorepo subpaths)
+	// External projects (monorepo subpaths). Each entry is a reviewed package
+	// `src/` tree — never a whole monorepo — so test fixtures, build output, and
+	// scaffolding stay out (the perf prune only catches `fixtures`/`test/samples`).
 	{ path: '../kit/packages/kit/src', tier: 'real' },
 	{ path: '../svelte/packages/svelte/src', tier: 'real' },
 	{ path: '../svelte.dev/apps/svelte.dev/src', tier: 'real' },
