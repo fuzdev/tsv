@@ -409,6 +409,20 @@ pub fn parse_typescript_json_with_goal_no_locations(
     })
 }
 
+/// `parse_internal_typescript` (parse-only, no serialization) against an explicit
+/// goal — the benchmark coverage/throughput probe. Mirrors the `tsv_ts` arm of
+/// the macro's `parse_internal_*` with a goal parameter.
+#[cfg(feature = "parse")]
+#[wasm_bindgen]
+pub fn parse_internal_typescript_with_goal(source: &str, goal: &str) -> Result<(), JsError> {
+    let goal = goal_from_str(goal)?;
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
+        std::hint::black_box(ast);
+        Ok(())
+    })
+}
+
 /// `parse_typescript` without per-node `loc`, materialized in Rust. Untyped
 /// (`any`) return — the shape omits the `loc` that `tsv_ast.d.ts` requires.
 #[cfg(feature = "parse")]

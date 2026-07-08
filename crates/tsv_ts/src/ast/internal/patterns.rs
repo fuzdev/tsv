@@ -5,7 +5,7 @@
 
 use tsv_lang::Span;
 
-use super::{Expression, Property, TSTypeAnnotation};
+use super::{Decorator, Expression, Property, TSTypeAnnotation};
 
 /// Object pattern for destructuring: `{a, b}`, `{a: x, b: y}`, `{...rest}`
 ///
@@ -25,6 +25,10 @@ pub struct ObjectPattern<'arena> {
     /// parameter position; the `?` extends `span` and precedes `type_annotation`.
     pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
+    /// Parameter decorators (`@dec { a }: T`). Only set in a parameter position;
+    /// emitted last in the wire, matching acorn (which attaches a parameter's
+    /// decorators to its top-level binding node).
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     pub span: Span,
 }
 
@@ -64,6 +68,9 @@ pub struct ArrayPattern<'arena> {
     /// parameter position; the `?` extends `span` and precedes `type_annotation`.
     pub optional: bool,
     pub type_annotation: Option<TSTypeAnnotation<'arena>>,
+    /// Parameter decorators (`@dec [a]: T`). Only set in a parameter position;
+    /// emitted last in the wire, matching acorn.
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     pub span: Span,
 }
 
@@ -81,6 +88,10 @@ pub struct AssignmentPattern<'arena> {
     pub left: &'arena Expression<'arena>,
     /// The default value expression
     pub right: &'arena Expression<'arena>,
+    /// Parameter decorators (`@dec a = 1`, `@dec { a } = {}`). Only set in a
+    /// parameter position; emitted last in the wire — acorn attaches a decorated
+    /// default parameter's decorators to the `AssignmentPattern`, not its `left`.
+    pub decorators: Option<&'arena [Decorator<'arena>]>,
     pub span: Span,
 }
 

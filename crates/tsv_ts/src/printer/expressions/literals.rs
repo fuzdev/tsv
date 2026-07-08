@@ -321,7 +321,7 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for an identifier
     pub(in crate::printer) fn build_identifier_doc(&self, id: &internal::Identifier<'_>) -> DocId {
-        self.build_identifier_doc_inner(id, false)
+        self.build_identifier_doc_inner(id, false, false)
     }
 
     /// Build a Doc for an identifier with wrapping type arguments.
@@ -332,7 +332,18 @@ impl<'a> Printer<'a> {
         &self,
         id: &internal::Identifier<'_>,
     ) -> DocId {
-        self.build_identifier_doc_inner(id, true)
+        self.build_identifier_doc_inner(id, true, false)
+    }
+
+    /// Build an identifier param doc **without** its parameter decorators — used
+    /// by the `TSParameterProperty` printer, which renders the decorators before
+    /// the accessibility/`readonly` modifiers (`@dec private x`) even though acorn
+    /// stores them on the inner identifier.
+    pub(in crate::printer) fn build_identifier_doc_no_decorators(
+        &self,
+        id: &internal::Identifier<'_>,
+    ) -> DocId {
+        self.build_identifier_doc_inner(id, false, true)
     }
 
     /// Inner implementation for identifier doc building.
@@ -340,6 +351,7 @@ impl<'a> Printer<'a> {
         &self,
         id: &internal::Identifier<'_>,
         wrap_type_args: bool,
+        skip_decorators: bool,
     ) -> DocId {
         let d = self.d();
 
@@ -348,19 +360,31 @@ impl<'a> Printer<'a> {
         // Skips the single-element `parts` Vec the slow path heap-allocates and
         // the name-end scan that only the modifier/annotation branches consume.
         // Returns the exact DocId the `parts.len() == 1` tail would.
-        if id.decorators().is_none() && !id.optional && id.type_annotation().is_none() {
+        let render_decorators = !skip_decorators && id.decorators().is_some();
+        if !render_decorators && !id.optional && id.type_annotation().is_none() {
             return self.identifier_name_doc(id);
         }
 
         let mut parts = DocBuf::new();
 
-        // Handle decorators (for parameter decorators)
-        if let Some(decorators) = id.decorators() {
-            for decorator in decorators {
+        // Handle decorators (for parameter decorators). Own-line in source → each
+        // on its own line and the parameter list expands (the hardline breaks the
+        // enclosing parameter group); inline → a single space. Matches prettier's
+        // `printDecorators`; same rule as `with_param_decorators`.
+        if render_decorators && let Some(decorators) = id.decorators() {
+            let sep = if self.has_newline_after_any_decorator(decorators) {
+                d.hardline()
+            } else {
+                d.text(" ")
+            };
+            for (i, decorator) in decorators.iter().enumerate() {
+                if i > 0 {
+                    parts.push(sep);
+                }
                 parts.push(d.text("@"));
                 parts.push(self.build_decorator_expression_doc(decorator));
-                parts.push(d.text(" "));
             }
+            parts.push(sep);
         }
 
         // Add identifier name
