@@ -196,9 +196,19 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 // like value-param functions — `build_signature_params_doc`) resolved the residual
 // unexplained hunk in kit/src/types/internal.d.ts, so it moved partial→known (its
 // tabs_only_alignment divergence remains, hence known not match). svelte/css unmoved.
+//
+// typescript 64→63 (2026-07-08, ../prettier 1dcd0b0, ../svelte 8fb7ceeba,
+// ../kit 1b4adccf7, ../svelte.dev fb5a4e2, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 312d079): the intersection continuation-indent fix (a pure
+// non-object intersection breaking in a `wrap_in_group` position — type argument,
+// tuple element, conditional branch — now indents continuation members one level
+// deeper, `build_intersection_type_doc`) resolved the residual unexplained hunk in
+// prettier/tests/format/typescript/union/consistent-with-flow/comment.ts, so it moved
+// partial→known. A before/after --all diff on the identical corpus confirmed exactly
+// one file moved (0 new unknowns, match/unknown unmoved, SAFETY 0). svelte/css unmoved.
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 4,
-	typescript: 64,
+	typescript: 63,
 	css: 8,
 };
 
