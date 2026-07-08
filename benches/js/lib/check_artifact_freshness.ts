@@ -38,11 +38,33 @@ import { env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { current_runtime } from './runtime.ts';
 
-/** Crates whose source compiles into every tsv artifact (the shared core). */
-const CORE_CRATES = ['tsv_lang', 'tsv_html', 'tsv_ts', 'tsv_css', 'tsv_svelte'];
+/**
+ * Crates whose source compiles into every tsv artifact (the shared core).
+ * `tsv_arena` feeds all three bindings' per-thread reuse; `tsv_ignore` +
+ * `tsv_discover` ship in the WASM bundle (the `IgnoreStack` export) — an edit
+ * to any of them must trip staleness like a language-crate edit does.
+ * Exported (with `newest_source_mtime`) for `scripts/run_if_stale.ts`, the
+ * build-side sibling — the two sides must agree on what "the sources" are.
+ * Deliberately excludes the dev-tooling crates (`tsv_debug`, `tsv_cli`): they
+ * don't feed the measured artifacts, and including them would force wasm
+ * rebuilds on every fixture-workflow edit.
+ */
+export const CORE_CRATES = [
+	'tsv_lang',
+	'tsv_arena',
+	'tsv_html',
+	'tsv_ignore',
+	'tsv_discover',
+	'tsv_ts',
+	'tsv_css',
+	'tsv_svelte',
+];
 
 /** Absolute path to the workspace `crates/` directory. */
 const CRATES_DIR = fileURLToPath(new URL('../../../crates', import.meta.url));
+
+/** Absolute path to the workspace `Cargo.lock` (dependency bumps must also trip staleness). */
+const CARGO_LOCK = fileURLToPath(new URL('../../../Cargo.lock', import.meta.url));
 
 export interface ArtifactCheck {
 	/** Human-readable label used in messages, e.g. `FFI (release)`. */
@@ -58,7 +80,7 @@ export interface ArtifactCheck {
 	rebuild: string;
 }
 
-interface SourceMtime {
+export interface SourceMtime {
 	/** Newest mtime in milliseconds (0 if no sources were found). */
 	ms: number;
 	/** `crates/`-relative path of the newest source, for the message. */
@@ -86,7 +108,7 @@ function fmt_mtime(ms: number): string {
 const _mtime_cache = new Map<string, SourceMtime>();
 
 /** Newest mtime across `*.rs` files and `Cargo.toml` under the given crates. Memoized per crate set. */
-async function newest_source_mtime(crates: string[]): Promise<SourceMtime> {
+export async function newest_source_mtime(crates: string[]): Promise<SourceMtime> {
 	const key = crates.join(',');
 	const cached = _mtime_cache.get(key);
 	if (cached) return cached;
@@ -130,7 +152,13 @@ async function newest_source_mtime(crates: string[]): Promise<SourceMtime> {
  */
 export async function check_artifact_freshness(checks: readonly ArtifactCheck[]): Promise<void> {
 	const stale_ok = env.BENCH_STALE_OK === '1';
-	const core = await newest_source_mtime(CORE_CRATES);
+	let core = await newest_source_mtime(CORE_CRATES);
+	try {
+		const lock = await stat(CARGO_LOCK);
+		if (lock.mtimeMs > core.ms) core = { ms: lock.mtimeMs, path: 'Cargo.lock' };
+	} catch {
+		// no lockfile (fresh clone pre-build) — the missing-artifact check governs
+	}
 
 	const stale: StaleArtifact[] = [];
 	for (const check of checks) {

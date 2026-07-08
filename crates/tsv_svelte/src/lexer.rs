@@ -355,10 +355,22 @@ impl<'a> Lexer<'a> {
                 }
                 Ok(self.make_token(TokenKind::Identifier, start))
             }
-            Some(ch) => Err(lex_err(
-                format!("Unexpected character in template: '{ch}'"),
-                start,
-            )),
+            // Any other char inside a tag is a name char per Svelte's `read_tag`
+            // (a name run is anything but `/[\s=/>"']/`, and every one of those
+            // terminators is handled by an arm above). Emit it as a single-char
+            // Identifier; the parser's `attribute_name_run_end` extends it into the
+            // full name, so a symbol-led attribute name (`<div %foo>`, `[innerHTML]`)
+            // parses as Svelte's `read_static_attribute` reads it. This arm is
+            // reached only inside a tag (template mode stops at `<`/`{`), and it only
+            // ever converts a former hard error into a token — so it cannot regress a
+            // previously-valid parse. A symbol-led *tag* name (`<%foo>`) then
+            // over-accepts, joining tsv's other deferred tag-name early-errors
+            // (`<_foo>`): tag-name validity is a diagnostics-layer check tsv defers,
+            // not a parse error.
+            Some(_) => {
+                self.advance();
+                Ok(self.make_token(TokenKind::Identifier, start))
+            }
         }
     }
 }

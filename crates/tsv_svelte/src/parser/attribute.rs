@@ -153,6 +153,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                         self.parse_static_brace_attribute()?,
                     ));
                 }
+            } else if self.current_token_starts_attribute_name() {
+                // Leading-symbol attribute name (e.g. `<p }>`) — Svelte's `read_static_attribute`
+                // reads any run of non-terminator chars as a name, so a name can start with a
+                // symbol the lexer tokenized on its own (`}`) rather than an identifier char.
+                // `parse_attribute_or_directive` reads the raw run from `current_start`, so it
+                // handles this once the dispatch routes here. `{`/`<` (spread/shorthand/attach)
+                // and `>`/`/` (tag close) are peeled off above, so this only sees stray symbols.
+                attributes.push(self.parse_attribute_or_directive(parse_expressions)?);
             } else {
                 return Err(self.error_expected_found("attribute name or '>'"));
             }
@@ -165,6 +173,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn peek_char_after_brace(&self) -> Option<char> {
         let pos = self.current_start + 1; // Skip the '{'
         self.source.get(pos..)?.chars().find(|c| !c.is_whitespace())
+    }
+
+    /// Whether the current token begins a (possibly symbol-led) attribute-name run — its first
+    /// byte is not one of Svelte's name terminators (`/[\s=/>"']/`). The dispatch peels off
+    /// `{`/`<` (spread/shorthand/attach) and `>`/`/` (tag close) first, so a non-terminator here
+    /// is a leading-symbol name like `<p }>` (Svelte's `read_static_attribute` raw run).
+    fn current_token_starts_attribute_name(&self) -> bool {
+        self.source
+            .as_bytes()
+            .get(self.current_start)
+            .is_some_and(|&b| !is_attr_name_terminator(b))
     }
 
     /// Byte offset of the first attribute-name terminator at/after `start`, mirroring

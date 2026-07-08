@@ -10,9 +10,13 @@
  *   corpus. The correctness gates (`corpus:compare:*` `--all`, `skip_triage`,
  *   `wasm_json_probe`) keep this scope — their sanction lists and coverage were
  *   reviewed against it.
- * - `conformance` — everything: `gates` plus the parse-conformance suites
- *   (Svelte's compiler tests, the wpt-css harvest cache, test262 graded
- *   positives). The per-tool parse coverage/throughput measurement surface
+ * - `conformance` — the hard parse cases only: the prettier fixture suites plus
+ *   the parse-conformance suites (Svelte's compiler tests, the wpt-css harvest
+ *   cache, test262 graded positives). Deliberately EXCLUDES the `real` perf tier,
+ *   so the conformance coverage surface and the perf corpus are mutually exclusive:
+ *   `perf` is the "every in-scope tool must fully process it" corpus (`bench.ts`
+ *   hard-fails an unlisted failure there — see `perf_omit.ts`), `conformance` is
+ *   where sub-100% coverage is the metric. The per-tool parse coverage surface
  *   (`deno task bench:conformance`).
  *
  * - DevReposLoader: loads one view of CORPUS_ENTRIES (hardcoded ~/dev/ repos)
@@ -25,7 +29,8 @@ import { fs_exists } from '@fuzdev/fuz_util/fs.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
-import type { Language, Logger, SourceFile } from './types.ts';
+import { clone_hint } from './corpus_repos.ts';
+import type { Language, Logger, ParseGoal, SourceFile } from './types.ts';
 
 //
 // Shared Utilities
@@ -48,14 +53,16 @@ function detect_language(path: string): Language | null {
 	}
 }
 
-/** Default exclusion patterns */
+/**
+ * Exclusion patterns applied to EVERY walk. `.d.ts` is deliberately NOT here:
+ * the product formats declaration files (`tsv format` discovers them like any
+ * `.ts`), so the corpus must exercise them — declaration-heavy shapes (overload
+ * chains, huge unions, `declare` blocks) demonstrably carry divergence signal.
+ */
 const DEFAULT_EXCLUSIONS = [
-	'.d.ts', // Declaration files
 	'/node_modules/',
 	'/.svelte-kit/',
 	'/.gro/',
-	'/build/',
-	'/dist/',
 	// Prettier test fixtures that aren't representative of standard parsing:
 	// `_errors_/` contains intentionally-malformed inputs prettier tracks for
 	// error-recovery testing, `front-matter/` files embed YAML front-matter
@@ -69,10 +76,21 @@ const DEFAULT_EXCLUSIONS = [
 	'/cursor/',
 ];
 
+/**
+ * Build-output patterns, applied only to UNCURATED walks (`DirectoryLoader` —
+ * arbitrary project scans that may contain compiled artifacts). The curated
+ * `CORPUS_ENTRIES` point at reviewed `src/` trees where a `build/` segment is
+ * real source (kit's `src/exports/vite/build/`), so `DevReposLoader` opts out.
+ */
+const BUILD_OUTPUT_EXCLUSIONS = ['/build/', '/dist/'];
+
+/** The uncurated-walk pattern set, precomposed once (`should_exclude` runs per file). */
+const UNCURATED_EXCLUSIONS = [...DEFAULT_EXCLUSIONS, ...BUILD_OUTPUT_EXCLUSIONS];
+
 const DEFAULT_EXTENSIONS = ['svelte', 'ts', 'js', 'css'];
 
-/** Check if file should be excluded */
-function should_exclude(path: string): boolean {
+/** Check if file should be excluded. `prune_build_output` adds the `/build/`+`/dist/` patterns (uncurated walks only). */
+function should_exclude(path: string, prune_build_output: boolean): boolean {
 	const name = basename(path);
 	const segments = path.split('/');
 	// The `multiparser*` family — prettier's embedded-language tests. The bare
@@ -90,7 +108,8 @@ function should_exclude(path: string): boolean {
 	if (segments.some((s) => s === 'multiparser' || s.startsWith('multiparser-'))) {
 		return true;
 	}
-	for (const pattern of DEFAULT_EXCLUSIONS) {
+	const patterns = prune_build_output ? UNCURATED_EXCLUSIONS : DEFAULT_EXCLUSIONS;
+	for (const pattern of patterns) {
 		if (pattern.startsWith('/')) {
 			// Directory patterns (`/node_modules/`) anchor on path SEGMENTS, not raw
 			// substring — otherwise any absolute path that merely contains the text
@@ -140,6 +159,8 @@ type SkipFn = (path: string, relative: string) => boolean | Promise<boolean>;
 interface WalkOptions {
 	extensions?: string[];
 	skip?: SkipFn;
+	/** Apply `BUILD_OUTPUT_EXCLUSIONS` (default true — curated entry walks opt out). */
+	prune_build_output?: boolean;
 }
 
 /** Walk a directory and yield source files one at a time.
@@ -164,7 +185,7 @@ async function* walk_corpus(
 	for (const relative of relative_paths) {
 		const path = join(dir_path, relative);
 		if (!ext_set.has(extname(path).toLowerCase())) continue;
-		if (should_exclude(path)) continue;
+		if (should_exclude(path, options.prune_build_output ?? true)) continue;
 
 		const language = detect_language(path);
 		if (!language) continue;
@@ -193,15 +214,18 @@ async function* walk_corpus(
  * still dropped.
  */
 async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
-	let paths: string[];
+	let raw: Array<string | { path: string; goal?: ParseGoal }>;
 	try {
-		paths = JSON.parse(await readFile(list_path, 'utf8'));
+		raw = JSON.parse(await readFile(list_path, 'utf8'));
 	} catch (e) {
 		console.warn(`Warning: Could not read file list ${list_path}: ${e}`);
 		return;
 	}
-	paths.sort();
-	for (const relative of paths) {
+	// Accept both the `{path, goal}` shape (test262, goal-aware) and a bare
+	// `string[]` (older caches / other file lists — goal defaults to module).
+	const entries = raw.map((e) => (typeof e === 'string' ? {path: e} : e));
+	entries.sort((a, b) => a.path.localeCompare(b.path));
+	for (const {path: relative, goal} of entries) {
 		const path = resolve(relative);
 		const language = detect_language(path);
 		if (!language) continue;
@@ -212,6 +236,7 @@ async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
 				content,
 				language,
 				bytes: new TextEncoder().encode(content).length,
+				goal,
 			};
 		} catch (e) {
 			console.warn(`Warning: Could not read ${path}: ${e}`);
@@ -268,10 +293,12 @@ interface CorpusEntryBase {
 	skip?: SkipFn;
 	/**
 	 * Tolerate absence with a warning instead of failing the run. Only for the
-	 * derived harvest caches, whose source checkouts (`../wpt`, `../test262`)
-	 * are legitimately machine-dependent — the harvest tasks warn-and-skip the
-	 * same way, and `corpus_sources` disclosure covers the smaller corpus.
-	 * Everything else is required: a missing repo fails fast (see `stream`).
+	 * derived harvest caches: wpt/test262 because their source checkouts are
+	 * legitimately machine-dependent (their harvest tasks warn-and-skip the same
+	 * way), svelte_styles because it's generated from the always-required dev
+	 * repos and just may not have been harvested yet. `corpus_sources`
+	 * disclosure covers the smaller corpus. Everything else is required: a
+	 * missing repo fails fast (see `stream`).
 	 */
 	optional?: boolean;
 	/** Remedy appended to the missing-entry warning/error (e.g. the harvest task to run). */
@@ -348,10 +375,27 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 	{ path: '../fuz_template/src', tier: 'real' },
 	{ path: '../fuz_ui/src', tier: 'real' },
 	{ path: '../fuz_util/src', tier: 'real' },
+	{ path: '../mdz/src', tier: 'real' },
 	// Build tooling
 	{ path: '../gro/src', tier: 'real' },
 	{ path: '../svelte-docinfo/src', tier: 'real' },
 	{ path: '../tsv.fuz.dev/src', tier: 'real' },
+	// Personal sites (public repos beyond the fuz ecosystem)
+	{ path: '../ryanatkn.com/src', tier: 'real' },
+	{ path: '../webdevladder.net/src', tier: 'real' },
+	// Real-authored CSS extracted from the perf-view `.svelte` files' <style>
+	// blocks, concatenated per source repo (bench:harvest:svelte-styles). Derived
+	// but real content: ~3×es the otherwise-tiny standalone-CSS sample with
+	// naturally-sized files, and in the gates view exercises the *standalone* CSS
+	// path on real content (embedded CSS rides EmbedContext — a different path).
+	// The same bytes are also timed in the svelte rows; rows are never summed.
+	{
+		path: 'benches/js/.cache/svelte_styles',
+		tier: 'real',
+		extensions: ['css'],
+		optional: true,
+		hint: 'run `deno task bench:harvest:svelte-styles`',
+	},
 	// External projects (monorepo subpaths)
 	{ path: '../kit/packages/kit/src', tier: 'real' },
 	{ path: '../svelte/packages/svelte/src', tier: 'real' },
@@ -370,7 +414,9 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 	{ path: '../prettier/tests/format/js', tier: 'prettier_fixture' },
 	{ path: '../prettier/tests/format/css', tier: 'prettier_fixture' },
 	{ path: '../prettier/tests/format/html', tier: 'prettier_fixture', extensions: ['html'] },
-	// TODO: '../prettier/tests/format/jsx' (91 files — JSX formatting edge cases)
+	// '../prettier/tests/format/jsx' is deliberately absent: tsv rejects JSX by design
+	// (drop-in for Svelte's parser; acorn without the JSX plugin rejects it too), so the
+	// suite's 91 files would grade as always-reject noise, not conformance signal.
 	// Parse-conformance suites (`conformance` view only)
 	{ path: '../svelte/packages/svelte/tests', tier: 'suite', skip: svelte_tests_skip },
 	{
@@ -391,7 +437,11 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
 	perf: ['real'],
 	gates: ['real', 'prettier_fixture'],
-	conformance: ['real', 'prettier_fixture', 'suite'],
+	// deliberately NO `real`: the conformance coverage surface and the perf corpus
+	// are mutually exclusive sets. perf is the "every in-scope tool must fully
+	// process it" corpus (bench.ts hard-fails an unlisted failure); conformance is
+	// the hard-cases-only surface where sub-100% coverage is the measurement.
+	conformance: ['prettier_fixture', 'suite'],
 };
 
 /**
@@ -423,6 +473,28 @@ async function load_svelte_reject_set(): Promise<Set<string> | null> {
 // Dev Repos Loader
 //
 
+/**
+ * A corpus source's GitHub origin — git-detected at report-build time
+ * (`lib/corpus_repos.ts`), so the report links straight to the exact code the
+ * numbers were measured against without a hand-maintained path→URL map.
+ */
+export interface CorpusRepoRef {
+	/** Canonical https GitHub URL, e.g. `https://github.com/sveltejs/svelte`. */
+	url: string;
+	/** `owner/name` (e.g. `sveltejs/svelte`) — the linkified label. */
+	slug: string;
+	/**
+	 * The commit the corpus was loaded at (full SHA), so links pin to it; `''`
+	 * for a harvested cache linked at its canonical upstream root (no pin).
+	 */
+	commit: string;
+	/** Path within the repo to this source (`''` = repo root); drives `/tree/<commit>/<subpath>`. */
+	subpath: string;
+}
+
+// `clone_hint` is a pure helper; the reverse import (`corpus_repos.ts` → this
+// module) is type-only, so there is no runtime import cycle.
+
 /** One loaded corpus entry's disclosure row — reported as `corpus_sources`. */
 export interface CorpusSource {
 	path: string;
@@ -433,6 +505,12 @@ export interface CorpusSource {
 	 * rather than only a bare total.
 	 */
 	by_language: Record<Language, number>;
+	/**
+	 * The source's GitHub origin, git-detected by `enrich_source_repos` at
+	 * report-build time. `undefined` for a source with no GitHub remote (the
+	 * local `svelte_styles` cache) or when detection fails (absent checkout).
+	 */
+	repo?: CorpusRepoRef;
 }
 
 /**
@@ -510,7 +588,11 @@ export class DevReposLoader {
 			} else if (entry.optional) {
 				logger(`  ⚠ optional corpus entry missing: ${entry_path}${entry.hint ? ` — ${entry.hint}` : ''}`);
 			} else {
-				missing.push(entry_path + (entry.hint ? ` (${entry.hint})` : ''));
+				// Prefer an entry's own remedy (a harvest task for the derived
+				// caches); otherwise a concrete `git clone` line for a known
+				// suite/framework checkout.
+				const remedy = entry.hint ?? clone_hint(entry_path);
+				missing.push(entry_path + (remedy ? ` (${remedy})` : ''));
 			}
 		}
 		if (missing.length > 0) {
@@ -575,7 +657,11 @@ export class DevReposLoader {
 					}
 					: base_skip;
 				for await (
-					const file of walk_corpus(resolved_path, { extensions: entry.extensions, skip })
+					const file of walk_corpus(resolved_path, {
+						extensions: entry.extensions,
+						skip,
+						prune_build_output: false,
+					})
 				) {
 					count++;
 					by_language[file.language]++;

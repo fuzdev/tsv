@@ -36,11 +36,21 @@ interface Entry {
 	runtime: Runtime;
 }
 
+/** The machine block a `version` 7+ sibling report carries (`lib/runtime.ts`
+ * `Machine`); absent on older siblings, hence optional on `Report`. */
+interface Machine {
+	cpu_model: string;
+	os: string;
+	arch: string;
+	runtime_version: string;
+}
+
 interface Report {
 	version: number;
 	runtime: Runtime;
 	timestamp: string;
 	git_commit: string | null;
+	machine?: Machine;
 	versions: Record<string, string>;
 	entries: Entry[];
 }
@@ -110,16 +120,32 @@ const sources = present.map((r) => ({
 	timestamp: reports.get(r)!.timestamp,
 	git_commit: reports.get(r)!.git_commit,
 	tsv: reports.get(r)!.versions?.tsv ?? null,
+	machine: reports.get(r)!.machine ?? null,
 }));
 const mixed_vintage = new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}`)).size > 1;
 
+// Loud flag when the siblings were produced on DIFFERENT boxes — the
+// throughput numbers are machine-relative, so cross-runtime ratios are only
+// meaningful on same-machine siblings. Compares the HARDWARE identity only
+// (CPU/OS/arch); `runtime_version` differs per sibling by design. Ignores
+// siblings with no `machine` (pre-`version` 7), so a stale old sibling can't
+// spuriously trip the flag during the transition.
+const machine_ids = sources
+	.map((s) => (s.machine ? `${s.machine.cpu_model}|${s.machine.os}|${s.machine.arch}` : null))
+	.filter((v): v is string => v !== null);
+const mixed_machine = machine_ids.length > 0 && new Set(machine_ids).size > 1;
+/** The shared hardware identity (any present source has it — they agree unless
+ * `mixed_machine`), for the one-line md disclosure. */
+const machine = sources.find((s) => s.machine)?.machine ?? null;
+
 // JSON: metadata + provenance per source + the comparison rows.
 const combined = {
-	version: 6,
+	version: 7,
 	kind: 'combined' as const,
 	generated: new Date().toISOString(),
 	runtimes: present,
 	mixed_vintage,
+	mixed_machine,
 	sources,
 	rows: order.map((key) => {
 		const row = rows.get(key)!;
@@ -153,12 +179,23 @@ md.push(
 		'— each runtime’s full report is its `report.<runtime>.{json,md}` sibling.\n',
 );
 for (const s of sources) {
+	const rt_ver = s.machine ? ` ${s.machine.runtime_version}` : '';
 	md.push(
-		`- \`${s.runtime}\`: ${s.git_commit ?? 'unknown commit'} @ ${s.timestamp}` +
+		`- \`${s.runtime}\`${rt_ver}: ${s.git_commit ?? 'unknown commit'} @ ${s.timestamp}` +
 			`${s.tsv ? ` (tsv ${s.tsv})` : ''}`,
 	);
 }
 md.push('');
+if (machine) {
+	md.push(`**Machine:** ${machine.cpu_model} · ${machine.os}/${machine.arch}\n`);
+}
+if (mixed_machine) {
+	md.push(
+		'⚠ **Mixed machines** — the sibling reports were produced on different ' +
+			'hardware, so the cross-runtime ratios are not comparable; re-run every ' +
+			'runtime on one machine (`deno task bench:perf`).\n',
+	);
+}
 if (mixed_vintage) {
 	md.push(
 		'⚠ **Mixed vintages** — the sibling reports above come from different ' +
@@ -236,6 +273,13 @@ if (mixed_vintage) {
 		'⚠ compose: sibling reports have MIXED VINTAGES (' +
 			sources.map((s) => `${s.runtime}=${(s.git_commit ?? '?').slice(0, 8)}`).join(' ') +
 			') — cross-runtime ratios unreliable; re-run the stale runtimes.',
+	);
+}
+if (mixed_machine) {
+	console.error(
+		'⚠ compose: sibling reports were produced on DIFFERENT machines (' +
+			sources.map((s) => `${s.runtime}=${s.machine?.cpu_model ?? '?'}`).join(' | ') +
+			') — cross-runtime ratios are not comparable; re-run every runtime on one box.',
 	);
 }
 console.log(`Composed cross-runtime report from: ${present.join(', ')}`);

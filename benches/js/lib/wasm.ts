@@ -15,7 +15,7 @@ import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { current_runtime } from './runtime.ts';
-import type { Language, TsvImplementation } from './types.ts';
+import type { Language, ParseGoal, TsvImplementation } from './types.ts';
 
 /** WASM module function signatures */
 interface WasmModule {
@@ -32,6 +32,11 @@ interface WasmModule {
 	// svelte + typescript only (CSS emits no `loc`)
 	parse_svelte_no_locations: (source: string) => unknown;
 	parse_typescript_no_locations: (source: string) => unknown;
+	// goal-aware TS parse (`'script'`/`'module'`) — the conformance surface's
+	// test262 files. The JSON-string exports (materialize via JSON.parse, like ffi/napi).
+	parse_typescript_json_with_goal: (source: string, goal: string) => string;
+	parse_typescript_json_with_goal_no_locations: (source: string, goal: string) => string;
+	parse_internal_typescript_with_goal: (source: string, goal: string) => void;
 }
 
 export class WasmImplementation implements TsvImplementation {
@@ -135,6 +140,10 @@ export class WasmImplementation implements TsvImplementation {
 			format_css: module.format_css,
 			parse_svelte_no_locations: module.parse_svelte_no_locations,
 			parse_typescript_no_locations: module.parse_typescript_no_locations,
+			parse_typescript_json_with_goal: module.parse_typescript_json_with_goal,
+			parse_typescript_json_with_goal_no_locations:
+				module.parse_typescript_json_with_goal_no_locations,
+			parse_internal_typescript_with_goal: module.parse_internal_typescript_with_goal,
 		};
 
 		// Fairness guard for the parse rows: the wasm parse fns must return a
@@ -151,15 +160,25 @@ export class WasmImplementation implements TsvImplementation {
 		}
 	}
 
-	parse(source: string, language: Language): unknown {
+	parse(source: string, language: Language, goal?: ParseGoal): unknown {
+		if (goal && language === 'typescript') {
+			return JSON.parse(this.module.parse_typescript_json_with_goal(source, goal));
+		}
 		return this.parse_fns[language](source);
 	}
 
-	parse_internal(source: string, language: Language): void {
+	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
+		if (goal && language === 'typescript') {
+			this.module.parse_internal_typescript_with_goal(source, goal);
+			return;
+		}
 		this.parse_internal_fns[language](source);
 	}
 
-	parse_no_locations(source: string, language: Language): unknown {
+	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
+		if (goal && language === 'typescript') {
+			return JSON.parse(this.module.parse_typescript_json_with_goal_no_locations(source, goal));
+		}
 		const fn = this.parse_no_locations_fns[language];
 		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
 		return fn(source);

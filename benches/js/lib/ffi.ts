@@ -5,7 +5,7 @@
  */
 
 import { native_library_filename } from './runtime.ts';
-import type { Language, TsvImplementation } from './types.ts';
+import type { Language, ParseGoal, TsvImplementation } from './types.ts';
 
 // FFI symbol definitions.
 //
@@ -73,6 +73,20 @@ const symbols = {
 		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
 	},
+	// goal-aware TS parse (extra `u32` goal: 0 = Module, 1 = Script) — the
+	// conformance surface's test262 files
+	tsv_parse_typescript_with_goal: {
+		parameters: ['pointer', 'usize', 'u32', 'pointer'],
+		result: 'pointer',
+	},
+	tsv_parse_typescript_no_locations_with_goal: {
+		parameters: ['pointer', 'usize', 'u32', 'pointer'],
+		result: 'pointer',
+	},
+	tsv_parse_internal_typescript_with_goal: {
+		parameters: ['pointer', 'usize', 'u32', 'pointer'],
+		result: 'pointer',
+	},
 	tsv_format_css: {
 		parameters: ['pointer', 'usize', 'pointer'],
 		result: 'pointer',
@@ -86,6 +100,13 @@ const symbols = {
 type FfiFn = (
 	source: Deno.PointerValue,
 	len: number | bigint,
+	out_len: Deno.PointerValue,
+) => Deno.PointerValue;
+/** Goal-aware TS parse symbol: an extra `u32` goal (0 = Module, 1 = Script). */
+type FfiGoalFn = (
+	source: Deno.PointerValue,
+	len: number | bigint,
+	goal: number,
 	out_len: Deno.PointerValue,
 ) => Deno.PointerValue;
 type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
@@ -219,6 +240,48 @@ export class NativeImplementation implements TsvImplementation {
 		return this.decoder.decode(result_bytes);
 	}
 
+	/**
+	 * `call_ffi` for the goal-aware TS symbols (extra `u32` goal argument). A
+	 * near-duplicate of `call_ffi` rather than a shared closure so the timed
+	 * `call_ffi` path takes no per-call indirection; this variant is only reached
+	 * from the coverage-only conformance preflight.
+	 */
+	private call_ffi_goal(fn: FfiGoalFn, source: string, goal: ParseGoal): string {
+		const m = this._marshal;
+		if (!m) throw new Error('Native library not initialized');
+
+		const max_bytes = source.length * 3;
+		if (max_bytes > m.source_buffer.length) {
+			m.source_buffer = new Uint8Array(
+				new ArrayBuffer(next_capacity(max_bytes, m.source_buffer.length)),
+			);
+			m.source_ptr = Deno.UnsafePointer.of(m.source_buffer);
+		}
+		const {read, written} = this.encoder.encodeInto(source, m.source_buffer);
+		if (read !== source.length) {
+			throw new Error(`encodeInto consumed ${read} of ${source.length} source units`);
+		}
+
+		const result_ptr = fn(m.source_ptr, written, goal === 'script' ? 1 : 0, m.out_len_ptr);
+		if (result_ptr === null) {
+			throw new Error('FFI function returned null pointer');
+		}
+
+		const result_len = m.out_len_buffer[0];
+		const result_byte_count = Number(result_len);
+		if (result_byte_count > m.result_buffer.length) {
+			m.result_buffer = new Uint8Array(
+				new ArrayBuffer(next_capacity(result_byte_count, m.result_buffer.length)),
+			);
+		}
+
+		const result_bytes = m.result_buffer.subarray(0, result_byte_count);
+		new Deno.UnsafePointerView(result_ptr).copyInto(result_bytes);
+		this.symbols.tsv_free(result_ptr, result_len);
+
+		return this.decoder.decode(result_bytes);
+	}
+
 	/** Check FFI result for error and throw if present */
 	private check_error(result: string): void {
 		// Error responses are JSON objects with an "error" key
@@ -280,8 +343,10 @@ export class NativeImplementation implements TsvImplementation {
 		};
 	}
 
-	parse(source: string, language: Language): unknown {
-		const result = this.call_ffi(this.parse_fns[language], source);
+	parse(source: string, language: Language, goal?: ParseGoal): unknown {
+		const result = goal && language === 'typescript'
+			? this.call_ffi_goal(this.symbols.tsv_parse_typescript_with_goal as FfiGoalFn, source, goal)
+			: this.call_ffi(this.parse_fns[language], source);
 		const parsed = JSON.parse(result);
 		if (parsed.error) {
 			throw new Error(parsed.error);
@@ -289,15 +354,31 @@ export class NativeImplementation implements TsvImplementation {
 		return parsed;
 	}
 
-	parse_internal(source: string, language: Language): void {
-		const result = this.call_ffi(this.parse_internal_fns[language], source);
+	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
+		const result = goal && language === 'typescript'
+			? this.call_ffi_goal(
+				this.symbols.tsv_parse_internal_typescript_with_goal as FfiGoalFn,
+				source,
+				goal,
+			)
+			: this.call_ffi(this.parse_internal_fns[language], source);
 		this.check_error(result);
 	}
 
-	parse_no_locations(source: string, language: Language): unknown {
-		const fn = this.parse_no_locations_fns[language];
-		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
-		const parsed = JSON.parse(this.call_ffi(fn, source));
+	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
+		let result: string;
+		if (goal && language === 'typescript') {
+			result = this.call_ffi_goal(
+				this.symbols.tsv_parse_typescript_no_locations_with_goal as FfiGoalFn,
+				source,
+				goal,
+			);
+		} else {
+			const fn = this.parse_no_locations_fns[language];
+			if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
+			result = this.call_ffi(fn, source);
+		}
+		const parsed = JSON.parse(result);
 		if (parsed.error) {
 			throw new Error(parsed.error);
 		}

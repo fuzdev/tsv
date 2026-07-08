@@ -10,13 +10,17 @@
  *                             invalid input). The healthy state; never gates.
  *   - `tsv_fails_canonical_ok` — tsv rejects input the canonical parser accepts:
  *                             an **over-rejection**. A real drop-in gap unless the
- *                             path is in `SANCTIONED` below.
+ *                             path is catalogued below — in `SANCTIONED` (a
+ *                             deliberate divergence: deprecated syntax or a permanent
+ *                             non-goal) or `KNOWN_GAPS` (tsv wrong, a tracked gap to
+ *                             fix — skip_triage's analog of the dedicated gates'
+ *                             KNOWN_GAPS, since it has no per-language gate).
  *   - `canonical_fails_tsv_ok` — tsv accepts input the canonical parser rejects:
  *                             an over-acceptance, usually a deferred early-error
  *                             (tsv's documented posture). Reported, does not gate.
  *
- * The gate fails (exit 1) only on an **un-sanctioned over-rejection** — a tsv
- * parse gap on valid input that isn't already catalogued. Point it at a corpus
+ * The gate fails (exit 1) only on an **untracked over-rejection** — a tsv
+ * parse gap on valid input in neither `SANCTIONED` nor `KNOWN_GAPS`. Point it at a corpus
  * with a directory argument (defaults to the ~/dev repos):
  *
  *   # real source — expect green (valid code parses in both)
@@ -31,7 +35,7 @@
 
 import { DevReposLoader, DirectoryLoader, group_by_language } from '../lib/corpus.ts';
 import { init_implementations } from '../lib/implementations.ts';
-import { type Sanction, sanction_for, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
+import { type KnownGap, type Sanction, sanction_for, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
 import type { Language } from '../lib/types.ts';
 
 /**
@@ -48,36 +52,54 @@ const SANCTIONED: Sanction[] = [
 	...SVELTE_FIXTURE_SANCTIONS,
 	// Legacy Stage-3 import-assertions `assert { … }` clause — never merged into
 	// ecma262 (the final WithClause grammar is `with`-only) and since removed from
-	// engines; acorn-typescript still accepts it. tsv parses only the spec form.
-	// See docs/conformance_svelte.md §TypeScript Corrections.
+	// engines; acorn-typescript still accepts it. Deliberate: deprecated syntax
+	// declined for its successor `with {…}` (which tsv parses). See
+	// docs/conformance_svelte.md §TypeScript Corrections.
 	{
 		pattern: 'tests/format/js/import-assertions/',
 		reason: 'legacy `assert {…}` import attributes — abandoned pre-spec form; tsv is `with`-only per ecma262',
 	},
-	// CSS spec-strictness on the prettier test corpus — Svelte's parseCss is
-	// lenient where tsv follows the CSS grammar. Same class as the svelte/tests
-	// CSS entries; see docs/conformance_svelte.md §CSS Parser Scope & Error Model.
-	{
-		pattern: 'tests/format/css/attribute/quotes.css',
-		reason: 'function as attr value `[id=func("foo")]` — selectors-4 attr value is <string>|<ident>',
-	},
-	{
-		pattern: 'tests/format/css/attribute/sensitive.css',
-		reason: 'invalid attr case-flag `[type=a x]` — selectors-4 <attr-modifier> is `i`|`s` only',
-	},
-	{
-		pattern: 'tests/format/css/no-semicolon/url.css',
-		reason: '`url` split across a newline in `@import` — css-cascade prelude is url()/string',
-	},
+	// IE property/selector hacks — proprietary syntax outside the CSS grammar, a
+	// PERMANENT non-goal (docs/conformance_svelte.md §CSS Parser Scope). tsv is
+	// spec-only; this never becomes valid, so it's a true sanction, not a gap.
 	{
 		pattern: 'tests/format/css/stylefmt-repo/ie-hacks/',
-		reason: 'IE property/selector hacks — proprietary syntax outside the CSS grammar; tsv is spec-only',
+		reason: 'IE property/selector hacks — proprietary syntax outside the CSS grammar; tsv is spec-only (permanent non-goal)',
 	},
 	// Not a Svelte component — an HTML conformance file the corpus loader feeds
 	// to the Svelte parser; svelte/compiler happens to tolerate its raw `[`.
 	{
 		pattern: 'tests/format/html/tags/tags.html',
 		reason: '.html file, not Svelte — raw template `[` svelte tolerates; out of tsv scope',
+	},
+];
+
+// Over-rejections where tsv is grammar-correct on INVALID CSS but hard-fails the whole
+// file where the CSS spec RECOVERS (drop the bad rule, keep the rest). NOT sanctions —
+// tsv will accept the file once error recovery lands (docs/conformance_svelte.md §CSS
+// Parser Scope & Error Model). skip_triage has no per-language gate, so its KNOWN_GAPS
+// (the dedicated-gate concept) live here; tracked so they don't read as `unexpected`.
+const KNOWN_GAPS: KnownGap[] = [
+	{
+		pattern: 'tests/format/css/attribute/quotes.css',
+		category: 'css-error-recovery',
+		reason: 'function as attr value `[id=func("foo")]` — invalid per selectors-4 (<string>|<ident>); recovery drops the rule',
+	},
+	{
+		pattern: 'tests/format/css/attribute/sensitive.css',
+		category: 'css-error-recovery',
+		reason: 'invalid attr case-flag `[type=a x]` — selectors-4 <attr-modifier> is `i`|`s` only; recovery drops the rule',
+	},
+	{
+		pattern: 'tests/format/css/loose/loose.css',
+		category: 'css-error-recovery',
+		reason: 'whitespace before `(` in `calc (…)` / split calc() — invalid function-token grammar (ident + `(` must be adjacent); parseCss+prettier lenient, recovery drops the rule',
+	},
+	// A REAL tsv CSS bug (not error recovery): valid CSS both oracles accept, tsv wrongly rejects.
+	{
+		pattern: 'tests/format/css/inline-url/inline_url.css',
+		category: 'css-url-string',
+		reason: 'quoted `url(\'…{}…\')` with special chars inside the string — VALID CSS (parseCss + prettier accept); tsv over-rejects with `Expected }` (treats the `{` inside the string as a block open)',
 	},
 ];
 
@@ -103,6 +125,8 @@ interface Buckets {
 	unexpected_over_rejection: Entry[];
 	/** Over-rejections matched by `SANCTIONED` — deliberate, catalogued. */
 	sanctioned_over_rejection: (Entry & { reason: string })[];
+	/** Over-rejections matched by `KNOWN_GAPS` — tsv wrong but tracked (invalid-CSS pending recovery). */
+	known_gap_over_rejection: (Entry & { reason: string })[];
 	/** tsv accepts, canonical rejects — over-acceptance (deferred early-errors). */
 	over_acceptance: Entry[];
 	/** Both reject — parity, the healthy state. */
@@ -115,6 +139,7 @@ for (const lang of langs) {
 	const buckets: Buckets = {
 		unexpected_over_rejection: [],
 		sanctioned_over_rejection: [],
+		known_gap_over_rejection: [],
 		over_acceptance: [],
 		parity: [],
 	};
@@ -136,8 +161,11 @@ for (const lang of langs) {
 		}
 		if (tsv_err && !canon_err) {
 			const reason = sanction_for(SANCTIONED, f.path);
+			const gap = KNOWN_GAPS.find((g) => f.path.includes(g.pattern));
 			if (reason) {
 				buckets.sanctioned_over_rejection.push({ path: f.path, error: tsv_err, reason });
+			} else if (gap) {
+				buckets.known_gap_over_rejection.push({ path: f.path, error: tsv_err, reason: gap.reason });
 			} else {
 				buckets.unexpected_over_rejection.push({ path: f.path, error: tsv_err });
 			}
@@ -158,6 +186,7 @@ for (const lang of langs) {
 	console.error(
 		`\n${lang}: parity(both-reject)=${b.parity.length}  ` +
 			`sanctioned-over-rejection=${b.sanctioned_over_rejection.length}  ` +
+			`known-gap-over-rejection=${b.known_gap_over_rejection.length}  ` +
 			`over-acceptance=${b.over_acceptance.length}  ` +
 			`UNEXPECTED-over-rejection=${b.unexpected_over_rejection.length}`,
 	);
@@ -170,9 +199,10 @@ console.log(JSON.stringify(report, null, 2));
 
 if (unexpected_total > 0) {
 	console.error(
-		`\nFAIL: ${unexpected_total} un-sanctioned over-rejection(s) — tsv rejects input the ` +
-			`canonical parser accepts. Fix the parser, or (if tsv is correctly stricter) add a ` +
-			`reasoned entry to SANCTIONED in this file.`,
+		`\nFAIL: ${unexpected_total} untracked over-rejection(s) — tsv rejects input the ` +
+			`canonical parser accepts. Fix the parser, or add a reasoned entry to SANCTIONED ` +
+			`(a deliberate divergence — deprecated syntax or a permanent non-goal) / KNOWN_GAPS ` +
+			`(tsv wrong, a tracked gap to fix) in this file.`,
 	);
 	Deno.exit(1);
 }

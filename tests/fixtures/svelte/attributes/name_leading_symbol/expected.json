@@ -1,0 +1,142 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 62,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 28,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 4,
+						"character": 4
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 5,
+						"end": 9,
+						"name": "%foo",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 5,
+								"character": 5
+							},
+							"end": {
+								"line": 1,
+								"column": 9,
+								"character": 9
+							}
+						},
+						"value": true
+					},
+					{
+						"type": "Attribute",
+						"start": 10,
+						"end": 14,
+						"name": "#bar",
+						"name_loc": {
+							"start": {
+								"line": 1,
+								"column": 10,
+								"character": 10
+							},
+							"end": {
+								"line": 1,
+								"column": 14,
+								"character": 14
+							}
+						},
+						"value": true
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 15,
+							"end": 22,
+							"raw": "content",
+							"data": "content"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 28,
+				"end": 29,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 29,
+				"end": 61,
+				"name": "span",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 30
+					},
+					"end": {
+						"line": 2,
+						"column": 5,
+						"character": 34
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 35,
+						"end": 53,
+						"name": "[innerHTML]",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 6,
+								"character": 35
+							},
+							"end": {
+								"line": 2,
+								"column": 17,
+								"character": 46
+							}
+						},
+						"value": [
+							{
+								"start": 48,
+								"end": 52,
+								"type": "Text",
+								"raw": "text",
+								"data": "text"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

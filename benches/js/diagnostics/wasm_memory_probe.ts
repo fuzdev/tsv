@@ -23,9 +23,9 @@
  *
  *   default (steady-state) — ONE warm instance formats the whole corpus; the
  *           final byteLength is the reset()-reuse high-water (bounded by the
- *           largest single file's actual demand, NOT the pre-size hint — the lore
- *           predicts this is ~invariant to the pre-size levers; this mode proves
- *           or refutes that).
+ *           largest single file's actual demand, NOT the pre-size hint — the
+ *           working notes predict this is ~invariant to the pre-size levers;
+ *           this mode proves or refutes that).
  *
  * A/B two builds with --baseline (mirrors wasm_format_probe.ts): each build is a
  * separate module URL → its own instance+memory, so both load in one process.

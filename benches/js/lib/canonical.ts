@@ -10,6 +10,7 @@ import {
 	type Language,
 	LANGUAGE_EXTENSIONS,
 	LANGUAGE_PRETTIER_PARSERS,
+	type ParseGoal,
 	type TsvImplementation,
 } from './types.ts';
 import type { CanonicalVersions } from './versions.ts';
@@ -141,7 +142,19 @@ export class CanonicalImplementation implements TsvImplementation {
 		};
 	}
 
-	parse(source: string, language: Language): unknown {
+	parse(source: string, language: Language, goal?: ParseGoal): unknown {
+		// A test262 goal overrides the default module `sourceType` so acorn scores
+		// each script-goal file at its declared goal (e.g. `await` as an ordinary
+		// identifier), matching how tsv is measured — the fairness point of the
+		// conformance surface's goal-awareness.
+		if (goal && language === 'typescript') {
+			if (!this.#acorn_ts_parser) throw new Error('Acorn not initialized');
+			return this.#acorn_ts_parser.parse(source, {
+				sourceType: goal,
+				ecmaVersion: 2025,
+				locations: true,
+			});
+		}
 		return this.#parse_fns[language](source);
 	}
 

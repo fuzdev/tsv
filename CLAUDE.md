@@ -320,9 +320,12 @@ shared code using `node:` builtins.
 
 **Perf vs conformance surfaces.** The perf surface (`deno task bench:perf`) measures a
 **real-world-only** corpus (app + framework source; fixture suites excluded) — the
-throughput headline. The conformance surface (`deno task bench:conformance`) measures
-per-tool **parse coverage** over the fixtures-included corpus (prettier suites +
-svelte compiler tests + the wpt-css/test262 harvests), writing
+throughput headline. It's held to a hard invariant: every in-scope tool must fully
+process every file or the run fails (unlisted pre-flight failures hard-fail; see
+`benches/js/lib/perf_omit.ts`), so its coverage is 100% by construction. The conformance
+surface (`deno task bench:conformance`) measures per-tool **parse coverage** over a
+**disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the
+wpt-css/test262 harvests — the real-world code is deliberately excluded), writing
 `report.conformance.node.{json,md}`. Its **Svelte** set excludes the files
 `svelte/compiler` rejects (the `bench:harvest:svelte-rejects` cache) so coverage
 measures fidelity on *valid* Svelte rather than permissiveness over the suite's
@@ -364,12 +367,12 @@ deno task bench:deno:run
 deno task bench:node:run
 deno task bench:bun:run
 
-# Conformance surface: per-tool parse COVERAGE, fixtures-included corpus (Svelte set
+# Conformance surface: per-tool parse COVERAGE, fixtures-only corpus disjoint from perf (Svelte set
 # minus canonical-rejects) (parse groups only) → report.conformance.node.{json,md}. Coverage-only + node-only
 # by design (see "Perf vs conformance surfaces" above): entries carry null timing.
 deno task bench:conformance        # harvest + build:bench:node + coverage run
 deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
-deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject caches (freshness-stamped: skips when the source commits + pins match; --force after harvest-logic changes)
+deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-reject + svelte-styles caches (first three freshness-stamped: skip when the source commits + pins match, --force after harvest-logic changes; svelte-styles always re-harvests — live-repo source, ~2 s)
 
 # Per-file skip detail (off by default — counts always shown, paths/errors opt-in)
 deno task bench:deno:run -- --verbose
@@ -378,7 +381,7 @@ deno task bench:deno:run -- --verbose
 BENCH_LIMIT=10 deno task bench:deno:run        # Limit files per language (default: all)
 BENCH_FILTER=zzz deno task bench:deno:run      # Filter by path pattern (default: none)
 BENCH_DURATION=10000 deno task bench:deno:run  # Duration per benchmark in ms (default: 5000; conformance mode: 15000)
-BENCH_WARMUP=10 deno task bench:deno:run       # Set warmup iterations (default: 3)
+BENCH_WARMUP=10 deno task bench:deno:run       # Set warmup iterations (default: 3; slow >5s-per-sweep tasks tier to 1 unless set explicitly)
 BENCH_MODE=union deno task bench:deno:run      # Per-impl iteration (default: intersection)
 BENCH_CORPUS=conformance deno task bench:deno:run  # Corpus/surface selector (default: perf)
 BENCH_STALE_OK=1 deno task bench:deno:run      # Run despite stale artifacts (default: off)

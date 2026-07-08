@@ -1,0 +1,140 @@
+/**
+ * Harvest real-authored CSS for the corpus: extract every component-level
+ * `<style>` block from the **perf view's** `.svelte` files and concatenate them
+ * per source repo into `benches/js/.cache/svelte_styles/<repo>.css`. That
+ * directory is a `real`-tier corpus entry, so the harvest ~3×es the
+ * standalone-CSS sample (otherwise ~30 tiny files) with content people actually
+ * wrote — and because the blocks are concatenated per repo, file sizes are
+ * driven by reality (each repo's total embedded CSS), not an arbitrary chunking
+ * knob, and large files measure engine throughput rather than per-call fixed
+ * costs. In the gates view the concats additionally exercise the *standalone*
+ * CSS formatting path on real content (embedded CSS rides `EmbedContext` — a
+ * different path), so this is conformance coverage too, not just perf sample
+ * size. The same bytes are also timed inside the svelte rows; rows are never
+ * summed, so that's a disclosure note (benches/js/CLAUDE.md §Corpus), not a
+ * distortion.
+ *
+ * Extraction is textual and deliberately conservative: only `<style …>` /
+ * `</style>` tags at line start (the component-level convention every formatter
+ * normalizes to), skipping `lang=` blocks that aren't CSS. Svelte allows one
+ * style element per component, so this misses nothing structural; the parser is
+ * the downstream arbiter (a bad extraction shows up as a gates error, never
+ * silently). Blocks keep their authored bytes verbatim (including the one-level
+ * embedded indent), joined with blank lines under a generated-file banner.
+ *
+ * Unlike the wpt/test262/svelte-rejects harvests there is NO freshness stamp:
+ * the sources are the live dev repos (no single commit to stamp) and the walk
+ * takes ~2 s, so it always re-harvests; files are rewritten only when content
+ * changed, and strays from repos that no longer contribute are deleted. The
+ * block count is pinned as a MINIMUM (`SVELTE_STYLES_BLOCKS_MIN` — live-corpus
+ * semantics: growth passes; a small shrink warns and still writes, only a
+ * collapse below 90% of the pin fails before writing).
+ *
+ * Run (from repo root):
+ *   deno run --allow-read --allow-write=benches/js/.cache --allow-env \
+ *     --allow-sys --config benches/js/deno.json \
+ *     benches/js/diagnostics/svelte_styles_harvest.ts
+ */
+
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { relative, resolve, sep } from 'node:path';
+
+import { DevReposLoader } from '../lib/corpus.ts';
+import { SVELTE_STYLES_BLOCKS_MIN } from '../lib/gate_counts.ts';
+
+const CACHE_DIR = 'benches/js/.cache/svelte_styles';
+
+/** Line-anchored component-level style blocks; group 1 = attrs, group 2 = content. */
+const STYLE_RE = /^<style([^>]*)>\n([\s\S]*?)^<\/style>/gm;
+
+async function main(): Promise<void> {
+	// The styles cache itself is a perf-view entry, so on a re-run the loader
+	// yields the previous concats too — harmless, the `.svelte` filter drops
+	// them (and its absence on a first run is `optional`, a warning). Missing
+	// REQUIRED repos fail fast with the loader's clear error instead of
+	// surfacing as a misleading pin trip on a silently smaller harvest.
+	const loader = new DevReposLoader('perf');
+	const workspace = resolve('..');
+	const by_repo = new Map<string, { blocks: string[]; bytes: number }>();
+	let blocks = 0;
+	for await (const f of loader.stream((m) => console.error(m))) {
+		if (f.language !== 'svelte' || !f.path.endsWith('.svelte')) continue;
+		for (const m of f.content.matchAll(STYLE_RE)) {
+			const attrs = m[1];
+			const lang = /lang\s*=\s*["']?([\w-]+)/.exec(attrs)?.[1];
+			if (lang !== undefined && lang !== 'css') continue; // scss etc. — not CSS
+			const content = m[2].replace(/^\n+/, '').trimEnd();
+			if (content === '') continue;
+			const repo = relative(workspace, f.path).split(sep)[0];
+			const entry = by_repo.get(repo) ?? { blocks: [], bytes: 0 };
+			entry.blocks.push(content);
+			entry.bytes += content.length;
+			by_repo.set(repo, entry);
+			blocks++;
+		}
+	}
+
+	// Two-tier guard (live corpus — growth always passes). The perf-view source
+	// is the author's own daily-churning repos and the count is pure input
+	// material (not a tsv success count), so an ordinary refactor dropping a
+	// `<style>` block is benign drift, not breakage — distinguish the two by
+	// magnitude:
+	//   • COLLAPSE (below 90% of the pin) — extraction broke or the corpus was
+	//     gutted; FAIL before writing so a garbage cache never replaces a good one.
+	//   • a small shrink above that floor — WARN but still write, so one removed
+	//     block doesn't block a whole `bench` run. Re-pin in ../lib/gate_counts.ts
+	//     when convenient to silence the warning.
+	const collapse_floor = Math.floor(SVELTE_STYLES_BLOCKS_MIN * 0.9);
+	if (blocks < collapse_floor) {
+		console.error(
+			`FAIL: collapse — ${blocks} style blocks < ${collapse_floor} (90% of pinned ${SVELTE_STYLES_BLOCKS_MIN}); ` +
+				`cache not written. Extraction likely broke or the corpus was gutted — investigate before re-pinning lib/gate_counts.ts.`,
+		);
+		Deno.exit(1);
+	}
+	if (blocks < SVELTE_STYLES_BLOCKS_MIN) {
+		console.error(
+			`WARN: ${blocks} style blocks < pinned minimum ${SVELTE_STYLES_BLOCKS_MIN} ` +
+				`(within the 10% drift band) — writing cache anyway. If deliberate, re-pin in lib/gate_counts.ts to silence.`,
+		);
+	}
+
+	const out_dir = resolve(CACHE_DIR);
+	await mkdir(out_dir, { recursive: true });
+	let written = 0;
+	let unchanged = 0;
+	const expected = new Set<string>();
+	for (const [repo, entry] of by_repo) {
+		const name = `${repo}.css`;
+		expected.add(name);
+		const banner =
+			`/* generated by \`deno task bench:harvest:svelte-styles\` — CSS extracted from ` +
+			`../${repo}'s .svelte <style> blocks (${entry.blocks.length} blocks); do not edit */`;
+		const content = banner + '\n\n' + entry.blocks.join('\n\n') + '\n';
+		const path = resolve(out_dir, name);
+		const previous = await readFile(path, 'utf8').catch(() => null);
+		if (previous === content) {
+			unchanged++;
+			continue;
+		}
+		await writeFile(path, content);
+		written++;
+	}
+	// Delete strays so a repo that stopped contributing doesn't linger in the corpus.
+	let removed = 0;
+	for (const name of await readdir(out_dir)) {
+		if (!expected.has(name)) {
+			await rm(resolve(out_dir, name));
+			removed++;
+		}
+	}
+
+	const total_bytes = [...by_repo.values()].reduce((s, e) => s + e.bytes, 0);
+	console.error(
+		`svelte_styles_harvest: ${blocks} style blocks / ${(total_bytes / 1024).toFixed(0)} KB ` +
+			`from ${by_repo.size} repos → ${relative(resolve('.'), out_dir)}/ ` +
+			`(${written} written, ${unchanged} unchanged${removed > 0 ? `, ${removed} stray removed` : ''})`,
+	);
+}
+
+await main();
