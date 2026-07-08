@@ -591,8 +591,12 @@ impl<'a> Printer<'a> {
                 && preceding_args_allow_expand_last(new_expr.arguments, self.line_breaks)
                 && !has_inter_argument_comments_slice(new_expr.arguments, self)
             {
-                let (head_parts, last_arg_doc, all_args_broken) =
-                    build_args_split_last(new_expr.arguments, self, paren_open);
+                let (head_parts, last_arg_doc, all_args_broken) = build_args_split_last(
+                    new_expr.arguments,
+                    self,
+                    paren_open,
+                    self.has_comments_between(paren_open, new_expr.span.end),
+                );
 
                 // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
                 if head_parts.iter().any(|&id| d.will_break(id)) {
