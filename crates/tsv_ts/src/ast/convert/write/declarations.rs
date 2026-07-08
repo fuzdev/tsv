@@ -40,7 +40,7 @@ pub(super) fn write_decorator(
 
 /// Emit a `decorators` field when the internal node carries decorators
 /// (`Option<Vec>` with skip-if-none: present ⇒ emitted, even empty).
-fn write_decorators_field(
+pub(super) fn write_decorators_field(
     w: &mut JsonWriter,
     decorators: Option<&[internal::Decorator<'_>]>,
     ctx: &Ctx<'_>,

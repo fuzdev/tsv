@@ -278,6 +278,98 @@ lang_bindings!(
 );
 
 //
+// Goal-aware TypeScript parse (script vs module)
+//
+// The parse goal is TypeScript-only (Svelte `<script>` is always a module; CSS
+// has no goal), so — like `tsv_wasm` — these live outside `lang_bindings!`
+// rather than threading a meaningless goal through svelte/css. The goalless
+// `tsv_parse_typescript*` exports remain the `Module` default; these mirror them
+// against an explicit goal code (`0` = Module, anything else = Script). At Script
+// goal, `await` is an ordinary identifier and `import`/`export`/`import.meta` are
+// syntax errors. See `tsv parse --goal` and `tsv_ts::parse_with_goal`.
+
+/// Map the C-ABI goal code to `tsv_ts::Goal` (`0` = Module, else Script).
+#[cfg(feature = "parse")]
+fn ffi_goal(goal: u32) -> tsv_ts::Goal {
+    if goal == 0 {
+        tsv_ts::Goal::Module
+    } else {
+        tsv_ts::Goal::Script
+    }
+}
+
+/// `tsv_parse_typescript` (JSON AST) against an explicit goal.
+///
+/// # Safety
+/// See the module-level safety contract.
+#[cfg(feature = "parse")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsv_parse_typescript_with_goal(
+    source_ptr: *const u8,
+    source_len: usize,
+    goal: u32,
+    out_len: *mut usize,
+) -> *mut u8 {
+    unsafe {
+        with_source_string(source_ptr, source_len, out_len, |source| {
+            with_ast_arena(|arena| {
+                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
+                    .map_err(|e| e.to_string())?;
+                Ok(tsv_ts::convert_ast_json_bytes(&ast, source))
+            })
+        })
+    }
+}
+
+/// `tsv_parse_typescript_no_locations` (span-only JSON AST) against an explicit goal.
+///
+/// # Safety
+/// See the module-level safety contract.
+#[cfg(feature = "parse")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsv_parse_typescript_no_locations_with_goal(
+    source_ptr: *const u8,
+    source_len: usize,
+    goal: u32,
+    out_len: *mut usize,
+) -> *mut u8 {
+    unsafe {
+        with_source_string(source_ptr, source_len, out_len, |source| {
+            with_ast_arena(|arena| {
+                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
+                    .map_err(|e| e.to_string())?;
+                Ok(tsv_ts::convert_ast_json_bytes_no_locations(&ast, source))
+            })
+        })
+    }
+}
+
+/// `tsv_parse_internal_typescript` (parse-only, no serialization) against an
+/// explicit goal — the coverage/throughput probe.
+///
+/// # Safety
+/// See the module-level safety contract.
+#[cfg(feature = "parse")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn tsv_parse_internal_typescript_with_goal(
+    source_ptr: *const u8,
+    source_len: usize,
+    goal: u32,
+    out_len: *mut usize,
+) -> *mut u8 {
+    unsafe {
+        with_source_parse_internal(source_ptr, source_len, out_len, |source| {
+            with_ast_arena(|arena| {
+                let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
+                    .map_err(|e| e.to_string())?;
+                std::hint::black_box(&ast);
+                Ok(())
+            })
+        })
+    }
+}
+
+//
 // Memory Management
 //
 
@@ -415,6 +507,55 @@ mod tests {
                 "{label}: expected error JSON, got: {out}"
             );
         }
+    }
+
+    // --- goal-aware TS parse: script accepts `await` as an identifier, module rejects ---
+
+    #[test]
+    fn parse_typescript_with_goal_switches_await() {
+        type GoalFn = unsafe extern "C" fn(*const u8, usize, u32, *mut usize) -> *mut u8;
+        fn call_goal(f: GoalFn, source: &str, goal: u32) -> String {
+            let bytes = source.as_bytes();
+            let mut out_len: usize = 0;
+            // Safety: `bytes` is a valid slice; `out_len` is a live `usize`; the
+            // call writes `out_len` bytes at `ptr`, freed exactly once.
+            unsafe {
+                let ptr = f(bytes.as_ptr(), bytes.len(), goal, &raw mut out_len);
+                let s = String::from_utf8_lossy(slice::from_raw_parts(ptr, out_len)).into_owned();
+                tsv_free(ptr, out_len);
+                s
+            }
+        }
+        const MODULE: u32 = 0;
+        const SCRIPT: u32 = 1;
+        // `await` is an ordinary identifier at Script goal, reserved at Module goal.
+        let src = "var await = 1;\n";
+        for f in [
+            tsv_parse_typescript_with_goal,
+            tsv_parse_typescript_no_locations_with_goal,
+        ] {
+            assert!(
+                error_message(&call_goal(f, src, SCRIPT)).is_none(),
+                "script goal should accept `await` as identifier"
+            );
+            assert!(
+                error_message(&call_goal(f, src, MODULE)).is_some(),
+                "module goal should reject `await` as identifier"
+            );
+        }
+        // parse_internal returns "" on success, error JSON on failure.
+        assert_eq!(
+            call_goal(tsv_parse_internal_typescript_with_goal, src, SCRIPT),
+            ""
+        );
+        assert!(
+            error_message(&call_goal(
+                tsv_parse_internal_typescript_with_goal,
+                src,
+                MODULE
+            ))
+            .is_some()
+        );
     }
 
     // --- format_panic renders each payload variant (pure, no panic needed) ---

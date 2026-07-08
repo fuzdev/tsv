@@ -149,9 +149,16 @@ impl<'a> Printer<'a> {
             Expression::ThisExpression(_) => d.text("this"),
             Expression::Super(_) => d.text("super"),
             Expression::AssignmentExpression(assign) => self.build_assignment_doc(assign),
-            Expression::ObjectPattern(obj) => self.build_object_pattern_doc(obj),
-            Expression::ArrayPattern(arr) => self.build_array_pattern_doc(arr),
-            Expression::AssignmentPattern(pattern) => self.build_assignment_pattern_doc(pattern),
+            Expression::ObjectPattern(obj) => {
+                self.with_param_decorators(obj.decorators, self.build_object_pattern_doc(obj))
+            }
+            Expression::ArrayPattern(arr) => {
+                self.with_param_decorators(arr.decorators, self.build_array_pattern_doc(arr))
+            }
+            Expression::AssignmentPattern(pattern) => self.with_param_decorators(
+                pattern.decorators,
+                self.build_assignment_pattern_doc(pattern),
+            ),
             Expression::RestElement(rest) => self.build_rest_element_doc(rest),
             Expression::TSTypeAssertion(type_assert) => {
                 self.build_ts_type_assertion_doc(type_assert)
@@ -260,9 +267,10 @@ impl<'a> Printer<'a> {
     /// Build doc for function parameter expression, using FunctionParameter context for patterns
     pub(super) fn build_function_parameter_doc(&self, expr: &Expression<'_>) -> DocId {
         match expr {
-            Expression::ObjectPattern(obj) => {
-                self.build_object_pattern_doc_with_context(obj, PatternContext::FunctionParameter)
-            }
+            Expression::ObjectPattern(obj) => self.with_param_decorators(
+                obj.decorators,
+                self.build_object_pattern_doc_with_context(obj, PatternContext::FunctionParameter),
+            ),
             // For other expressions, use normal doc building
             _ => self.build_expression_doc(expr),
         }
@@ -1020,6 +1028,7 @@ impl<'a> Printer<'a> {
         &self,
         param_prop: &crate::ast::internal::TSParameterProperty<'_>,
     ) -> DocId {
+        use crate::ast::internal::Expression;
         let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
 
@@ -1037,9 +1046,22 @@ impl<'a> Printer<'a> {
             parts.push(d.text("readonly "));
         }
 
-        // Print the parameter (identifier or assignment pattern)
-        parts.push(self.build_expression_doc(param_prop.parameter));
+        // Print the parameter. acorn stores a decorated property's decorators on
+        // the inner binding (`@dec private a` → decorators on the Identifier),
+        // but the source order is `@dec` before the modifiers — so render the
+        // inner binding WITHOUT its decorators here, then prefix the whole
+        // property with them below.
+        let (inner_doc, decorators) = match param_prop.parameter {
+            Expression::Identifier(id) => {
+                (self.build_identifier_doc_no_decorators(id), id.decorators())
+            }
+            Expression::AssignmentPattern(ap) => {
+                (self.build_assignment_pattern_doc(ap), ap.decorators)
+            }
+            other => (self.build_expression_doc(other), None),
+        };
+        parts.push(inner_doc);
 
-        d.concat(&parts)
+        self.with_param_decorators(decorators, d.concat(&parts))
     }
 }

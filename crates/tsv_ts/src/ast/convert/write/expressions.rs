@@ -293,6 +293,7 @@ pub(super) fn write_expression_inner(
                 w.raw(",\"optional\":true");
             }
             write_type_annotation_field(w, arr.type_annotation.as_ref(), ctx);
+            super::declarations::write_decorators_field(w, arr.decorators, ctx);
             close_node(w, "ArrayPattern", arr.span, ctx);
         }
         internal::Expression::AssignmentPattern(pattern) => {

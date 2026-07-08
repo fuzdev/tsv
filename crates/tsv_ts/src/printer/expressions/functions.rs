@@ -1205,7 +1205,10 @@ impl<'a> Printer<'a> {
         let should_hug_single_pattern = params.len() == 1
             && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
             && no_leading_comments
-            && no_trailing_comments;
+            && no_trailing_comments
+            // An own-line parameter decorator forces the list to expand (prettier),
+            // which the hug can't express — fall through to the breakable path.
+            && !self.param_has_own_line_decorators(&params[0]);
 
         if should_hug_single_pattern {
             // Hug mode: just ( + pattern + optional trailing comma + )
@@ -1454,9 +1457,15 @@ impl<'a> Printer<'a> {
         &self,
         params: &[internal::Expression<'_>],
     ) -> bool {
-        params
-            .windows(2)
-            .any(|pair| self.has_blank_line_between(pair[0].span().end, pair[1].span().start))
+        params.windows(2).any(|pair| {
+            // Measure to the next param's first decorator, not its binding — a
+            // decorator written on its own line sits between the two bindings but
+            // is not an author blank line.
+            self.has_blank_line_between(
+                pair[0].span().end,
+                self.param_start_with_decorators(&pair[1]),
+            )
+        })
     }
 
     /// Build doc for leading comments before a parameter

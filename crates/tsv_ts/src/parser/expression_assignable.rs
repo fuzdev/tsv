@@ -114,6 +114,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     properties: properties.into_bump_slice(),
                     optional: false,
                     type_annotation: None,
+                    decorators: None,
                     span: obj.span,
                 }))
             }
@@ -158,6 +159,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     elements: elements.into_bump_slice(),
                     optional: false,
                     type_annotation: None,
+                    decorators: None,
                     span: arr.span,
                 }))
             }
@@ -186,6 +188,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Ok(Expression::AssignmentPattern(AssignmentPattern {
                     left: self.alloc(left),
                     right: assign.right,
+                    decorators: None,
                     span: assign.span,
                 }))
             }

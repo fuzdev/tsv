@@ -51,16 +51,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             param = Expression::AssignmentPattern(AssignmentPattern {
                 left: self.alloc(param),
                 right: default_value,
+                decorators: None,
                 span: Span::new(param_start as u32, assign_end),
             });
         }
         Ok(param)
     }
 
-    /// Attach parameter decorators to the binding identifier of a freshly-parsed
-    /// parameter, merging them into the identifier's `extra` (preserving any type
-    /// annotation already present). The identifier may be the parameter directly
-    /// or the `left` of an `AssignmentPattern` default (`@dec x = 1`).
+    /// Attach parameter decorators to a freshly-parsed parameter's **top-level
+    /// binding node**, matching acorn: a parameter's decorators live on the
+    /// `Identifier` / `AssignmentPattern` / `ObjectPattern` / `ArrayPattern` it
+    /// binds — reaching *inside* a `TSParameterProperty` onto its `.parameter`
+    /// (the property node's span still starts at the modifier). Notably the
+    /// default-value case (`@dec a = 1`) attaches to the `AssignmentPattern`, not
+    /// its `left`.
     fn attach_param_decorators(
         &self,
         mut param: Expression<'arena>,
@@ -68,6 +72,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Expression<'arena> {
         let arena = self.arena;
         match &mut param {
+            // `@dec private a` — decorators ride the inner binding, not the
+            // property wrapper. Recurse (the inner is an Identifier or, for
+            // `@dec private a = 1`, an AssignmentPattern).
+            Expression::TSParameterProperty(pp) => {
+                let inner = self.attach_param_decorators((*pp.parameter).clone(), decorators);
+                pp.parameter = arena.alloc(inner);
+                param
+            }
             Expression::Identifier(id) => {
                 let type_annotation = id.type_annotation().cloned();
                 id.extra = Some(arena.alloc(IdentifierParamExtra {
@@ -77,14 +89,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 param
             }
             Expression::AssignmentPattern(ap) => {
-                if let Expression::Identifier(id) = ap.left {
-                    let mut new_id = id.clone();
-                    new_id.extra = Some(arena.alloc(IdentifierParamExtra {
-                        type_annotation: id.type_annotation().cloned(),
-                        decorators: Some(decorators),
-                    }));
-                    ap.left = arena.alloc(Expression::Identifier(new_id));
-                }
+                ap.decorators = Some(decorators);
+                param
+            }
+            Expression::ObjectPattern(op) => {
+                op.decorators = Some(decorators);
+                param
+            }
+            Expression::ArrayPattern(arr) => {
+                arr.decorators = Some(decorators);
                 param
             }
             _ => param,
@@ -195,29 +208,28 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut params = self.bvec();
         if !self.check(&TokenKind::ParenClose) {
             loop {
-                // Parse parameter: identifier, array pattern, or object pattern
-                let param = match self.current_kind() {
-                    // Parameter decorators: @dec1 @dec2 identifier
-                    TokenKind::At => {
-                        // Parse decorators
-                        let mut decorators = self.bvec();
-                        while self.check(&TokenKind::At) {
-                            let start = self.current_pos().0;
-                            self.advance()?; // consume '@'
-                            let expression = self.parse_assignment_expression()?;
-                            // Covers a parenthesized expression's closing `)` (`@(expr)`)
-                            let end = self.prev_token_end();
-                            decorators.push(Decorator {
-                                expression,
-                                span: Span::new(start as u32, end as u32),
-                            });
-                        }
-                        let decorators: &'arena [Decorator<'arena>] = decorators.into_bump_slice();
-                        // After decorators, parse parameter and attach decorators to the
-                        // identifier (possibly inside an AssignmentPattern default).
-                        let param = self.parse_simple_param()?;
-                        self.attach_param_decorators(param, decorators)
+                // Parameter decorators: `@dec1 @dec2 <param>`. Parsed up front so the
+                // parameter body below can be any binding form — a parameter property
+                // (`@dec private a`) or a destructuring pattern (`@dec { a }: T`), not
+                // just a bare identifier — and the decorators are attached afterwards.
+                let decorators: &'arena [Decorator<'arena>] = if self.check(&TokenKind::At) {
+                    // Uses the shared restricted ES decorators grammar
+                    // (`parse_decorator_expression`), NOT a full assignment
+                    // expression — so `@dec [a, b]` reads as a decorator on `dec`
+                    // plus an array-pattern parameter, not the computed member
+                    // `dec[a, b]` (matching acorn).
+                    let decorators = self.parse_decorators()?;
+                    // Decorators are not valid on a rest parameter (acorn rejects `@d ...a`).
+                    if self.check(&TokenKind::DotDotDot) {
+                        return Err(self.error_msg("Decorators are not valid on a rest parameter"));
                     }
+                    decorators.into_bump_slice()
+                } else {
+                    &[]
+                };
+
+                // Parse parameter: identifier, parameter property, or destructuring pattern
+                let param = match self.current_kind() {
                     TokenKind::Identifier => {
                         let param_start = self.current_pos().0;
 
@@ -287,6 +299,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             Expression::AssignmentPattern(AssignmentPattern {
                                 left: self.alloc(pattern),
                                 right: default_value,
+                                decorators: None,
                                 span: Span::new(pattern_start, assign_end),
                             })
                         } else {
@@ -356,6 +369,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             self.error_expected_found("parameter name or destructuring pattern")
                         );
                     }
+                };
+
+                // Attach any parameter decorators to the binding node (matching acorn).
+                let param = if decorators.is_empty() {
+                    param
+                } else {
+                    self.attach_param_decorators(param, decorators)
                 };
 
                 let is_rest = matches!(&param, Expression::RestElement(_));
