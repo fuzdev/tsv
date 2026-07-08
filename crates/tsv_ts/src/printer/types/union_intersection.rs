@@ -804,16 +804,23 @@ impl<'a> Printer<'a> {
         //   TypeLiteral handles its own expansion, no extra indent needed
         // - If huggable with other continuations (A & B & {c}): wrap in indent
         //   When intersection breaks, TypeLiteral content needs continuation indentation
-        // - No huggable at all: no indent
-        //   Parent context provides indent (e.g., type alias wraps at =)
+        // - Pure non-object in a `wrap_in_group` context (type argument, tuple
+        //   element, mapped-type value, conditional branch): own the continuation
+        //   indent here. The caller puts the first member on its own line but
+        //   supplies no hanging indent, so continuations must indent one level
+        //   deeper — mirroring the line-comment path above and prettier's
+        //   `printIntersectionType` (each continuation `indent([" &", line, doc])`).
+        // - Pure non-object otherwise (type alias / annotation / return): no indent.
+        //   The caller wraps the whole result in `indent(...)` (e.g. type alias
+        //   wraps at =), so the first member stays on the `=` line and the caller's
+        //   indent already covers the continuations.
         let mut parts = first_parts;
         let has_non_huggable_continuations = last_is_huggable && intersection.types.len() > 2;
         if !continuation_parts.is_empty() {
-            if has_non_huggable_continuations {
-                // Multiple continuations with huggable at end - wrap in indent
+            if has_non_huggable_continuations || (wrap_in_group && !is_huggable_pair) {
                 parts.push(d.indent(d.concat(&continuation_parts)));
             } else {
-                // Either huggable-only or no huggable - no internal indent
+                // Huggable-only pair (`A & {b}`) or a caller-indented context - no internal indent
                 parts.extend(continuation_parts);
             }
         }

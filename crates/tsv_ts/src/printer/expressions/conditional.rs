@@ -21,6 +21,39 @@ pub(in crate::printer) fn is_nullish_coalescing(expr: &internal::Expression<'_>)
     )
 }
 
+/// A ternary consequent/alternate that gets clarity parens (prettier:
+/// needs-parentheses.js, the `ConditionalExpression` parent case). `as`/`satisfies`
+/// and an assignment bind tighter than `?:` so the parens are pure clarity (same
+/// AST); `??` is always parenthesized under a conditional. Shared by the inline and
+/// line-comment layouts so both branch paths agree.
+fn ternary_branch_needs_parens(expr: &internal::Expression<'_>) -> bool {
+    matches!(
+        expr,
+        internal::Expression::TSAsExpression(_)
+            | internal::Expression::TSSatisfiesExpression(_)
+            | internal::Expression::AssignmentExpression(_)
+    ) || is_nullish_coalescing(expr)
+}
+
+/// A ternary TEST that gets parens (prettier: needs-parentheses.js). For arrow/yield
+/// it is **semantic** — without parens the body absorbs the ternary (`() => 1 ? x : y`
+/// parses as `() => (1 ? x : y)`; `yield 1 ? x : y` as `yield (1 ? x : y)`); for
+/// `as`/`satisfies`/assignment/`??` it is clarity (same AST, they bind tighter than
+/// `?:`). Shared by the inline and line-comment layouts so both agree — the
+/// line-comment path must not drop the semantic arrow/yield parens.
+fn ternary_test_needs_parens(expr: &internal::Expression<'_>) -> bool {
+    is_nullish_coalescing(expr)
+        || matches!(
+            expr,
+            internal::Expression::AssignmentExpression(_)
+                | internal::Expression::AwaitExpression(_)
+                | internal::Expression::ArrowFunctionExpression(_)
+                | internal::Expression::YieldExpression(_)
+                | internal::Expression::TSAsExpression(_)
+                | internal::Expression::TSSatisfiesExpression(_)
+        )
+}
+
 /// Check if an expression is a template literal containing newlines
 ///
 /// When a template literal contains embedded newlines in its quasi strings,
@@ -123,20 +156,9 @@ impl<'a> Printer<'a> {
             self.build_expression_doc(cond.test)
         };
         // Several test-position expressions get parens (Prettier: needs-parentheses.js).
-        // For arrow/yield it is semantic: without parens the body absorbs the ternary
-        // (`() => 1 ? x : y` parses as `() => (1 ? x : y)`; `yield 1 ? x : y` as
-        // `yield (1 ? x : y)`). For `as`/`satisfies` it is clarity parens (same AST —
-        // they bind tighter than `?:`), matching the consequent/alternate arms below.
-        let test = if is_nullish_coalescing(cond.test)
-            || matches!(
-                cond.test,
-                internal::Expression::AssignmentExpression(_)
-                    | internal::Expression::AwaitExpression(_)
-                    | internal::Expression::ArrowFunctionExpression(_)
-                    | internal::Expression::YieldExpression(_)
-                    | internal::Expression::TSAsExpression(_)
-                    | internal::Expression::TSSatisfiesExpression(_)
-            ) {
+        // See `ternary_test_needs_parens` for the arrow/yield semantics vs the
+        // `as`/`satisfies`/assignment/`??` clarity cases.
+        let test = if ternary_test_needs_parens(cond.test) {
             d.parens(test)
         } else {
             test
@@ -214,13 +236,7 @@ impl<'a> Printer<'a> {
                     let flat_consequent = d.parens(consequent);
                     d.if_break(broken_consequent, flat_consequent)
                 }
-            } else if matches!(
-                cond.consequent,
-                internal::Expression::TSAsExpression(_)
-                    | internal::Expression::TSSatisfiesExpression(_)
-                    | internal::Expression::AssignmentExpression(_)
-            ) || is_nullish_coalescing(cond.consequent)
-            {
+            } else if ternary_branch_needs_parens(cond.consequent) {
                 d.indent(d.parens(consequent))
             } else {
                 d.indent(consequent)
@@ -242,13 +258,7 @@ impl<'a> Printer<'a> {
                     indent_binary_test,
                     cond.span.end,
                 );
-                let alternate = if matches!(
-                    cond.alternate,
-                    internal::Expression::TSAsExpression(_)
-                        | internal::Expression::TSSatisfiesExpression(_)
-                        | internal::Expression::AssignmentExpression(_)
-                ) || is_nullish_coalescing(cond.alternate)
-                {
+                let alternate = if ternary_branch_needs_parens(cond.alternate) {
                     d.parens(alternate)
                 } else {
                     alternate
@@ -299,14 +309,12 @@ impl<'a> Printer<'a> {
         let consequent_end = cond.consequent.span().end;
         let alternate_start = cond.alternate.span().start;
 
-        // Build test expression with parens if needed (same logic as non-breaking path)
+        // Build test expression with parens if needed — the same predicate as the
+        // non-breaking path, so the load-bearing arrow/yield parens (and the
+        // `as`/`satisfies` clarity parens) are never dropped just because a branch
+        // carries a line comment.
         let test = self.build_expression_doc(cond.test);
-        let test = if is_nullish_coalescing(cond.test)
-            || matches!(
-                cond.test,
-                internal::Expression::AssignmentExpression(_)
-                    | internal::Expression::AwaitExpression(_)
-            ) {
+        let test = if ternary_test_needs_parens(cond.test) {
             d.parens(test)
         } else {
             test
@@ -355,14 +363,26 @@ impl<'a> Printer<'a> {
                 let chained = self.build_conditional_doc_impl(nested, true, false);
                 (d.group_break(chained), true)
             } else {
-                (
-                    self.wrap_for_init_in(
-                        cond.consequent,
-                        self.build_expression_doc(cond.consequent),
-                    ),
-                    false,
-                )
+                let expr_doc = self
+                    .wrap_for_init_in(cond.consequent, self.build_expression_doc(cond.consequent));
+                // Clarity parens (`(a ?? b)`, `(x as T)`) exactly as the inline layout
+                // applies them — the line-comment path must not drop them.
+                let expr_doc = if ternary_branch_needs_parens(cond.consequent) {
+                    d.parens(expr_doc)
+                } else {
+                    expr_doc
+                };
+                (expr_doc, false)
             };
+        // A nested conditional handles its own indent via its chained structure;
+        // any other consequent hangs one level deeper (its own multiline content
+        // then aligns with the main layout, whether it sits on its own line after a
+        // comment or trails a single block comment / bare `?`).
+        let placed_consequent = if is_nested_cond {
+            consequent
+        } else {
+            d.indent(consequent)
+        };
         if consequent_on_own_line {
             // A comment can't share the consequent's line — consequent on a new line
             // (preserving an author blank line before it).
@@ -371,17 +391,11 @@ impl<'a> Printer<'a> {
             }
             q_parts.push(d.hardline());
             q_parts.push(d.text(INDENT));
-            q_parts.push(consequent);
         } else {
             // Single block comment or no comment - space then consequent
             q_parts.push(d.text(" "));
-            if is_nested_cond {
-                // Nested conditional handles its own indent via chained structure
-                q_parts.push(consequent);
-            } else {
-                q_parts.push(d.indent(consequent));
-            }
         }
+        q_parts.push(placed_consequent);
 
         // Comments between consequent and :. Mirrors the test→? handling above
         // (same shared helper): same-line comments trail the consequent, later-line
@@ -406,17 +420,22 @@ impl<'a> Printer<'a> {
             self.emit_ternary_branch_comments(&mut q_parts, colon_pos, alternate_start);
 
         // Alternate expression - nested conditionals cascade the break without extra indent
-        let alternate_doc = if let internal::Expression::ConditionalExpression(nested) =
-            cond.alternate
-        {
-            // Recursively use breaking layout - no indent wrapper (has its own structure)
-            self.build_conditional_doc_with_line_comments(nested, true)
-        } else {
-            // Regular expressions get indent wrapper
-            d.indent(
-                self.wrap_for_init_in(cond.alternate, self.build_expression_doc(cond.alternate)),
-            )
-        };
+        let alternate_doc =
+            if let internal::Expression::ConditionalExpression(nested) = cond.alternate {
+                // Recursively use breaking layout - no indent wrapper (has its own structure)
+                self.build_conditional_doc_with_line_comments(nested, true)
+            } else {
+                // Regular expressions get indent wrapper, plus the same clarity parens
+                // the inline layout applies (`(a ?? b)`, `(x as T)`).
+                let expr_doc = self
+                    .wrap_for_init_in(cond.alternate, self.build_expression_doc(cond.alternate));
+                let expr_doc = if ternary_branch_needs_parens(cond.alternate) {
+                    d.parens(expr_doc)
+                } else {
+                    expr_doc
+                };
+                d.indent(expr_doc)
+            };
 
         if alternate_on_own_line {
             if blank_before_alternate {
