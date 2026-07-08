@@ -1468,6 +1468,64 @@ const block_multiline_attrs_hug: DivergencePattern = {
 	},
 };
 
+const comment_preserved: DivergencePattern = {
+	id: 'comment_preserved',
+	description: 'We preserve a comment inside {…}/a tag that Prettier drops',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Attributes', 'Svelte: Elements'],
+	fixtures: [
+		'svelte/syntax/comments/expr_trailing_prettier_divergence',
+		'svelte/syntax/comments/expr_trailing_line_prettier_divergence',
+		'svelte/tags/debug/debug_comment_prettier_divergence',
+		'svelte/tags/debug/debug_comma_comment_prettier_divergence',
+	],
+	// The "we preserve / Prettier DROPS a comment" family (◆content_preservation).
+	// `comment_position` deliberately can't claim these — its content guard requires
+	// the comment in BOTH outputs, and a dropped comment is absent from prettier's —
+	// so this dedicated detector keys on the opposite, safe signal.
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// Strip JS/Svelte comments + all whitespace, leaving only code glyphs — so
+		// two lines that differ ONLY by a comment (and its reflow) compare equal.
+		const strip_code = (s: string): string =>
+			s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').replace(/\s+/g, '');
+		const has_comment = (s: string): boolean => /\/\*[\s\S]*?\*\/|\/\//.test(s);
+
+		// Claim a hunk where an OURS (added) line carries a comment and, with the
+		// comment stripped, reproduces a PRETTIER (removed) line's code — directly,
+		// or once the `}` prettier reflowed onto that line is rejoined from the next
+		// ours line (the `{expr // c⏎}` line-comment form). DIRECTIONAL BY
+		// CONSTRUCTION: the signal is a comment on the OURS side, so it can never
+		// fire on an ours-side DROP (that has the comment on the prettier/removed
+		// side) — a data-loss is never masked as `known`, and `safety.ts` guards
+		// real char-loss independently.
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const removed_code = hunk.removed_lines.filter((p) => !has_comment(p)).map(strip_code);
+			const added = hunk.added_lines;
+			for (let i = 0; i < added.length; i++) {
+				const a = added[i];
+				if (!has_comment(a)) continue;
+				const a_code = strip_code(a);
+				if (a_code === '') continue;
+				const a_joined = a_code + (i + 1 < added.length ? strip_code(added[i + 1]) : '');
+				if (removed_code.some((p) => p === a_code || p === a_joined)) return true;
+			}
+			return false;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'comment_preserved',
+				confidence: 'likely',
+				hunk_indices,
+				reason: 'We preserve a comment inside {…}/a tag that Prettier drops',
+			};
+		}
+		return null;
+	},
+};
+
 const short_expr_100: DivergencePattern = {
 	id: 'short_expr_100',
 	description: 'Short expression in block exceeds 100 chars, we break',
@@ -2262,6 +2320,7 @@ export const PATTERNS: DivergencePattern[] = [
 	inline_content_block_style,
 	fill_after_inline,
 	block_multiline_attrs_hug,
+	comment_preserved,
 	short_expr_100,
 
 	// 5. Semantic preservation patterns

@@ -122,10 +122,16 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * corpus:compare:format --all — MINIMUM per-language exact `match` count (same
  * live-corpus semantics as `CORPUS_PARSE_COMPARED_MIN`). Measured 2026-07-07
  * after the `.d.ts` corpus admission (typescript 3983→4086; svelte/css unchanged).
+ * Re-pinned 2026-07-08 (../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
+ * oracle @sveltejs/acorn-typescript 1.0.11): typescript 4086→4082 as the live
+ * framework/site repos shed ~12 TS files since 2026-07-07 (total 4708→4696) — a
+ * float in the live-corpus floor, not a tsv change (SAFETY 0; parse side unmoved —
+ * tsv_errors still 9, `compared` still ≥ its mins). svelte/css unchanged (1111 at
+ * floor / 126).
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 1111,
-	typescript: 4086,
+	typescript: 4082,
 	css: 126,
 };
 
@@ -156,15 +162,30 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  * generic-param / conditional-type break-strategy classes). Partial +2:
  * kit/src/exports/public.d.ts + kit/src/types/internal.d.ts
  * (tabs_only_alignment family, residual hunks unexplained).
+ *
+ * Re-pinned 2026-07-08 (../svelte 8fb7ceeba, ../kit 1b4adccf7, ../svelte.dev fb5a4e2,
+ * ../prettier-plugin-svelte 7809486, oracle acorn-typescript 1.0.11): both buckets
+ * ratchet DOWN on live-corpus churn — svelte 8→7 (the tsv.fuz.dev
+ * BenchmarksCrossRuntime.svelte real-world file dropped out; the 7 remaining are all
+ * prettier-plugin-svelte / prettier-html torture files) and typescript 184→183. No
+ * bucket rose, SAFETY 0, partials unmoved (svelte 4 / ts 65 / css 8), css unknown
+ * unchanged (23), and the parse side reports 0 undocumented AST diffs — so the move is
+ * corpus churn + already-landed fixes, not a new divergence. @ryanatkn real-world tier
+ * bug-clean.
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
-	svelte: 8,
-	typescript: 184,
+	svelte: 7,
+	typescript: 183,
 	css: 23,
 };
+// typescript 65→64 (2026-07-08): the single-object-type-param signature hug
+// (bodyless declare/overload + method/call/construct signatures now hug `(o: {`
+// like value-param functions — `build_signature_params_doc`) resolved the residual
+// unexplained hunk in kit/src/types/internal.d.ts, so it moved partial→known (its
+// tabs_only_alignment divergence remains, hence known not match). svelte/css unmoved.
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 4,
-	typescript: 65,
+	typescript: 64,
 	css: 8,
 };
 
