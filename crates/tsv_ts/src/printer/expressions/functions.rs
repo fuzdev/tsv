@@ -95,7 +95,11 @@ fn has_leftmost_object_expression(expr: &internal::Expression<'_>) -> bool {
 ///
 /// Prettier's `shouldHugFunctionParameters` hugs single object/array patterns,
 /// keeping `({` and `}: Type)` together while letting the pattern's content break.
-fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
+///
+/// Shared with the signature-param path (`build_signature_params_doc`) so bodyless
+/// declarations (declare / overload) and type-member signatures (method / call /
+/// construct) hug the lone param exactly like value-param functions do.
+pub(in crate::printer) fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => true,
         // Assignment pattern with object/array on left: `{a, b} = default`
@@ -122,7 +126,10 @@ fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
 /// like `a: { b: T } = {}`, the `= {}` prevents hugging — prettier breaks the
 /// param list instead. Destructuring patterns with defaults (`{a, b} = {}`) are
 /// handled separately by `is_huggable_pattern`.
-fn has_huggable_type_annotation(expr: &internal::Expression<'_>) -> bool {
+///
+/// Shared with the signature-param path (`build_signature_params_doc`) — see
+/// `is_huggable_pattern`.
+pub(in crate::printer) fn has_huggable_type_annotation(expr: &internal::Expression<'_>) -> bool {
     match expr {
         internal::Expression::Identifier(id) => id
             .type_annotation()

@@ -88,11 +88,16 @@ Every pattern in `patterns.ts` includes:
 
 `deno task divergence:audit` cross-references the `fixtures` lists against
 `conformance_prettier.md` and reports how many documented divergences are claimed by some
-pattern versus the uncovered remainder. **Coverage is partial by design** — some
-documented divergences have no detector (e.g. the "we preserve / Prettier drops a comment"
-family, which `comment_position`'s content guard deliberately will not claim because the
-dropped comment is absent from prettier's output). Those surface in the audit's uncovered
-list rather than being falsely claimed by a pattern that cannot actually detect them.
+pattern versus the uncovered remainder. **Coverage is partial by design** — some documented
+divergences have no detector, and a few deliberately never will: the `typescript/chain-expression`
+optional-chain paren torture files mix a tsv-keeps/prettier-strips correctness divergence *and* its
+reverse in one file, so any detector reaching them would have to claim the ours-side strip direction
+— masking the paren-strip correctness family — and is left undetected. The "we preserve / Prettier
+drops a comment" family (Svelte `expr_trailing`, `debug_comment`) is claimed by the dedicated
+`comment_preserved` pattern, which keys on the *added*-comment direction — the direction
+`comment_position`'s content guard cannot claim, since a dropped comment is absent from prettier's
+output. Genuinely-uncovered divergences surface in the audit's uncovered list rather than being
+falsely claimed by a pattern that cannot actually detect them.
 
 ## Pattern Registry
 
@@ -107,7 +112,7 @@ language/feature pattern claims a hunk before the broad `fill_101_boundary` /
 3. **Feature patterns** — template-literal width, single-specifier import,
    member-expression call, return-type generic union, …
 4. **Svelte element/block patterns** — `inline_content_hug`, `short_expr_100`,
-   `block_expression_logical`, …
+   `block_expression_logical`, `comment_preserved`, …
 5. **Broad fallbacks, run last** — `css_value_wrap`, `fill_101_boundary`,
    `comment_position`
 
