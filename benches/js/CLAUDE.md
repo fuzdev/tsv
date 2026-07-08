@@ -23,16 +23,21 @@ delta on the same row is the detector.
 - **Runtime-labeled sibling reports.** Each runtime writes its own
   `results/report.<runtime>.{json,md}` (+ a timestamped `…_<commit>.<runtime>.*`
   pair), same schema, never merged. Every row carries a `runtime` field; the JSON
-  has a top-level `runtime` and `version: 6`. `deno task bench:compose` (run at
+  has a top-level `runtime`, a top-level `machine` block (CPU model, OS/arch,
+  runtime version — the numbers are machine-relative, so this travels with
+  them), and `version: 7`. `deno task bench:compose` (run at
   the end of `deno task bench:perf`) then folds the siblings into a compact combined
   `results/report.{json,md}` — the cross-runtime view tsv.fuz.dev consumes
   (`compose_reports.ts`; a per-runtime delta on a row is the headline). The
   composer records per-source provenance (runtime, commit, timestamp, tsv
-  version — in the JSON `sources[]` and the md header) and flags **mixed
+  version, machine — in the JSON `sources[]` and the md header) and flags **mixed
   vintages** loudly (md banner + stderr + `mixed_vintage` in the JSON) when the
   siblings come from different commits/versions — it folds whatever exists, so
   a fresh `report.deno.*` next to a stale `report.node.*` would otherwise read
-  as a runtime effect. It also annotates any row whose per-runtime
+  as a runtime effect. It flags **mixed machines** the same way
+  (`mixed_machine`) when the siblings' hardware identity (CPU/OS/arch, not the
+  per-runtime version) disagrees — cross-runtime ratios are only meaningful on
+  same-box siblings. It also annotates any row whose per-runtime
   intersections differ (`⚠ files a/b/c`) — each runtime times the files *its*
   impls passed preflight on, so unequal counts mean a sliver of the ratio is
   file-set, not runtime. The
@@ -96,7 +101,7 @@ number, regardless.)
 Compare formatting output against Prettier on arbitrary codebases:
 
 ```bash
-# The gates corpus view (~6,000 files: real repos + prettier suites — see §Corpus)
+# The gates corpus view (~6,200 files: real repos + prettier suites — see §Corpus)
 deno task corpus:compare:format --all
 deno task corpus:compare:format --all --explain
 deno task corpus:compare:format --all --summary
@@ -301,13 +306,15 @@ targets). `.svelte.js`/`.ts`/`.css` are out of scope (test262 / wpt cover those)
 Two comparisons per input:
 
 - **Verdict parity** (the enforced gate) — buckets over-rejections (tsv rejects
-  what Svelte accepts) into `SANCTIONED` (tsv correctly stricter; input is
-  invalid Svelte the parser is merely lenient about), `KNOWN_GAPS` (tsv wrong; a
-  tracked drop-in gap that must only shrink), and `unexpected` (a NEW gap —
-  **exits 1**). Both lists are reviewed in-file allowlists in
-  `svelte_fixtures_compare.ts`. `over_acceptance` (tsv accepts, Svelte rejects) is
-  a deferred early-error, reported not gated. Green at baseline = every gap is
-  sanctioned or tracked.
+  what Svelte accepts) into `SANCTIONED` (tsv diverges *deliberately* — deprecated
+  syntax declined for its successor, or a cataloged taste divergence; a merely
+  *lenient parser* is NOT grounds, since tsv is a drop-in for Svelte's parser, so
+  this list is currently **empty** for Svelte), `KNOWN_GAPS` (tsv wrong; a tracked
+  drop-in gap that must only shrink), and `unexpected` (a NEW gap — **exits 1**).
+  The SANCTIONED list is shared (`lib/parse_sanctions.ts`); KNOWN_GAPS is an in-file
+  allowlist in `svelte_fixtures_compare.ts`. `over_acceptance` (tsv accepts, Svelte
+  rejects) is a deferred early-error, reported not gated. Green at baseline = every
+  gap is sanctioned or tracked.
 - **AST-shape** (report-only) — for inputs both accept, deep-diffs tsv's wire AST
   vs the Svelte AST via the SHARED `corpus_compare_parse.ts` engine (`diff_asts`
   + `DOCUMENTED_MATCHERS`, imported — that module is now `import.meta.main`-guarded
@@ -435,8 +442,10 @@ every real move in a number is a deliberate, visible edit.
   (minimum per-language `match` + EXACT per-language `unknown`/`partial`
   counts — the un-triaged divergence backlog is pinned, so a new unexplained
   divergence fails until fixed/cataloged, and a shrink is re-pinned to record
-  the win), and the three harvests (wpt block count, test262 positive count,
-  svelte-rejects count).
+  the win), and the four harvests (wpt block count, test262 positive count,
+  svelte-rejects count — exact; svelte-styles block count — a live-corpus
+  MINIMUM with a drift band, since its source is the perf-view dev repos: a
+  small shrink warns and still writes, only a >10% collapse fails).
 - Rust-side counts are consts in their commands — grep `REGRESSION PIN`:
   test262 (discovered + graded-manifest), `fixtures_validate` (total fixtures —
   protects the primary gate against a discovery collapse), and `swallow_audit`
@@ -450,7 +459,10 @@ every real move in a number is a deliberate, visible edit.
   are deterministic — a drop is a regression or gutted input, a rise is a suite
   refresh or behavior change; both must be re-pinned deliberately. No slack:
   slack lets small regressions creep and silently widens after every refresh.
-- **Minimums at the exact measured value** (shrink fails, growth passes): the
+- **Minimums at the exact measured value** (shrink fails, growth passes — with
+  one carve-out: `SVELTE_STYLES_BLOCKS_MIN` warns on a small shrink and fails
+  only on a >10% collapse, since it counts pure input material off
+  daily-churning repos): the
   two non-deterministic-growth cases. (1) The `corpus:compare:* --all` corpus is
   LIVE dev repos that grow with ordinary work — re-pin to current when touching
   the corpus (e.g. at release) so the minimum stays tight. (2) The
@@ -468,7 +480,9 @@ every real move in a number is a deliberate, visible edit.
 
 Pins apply only to FULL runs (default suite root, `--all`, default harvest
 source) — subtree and filtered runs legitimately grade a slice. Harvest pins
-fail **before** writing, so a wrong cache never replaces a good one. CI runs
+fail **before** writing, so a wrong cache never replaces a good one (the
+`SVELTE_STYLES_BLOCKS_MIN` drift band still holds this — only a collapse
+fails-before-writing; a small shrink warns and writes valid data). CI runs
 only the committed-tree pins (`check.yml` is a clean checkout — no sibling
 clones); the rest are dev-machine gates at conformance/publish cadence.
 
@@ -576,8 +590,11 @@ to tsv.fuz.dev, run `npm run update-benchmarks` in ~/dev/tsv.fuz.dev — its cop
 list names these report files exactly, so renaming a report artifact means
 updating that script in the same change.
 
-The committed `report.<runtime>.json` (baseline `version: 6`) carries, beyond
-timing stats: a top-level `runtime`, `corpus_kind` (`perf` | `conformance` —
+The committed `report.<runtime>.json` (baseline `version: 7`) carries, beyond
+timing stats: a top-level `runtime`, a top-level `machine` block
+(`cpu_model` + `os`/`arch` + `runtime_version` — the hardware/runtime the
+numbers were measured on; excludes hostname and volatile fields so it doesn't
+churn), `corpus_kind` (`perf` | `conformance` —
 which corpus/surface produced it), per-language `corpus` totals,
 `corpus_sources` (per-entry loaded file counts + a `by_language`
 svelte/typescript/css split summing to `files` — the composition disclosure;
@@ -587,8 +604,12 @@ see [Corpus](#corpus)), `versions`, and `binary_sizes` (each with
 `files_processed`/`files_total` (per-impl preflight coverage — the `Coverage:`
 line) and `files_iterated` (the timed set — the `Files (intersection):`
 count). A top-level `suppressed_noise` map records silenced third-party stderr
-crashes as `{pattern: count}`. `report.<runtime>.md` renders coverage/iterated
-as prose; the per-entry numbers and `suppressed_noise` are JSON-only.
+crashes as `{pattern: count}`, and a top-level `variant_parity` array records
+any same-engine native/wasm pair whose pre-flight accept sets disagreed
+(`[]` when healthy — see `warn_variant_parity` in bench.ts; a non-empty list
+in a committed report is a binding-boundary bug surfacing in the diff).
+`report.<runtime>.md` renders coverage/iterated as prose; the per-entry
+numbers, `suppressed_noise`, and `variant_parity` are JSON-only.
 
 ```bash
 deno task bench:install   # one-time: install harness npm deps (see Cross-Runtime above)
@@ -610,8 +631,8 @@ deno task bench:node      # Node only (needs node)
 deno task bench:bun       # Bun only (needs bun; reuses the Node artifacts — N-API + nodejs-target WASM)
 deno task bench:compose   # Fold whatever report.{deno,node,bun}.json exist → combined report.{json,md}
 
-# Conformance measurement — per-tool PARSE COVERAGE over the full
-# fixtures-included corpus (the `conformance` view; parse groups only, no format
+# Conformance measurement — per-tool PARSE COVERAGE over the fixtures-only
+# conformance corpus (the `conformance` view, disjoint from perf; parse groups only, no format
 # impls) → report.conformance.node.{json,md}. COVERAGE-ONLY + NODE-ONLY by design
 # (BENCH_COVERAGE_ONLY=1): coverage is a pre-flight product, so the timed phase is
 # skipped, and it's runtime-invariant (same parser engine — the site folds a tool's
@@ -636,11 +657,19 @@ deno task bench:conformance:run    # skip harvest + rebuild (freshness-guarded)
 # bench:conformance build tasks; run standalone after a ../wpt or ../test262
 # update — EXPECT the pinned harvest count to trip after a source pull
 # (§Pinned gate counts): re-pin in lib/gate_counts.ts deliberately.
-deno task bench:harvest            # all three harvests
+deno task bench:harvest            # all four harvests
 deno task bench:harvest:wpt        # ../wpt/css <style> blocks → .cache/wpt_css
 deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
 deno task bench:harvest:svelte-rejects  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json
                                         # (the conformance view excludes these — see §Corpus)
+deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks, concatenated per repo
+                                        # → .cache/svelte_styles/<repo>.css — a real-tier corpus
+                                        # entry (see §Corpus). NOT stamped (sources are the live
+                                        # dev repos; the walk is ~2 s, always re-harvests, rewrites
+                                        # only changed files); block count pinned as a MINIMUM
+                                        # with a 10% drift band (small shrink warns, collapse fails).
+                                        # Also chained at the start of bench:perf so perf runs
+                                        # measure a fresh cache.
 
 # Run without rebuilding (if already built) — guarded against stale artifacts,
 # see "Artifact Freshness Guard" below
@@ -688,9 +717,28 @@ stale `.so` that should have been `155/183`). `lib/check_artifact_freshness.ts`
 guards against this: before a run touches the executed artifacts (the runtime's
 native binding + WASM bundle — Deno: FFI + `pkg/all/deno`; Node: N-API +
 `pkg/all/nodejs`), it compares their mtimes against the crate sources feeding them
+(plus the workspace `Cargo.lock`, so dependency bumps trip it too)
 and **aborts (exit 1)** if any is stale, or missing. The build-first tasks
 (`bench`, `bench:deno`, `bench:node`, `corpus:compare:format`) rebuild first, so
 they pass the guard for free.
+
+**The build-side sibling: fresh builds SKIP.** The four wasm-pack bench build
+tasks (`build:wasm:deno`, `build:wasm:parse:deno`, `build:wasm:all:deno`,
+`build:wasm:all:nodejs`) ride `scripts/run_if_stale.ts`, which skips wasm-pack
+when the bundle's `.wasm` is already newer than every source that feeds it
+(the guard's `CORE_CRATES` + `tsv_wasm` — imported, so the two sides can't
+drift; dev-tooling crates deliberately excluded so `tsv_debug` edits don't
+force wasm rebuilds — plus the workspace `Cargo.toml` + `Cargo.lock`, and
+`deno.json` — so editing a build task's flags re-triggers
+it). Rationale: wasm-pack re-runs wasm-opt (~8–27s per bundle) even when cargo
+is a fully-cached no-op, so a source-unchanged `deno task bench` used to pay
+~90s of pure wasm-opt. Same mtime discipline as the run-side guard, opposite
+end. What the check CANNOT see is a toolchain change (wasm-pack / wasm-opt /
+rustc upgrade) — after one of those, force a rebuild with `TSV_BUILD_FORCE=1`
+(the build-side analog of the harvest stamps' `--force`). The publish path
+never skips: `scripts/publish.ts` sets `TSV_BUILD_FORCE=1` around its
+`build:packages` step. The npm build tasks (`build:npm:*`) are deliberately
+unwrapped.
 
 **Escape hatch:** `BENCH_STALE_OK=1` downgrades a _stale_ artifact to a `⚠`
 warning and proceeds (a _missing_ one stays fatal). See the module doc for the
@@ -773,12 +821,16 @@ Things the published numbers measure that aren't quite what they look like:
   ecosystem plus svelte/kit source — the same code tsv is developed and
   fixture-tuned against. Throughput tracks the syntactic mix of _this_
   corpus, so the ratios are "N× on this corpus," not universal. CSS is by
-  far the weakest sample (a few dozen real files — most of the old CSS
-  corpus was prettier's fixture suite), so its per-file ratios are the
-  noisiest in the report.
+  far the weakest sample: only a few dozen real standalone files exist in
+  this ecosystem (most CSS is authored inside `.svelte` `<style>` blocks),
+  so the corpus adds the `svelte_styles` harvest — those blocks extracted
+  and concatenated per repo (~3× the standalone bytes, naturally-sized
+  files). Note the harvest bytes are also timed inside the svelte rows
+  (rows are never summed, so this is disclosure, not distortion), and CSS
+  per-file ratios remain the noisiest in the report.
 - **Conformance-surface semantics (`BENCH_CORPUS=conformance`).** Parse-only
   by design, and the committed surface is **coverage-only** (per-tool preflight
-  parse success over the fixtures-included corpus) — the timed phase is
+  parse success over the fixtures-only conformance corpus) — the timed phase is
   skipped, so there is no committed throughput. The **Svelte** set has the
   `svelte/compiler`-rejected files removed (the `bench:harvest:svelte-rejects`
   cache, see §Corpus), so Svelte coverage reads as fidelity on *valid* Svelte
@@ -788,15 +840,19 @@ Things the published numbers measure that aren't quite what they look like:
   neither is a validity oracle). If you run the ad-hoc timed
   variant (coverage flag unset), its throughput is over the all-tools-pass
   intersection — an adversarial corpus that's the "easy" subset
-  (`BENCH_MODE=union` audits what it hides). test262 files are
-  parsed at every tool's default **module** goal: none of the tsv bindings
-  take a goal parameter, the canonical acorn wrapper hardcodes
-  `sourceType: 'module'`, and oxc infers module from the synthetic `.ts`
-  filename — so strict-script-only constructs (e.g. `await` as an
-  identifier) count against every tool equally. The goal-aware per-test
-  differential is `diagnostics/test262_compare.ts`, and the graded pass/fail
-  conformance gates remain `tsv_debug test262` / `conformance:svelte-fixtures` —
-  this surface measures coverage, it doesn't replace them.
+  (`BENCH_MODE=union` audits what it hides). test262 files are parsed at the
+  goal test262 **declares** (`SourceFile.goal`, from the harvest's per-file
+  `module` flag → `module`, else strict `script`): tsv routes through its
+  goal-aware bindings (`parse_*_typescript*_with_goal`), acorn takes
+  `sourceType: goal`, and oxc takes an explicit `sourceType` — so a script-goal
+  `await`-identifier test is scored as valid against every tool, not counted as a
+  module-goal failure. (Before this, everything parsed at module goal and those
+  tests depressed the TS coverage of tsv/acorn alike; oxc's filename inference
+  hid it, making tsv read ~2 files behind when it was really a goal artifact.)
+  Only the conformance-coverage preflight is goal-aware — the perf surface has no
+  test262. The goal-aware per-test differential is `diagnostics/test262_compare.ts`,
+  and the graded pass/fail conformance gates remain `tsv_debug test262` /
+  `conformance:svelte-fixtures` — this surface measures coverage, it doesn't replace them.
 - **Measurement-shape asymmetries (small, mostly self-cancelling).** (a) Every
   `tsv` FFI format call UTF-8-encodes the input and decodes the output back to a
   JS string (`lib/ffi.ts` — through persistent grow-only staging buffers, so the
@@ -929,17 +985,34 @@ One tagged entry list (`lib/corpus.ts` `CORPUS_ENTRIES`, paths relative to the
 project root). Every entry carries a tier — `real`, `prettier_fixture`, or
 `suite` — and each consumer selects a **view**:
 
-- **`perf`** (~2,900 files) — `real` entries only: application & library
+- **`perf`** (~3,200 files) — `real` entries only: application & library
   source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
-  svelte-docinfo, tsv.fuz.dev) plus upstream framework source
+  svelte-docinfo, tsv.fuz.dev — plus the author's public SvelteKit sites:
+  ryanatkn.com, webdevladder.net) plus upstream framework source
   (kit/packages/kit, svelte/packages/svelte, and the svelte.dev subpaths).
+  `.d.ts` files are IN scope (the product formats them; declaration-heavy
+  shapes carry real divergence signal), and the curated entries skip the
+  `/build/`+`/dist/` build-output pruning (a `build/` segment inside a
+  reviewed `src/` tree is real source, e.g. kit's `src/exports/vite/build/`;
+  `DirectoryLoader`'s arbitrary-path scans still prune both).
+  The CSS set additionally carries the `svelte_styles` per-repo concats
+  harvested from those repos' `.svelte` `<style>` blocks (see
+  `bench:harvest:svelte-styles` + §Fairness Caveats).
   Fixture subtrees inside those repos are pruned (`fixtures` segments
   anywhere; `samples` segments under a `test` segment) while `*.test.ts`
   files stay — tests are real code. This is what `deno task bench` measures,
   so throughput reflects real code, not formatter edge-case suites. This
   framing is the source of truth for the public benchmark page's "What's
-  measured" prose — keep them in sync.
-- **`gates`** (~6,000 files) — `real` + `prettier_fixture`, no perf prune:
+  measured" prose — keep them in sync. Because it's code that ships, every
+  in-scope tool must process every file: after the perf pre-flight, `bench.ts`
+  HARD-FAILS on any per-file failure not excused by `lib/perf_omit.ts`
+  (`PERF_OMITS` — kept minimal; the current entries all tolerate third-party
+  limitations on declaration-file-only syntax, e.g. acorn-typescript has no
+  `.d.ts` mode) — a silent skip would let coverage quietly erode. That
+  invariant is what makes the perf/conformance split meaningful: perf is 100%
+  by construction (modulo the reviewed omits), conformance is where sub-100%
+  coverage is the metric.
+- **`gates`** (~6,200 files) — `real` + `prettier_fixture`, no perf prune:
   adds Prettier's `tests/format/{typescript,js,css,html}` suites and
   prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a
   companion `options.json` skipped) — deliberately tricky edge cases.
@@ -949,15 +1022,18 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   reviewed against it. The `DevReposLoader` view is required at every
   construction site — the view decides what a number or gate verdict means,
   so there's no implicit default to inherit by accident.
-- **`conformance`** — everything: `gates` + the parse-conformance `suite`
-  entries — Svelte's compiler tests (`../svelte/packages/svelte/tests`, with
-  the gate-aligned skips: `_`-prefixed segments, `migrate/`, `output.svelte`
-  snapshots), the wpt-css harvest cache (`benches/js/.cache/wpt_css`, from
-  `deno task bench:harvest:wpt`), and the test262 graded-positive path list
-  (`benches/js/.cache/test262_files.json`, a `files_from` entry from
-  `deno task bench:harvest:test262`). This is what
-  `deno task bench:conformance` measures — the per-tool parse
-  coverage surface (coverage-only + node-only).
+- **`conformance`** — the hard parse cases only: the `prettier_fixture` suites +
+  the parse-conformance `suite` entries — Svelte's compiler tests
+  (`../svelte/packages/svelte/tests`, with the gate-aligned skips: `_`-prefixed
+  segments, `migrate/`, `output.svelte` snapshots), the wpt-css harvest cache
+  (`benches/js/.cache/wpt_css`, from `deno task bench:harvest:wpt`), and the
+  test262 graded-positive path list (`benches/js/.cache/test262_files.json`, a
+  `files_from` entry from `deno task bench:harvest:test262`). Deliberately
+  **excludes the `real` perf tier**, so the conformance coverage surface and the
+  perf corpus are mutually exclusive sets: perf is the "every in-scope tool must
+  fully process it" corpus (the hard-fail above), conformance is where sub-100%
+  coverage is the metric. This is what `deno task bench:conformance` measures —
+  the per-tool parse coverage surface (coverage-only + node-only).
 
   **Canonical-reject exclusion (Svelte only, conformance view only).** The
   suite deliberately bundles deliberately-invalid fixtures (svelte's own
@@ -970,7 +1046,9 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   `deno task bench:harvest:svelte-rejects` (`diagnostics/svelte_reject_harvest.ts`),
   loaded by `DevReposLoader` only when `view === 'conformance'`. Coverage then
   measures fidelity on *valid* Svelte: svelte/compiler → 100% (it's the oracle),
-  tsv → ~99.85% (residual = the 8 sanctioned over-rejections, `SVELTE_FIXTURE_SANCTIONS`).
+  tsv → ~99.8% (residual = 8 tracked over-rejections — drop-in gaps to fix, not
+  sanctions: 7 are the svelte-fixtures gate's `KNOWN_GAPS`, and 1 is a prettier
+  `tests/format/html` Angular file outside that gate's scope).
   **Svelte only** — svelte/compiler is the parser tsv is a strict drop-in *for*;
   `acorn-typescript` **trails** modern TS/JS (its rejects include valid code tsv
   correctly parses) and `parseCss` is lenient, so neither is a validity oracle and
@@ -986,10 +1064,12 @@ Each entry is `{path|files_from, tier, extensions?, skip?, optional?}`.
 **Missing entries fail fast** — the loader checks every entry up front and
 throws listing the missing paths, so a partial checkout can't silently shrink
 a perf number or let a correctness gate pass while grading less than it
-claims. The only exceptions: the two derived harvest caches are `optional`
-(warn-and-skip — their source checkouts `../wpt`/`../test262` are legitimately
-machine-dependent, matching the harvests' own `--if-present` posture), and
-`BENCH_ALLOW_MISSING=1` opts the bench into a partial corpus explicitly.
+claims. The only exceptions: the three derived harvest caches are `optional`
+(warn-and-skip — wpt/test262 because their source checkouts are legitimately
+machine-dependent, matching those harvests' `--if-present` posture;
+svelte_styles because it's generated from the always-required dev repos and
+just may not have been harvested yet), and `BENCH_ALLOW_MISSING=1` opts the
+bench into a partial corpus explicitly.
 Reports carry `corpus_sources` (per-entry loaded file counts) so any tolerated
 gap is disclosed rather than invisible.
 
@@ -1017,6 +1097,7 @@ benches/js/
 │   ├── test262_compare.ts    # test262 differential (tsv vs oxc-parser, from the Rust manifest)
 │   ├── wpt_css_harvest.ts    # wpt <style> blocks → .cache/wpt_css (task: bench:harvest:wpt)
 │   ├── svelte_reject_harvest.ts  # svelte/compiler-rejected Svelte files → .cache/svelte_parse_rejects.json (task: bench:harvest:svelte-rejects; conformance view excludes these)
+│   ├── svelte_styles_harvest.ts  # perf-view .svelte <style> blocks → per-repo concats in .cache/svelte_styles/ (task: bench:harvest:svelte-styles; a real-tier corpus entry — see §Corpus)
 │   ├── wasm_json_probe.ts    # WASM-vs-native JSON parse penalty attribution
 │   └── wasm_format_probe.ts  # WASM format wall-time A/B
 ├── results/baseline.json  # Saved baseline for regression detection (gitignored; written by @fuzdev/fuz_util's benchmark_baseline module)
@@ -1075,13 +1156,16 @@ via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
 cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (32 checks)
+deno task smoke           # confirm every impl still loads + formats (36 checks)
+deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
 
 These packages are free to bump independently — they're measured against, not
-baked into fixtures.
+baked into fixtures. A **major** bump (e.g. `@biomejs/js-api` 4→6) can change a
+package's *type* surface without breaking the runtime path smoke exercises, so
+the `deno check` step above is the guard for those.
 
 ⚠ **The oxc wasm binding is not a regular dep.** It's pure-wasm but its metadata
 declares `cpu: wasm32`, so it lives in neither `dependencies` nor
@@ -1167,17 +1251,16 @@ prettier. This is load-bearing, not cosmetic, on two axes:
 - **Native bindings** (`@oxfmt/{platform}`): 8 platform variants. **No WASM variant exists.**
 - **Svelte support** is experimental (added in v0.49 via oxc-project/oxc#21700);
   we enable it and let the per-file try/catch + effective-corpus report quantify coverage.
-- **Language composition (what each oxfmt format row measures).** The native Rust
-  formatter handles **JS/TS only**. Everything else routes through JS-side fallback
-  callbacks into oxfmt's **bundled prettier** (`dist/apis-*.js` `formatFile` →
-  `prettier.format`): the **css** row is bundled-prettier(postcss) work, and the
-  **svelte** row is bundled-prettier + a bundled svelte plugin with
-  `prettier-plugin-oxfmt` formatting the embedded `<script>` through the native
-  `jsTextToDoc`. So `tsv` vs `oxfmt` is a native-vs-native engine race **on
-  TypeScript only**; on css/svelte the oxfmt row is (mostly) a prettier-pipeline
-  number in oxfmt packaging — which is what an oxfmt user gets, but read the
-  ratios accordingly. The report ratios corroborate: oxfmt ≈ prettier on
-  css/svelte, ~20× prettier on TS.
+- **Language composition (what each oxfmt format row measures).** As of `oxfmt`
+  0.57 the native Rust formatter handles **JS/TS *and* CSS**. Only **Svelte** still
+  routes through a JS-side fallback into oxfmt's **bundled prettier**
+  (`dist/apis-*.js` `formatFile` → `prettier.format`) + a bundled svelte plugin
+  with `prettier-plugin-oxfmt` formatting the embedded `<script>` through the
+  native `jsTextToDoc`. So `tsv` vs `oxfmt` is a native-vs-native engine race on
+  **TypeScript AND CSS**; only the **svelte** oxfmt row is (mostly) a
+  prettier-pipeline number in oxfmt packaging — read that one ratio accordingly.
+  The report ratios corroborate: oxfmt ≈ prettier on **svelte** (~1x, the bundled
+  path), but ~6x prettier on **css** and ~14x on **TS** (both native engines).
 
 **Deprecated**: `@oxc-parser/wasm` exists on npm but is deprecated. The correct WASM
 package is `@oxc-parser/binding-wasm32-wasi`.
@@ -1315,6 +1398,23 @@ Implementation: `lib/binary_sizes.ts`
   `serde_wasm_bindgen`-built object graph). The Rust-side parse-vs-write timing
   is measured by `cargo run --release -p tsv_debug -- json_profile <paths>` —
   `wasm_json_probe.ts` covers the end-to-end view including the JS boundary.
+- **The oxc WASI binding's `errors` getter is CONSUME-ONCE.** On
+  `@oxc-parser/binding-wasm32-wasi`, the first access to `result.errors`
+  returns the real error array; every later access returns `[]` (the native
+  `oxc-parser` package caches, so only the WASI path behaves this way). Any
+  double-access check (`result.errors && result.errors.length`) therefore
+  never fires — invalid input silently yields an empty `Program` (`end: 0`
+  inside the `{node, fixes}` wrapper) and counts as parsed, which once
+  fabricated a 100% `oxc-parser-wasm` conformance-coverage row while native
+  oxc-parser correctly rejected 245 files. Rule: read getter-backed
+  napi-WASI result fields **once into a local** (`lib/oxc_wasm.ts` does;
+  `lib/oxc.ts` mirrors the form defensively). Two guards exist: the
+  single-read pattern at the wrappers, and `bench.ts`'s `warn_variant_parity`
+  — after pre-flight, same-engine native/wasm pairs (tsv↔tsv_wasm variants,
+  oxc-parser↔oxc-parser-wasm) are compared file-for-file and any accept-set
+  divergence prints a `⚠ variant parity` warning (same engine ⇒ a divergence
+  is a binding-boundary bug, not an engine difference). Candidate upstream
+  report (oxc-parser / napi-rs wasm-runtime) — tracked in internal notes.
 - **TypeScript canonical parser**: acorn-typescript fails on some modern syntax
   (files skipped) — and the reverse, files tsv fails that acorn accepts, is a
   known parse gap.
@@ -1401,7 +1501,7 @@ CWD-relative).
   subsequent timers indefinitely. Repro:
   `await import('oxfmt').then((m) => m.format('file.ts', 'x=1', {useTabs:true}))` followed by
   two `new Promise((r) => setTimeout(r, 50))` — first resolves, second never does.
-  Independent of oxfmt version (reproduced with 0.28.0, 0.50.0, and 0.53.0 on Deno 2.8.3)
+  Independent of oxfmt version (reproduced with 0.28.0, 0.50.0, 0.53.0, and 0.57.0 on Deno 2.8.3)
   so the regression is on the Deno / napi-rs side; re-test the repro before ever removing
   the workaround. In `bench.ts` oxfmt is invoked per-iteration during the `format/*` measurement
   loops; the leak shows up at the next inter-task `await wait(cooldown_ms)`, which never

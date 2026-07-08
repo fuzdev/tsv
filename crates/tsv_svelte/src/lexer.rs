@@ -134,6 +134,22 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Byte offset of the first non-whitespace char at or after the cursor, without
+    /// consuming input. Whitespace matches `skip_whitespace` (`char::is_whitespace`),
+    /// so a follow-up `skip_whitespace()` lands exactly here.
+    #[inline]
+    fn peek_past_whitespace(&self) -> usize {
+        let mut pos = self.position;
+        for ch in self.source[self.position..].chars() {
+            if ch.is_whitespace() {
+                pos += ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        pos
+    }
+
     /// Skip everything until we hit a special character (<, {)
     /// Used in template mode to treat text content as gaps
     /// Note: '}' is NOT special in template mode - it's only consumed directly
@@ -205,31 +221,41 @@ impl<'a> Lexer<'a> {
             }
             Some('{') => {
                 self.advance();
-                // Check for block tokens: {#, {:, {/
-                match self.current {
-                    Some('#') => {
+                // Check for block tokens: {#, {:, {/, {@ — Svelte's `tag()` runs
+                // `allow_whitespace()` right after `{`, so the marker may be separated
+                // from the brace by whitespace: `{ #if}` tokenizes like `{#if}`. (The
+                // runes-mode "no whitespace" rule is a phase-2 validator early-error
+                // tsv defers.) Peek past whitespace for a marker; only consume it when
+                // one follows, so a bare `{` expression/declaration tag keeps its exact
+                // offsets (the block/tag parsers read the keyword from the token end,
+                // so absorbing leading whitespace into the marker token is transparent).
+                let marker = self.peek_past_whitespace();
+                match self.source.as_bytes().get(marker) {
+                    Some(b'#') => {
+                        self.skip_whitespace();
                         self.advance();
                         Ok(self.make_token(TokenKind::BlockOpen, start))
                     }
-                    Some(':') => {
+                    Some(b':') => {
+                        self.skip_whitespace();
                         self.advance();
                         Ok(self.make_token(TokenKind::BlockContinue, start))
                     }
-                    Some('/') => {
-                        // Check if next char is '*' or '/' - that means {/* or {// (comment), not {/if (block close)
-                        match self.source.as_bytes().get(self.position + 1) {
-                            Some(b'*') | Some(b'/') => {
-                                // Comment inside expression: {/* ... */} or {// ...} - return just '{'
-                                Ok(self.make_token(TokenKind::LeftBrace, start))
-                            }
-                            _ => {
-                                // Block close: {/if}, {/each}, etc
-                                self.advance();
-                                Ok(self.make_token(TokenKind::BlockClose, start))
-                            }
-                        }
+                    // `{/if}` close vs `{/* */}` / `{// }` comment expression: a `*`/`/`
+                    // after the marker `/` means a comment, so fall through to LeftBrace.
+                    Some(b'/')
+                        if !matches!(
+                            self.source.as_bytes().get(marker + 1),
+                            Some(b'*') | Some(b'/')
+                        ) =>
+                    {
+                        // Block close: {/if}, {/each}, etc
+                        self.skip_whitespace();
+                        self.advance();
+                        Ok(self.make_token(TokenKind::BlockClose, start))
                     }
-                    Some('@') => {
+                    Some(b'@') => {
+                        self.skip_whitespace();
                         self.advance();
                         Ok(self.make_token(TokenKind::TagOpen, start))
                     }
@@ -355,10 +381,22 @@ impl<'a> Lexer<'a> {
                 }
                 Ok(self.make_token(TokenKind::Identifier, start))
             }
-            Some(ch) => Err(lex_err(
-                format!("Unexpected character in template: '{ch}'"),
-                start,
-            )),
+            // Any other char inside a tag is a name char per Svelte's `read_tag`
+            // (a name run is anything but `/[\s=/>"']/`, and every one of those
+            // terminators is handled by an arm above). Emit it as a single-char
+            // Identifier; the parser's `attribute_name_run_end` extends it into the
+            // full name, so a symbol-led attribute name (`<div %foo>`, `[innerHTML]`)
+            // parses as Svelte's `read_static_attribute` reads it. This arm is
+            // reached only inside a tag (template mode stops at `<`/`{`), and it only
+            // ever converts a former hard error into a token — so it cannot regress a
+            // previously-valid parse. A symbol-led *tag* name (`<%foo>`) then
+            // over-accepts, joining tsv's other deferred tag-name early-errors
+            // (`<_foo>`): tag-name validity is a diagnostics-layer check tsv defers,
+            // not a parse error.
+            Some(_) => {
+                self.advance();
+                Ok(self.make_token(TokenKind::Identifier, start))
+            }
         }
     }
 }

@@ -44,13 +44,20 @@ import { type KnownGap, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.
  * Over-rejections where tsv is WRONG — genuine drop-in parse gaps, tracked so the
  * gate is green at baseline and only regressions (a NEW, untracked over-rejection)
  * fail it. This set must only SHRINK: when a gap is fixed, delete its entry (the
- * input then parses → parity). Full triage lives in the grimoire lore
+ * input then parses → parity). Full triage lives in internal notes
  * (TODO_PARSE_COVERAGE.md §"Svelte parse over-rejections vs `svelte/tests`").
  */
 const KNOWN_GAPS: KnownGap[] = [
-	// Empty: the frontier is at 0 — every tracked Svelte over-rejection has been fixed.
-	// A NEW over-rejection surfaces as `unexpected` (exits 1); add an entry here only to
-	// deliberately track a gap while its fix is pending, and delete it once fixed.
+	// These are drop-in gaps, not correct-strictness: svelte's PARSER accepts each (its
+	// VALIDATOR — a stage tsv doesn't run — rejects), so tsv over-rejecting at parse is a gap
+	// to fix. Each gets a fixtures-first fix; delete its entry once the input parses. See the
+	// sanction bar in `lib/parse_sanctions.ts`.
+	{
+		pattern: 'validator/samples/css-invalid-combinator-selector',
+		category: 'css-error-recovery',
+		reason:
+			'invalid top-level leading combinator `>`/`+` (no parent rule; tsv parses relative selectors where valid — nesting, @scope body): tsv is grammar-correct to reject the selector but hard-fails the whole file where the CSS spec recovers (drop the bad rule, keep the rest). Parity comes from error recovery, not from accepting invalid CSS. See docs/conformance_svelte.md §CSS Parser Scope & Error Model',
+	},
 ];
 
 /** The gate's config — exported for the `conformance.ts` single-process driver. */

@@ -1,202 +1,49 @@
 {
-	"version": 6,
+	"version": 7,
 	"runtime": "node",
 	"corpus_kind": "conformance",
-	"timestamp": "2026-07-05T16:36:58.498Z",
-	"git_commit": "bbd52a6b",
+	"timestamp": "2026-07-08T02:15:20.689Z",
+	"git_commit": "99ac4c69",
+	"machine": {
+		"cpu_model": "AMD Ryzen 5 PRO 7530U with Radeon Graphics",
+		"os": "linux",
+		"arch": "x86_64",
+		"runtime_version": "24.14.1"
+	},
 	"corpus": {
-		"svelte": 5217,
-		"typescript": 46708,
-		"css": 22672
+		"svelte": 4535,
+		"typescript": 44224,
+		"css": 22641
 	},
 	"corpus_sources": [
 		{
-			"path": "../zzz/src",
-			"files": 325,
-			"by_language": {
-				"svelte": 173,
-				"typescript": 151,
-				"css": 1
-			}
-		},
-		{
-			"path": "../fuz_app/src",
-			"files": 664,
-			"by_language": {
-				"svelte": 33,
-				"typescript": 630,
-				"css": 1
-			}
-		},
-		{
-			"path": "../fuz_blog/src",
-			"files": 32,
-			"by_language": {
-				"svelte": 18,
-				"typescript": 13,
-				"css": 1
-			}
-		},
-		{
-			"path": "../fuz_code/src",
-			"files": 64,
-			"by_language": {
-				"svelte": 21,
-				"typescript": 38,
-				"css": 5
-			}
-		},
-		{
-			"path": "../fuz_css/src",
-			"files": 124,
-			"by_language": {
-				"svelte": 37,
-				"typescript": 85,
-				"css": 2
-			}
-		},
-		{
-			"path": "../fuz_docs/src",
-			"files": 64,
-			"by_language": {
-				"svelte": 45,
-				"typescript": 18,
-				"css": 1
-			}
-		},
-		{
-			"path": "../fuz_gitops/src",
-			"files": 203,
-			"by_language": {
-				"svelte": 28,
-				"typescript": 174,
-				"css": 1
-			}
-		},
-		{
-			"path": "../fuz_mastodon/src",
-			"files": 24,
-			"by_language": {
-				"svelte": 15,
-				"typescript": 8,
-				"css": 1
-			}
-		},
-		{
-			"path": "../fuz_template/src",
-			"files": 15,
-			"by_language": {
-				"svelte": 10,
-				"typescript": 4,
-				"css": 1
-			}
-		},
-		{
-			"path": "../fuz_ui/src",
-			"files": 215,
-			"by_language": {
-				"svelte": 121,
-				"typescript": 94,
-				"css": 0
-			}
-		},
-		{
-			"path": "../fuz_util/src",
-			"files": 144,
-			"by_language": {
-				"svelte": 8,
-				"typescript": 135,
-				"css": 1
-			}
-		},
-		{
-			"path": "../gro/src",
-			"files": 187,
-			"by_language": {
-				"svelte": 11,
-				"typescript": 175,
-				"css": 1
-			}
-		},
-		{
-			"path": "../svelte-docinfo/src",
-			"files": 297,
-			"by_language": {
-				"svelte": 82,
-				"typescript": 214,
-				"css": 1
-			}
-		},
-		{
-			"path": "../tsv.fuz.dev/src",
-			"files": 28,
-			"by_language": {
-				"svelte": 16,
-				"typescript": 11,
-				"css": 1
-			}
-		},
-		{
-			"path": "../kit/packages/kit/src",
+			"path": "../prettier-plugin-svelte/test",
 			"files": 318,
 			"by_language": {
-				"svelte": 84,
-				"typescript": 233,
-				"css": 1
-			}
-		},
-		{
-			"path": "../svelte/packages/svelte/src",
-			"files": 375,
-			"by_language": {
-				"svelte": 0,
-				"typescript": 375,
-				"css": 0
-			}
-		},
-		{
-			"path": "../svelte.dev/apps/svelte.dev/src",
-			"files": 135,
-			"by_language": {
-				"svelte": 60,
-				"typescript": 75,
-				"css": 0
-			}
-		},
-		{
-			"path": "../svelte.dev/packages/repl/src",
-			"files": 48,
-			"by_language": {
-				"svelte": 17,
-				"typescript": 29,
-				"css": 2
-			}
-		},
-		{
-			"path": "../svelte.dev/packages/site-kit/src",
-			"files": 65,
-			"by_language": {
-				"svelte": 26,
-				"typescript": 28,
-				"css": 11
-			}
-		},
-		{
-			"path": "../prettier-plugin-svelte/test",
-			"files": 302,
-			"by_language": {
-				"svelte": 302,
+				"svelte": 318,
 				"typescript": 0,
 				"css": 0
+			},
+			"repo": {
+				"url": "https://github.com/sveltejs/prettier-plugin-svelte",
+				"slug": "sveltejs/prettier-plugin-svelte",
+				"commit": "7809486a9716faa2234c8a45d88b601034de52d8",
+				"subpath": "test"
 			}
 		},
 		{
 			"path": "../prettier/tests/format/typescript",
-			"files": 789,
+			"files": 793,
 			"by_language": {
 				"svelte": 0,
-				"typescript": 789,
+				"typescript": 793,
 				"css": 0
+			},
+			"repo": {
+				"url": "https://github.com/prettier/prettier",
+				"slug": "prettier/prettier",
+				"commit": "1dcd0b05d026356cce5bf538c6d425955b29903b",
+				"subpath": "tests/format/typescript"
 			}
 		},
 		{
@@ -206,6 +53,12 @@
 				"svelte": 0,
 				"typescript": 1103,
 				"css": 0
+			},
+			"repo": {
+				"url": "https://github.com/prettier/prettier",
+				"slug": "prettier/prettier",
+				"commit": "1dcd0b05d026356cce5bf538c6d425955b29903b",
+				"subpath": "tests/format/js"
 			}
 		},
 		{
@@ -215,6 +68,12 @@
 				"svelte": 0,
 				"typescript": 78,
 				"css": 150
+			},
+			"repo": {
+				"url": "https://github.com/prettier/prettier",
+				"slug": "prettier/prettier",
+				"commit": "1dcd0b05d026356cce5bf538c6d425955b29903b",
+				"subpath": "tests/format/css"
 			}
 		},
 		{
@@ -224,15 +83,27 @@
 				"svelte": 84,
 				"typescript": 0,
 				"css": 0
+			},
+			"repo": {
+				"url": "https://github.com/prettier/prettier",
+				"slug": "prettier/prettier",
+				"commit": "1dcd0b05d026356cce5bf538c6d425955b29903b",
+				"subpath": "tests/format/html"
 			}
 		},
 		{
 			"path": "../svelte/packages/svelte/tests",
-			"files": 4341,
+			"files": 4451,
 			"by_language": {
-				"svelte": 4026,
-				"typescript": 135,
-				"css": 180
+				"svelte": 4133,
+				"typescript": 137,
+				"css": 181
+			},
+			"repo": {
+				"url": "https://github.com/sveltejs/svelte",
+				"slug": "sveltejs/svelte",
+				"commit": "8fb7ceeba5dd1d3b7fc3f587f4e2138bf1b978ed",
+				"subpath": "packages/svelte/tests"
 			}
 		},
 		{
@@ -242,6 +113,12 @@
 				"svelte": 0,
 				"typescript": 0,
 				"css": 22310
+			},
+			"repo": {
+				"url": "https://github.com/web-platform-tests/wpt",
+				"slug": "web-platform-tests/wpt",
+				"commit": "",
+				"subpath": ""
 			}
 		},
 		{
@@ -251,86 +128,92 @@
 				"svelte": 0,
 				"typescript": 42113,
 				"css": 0
+			},
+			"repo": {
+				"url": "https://github.com/tc39/test262",
+				"slug": "tc39/test262",
+				"commit": "",
+				"subpath": ""
 			}
 		}
 	],
 	"versions": {
 		"tsv": "0.1.0",
-		"svelte": "5.56.1",
+		"svelte": "5.56.4",
 		"acorn": "8.16.0",
 		"acorn_ts": "1.0.10",
 		"prettier": "3.9.0",
 		"prettier_svelte": "4.1.1",
-		"oxc_parser": "0.134.0",
-		"oxfmt": "0.53.0",
-		"biome": "2.4.16"
+		"oxc_parser": "0.139.0",
+		"oxfmt": "0.57.0",
+		"biome": "2.5.2"
 	},
 	"binary_sizes": [
 		{
 			"label": "tsv (ffi)",
-			"bytes": 3307360,
+			"bytes": 3348832,
 			"kind": "native",
-			"gzip_bytes": 1428738
+			"gzip_bytes": 1444707
 		},
 		{
 			"label": "tsv format (ffi)",
-			"bytes": 3054656,
+			"bytes": 3085648,
 			"kind": "native",
-			"gzip_bytes": 1324423
+			"gzip_bytes": 1337366
 		},
 		{
 			"label": "tsv parse (ffi)",
-			"bytes": 1542576,
+			"bytes": 1568432,
 			"kind": "native",
-			"gzip_bytes": 682941
+			"gzip_bytes": 691800
 		},
 		{
 			"label": "tsv (napi)",
-			"bytes": 3431120,
+			"bytes": 3482128,
 			"kind": "native",
-			"gzip_bytes": 1470536
+			"gzip_bytes": 1489183
 		},
 		{
 			"label": "tsv_format_wasm",
-			"bytes": 2186094,
+			"bytes": 2214519,
 			"kind": "wasm",
-			"gzip_bytes": 754306
+			"gzip_bytes": 763363
 		},
 		{
 			"label": "tsv_parse_wasm",
-			"bytes": 1015654,
+			"bytes": 1036989,
 			"kind": "wasm",
-			"gzip_bytes": 375849
+			"gzip_bytes": 381243
 		},
 		{
 			"label": "tsv_wasm",
-			"bytes": 2410073,
+			"bytes": 2444330,
 			"kind": "wasm",
-			"gzip_bytes": 833573
+			"gzip_bytes": 843039
 		},
 		{
 			"label": "biome (wasm)",
-			"bytes": 34430368,
+			"bytes": 37540009,
 			"kind": "wasm",
-			"gzip_bytes": 8187702
+			"gzip_bytes": 9006428
 		},
 		{
 			"label": "oxc-parser (napi)",
-			"bytes": 2658008,
+			"bytes": 2428632,
 			"kind": "native",
-			"gzip_bytes": 1032774
+			"gzip_bytes": 977389
 		},
 		{
 			"label": "oxfmt (napi)",
-			"bytes": 8016464,
+			"bytes": 9061136,
 			"kind": "native",
-			"gzip_bytes": 3224684
+			"gzip_bytes": 3631974
 		},
 		{
 			"label": "oxc-parser (wasm)",
-			"bytes": 1866798,
+			"bytes": 1616596,
 			"kind": "wasm",
-			"gzip_bytes": 518682
+			"gzip_bytes": 501431
 		}
 	],
 	"entries": [
@@ -349,9 +232,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5217,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 4535,
+			"files_total": 4535,
+			"files_iterated": 4527,
 			"runtime": "node"
 		},
 		{
@@ -369,9 +252,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5209,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 4527,
+			"files_total": 4535,
+			"files_iterated": 4527,
+			"runtime": "node"
+		},
+		{
+			"name": "tsv-json-no-locations",
+			"group": "parse/svelte",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 4527,
+			"files_total": 4535,
+			"files_iterated": 4527,
 			"runtime": "node"
 		},
 		{
@@ -389,9 +292,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5209,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 4527,
+			"files_total": 4535,
+			"files_iterated": 4527,
+			"runtime": "node"
+		},
+		{
+			"name": "tsv_wasm-json-no-locations",
+			"group": "parse/svelte",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 4527,
+			"files_total": 4535,
+			"files_iterated": 4527,
 			"runtime": "node"
 		},
 		{
@@ -409,9 +332,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5209,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 4527,
+			"files_total": 4535,
+			"files_iterated": 4527,
 			"runtime": "node"
 		},
 		{
@@ -429,9 +352,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 5209,
-			"files_total": 5217,
-			"files_iterated": 5209,
+			"files_processed": 4527,
+			"files_total": 4535,
+			"files_iterated": 4527,
 			"runtime": "node"
 		},
 		{
@@ -449,9 +372,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46030,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 43641,
+			"files_total": 44224,
+			"files_iterated": 43613,
 			"runtime": "node"
 		},
 		{
@@ -469,9 +392,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46464,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 44026,
+			"files_total": 44224,
+			"files_iterated": 43613,
+			"runtime": "node"
+		},
+		{
+			"name": "tsv-json-no-locations",
+			"group": "parse/typescript",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 44026,
+			"files_total": 44224,
+			"files_iterated": 43613,
 			"runtime": "node"
 		},
 		{
@@ -489,9 +432,29 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46464,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 44026,
+			"files_total": 44224,
+			"files_iterated": 43613,
+			"runtime": "node"
+		},
+		{
+			"name": "tsv_wasm-json-no-locations",
+			"group": "parse/typescript",
+			"mean_ns": null,
+			"p50_ns": null,
+			"p75_ns": null,
+			"p90_ns": null,
+			"p95_ns": null,
+			"p99_ns": null,
+			"min_ns": null,
+			"max_ns": null,
+			"std_dev_ns": null,
+			"cv": null,
+			"ops_per_second": null,
+			"sample_size": null,
+			"files_processed": 44026,
+			"files_total": 44224,
+			"files_iterated": 43613,
 			"runtime": "node"
 		},
 		{
@@ -509,9 +472,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46464,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 44026,
+			"files_total": 44224,
+			"files_iterated": 43613,
 			"runtime": "node"
 		},
 		{
@@ -529,9 +492,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46464,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 44026,
+			"files_total": 44224,
+			"files_iterated": 43613,
 			"runtime": "node"
 		},
 		{
@@ -549,9 +512,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46465,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 44014,
+			"files_total": 44224,
+			"files_iterated": 43613,
 			"runtime": "node"
 		},
 		{
@@ -569,9 +532,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 46708,
-			"files_total": 46708,
-			"files_iterated": 45959,
+			"files_processed": 44014,
+			"files_total": 44224,
+			"files_iterated": 43613,
 			"runtime": "node"
 		},
 		{
@@ -589,9 +552,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22433,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22402,
+			"files_total": 22641,
+			"files_iterated": 22378,
 			"runtime": "node"
 		},
 		{
@@ -609,9 +572,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22478,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22447,
+			"files_total": 22641,
+			"files_iterated": 22378,
 			"runtime": "node"
 		},
 		{
@@ -629,9 +592,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22478,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22447,
+			"files_total": 22641,
+			"files_iterated": 22378,
 			"runtime": "node"
 		},
 		{
@@ -649,9 +612,9 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22478,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22447,
+			"files_total": 22641,
+			"files_iterated": 22378,
 			"runtime": "node"
 		},
 		{
@@ -669,11 +632,12 @@
 			"cv": null,
 			"ops_per_second": null,
 			"sample_size": null,
-			"files_processed": 22478,
-			"files_total": 22672,
-			"files_iterated": 22409,
+			"files_processed": 22447,
+			"files_total": 22641,
+			"files_iterated": 22378,
 			"runtime": "node"
 		}
 	],
-	"suppressed_noise": {}
+	"suppressed_noise": {},
+	"variant_parity": []
 }

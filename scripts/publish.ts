@@ -374,7 +374,12 @@ console.log('\n=== Step 4: Build WASM bundles (npm + deno) ===');
 // publish), and is ordered to group cargo feature sets (format, format, parse,
 // parse, default, default) so the wasm crate compiles once per feature set, not
 // once per task. CI's artifacts job runs the same task, so the two can't drift.
+// A release build must never freshness-skip: the wasm build tasks ride
+// scripts/run_if_stale.ts, whose mtime check can't see toolchain changes
+// (wasm-pack/wasm-opt/rustc upgrades). Force for the whole build step.
+Deno.env.set('TSV_BUILD_FORCE', '1');
 run('deno task build:packages', 'deno', ['task', 'build:packages']);
+Deno.env.delete('TSV_BUILD_FORCE');
 
 // Step 5: Verify built packages
 

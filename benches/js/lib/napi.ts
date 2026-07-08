@@ -21,7 +21,7 @@
 import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { native_library_filename } from './runtime.ts';
-import type { Language, TsvImplementation } from './types.ts';
+import type { Language, ParseGoal, TsvImplementation } from './types.ts';
 
 /** The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI). */
 export interface NapiAddon {
@@ -37,6 +37,10 @@ export interface NapiAddon {
 	// span-only wire — svelte + typescript only (CSS emits no `loc`)
 	parse_svelte_no_locations: (source: string) => string;
 	parse_typescript_no_locations: (source: string) => string;
+	// goal-aware TS parse (`'script'`/`'module'`) — the conformance surface's test262 files
+	parse_typescript_with_goal: (source: string, goal: string) => string;
+	parse_typescript_no_locations_with_goal: (source: string, goal: string) => string;
+	parse_internal_typescript_with_goal: (source: string, goal: string) => void;
 }
 
 /** Path to the built `tsv_napi` cdylib (loaded directly as an N-API addon). */
@@ -120,18 +124,28 @@ export class NapiImplementation implements TsvImplementation {
 		};
 	}
 
-	parse(source: string, language: Language): unknown {
+	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		// `parse_<lang>` returns a JSON string (the engine throws on parse error);
 		// materialize it the same way ffi.ts / wasm.ts do for an apples-to-apples
-		// `tsv-json`-style row.
+		// `tsv-json`-style row. A test262 goal routes through the goal-aware TS export.
+		if (goal && language === 'typescript') {
+			return JSON.parse(this.addon.parse_typescript_with_goal(source, goal));
+		}
 		return JSON.parse(this.parse_fns[language](source));
 	}
 
-	parse_internal(source: string, language: Language): void {
+	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
+		if (goal && language === 'typescript') {
+			this.addon.parse_internal_typescript_with_goal(source, goal);
+			return;
+		}
 		this.parse_internal_fns[language](source);
 	}
 
-	parse_no_locations(source: string, language: Language): unknown {
+	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
+		if (goal && language === 'typescript') {
+			return JSON.parse(this.addon.parse_typescript_no_locations_with_goal(source, goal));
+		}
 		const fn = this.parse_no_locations_fns[language];
 		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
 		return JSON.parse(fn(source));

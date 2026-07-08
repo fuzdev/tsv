@@ -15,12 +15,12 @@
 		"@sveltejs/acorn-typescript": "1.0.11",
 		"prettier": "3.9.0",
 		"prettier-plugin-svelte": "4.1.1",
-		"@biomejs/js-api": "4.0.0",
-		"@biomejs/wasm-bundler": "2.4.16",
-		"oxc-parser": "0.134.0",
-		"oxfmt": "0.53.0",
+		"@biomejs/js-api": "6.0.0",
+		"@biomejs/wasm-bundler": "2.5.2",
+		"oxc-parser": "0.139.0",
+		"oxfmt": "0.57.0",
 		"zod": "^4.4.3",
-		"@fuzdev/fuz_util": "0.64.0"
+		"@fuzdev/fuz_util": "0.65.2"
 	},
 	"//types": "@types/node is types-only and dev-only (never ships, no runtime cost). It lets the shared harness's `node:` builtins type-check under `deno check` (and editors) when an npm package's .d.ts pulls in node types in npm-resolution mode — the portable-node:-builtins architecture's one new dev dep. NOT needed by the gated `deno task test:deno` (that's the dependency-free divergence suite — `node:assert` + relative imports, no node_modules).",
 	"devDependencies": {

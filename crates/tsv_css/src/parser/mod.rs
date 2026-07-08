@@ -260,6 +260,52 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Ok(())
     }
 
+    /// Skip a run of legacy HTML-comment markers `<!-- ... -->` (CDO/CDC) at a
+    /// stylesheet statement or selector-list boundary, mirroring Svelte `parseCss`'s
+    /// `allow_comment_or_whitespace`. The whole span — **including any CSS between the
+    /// markers** — is discarded (no AST node), diverging from the CSS Syntax spec
+    /// (where `<!--`/`-->` are independent no-op tokens and content between them parses
+    /// as ordinary CSS); tsv matches `parseCss`. See `../../docs/conformance_svelte.md`
+    /// §CSS Compat Behaviors.
+    ///
+    /// Recognized only where the current token begins `<!--`, so a bare `<` (a
+    /// container-query range operator) is untouched, and `<!--`/`-->` in value or
+    /// at-rule-prelude position stay raw text — those readers scan raw and never call
+    /// this, so a `;`/`{` between the markers there stays significant, matching
+    /// `parseCss`. Unterminated (`-->` missing) is an error, like Svelte's
+    /// `eat('-->', true)`.
+    ///
+    /// Skips leading whitespace itself, so it is a self-sufficient drop-in at any
+    /// boundary (the `<!--`-preceding whitespace need not already be consumed). Does
+    /// **not** handle `/* */` comments — their disposition (register vs. push as a
+    /// block child) is context-specific and stays with each call site.
+    pub(crate) fn skip_html_comment_markers(&mut self) -> Result<(), ParseError> {
+        self.skip_whitespace()?;
+        while self.check(TokenKind::LessThan)
+            && self.source[self.current_start..].starts_with("<!--")
+        {
+            // Scan raw for the required `-->` terminator — trivia-unaware, exactly like
+            // Svelte's `read_until(/-->/)`: a `-->` inside a string/comment between the
+            // markers still ends the span. ASCII, so a plain byte scan is boundary-safe.
+            let bytes = self.source.as_bytes();
+            let mut i = self.current_start + 4; // past `<!--`
+            let after = loop {
+                if bytes[i..].starts_with(b"-->") {
+                    break i + 3;
+                }
+                if i >= bytes.len() {
+                    return Err(self.error_msg("Unterminated HTML comment"));
+                }
+                i += 1;
+            };
+            self.peek = None; // any lookahead was lexed from before the marker
+            self.lexer.seek(after);
+            self.advance()?;
+            self.skip_whitespace()?;
+        }
+        Ok(())
+    }
+
     /// Get the current token's value from source (for most tokens)
     #[inline]
     pub(crate) fn current_value(&self) -> &str {
@@ -385,14 +431,17 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     pub(crate) fn parse(&mut self) -> Result<CssStyleSheet<'arena>, ParseError> {
         let mut nodes = self.bvec();
 
-        self.skip_whitespace()?;
+        // The stylesheet body is a `read_body` boundary: whitespace, `/*` comments,
+        // and legacy `<!-- ... -->` markers may separate items. `skip_html_comment_markers`
+        // covers whitespace + markers; `/*` comments are registered inside the loop.
+        self.skip_html_comment_markers()?;
 
         while !self.check(TokenKind::Eof) {
             // Handle comments at top level - add to comments Vec
             if matches!(&self.current_kind, TokenKind::Comment) {
                 self.register_current_comment();
                 self.advance()?;
-                self.skip_whitespace()?;
+                self.skip_html_comment_markers()?;
                 continue;
             }
 
@@ -401,7 +450,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
                 // Top-level at-rules are not nested in rules
                 let atrule = atrules::parse_atrule(self, false)?;
                 nodes.push(CssNode::Atrule(atrule));
-                self.skip_whitespace()?;
+                self.skip_html_comment_markers()?;
                 continue;
             }
 
@@ -409,7 +458,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             let node = declarations::parse_rule(self, false)?;
             nodes.push(CssNode::Rule(node));
 
-            self.skip_whitespace()?;
+            self.skip_html_comment_markers()?;
         }
 
         // Comments are already sorted by span.start since we add them in order during parsing
