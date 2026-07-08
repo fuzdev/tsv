@@ -628,6 +628,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Class property definite `!` → Before `!` modifier — [property_definite_comment](../tests/fixtures/typescript/statements/class/property_definite_comment_prettier_divergence/)
 - Class property modifier → Before `?`/`!` modifier — [property_modifier_comment](../tests/fixtures/typescript/statements/class/property_modifier_comment_prettier_divergence/)
 - Between member modifiers → After the last modifier — [modifier_pair_comment](../tests/fixtures/typescript/declarations/class/modifier_pair_comment_prettier_divergence/)
+- Between parameter-property modifiers → After the last modifier (same rule as class members) — [param_property_modifier_pair_comment](../tests/fixtures/typescript/declarations/class/param_property_modifier_pair_comment_prettier_divergence/)
 - Generator method `async`→`*` (class + object shorthand) → After the `*`, before the name (`async */* c */ m()`) — [async_star_comment (class)](../tests/fixtures/typescript/statements/class/async_star_comment_prettier_divergence/), [(object)](../tests/fixtures/typescript/expressions/objects/async_star_comment_prettier_divergence/)
 - Interface member after `?` → Before `?` or inside parens — [modifier_after_comment](../tests/fixtures/typescript/types/type_members/modifier_after_comment_prettier_divergence/)
 - Type-literal member after `?` → Before `?` or inside parens — [optional_marker_comment](../tests/fixtures/typescript/types/type_literal/optional_marker_comment_prettier_divergence/)

@@ -1029,22 +1029,30 @@ impl<'a> Printer<'a> {
         param_prop: &crate::ast::internal::TSParameterProperty<'_>,
     ) -> DocId {
         use crate::ast::internal::Expression;
-        let d = self.d();
         let mut parts: DocBuf = DocBuf::new();
 
-        // Print modifiers in canonical TS order: accessibility, override, readonly
-        if let Some(acc) = &param_prop.accessibility {
-            parts.push(d.text(acc.as_str()));
-            parts.push(d.text(" "));
-        }
+        // The binding name (past any decorators — acorn stores those on the inner
+        // binding, and its span starts at the name). Bounds the modifier scans.
+        let name_start = param_prop.parameter.span().start;
 
+        // Print modifiers in canonical TS order (accessibility → override →
+        // readonly), preserving comments between them and before the binding name
+        // (`readonly /* c */ x`) — the same cursor-based scan the class-body
+        // `PropertyDefinition` printer uses. The property span starts at the first
+        // modifier (decorators precede it in source but render separately below),
+        // so the cursor begins there.
+        let mut cursor = param_prop.span.start;
+        if let Some(acc) = param_prop.accessibility {
+            self.push_member_keyword_doc(&mut parts, acc.as_keyword(), &mut cursor, name_start);
+        }
         if param_prop.r#override {
-            parts.push(d.text("override "));
+            self.push_member_keyword_doc(&mut parts, "override ", &mut cursor, name_start);
         }
-
         if param_prop.readonly {
-            parts.push(d.text("readonly "));
+            self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, name_start);
         }
+        // Comments between the last modifier and the binding name.
+        self.push_pre_name_comments_doc(&mut parts, cursor, name_start);
 
         // Print the parameter. acorn stores a decorated property's decorators on
         // the inner binding (`@dec private a` → decorators on the Identifier),
@@ -1062,6 +1070,6 @@ impl<'a> Printer<'a> {
         };
         parts.push(inner_doc);
 
-        self.with_param_decorators(decorators, d.concat(&parts))
+        self.with_param_decorators(decorators, self.d().concat(&parts))
     }
 }

@@ -9,15 +9,6 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
-/// Printed keyword (with trailing space) for an accessibility modifier.
-fn accessibility_keyword(accessibility: &str) -> &'static str {
-    match accessibility {
-        "private" => "private ",
-        "protected" => "protected ",
-        _ => "public ",
-    }
-}
-
 impl<'a> Printer<'a> {
     /// Build a Doc for a class declaration
     #[inline]
@@ -398,8 +389,12 @@ impl<'a> Printer<'a> {
 
         // Accessibility modifier
         if let Some(accessibility) = &prop.accessibility {
-            let kind_text = accessibility_keyword(accessibility.as_str());
-            self.push_member_keyword_doc(&mut parts, kind_text, &mut cursor, key_start);
+            self.push_member_keyword_doc(
+                &mut parts,
+                accessibility.as_keyword(),
+                &mut cursor,
+                key_start,
+            );
         }
 
         // Static modifier
@@ -591,8 +586,12 @@ impl<'a> Printer<'a> {
 
         // Accessibility modifier
         if let Some(accessibility) = &method.accessibility {
-            let kind_text = accessibility_keyword(accessibility.as_str());
-            self.push_member_keyword_doc(&mut parts, kind_text, &mut cursor, key_start);
+            self.push_member_keyword_doc(
+                &mut parts,
+                accessibility.as_keyword(),
+                &mut cursor,
+                key_start,
+            );
         }
 
         // Static modifier
