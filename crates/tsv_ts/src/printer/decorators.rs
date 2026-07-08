@@ -1,8 +1,8 @@
 // Decorator printing for TypeScript
 //
-// Class-level decorators (always own-line) and class-member decorators
-// (inline vs own-line preserved from source), including comment placement
-// between decorators and the decorated member.
+// Class-level decorators (always own-line), class-member decorators, and
+// parameter decorators (both inline vs own-line preserved from source),
+// including comment placement between decorators and the decorated member.
 
 use crate::ast::internal;
 use smallvec::smallvec;
@@ -30,6 +30,85 @@ impl<'a> Printer<'a> {
         } else {
             d.parens(expr_doc)
         }
+    }
+
+    /// prettier's `hasNewlineBetweenOrAfterDecorators`: true when any decorator is
+    /// followed (skipping spaces/tabs) by a newline before the next token, so the
+    /// decorators break onto their own lines. Comments between the decorator and
+    /// the newline do NOT count — prettier only skips spaces/tabs, so `@fn /* c */\nb`
+    /// yields false (the first non-space char is `/`). Drives both class-member
+    /// decorators and parameter decorators.
+    pub(in crate::printer) fn has_newline_after_any_decorator(
+        &self,
+        decorators: &[internal::Decorator<'_>],
+    ) -> bool {
+        decorators.iter().any(|dec| {
+            let end = dec.span.end as usize;
+            self.source[end..]
+                .bytes()
+                .find(|&b| b != b' ' && b != b'\t')
+                .is_some_and(|b| b == b'\n' || b == b'\r')
+        })
+    }
+
+    /// True when `expr` is a single parameter whose decorators are written on
+    /// their own line — such a parameter can't hug (the forced break would split
+    /// the pattern mid-hug), so the parameter list expands instead, matching
+    /// prettier.
+    pub(in crate::printer) fn param_has_own_line_decorators(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> bool {
+        param_decorators(expr).is_some_and(|decs| self.has_newline_after_any_decorator(decs))
+    }
+
+    /// The source position where a parameter's rendered form begins: its first
+    /// decorator when it carries parameter decorators, else the binding itself.
+    /// Decorators precede the binding but are stored *on* it, so the binding span
+    /// alone skips them — measuring a blank line to it would miscount a decorator
+    /// line as an author blank line.
+    pub(in crate::printer) fn param_start_with_decorators(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> u32 {
+        param_decorators(expr)
+            .and_then(|decs| decs.first())
+            .map_or_else(|| expr.span().start, |first| first.span.start)
+    }
+
+    /// Prefix a parameter binding's doc with its parameter decorators, matching
+    /// prettier's generic `printDecorators`: a decorator written on its own line
+    /// in the source (a newline before the binding) keeps each decorator on its
+    /// own line and expands the parameter list (the `hardline` carries the break
+    /// to the enclosing parameter group); an inline decorator stays inline,
+    /// separated by a single space. A no-op when there are no decorators. Used for
+    /// destructuring and default parameters (`@dec { a }: T`, `@dec a = 1`), whose
+    /// decorators acorn stores on the pattern / `AssignmentPattern` node.
+    pub(in crate::printer) fn with_param_decorators(
+        &self,
+        decorators: Option<&[internal::Decorator<'_>]>,
+        inner: DocId,
+    ) -> DocId {
+        let Some(decorators) = decorators.filter(|d| !d.is_empty()) else {
+            return inner;
+        };
+        let d = self.d();
+        let sep = if self.has_newline_after_any_decorator(decorators) {
+            d.hardline()
+        } else {
+            d.text(" ")
+        };
+        let mut parts = DocBuf::new();
+        for (i, decorator) in decorators.iter().enumerate() {
+            if i > 0 {
+                parts.push(sep);
+            }
+            parts.push(d.text("@"));
+            parts.push(self.build_decorator_expression_doc(decorator));
+        }
+        parts.push(sep);
+        parts.push(inner);
+        d.concat(&parts)
     }
 
     /// Build a Doc for a list of decorators, each on its own line
@@ -101,19 +180,9 @@ impl<'a> Printer<'a> {
         }
         let d = self.d();
 
-        // Check if any decorator has a newline between it and the next token.
-        // Mirrors prettier's hasNewlineBetweenOrAfterDecorators: skip spaces/tabs
-        // from locEnd(decorator), check if the next non-space char is a newline.
-        // Comments between decorator and newline do NOT count — prettier only skips
-        // spaces/tabs, so a comment like `@fn /* c */\nb` makes the first non-space
-        // char '/' (not '\n'), resulting in false.
-        let has_newline_after = decorators.iter().any(|dec| {
-            let end = dec.span.end as usize;
-            self.source[end..]
-                .bytes()
-                .find(|&b| b != b' ' && b != b'\t')
-                .is_some_and(|b| b == b'\n' || b == b'\r')
-        });
+        // Own-line if any decorator has a newline between it and the next token
+        // (prettier's hasNewlineBetweenOrAfterDecorators).
+        let has_newline_after = self.has_newline_after_any_decorator(decorators);
 
         // Track whether any line comment exists — line comments force the group
         // to break regardless of has_newline_after (the line comment takes up the
@@ -227,6 +296,24 @@ impl<'a> Printer<'a> {
             group_parts.push(d.break_parent());
         }
         Some(d.group(d.concat(&group_parts)))
+    }
+}
+
+/// The parameter decorators attached to a binding form (identifier / object or
+/// array pattern / assignment-pattern default), reaching inside a
+/// `TSParameterProperty` onto its inner binding — matching where acorn stores a
+/// parameter's decorators. Returns `None` for any non-parameter or undecorated
+/// form.
+fn param_decorators<'arena>(
+    expr: &internal::Expression<'arena>,
+) -> Option<&'arena [internal::Decorator<'arena>]> {
+    match expr {
+        internal::Expression::Identifier(id) => id.decorators(),
+        internal::Expression::ObjectPattern(obj) => obj.decorators,
+        internal::Expression::ArrayPattern(arr) => arr.decorators,
+        internal::Expression::AssignmentPattern(ap) => ap.decorators,
+        internal::Expression::TSParameterProperty(pp) => param_decorators(pp.parameter),
+        _ => None,
     }
 }
 

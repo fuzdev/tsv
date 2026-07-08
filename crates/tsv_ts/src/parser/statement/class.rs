@@ -178,7 +178,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a list of decorators: `@dec1 @dec2 ...`
-    pub(super) fn parse_decorators(
+    pub(in crate::parser) fn parse_decorators(
         &mut self,
     ) -> Result<bumpalo::collections::Vec<'arena, Decorator<'arena>>, ParseError> {
         let mut decorators = self.bvec();

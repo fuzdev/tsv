@@ -889,6 +889,8 @@ export interface ObjectPattern {
 	properties: ObjectPatternProperty[];
 	optional?: boolean;
 	typeAnnotation?: TSTypeAnnotation;
+	/** Parameter decorators (`@dec { a }: T`) — only in a parameter position. */
+	decorators?: Decorator[];
 }
 
 export type ObjectPatternProperty = Property | RestElement;
@@ -901,6 +903,8 @@ export interface ArrayPattern {
 	elements: (Expression | null)[];
 	optional?: boolean;
 	typeAnnotation?: TSTypeAnnotation;
+	/** Parameter decorators (`@dec [a]: T`) — only in a parameter position. */
+	decorators?: Decorator[];
 }
 
 export interface AssignmentPattern {
@@ -910,6 +914,8 @@ export interface AssignmentPattern {
 	loc: SourceLocation;
 	left: Expression;
 	right: Expression;
+	/** Parameter decorators (`@dec a = 1`) — only in a parameter position. */
+	decorators?: Decorator[];
 }
 
 export interface RestElement {
