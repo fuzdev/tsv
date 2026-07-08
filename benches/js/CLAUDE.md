@@ -306,13 +306,15 @@ targets). `.svelte.js`/`.ts`/`.css` are out of scope (test262 / wpt cover those)
 Two comparisons per input:
 
 - **Verdict parity** (the enforced gate) — buckets over-rejections (tsv rejects
-  what Svelte accepts) into `SANCTIONED` (tsv correctly stricter; input is
-  invalid Svelte the parser is merely lenient about), `KNOWN_GAPS` (tsv wrong; a
-  tracked drop-in gap that must only shrink), and `unexpected` (a NEW gap —
-  **exits 1**). Both lists are reviewed in-file allowlists in
-  `svelte_fixtures_compare.ts`. `over_acceptance` (tsv accepts, Svelte rejects) is
-  a deferred early-error, reported not gated. Green at baseline = every gap is
-  sanctioned or tracked.
+  what Svelte accepts) into `SANCTIONED` (tsv diverges *deliberately* — deprecated
+  syntax declined for its successor, or a cataloged taste divergence; a merely
+  *lenient parser* is NOT grounds, since tsv is a drop-in for Svelte's parser, so
+  this list is currently **empty** for Svelte), `KNOWN_GAPS` (tsv wrong; a tracked
+  drop-in gap that must only shrink), and `unexpected` (a NEW gap — **exits 1**).
+  The SANCTIONED list is shared (`lib/parse_sanctions.ts`); KNOWN_GAPS is an in-file
+  allowlist in `svelte_fixtures_compare.ts`. `over_acceptance` (tsv accepts, Svelte
+  rejects) is a deferred early-error, reported not gated. Green at baseline = every
+  gap is sanctioned or tracked.
 - **AST-shape** (report-only) — for inputs both accept, deep-diffs tsv's wire AST
   vs the Svelte AST via the SHARED `corpus_compare_parse.ts` engine (`diff_asts`
   + `DOCUMENTED_MATCHERS`, imported — that module is now `import.meta.main`-guarded
@@ -1044,7 +1046,9 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   `deno task bench:harvest:svelte-rejects` (`diagnostics/svelte_reject_harvest.ts`),
   loaded by `DevReposLoader` only when `view === 'conformance'`. Coverage then
   measures fidelity on *valid* Svelte: svelte/compiler → 100% (it's the oracle),
-  tsv → ~99.85% (residual = the 8 sanctioned over-rejections, `SVELTE_FIXTURE_SANCTIONS`).
+  tsv → ~99.8% (residual = 8 tracked over-rejections — drop-in gaps to fix, not
+  sanctions: 7 are the svelte-fixtures gate's `KNOWN_GAPS`, and 1 is a prettier
+  `tests/format/html` Angular file outside that gate's scope).
   **Svelte only** — svelte/compiler is the parser tsv is a strict drop-in *for*;
   `acorn-typescript` **trails** modern TS/JS (its rejects include valid code tsv
   correctly parses) and `parseCss` is lenient, so neither is a validity oracle and

@@ -69,8 +69,12 @@ export interface GatePins {
 	both_accept: number;
 }
 
-/** conformance:svelte-fixtures — measured 2026-07-06: ../svelte at 8fb7ceeba (svelte@5.56.4-3), oracle svelte@5.56.4. */
-export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3273 };
+/**
+ * conformance:svelte-fixtures — measured 2026-07-06: ../svelte at 8fb7ceeba (svelte@5.56.4-3), oracle svelte@5.56.4.
+ * both_accept 3273→3274: leading-symbol attribute names (`<p }>`) now parse (svelte-attr-name gap fixed),
+ * so `validator/samples/attribute-invalid-name` moved from over-rejection to both-accept.
+ */
+export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3274 };
 
 /** conformance:ts-fixtures — measured 2026-07-06: ../acorn-typescript at 13c49a7 (v1.0.10), oracle @sveltejs/acorn-typescript@1.0.10. */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 201, both_accept: 181 };

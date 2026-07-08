@@ -1,13 +1,18 @@
 /**
  * Shared parse-parity SANCTIONS — over-rejections (tsv rejects input the
- * canonical parser accepts) that tsv *keeps deliberately*: either the input is
- * invalid the canonical parser is merely lenient about (its own
- * validator/compiler rejects it), or it is valid-but-deprecated syntax tsv
- * declines in favour of its successor. Either way rejecting is intended and must
- * NOT be "fixed". Matched as a path substring; each carries a reason so the list
- * stays a reviewed catalogue, never a silent bug suppressor. A genuine gap
- * (tsv wrong, intent-to-fix) goes in the consuming tool's own KNOWN_GAPS, never
- * here.
+ * canonical parser accepts) that tsv *keeps deliberately*. The bar is high:
+ * matching the canonical PARSER is the drop-in contract, and tsv already defers
+ * static-semantic "invalid" verdicts to a diagnostics layer (as it does for TS
+ * early-errors). So "the canonical parser is merely lenient; its
+ * validator/compiler rejects it later" is NOT a sanction — that input should
+ * parse (accept → AST → format round-trip) and its invalidity is a `KnownGap` in
+ * the consuming gate, not a strictness win. Only two shapes qualify: (1)
+ * valid-but-**deprecated** syntax tsv declines for its successor (e.g. import
+ * assertions `assert {…}` → the `with {…}` tsv parses), and (2) an explicit
+ * **taste** divergence cataloged with a spec/prettier reason. Matched as a path
+ * substring; each carries a reason so the list stays a reviewed catalogue, never
+ * a silent bug suppressor. A genuine gap (tsv wrong, intent-to-fix) goes in the
+ * consuming gate's own KNOWN_GAPS, never here.
  *
  * One home shared by `diagnostics/skip_triage.ts` (the general parse-parity gate)
  * and the dedicated per-language fixtures gates (`svelte_fixtures_compare.ts`,
@@ -36,31 +41,13 @@ export interface KnownGap {
 }
 
 /**
- * Svelte's own `tests/` fixtures where tsv is correctly stricter. Real source
- * needs none of these — each is invalid Svelte the parser merely tolerates.
+ * Svelte's own `tests/` fixtures: no sanctions. Every Svelte over-rejection is a
+ * drop-in gap to fix, not correct-strictness — svelte's PARSER accepts each (its
+ * VALIDATOR, a stage tsv doesn't run, is what rejects), so they're tracked as
+ * `KnownGap`s in `svelte_fixtures_compare.ts` and get fixtures-first fixes. See
+ * the sanction bar in the module doc above.
  */
-export const SVELTE_FIXTURE_SANCTIONS: Sanction[] = [
-	// CSS grammar-strictness — Svelte's parseCss is lenient where tsv follows the
-	// CSS grammar. See docs/conformance_svelte.md §CSS Parser Scope & Error Model.
-	{
-		pattern: 'css/samples/comment-html/',
-		reason: 'HTML comment (`<!-- -->`) in a CSS selector — Svelte lenient, tsv follows the CSS grammar',
-	},
-	{
-		pattern: 'validator/samples/css-invalid-combinator-selector',
-		reason: 'invalid leading combinator (`>`/`+`) — Svelte parser accepts, its validator rejects',
-	},
-	// Invalid Svelte markup — Svelte's PARSER accepts, its VALIDATOR rejects; the
-	// input is invalid either way, tsv just rejects one stage earlier.
-	{
-		pattern: 'validator/samples/attribute-invalid-name',
-		reason: 'invalid attribute-name character — Svelte parser lenient, validator rejects',
-	},
-	{
-		pattern: 'validator/samples/if-block-whitespace',
-		reason: 'whitespace after `{#` (`{ #if}`) — Svelte parser lenient, validator rejects',
-	},
-];
+export const SVELTE_FIXTURE_SANCTIONS: Sanction[] = [];
 
 /**
  * acorn-typescript's own `test/` fixtures where tsv over-rejects deliberately.
