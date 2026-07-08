@@ -198,7 +198,7 @@ impl<'a> Printer<'a> {
                 let prop_doc = if self.has_format_ignore_in_range(search_start, prop_start) {
                     self.raw_source_doc(prop.span())
                 } else {
-                    self.build_object_property_doc(prop)
+                    self.build_object_property_doc(prop, has_comments)
                 };
                 parts.push(prop_doc);
 
@@ -300,7 +300,7 @@ impl<'a> Printer<'a> {
                 }
 
                 // Build property doc
-                let prop_doc = self.build_object_property_doc(prop);
+                let prop_doc = self.build_object_property_doc(prop, has_comments);
                 parts.push(prop_doc);
 
                 // Add comma and line break
@@ -361,9 +361,13 @@ impl<'a> Printer<'a> {
             return d.text("{}");
         }
 
+        // Object-wide comment-presence flag (one binary search); gates the per-property
+        // key→value comment queries in build_property_doc.
+        let has_comments = self.has_comments_between(obj.span.start, obj.span.end);
+
         let mut parts: DocBuf = DocBuf::new();
         for (i, prop) in obj.properties.iter().enumerate() {
-            let prop_doc = self.build_object_property_doc(prop);
+            let prop_doc = self.build_object_property_doc(prop, has_comments);
             parts.push(prop_doc);
 
             if i < obj.properties.len() - 1 {
@@ -382,15 +386,28 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for an object property (either Property or SpreadElement)
-    fn build_object_property_doc(&self, prop: &internal::ObjectProperty<'_>) -> DocId {
+    ///
+    /// `has_comments` is the object-wide comment-presence flag (one binary search
+    /// over the whole `{…}` span); it gates the per-property key→value comment
+    /// queries in `build_property_doc`.
+    fn build_object_property_doc(
+        &self,
+        prop: &internal::ObjectProperty<'_>,
+        has_comments: bool,
+    ) -> DocId {
         match prop {
-            internal::ObjectProperty::Property(p) => self.build_property_doc(p),
+            internal::ObjectProperty::Property(p) => self.build_property_doc(p, has_comments),
             internal::ObjectProperty::SpreadElement(s) => self.build_spread_doc(s),
         }
     }
 
     /// Build a Doc for a single property
-    fn build_property_doc(&self, prop: &internal::Property<'_>) -> DocId {
+    ///
+    /// `has_comments` is the object-wide comment-presence flag: when it is false,
+    /// no comment lies anywhere in the object span, so none can lie in this
+    /// property's key→value gap either — the colon scan and the per-gap comment
+    /// lookups are skipped (canonical reference: `build_params_doc_with_comments`).
+    fn build_property_doc(&self, prop: &internal::Property<'_>, has_comments: bool) -> DocId {
         let d = self.d();
         // For computed keys, use expression doc (preserves string quotes)
         // For regular keys, use property key doc (converts strings to bare identifiers when valid)
@@ -513,7 +530,28 @@ impl<'a> Printer<'a> {
                 key_doc
             }
         } else {
-            // Regular property: check for comments between key and value
+            // Regular property.
+            //
+            // Zero-comment fast gate: when the object has no comments at all, none
+            // can lie between this key and its value, so skip the colon scan and the
+            // per-gap comment lookups and emit the plain `key: value` layout directly
+            // (canonical reference: build_params_doc_with_comments).
+            if !has_comments {
+                let needs_parens =
+                    self.needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
+                return if needs_parens {
+                    let value_doc = d.concat(&[
+                        d.text("("),
+                        self.build_expression_doc(&prop.value),
+                        d.text(")"),
+                    ]);
+                    d.concat(&[key_doc, d.text(": "), value_doc])
+                } else {
+                    let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
+                    self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key, None)
+                };
+            }
+
             // Find colon position and check for comments
             // Use key_region_end (after `]` for computed, after key for normal)
             // to avoid double-counting comments already inside brackets
