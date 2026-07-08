@@ -533,8 +533,14 @@ impl<'a> Printer<'a> {
         // shouldGroupFunctionParameters: a single param whose return type is an
         // object/mapped type (or otherwise will-breaks) hugs — the params stay flat
         // and the return type breaks, instead of the params breaking.
-        let params_doc =
-            group_params_if_should(params_doc, params, type_parameters, return_type, return_type_doc, d);
+        let params_doc = group_params_if_should(
+            params_doc,
+            params,
+            type_parameters,
+            return_type,
+            return_type_doc,
+            d,
+        );
 
         let mut sig_parts: DocBuf = smallvec![params_doc];
         if let Some(rt_doc) = return_type_doc {
