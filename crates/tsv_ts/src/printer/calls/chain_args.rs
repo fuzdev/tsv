@@ -289,16 +289,24 @@ fn build_call_args_doc_for_chain_impl(
 
     // Check for any comments in arguments (leading, inter-argument, or trailing)
     // Note: presence of comments doesn't necessarily mean expansion - only line comments
-    // and block comments on their own line force expansion
-    let has_leading_comments = !call.arguments.is_empty()
+    // and block comments on their own line force expansion.
+    //
+    // Whole-call comment-presence gate (one binary search over [paren_open,
+    // call.span.end]): every sub-scan below lies within that window, so with no
+    // comment they are all provably false — skip them. Canonical reference:
+    // build_params_doc_with_comments.
+    let call_has_comments = printer.has_comments_between(paren_open, call.span.end);
+    let has_leading_comments = call_has_comments
+        && !call.arguments.is_empty()
         && printer.has_comments_between(paren_open, call.arguments[0].span().start);
-    let has_inter_arg_comments = has_inter_argument_comments(call, printer);
-    let has_trailing_comments = has_trailing_comments_on_args(call, printer);
+    let has_inter_arg_comments = call_has_comments && has_inter_argument_comments(call, printer);
+    let has_trailing_comments = call_has_comments && has_trailing_comments_on_args(call, printer);
     // Also check for trailing block comments on last arg (for inline handling)
-    let has_trailing_block_comments = call
-        .arguments
-        .last()
-        .is_some_and(|last| printer.has_comments_between(last.span().end, call.span.end));
+    let has_trailing_block_comments = call_has_comments
+        && call
+            .arguments
+            .last()
+            .is_some_and(|last| printer.has_comments_between(last.span().end, call.span.end));
     let has_any_comments = has_leading_comments
         || has_inter_arg_comments
         || has_trailing_comments
@@ -313,8 +321,10 @@ fn build_call_args_doc_for_chain_impl(
     };
 
     // Check if any comments require expansion (line comments or block comments on own line)
-    // Inline block comments don't force expansion
-    let comments_force_expansion = any_comment_forces_expansion(call, printer, paren_open);
+    // Inline block comments don't force expansion. `has_any_comments` is a superset —
+    // forced expansion needs a comment to exist — so gate this scan on it.
+    let comments_force_expansion =
+        has_any_comments && any_comment_forces_expansion(call, printer, paren_open);
 
     // Function composition: call arg contains a callback → expand all args
     // e.g., x.y(arr.map((e) => e[0]), ['foo']) — matches Prettier's isFunctionCompositionArgs
@@ -684,7 +694,8 @@ fn build_chain_args_single(
     if let Expression::ArrowFunctionExpression(arrow) = arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && arrow_body_is_call_through_non_null(body_expr)
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(has_any_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -742,7 +753,8 @@ fn build_chain_args_single(
     if let Expression::ArrowFunctionExpression(arrow) = arg
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && is_ternary_arrow_body(body_expr)
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(has_any_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -807,7 +819,8 @@ fn build_chain_args_single(
             &**body_expr,
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         )
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(has_any_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         // Render the arrow with flat params (prettier's expandLastArg
         // `removeLines`) so the force-broken state breaks the body, not the
@@ -1005,10 +1018,11 @@ fn build_chain_args_multi(
         && call.arguments.last().is_some_and(is_block_function)
         && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(has_any_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(call.arguments, printer, paren_open);
+            build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1037,7 +1051,8 @@ fn build_chain_args_multi(
     if call.arguments.len() >= 2
         && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(has_any_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
         && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && matches!(
@@ -1046,7 +1061,7 @@ fn build_chain_args_multi(
         )
     {
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(call.arguments, printer, paren_open);
+            build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1095,7 +1110,8 @@ fn build_chain_args_multi(
     if call.arguments.len() >= 2
         && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(has_any_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
         && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && matches!(
@@ -1104,7 +1120,7 @@ fn build_chain_args_multi(
         )
     {
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(call.arguments, printer, paren_open);
+            build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1151,7 +1167,7 @@ fn build_chain_args_multi(
     if call.arguments.len() == 2
         && is_block_function(&call.arguments[0])
         && !comments_force_expansion
-        && !first_arg_has_any_comments(call.arguments, printer, paren_open)
+        && !(has_any_comments && first_arg_has_any_comments(call.arguments, printer, paren_open))
         // Prettier's shouldExpandFirstArg checks !couldExpandArg(secondArg).
         // couldExpandArg returns true for objects/arrays when hasComment(node) is true,
         // which includes leading comments. Block expand-first when the second arg is
@@ -1220,7 +1236,8 @@ fn build_chain_args_multi(
         && !call.arguments.last().is_some_and(is_concise_numeric_array)
         && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
         && !comments_force_expansion
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(has_any_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
         // Prettier blocks expand-last for 2-arg arrow+array (React hook pattern)
         && !(call.arguments.len() == 2
             && matches!(
@@ -1234,7 +1251,7 @@ fn build_chain_args_multi(
         && !last_two_args_same_type(call.arguments)
     {
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(call.arguments, printer, paren_open);
+            build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {

@@ -393,6 +393,7 @@ pub(crate) fn build_args_split_last(
     arguments: &[internal::Expression<'_>],
     printer: &Printer<'_>,
     paren_open: u32,
+    has_comments: bool,
 ) -> (DocBuf, DocId, DocId) {
     let d = printer.d();
     // Build all args (using build_huggable_expression_doc for proper parens on assignments
@@ -420,8 +421,14 @@ pub(crate) fn build_args_split_last(
 
     // Leading comments between `(` and the first argument (e.g., /** @type {T} */).
     // Not handled by per-arg building — prepended to both head_parts and all_args_broken.
-    let leading_comment_doc =
-        printer.build_rhs_comments_glued_opt(paren_open, arguments[0].span().start);
+    // Zero-comment fast gate: the leading + per-gap inline block-comment lookups below
+    // are skipped when the whole call has no comment (canonical reference:
+    // build_params_doc_with_comments); the structural commas stay unconditional.
+    let leading_comment_doc = if has_comments {
+        printer.build_rhs_comments_glued_opt(paren_open, arguments[0].span().start)
+    } else {
+        None
+    };
 
     // Build head docs (all but last) with commas and inline block comments
     // Comments are placed relative to the comma based on their source position
@@ -433,29 +440,35 @@ pub(crate) fn build_args_split_last(
     for (i, doc) in arg_docs.iter().take(arg_docs.len() - 1).enumerate() {
         head_parts.push(*doc);
 
-        let arg_end = arguments[i].span().end;
-        let next_arg_start = arguments[i + 1].span().start;
-        let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
+        // Only the `, ` separator is structural; the comma scan and the two inline
+        // block-comment lookups are pure comment placement, so gate them.
+        if has_comments {
+            let arg_end = arguments[i].span().end;
+            let next_arg_start = arguments[i + 1].span().start;
+            let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
 
-        // Add inline block comments around comma
-        if let Some(cpos) = comma_pos {
-            for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
-                if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
-                    head_parts.push(d.text(" "));
-                    head_parts.push(printer.build_comment_doc(comment));
+            // Add inline block comments around comma
+            if let Some(cpos) = comma_pos {
+                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+                    if is_inline_block_before_comma(comment, cpos, printer.line_breaks, arg_end) {
+                        head_parts.push(d.text(" "));
+                        head_parts.push(printer.build_comment_doc(comment));
+                    }
                 }
             }
-        }
 
-        head_parts.push(d.text(", "));
+            head_parts.push(d.text(", "));
 
-        if let Some(cpos) = comma_pos {
-            for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
-                if is_inline_block_after_comma(comment, cpos, printer.line_breaks, arg_end) {
-                    head_parts.push(printer.build_comment_doc(comment));
-                    head_parts.push(d.text(" "));
+            if let Some(cpos) = comma_pos {
+                for comment in comments_in_range(printer.comments, arg_end, next_arg_start) {
+                    if is_inline_block_after_comma(comment, cpos, printer.line_breaks, arg_end) {
+                        head_parts.push(printer.build_comment_doc(comment));
+                        head_parts.push(d.text(" "));
+                    }
                 }
             }
+        } else {
+            head_parts.push(d.text(", "));
         }
     }
     let last_arg_doc = arg_docs[arg_docs.len() - 1];
@@ -472,8 +485,9 @@ pub(crate) fn build_args_split_last(
         }
         all_args_parts.push(*doc);
 
-        // Add trailing inline block comments (except after last arg)
-        if i < arguments.len() - 1 {
+        // Add trailing inline block comments (except after last arg). Pure comment
+        // placement — gated on the whole-call comment flag.
+        if has_comments && i < arguments.len() - 1 {
             let arg_end = arguments[i].span().end;
             let next_arg_start = arguments[i + 1].span().start;
             let comma_pos = find_comma_pos(printer.source, arg_end, next_arg_start);
