@@ -13,7 +13,7 @@ use tsv_lang::doc::arena::DocId;
 /// Check if an expression is a nullish coalescing expression (`??`)
 ///
 /// Prettier wraps `??` in parens when inside a ternary for clarity.
-pub(in crate::printer) fn is_nullish_coalescing(expr: &internal::Expression<'_>) -> bool {
+fn is_nullish_coalescing(expr: &internal::Expression<'_>) -> bool {
     matches!(
         expr,
         internal::Expression::BinaryExpression(bin)
@@ -64,6 +64,28 @@ fn is_multiline_template_literal(expr: &internal::Expression<'_>) -> bool {
 }
 
 impl<'a> Printer<'a> {
+    /// Wrap a ternary consequent/alternate doc in clarity parens when its `expr`
+    /// needs them. The single seam both layouts (inline + line-comment) route
+    /// through, so a branch can't get parenthesized in one and bare in the other.
+    fn parenthesize_ternary_branch(&self, expr: &internal::Expression<'_>, doc: DocId) -> DocId {
+        if ternary_branch_needs_parens(expr) {
+            self.d().parens(doc)
+        } else {
+            doc
+        }
+    }
+
+    /// Wrap a ternary test doc in parens when its `expr` needs them (arrow/yield are
+    /// load-bearing — see `ternary_test_needs_parens`). The shared seam for both
+    /// layouts, mirroring `parenthesize_ternary_branch`.
+    fn parenthesize_ternary_test(&self, expr: &internal::Expression<'_>, doc: DocId) -> DocId {
+        if ternary_test_needs_parens(expr) {
+            self.d().parens(doc)
+        } else {
+            doc
+        }
+    }
+
     /// Build a Doc for a conditional expression with wrapping support
     pub(in crate::printer) fn build_conditional_doc_with_wrapping(
         &self,
@@ -158,11 +180,7 @@ impl<'a> Printer<'a> {
         // Several test-position expressions get parens (Prettier: needs-parentheses.js).
         // See `ternary_test_needs_parens` for the arrow/yield semantics vs the
         // `as`/`satisfies`/assignment/`??` clarity cases.
-        let test = if ternary_test_needs_parens(cond.test) {
-            d.parens(test)
-        } else {
-            test
-        };
+        let test = self.parenthesize_ternary_test(cond.test, test);
         // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
         // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
         let test = self.wrap_for_init_in(cond.test, test);
@@ -236,10 +254,8 @@ impl<'a> Printer<'a> {
                     let flat_consequent = d.parens(consequent);
                     d.if_break(broken_consequent, flat_consequent)
                 }
-            } else if ternary_branch_needs_parens(cond.consequent) {
-                d.indent(d.parens(consequent))
             } else {
-                d.indent(consequent)
+                d.indent(self.parenthesize_ternary_branch(cond.consequent, consequent))
             };
 
         // Handle nested conditional in alternate: continue the chain
@@ -258,12 +274,7 @@ impl<'a> Printer<'a> {
                     indent_binary_test,
                     cond.span.end,
                 );
-                let alternate = if ternary_branch_needs_parens(cond.alternate) {
-                    d.parens(alternate)
-                } else {
-                    alternate
-                };
-                d.indent(alternate)
+                d.indent(self.parenthesize_ternary_branch(cond.alternate, alternate))
             };
 
         let inner = d.concat(&[
@@ -309,16 +320,11 @@ impl<'a> Printer<'a> {
         let consequent_end = cond.consequent.span().end;
         let alternate_start = cond.alternate.span().start;
 
-        // Build test expression with parens if needed — the same predicate as the
+        // Build test expression with parens if needed — the same seam as the
         // non-breaking path, so the load-bearing arrow/yield parens (and the
         // `as`/`satisfies` clarity parens) are never dropped just because a branch
         // carries a line comment.
-        let test = self.build_expression_doc(cond.test);
-        let test = if ternary_test_needs_parens(cond.test) {
-            d.parens(test)
-        } else {
-            test
-        };
+        let test = self.parenthesize_ternary_test(cond.test, self.build_expression_doc(cond.test));
         // Parenthesize an `in` test inside a for-header init (`for (a = (b in c) ? …;…)`);
         // a no-op elsewhere. The test is `[~In]`, so the parens are load-bearing.
         let test = self.wrap_for_init_in(cond.test, test);
@@ -363,16 +369,14 @@ impl<'a> Printer<'a> {
                 let chained = self.build_conditional_doc_impl(nested, true, false);
                 (d.group_break(chained), true)
             } else {
-                let expr_doc = self
-                    .wrap_for_init_in(cond.consequent, self.build_expression_doc(cond.consequent));
                 // Clarity parens (`(a ?? b)`, `(x as T)`) exactly as the inline layout
                 // applies them — the line-comment path must not drop them.
-                let expr_doc = if ternary_branch_needs_parens(cond.consequent) {
-                    d.parens(expr_doc)
-                } else {
-                    expr_doc
-                };
-                (expr_doc, false)
+                let expr_doc = self
+                    .wrap_for_init_in(cond.consequent, self.build_expression_doc(cond.consequent));
+                (
+                    self.parenthesize_ternary_branch(cond.consequent, expr_doc),
+                    false,
+                )
             };
         // A nested conditional handles its own indent via its chained structure;
         // any other consequent hangs one level deeper (its own multiline content
@@ -429,12 +433,7 @@ impl<'a> Printer<'a> {
                 // the inline layout applies (`(a ?? b)`, `(x as T)`).
                 let expr_doc = self
                     .wrap_for_init_in(cond.alternate, self.build_expression_doc(cond.alternate));
-                let expr_doc = if ternary_branch_needs_parens(cond.alternate) {
-                    d.parens(expr_doc)
-                } else {
-                    expr_doc
-                };
-                d.indent(expr_doc)
+                d.indent(self.parenthesize_ternary_branch(cond.alternate, expr_doc))
             };
 
         if alternate_on_own_line {

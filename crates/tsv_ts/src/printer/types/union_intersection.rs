@@ -816,8 +816,13 @@ impl<'a> Printer<'a> {
         //   indent already covers the continuations.
         let mut parts = first_parts;
         let has_non_huggable_continuations = last_is_huggable && intersection.types.len() > 2;
+        // Own the continuation indent when the caller can't: a huggable-at-end
+        // continuation set, or a pure non-object set in a `wrap_in_group` position
+        // (first member on its own line, no caller-supplied hanging indent).
+        let indent_continuations =
+            has_non_huggable_continuations || (wrap_in_group && !is_huggable_pair);
         if !continuation_parts.is_empty() {
-            if has_non_huggable_continuations || (wrap_in_group && !is_huggable_pair) {
+            if indent_continuations {
                 parts.push(d.indent(d.concat(&continuation_parts)));
             } else {
                 // Huggable-only pair (`A & {b}`) or a caller-indented context - no internal indent
