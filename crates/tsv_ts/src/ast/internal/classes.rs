@@ -137,6 +137,16 @@ impl Accessibility {
             Accessibility::Protected => "protected",
         }
     }
+
+    /// The keyword text with a trailing space (`"public "` / `"private "` /
+    /// `"protected "`), for a printer that emits it as a member/parameter modifier.
+    pub const fn as_keyword(self) -> &'static str {
+        match self {
+            Accessibility::Public => "public ",
+            Accessibility::Private => "private ",
+            Accessibility::Protected => "protected ",
+        }
+    }
 }
 
 /// TypeScript parameter property in constructor: `constructor(public x: number)`
