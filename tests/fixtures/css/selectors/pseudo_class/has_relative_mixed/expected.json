@@ -1,0 +1,185 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 174,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 96,
+					"end": 147,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 96,
+							"end": 147,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "figure",
+											"start": 96,
+											"end": 102
+										},
+										{
+											"type": "PseudoClassSelector",
+											"name": "has",
+											"args": {
+												"type": "SelectorList",
+												"start": 107,
+												"end": 146,
+												"children": [
+													{
+														"type": "ComplexSelector",
+														"start": 107,
+														"end": 110,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": null,
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "img",
+																		"start": 107,
+																		"end": 110
+																	}
+																],
+																"start": 107,
+																"end": 110
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 112,
+														"end": 124,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": "+",
+																	"start": 112,
+																	"end": 113
+																},
+																"selectors": [
+																	{
+																		"type": "TypeSelector",
+																		"name": "figcaption",
+																		"start": 114,
+																		"end": 124
+																	}
+																],
+																"start": 112,
+																"end": 124
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 126,
+														"end": 134,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": "~",
+																	"start": 126,
+																	"end": 127
+																},
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "aside",
+																		"start": 128,
+																		"end": 134
+																	}
+																],
+																"start": 126,
+																"end": 134
+															}
+														]
+													},
+													{
+														"type": "ComplexSelector",
+														"start": 136,
+														"end": 146,
+														"children": [
+															{
+																"type": "RelativeSelector",
+																"combinator": {
+																	"type": "Combinator",
+																	"name": ">",
+																	"start": 136,
+																	"end": 137
+																},
+																"selectors": [
+																	{
+																		"type": "ClassSelector",
+																		"name": "caption",
+																		"start": 138,
+																		"end": 146
+																	}
+																],
+																"start": 136,
+																"end": 146
+															}
+														]
+													}
+												]
+											},
+											"start": 102,
+											"end": 147
+										}
+									],
+									"start": 96,
+									"end": 147
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 148,
+					"end": 165,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 152,
+							"end": 161,
+							"property": "margin",
+							"value": "0"
+						}
+					]
+				},
+				"start": 96,
+				"end": 165
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 166,
+			"styles": "\n\t/* relative list: bare first item (descendant), then combinator-leading tail items */\n\tfigure:has(img, + figcaption, ~ .aside, > .caption) {\n\t\tmargin: 0;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 175,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

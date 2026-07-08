@@ -144,15 +144,13 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// `self`. Result is cached so repeated peeks are efficient. (Named `peek_kind`,
     /// not `peek`, to match `tsv_ts` and avoid shadowing the `peek` field.)
     pub(crate) fn peek_kind(&mut self) -> Result<TokenKind, ParseError> {
-        if self.peek.is_none() {
-            self.peek = Some(self.lexer.next_token()?);
+        if let Some(token) = &self.peek {
+            return Ok(token.kind);
         }
-        // peek is guaranteed Some after the if block above
-        match &self.peek {
-            Some(token) => Ok(token.kind),
-            #[allow(clippy::unreachable)] // peek was set Some immediately above
-            None => unreachable!("peek was just populated"),
-        }
+        let token = self.lexer.next_token()?;
+        let kind = token.kind;
+        self.peek = Some(token);
+        Ok(kind)
     }
 
     /// Peek past whitespace and comments to find the next significant token.
