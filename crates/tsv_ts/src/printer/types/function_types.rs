@@ -430,7 +430,61 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let prefix = self.build_paren_to_return_type_comments(paren_pos, return_type.span.start);
-        d.concat(&[prefix, self.build_type_annotation_doc(return_type)])
+        d.concat(&[
+            prefix,
+            self.build_type_annotation_doc_for_return_type(return_type),
+        ])
+    }
+
+    /// Wrap the parameter list and return-type annotation of a type-member
+    /// signature (`MethodSignature` / `CallSignature` / `ConstructSignature`) or a
+    /// bodyless function signature (overload / `declare`) in one **signature
+    /// group**, so a too-long signature breaks the PARAMS before the return-type
+    /// generic breaks — params-break-priority, matching `build_callable_signature_doc`
+    /// for class/function signatures and prettier.
+    ///
+    /// Three pieces cooperate: `build_signature_params_doc` leaves the params
+    /// **ungrouped** (softlines this group controls); `build_signature_return_type_doc`
+    /// uses the return-type type variant (which keeps a union / multi-arg generic
+    /// inline until the params have broken); and prettier's
+    /// `shouldGroupFunctionParameters` (1 param + `type_params_allow_grouping` +
+    /// `return_type_triggers_grouping` — an object/mapped return, or one whose doc
+    /// will-breaks) re-wraps the params in their OWN group so they HUG (stay flat)
+    /// while the return type breaks — e.g. `create_context<T>(fallback: () => T): {⏎…⏎}`.
+    /// The signature group is scoped to just params+return — NOT the member key or
+    /// its comments — so a comment-forced hardline elsewhere in the member (e.g.
+    /// `new // c⏎(a): A`) doesn't drag the params open.
+    pub(in crate::printer) fn build_signature_params_return_group(
+        &self,
+        params: &[internal::Expression<'_>],
+        type_parameters: Option<&internal::TSTypeParameterDeclaration<'_>>,
+        return_type: Option<&internal::TSTypeAnnotation<'_>>,
+        paren_pos: Option<u32>,
+    ) -> DocId {
+        let d = self.d();
+        let params_doc = self.build_signature_params_doc(params, paren_pos);
+        let return_type_doc =
+            return_type.map(|rt| self.build_signature_return_type_doc(paren_pos, rt));
+
+        // shouldGroupFunctionParameters: a single param whose return type is an
+        // object/mapped type (or otherwise will-breaks) hugs — the params stay flat
+        // and the return type breaks, instead of the params breaking.
+        let params_doc = if params.len() == 1
+            && type_params_allow_grouping(type_parameters)
+            && return_type
+                .zip(return_type_doc)
+                .is_some_and(|(rt, rt_doc)| return_type_triggers_grouping(rt, rt_doc, d))
+        {
+            d.group(params_doc)
+        } else {
+            params_doc
+        };
+
+        let mut sig_parts: DocBuf = smallvec![params_doc];
+        if let Some(rt_doc) = return_type_doc {
+            sig_parts.push(rt_doc);
+        }
+        d.group(d.concat(&sig_parts))
     }
 
     /// Build a function-declaration return type (`: T`) with `)`→`:` comment
@@ -591,8 +645,11 @@ impl<'a> Printer<'a> {
         parts.push(d.softline());
         parts.push(d.text(")"));
 
-        // Wrap in group so params break independently of outer context
-        d.group(d.concat(&parts))
+        // No group — the outer signature group (build_method_signature_member_doc /
+        // build_call_or_construct_signature_doc) controls these softlines, so a too-long
+        // signature breaks the PARAMS before the return-type generic breaks (matching
+        // build_params_doc_with_comments for class/function signatures, and prettier).
+        d.concat(&parts)
     }
 
     /// Build a Doc for a function type parameter expression with wrapping type annotations.

@@ -606,12 +606,16 @@ impl<'a> Printer<'a> {
         {
             self.append_type_params_to_paren_comments(&mut tail, tp, pp);
         }
-        tail.push(self.build_signature_params_doc(decl.params, paren_pos));
-
-        // Return type (preserves a comment between `)` and `:`)
-        if let Some(return_type) = &decl.return_type {
-            tail.push(self.build_signature_return_type_doc(paren_pos, return_type));
-        }
+        // Params + return in one signature group (preserves a comment between `)`
+        // and `:`), so a too-long signature breaks the params before the return-type
+        // generic — and a long type-param list breaking above doesn't drag the params
+        // open (they stay inline when `>(a, b): R` fits).
+        tail.push(self.build_signature_params_return_group(
+            decl.params,
+            decl.type_parameters.as_ref(),
+            decl.return_type.as_ref(),
+            paren_pos,
+        ));
 
         // Comments between return type (or `)`) and `;`. An own-line comment defers
         // past the `;` (prettier); here the `;` is in this same doc, so emit it locally.
