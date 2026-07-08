@@ -1372,6 +1372,15 @@ impl<'a> Printer<'a> {
             let needs_comma = !is_last;
             if needs_comma {
                 inner_parts.push(d.text(","));
+                // A stranded after-comma block (on the comma's line, but a newline
+                // before the next param) trails the comma — preserving the author's
+                // placement, matching call args / declarators (prettier relocates it
+                // before the comma). A block hugging the next param leads it instead
+                // (as a leading comment). See conformance_prettier.md §Comment relocation.
+                if let Some(cp) = comma_pos {
+                    let next_start = self.param_start_with_decorators(&params[i + 1]);
+                    self.push_stranded_after_comma_blocks(&mut inner_parts, cp, next_start);
+                }
             }
 
             // Block comments AFTER the comma on the last param: preserve their position.
@@ -1518,6 +1527,15 @@ impl<'a> Printer<'a> {
                 let Some(comma) = prev_comma_pos else {
                     return true; // First param - keep all comments
                 };
+                // A stranded after-comma block (on the comma's line, newline before
+                // this param) trails the comma — emitted by the loop's
+                // `push_stranded_after_comma_blocks`, not led here.
+                if c.is_block
+                    && c.span.start >= comma
+                    && self.is_stranded_after_comma_block(c, comma, param_render_start)
+                {
+                    return false;
+                }
                 // Different line from prev param - definitely a leading comment
                 if !self.is_same_line(start, c.span.start) {
                     return true;
@@ -1531,38 +1549,84 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        let mut parts: DocBuf = DocBuf::new();
-
-        for (i, comment) in comments.iter().enumerate() {
-            // Check if comment is on its own line (not same line as previous content)
-            let prev_pos = if i == 0 {
+        // Neighbor bounds for the comment at index `i`: its predecessor is the `(`
+        // (== `start`) for the first comment, else the previous comment's end; its
+        // successor is the next comment's start, else the param's rendered start.
+        let prev_of = |i: usize| {
+            if i == 0 {
                 start
             } else {
                 comments[i - 1].span.end
-            };
+            }
+        };
+        let next_of = |i: usize| {
+            comments
+                .get(i + 1)
+                .map_or(param_render_start, |c| c.span.start)
+        };
+
+        // For the first param, prettier collapses leading block comment(s) inline
+        // (`(/* c */ x)`) UNLESS one is isolated on its own line — a line break on both
+        // sides — or is a line comment (the same isolated-from-neighbors rule the outer
+        // `has_leading_own_line_comment` gate uses). When nothing is isolated, every
+        // separator is a space so the group stays flat; an isolated/line comment
+        // re-expands the run with hardlines tracking the source newlines. A non-first
+        // param keeps the legacy own-line behavior — its comma-relocation cases differ.
+        let first_param = prev_comma_pos.is_none();
+        let force_expand = first_param
+            && comments
+                .iter()
+                .enumerate()
+                .any(|(i, c)| self.comment_isolated_from_neighbors(prev_of(i), c, next_of(i)));
+
+        let mut parts: DocBuf = DocBuf::new();
+
+        for (i, comment) in comments.iter().enumerate() {
+            let prev_pos = prev_of(i);
             let on_own_line = !self.is_same_line(prev_pos, comment.span.start);
 
-            if on_own_line && i > 0 {
-                // Comment on its own line (not first) - add hardline before it,
-                // preserving a blank line the author left between the two comments.
-                self.push_blank_preserving_hardline(&mut parts, prev_pos, comment.span.start);
+            if i > 0 {
+                if first_param {
+                    // Collapse mode uses a space; expand mode preserves the source
+                    // newline (blank-aware). Two comments sharing a line stay spaced.
+                    if force_expand && on_own_line {
+                        self.push_blank_preserving_hardline(
+                            &mut parts,
+                            prev_pos,
+                            comment.span.start,
+                        );
+                    } else {
+                        parts.push(d.text(" "));
+                    }
+                } else if on_own_line {
+                    // Non-first param (legacy): own-line comment gets a hardline,
+                    // preserving a blank line the author left between the two comments.
+                    self.push_blank_preserving_hardline(&mut parts, prev_pos, comment.span.start);
+                }
             }
             parts.push(self.build_comment_doc(comment));
         }
 
-        // Check if the param itself is on its own line after the last comment.
-        // Measure to the param's rendered start (its first own-line decorator, if
-        // any) so a decorator between the comment and the binding isn't miscounted
-        // as an author blank line.
+        // Separator between the last leading comment and the param. Measure to the
+        // param's rendered start (its first own-line decorator, if any) so a decorator
+        // between the comment and the binding isn't miscounted as an author blank line.
         let last_comment_end = comments.last().map_or(start, |c| c.span.end);
         let param_on_own_line = !self.is_same_line(last_comment_end, param_render_start);
 
-        if param_on_own_line {
-            // Preserve a blank line between the last leading comment and the param.
-            self.push_blank_preserving_hardline(&mut parts, last_comment_end, param_render_start);
+        // First param collapses inline unless an isolated/line comment forced expansion;
+        // non-first stays inline only when the param shares the last comment's line.
+        let collapse_to_param = if first_param {
+            !force_expand || !param_on_own_line
         } else {
+            !param_on_own_line
+        };
+
+        if collapse_to_param {
             // Inline - add space after comment
             parts.push(d.text(" "));
+        } else {
+            // Preserve a blank line between the last leading comment and the param.
+            self.push_blank_preserving_hardline(&mut parts, last_comment_end, param_render_start);
         }
 
         d.concat(&parts)
