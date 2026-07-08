@@ -1,6 +1,7 @@
 // Object, array, template, and pattern writers.
 
 use super::super::super::internal;
+use super::declarations::write_decorators_field;
 use super::expressions::{write_expression, write_expressions};
 use super::functions::write_function_expression;
 use super::{Ctx, JsonWriter, close_node, node_header, write_array, write_type_annotation_field};
@@ -50,7 +51,7 @@ pub(super) fn write_template_element(
 }
 
 /// Emits an `ObjectPattern` node. Field order: `properties`, `optional`
-/// (only when true), `typeAnnotation?`.
+/// (only when true), `typeAnnotation?`, `decorators?` (parameter position).
 pub(super) fn write_object_pattern(
     w: &mut JsonWriter,
     obj: &internal::ObjectPattern<'_>,
@@ -66,6 +67,7 @@ pub(super) fn write_object_pattern(
         w.raw(",\"optional\":true");
     }
     write_type_annotation_field(w, obj.type_annotation.as_ref(), ctx);
+    write_decorators_field(w, obj.decorators, ctx);
     close_node(w, "ObjectPattern", obj.span, ctx);
 }
 
@@ -148,5 +150,6 @@ pub(super) fn write_assignment_pattern(
     write_expression(w, pattern.left.skip_type_assertions(), ctx);
     w.raw(",\"right\":");
     write_expression(w, pattern.right, ctx);
+    write_decorators_field(w, pattern.decorators, ctx);
     close_node(w, "AssignmentPattern", span, ctx);
 }

@@ -137,6 +137,21 @@ const samples: Sample[] = [
 		type: 'Program',
 	},
 	{
+		// Parameter decorators on non-identifier bindings — the `decorators` field
+		// on ObjectPattern / ArrayPattern / AssignmentPattern (and, for a property,
+		// the inner binding). acorn attaches a parameter's decorators to its
+		// top-level binding node.
+		name: 'ts_param_decorator_bindings',
+		source: [
+			'class A {',
+			'\tconstructor(@d private a: number = 1) {}',
+			'\tm(@d { a }: T, @e [b]: U, @f c = 1) {}',
+			'}',
+		].join('\n'),
+		parser: 'typescript',
+		type: 'Program',
+	},
+	{
 		name: 'css_rule_at_media',
 		source: '.foo { color: red; }\n@media (min-width: 600px) {\n\t.bar { padding: 1em 2em; }\n}',
 		parser: 'css',

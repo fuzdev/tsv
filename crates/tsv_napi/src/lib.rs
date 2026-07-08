@@ -121,6 +121,67 @@ lang_bindings!(
     "format_css"
 );
 
+//
+// Goal-aware TypeScript parse (script vs module)
+//
+// The parse goal is TypeScript-only (Svelte `<script>` is always a module; CSS
+// has no goal), so — like `tsv_wasm` — these live outside `lang_bindings!`
+// rather than threading a meaningless goal through svelte/css. The goalless
+// `parse_typescript*` exports remain the `Module` default; these mirror them
+// against an explicit goal string (`"script"` / `"module"`). At Script goal,
+// `await` is an ordinary identifier and `import`/`export`/`import.meta` are
+// syntax errors. See `tsv parse --goal` and `tsv_ts::parse_with_goal`.
+
+/// Parse a goal string (`"script"` / `"module"`) for the goal-aware TS exports.
+#[cfg(feature = "parse")]
+fn napi_goal(goal: &str) -> napi::Result<tsv_ts::Goal> {
+    tsv_ts::Goal::from_source_type(goal).ok_or_else(|| {
+        napi::Error::from_reason(format!(
+            "invalid goal '{goal}' (expected 'script' or 'module')"
+        ))
+    })
+}
+
+/// `parse_typescript` (JSON AST string) against an explicit goal.
+#[cfg(feature = "parse")]
+#[napi(js_name = "parse_typescript_with_goal")]
+pub fn parse_typescript_with_goal(source: String, goal: String) -> napi::Result<String> {
+    let goal = napi_goal(&goal)?;
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        Ok(tsv_ts::convert_ast_json_string(&ast, &source))
+    })
+}
+
+/// `parse_typescript_no_locations` (span-only JSON AST string) against an explicit goal.
+#[cfg(feature = "parse")]
+#[napi(js_name = "parse_typescript_no_locations_with_goal")]
+pub fn parse_typescript_no_locations_with_goal(
+    source: String,
+    goal: String,
+) -> napi::Result<String> {
+    let goal = napi_goal(&goal)?;
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, &source))
+    })
+}
+
+/// `parse_internal_typescript` (parse-only, no serialization) against an explicit goal.
+#[cfg(feature = "parse")]
+#[napi(js_name = "parse_internal_typescript_with_goal")]
+pub fn parse_internal_typescript_with_goal(source: String, goal: String) -> napi::Result<()> {
+    let goal = napi_goal(&goal)?;
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        std::hint::black_box(&ast);
+        Ok(())
+    })
+}
+
 // Drive every entry point in-process so `cargo test` exercises the native
 // binding without a Node host (the Deno/WASM smoke paths don't cover napi).
 // These call the plain Rust functions the `#[napi]` macro wraps; the JS
@@ -181,6 +242,26 @@ mod tests {
                 "{label}: unexpected root type in {json}"
             );
         }
+    }
+
+    // --- goal-aware TS parse: script accepts `await` as identifier, module rejects ---
+
+    #[test]
+    fn parse_typescript_with_goal_switches_await() {
+        // `await` is an ordinary identifier at Script goal, reserved at Module goal.
+        let src = "var await = 1;\n";
+        assert!(parse_typescript_with_goal(src.to_owned(), "script".to_owned()).is_ok());
+        assert!(parse_typescript_with_goal(src.to_owned(), "module".to_owned()).is_err());
+        assert!(
+            parse_typescript_no_locations_with_goal(src.to_owned(), "script".to_owned()).is_ok()
+        );
+        assert!(
+            parse_typescript_no_locations_with_goal(src.to_owned(), "module".to_owned()).is_err()
+        );
+        assert!(parse_internal_typescript_with_goal(src.to_owned(), "script".to_owned()).is_ok());
+        assert!(parse_internal_typescript_with_goal(src.to_owned(), "module".to_owned()).is_err());
+        // An invalid goal string is a thrown error, not a silent module fallback.
+        assert!(parse_typescript_with_goal(src.to_owned(), "sloppy".to_owned()).is_err());
     }
 
     // --- parse_internal: parses without converting (Ok, no JSON), every language ---
