@@ -20,7 +20,7 @@ mod arrays;
 pub(in crate::printer) mod assignment;
 mod blocks;
 mod conditional;
-mod functions;
+pub(in crate::printer) mod functions;
 pub(crate) mod literals;
 mod objects;
 mod operators;

@@ -33,8 +33,13 @@ impl<'a> Printer<'a> {
         body_start: u32,
     ) -> (DocId, u32) {
         let d = self.d();
-        let (params_doc, return_type_doc, sig_end) =
-            self.build_signature_params_return(params, type_parameters, return_type, params_start, body_start);
+        let (params_doc, return_type_doc, sig_end) = self.build_signature_params_return(
+            params,
+            type_parameters,
+            return_type,
+            params_start,
+            body_start,
+        );
 
         let mut sig_parts: DocBuf = smallvec![params_doc];
         if let Some(rt_doc) = return_type_doc {

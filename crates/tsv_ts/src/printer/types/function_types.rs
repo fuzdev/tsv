@@ -7,6 +7,7 @@
 // - Return type annotations
 
 use super::super::comments_in_range;
+use super::super::expressions::functions::{has_huggable_type_annotation, is_huggable_pattern};
 use super::helpers::type_args_should_wrap_for_return_type;
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
@@ -533,8 +534,14 @@ impl<'a> Printer<'a> {
         // shouldGroupFunctionParameters: a single param whose return type is an
         // object/mapped type (or otherwise will-breaks) hugs — the params stay flat
         // and the return type breaks, instead of the params breaking.
-        let params_doc =
-            group_params_if_should(params_doc, params, type_parameters, return_type, return_type_doc, d);
+        let params_doc = group_params_if_should(
+            params_doc,
+            params,
+            type_parameters,
+            return_type,
+            return_type_doc,
+            d,
+        );
 
         let mut sig_parts: DocBuf = smallvec![params_doc];
         if let Some(rt_doc) = return_type_doc {
@@ -582,6 +589,24 @@ impl<'a> Printer<'a> {
 
         // Check for line comments or own-line block comments that force multiline
         let close_paren_pos = paren_pos.and_then(|p| self.matching_close_paren(p));
+
+        // Prettier's shouldHugFunctionParameters: a single param that's an object/array
+        // pattern (or carries an object/type-literal annotation) hugs — `(o: {` and
+        // `}: T)` stay together while the object's own group breaks, instead of the
+        // param LIST breaking around it. Mirrors `build_params_doc_with_comments` for
+        // value params; this is the signature-context path (bodyless declare/overload
+        // functions, method/call/construct signatures). Skipped when a comment sits in
+        // the `(`→param or param→`)` gap — the breakable path below places those.
+        let no_hug_comments = paren_pos
+            .is_none_or(|p| !self.has_comments_between(p + 1, params[0].span().start))
+            && close_paren_pos.is_none_or(|c| !self.has_comments_between(params[0].span().end, c));
+        if params.len() == 1
+            && (is_huggable_pattern(&params[0]) || has_huggable_type_annotation(&params[0]))
+            && no_hug_comments
+            && !self.param_has_own_line_decorators(&params[0])
+        {
+            return d.parens(self.build_function_type_param_expression_doc(&params[0]));
+        }
         let end_boundary =
             close_paren_pos.unwrap_or_else(|| params.last().map_or(0, |p| p.span().end));
         // Zero-comment window gate: one binary search over the whole params window.
