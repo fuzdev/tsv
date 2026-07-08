@@ -148,9 +148,25 @@ pub(super) fn build_call_doc_with_wrapping(
         return d.concat(&parts);
     }
 
+    // Position after type args (or callee if no type args) — the `(` follows this.
+    let paren_open = call
+        .type_arguments
+        .as_ref()
+        .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
+
+    // Whole-call comment-presence gate: one binary search over the entire argument
+    // window. Every per-argument comment sub-query below (the leading / inter-arg /
+    // trailing predicates, each O(n) over args, plus the general comment path) lies
+    // within [paren_open, call.span.end], so when the call has no comment they are
+    // provably all false/empty — skip them. Canonical reference:
+    // build_params_doc_with_comments.
+    let call_has_comments = printer.has_comments_between(paren_open, call.span.end);
+
     // Module path calls that should not break at arguments (e.g., require.resolve)
     // Keep the call on one line; let assignment/parent break instead
-    if is_module_path_no_break(call, printer) && !has_trailing_comments_on_args(call, printer) {
+    if is_module_path_no_break(call, printer)
+        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
+    {
         return d.concat(&[
             callee,
             d.text("("),
@@ -167,7 +183,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // Module path calls (require.resolve.paths, import.meta.resolve) break at chain
     // rather than at arguments, keeping the path on the same line as the method
     if let Some((base_expr, method_name)) = get_module_path_chain_break(call, printer)
-        .filter(|_| !has_trailing_comments_on_args(call, printer))
+        .filter(|_| !(call_has_comments && has_trailing_comments_on_args(call, printer)))
     {
         let base_doc = printer.build_expression_doc(base_expr);
         let method_doc = printer.identifier_name_doc(method_name);
@@ -192,11 +208,13 @@ pub(super) fn build_call_doc_with_wrapping(
     // - Expression arrows use width-aware group (wrap when exceeds line limit)
     // Skip hugging if there are trailing comments - let comment handling block handle it
     // Note: Check both trailing line comments AND trailing block comments
-    let has_trailing_block_comment = call.arguments.last().is_some_and(|last_arg| {
-        comments_in_range(printer.comments, last_arg.span().end, call.span.end).any(|c| c.is_block)
-    });
+    let has_trailing_block_comment = call_has_comments
+        && call.arguments.last().is_some_and(|last_arg| {
+            comments_in_range(printer.comments, last_arg.span().end, call.span.end)
+                .any(|c| c.is_block)
+        });
     if call.arguments.len() == 1
-        && !has_trailing_comments_on_args(call, printer)
+        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
         && !has_trailing_block_comment
         && let Some(doc) = try_single_arg_hug(printer, call, callee)
     {
@@ -212,12 +230,6 @@ pub(super) fn build_call_doc_with_wrapping(
     {
         return doc;
     }
-
-    // Position after type args (or callee if no type args) — the `(` follows this
-    let paren_open = call
-        .type_arguments
-        .as_ref()
-        .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
 
     // Check if any argument has multiline content (e.g., line continuation strings)
     // Prettier expands calls containing multiline strings (recursively)
@@ -239,7 +251,8 @@ pub(super) fn build_call_doc_with_wrapping(
     // e.g., fn(arr.map((x) => x), b) → fn(\n\tarr.map((x) => x),\n\tb,\n)
     // Prettier's isFunctionCompositionArgs: 2+ args, any arg is call with function/arrow inside
     // Skip if there are trailing comments - let the comment handling code deal with expansion
-    if is_function_composition_args(call.arguments) && !has_trailing_comments_on_args(call, printer)
+    if is_function_composition_args(call.arguments)
+        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
     {
         let arg_parts =
             build_args_joined_with_comments(printer, call.arguments, paren_open, true, |p, a| {
@@ -252,8 +265,8 @@ pub(super) fn build_call_doc_with_wrapping(
     // and remaining args are short, hug the function and put tail args after closing }
     // e.g., setTimeout(() => { tick(); }, 100);
     if should_expand_first_arg(printer, call.arguments)
-        && !has_trailing_comments_on_args(call, printer)
-        && !first_arg_has_any_comments(call.arguments, printer, paren_open)
+        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
+        && !(call_has_comments && first_arg_has_any_comments(call.arguments, printer, paren_open))
     {
         let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
 
@@ -299,7 +312,7 @@ pub(super) fn build_call_doc_with_wrapping(
             .iter()
             .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
 
-    if all_args_are_arrows && !has_trailing_comments_on_args(call, printer) {
+    if all_args_are_arrows && !(call_has_comments && has_trailing_comments_on_args(call, printer)) {
         let arg_parts =
             build_args_joined_with_comments(printer, call.arguments, paren_open, true, |p, a| {
                 p.build_expression_doc(a)
@@ -310,14 +323,18 @@ pub(super) fn build_call_doc_with_wrapping(
     // Expand-last pattern for function/arrow last arguments. Returns `None` when
     // there are fewer than 2 args, the guard fails, or the last arg is a
     // non-expandable expression-body arrow (which falls through to the default path).
-    if let Some(doc) = try_expand_last_function_arg(printer, call, callee, paren_open) {
+    if let Some(doc) =
+        try_expand_last_function_arg(printer, call, callee, paren_open, call_has_comments)
+    {
         return doc;
     }
 
     // Expand-last pattern for array/object last arguments (Prettier's
     // shouldExpandLastArg). Must come BEFORE the comment-handling path below.
     // Returns `None` when the guard fails, so the caller falls through.
-    if let Some(doc) = try_expand_last_array_object_arg(printer, call, callee, paren_open) {
+    if let Some(doc) =
+        try_expand_last_array_object_arg(printer, call, callee, paren_open, call_has_comments)
+    {
         return doc;
     }
 
@@ -330,6 +347,7 @@ pub(super) fn build_call_doc_with_wrapping(
         callee,
         paren_open,
         has_trailing_block_comment,
+        call_has_comments,
     ) {
         return doc;
     }
@@ -858,6 +876,7 @@ fn try_expand_last_function_arg(
     call: &internal::CallExpression<'_>,
     callee: DocId,
     paren_open: u32,
+    call_has_comments: bool,
 ) -> Option<DocId> {
     let d = printer.d();
     if call.arguments.len() < 2 {
@@ -874,11 +893,12 @@ fn try_expand_last_function_arg(
 
     if last_is_function
         && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
-        && !any_comment_forces_expansion(call, printer, paren_open)
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(call_has_comments && any_comment_forces_expansion(call, printer, paren_open))
+        && !(call_has_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(call.arguments, printer, paren_open);
+            build_args_split_last(call.arguments, printer, paren_open, call_has_comments);
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         // When any head arg's doc will break (e.g., new Map([...multiline...])),
@@ -1011,14 +1031,16 @@ fn try_expand_last_array_object_arg(
     call: &internal::CallExpression<'_>,
     callee: DocId,
     paren_open: u32,
+    call_has_comments: bool,
 ) -> Option<DocId> {
     let d = printer.d();
     if call.arguments.len() >= 2
         && last_arg_is_array_or_object(call.arguments)
         && !call.arguments.last().is_some_and(is_concise_numeric_array)
         && preceding_args_allow_expand_last(call.arguments, printer.line_breaks)
-        && !any_comment_forces_expansion(call, printer, paren_open)
-        && !last_arg_has_comments(call.arguments, printer, call.span.end, paren_open)
+        && !(call_has_comments && any_comment_forces_expansion(call, printer, paren_open))
+        && !(call_has_comments
+            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
         && !(call.arguments.len() == 2
             && matches!(
                 call.arguments.first(),
@@ -1033,7 +1055,7 @@ fn try_expand_last_array_object_arg(
             // Same type: use 2-state conditional (inline, expand-all)
             // Don't use the "hug with bracket" state
             let (head_parts, last_arg_doc, all_args_broken) =
-                build_args_split_last(call.arguments, printer, paren_open);
+                build_args_split_last(call.arguments, printer, paren_open, call_has_comments);
 
             // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
             if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1061,7 +1083,7 @@ fn try_expand_last_array_object_arg(
         // Different types: check if last arg has hardlines (e.g., comments)
         // If it does, Prettier uses expand-all instead of hug
         let (head_parts, last_arg_doc, all_args_broken) =
-            build_args_split_last(call.arguments, printer, paren_open);
+            build_args_split_last(call.arguments, printer, paren_open, call_has_comments);
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1118,8 +1140,16 @@ fn build_call_with_arg_comments(
     callee: DocId,
     paren_open: u32,
     has_trailing_block_comment: bool,
+    call_has_comments: bool,
 ) -> Option<DocId> {
     let d = printer.d();
+
+    // Zero-comment fast gate: this path only fires when the argument list has
+    // comments; with none, every check below is false and it returns None anyway,
+    // so skip them (canonical reference: build_params_doc_with_comments).
+    if !call_has_comments {
+        return None;
+    }
 
     // Check for any comments in arguments (leading, inter-argument, or trailing)
     let has_leading_comments = !call.arguments.is_empty()

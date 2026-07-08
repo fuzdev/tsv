@@ -116,12 +116,17 @@ impl<'a> Printer<'a> {
                 )
             });
             let paren_open = call.callee.span().end;
+            // Whole-call comment-presence gate (one binary search over the argument
+            // window); short-circuits the comment predicates below and threads into
+            // build_args_split_last. Canonical reference: build_params_doc_with_comments.
+            let call_has_comments = self.has_comments_between(paren_open, call.span.end);
             if call.arguments.len() >= 2
                 && call.arguments.last().is_some_and(is_block_function)
                 && preceding_args_allow_expand_last(call.arguments, self.line_breaks)
                 && !has_blank_lines_between_args
-                && !any_comment_forces_expansion(call, self, paren_open)
-                && !last_arg_has_comments(call.arguments, self, call.span.end, paren_open)
+                && !(call_has_comments && any_comment_forces_expansion(call, self, paren_open))
+                && !(call_has_comments
+                    && last_arg_has_comments(call.arguments, self, call.span.end, paren_open))
                 && !inner_has_multiline_arg
             {
                 let d = self.d();
@@ -130,7 +135,7 @@ impl<'a> Printer<'a> {
                 // Build args split into head (with commas) and last
                 // Leading comments before first arg are handled inside build_args_split_last
                 let (head_parts, last_arg_doc, all_args_broken) =
-                    build_args_split_last(call.arguments, self, paren_open);
+                    build_args_split_last(call.arguments, self, paren_open, call_has_comments);
 
                 let state_inline = d.concat(&[
                     callee_doc,
