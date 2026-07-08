@@ -303,9 +303,30 @@ impl<'a> Printer<'a> {
                 {
                     id_end = bang_pos + 1;
                 }
-                let equals_pos = self.find_equals_position(id_end, init_start);
-                let has_comments_before_eq = self.has_comments_between(id_end, equals_pos);
-                let has_comments_after_eq = self.has_comments_between(equals_pos + 1, init_start);
+                // Zero-comment fast gate: one binary search over the whole name→value
+                // gap. The overwhelming common case (no comment around `=`) then skips
+                // locating `=` — a byte-by-byte source scan — and both the before-`=`
+                // and after-`=` comment probes, falling through to the plain `id = init`
+                // layout below. Sound because comments are start-sorted + disjoint and
+                // both gap sub-ranges lie within `[id_end, init_start]`, so an empty
+                // whole-gap window makes every sub-query provably empty. Canonical
+                // reference: `build_params_doc_with_comments`.
+                let gap_has_comments = self.has_comments_between(id_end, init_start);
+                let (equals_pos, has_comments_before_eq, has_comments_after_eq) =
+                    if gap_has_comments {
+                        let eq = self.find_equals_position(id_end, init_start);
+                        (
+                            eq,
+                            self.has_comments_between(id_end, eq),
+                            self.has_comments_between(eq + 1, init_start),
+                        )
+                    } else {
+                        // No gap comment ⇒ the `=` position is never consulted (its only
+                        // uses bound comment ranges, all empty here); the value below is
+                        // a never-read sentinel that keeps the gated call sites' ranges
+                        // trivially empty.
+                        (init_start, false, false)
+                    };
 
                 // A line comment between the binding and `=` keeps the comment in place
                 // and drops `= value` to a continuation line indented one level (preserve
@@ -316,12 +337,15 @@ impl<'a> Printer<'a> {
                 // no-comment path is unaffected. Init declarators always feed `parts`
                 // (the comma/separator is handled above, the `;` after the loop), so a
                 // plain push + `continue` is safe.
-                if let Some(cont) =
-                    self.build_initializer_line_continuation(id_end, equals_pos, || {
-                        let value_doc = self
-                            .build_expression_doc_with_paren_comments(init, declarator.span.end);
-                        self.prepend_rhs_comments(value_doc, equals_pos + 1, init_start)
-                    })
+                if has_comments_before_eq
+                    && let Some(cont) =
+                        self.build_initializer_line_continuation(id_end, equals_pos, || {
+                            let value_doc = self.build_expression_doc_with_paren_comments(
+                                init,
+                                declarator.span.end,
+                            );
+                            self.prepend_rhs_comments(value_doc, equals_pos + 1, init_start)
+                        })
                 {
                     parts.push(id_doc);
                     parts.push(cont);
@@ -575,9 +599,12 @@ impl<'a> Printer<'a> {
                 // Curried arrows with return type always break after `=`
                 let is_curried_arrow = is_curried_arrow_with_return_type(init);
 
-                if let Some(rhs) = self.build_eq_comment_break_rhs(equals_pos, init_start, || {
-                    self.build_init_value_doc(init, declarator.span.end)
-                }) {
+                if has_comments_after_eq
+                    && let Some(rhs) =
+                        self.build_eq_comment_break_rhs(equals_pos, init_start, || {
+                            self.build_init_value_doc(init, declarator.span.end)
+                        })
+                {
                     // A comment after `=` forces a break (line comment → partition;
                     // own-line / multiline block → break-after-operator hang). Shared
                     // with the for-loop init clause.
@@ -588,8 +615,9 @@ impl<'a> Printer<'a> {
                     // after `=`. An inline block glued to `=` trails it on that line.
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
-                    if let Some(inline) =
-                        self.build_inline_comments_between_doc_opt(equals_pos + 1, init_start)
+                    if has_comments_after_eq
+                        && let Some(inline) =
+                            self.build_inline_comments_between_doc_opt(equals_pos + 1, init_start)
                     {
                         parts.push(inline);
                     }
