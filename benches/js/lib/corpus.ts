@@ -29,6 +29,7 @@ import { fs_exists } from '@fuzdev/fuz_util/fs.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join, resolve } from 'node:path';
 
+import { clone_hint } from './corpus_repos.ts';
 import type { Language, Logger, SourceFile } from './types.ts';
 
 //
@@ -468,6 +469,28 @@ async function load_svelte_reject_set(): Promise<Set<string> | null> {
 // Dev Repos Loader
 //
 
+/**
+ * A corpus source's GitHub origin — git-detected at report-build time
+ * (`lib/corpus_repos.ts`), so the report links straight to the exact code the
+ * numbers were measured against without a hand-maintained path→URL map.
+ */
+export interface CorpusRepoRef {
+	/** Canonical https GitHub URL, e.g. `https://github.com/sveltejs/svelte`. */
+	url: string;
+	/** `owner/name` (e.g. `sveltejs/svelte`) — the linkified label. */
+	slug: string;
+	/**
+	 * The commit the corpus was loaded at (full SHA), so links pin to it; `''`
+	 * for a harvested cache linked at its canonical upstream root (no pin).
+	 */
+	commit: string;
+	/** Path within the repo to this source (`''` = repo root); drives `/tree/<commit>/<subpath>`. */
+	subpath: string;
+}
+
+// `clone_hint` is a pure helper; the reverse import (`corpus_repos.ts` → this
+// module) is type-only, so there is no runtime import cycle.
+
 /** One loaded corpus entry's disclosure row — reported as `corpus_sources`. */
 export interface CorpusSource {
 	path: string;
@@ -478,6 +501,12 @@ export interface CorpusSource {
 	 * rather than only a bare total.
 	 */
 	by_language: Record<Language, number>;
+	/**
+	 * The source's GitHub origin, git-detected by `enrich_source_repos` at
+	 * report-build time. `undefined` for a source with no GitHub remote (the
+	 * local `svelte_styles` cache) or when detection fails (absent checkout).
+	 */
+	repo?: CorpusRepoRef;
 }
 
 /**
@@ -555,7 +584,11 @@ export class DevReposLoader {
 			} else if (entry.optional) {
 				logger(`  ⚠ optional corpus entry missing: ${entry_path}${entry.hint ? ` — ${entry.hint}` : ''}`);
 			} else {
-				missing.push(entry_path + (entry.hint ? ` (${entry.hint})` : ''));
+				// Prefer an entry's own remedy (a harvest task for the derived
+				// caches); otherwise a concrete `git clone` line for a known
+				// suite/framework checkout.
+				const remedy = entry.hint ?? clone_hint(entry_path);
+				missing.push(entry_path + (remedy ? ` (${remedy})` : ''));
 			}
 		}
 		if (missing.length > 0) {

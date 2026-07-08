@@ -74,6 +74,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { argv, env, exit } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { type CorpusSource, DevReposLoader, group_by_language } from './lib/corpus.ts';
+import { enrich_source_repos } from './lib/corpus_repos.ts';
 import { PERF_OMITS, perf_omit_reason } from './lib/perf_omit.ts';
 import {
 	canonical_parser_label,
@@ -393,6 +394,9 @@ const files: SourceFile[] = [];
 for await (const file of corpus_loader.stream(log)) {
 	files.push(file);
 }
+// Reify each loaded source's GitHub origin (URL + commit + subpath) so the
+// report links straight to the measured code — a few cheap `git` calls.
+await enrich_source_repos(corpus_loader.sources);
 const by_language = group_by_language(files);
 
 // Preserve total counts before limiting

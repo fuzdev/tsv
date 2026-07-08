@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-07-07T21:24:55.476Z — tsv 0.1.0 (2cc5035d)
+**Date:** 2026-07-07T22:02:05.501Z — tsv 0.1.0 (da240269)
 
 **Corpus:** 4535 Svelte (1.1 MB), 44224 TypeScript (63.3 MB), 22641 CSS (7.7 MB) — 71400 files, 72.0 MB total
 
@@ -73,4 +73,95 @@ _Gzipped ≈ npm-tarball wire size (`gzip -c`, system default level). `vs tsv (g
 - parse/svelte: tsv-internal: 8
 - parse/svelte: tsv_wasm-internal: 8
 
-_Per-file detail omitted. Re-run with `--verbose` to include error messages and failure sets per file._
+### Svelte
+
+- `/home/lap/dev/prettier/tests/format/html/tags/tags.html`
+  - Error: Unexpected character in template: '[' 87:11 <p>"<span [innerHTML]="title"></span>" is the <i>property bound</i> title.</p>               ^ here
+  - Failed in: parse/svelte: tsv-json, parse/svelte: tsv-json-no-locations, parse/svelte: tsv_wasm-json, parse/svelte: tsv_wasm-json-no-locations, parse/svelte: tsv-internal, parse/svelte: tsv_wasm-internal
+- `/home/lap/dev/svelte/packages/svelte/tests/css/samples/comment-html/input.svelte`
+  - Error: Unexpected token in selector: '<' 4:2 	<!-- /* comment */ -->     ^ here
+  - Failed in: parse/svelte: tsv-json, parse/svelte: tsv-json-no-locations, parse/svelte: tsv_wasm-json, parse/svelte: tsv_wasm-json-no-locations, parse/svelte: tsv-internal, parse/svelte: tsv_wasm-internal
+- `/home/lap/dev/svelte/packages/svelte/tests/validator/samples/attribute-invalid-name/input.svelte`
+  - Error: Expected attribute name or '>', found '}' 1:4 <p }>Test</p>       ^ here
+  - Failed in: parse/svelte: tsv-json, parse/svelte: tsv-json-no-locations, parse/svelte: tsv_wasm-json, parse/svelte: tsv_wasm-json-no-locations, parse/svelte: tsv-internal, parse/svelte: tsv_wasm-internal
+- `/home/lap/dev/svelte/packages/svelte/tests/validator/samples/css-invalid-combinator-selector-1/input.svelte`
+  - Error: Unexpected token in selector: '>' 10:2 	> span {      ^ here
+  - Failed in: parse/svelte: tsv-json, parse/svelte: tsv-json-no-locations, parse/svelte: tsv_wasm-json, parse/svelte: tsv_wasm-json-no-locations, parse/svelte: tsv-internal, parse/svelte: tsv_wasm-internal
+- `/home/lap/dev/svelte/packages/svelte/tests/validator/samples/css-invalid-combinator-selector-2/input.svelte`
+  - Error: Unexpected token in selector: '+' 8:2 	+ p {     ^ here
+  - Failed in: parse/svelte: tsv-json, parse/svelte: tsv-json-no-locations, parse/svelte: tsv_wasm-json, parse/svelte: tsv_wasm-json-no-locations, parse/svelte: tsv-internal, parse/svelte: tsv_wasm-internal
+- `/home/lap/dev/svelte/packages/svelte/tests/validator/samples/css-invalid-combinator-selector-3/input.svelte`
+  - Error: Unexpected token in selector: '>' 5:3 		> span {      ^ here
+  - Failed in: parse/svelte: tsv-json, parse/svelte: tsv-json-no-locations, parse/svelte: tsv_wasm-json, parse/svelte: tsv_wasm-json-no-locations, parse/svelte: tsv-internal, parse/svelte: tsv_wasm-internal
+- `/home/lap/dev/svelte/packages/svelte/tests/validator/samples/if-block-whitespace-legacy/input.svelte`
+  - Error: Expected identifier after '#', found 'if' 5:5 	{ #if true}        ^ here
+  - Failed in: parse/svelte: tsv-json, parse/svelte: tsv-json-no-locations, parse/svelte: tsv_wasm-json, parse/svelte: tsv_wasm-json-no-locations, parse/svelte: tsv-internal, parse/svelte: tsv_wasm-internal
+- `/home/lap/dev/svelte/packages/svelte/tests/validator/samples/if-block-whitespace-runes/input.svelte`
+  - Error: Expected identifier after '#', found 'if' 10:5 	{ #if true}         ^ here
+  - Failed in: parse/svelte: tsv-json, parse/svelte: tsv-json-no-locations, parse/svelte: tsv_wasm-json, parse/svelte: tsv_wasm-json-no-locations, parse/svelte: tsv-internal, parse/svelte: tsv_wasm-internal
+
+### TypeScript (showing top 10 of 1176, sorted rarest failure-set first)
+
+- `/home/lap/dev/prettier/tests/format/js/arrows-bind/arrows-bind.js`
+  - Error: Unexpected token (1:9)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/arrows/call.js`
+  - Error: Unexpected token (33:8)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/arrows/comment.js`
+  - Error: Unexpected token (26:2)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/async-do-expressions/async-do-expressions.js`
+  - Error: Unexpected token (1:6)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/babel-plugins/async-do-expressions.js`
+  - Error: Unexpected token (1:6)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/babel-plugins/decorators.js`
+  - Error: Identifier 'MyClass' has already been declared (11:6)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/babel-plugins/deferred-import-evaluation.js`
+  - Error: Unexpected token (1:13)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/babel-plugins/destructuring-private.js`
+  - Error: Unexpected token (5:12)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/babel-plugins/discard-binding.js`
+  - Error: Unexpected keyword 'void' (1:10)
+  - Failed in: parse/typescript: acorn-typescript
+- `/home/lap/dev/prettier/tests/format/js/babel-plugins/do-expressions.js`
+  - Error: Unexpected token (3:8)
+  - Failed in: parse/typescript: acorn-typescript
+
+### CSS (showing top 10 of 433, sorted rarest failure-set first)
+
+- `/home/lap/dev/prettier/tests/format/css/atrule/extend.css`
+  - Error: Expected a valid CSS identifier https://svelte.dev/e/css_expected_identifier
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/atrule/import.css`
+  - Error: Expected a valid CSS identifier https://svelte.dev/e/css_expected_identifier
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/atrule/supports.css`
+  - Error: Expected a valid CSS identifier https://svelte.dev/e/css_expected_identifier
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/attribute/namespaces.css`
+  - Error: Expected token ] https://svelte.dev/e/expected_token
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/attribute/spaces.css`
+  - Error: Expected token ] https://svelte.dev/e/expected_token
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/combinator/combinator.css`
+  - Error: Expected a valid CSS identifier https://svelte.dev/e/css_expected_identifier
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/comments/custom-properties.css`
+  - Error: Expected a valid CSS identifier https://svelte.dev/e/css_expected_identifier
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/comments/selectors.css`
+  - Error: Expected a valid CSS identifier https://svelte.dev/e/css_expected_identifier
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/custom-properties/emoji.css`
+  - Error: Expected a valid CSS identifier https://svelte.dev/e/css_expected_identifier
+  - Failed in: parse/css: svelte/compiler
+- `/home/lap/dev/prettier/tests/format/css/modules/modules.css`
+  - Error: Expected a valid CSS identifier https://svelte.dev/e/css_expected_identifier
+  - Failed in: parse/css: svelte/compiler
