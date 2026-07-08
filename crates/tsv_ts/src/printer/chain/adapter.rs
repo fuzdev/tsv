@@ -193,10 +193,6 @@ impl<'a> ChainPrinter for Printer<'a> {
     fn get_source(&self) -> &str {
         self.source
     }
-
-    fn should_force_expand(&self) -> bool {
-        self.force_chain_expand.get()
-    }
 }
 
 impl<'a> Printer<'a> {

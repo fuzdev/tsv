@@ -185,43 +185,40 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         false
     }
 
-    /// Check if position points to a TypeScript type keyword
+    /// Check if position points to a TypeScript type keyword.
+    ///
+    /// Called on every `<`/`<<` disambiguation in the postfix loop, so ordinary
+    /// relational comparisons (`i < n`) and shifts hit it — keep it cheap. A first-byte
+    /// `match` dispatches to only the same-initial-letter candidate(s), so a byte that
+    /// can't begin any of the 19 keywords (a digit, `(`, `[`, a quote, or an identifier
+    /// starting with one of the other 14 letters) bails in O(1) instead of scanning all
+    /// 19. Byte-identical to the prior linear scan: each keyword is checked with the
+    /// same full-string compare + non-identifier-boundary condition, and no keyword is a
+    /// prefix of another, so at most one can match at a position.
     fn is_type_keyword_at(&self, bytes: &[u8], pos: usize) -> bool {
-        const TYPE_KEYWORDS: &[&[u8]] = &[
-            b"never",
-            b"string",
-            b"number",
-            b"boolean",
-            b"any",
-            b"unknown",
-            b"void",
-            b"null",
-            b"undefined",
-            b"symbol",
-            b"bigint",
-            b"object",
-            b"this",
-            b"true",
-            b"false",
-            // Type operators that can start a type
-            b"typeof",
-            b"keyof",
-            b"infer",
-            b"readonly",
-            b"unique",
-        ];
-
-        for kw in TYPE_KEYWORDS {
-            if pos + kw.len() <= bytes.len() && &bytes[pos..pos + kw.len()] == *kw {
-                // Check it's not part of a longer identifier
-                let next_pos = pos + kw.len();
-                if next_pos >= bytes.len()
-                    || (!bytes[next_pos].is_ascii_alphanumeric() && bytes[next_pos] != b'_')
-                {
-                    return true;
-                }
-            }
+        // Full keyword match at `pos`, not part of a longer identifier.
+        let kw = |k: &[u8]| -> bool {
+            pos + k.len() <= bytes.len()
+                && &bytes[pos..pos + k.len()] == k
+                && bytes
+                    .get(pos + k.len())
+                    .is_none_or(|&b| !b.is_ascii_alphanumeric() && b != b'_')
+        };
+        match bytes.get(pos) {
+            Some(b'n') => kw(b"never") || kw(b"number") || kw(b"null"),
+            Some(b's') => kw(b"string") || kw(b"symbol"),
+            Some(b'b') => kw(b"boolean") || kw(b"bigint"),
+            Some(b'a') => kw(b"any"),
+            Some(b'u') => kw(b"unknown") || kw(b"undefined") || kw(b"unique"),
+            Some(b'v') => kw(b"void"),
+            Some(b'o') => kw(b"object"),
+            // Type operators that can start a type: typeof, keyof, infer, readonly, unique
+            Some(b't') => kw(b"this") || kw(b"true") || kw(b"typeof"),
+            Some(b'f') => kw(b"false"),
+            Some(b'k') => kw(b"keyof"),
+            Some(b'i') => kw(b"infer"),
+            Some(b'r') => kw(b"readonly"),
+            _ => false,
         }
-        false
     }
 }

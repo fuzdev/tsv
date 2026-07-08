@@ -134,12 +134,6 @@ pub trait ChainPrinter: SymbolLookup {
 
     /// Get the source code string
     fn get_source(&self) -> &str;
-
-    /// Check if chain expansion should be forced
-    ///
-    /// Used when inside template expressions with original breaks, where the
-    /// expression is too long for the remaining print width.
-    fn should_force_expand(&self) -> bool;
 }
 
 //
