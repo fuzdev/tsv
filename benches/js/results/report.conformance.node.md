@@ -6,7 +6,7 @@
 
 **Corpus kind:** conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)
 
-**Date:** 2026-07-08T00:33:27.632Z — tsv 0.1.0 (7211c76b)
+**Date:** 2026-07-08T02:15:20.689Z — tsv 0.1.0 (99ac4c69)
 
 **Corpus:** 4535 Svelte (1.1 MB), 44224 TypeScript (63.3 MB), 22641 CSS (7.7 MB) — 71400 files, 72.0 MB total
 
@@ -32,14 +32,14 @@
 
 | Binary | Size | Gzipped | vs tsv | vs tsv (gz) |
 | --- | ---: | ---: | ---: | ---: |
-| tsv_format_wasm | 2.2 MB | 762.0 KB | 0.9x | 0.9x |
-| tsv_parse_wasm | 1.0 MB | 381.0 KB | 0.4x | 0.5x |
-| tsv_wasm | 2.4 MB | 841.9 KB | — | — |
+| tsv_format_wasm | 2.2 MB | 763.4 KB | 0.9x | 0.9x |
+| tsv_parse_wasm | 1.0 MB | 381.2 KB | 0.4x | 0.5x |
+| tsv_wasm | 2.4 MB | 843.0 KB | — | — |
 | biome (wasm) | 37.5 MB | 9.0 MB | 15.4x | 10.7x |
 | oxc-parser (wasm) | 1.6 MB | 501.4 KB | 0.7x | 0.6x |
 | tsv (ffi) | 3.3 MB | 1.4 MB | 1.0x | 1.0x |
 | tsv format (ffi) | 3.1 MB | 1.3 MB | 0.9x | 0.9x |
-| tsv parse (ffi) | 1.6 MB | 691.2 KB | 0.4x | 0.5x |
+| tsv parse (ffi) | 1.6 MB | 691.8 KB | 0.5x | 0.5x |
 | tsv (napi) | 3.5 MB | 1.5 MB | — | — |
 | oxc-parser+oxfmt (napi) | 11.5 MB | 4.6 MB | 3.3x | 3.1x |
 | oxc-parser (napi) | 2.4 MB | 977.4 KB | 0.7x | 0.7x |
