@@ -5,17 +5,6 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{ParseError, Span};
 
-/// Parse a complex selector list: `div, span > a, .class#id`
-///
-/// This parses a comma-separated list of complex selectors.
-/// Complex selectors can contain combinators (>, +, ~, descendant) but CANNOT start with them.
-///
-/// Used in:
-/// - Top-level CSS rules: `div, span { }`
-/// - :is(), :where(), :not() pseudo-classes (they accept complex selectors but not relative selectors)
-///
-/// For selectors that CAN start with combinators, use `parse_relative_selector_list()` instead.
-/// See: CSS Selectors Level 4 - <<complex-selector-list>> vs <<relative-selector-list>>
 /// Register comment(s) sitting between a complex selector and its `,` separator
 /// (comments are inter-token trivia removed at tokenization — no token, not even
 /// whitespace — per css-syntax-3) — but only when a comma
@@ -36,18 +25,31 @@ fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), Pars
     Ok(())
 }
 
-pub(crate) fn parse_complex_selector_list<'arena>(
+/// Parse a comma-separated selector list, applying `parse_item` to every selector — the
+/// first, and each one after a comma. A complex list and a relative list differ ONLY in
+/// that per-item parser — a complex item never leads with a combinator, a relative one may
+/// — and within either list the first item and the tail items parse identically, so the
+/// entire list body is shared here. `parse_item` is passed as a fn pointer
+/// (`parse_complex_selector` / `parse_relative_complex_selector`, both
+/// `fn(&mut CssParser) -> Result<ComplexSelector, ParseError>`) rather than a closure.
+///
+/// Deliberately NOT shared with `parse_forgiving_selector_list`, whose loop has different
+/// semantics — it wraps parse errors as `Invalid` selectors, terminates on `)` rather than
+/// `{`, registers comments unconditionally, and skips no `<!-- -->` markers — so folding it
+/// in would distort this helper rather than dedup it.
+fn parse_selector_list_with<'arena>(
     parser: &mut CssParser<'_, 'arena>,
+    parse_item: fn(&mut CssParser<'_, 'arena>) -> Result<ComplexSelector<'arena>, ParseError>,
 ) -> Result<SelectorList<'arena>, ParseError> {
     let start = parser.span_pos(parser.current_start());
     let mut selectors = parser.bvec();
 
-    // Parse first complex selector
-    let first = parse_complex_selector(parser)?;
+    // Parse the first selector; a selector list always has at least one.
+    let first = parse_item(parser)?;
     let mut end = first.span.end;
     selectors.push(first);
 
-    // Parse additional selectors separated by commas
+    // Parse each additional selector after its comma.
     loop {
         // Selector-list boundaries (`read_selector_list`'s `allow_comment_or_whitespace`):
         // legacy `<!-- ... -->` markers are allowed after a complete selector (before
@@ -61,7 +63,7 @@ pub(crate) fn parse_complex_selector_list<'arena>(
         parser.advance()?; // consume comma
         parser.skip_whitespace_registering_comments()?; // register after-comma comments
         parser.skip_html_comment_markers()?;
-        let sel = parse_complex_selector(parser)?;
+        let sel = parse_item(parser)?;
         end = sel.span.end;
         selectors.push(sel);
     }
@@ -70,6 +72,23 @@ pub(crate) fn parse_complex_selector_list<'arena>(
         selectors: selectors.into_bump_slice(),
         span: Span { start, end },
     })
+}
+
+/// Parse a complex selector list: `div, span > a, .class#id`
+///
+/// This parses a comma-separated list of complex selectors.
+/// Complex selectors can contain combinators (>, +, ~, descendant) but CANNOT start with them.
+///
+/// Used in:
+/// - Top-level CSS rules: `div, span { }`
+/// - :is(), :where(), :not() pseudo-classes (they accept complex selectors but not relative selectors)
+///
+/// For selectors that CAN start with combinators, use `parse_relative_selector_list()` instead.
+/// See: CSS Selectors Level 4 - <<complex-selector-list>> vs <<relative-selector-list>>
+pub(crate) fn parse_complex_selector_list<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<SelectorList<'arena>, ParseError> {
+    parse_selector_list_with(parser, parse_complex_selector)
 }
 
 /// Parse a forgiving complex selector list: `div, >>>invalid, span`
@@ -246,35 +265,7 @@ fn extract_selector_until_comma_or_end<'a>(
 pub(crate) fn parse_relative_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
-    let start = parser.span_pos(parser.current_start());
-    let mut selectors = parser.bvec();
-
-    // Parse first relative complex selector
-    let first = parse_relative_complex_selector(parser)?;
-    let mut end = first.span.end;
-    selectors.push(first);
-
-    // Parse additional selectors separated by commas
-    loop {
-        // Selector-list boundaries (see `parse_complex_selector_list`): `<!-- ... -->`
-        // after a complete selector (before `{`/`,`) and after a comma, not between compounds.
-        parser.skip_html_comment_markers()?;
-        skip_comments_before_comma(parser)?;
-        if !parser.check(TokenKind::Comma) {
-            break;
-        }
-        parser.advance()?; // consume comma
-        parser.skip_whitespace_registering_comments()?; // register after-comma comments
-        parser.skip_html_comment_markers()?;
-        let sel = parse_relative_complex_selector(parser)?;
-        end = sel.span.end;
-        selectors.push(sel);
-    }
-
-    Ok(SelectorList {
-        selectors: selectors.into_bump_slice(),
-        span: Span { start, end },
-    })
+    parse_selector_list_with(parser, parse_relative_complex_selector)
 }
 
 /// Parse a relative complex selector: `> div > span` or `+ li` or just `div`
@@ -361,6 +352,22 @@ fn parse_complex_selector_tail<'arena>(
     })
 }
 
+/// Map an explicit combinator token (`>`, `+`, `~`, `||`) to its `Combinator`, or `None`
+/// for any other token. The single source of truth for the explicit-combinator set — both
+/// combinator parsers and `is_explicit_combinator_kind` route through it, so the
+/// token→variant set stays in lockstep (the same discipline `is_selector_start_kind`
+/// applies to the selector-start set). Excludes the descendant combinator, which is
+/// whitespace rather than a token (`parse_combinator` derives that separately).
+fn explicit_combinator_kind(kind: TokenKind) -> Option<Combinator> {
+    match kind {
+        TokenKind::GreaterThan => Some(Combinator::Child),
+        TokenKind::Plus => Some(Combinator::NextSibling),
+        TokenKind::Tilde => Some(Combinator::SubsequentSibling),
+        TokenKind::ColumnCombinator => Some(Combinator::Column),
+        _ => None,
+    }
+}
+
 /// Parse an EXPLICIT combinator only: `>`, `+`, `~`, `||` (but NOT whitespace/descendant)
 /// Returns (combinator type, combinator span) only for explicit combinator symbols.
 /// Used for checking leading combinators in relative selectors where descendant is NOT implied.
@@ -373,15 +380,7 @@ pub(crate) fn parse_explicit_combinator(
 
     let combinator_start = parser.span_pos(parser.current_start());
 
-    let combinator = match &parser.current_kind {
-        TokenKind::GreaterThan => Some(Combinator::Child),
-        TokenKind::Plus => Some(Combinator::NextSibling),
-        TokenKind::Tilde => Some(Combinator::SubsequentSibling),
-        TokenKind::ColumnCombinator => Some(Combinator::Column),
-        _ => None, // No explicit combinator found
-    };
-
-    if let Some(comb) = combinator {
+    if let Some(comb) = explicit_combinator_kind(parser.current_kind) {
         let end = parser.span_pos(parser.current_end);
         parser.advance()?; // consume combinator token
         skip_combinator_gap(parser)?;
@@ -421,25 +420,19 @@ pub(crate) fn parse_combinator(
 
     let combinator_start = parser.span_pos(parser.current_start());
 
-    let combinator = match &parser.current_kind {
-        TokenKind::GreaterThan => Some(Combinator::Child),
-        TokenKind::Plus => Some(Combinator::NextSibling),
-        TokenKind::Tilde => Some(Combinator::SubsequentSibling),
-        TokenKind::ColumnCombinator => Some(Combinator::Column),
-        _ => {
-            // Descendant requires actual whitespace (or a gap comment) between the
-            // selectors — an adjacent selector token is part of the same compound
-            // (handled by the is_simple_selector_chain loop) and must never fabricate a
-            // zero-width combinator.
-            if (combinator_start > whitespace_start || had_gap_comment)
-                && (is_selector_start(parser) || pseudo_arg_terminal_nth(parser))
-            {
-                Some(Combinator::Descendant)
-            } else {
-                None
-            }
+    // An explicit combinator token wins; otherwise a descendant combinator requires actual
+    // whitespace (or a gap comment) between the selectors — an adjacent selector token is
+    // part of the same compound (handled by the is_simple_selector_chain loop) and must
+    // never fabricate a zero-width combinator.
+    let combinator = explicit_combinator_kind(parser.current_kind).or_else(|| {
+        if (combinator_start > whitespace_start || had_gap_comment)
+            && (is_selector_start(parser) || pseudo_arg_terminal_nth(parser))
+        {
+            Some(Combinator::Descendant)
+        } else {
+            None
         }
-    };
+    });
 
     let result = if let Some(comb) = combinator {
         let (start, end) = if comb == Combinator::Descendant {
@@ -490,13 +483,11 @@ fn is_selector_start_kind(kind: TokenKind) -> bool {
     )
 }
 
-/// The explicit combinator symbols (`>`, `+`, `~`, `||`). A gap comment followed by
-/// one of these still continues the selector (`i /* c */ > em`).
+/// Whether a token is an explicit combinator symbol (`>`, `+`, `~`, `||`). A gap comment
+/// followed by one of these still continues the selector (`i /* c */ > em`). Delegates to
+/// `explicit_combinator_kind` so the set stays in lockstep with the combinator parsers.
 fn is_explicit_combinator_kind(kind: TokenKind) -> bool {
-    matches!(
-        kind,
-        TokenKind::GreaterThan | TokenKind::Plus | TokenKind::Tilde | TokenKind::ColumnCombinator
-    )
+    explicit_combinator_kind(kind).is_some()
 }
 
 /// Check if current token could start a selector
@@ -1053,7 +1044,62 @@ fn match_anb_tail(bytes: &[u8], pos: usize, plus_only: bool) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::{match_nth_value, nth_arg_is_anb};
+    use super::{
+        Combinator, TokenKind, explicit_combinator_kind, is_explicit_combinator_kind,
+        match_nth_value, nth_arg_is_anb,
+    };
+
+    /// `explicit_combinator_kind` is the single source of truth for the explicit-combinator
+    /// token set (`>`, `+`, `~`, `||`) that both combinator parsers and
+    /// `is_explicit_combinator_kind` route through, so this pins the full mapping — the rare
+    /// `||`/`ColumnCombinator` → `Column` arm included — and asserts the boolean predicate
+    /// stays exactly its `Some`/`None` projection.
+    #[test]
+    fn explicit_combinator_kind_maps_the_four_symbols() {
+        assert_eq!(
+            explicit_combinator_kind(TokenKind::GreaterThan),
+            Some(Combinator::Child)
+        );
+        assert_eq!(
+            explicit_combinator_kind(TokenKind::Plus),
+            Some(Combinator::NextSibling)
+        );
+        assert_eq!(
+            explicit_combinator_kind(TokenKind::Tilde),
+            Some(Combinator::SubsequentSibling)
+        );
+        assert_eq!(
+            explicit_combinator_kind(TokenKind::ColumnCombinator),
+            Some(Combinator::Column)
+        );
+
+        // Not explicit combinators — including the whitespace-derived descendant, which is
+        // never a token and so is deliberately absent from the mapping.
+        for kind in [
+            TokenKind::Identifier,
+            TokenKind::Dot,
+            TokenKind::Comma,
+            TokenKind::Whitespace,
+            TokenKind::LeftBrace,
+        ] {
+            assert_eq!(explicit_combinator_kind(kind), None);
+        }
+
+        // `is_explicit_combinator_kind` is exactly the `Some`/`None` projection.
+        for kind in [
+            TokenKind::GreaterThan,
+            TokenKind::Plus,
+            TokenKind::Tilde,
+            TokenKind::ColumnCombinator,
+            TokenKind::Identifier,
+            TokenKind::Comma,
+        ] {
+            assert_eq!(
+                is_explicit_combinator_kind(kind),
+                explicit_combinator_kind(kind).is_some()
+            );
+        }
+    }
 
     /// `nth_arg_is_anb` decides whether a `:nth-*()` argument takes the dedicated `Nth`
     /// path (a clean spec `<an+b> [of S]?`, comment-tolerant) or falls through to the
