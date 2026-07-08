@@ -218,10 +218,12 @@ impl<'a> Printer<'a> {
             self.append_type_params_to_paren_comments(&mut parts, tp_end, paren_pos);
         }
 
-        parts.push(self.build_signature_params_doc(method.params, paren_pos));
-        if let Some(return_type) = &method.return_type {
-            parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
-        }
+        parts.push(self.build_signature_params_return_group(
+            method.params,
+            method.type_parameters.as_ref(),
+            method.return_type.as_ref(),
+            paren_pos,
+        ));
         // Comments between return type (or params) and `;`
         self.append_signature_end_comments(
             &mut parts,
@@ -343,10 +345,12 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(self.build_signature_params_doc(params, paren_pos));
-        if let Some(return_type) = return_type {
-            parts.push(self.build_signature_return_type_doc(paren_pos, return_type));
-        }
+        parts.push(self.build_signature_params_return_group(
+            params,
+            type_parameters,
+            return_type,
+            paren_pos,
+        ));
         // Comments between return type (or params) and `;`
         self.append_signature_end_comments(&mut parts, return_type, paren_pos, span.end, deferred);
         d.group(d.concat(&parts))
