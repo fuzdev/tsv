@@ -95,8 +95,10 @@ pub(crate) fn parse_single_value<'arena>(
         return Some(val);
     }
 
-    // Function call or color function
-    if let Some(paren_pos) = s.find('(')
+    // Function call or color function. Byte-position scan for the ASCII `(` — a
+    // hot per-value-token path where `str::find(char)`'s CharSearcher state machine
+    // outweighs a direct byte loop (equivalent: `(` is ASCII, self-synchronising).
+    if let Some(paren_pos) = s.as_bytes().iter().position(|&b| b == b'(')
         && let Some((name, args, true)) = extract_function_parts(s, paren_pos)
     {
         // Try color function first

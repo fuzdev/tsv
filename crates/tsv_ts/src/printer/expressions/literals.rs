@@ -168,8 +168,13 @@ fn strip_exponent_plus_and_zeros(s: Cow<'_, str>) -> Cow<'_, str> {
 }
 
 /// `/^([+-]?[\d.]+)e[+-]?0+$/` → `$1`  (removes a whole zero exponent: `0.5e0` → `0.5`)
+//
+// The `e`/`.` scans through this number-normalization pipeline use a byte
+// `.position()` rather than `str::find(char)`: the haystack is a short numeric
+// literal, where `find(char)`'s `CharSearcher` setup dominates and never
+// amortizes (`e`/`.` are ASCII, so byte-position ≡ char-position).
 fn strip_zero_exponent(s: Cow<'_, str>) -> Cow<'_, str> {
-    let Some(e_idx) = s.find('e') else {
+    let Some(e_idx) = s.as_bytes().iter().position(|&b| b == b'e') else {
         return s;
     };
     let mantissa = &s[..e_idx];
@@ -206,7 +211,7 @@ fn ensure_leading_digit(s: Cow<'_, str>) -> Cow<'_, str> {
 
 /// `/(\.\d+?)0+(?=e|$)/` → `$1`  (first match only; `1.00500` → `1.005`, `1.50` → `1.5`)
 fn strip_trailing_fraction_zeros(s: Cow<'_, str>) -> Cow<'_, str> {
-    let Some(dot) = s.find('.') else {
+    let Some(dot) = s.as_bytes().iter().position(|&b| b == b'.') else {
         return s;
     };
     let bytes = s.as_bytes();
@@ -241,7 +246,7 @@ fn strip_trailing_fraction_zeros(s: Cow<'_, str>) -> Cow<'_, str> {
 /// `/\.(?=e|$)/` → ``  (drop a trailing dot before `e` or end: `1.` → `1`, `1.e1` → `1e1`)
 fn strip_trailing_dot(s: Cow<'_, str>) -> Cow<'_, str> {
     let bytes = s.as_bytes();
-    if let Some(dot) = s.find('.') {
+    if let Some(dot) = bytes.iter().position(|&b| b == b'.') {
         let after = dot + 1;
         if after == bytes.len() || bytes[after] == b'e' {
             return Cow::Owned(format!("{}{}", &s[..dot], &s[after..]));
