@@ -36,6 +36,14 @@ impl<'a> Printer<'a> {
         parts.push(d.line_suffix_boundary());
         parts.push(d.text("`"));
 
+        // Zero-comment fast gate: one binary search over the whole template window
+        // short-circuits the two per-`${}` interpolation comment collects below.
+        // Sound because every interpolation's leading/trailing comment sub-range
+        // lies within the template span, so no comment anywhere in the window means
+        // every per-interpolation collect is empty. Templates are comment-sparse.
+        let template_has_comments =
+            self.has_comments_between(template.span.start, template.span.end);
+
         let mut previous_quasi_indent_size: usize = 0;
 
         for (i, quasi) in template.quasis.iter().enumerate() {
@@ -66,12 +74,24 @@ impl<'a> Printer<'a> {
                     self.build_expression_doc(expr)
                 };
 
-                // Collect comments in the interpolation region
-                let leading_comments: CommentVec<'_> =
-                    comments_in_range(self.comments, quasi.span.end, expr.span().start).collect();
-                let trailing_comments: CommentVec<'_> =
-                    comments_in_range(self.comments, expr.span().end, next_quasi.span.start)
-                        .collect();
+                // Collect comments in the interpolation region (gated: when the
+                // template carries no comments at all, both ranges are provably
+                // empty, so skip the two collects).
+                let (leading_comments, trailing_comments): (CommentVec<'_>, CommentVec<'_>) =
+                    if template_has_comments {
+                        (
+                            comments_in_range(self.comments, quasi.span.end, expr.span().start)
+                                .collect(),
+                            comments_in_range(
+                                self.comments,
+                                expr.span().end,
+                                next_quasi.span.start,
+                            )
+                            .collect(),
+                        )
+                    } else {
+                        (CommentVec::new(), CommentVec::new())
+                    };
 
                 // Check if any comments are line comments (non-block)
                 let has_line_comment = leading_comments.iter().any(|c| !c.is_block)
