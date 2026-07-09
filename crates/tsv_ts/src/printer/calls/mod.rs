@@ -182,7 +182,7 @@ impl<'a> Printer<'a> {
             let nodes = chain::linearize_chain_from_call(call);
             let base_start = get_chain_base_comment_start(&nodes, call.callee);
             let groups = chain::group_chain_nodes(&nodes);
-            let chain_doc = chain::build_chain_doc(&groups, self);
+            let chain_doc = chain::build_chain_doc(&groups, call.span, self);
             self.prepend_removed_paren_comments(call.span.start, base_start, chain_doc)
         } else {
             // Simple call (non-memberish callee) - wrap args directly
@@ -210,7 +210,7 @@ impl<'a> Printer<'a> {
         let nodes = chain::linearize_chain_from_member(member);
         let base_start = get_chain_base_comment_start(&nodes, member.object);
         let groups = chain::group_chain_nodes(&nodes);
-        let chain_doc = chain::build_chain_doc(&groups, self);
+        let chain_doc = chain::build_chain_doc(&groups, member.span, self);
 
         // Prepend comments from removed parentheses at the chain base.
         // For call chains, base_start excludes paren gaps handled mid-chain.
