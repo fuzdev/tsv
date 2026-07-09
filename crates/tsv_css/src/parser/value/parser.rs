@@ -44,6 +44,18 @@ pub(crate) struct ValueParser<'a> {
     base_offset: u32,
 }
 
+/// Outcome of `ValueParser::fast_scan` — the single-pass classification of a value.
+enum FastScan<'arena> {
+    /// A top-level comma was found; the comma list is already split and parsed.
+    Comma(&'arena [CssValue<'arena>]),
+    /// No comma but a top-level whitespace run — a whitespace list.
+    Whitespace,
+    /// Neither a comma nor top-level whitespace — a single leaf value.
+    Leaf,
+    /// A `/* */` comment was found; take the comment-aware two-pass fallback.
+    Comment,
+}
+
 impl<'a> ValueParser<'a> {
     /// Create parser from value string and its span in full CSS
     ///
@@ -123,7 +135,14 @@ impl<'a> ValueParser<'a> {
 
     /// Main parse entry point
     ///
-    /// Determines the type of value and delegates to appropriate parser.
+    /// Determines the value's structure and delegates. A comment-free value takes a
+    /// single fused pass (`fast_scan`): a comma list is split and its elements built
+    /// inline (no second `ValueCursor` walk), while a whitespace list or single leaf
+    /// dispatches to the same builders as before. A value with a `/* */` comment
+    /// falls back to the original two-pass path — `classify_separators` is
+    /// comment-*aware* while the `ValueCursor` split is comment-*blind*, and the two
+    /// deliberately disagree on a comment between value tokens, so the single-string
+    /// fast pass hands such a value off unchanged.
     pub fn parse<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
         let trimmed = text.trim();
@@ -135,14 +154,154 @@ impl<'a> ValueParser<'a> {
             };
         }
 
-        // Classify the top-level separators in a single pass (commas win over
-        // whitespace), then split accordingly. Detection uses `trimmed` so
-        // leading/trailing whitespace is not mistaken for a separator.
+        // Fast path: the parse range is already trimmed at every level (the top
+        // parser and every `sub_parser` slice off surrounding whitespace), so
+        // `text == trimmed` and one string serves both the comment-aware kind and
+        // the comment-blind split. The guard makes that assumption explicit — an
+        // untrimmed range (were one ever passed) takes the original two-pass path
+        // below, which classifies on `trimmed` and splits on the untrimmed text.
+        if trimmed.len() == text.len() {
+            match self.fast_scan(text, arena) {
+                FastScan::Comma(values) => {
+                    return CssValue::CommaSeparated {
+                        values,
+                        span: self.absolute_span(),
+                    };
+                }
+                FastScan::Whitespace => return self.parse_space_separated(arena),
+                FastScan::Leaf => return self.parse_single(arena),
+                // A `/* */` comment was found — defer to the comment-aware path.
+                FastScan::Comment => {}
+            }
+        }
+
+        // Fallback (comment present, or a non-trimmed range): classify comment-aware,
+        // then split with the comment-blind `ValueCursor` — the original behaviour.
         match classify_separators(trimmed) {
             ValueSeparator::Comma => self.parse_comma_separated(arena),
             ValueSeparator::Whitespace => self.parse_space_separated(arena),
             ValueSeparator::None => self.parse_single(arena),
         }
+    }
+
+    /// One fused pass over the (already-trimmed) value `text`, doing the work of
+    /// `classify_separators` and the comma arm of `split_top_level` at once:
+    ///
+    /// - a top-level comma commits the value to a comma list, whose elements are
+    ///   split and parsed inline here — skipping the second `ValueCursor` walk the
+    ///   old comma path took;
+    /// - otherwise a top-level whitespace run makes it a whitespace list and a bare
+    ///   run makes it a single leaf, both handled by the existing builders, so the
+    ///   fast pass only reports which;
+    /// - a `/* */` comment outside quotes is reported so the caller takes the
+    ///   comment-aware two-pass path (the comment-blind split here would diverge).
+    ///
+    /// Paren/quote nesting is tracked exactly as `classify_separators` and
+    /// `ValueCursor` track it, so for a comment-free value the comma split is
+    /// byte-for-byte identical to the old two-pass result.
+    fn fast_scan<'arena>(&self, text: &str, arena: &'arena Bump) -> FastScan<'arena> {
+        let bytes = text.as_bytes();
+        let mut in_parens: u32 = 0;
+        let mut in_quote = false;
+        let mut quote_char = 0u8;
+        let mut ws_seen = false;
+
+        let mut values: BumpVec<'arena, CssValue<'arena>> = BumpVec::new_in(arena);
+        let mut seg_start = 0usize; // start of the current comma segment
+        let mut any_comma = false;
+        let mut pushed = false; // any non-empty element emitted (for the leaf guard)
+
+        let mut i = 0;
+        while i < bytes.len() {
+            let b = bytes[i];
+
+            // A block comment outside quotes: the comment-blind split below would
+            // treat the `,`/space inside it as separators, so hand the whole value
+            // to the comment-aware fallback instead.
+            if !in_quote && b == b'/' && bytes.get(i + 1) == Some(&b'*') {
+                return FastScan::Comment;
+            }
+
+            // Delimiter tests use the nesting level as of *before* this byte, then
+            // the byte updates the nesting — the same order `ValueCursor` uses.
+            let top = in_parens == 0 && !in_quote;
+            match b {
+                b'\'' | b'"' if !in_quote => {
+                    in_quote = true;
+                    quote_char = b;
+                }
+                _ if in_quote && b == quote_char => in_quote = false,
+                b'(' if !in_quote => in_parens += 1,
+                b')' if !in_quote => in_parens = in_parens.saturating_sub(1),
+                b',' if top => {
+                    self.push_comma_segment(&mut values, text, seg_start, i, &mut pushed, arena);
+                    any_comma = true;
+                    seg_start = i + 1;
+                }
+                _ if top && b.is_ascii_whitespace() => ws_seen = true,
+                _ => {}
+            }
+
+            i += 1;
+        }
+
+        if any_comma {
+            // Final segment runs to EOF (`ve_raw == text.len()`), which arms the
+            // leaf guard when it is the first non-empty element (a leading-comma
+            // value like `,a b`, matching `split_top_level`).
+            self.push_comma_segment(
+                &mut values,
+                text,
+                seg_start,
+                bytes.len(),
+                &mut pushed,
+                arena,
+            );
+            FastScan::Comma(values.into_bump_slice())
+        } else if ws_seen {
+            FastScan::Whitespace
+        } else {
+            FastScan::Leaf
+        }
+    }
+
+    /// Emit one comma-list element for the raw segment `text[seg_start..seg_end]`,
+    /// reproducing `split_top_level`'s per-element handling: skip leading and trim
+    /// trailing whitespace, drop an empty element, and parse the first non-empty
+    /// element that runs to EOF as a single leaf (the progress guard). `seg_end` is
+    /// the `ve_raw` position — a comma index, or `text.len()` for the final segment.
+    fn push_comma_segment<'arena>(
+        &self,
+        values: &mut BumpVec<'arena, CssValue<'arena>>,
+        text: &str,
+        seg_start: usize,
+        seg_end: usize,
+        pushed: &mut bool,
+        arena: &'arena Bump,
+    ) {
+        let seg = &text[seg_start..seg_end];
+        // Match `split_top_level`'s asymmetric trimming exactly: leading whitespace is
+        // skipped ASCII-only (like `ValueCursor::skip_whitespace`), trailing is trimmed
+        // Unicode-wide (like `trimmed_end`'s `str::trim_end`). A leading non-ASCII space
+        // (e.g. NBSP) therefore stays part of the element, as it does in the old path.
+        let after_lead = seg.trim_start_matches(|c: char| c.is_ascii_whitespace());
+        let core = after_lead.trim_end();
+        if core.is_empty() {
+            return;
+        }
+        let value_start = seg_start + (seg.len() - after_lead.len());
+        let value_end = value_start + core.len();
+        let sub = self.sub_parser(value_start, value_end);
+        // Same guard as `split_top_level`: a first non-empty element whose raw end
+        // reaches EOF is parsed as a single leaf (the classify/cursor disagreement
+        // safety, reachable comment-free only via leading delimiters).
+        let node = if !*pushed && seg_end == text.len() {
+            sub.parse_single(arena)
+        } else {
+            sub.parse(arena)
+        };
+        values.push(node);
+        *pushed = true;
     }
 
     /// Parse comma-separated values: "a, b, c"
