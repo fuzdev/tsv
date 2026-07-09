@@ -20,15 +20,18 @@ pub fn parse_function_arguments<'arena>(
     parent_span: Span,
     arena: &'arena Bump,
 ) -> &'arena [CssValue<'arena>] {
-    let trimmed = args_str.trim();
+    // Strip leading whitespace by offset, then trailing on the remaining slice — one
+    // boundary scan per side (vs a `.trim()` plus a separate `.trim_start()`/`.trim_end()`
+    // recomputing the same two boundaries).
+    let trim_start_offset = args_str.len() - args_str.trim_start().len();
+    let trimmed = args_str[trim_start_offset..].trim_end();
 
     if trimmed.is_empty() {
         return &[];
     }
 
     // Calculate adjusted span for trimmed args (same logic as parse_value_from_source)
-    let trim_start_offset = args_str.len() - args_str.trim_start().len();
-    let trim_end_offset = args_str.len() - args_str.trim_end().len();
+    let trim_end_offset = args_str.len() - trim_start_offset - trimmed.len();
     let adjusted_span = Span {
         start: parent_span.start + trim_start_offset as u32,
         end: parent_span.end - trim_end_offset as u32,

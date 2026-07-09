@@ -177,10 +177,12 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str, bool
     let mut paren_count = 0;
     let mut closing_paren_pos = None;
 
-    for (i, ch) in s[paren_pos..].char_indices() {
-        match ch {
-            '(' => paren_count += 1,
-            ')' => {
+    // Byte scan: `(` / `)` are ASCII, so no UTF-8 lead/continuation byte collides with
+    // them — the matching-paren offset is the same as a char scan, without decoding.
+    for (i, &b) in s.as_bytes()[paren_pos..].iter().enumerate() {
+        match b {
+            b'(' => paren_count += 1,
+            b')' => {
                 paren_count -= 1;
                 if paren_count == 0 {
                     closing_paren_pos = Some(paren_pos + i);
