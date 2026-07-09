@@ -711,6 +711,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ..
         } = header;
 
+        // A non-static, non-computed `get`/`set` accessor keyed `constructor`
+        // (bare identifier or the `'constructor'` string) is rejected — acorn
+        // ("Constructor can't have get/set modifier") and tsc (TS1341) both reject
+        // it at parse. `name_is_constructor` is already false for computed/private/
+        // numeric keys, and `!is_static` excludes the static forms, so this matches
+        // acorn's boundary exactly (static and computed accessors named `constructor`
+        // stay valid). Unlike the ambient-context early-errors tsv defers to the
+        // diagnostics layer, acorn emits no AST here — so drop-in parity with the
+        // canonical parser means rejecting too.
+        if accessor_kind.is_some() && name_is_constructor && !is_static {
+            return Err(self.error_msg("Constructor can't have get/set modifier"));
+        }
+
         // Method definition - use accessor_kind if set, otherwise check for
         // constructor. A `static` method named `constructor` is NOT the class
         // constructor (that name is only reserved on instance methods), so it
@@ -729,6 +742,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let params = self
             .with_in_await(is_async, Self::parse_parameter_list)?
             .into_bump_slice();
+
+        // A `get`/`set` accessor must obey the accessor arity grammar (getter: no
+        // params; setter: exactly one non-rest param). acorn rejects a violation
+        // at parse, so tsv does too (drop-in parity) — see
+        // `check_accessor_param_arity`.
+        // A class-member accessor counts a `this` param toward arity (acorn's
+        // class path has no `this` exclusion), so `allow_this_param = false`.
+        if let Some(k) = accessor_kind {
+            self.check_accessor_param_arity(matches!(k, MethodKind::Get), params, false)?;
+        }
 
         // Check for return type annotation: (): type or type predicate
         let return_type = self.parse_optional_return_type()?;
