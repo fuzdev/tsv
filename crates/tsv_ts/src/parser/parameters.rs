@@ -431,8 +431,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// diagnostics layer — an optional/default param is an `Identifier` /
     /// `AssignmentPattern`, not a `RestElement`, so it passes unchanged. (A
     /// *type-member* setter's optional-param rejection, which acorn does enforce
-    /// at parse, is applied at that call site.) Shared by the class-member,
-    /// object-literal, and type-member accessor parsers.
+    /// at parse, lives in `check_type_member_accessor_params`.) Shared by the
+    /// class-member, object-literal, and type-member accessor parsers.
     pub(super) fn check_accessor_param_arity(
         &self,
         is_getter: bool,
@@ -452,6 +452,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
         if !is_getter && matches!(params.first(), Some(Expression::RestElement(_))) {
             return Err(self.error_msg("Setter cannot use rest params"));
+        }
+        Ok(())
+    }
+
+    /// Validate a **type-member accessor** signature's parameters — the
+    /// type-member-specific composite over `check_accessor_param_arity`, matching
+    /// the get/set checks in acorn's `tsParsePropertyOrMethodSignature`. Beyond
+    /// the shared arity rule (getter: no params; setter: exactly one non-rest
+    /// param; a `this` param counts toward arity here, `allow_this_param = false`),
+    /// a type-member **setter** also rejects — at parse, unlike a value-position
+    /// setter — a `this` parameter (`AccesorCannotDeclareThisParameter`; the getter
+    /// form is already caught by the 0-param arity check) and an optional parameter
+    /// (`SetAccesorCannotHaveOptionalParameter`, TS1051, which tsv otherwise defers).
+    pub(super) fn check_type_member_accessor_params(
+        &self,
+        kind: MethodKind,
+        params: &[Expression<'arena>],
+    ) -> Result<(), ParseError> {
+        let is_getter = matches!(kind, MethodKind::Get);
+        self.check_accessor_param_arity(is_getter, params, false)?;
+        if !is_getter {
+            if self.is_this_param(&params[0]) {
+                return Err(
+                    self.error_msg("'get' and 'set' accessors cannot declare 'this' parameters")
+                );
+            }
+            if let Expression::Identifier(id) = &params[0]
+                && id.optional
+            {
+                return Err(self.error_msg("A 'set' accessor cannot have an optional parameter"));
+            }
         }
         Ok(())
     }
