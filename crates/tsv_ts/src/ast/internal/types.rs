@@ -507,11 +507,13 @@ pub struct TSConstructSignatureDeclaration<'arena> {
     pub span: Span,
 }
 
-/// Index signature: `[key: string]: T`
+/// Index signature: `[key: string]: T`, or typeless `[key: string]` (the value
+/// type annotation is optional — a typeless form is a deferred tsc checker error
+/// (TS1021), not a parse error; acorn parses it and omits `typeAnnotation`).
 #[derive(Debug, Clone)]
 pub struct TSIndexSignature<'arena> {
     pub parameters: &'arena [Identifier<'arena>],
-    pub type_annotation: TSTypeAnnotation<'arena>,
+    pub type_annotation: Option<TSTypeAnnotation<'arena>>,
     pub is_static: bool,
     pub readonly: bool,
     pub span: Span,

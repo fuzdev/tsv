@@ -511,8 +511,13 @@ pub(super) fn write_index_signature(
             ctx,
         );
     });
-    w.raw(",\"typeAnnotation\":");
-    write_type_annotation(w, &sig.type_annotation, ctx);
+    // A typeless index signature (`[key: string]`) omits `typeAnnotation`
+    // entirely — acorn parses it that way (the missing value type is a deferred
+    // tsc checker error, TS1021, not a parse error).
+    if let Some(type_annotation) = &sig.type_annotation {
+        w.raw(",\"typeAnnotation\":");
+        write_type_annotation(w, type_annotation, ctx);
+    }
     close_node(w, "TSIndexSignature", sig.span, ctx);
 }
 
