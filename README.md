@@ -59,6 +59,7 @@ Future features (unknown order):
 - JSON support
 - HTML support (formatting as Svelte isn't correct e.g. with whitespace and `{`,
   but the lift to support it is small)
+- JS parsing diagnostics (test262 negative cases)
 - CSS error recovery (recover past invalid CSS per the spec)
 - later:
   - TypeScript 7 integration (the Go impl), unlocking:
