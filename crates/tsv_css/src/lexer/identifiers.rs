@@ -46,6 +46,18 @@ pub(crate) fn is_identifier_start(ch: char) -> bool {
         || ch == '\\'
 }
 
+/// The ASCII byte form of `is_identifier_start`, for the lexer's byte-first dispatch.
+///
+/// Equal to `is_identifier_start(b as char)` for every ASCII byte (`b < 0x80`), and
+/// `false` for every non-ASCII byte — the non-ASCII identifier code points (`>= 0xA0`)
+/// are `>= 0x80`, so they're handled by the dispatch's char tail, not here. Covers the
+/// ASCII letters, `-`, `_`, and the `\` escape introducer (digits and a leading `$`
+/// have their own dispatch arms).
+#[inline]
+pub(crate) fn is_ascii_identifier_start(b: u8) -> bool {
+    b.is_ascii_alphabetic() || b == b'-' || b == b'_' || b == b'\\'
+}
+
 /// Read a CSS identifier
 /// CSS identifiers can contain unicode escapes; the characters a-z, A-Z, 0-9, -, _;
 /// any non-ASCII code point at or above U+00A0 (symbols and emoji, matching Svelte's
