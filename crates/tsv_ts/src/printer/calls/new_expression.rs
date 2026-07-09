@@ -271,7 +271,8 @@ impl<'a> Printer<'a> {
                         // couldExpandArg keys on the body type, looking through the
                         // return-type annotation and a trailing non-null `!`.
                         if arrow_body_is_call_through_non_null(body_expr) {
-                            let arrow_doc = self.build_expression_doc(&new_expr.arguments[0]);
+                            // Build the body ONCE (see `build_arrow_call_body_states`) — a
+                            // separate whole-arrow doc re-built this body and recursed → O(2^depth).
                             let body_doc = self.build_expression_doc(body_expr);
                             let body_doc = prepend_arrow_body_comments(
                                 self,
@@ -283,7 +284,6 @@ impl<'a> Printer<'a> {
                             return build_arrow_call_body_states(
                                 d,
                                 callee_with_types,
-                                arrow_doc,
                                 sig_doc,
                                 body_doc,
                             );

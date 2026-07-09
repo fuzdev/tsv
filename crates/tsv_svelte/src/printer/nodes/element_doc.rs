@@ -385,32 +385,83 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let tag_sym = element.name.to_u32();
+        let is_inline = ctx.kind.is_inline();
+        let nodes = element.fragment.nodes;
 
-        // Build children doc
-        let children_doc = if multiline_children {
-            // Multiline content: the prettier-shaped trimmed builder in `multiline` mode.
-            let breakable_exprs = Self::nodes_have_breakable_expression(element.fragment.nodes);
-            self.build_nodes_doc_trimmed(
-                element.fragment.nodes,
-                ctx.trim_boundaries,
-                breakable_exprs,
-                true,
-            )
-        } else if !(start_mode == BoundaryMode::Hug && end_mode == BoundaryMode::Hug) {
-            self.build_nodes_doc_trimmed(element.fragment.nodes, ctx.trim_boundaries, false, false)
-        } else {
-            // Hug both: route through the prettier-shaped trimmed builder (the convergence
-            // base). When the fragment carries a break-capable expression tag, opt into the
-            // hard-width divergence so a long multi-expression run breaks the expression
-            // rather than overshooting printWidth (`fill_multiple_expr_long`).
-            let breakable_exprs = Self::nodes_have_breakable_expression(element.fragment.nodes);
-            self.build_nodes_doc_trimmed(
-                element.fragment.nodes,
-                ctx.trim_boundaries,
-                breakable_exprs,
-                false,
-            )
-        };
+        // Build the children doc EXACTLY ONCE, in the variant the resolved boundary arm
+        // actually uses. Every input to that decision (both boundary modes, `multiline_children`,
+        // `is_inline`, `trim_boundaries`) is already known here, so the final `(trim, breakable,
+        // multiline)` triple can be selected up front. Previously a "default" children doc was
+        // built eagerly and then several arms threw it away and rebuilt it (`trim=true` for a
+        // padded inline element, or the multiline form) — and because those rebuilds recurse into
+        // children that ALSO rebuild, deeply nested inline content was O(2^depth). Selecting the
+        // variant up front keeps output byte-identical (each arm ends up using exactly one of the
+        // builds either way) while building each subtree once. This is the inline/element-side
+        // twin of the block-side reuse in `(Hard, Hard)` below; see the build-fanout audit.
+        //
+        // `breakable_exprs` (the fill-vs-hard-width divergence for long multi-expression runs,
+        // `fill_multiple_expr_long`) is only consulted by the multiline variants, so it is computed
+        // only where used.
+        let (child_trim, child_breakable, child_multiline) =
+            if start_mode == BoundaryMode::Hug && end_mode == BoundaryMode::Hug {
+                // Hug both: the prettier-shaped trimmed builder (the convergence base).
+                (
+                    ctx.trim_boundaries,
+                    Self::nodes_have_breakable_expression(nodes),
+                    multiline_children,
+                )
+            } else {
+                match (start_mode, end_mode) {
+                    (BoundaryMode::Hug, _) => {
+                        if multiline_children {
+                            (
+                                ctx.trim_boundaries,
+                                Self::nodes_have_breakable_expression(nodes),
+                                true,
+                            )
+                        } else {
+                            (ctx.trim_boundaries, false, false)
+                        }
+                    }
+                    (_, BoundaryMode::Hug) => {
+                        // Hug end: a padded inline element (line()/softline provides the boundary
+                        // space) trims so the boundary space is not duplicated.
+                        if is_inline && !ctx.trim_boundaries && !multiline_children {
+                            (true, false, false)
+                        } else if multiline_children {
+                            (
+                                ctx.trim_boundaries,
+                                Self::nodes_have_breakable_expression(nodes),
+                                true,
+                            )
+                        } else {
+                            (ctx.trim_boundaries, false, false)
+                        }
+                    }
+                    (BoundaryMode::Hard, BoundaryMode::Hard) => {
+                        // Full multiline — always the `build_nodes_doc_multiline` shape
+                        // (`trim=true`, `multiline=true`); the two former branches (reuse-eager vs
+                        // rebuild-multiline) produced this same triple in every sub-case.
+                        (true, Self::nodes_have_breakable_expression(nodes), true)
+                    }
+                    _ => {
+                        // Standard: a padded inline element trims (line() provides the space).
+                        if is_inline && !ctx.trim_boundaries {
+                            (true, false, false)
+                        } else if multiline_children {
+                            (
+                                ctx.trim_boundaries,
+                                Self::nodes_have_breakable_expression(nodes),
+                                true,
+                            )
+                        } else {
+                            (ctx.trim_boundaries, false, false)
+                        }
+                    }
+                }
+            };
+        let children_doc =
+            self.build_nodes_doc_trimmed(nodes, child_trim, child_breakable, child_multiline);
 
         // Hug-both builds its own opening (the `>` is content-keyed, not attr-keyed), so handle it
         // before building `opening_tag` — every remaining arm uses `opening_tag`, this one doesn't.
@@ -455,7 +506,6 @@ impl<'a> Printer<'a> {
             }
             (_, BoundaryMode::Hug) => {
                 // Hug end: content hugs closing tag
-                let is_inline = ctx.kind.is_inline();
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
                 } else if is_inline
@@ -472,19 +522,8 @@ impl<'a> Printer<'a> {
                 } else {
                     d.softline()
                 };
-                // Rebuild children with trim=true for inline elements when
-                // trim_boundaries was false, since line()/softline now provides
-                // the boundary space that would otherwise duplicate.
-                // Skip when multiline_children is true — the multiline doc already
-                // handles whitespace correctly and must not be replaced with trimmed.
-                let effective_children = if is_inline && !ctx.trim_boundaries && !multiline_children
-                {
-                    self.build_nodes_doc_trimmed(element.fragment.nodes, true, false, false)
-                } else {
-                    children_doc
-                };
                 let inner_group =
-                    d.group(d.concat(&[effective_children, d.text("</"), d.symbol(tag_sym)]));
+                    d.group(d.concat(&[children_doc, d.text("</"), d.symbol(tag_sym)]));
                 let indent_inner = d.indent(d.concat(&[leading_break, inner_group]));
                 d.group(d.concat(&[
                     opening_tag,
@@ -495,20 +534,10 @@ impl<'a> Printer<'a> {
                 ]))
             }
             (BoundaryMode::Hard, BoundaryMode::Hard) => {
-                // Full multiline. Reuse the eagerly-built `children_doc` instead of
-                // rebuilding the whole subtree: when `multiline_children`, it was built (above)
-                // as `build_nodes_doc_trimmed(nodes, ctx.trim_boundaries, breakable, true)`, and
-                // `build_nodes_doc_multiline` is the same call with `trim=true` hardcoded — so the
-                // two are identical exactly when `ctx.trim_boundaries` is already true. Rebuilding
-                // here is what made deeply-nested block content O(2^depth) (each level rebuilt its
-                // children, which rebuilt theirs); the fallback keeps output byte-identical when the
-                // eager doc used a different mode. See the build-fanout audit.
-                let multiline_children_doc = if multiline_children && ctx.trim_boundaries {
-                    children_doc
-                } else {
-                    self.build_nodes_doc_multiline(element.fragment.nodes)
-                };
-                let indent_inner = d.indent(d.concat(&[d.hardline(), multiline_children_doc]));
+                // Full multiline. `children_doc` was built once above as the multiline shape
+                // (`build_nodes_doc_multiline` == `build_nodes_doc_trimmed(nodes, true, breakable,
+                // true)`); rebuilding here per level is what made deeply-nested content O(2^depth).
+                let indent_inner = d.indent(d.concat(&[d.hardline(), children_doc]));
                 d.concat(&[
                     opening_tag,
                     d.text(">"),
@@ -528,9 +557,6 @@ impl<'a> Printer<'a> {
                 // when hasLeadingSpaces && isLeadingSpaceSensitive.
                 //
                 // line() handles both modes: space in flat, newline in break.
-                // When trim_boundaries was false, rebuild children with trim=true
-                // since line() now provides the boundary space.
-                let is_inline = ctx.kind.is_inline();
                 let leading_break = if start_mode == BoundaryMode::Hard {
                     d.hardline()
                 } else if is_inline
@@ -549,15 +575,7 @@ impl<'a> Printer<'a> {
                 } else {
                     d.softline()
                 };
-                // Rebuild children with trim=true when trim_boundaries was false,
-                // since line() now provides the boundary space that
-                // handle_text_child would otherwise duplicate.
-                let effective_children = if is_inline && !ctx.trim_boundaries {
-                    self.build_nodes_doc_trimmed(element.fragment.nodes, true, false, false)
-                } else {
-                    children_doc
-                };
-                let inner_group = d.group(d.concat(&[effective_children]));
+                let inner_group = d.group(d.concat(&[children_doc]));
                 let indent_inner = d.indent(d.concat(&[leading_break, inner_group]));
                 d.group(d.concat(&[
                     opening_tag,
