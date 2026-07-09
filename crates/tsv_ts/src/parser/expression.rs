@@ -1144,6 +1144,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         && (mode == SubscriptMode::Normal || self.is_type_args_followed_by_call());
                     if consume {
                         left = self.parse_instantiation_expression(left)?;
+                        // An instantiation expression can't be followed by a property
+                        // access (`f<T>.x`); a call or tagged template, which the loop
+                        // below flattens into the expression, stays valid.
+                        self.reject_instantiation_property_access()
+                            .map_err(Box::new)?;
                     } else {
                         break;
                     }
@@ -1686,6 +1691,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ))
     }
 
+    /// Reject a property access immediately after a TypeScript instantiation
+    /// expression. A `f<T>` (and a bare `new A<T>` — type arguments with no call)
+    /// may not be followed by `.`/`?.` property access: acorn rejects `f<T>.x` /
+    /// `f<T>?.x` / `f<T>?.[x]` ("Invalid property access after an instantiation
+    /// expression"). Errors when the *current* token starts such an access — a `.`,
+    /// or a `?.` whose next token is not `(` (an optional *call* `f<T>?.()` stays
+    /// valid). A plain call (`f<T>()`) or tagged template (`` f<T>`x` ``) never
+    /// reaches this check. Shared by the subscript-loop and `new`-expression paths.
+    fn reject_instantiation_property_access(&mut self) -> Result<(), ParseError> {
+        if matches!(self.current_kind(), TokenKind::Dot)
+            || (matches!(self.current_kind(), TokenKind::QuestionDot)
+                && !self.peek_is(&TokenKind::ParenOpen))
+        {
+            return Err(self.error_msg("Invalid property access after an instantiation expression"));
+        }
+        Ok(())
+    }
+
     /// Parse unary expression: `-x`, `+x`, `!x`, `~x`
     ///
     /// Unary operators have higher precedence than all binary operators.
@@ -2087,7 +2110,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 (args.into_bump_slice(), paren_end as u32)
             } else {
                 // new Date without parens - valid JS; bare instantiation type args
-                // (`new A<T>`) extend the span past the callee
+                // (`new A<T>`) extend the span past the callee. A bare `new A<T>`
+                // (type args, no call arguments) is instantiation-style: like `f<T>`
+                // it can't be followed by a property access (`new A<T>.x` rejects);
+                // `new A<T>()` took the `(` branch above, so its later `.prop` is an
+                // ordinary member access.
+                if type_arguments.is_some() {
+                    self.reject_instantiation_property_access()?;
+                }
                 let end = type_arguments
                     .as_ref()
                     .map_or(callee.actual_end, |ta| ta.span.end);

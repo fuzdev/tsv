@@ -281,6 +281,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         left: ForInOfLeft<'arena>,
         r#await: bool,
     ) -> Result<Statement<'arena>, ParseError> {
+        // A for-of variable declaration may not have an initializer: ecma262's
+        // `ForBinding` carries no `Initializer`, and (unlike for-in's `var` head)
+        // there is no Annex-B extension, so `for (var/let/const x = 1 of [])` is
+        // invalid in every mode — acorn and prettier both reject. This covers the
+        // `using` / `await using` heads too (all arrive here as a VariableDeclaration
+        // left). A default *inside* a binding pattern (`for (const {x = 1} of [])`) is
+        // a pattern default, not a declarator initializer, so it stays valid.
+        if matches!(&left, ForInOfLeft::VariableDeclaration(decl)
+            if decl.declarations.iter().any(|d| d.init.is_some()))
+        {
+            return Err(
+                self.error_msg("for-of loop variable declaration may not have an initializer")
+            );
+        }
+
         let right = self.parse_expression()?;
         self.expect(&TokenKind::ParenClose)?;
 
