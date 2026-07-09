@@ -840,14 +840,20 @@ impl<'a> Printer<'a> {
         // length to avoid the bump's chunk-doubling tail.
         let arena =
             bumpalo::Bump::with_capacity(tsv_lang::estimated_ast_arena_capacity(content.len()));
+        // Format into the host document's doc arena rather than a fresh per-element
+        // one — the same arena-sharing as the top-level `<style>`/`<script>` path
+        // (`format_embedded_in` / the TS build helpers). `format_in` is
+        // output-identical to `format`; the parsed content renders to an owned
+        // `String` here, so nothing borrowed from the arena escapes and the arena
+        // is not reset.
         let formatted = if is_style {
             tsv_css::parse(&content, &arena)
                 .ok()
-                .map(|ast| tsv_css::format(&ast, &content))
+                .map(|ast| tsv_css::format_in(&ast, &content, self.d()))
         } else {
             tsv_ts::parse(&content, &arena)
                 .ok()
-                .map(|ast| tsv_ts::format(&ast, &content))
+                .map(|ast| tsv_ts::format_in(&ast, &content, self.d()))
         };
 
         match formatted {

@@ -299,11 +299,16 @@ impl<'a> Printer<'a> {
                 base_indent_offset: 1,
                 ..tsv_lang::EmbedContext::default()
             };
-            let formatted_css = tsv_css::format_embedded(
+            // Share the host document's doc arena rather than allocating a fresh
+            // whole-host-sized one per `<style>` block. The embedded CSS renders
+            // to its own string; only doc-node storage is shared, and the arena is
+            // not reset, so the host's in-flight nodes stay valid.
+            let formatted_css = tsv_css::format_embedded_in(
                 &style.css_stylesheet,
                 self.source(),
                 &self.line_breaks,
                 embed,
+                self.d(),
             );
 
             // Indent each line - trim trailing newlines first to avoid extra blank lines

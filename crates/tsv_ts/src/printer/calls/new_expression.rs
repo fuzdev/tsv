@@ -85,28 +85,25 @@ impl<'a> Printer<'a> {
             new_expr.type_arguments.as_ref(),
         );
 
+        // Position just before `(` (after the callee and any type arguments); in
+        // the empty-args case it doubles as the dangling-comment boundary.
+        let paren_open = new_expr
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
+
         // Empty args: just `new Foo()` or `new Foo<K, V>()`, preserving dangling comments
         if new_expr.arguments.is_empty() {
-            let after_type_args = new_expr
-                .type_arguments
-                .as_ref()
-                .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
             return build_empty_args_doc(
                 self,
                 d.concat(&[d.text("new "), callee_with_types_base]),
-                after_type_args,
+                paren_open,
                 new_expr.span.end,
             );
         }
 
         // Build callee with type args: `new Foo<K, V>`
         let callee_with_types = d.concat(&[d.text("new "), callee_with_types_base]);
-
-        // Position just before `(` (after the callee and any type arguments).
-        let paren_open = new_expr
-            .type_arguments
-            .as_ref()
-            .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
         // Zero-comment fast gate: one binary search over the whole argument window
         // (`(` … `)`) short-circuits every per-branch argument-comment predicate
         // below (trailing-line / trailing-block / inter-argument / leading), each of
@@ -440,14 +437,7 @@ impl<'a> Printer<'a> {
             }
 
             let arg_doc = d.concat(&arg_parts);
-
-            return d.concat(&[
-                callee_with_types,
-                d.text("("),
-                d.indent(d.concat(&[d.hardline(), arg_doc])),
-                d.hardline(),
-                d.text(")"),
-            ]);
+            return wrap_call_with_hard_breaks(d, callee_with_types, arg_doc);
         }
 
         // Check for trailing BLOCK comments only (no line comments)
@@ -526,13 +516,7 @@ impl<'a> Printer<'a> {
                 } else {
                     d.concat(&arg_docs)
                 };
-                return d.concat(&[
-                    callee_with_types,
-                    d.text("("),
-                    d.indent(d.concat(&[d.hardline(), arg_parts])),
-                    d.hardline(),
-                    d.text(")"),
-                ]);
+                return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
             }
 
             if let Some(last_doc) = arg_docs.pop() {
