@@ -182,11 +182,13 @@ impl<'a> Ctx<'a> {
 
     /// Superset pre-check: does any template comment *start* in `[start, end)`?
     /// A miss means the expression stays fused (no skeleton, no attach).
+    ///
+    /// `self.comments` is sorted ascending by `span.start`, so the first comment
+    /// at/after `start` (binary search) starting before `end` settles the query.
     #[inline]
     fn any_comment_in(&self, start: u32, end: u32) -> bool {
-        self.comments
-            .iter()
-            .any(|c| c.span.start >= start && c.span.start < end)
+        let idx = self.comments.partition_point(|c| c.span.start < start);
+        self.comments.get(idx).is_some_and(|c| c.span.start < end)
     }
 }
 
@@ -940,7 +942,10 @@ fn write_const_tag(w: &mut JsonWriter, tag: &internal::ConstTag<'_>, ctx: &Ctx<'
     // hard-codes `parser.index - 1` (the byte before the closing `}`).
     let decl_end = ctx.pos(tag.span.end - 1);
     let declarator_end = ctx.pos(const_declarator_end(tag, ctx));
-    if ctx.comments.is_empty() {
+    // Scoped comment pre-check: a comment attaching to this tag necessarily starts
+    // inside its span, so no comment in `[tag.span.start, tag.span.end)` means the
+    // attach map would be empty — fuse directly (Off ≡ Emit(empty)).
+    if !ctx.any_comment_in(tag.span.start, tag.span.end) {
         write_const_declaration(w, tag, decl_end, declarator_end, CommentMode::Off, ctx);
     } else {
         // The document has template comments: precompute the init-subtree
@@ -1067,7 +1072,9 @@ fn write_declaration_tag(w: &mut JsonWriter, tag: &internal::DeclarationTag<'_>,
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"declaration\":");
-    if ctx.comments.is_empty() {
+    // Scoped comment pre-check (see `write_const_tag`): no comment inside this
+    // tag's span means the attach map is empty, so fuse directly.
+    if !ctx.any_comment_in(tag.span.start, tag.span.end) {
         write_variable_declaration_embedded(
             w,
             &tag.declaration,
