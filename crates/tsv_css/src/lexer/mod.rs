@@ -6,14 +6,12 @@
 // at a time (streaming, single-token lookahead, no token vector).
 // Svelte's CSS parser uses inline parsing (no separate tokenization step) with read_value().
 //
-// We keep the separate lexer: it's the more readable/debuggable factoring, and current
-// profiling doesn't favor inlining it. On the files profiled so far the token cursor is a
-// small share (~2.5%) and the CSS-parse hotspot is the value parser's repeated structural
-// re-scan (`ValueParser::parse` and the `contains_*` walks), so the inline single-pass
-// approach has nothing to win against right now — and the per-identifier decode allocation is
-// already lazy (see `read_identifier`). This is a snapshot, not a closed door: if the
-// value-parser re-scan is collapsed (the bigger lever), the cursor's relative share rises and
-// a byte-cursor / inline tokenization may become worth re-measuring.
+// We keep the separate lexer (rather than Svelte's inline single-pass parsing): it's the
+// more readable/debuggable factoring and carries no per-token UTF-8-decode tax the inline
+// approach would save — `next_token` dispatches byte-first (see `cur_byte`), decoding a
+// `char` only at the non-ASCII branches, and the per-identifier decode allocation is lazy
+// (see `read_identifier`). The remaining CSS-parse hotspot is elsewhere: the value parser's
+// repeated structural re-scan (`ValueParser::parse` and the `contains_*` walks).
 //
 // Pros of separate lexer:
 //   - Easier to debug (can inspect token stream)
@@ -33,7 +31,7 @@ mod strings;
 pub mod token;
 
 use comments::read_comment;
-use identifiers::{is_identifier_start, read_identifier};
+use identifiers::{is_ascii_identifier_start, is_identifier_start, read_identifier};
 use numbers::read_number;
 use strings::read_string;
 pub use token::{Token, TokenKind};
@@ -42,6 +40,12 @@ use tsv_lang::{ParseError, lex_err};
 
 pub struct Lexer<'a> {
     source: &'a str,
+    /// `source.as_bytes()`, cached so the hot `next_token` dispatch peeks a byte
+    /// without re-slicing + UTF-8-decoding a char per call. Char decoding is done
+    /// only at the non-ASCII branches (the dispatch tail, non-ASCII whitespace, the
+    /// `$`-ident peek, the url-token scan), which go through `source` at `pos`.
+    /// Mirrors `tsv_ts`'s lexer.
+    bytes: &'a [u8],
     pos: usize,
     /// Out-of-band decoded value for the **last token produced**, set only when an
     /// identifier actually contained an escape sequence (the no-escape common case
@@ -66,6 +70,7 @@ impl<'a> Lexer<'a> {
         };
         Self {
             source,
+            bytes: source.as_bytes(),
             pos,
             decoded: None,
         }
@@ -90,6 +95,23 @@ impl<'a> Lexer<'a> {
         self.decoded = None;
     }
 
+    /// The byte at the cursor, or `None` at EOF. Drives the hot `next_token`
+    /// dispatch; non-ASCII bytes (`>= 0x80`) are decoded to a `char` only where a
+    /// branch needs one (`current_char`).
+    #[inline]
+    fn cur_byte(&self) -> Option<u8> {
+        self.bytes.get(self.pos).copied()
+    }
+
+    /// The byte `offset` bytes ahead of the cursor, or `None` past EOF. Used for the
+    /// ASCII lookaheads in the dispatch (`/*`, `-`/`+`/`.` number prefixes, `||`).
+    #[inline]
+    fn peek_byte(&self, offset: usize) -> Option<u8> {
+        self.bytes.get(self.pos + offset).copied()
+    }
+
+    /// Decode the full character at the cursor (for the non-ASCII branches);
+    /// `None` at EOF. The hot ASCII paths use `cur_byte` and never call this.
     #[inline]
     fn current_char(&self) -> Option<char> {
         self.source[self.pos..].chars().next()
@@ -102,11 +124,22 @@ impl<'a> Lexer<'a> {
 
     fn skip_whitespace(&mut self) -> Token {
         let start = self.pos;
-        while let Some(ch) = self.current_char() {
-            if ch.is_whitespace() {
-                self.pos += ch.len_utf8();
-            } else {
-                break;
+        loop {
+            match self.cur_byte() {
+                // ASCII whitespace fast path — the overwhelming common case. Advances
+                // one byte per whitespace char, decoding nothing (see
+                // `is_ascii_css_whitespace`, which matches `char::is_whitespace` for ASCII).
+                Some(b) if is_ascii_css_whitespace(b) => self.pos += 1,
+                // Any other ASCII byte is not whitespace — stop.
+                Some(b) if b < 0x80 => break,
+                // Non-ASCII lead byte: decode to test the full Unicode whitespace rule
+                // (`char::is_whitespace`, which is true for NBSP, NEL, LS/PS, …). This is
+                // the same predicate the char loop applied — byte-identical.
+                Some(_) => match self.current_char() {
+                    Some(ch) if ch.is_whitespace() => self.pos += ch.len_utf8(),
+                    _ => break,
+                },
+                None => break,
             }
         }
         Token {
@@ -132,7 +165,7 @@ impl<'a> Lexer<'a> {
             |s| s.as_str(),
         );
         if ident_text.eq_ignore_ascii_case("url")
-            && self.current_char() == Some('(')
+            && self.cur_byte() == Some(b'(')
             && let Some(url) = self.consume_url_token(token.start)
         {
             // The url-token text is recovered verbatim from its span — no decode.
@@ -199,27 +232,21 @@ impl<'a> Lexer<'a> {
         // escaped identifier below sets it again.
         self.decoded = None;
 
-        if self.pos >= self.source.len() {
+        let start = self.pos;
+        let Some(b) = self.cur_byte() else {
             return Ok(Token {
                 kind: TokenKind::Eof,
-                start: self.pos as u32,
-                end: self.pos as u32,
-            });
-        }
-
-        let Some(ch) = self.current_char() else {
-            return Ok(Token {
-                kind: TokenKind::Eof,
-                start: self.pos as u32,
-                end: self.pos as u32,
+                start: start as u32,
+                end: start as u32,
             });
         };
 
-        // Helper macro for single-character tokens
-        macro_rules! single_char_token {
+        // Helper macro for single-byte (ASCII) tokens — every arm below advances one
+        // byte, matching the char dispatch's `ch.len_utf8()` for the ASCII punctuation
+        // it fires on.
+        macro_rules! single_byte_token {
             ($kind:expr) => {{
-                let start = self.pos;
-                self.pos += ch.len_utf8();
+                self.pos += 1;
                 Ok(Token {
                     kind: $kind,
                     start: start as u32,
@@ -228,78 +255,85 @@ impl<'a> Lexer<'a> {
             }};
         }
 
-        match ch {
-            // Whitespace
-            _ if ch.is_whitespace() => Ok(self.skip_whitespace()),
+        // Byte-first dispatch: the ASCII cases (the overwhelming majority of CSS bytes)
+        // branch on the raw byte with no UTF-8 decode; a `char` is materialized only at
+        // the non-ASCII tail. The arm order mirrors the former char dispatch exactly —
+        // whitespace, then the number/comment/`||` lookahead arms, then punctuation, then
+        // the identifier-start catch-all — so the token stream is byte-identical.
+        match b {
+            // Whitespace (ASCII subset of `char::is_whitespace`; non-ASCII whitespace is
+            // handled in the tail below).
+            _ if is_ascii_css_whitespace(b) => Ok(self.skip_whitespace()),
 
             // Comments
-            '/' if self.peek_char(1) == Some('*') => read_comment(self.source, &mut self.pos),
+            b'/' if self.peek_byte(1) == Some(b'*') => read_comment(self.source, &mut self.pos),
 
             // Strings
-            '"' => read_string(self.source, &mut self.pos, '"'),
-            '\'' => read_string(self.source, &mut self.pos, '\''),
+            b'"' => read_string(self.source, &mut self.pos, '"'),
+            b'\'' => read_string(self.source, &mut self.pos, '\''),
 
             // Numbers (including percentage and dimension)
-            _ if ch.is_ascii_digit() => read_number(self.source, &mut self.pos),
-            '.' if self.peek_char(1).is_some_and(|ch| ch.is_ascii_digit()) => {
+            _ if b.is_ascii_digit() => read_number(self.source, &mut self.pos),
+            b'.' if self.peek_byte(1).is_some_and(|b| b.is_ascii_digit()) => {
                 read_number(self.source, &mut self.pos)
             }
             // Negative numbers: -10px, -100%, -.5em (lookahead to distinguish from identifier)
             // Note: -. must be followed by digit (-.5), otherwise it's identifier prefix (-.class is combinator + class)
-            '-' if matches!(self.peek_char(1), Some(c) if c.is_ascii_digit())
-                || (self.peek_char(1) == Some('.')
-                    && matches!(self.peek_char(2), Some(c) if c.is_ascii_digit())) =>
+            b'-' if self.peek_byte(1).is_some_and(|b| b.is_ascii_digit())
+                || (self.peek_byte(1) == Some(b'.')
+                    && self.peek_byte(2).is_some_and(|b| b.is_ascii_digit())) =>
             {
                 read_number(self.source, &mut self.pos)
             }
             // Positive numbers with explicit + sign: +10px, +100%, +.5em
             // Note: +. must be followed by digit (+.5), otherwise it's combinator + class (+.class)
-            '+' if matches!(self.peek_char(1), Some(c) if c.is_ascii_digit())
-                || (self.peek_char(1) == Some('.')
-                    && matches!(self.peek_char(2), Some(c) if c.is_ascii_digit())) =>
+            b'+' if self.peek_byte(1).is_some_and(|b| b.is_ascii_digit())
+                || (self.peek_byte(1) == Some(b'.')
+                    && self.peek_byte(2).is_some_and(|b| b.is_ascii_digit())) =>
             {
                 read_number(self.source, &mut self.pos)
             }
 
             // Braces and delimiters
-            '{' => single_char_token!(TokenKind::LeftBrace),
-            '}' => single_char_token!(TokenKind::RightBrace),
-            '[' => single_char_token!(TokenKind::LeftBracket),
-            ']' => single_char_token!(TokenKind::RightBracket),
-            '(' => single_char_token!(TokenKind::LeftParen),
-            ')' => single_char_token!(TokenKind::RightParen),
+            b'{' => single_byte_token!(TokenKind::LeftBrace),
+            b'}' => single_byte_token!(TokenKind::RightBrace),
+            b'[' => single_byte_token!(TokenKind::LeftBracket),
+            b']' => single_byte_token!(TokenKind::RightBracket),
+            b'(' => single_byte_token!(TokenKind::LeftParen),
+            b')' => single_byte_token!(TokenKind::RightParen),
 
             // Punctuation
-            ':' => single_char_token!(TokenKind::Colon),
-            ';' => single_char_token!(TokenKind::Semicolon),
-            ',' => single_char_token!(TokenKind::Comma),
-            '.' => single_char_token!(TokenKind::Dot),
-            '#' => single_char_token!(TokenKind::Hash),
-            '>' => single_char_token!(TokenKind::GreaterThan),
-            '<' => single_char_token!(TokenKind::LessThan),
-            '+' => single_char_token!(TokenKind::Plus),
-            '~' => single_char_token!(TokenKind::Tilde),
-            '*' => single_char_token!(TokenKind::Asterisk),
-            '&' => single_char_token!(TokenKind::Ampersand),
-            '@' => single_char_token!(TokenKind::AtSign),
-            '/' => single_char_token!(TokenKind::Slash),
-            '=' => single_char_token!(TokenKind::Equals),
-            '%' => single_char_token!(TokenKind::Percent),
-            '^' => single_char_token!(TokenKind::Caret),
+            b':' => single_byte_token!(TokenKind::Colon),
+            b';' => single_byte_token!(TokenKind::Semicolon),
+            b',' => single_byte_token!(TokenKind::Comma),
+            b'.' => single_byte_token!(TokenKind::Dot),
+            b'#' => single_byte_token!(TokenKind::Hash),
+            b'>' => single_byte_token!(TokenKind::GreaterThan),
+            b'<' => single_byte_token!(TokenKind::LessThan),
+            b'+' => single_byte_token!(TokenKind::Plus),
+            b'~' => single_byte_token!(TokenKind::Tilde),
+            b'*' => single_byte_token!(TokenKind::Asterisk),
+            b'&' => single_byte_token!(TokenKind::Ampersand),
+            b'@' => single_byte_token!(TokenKind::AtSign),
+            b'/' => single_byte_token!(TokenKind::Slash),
+            b'=' => single_byte_token!(TokenKind::Equals),
+            b'%' => single_byte_token!(TokenKind::Percent),
+            b'^' => single_byte_token!(TokenKind::Caret),
             // `?` is a query-string char in unquoted url() (e.g. `url(a.ttf?x=1)`).
             // Per css-syntax-3 it's a valid <delim-token>; grammar enforces validity
             // later, so the value reassembler emits it raw like other punctuation.
-            '?' => single_char_token!(TokenKind::Question),
+            b'?' => single_byte_token!(TokenKind::Question),
             // `$`-prefixed identifier (SCSS variable / property name like `$foo`).
             // Svelte's parseCss treats it as a single identifier. A bare `$` (e.g.
             // the `$=` attribute selector) falls through to the Dollar token below.
-            '$' if self.peek_char(1).is_some_and(is_identifier_start) => self.read_identifier(),
-            '$' => single_char_token!(TokenKind::Dollar),
-            '!' => single_char_token!(TokenKind::Bang),
-            '|' => {
+            // The peek keeps `char` form: the char after `$` can be a non-ASCII
+            // identifier code point (`$♥`).
+            b'$' if self.peek_char(1).is_some_and(is_identifier_start) => self.read_identifier(),
+            b'$' => single_byte_token!(TokenKind::Dollar),
+            b'!' => single_byte_token!(TokenKind::Bang),
+            b'|' => {
                 // Check for || (column combinator)
-                if self.peek_char(1) == Some('|') {
-                    let start = self.pos;
+                if self.peek_byte(1) == Some(b'|') {
                     self.pos += 1; // skip first |
                     self.pos += 1; // skip second |
                     Ok(Token {
@@ -308,18 +342,49 @@ impl<'a> Lexer<'a> {
                         end: self.pos as u32,
                     })
                 } else {
-                    single_char_token!(TokenKind::Pipe)
+                    single_byte_token!(TokenKind::Pipe)
                 }
             }
 
-            // Identifiers (including those with unicode escapes)
-            _ if is_identifier_start(ch) => self.read_identifier(),
+            // Identifiers (ASCII start: letters, `-`, `_`, `\`; the non-ASCII identifier
+            // code points are handled in the tail). `is_ascii_identifier_start` is false
+            // for every non-ASCII byte, so a `>= 0x80` byte falls through to the tail.
+            _ if is_ascii_identifier_start(b) => self.read_identifier(),
 
-            // Unknown character
-            _ => Err(lex_err(
-                format!("Unexpected character in CSS: '{ch}'"),
+            // Any other ASCII byte is not a valid token start — error. `b as char` is the
+            // exact character the char dispatch would have reported (ASCII round-trips).
+            _ if b < 0x80 => Err(lex_err(
+                format!("Unexpected character in CSS: '{}'", b as char),
                 self.pos,
             )),
+
+            // Non-ASCII lead byte: decode the full char and run the char tail in the
+            // former arm order — whitespace (NBSP, NEL, LS/PS, …) first, then the
+            // non-ASCII identifier code points, then the unknown-character error.
+            _ => match self.current_char() {
+                Some(ch) if ch.is_whitespace() => Ok(self.skip_whitespace()),
+                Some(ch) if is_identifier_start(ch) => self.read_identifier(),
+                Some(ch) => Err(lex_err(
+                    format!("Unexpected character in CSS: '{ch}'"),
+                    self.pos,
+                )),
+                // Unreachable: `cur_byte` returned `Some`, so a char decodes here.
+                None => Ok(Token {
+                    kind: TokenKind::Eof,
+                    start: start as u32,
+                    end: start as u32,
+                }),
+            },
         }
     }
+}
+
+/// Whether `b` is an ASCII byte that `char::is_whitespace()` treats as whitespace:
+/// `<TAB>` U+0009, `<LF>` U+000A, `<VT>` U+000B, `<FF>` U+000C, `<CR>` U+000D, and
+/// `<SP>` U+0020 — the Unicode `White_Space` code points below U+0080. Deliberately
+/// **not** `u8::is_ascii_whitespace()`, which omits `<VT>` (U+000B) and so would
+/// diverge from the char dispatch this replaces.
+#[inline]
+const fn is_ascii_css_whitespace(b: u8) -> bool {
+    matches!(b, b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ')
 }
