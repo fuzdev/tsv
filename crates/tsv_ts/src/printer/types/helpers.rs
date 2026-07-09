@@ -5,7 +5,9 @@
 // - Type unwrapping utilities
 // - Source scanning helpers
 
-use crate::ast::internal::{self, TSIntersectionType, TSKeywordKind, TSType, TSUnionType};
+use crate::ast::internal::{
+    self, TSIntersectionType, TSKeywordKind, TSLiteralType, TSType, TSUnionType,
+};
 use tsv_lang::source_scan::find_char_skipping_comments;
 
 //
@@ -71,6 +73,41 @@ pub fn unwrap_parenthesized<'a>(ts_type: &'a TSType<'a>) -> &'a TSType<'a> {
         TSType::Parenthesized(p) => unwrap_parenthesized(p.type_annotation),
         _ => ts_type,
     }
+}
+
+/// Prettier's `isSimpleType` inline/hug criterion for a single type argument: an
+/// atomic type that never benefits from breaking — a primitive keyword, a plain
+/// literal (string / number / bigint / negative), `this`, or a bare type reference
+/// with no type arguments of its own (a nested `Array<X>` is *not* simple).
+/// Parenthesized wrappers are unwrapped first. The single source of truth shared by
+/// the call/`new`/instantiation type-argument builder and the type-position builder so
+/// the two agree by construction. Prettier ref: `utilities/is-simple-type.js` (booleans
+/// are `TSType::Keyword` here, so they fall under the keyword arm rather than `Literal`).
+///
+/// Template-literal types are **excluded** even though Prettier's `isSimpleType` accepts
+/// them: tsv's template-literal-type printer carries an internal `${…}` break point, so
+/// inlining the `<…>` would let the template break *there* (defeating the atomicity the
+/// caller relies on). They stay in the breakable group path — a residual divergence
+/// pending an atomic template-literal-type printer.
+pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
+    let unwrapped = unwrap_parenthesized(ty);
+    matches!(unwrapped, TSType::Keyword(_) | TSType::ThisType(_))
+        || matches!(unwrapped, TSType::Literal(lit) if !matches!(lit, TSLiteralType::TemplateLiteral(_)))
+        || matches!(unwrapped, TSType::TypeReference(r) if r.type_arguments.is_none())
+}
+
+/// Prettier's `shouldHugUnionType` criterion for a single type argument: a union with
+/// exactly one brace-delimited member and only void-like siblings (`{…} | null`,
+/// `null | {…}`, `{…} | void`), per [`should_hug_union_type`]. Such a union inlines
+/// atomically — the object member carries its own group and breaks block-style inside
+/// the hugged `<…>`, so the `<…>` itself never needs a break point. Parenthesized
+/// wrappers are unwrapped first. The single source of truth shared by the
+/// call/`new`/instantiation type-argument builder and the type-position builder so the
+/// two agree by construction. Prettier ref: `shouldHugType` → `shouldHugUnionType`.
+pub fn is_hugging_union_type_arg(ty: &TSType<'_>) -> bool {
+    matches!(unwrap_parenthesized(ty), TSType::Union(u)
+        if should_hug_union_type(u)
+            && u.types.iter().any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_))))
 }
 
 /// Find the `TSParenthesizedType` that directly wraps a union, walking through any

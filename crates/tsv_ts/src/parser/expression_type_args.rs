@@ -3,7 +3,8 @@
 
 use super::Parser;
 use super::expression_lookahead::{
-    is_function_type_start, is_generic_function_type_start, scan_for_closing_angle_bracket,
+    is_construct_type_start, is_function_type_start, is_generic_function_type_start,
+    scan_for_closing_angle_bracket,
 };
 use super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
 
@@ -15,6 +16,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Type keywords: `<string>`, `<never>`, etc.
     /// - Identifiers: `<T>`, `<Ns.Type>`, `<T | U>`, `<T, U>`
     /// - Function types: `<(x: T) => R>`, `<() => R>`
+    /// - Parenthesized types: `<(A | B) & C>`, `<(() => void) | null>`
     /// - Object/tuple/literal types: `<{ a: T }>`, `<[T, U]>`, `<"foo">`
     pub(super) fn is_type_arguments_start(&self) -> bool {
         let bytes = self.source.as_bytes();
@@ -53,8 +55,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.check_identifier_type_arg_pattern(bytes, pos)
             }
 
-            // Function type: `<(x: T) => R>` or `<() => R>`
-            b'(' => is_function_type_start(bytes, pos),
+            // A type argument starting with `(`: a function type (`<(x: T) => R>`,
+            // `<() => R>`) or a parenthesized type (`<(A | B) & C>`,
+            // `<(() => void) | null>`). `is_function_type_start` fast-paths the arrow
+            // shapes; otherwise fall back to the closing-`>` + follow-token scan (as the
+            // `{`/`[`/literal arms do), so `x < (b)` and `x < (b) > c` stay comparisons
+            // while `callee<(T)>(…)` and `x < (b) > (c)` are type arguments — matching
+            // acorn's `canFollowTypeArgumentsInExpression`.
+            b'(' => {
+                is_function_type_start(bytes, pos) || scan_for_closing_angle_bracket(bytes, pos)
+            }
 
             // A second `<` — the tail of a `<<` shift token, or a spaced
             // `< <` — can only open a generic function type
@@ -81,12 +91,41 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Check if identifier at `pos` is followed by valid type argument patterns.
     ///
-    /// After scanning the full qualified name (e.g., `Ns.Type.Sub`), checks what follows:
+    /// Leading keywords that introduce a *non-reference* type are handled first:
+    /// - `import('m').T` — an import type; always a valid type, so the closing-`>`
+    ///   follow-token scan decides call vs comparison (matches acorn).
+    /// - `new (…) => R` / `abstract new (…) => R` — a construct-signature type; the
+    ///   `(…) =>` shape distinguishes it from a `new Foo()` value expression (which
+    ///   stays a comparison), then the same scan confirms the close + follow token.
+    ///
+    /// Otherwise the leading word is a type reference: after scanning the full
+    /// qualified name (e.g., `Ns.Type.Sub`), checks what follows:
     /// - `>` or `<`: definitely type args
     /// - `,`, `|`, `&`: scan for matching `>` to confirm type args
     /// - `[`: disambiguate indexed type vs array access
     /// - `extends`: type constraint
     fn check_identifier_type_arg_pattern(&self, bytes: &[u8], pos: usize) -> bool {
+        // Leading keyword forms that start a non-reference type. `import` is always
+        // a valid type (scan decides); `new`/`abstract new` require the construct
+        // shape so `f<new B()>(x)` and `a < new B() > (c)` stay comparisons.
+        match &bytes[pos..skip_identifier(bytes, pos)] {
+            b"import" => return scan_for_closing_angle_bracket(bytes, pos),
+            b"new" => {
+                return is_construct_type_start(bytes, pos)
+                    && scan_for_closing_angle_bracket(bytes, pos);
+            }
+            b"abstract" => {
+                let after = skip_whitespace_and_comments(bytes, skip_identifier(bytes, pos));
+                if is_construct_type_start(bytes, after)
+                    && scan_for_closing_angle_bracket(bytes, pos)
+                {
+                    return true;
+                }
+                // A bare `abstract` is an ordinary type reference — fall through.
+            }
+            _ => {}
+        }
+
         // Skip identifier and any qualified parts (e.g., Namespace.Type.SubType)
         let mut pos = pos;
         loop {

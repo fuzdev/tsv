@@ -4,6 +4,7 @@
 // - Type parameter declarations: `<T, U extends V = W>`
 // - Type parameter instantiation (type arguments): `<T, U>`
 
+use super::helpers::{is_hugging_union_type_arg, is_simple_type_arg};
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::fluid_after_operator;
@@ -474,25 +475,11 @@ impl<'a> Printer<'a> {
             return d.text("<>");
         }
 
-        // Check for comments that force expansion: line comments or own-line block
-        // comments. Also check for a line comment BETWEEN `<` and the first argument
-        // (e.g. `foo<// c\n A>(x)`); without this the comment falls through to the
-        // block-comment-only group path below and is dropped (content loss).
-        let has_leading_line_comment = inst.params.first().is_some_and(|first| {
-            self.has_line_comments_between(inst.span.start + 1, first.span().start)
-        });
-        if has_leading_line_comment
-            || self.has_line_comments_in_delimited_list(
-                inst.params,
-                TSType::span,
-                inst.span.end - 1,
-            )
-            || self.has_own_line_block_comments_in_bracket_list(
-                inst.span,
-                inst.params,
-                TSType::span,
-            )
-        {
+        // Line comments (anywhere, including a leading `foo<// c\n A>(x)` — which
+        // would otherwise fall through to the block-comment-only group path below and
+        // be dropped) or own-line block comments force the multiline layout. Shared
+        // predicate with the type-position builder, incl. its zero-comment window gate.
+        if self.type_arguments_force_expansion(inst) {
             return self.build_type_parameter_instantiation_doc_with_line_comments(inst);
         }
 
@@ -507,6 +494,26 @@ impl<'a> Printer<'a> {
             && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
         {
             return d.concat(&[d.text("<"), type_doc, d.text(">")]);
+        }
+
+        // A single *simple* or *hugged-union* type argument inlines atomically: no
+        // group, no softlines. Simple = keyword, literal, `this`, or a bare type
+        // reference (`is_simple_type_arg`); hugged union = `{…} | null` / `null | {…}`
+        // (`is_hugging_union_type_arg`), whose object member carries its own group and
+        // breaks block-style inside the hugged `<…>` rather than breaking the `<…>` onto
+        // its own lines. Matches Prettier's `shouldInline`/`shouldHugType` and tsv's own
+        // type-position builder (`build_type_arguments_doc_wrapping`), via the shared
+        // predicates. Without it the fall-through group below gives the argument a
+        // softline break point, so an overflowing call head (`callee<Ref>(`) breaks the
+        // `<Ref>` instead of the arguments (and, as an assignment RHS, keeps the RHS on
+        // the `=` line rather than breaking after `=`). Comment-bearing single arguments
+        // are already routed to the multiline path above, so only inline block comments
+        // remain — the shared `build_single_type_arg_inline` preserves them. (The single
+        // brace-delimited object/mapped type is handled by the curly-hug case above.)
+        if inst.params.len() == 1
+            && (is_simple_type_arg(&inst.params[0]) || is_hugging_union_type_arg(&inst.params[0]))
+        {
+            return self.build_single_type_arg_inline(inst);
         }
 
         // Build params with commas and line breaks

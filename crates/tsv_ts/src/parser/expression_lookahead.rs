@@ -378,12 +378,53 @@ pub(super) fn is_generic_function_type_start(bytes: &[u8], pos: usize) -> bool {
     if after >= bytes.len() || bytes[after] != b'(' {
         return false;
     }
-    matching_paren_close(bytes, after + 1).is_some_and(|paren_close| {
+    paren_list_then_arrow(bytes, after)
+}
+
+/// Whether the `(` at `paren` opens a parameter list whose matching `)` is
+/// followed by `=>` — the tail shared by a generic function type's split
+/// (`<…>(params) =>`) and a construct type (`new (params) =>`). `paren` must
+/// point at the `(`; comments between `)` and `=>` are skipped. The `=>` is the
+/// signal that separates these types from a shift/comparison chain or a
+/// `new Foo()` value (neither of which has `(…) =>`).
+#[inline]
+fn paren_list_then_arrow(bytes: &[u8], paren: usize) -> bool {
+    matching_paren_close(bytes, paren + 1).is_some_and(|paren_close| {
         let after_params = skip_whitespace_and_comments(bytes, paren_close + 1);
         after_params + 1 < bytes.len()
             && bytes[after_params] == b'='
             && bytes[after_params + 1] == b'>'
     })
+}
+
+/// Whether `pos` begins a construct-signature type `new (params) => R` — the
+/// `new`-prefixed sibling of [`is_function_type_start`]. True iff a whole-word
+/// `new` is followed by a parenthesized parameter list whose matching `)` is
+/// followed by `=>`. The `=>` is what separates the construct TYPE from a
+/// `new Foo()` value expression, so `a < new Foo() > (c)` stays a comparison
+/// while `f<new () => T>(x)` is a generic call — mirroring the `=>` requirement
+/// in [`is_function_type_start`] / [`is_generic_function_type_start`]. Callers
+/// still gate on the closing-`>` follow-token scan, so a construct type only
+/// reads as type arguments when a call/tagged-template/end token actually
+/// follows the `>`. `pos` may point at `new` directly or (for `abstract new`)
+/// past the `abstract` keyword.
+pub(super) fn is_construct_type_start(bytes: &[u8], pos: usize) -> bool {
+    // Whole-word `new` (not an identifier like `newType`).
+    if !bytes[pos..].starts_with(b"new") {
+        return false;
+    }
+    let after_new = pos + b"new".len();
+    if bytes
+        .get(after_new)
+        .is_some_and(|&b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
+    {
+        return false;
+    }
+    let paren = skip_whitespace_and_comments(bytes, after_new);
+    if bytes.get(paren) != Some(&b'(') {
+        return false;
+    }
+    paren_list_then_arrow(bytes, paren)
 }
 
 /// Find the `>` closing the angle-bracket list opened just before `pos`
