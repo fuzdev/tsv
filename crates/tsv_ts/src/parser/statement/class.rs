@@ -746,6 +746,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ..
         } = header;
 
+        // A `get`/`set` accessor is neither a GeneratorMethod nor an AsyncMethod:
+        // ecma262's MethodDefinition productions are disjoint, so the method-only
+        // `async`/`*` modifiers cannot combine with `get`/`set`. `*get x() {}`,
+        // `async get x() {}` (and the `set` forms) have no valid parse — acorn,
+        // prettier, and tsc ("'async' modifier cannot be used here" / "'(' expected")
+        // all reject. An unconditional-local grammar violation (invalid in every
+        // mode/goal) → reject inline rather than emit an accessor carrying a spurious
+        // generator/async flag. (`async`/`*` methods *named* `get`/`set` — `async
+        // get() {}`, `*set() {}` — keep `accessor_kind = None` and stay valid.)
+        if accessor_kind.is_some() && (is_generator || is_async) {
+            return Err(self.error_msg("A getter or setter cannot be async or a generator"));
+        }
+
         // A non-static, non-computed `get`/`set` accessor keyed `constructor`
         // (bare identifier or the `'constructor'` string) is rejected — acorn
         // ("Constructor can't have get/set modifier") and tsc (TS1341) both reject
