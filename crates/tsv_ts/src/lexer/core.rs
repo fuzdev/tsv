@@ -19,18 +19,43 @@ const fn utf8_len(lead: u8) -> usize {
     }
 }
 
+/// 256-entry lookup tables for the ASCII identifier-class fast paths. Each entry is
+/// computed from the same predicate the byte tests below expand to, so the tables are
+/// exact — a lookup replaces the range/eq OR-chain with one L1 load on the hot
+/// per-character identifier-body loop.
+const ID_START_LUT: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0;
+    while i < 256 {
+        let b = i as u8;
+        t[i] = b.is_ascii_alphabetic() || b == b'_' || b == b'$';
+        i += 1;
+    }
+    t
+};
+const ID_CONTINUE_LUT: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0;
+    while i < 256 {
+        let b = i as u8;
+        t[i] = b.is_ascii_alphanumeric() || b == b'_' || b == b'$';
+        i += 1;
+    }
+    t
+};
+
 /// ASCII subset of `ID_Start` (`a-z A-Z _ $`) — the byte-cursor fast path before
 /// falling back to the full Unicode `is_id_start` on a decoded char.
 #[inline]
 const fn is_ascii_id_start(b: u8) -> bool {
-    b.is_ascii_alphabetic() || b == b'_' || b == b'$'
+    ID_START_LUT[b as usize]
 }
 
 /// ASCII subset of `ID_Continue` (`a-z A-Z 0-9 _ $`) — the byte-cursor fast path
 /// for an identifier body before falling back to the full Unicode `is_id_continue`.
 #[inline]
 const fn is_ascii_id_continue(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_' || b == b'$'
+    ID_CONTINUE_LUT[b as usize]
 }
 
 /// Try to decode a unicode escape sequence at the given position.
