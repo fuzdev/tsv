@@ -705,6 +705,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Detect if this is a method (has `(`) or property (has `=` or `;` or end of class)
         if matches!(self.current_kind(), TokenKind::ParenOpen) {
             self.finish_method_member(header)
+        } else if header.accessor_kind.is_some() || header.is_async || header.is_generator {
+            // A method-only modifier — `get`/`set` (accessor), `async`, or `*` (generator) —
+            // was committed, but no `(params)` list follows. ecma262 gives these only a
+            // `MethodDefinition`/`GeneratorMethod`/`AsyncMethod` form (always `( … )`), never a
+            // `FieldDefinition`, so `get x = 1` / `async x = 1` / `*x = 1` have no valid parse.
+            // acorn + prettier + tsc (TS1005 "'(' expected") all reject; it's an
+            // unconditional-local grammar violation (invalid in every mode/goal), so tsv rejects
+            // inline rather than falling into `finish_property_member`, which would silently drop
+            // the modifier keyword and emit a bare field (a content-loss bug).
+            Err(self.error_expected_found("'('"))
         } else {
             self.finish_property_member(header)
         }
