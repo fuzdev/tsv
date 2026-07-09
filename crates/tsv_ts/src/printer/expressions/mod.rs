@@ -767,7 +767,7 @@ impl<'a> Printer<'a> {
             // in the linearized chain for proper segment grouping.
             let nodes = chain::linearize_chain_from_non_null(non_null_expr);
             let groups = chain::group_chain_nodes(&nodes);
-            chain::build_chain_doc(&groups, self)
+            chain::build_chain_doc(&groups, non_null_expr.span, self)
         } else {
             let inner_doc = self.build_expression_doc(non_null_expr.expression);
             d.concat(&[inner_doc, d.text("!")])
