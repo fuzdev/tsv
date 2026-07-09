@@ -82,11 +82,14 @@ impl<'a> ValueCursor<'a> {
     /// Advances cursor past all whitespace characters and returns the
     /// new position (first non-whitespace character or EOF).
     pub fn skip_whitespace(&mut self) -> usize {
-        while let Some(ch) = self.peek() {
-            // CSS whitespace is ASCII-only; NBSP and other Unicode whitespace are
-            // value content (see `is_css_whitespace`).
-            if is_css_whitespace(ch) {
-                self.pos += ch.len_utf8();
+        let bytes = self.source.as_bytes();
+        // CSS whitespace is ASCII-only (`is_css_whitespace` is `is_ascii_whitespace`;
+        // NBSP and other Unicode whitespace are value content), so a non-ASCII byte
+        // always stops the skip and no UTF-8 decode is needed — byte-identical to
+        // the previous `peek`-per-char loop.
+        while let Some(&b) = bytes.get(self.pos) {
+            if b < 0x80 && is_css_whitespace(b as char) {
+                self.pos += 1;
             } else {
                 break;
             }
@@ -115,18 +118,38 @@ impl<'a> ValueCursor<'a> {
         F: Fn(char) -> bool,
     {
         let start = self.pos;
+        let bytes = self.source.as_bytes();
+        let mut i = self.pos;
 
-        // Iterate using char_indices for UTF-8 safety
-        // byte_offset is relative to self.source[self.pos..]
-        for (byte_offset, ch) in self.source[self.pos..].char_indices() {
+        // Walk bytes instead of `char_indices` to skip the per-char UTF-8 decode
+        // on the ASCII-dominant common case. Every delimiter and every nesting
+        // trigger (`(` `)` `'` `"`) is ASCII, so an ASCII byte is processed as its
+        // char with no decode; a non-ASCII lead byte is decoded in full so the
+        // predicate still sees the real char (some callers — e.g.
+        // `char::is_whitespace` — treat non-ASCII chars as delimiters). Advancing
+        // by the char width keeps `i` on a char boundary, so this is byte-for-byte
+        // identical to the previous `char_indices` loop.
+        while i < bytes.len() {
+            let b = bytes[i];
+            let (ch, width) = if b < 0x80 {
+                (b as char, 1)
+            } else {
+                // `i` is within bounds and on a char boundary, so `next()` is
+                // always `Some`; the `else` is unreachable.
+                let Some(c) = self.source[i..].chars().next() else {
+                    break;
+                };
+                (c, c.len_utf8())
+            };
+
             // Check delimiter BEFORE updating state (use current nesting level)
             if self.paren_depth == 0 && !self.in_quote && is_delimiter(ch) {
-                let end = self.pos + byte_offset;
-                return (start, end);
+                return (start, i);
             }
 
             // Update state for next iteration
             self.update_state(ch);
+            i += width;
         }
 
         // Reached EOF without finding delimiter
