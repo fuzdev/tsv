@@ -456,6 +456,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(())
     }
 
+    /// Restrict a **type-member signature**'s parameters to plain bindings —
+    /// `Identifier` / `RestElement` / `ObjectPattern` / `ArrayPattern` — a
+    /// faithful port of acorn's `tsParseBindingListForSignature`. A signature has
+    /// no implementation, so a default (`AssignmentPattern`, `set a(v = 1)`) or a
+    /// parameter property (`TSParameterProperty`, `m(public v)`) is an
+    /// unconditional-local grammar error acorn rejects at parse; tsv matches for
+    /// drop-in parity. Only type-member signatures (interface / type-literal
+    /// method, call, construct, accessor) call this — an *implementation*, an
+    /// *ambient* declaration (`declare function f(v = 1)`, TS1039 deferred), and an
+    /// *overload* keep their defaults (all acorn-accepts). Function *types* reject
+    /// defaults already via their own param parser (`parse_function_type_params`).
+    pub(super) fn check_signature_params(
+        &self,
+        params: &[Expression<'arena>],
+    ) -> Result<(), ParseError> {
+        for param in params {
+            if !matches!(
+                param,
+                Expression::Identifier(_)
+                    | Expression::RestElement(_)
+                    | Expression::ObjectPattern(_)
+                    | Expression::ArrayPattern(_)
+            ) {
+                return Err(self.error_msg(
+                    "Name in a signature must be an Identifier, ObjectPattern or ArrayPattern",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Whether a parameter is the TypeScript `this` pseudo-parameter (`this: T`)
     /// — a bare `this` identifier binding, matching acorn's `isThisParam`. Never
     /// escaped (it's the reserved word), so a raw source-slice compare on the
@@ -463,7 +494,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`base_offset` added), so it shifts back before slicing `self.source` (the
     /// local, possibly Svelte-embedded slice) — same discipline as
     /// `resolve_cooked`; `.get` keeps a stray span from panicking.
-    fn is_this_param(&self, param: &Expression<'arena>) -> bool {
+    pub(super) fn is_this_param(&self, param: &Expression<'arena>) -> bool {
         let Expression::Identifier(id) = param else {
             return false;
         };

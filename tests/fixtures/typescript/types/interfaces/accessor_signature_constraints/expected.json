@@ -1,0 +1,284 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 174,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a getter signature may carry a return type; a setter takes one plain param — valid",
+			"start": 36,
+			"end": 121,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 87
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 173,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 20,
+					"end": 163,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 30,
+						"end": 31,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 11
+							},
+							"end": {
+								"line": 2,
+								"column": 12
+							}
+						},
+						"name": "I"
+					},
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 32,
+						"end": 163,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 13
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSMethodSignature",
+								"start": 124,
+								"end": 140,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 18
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 128,
+									"end": 129,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 6
+										},
+										"end": {
+											"line": 4,
+											"column": 7
+										}
+									},
+									"name": "a"
+								},
+								"kind": "get",
+								"parameters": [],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 131,
+									"end": 139,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 9
+										},
+										"end": {
+											"line": 4,
+											"column": 17
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 133,
+										"end": 139,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 11
+											},
+											"end": {
+												"line": 4,
+												"column": 17
+											}
+										}
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a getter signature may carry a return type; a setter takes one plain param — valid",
+										"start": 36,
+										"end": 121
+									}
+								]
+							},
+							{
+								"type": "TSMethodSignature",
+								"start": 143,
+								"end": 160,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 19
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 147,
+									"end": 148,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 6
+										},
+										"end": {
+											"line": 5,
+											"column": 7
+										}
+									},
+									"name": "a"
+								},
+								"kind": "set",
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 149,
+										"end": 158,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 8
+											},
+											"end": {
+												"line": 5,
+												"column": 17
+											}
+										},
+										"name": "v",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 150,
+											"end": 158,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 9
+												},
+												"end": {
+													"line": 5,
+													"column": 17
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSNumberKeyword",
+												"start": 152,
+												"end": 158,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 11
+													},
+													"end": {
+														"line": 5,
+														"column": 17
+													}
+												}
+											}
+										}
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

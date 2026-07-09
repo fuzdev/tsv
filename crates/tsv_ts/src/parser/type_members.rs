@@ -115,6 +115,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Parse optional type parameters: <T>
             let type_parameters = self.parse_optional_type_parameters()?;
             let params = self.parse_parameter_list()?.into_bump_slice();
+            self.check_signature_params(params)?;
             let (return_type, end) = self.parse_signature_return_type(true)?;
             return Ok(TSTypeElement::CallSignature(TSCallSignatureDeclaration {
                 type_parameters,
@@ -136,6 +137,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Parse optional type parameters: <T>
                 let type_parameters = self.parse_optional_type_parameters()?;
                 let params = self.parse_parameter_list()?.into_bump_slice();
+                self.check_signature_params(params)?;
                 let (return_type, end) = self.parse_signature_return_type(false)?;
                 return Ok(TSTypeElement::ConstructSignature(
                     TSConstructSignatureDeclaration {
@@ -246,7 +248,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Parse type parameters if present: `<T>` or `<T, U extends V>`
             let type_parameters = self.parse_optional_type_parameters()?;
 
+            // An accessor signature cannot declare type parameters (acorn's
+            // `AccesorCannotHaveTypeParameters`) — `get a<T>()` / `set a<T>(v)`.
+            if accessor_kind.is_some() && type_parameters.is_some() {
+                return Err(self.error_msg("An accessor cannot have type parameters"));
+            }
+
             let params = self.parse_parameter_list()?.into_bump_slice();
+            // Every signature param must be a plain binding (no default / parameter
+            // property) — acorn's `tsParseBindingListForSignature`.
+            self.check_signature_params(params)?;
 
             // A `get`/`set` accessor signature must obey the accessor arity grammar
             // (getter: no params; setter: exactly one non-rest param) — acorn rejects
@@ -257,21 +268,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // rejects such a `this` param, and the count check does too for the
                 // getter / 2-param setter forms), so `allow_this_param = false`.
                 self.check_accessor_param_arity(is_getter, params, false)?;
-                // A type-member setter additionally rejects an optional parameter at
-                // parse (acorn's `SetAccesorCannotHaveOptionalParameter`, TS1051) —
-                // unlike a value-position setter, where tsv defers TS1051 to the
-                // diagnostics layer.
-                if !is_getter
-                    && let Expression::Identifier(id) = &params[0]
-                    && id.optional
-                {
-                    return Err(
-                        self.error_msg("A 'set' accessor cannot have an optional parameter")
-                    );
+                if !is_getter {
+                    // A type-member setter rejects a `this` param outright (acorn's
+                    // `AccesorCannotDeclareThisParameter`; the getter form is already
+                    // caught by the 0-param arity check above).
+                    if self.is_this_param(&params[0]) {
+                        return Err(self.error_msg(
+                            "'get' and 'set' accessors cannot declare 'this' parameters",
+                        ));
+                    }
+                    // …and an optional parameter at parse (acorn's
+                    // `SetAccesorCannotHaveOptionalParameter`, TS1051) — unlike a
+                    // value-position setter, where tsv defers TS1051 to diagnostics.
+                    if let Expression::Identifier(id) = &params[0]
+                        && id.optional
+                    {
+                        return Err(
+                            self.error_msg("A 'set' accessor cannot have an optional parameter")
+                        );
+                    }
                 }
             }
 
             let (return_type, end) = self.parse_signature_return_type(true)?;
+            // A `set` accessor signature cannot declare a return type (acorn's
+            // `SetAccesorCannotHaveReturnType`) — `set a(v): T`.
+            if matches!(accessor_kind, Some(MethodKind::Set)) && return_type.is_some() {
+                return Err(self.error_msg("A 'set' accessor cannot have a return type"));
+            }
 
             return Ok(TSTypeElement::MethodSignature(TSMethodSignature {
                 key,
