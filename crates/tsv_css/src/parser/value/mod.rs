@@ -79,13 +79,17 @@ pub fn parse_value_from_source<'arena>(
 // - parse_value_or_list() → handled internally by ValueParser
 // See: parser::ValueParser for the new implementation
 
-/// Parse a single CSS value (no lists)
+/// Parse a single CSS value (no lists).
+///
+/// `s` is expected already trimmed: the sole caller (`ValueParser::build_leaf`)
+/// forwards a trimmed range — the fast path passes `self.text()` (the boundary
+/// check confirmed it is trimmed) and the two-pass fallback passes
+/// `self.text().trim()` — so no `str::trim` is repeated here.
 pub(crate) fn parse_single_value<'arena>(
     s: &str,
     span: Span,
     arena: &'arena Bump,
 ) -> Option<CssValue<'arena>> {
-    let s = s.trim();
     if s.is_empty() {
         return None;
     }
