@@ -134,6 +134,24 @@ pub fn format_embedded(
     printer::format_css_embedded(stylesheet, source, line_breaks, embed)
 }
 
+/// Format an embedded CSS stylesheet into a caller-provided doc arena.
+///
+/// Identical output to [`format_embedded`], but the doc IR is built into `arena`
+/// rather than a freshly allocated one — so a Svelte host formatting a `<style>`
+/// block can share its own document arena instead of allocating a second
+/// whole-host-sized `DocArena` per block. Nothing borrowed from `arena` escapes
+/// (the embedded CSS renders to an owned `String`), and the arena is **not**
+/// reset, so the host's in-flight doc nodes stay valid across the call.
+pub fn format_embedded_in(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+    line_breaks: &[u32],
+    embed: tsv_lang::EmbedContext,
+    arena: &tsv_lang::doc::arena::DocArena,
+) -> String {
+    printer::format_css_embedded_in(stylesheet, source, line_breaks, embed, arena)
+}
+
 /// Convert CSS AST to JSON with character-based positions
 ///
 /// Returns a `serde_json::Value` parsed from the wire bytes

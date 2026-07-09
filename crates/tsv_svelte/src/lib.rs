@@ -61,8 +61,9 @@ pub fn format(root: &Root<'_>, source: &str) -> String {
 /// Identical output to [`format`], but the doc IR is built into `arena` instead
 /// of a freshly allocated one, so a driver that formats many files can reuse one
 /// arena across them (`arena.reset()` between files retains the buffers). Nothing
-/// borrowed from `arena` escapes — the result is an owned `String`. (Embedded
-/// `<style>` blocks still format through their own per-block arena.)
+/// borrowed from `arena` escapes — the result is an owned `String`. Embedded
+/// `<style>` blocks share this same arena (the CSS renders to its own string but
+/// builds its doc nodes into the host arena, not a second per-block one).
 pub fn format_in(root: &Root<'_>, source: &str, arena: &tsv_lang::doc::arena::DocArena) -> String {
     printer::format_svelte_in(root, source, arena)
 }
