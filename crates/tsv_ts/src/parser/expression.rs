@@ -589,8 +589,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Could be async arrow function, async function expression, or just identifier
                 // Look ahead to determine what follows 'async'
                 let peek = self.peek_kind();
-                if peek == TokenKind::Keyword(KeywordKind::Function) {
-                    // Async function expression: `async function() {}`
+                if peek == TokenKind::Keyword(KeywordKind::Function)
+                    && !self.peek_preceded_by_line_terminator()
+                {
+                    // Async function expression: `async function() {}` — `function` must be on the
+                    // same line (ECMAScript `async [no LineTerminator here] function`); a line break
+                    // demotes `async` to an ordinary identifier expression, so `const x = async⏎
+                    // function () {}` is a syntax error (a bodiless function declaration), matching
+                    // acorn/prettier — not a silently-accepted async function expression.
                     let (start, _) = self.current_pos();
                     self.advance()?; // consume 'async'
                     let expr = self.parse_async_function_expression(start)?;
