@@ -173,11 +173,6 @@ const ALLOW: &[Allow] = &[
     // ── tsv_lang ─────────────────────────────────────────────────────────────
     (
         "tsv_lang/src/doc/arena_render.rs",
-        "let trim_start = s.rfind('\\n').map_or(0, |i| i + 1);",
-        "non-source",
-    ),
-    (
-        "tsv_lang/src/doc/arena_render.rs",
         "if let Some(last_newline_pos) = s.rfind('\\n') {",
         "non-source",
     ),
@@ -187,11 +182,6 @@ const ALLOW: &[Allow] = &[
         "newline",
     ),
     ("tsv_lang/src/error.rs", ".find('\\n')", "newline"),
-    (
-        "tsv_lang/src/output.rs",
-        "let last_newline = self.buffer.rfind('\\n');",
-        "non-source",
-    ),
     // ── tsv_svelte ───────────────────────────────────────────────────────────
     (
         "tsv_svelte/src/parser/attribute.rs",

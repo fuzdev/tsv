@@ -47,8 +47,15 @@ fn trim_last_line(mut s: String) -> String {
 /// In-place form of [`trim_last_line`] for the `*_into` entry points that
 /// render into a caller-provided buffer.
 fn trim_last_line_in_place(s: &mut String) {
-    // Find the last newline — only trim after it (the final line)
-    let trim_start = s.rfind('\n').map_or(0, |i| i + 1);
+    // Find the last newline — only trim after it (the final line). A manual
+    // reverse byte scan avoids `str::rfind('\n')`'s `CharSearcher`/`memrchr`
+    // setup; `\n` is single-byte ASCII so its byte index is a char boundary and
+    // the resulting slice is identical.
+    let trim_start = s
+        .as_bytes()
+        .iter()
+        .rposition(|&b| b == b'\n')
+        .map_or(0, |i| i + 1);
     let trimmed_len = s[trim_start..].trim_end_matches([' ', '\t']).len();
     s.truncate(trim_start + trimmed_len);
 }
