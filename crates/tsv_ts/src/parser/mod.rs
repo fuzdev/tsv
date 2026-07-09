@@ -576,21 +576,47 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Whether `id`'s name equals `expected` (an ASCII name like `"this"`).
-    /// Span-identity names compare against the raw source slice (shifted back
-    /// to local coordinates); escaped names resolve through the interner, so an
-    /// escaped `this` still matches `"this"` exactly as symbol identity did.
-    pub(super) fn ident_name_is(&self, id: &Identifier<'_>, expected: &str) -> bool {
-        match id.escaped_name {
+    /// Whether a name equals `expected` (an ASCII name like `"this"`) — the shared
+    /// core of [`Parser::ident_name_is`] / [`Parser::private_name_is`]. An escaped
+    /// name resolves through the interner (so an escaped `this` still matches); a
+    /// span-identity name compares the `name_len` raw source bytes at `name_start`
+    /// (host coordinates, shifted back to the local slice).
+    fn name_bytes_are(
+        &self,
+        escaped: Option<DefaultSymbol>,
+        name_start: usize,
+        name_len: usize,
+        expected: &str,
+    ) -> bool {
+        match escaped {
             Some(sym) => self.interner.borrow().resolve(sym) == Some(expected),
             None => {
-                let start = id.span.start as usize - self.base_offset;
-                self.source
-                    .as_bytes()
-                    .get(start..start + id.name_len as usize)
-                    == Some(expected.as_bytes())
+                let start = name_start - self.base_offset;
+                self.source.as_bytes().get(start..start + name_len) == Some(expected.as_bytes())
             }
         }
+    }
+
+    /// Whether `id`'s name equals `expected` (an ASCII name like `"this"`).
+    pub(super) fn ident_name_is(&self, id: &Identifier<'_>, expected: &str) -> bool {
+        self.name_bytes_are(
+            id.escaped_name,
+            id.span.start as usize,
+            id.name_len as usize,
+            expected,
+        )
+    }
+
+    /// Whether a private identifier's name (the part after `#`) equals `expected`.
+    /// The name begins one byte past the node span's start — the `#` — so it passes
+    /// `span.start + 1`. Used to reject the reserved `#constructor` class-element name.
+    pub(super) fn private_name_is(&self, pid: &PrivateIdentifier, expected: &str) -> bool {
+        self.name_bytes_are(
+            pid.name.escaped,
+            pid.span.start as usize + 1,
+            pid.name.raw_len as usize,
+            expected,
+        )
     }
 
     /// Name channel for the current token as an identifier, accepting contextual

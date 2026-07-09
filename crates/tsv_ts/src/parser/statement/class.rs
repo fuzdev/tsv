@@ -601,6 +601,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             } else if matches!(self.current_kind(), TokenKind::Hash) {
                 // Private identifier key: #name
                 let private_id = self.parse_private_identifier()?;
+                // A class element named `#constructor` is illegal in every context
+                // (ecma262 Static Semantics: Early Errors for ClassElementName) —
+                // acorn rejects at parse, so tsv matches for drop-in parity. This
+                // shared private-key branch covers every member kind (method /
+                // field / get / set / static / accessor).
+                if self.private_name_is(&private_id, "constructor") {
+                    return Err(
+                        self.error_msg("Classes can't have an element named '#constructor'")
+                    );
+                }
                 (false, Expression::PrivateIdentifier(private_id), false)
             } else if self.current_is_identifier_or_keyword() {
                 // Identifier or keyword as key - keywords are valid as class member names.
@@ -847,9 +857,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             accessor,
             computed,
             key,
+            name_is_constructor,
             modifier,
             ..
         } = header;
+
+        // A class FIELD (or auto-accessor) named `constructor` is illegal — ecma262
+        // reserves the name for the constructor METHOD only (an instance
+        // `constructor(){}` is the constructor, a static one an ordinary method;
+        // both are `(`-led and reach `finish_method_member`, never here). acorn
+        // rejects the field form at parse ("Classes can't have a field named
+        // 'constructor'"), so tsv matches. `name_is_constructor` is already false
+        // for computed / private / numeric keys, so this only fires on a bare or
+        // string `constructor` key.
+        if name_is_constructor {
+            return Err(self.error_msg("Classes can't have a field named 'constructor'"));
+        }
 
         // Property definition: `name: type = value;` or `name: type;` or `name = value;` or `name;`
         // The optional/definite marker was already parsed above (shared with methods).
@@ -882,10 +905,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             |_| self.prev_token_end() as u32,
         );
 
-        // Consume optional semicolon (ASI applies), including it in the span
+        // Consume the field terminator. A class field must end with `;`, a line
+        // terminator (ASI), or the class body's `}`/EOF — acorn's `semicolon()`.
+        // `class C { a b }` / `class C { a foo(){} }` reject (same-line, no `;`);
+        // a method with a body self-terminates and never reaches this branch. A
+        // consumed `;` extends the span.
         let mut end = end;
         if self.eat(TokenKind::Semicolon) {
             end = self.prev_token_end() as u32;
+        } else if !self.can_insert_semicolon() {
+            return Err(self.error_expected("';'"));
         }
 
         Ok(ClassMember::PropertyDefinition(PropertyDefinition {
