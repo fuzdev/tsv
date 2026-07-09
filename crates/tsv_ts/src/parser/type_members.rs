@@ -41,20 +41,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         self.expect(&TokenKind::BracketClose)?;
-        let value_colon_start = self.current_pos().0;
-        self.expect(&TokenKind::Colon)?;
+        let bracket_end = self.prev_token_end() as u32;
 
-        let value_type = self.parse_type()?;
-        let member_end = value_type.span().end;
+        // The value type annotation is optional. A typeless index signature
+        // (`[key: string]`) is valid grammar — acorn parses it and omits
+        // `typeAnnotation`; the missing type is a deferred tsc checker error
+        // (TS1021), not a parse error.
+        let type_annotation = if self.check(&TokenKind::Colon) {
+            Some(self.parse_type_annotation()?)
+        } else {
+            None
+        };
+        let member_end = type_annotation.as_ref().map_or(bracket_end, |t| t.span.end);
 
         let mut parameters = self.bvec();
         parameters.push(param);
         Ok(TSTypeElement::IndexSignature(TSIndexSignature {
             parameters: parameters.into_bump_slice(),
-            type_annotation: TSTypeAnnotation {
-                type_annotation: self.alloc(value_type),
-                span: Span::new(value_colon_start as u32, member_end),
-            },
+            type_annotation,
             is_static: false,
             readonly,
             span: Span::new(sig_start as u32, member_end),
