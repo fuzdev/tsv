@@ -282,10 +282,19 @@ impl<'a> Printer<'a> {
             self.build_empty_object_pattern_doc(obj)
         } else {
             // Expand if: nested patterns, line comments, blank lines, or own-line
-            // block comments between/around properties
+            // block comments between/around properties. One whole-span comment
+            // pre-check gates both comment-scanning hints (blank lines are
+            // comment-independent, so `formatting_hints` still runs to detect them).
             let should_expand = object_pattern_should_expand(obj, context);
-            let (has_line_comments, has_blank_lines) = self.object_pattern_formatting_hints(obj);
-            let has_own_line_block = self.object_pattern_has_own_line_block_comments(obj);
+            let boundary = obj
+                .type_annotation
+                .as_ref()
+                .map_or(obj.span.end, |t| t.span.start);
+            let has_comments = self.has_comments_between(obj.span.start, boundary);
+            let (has_line_comments, has_blank_lines) =
+                self.object_pattern_formatting_hints(obj, has_comments);
+            let has_own_line_block =
+                has_comments && self.object_pattern_has_own_line_block_comments(obj);
 
             if should_expand || has_line_comments || has_blank_lines || has_own_line_block {
                 self.build_expanded_object_pattern_doc(obj)
@@ -421,11 +430,16 @@ impl<'a> Printer<'a> {
     ///
     /// Returns (has_line_comments, has_blank_lines) in a single pass.
     /// Works for any collection with elements that have spans.
+    ///
+    /// `has_comments` is the caller's whole-span comment pre-check: when false,
+    /// the per-element comment scans are skipped (no comment can be in any gap),
+    /// leaving only the comment-independent blank-line detection.
     fn collection_formatting_hints<T>(
         &self,
         collection_start: u32,
         collection_end: u32,
         elements: &[T],
+        has_comments: bool,
         get_span: impl Fn(&T) -> Span,
     ) -> (bool, bool) {
         let mut has_line_comments = false;
@@ -435,33 +449,43 @@ impl<'a> Printer<'a> {
         for elem in elements {
             let elem_start = get_span(elem).start;
 
-            // Check for blank line (before any comments)
-            let first_comment = comments_in_range(self.comments, prev_end, elem_start).next();
-            let check_pos = first_comment.map_or(elem_start, |c| c.span.start);
+            // Blank-line detection is comment-independent; when the collection has
+            // no comments the first-comment lookup is a no-op (check_pos == elem_start).
+            let check_pos = if has_comments {
+                comments_in_range(self.comments, prev_end, elem_start)
+                    .next()
+                    .map_or(elem_start, |c| c.span.start)
+            } else {
+                elem_start
+            };
             if self.has_blank_line_between(prev_end, check_pos) {
                 has_blank_lines = true;
             }
 
-            // Check for line comments
-            for comment in comments_in_range(self.comments, prev_end, elem_start) {
-                if !comment.is_block {
-                    has_line_comments = true;
-                    break;
+            if has_comments {
+                // Check for line comments
+                for comment in comments_in_range(self.comments, prev_end, elem_start) {
+                    if !comment.is_block {
+                        has_line_comments = true;
+                        break;
+                    }
                 }
-            }
 
-            // Early exit if both found
-            if has_line_comments && has_blank_lines {
-                return (true, true);
+                // Early exit if both found
+                if has_line_comments && has_blank_lines {
+                    return (true, true);
+                }
             }
 
             prev_end = get_span(elem).end;
         }
 
         // Check comments after last element
-        for comment in comments_in_range(self.comments, prev_end, collection_end) {
-            if !comment.is_block {
-                return (true, has_blank_lines);
+        if has_comments {
+            for comment in comments_in_range(self.comments, prev_end, collection_end) {
+                if !comment.is_block {
+                    return (true, has_blank_lines);
+                }
             }
         }
 
@@ -471,7 +495,11 @@ impl<'a> Printer<'a> {
     /// Check if object pattern has line comments or blank lines between properties
     ///
     /// Returns (has_line_comments, has_blank_lines) in a single pass.
-    fn object_pattern_formatting_hints(&self, obj: &internal::ObjectPattern<'_>) -> (bool, bool) {
+    fn object_pattern_formatting_hints(
+        &self,
+        obj: &internal::ObjectPattern<'_>,
+        has_comments: bool,
+    ) -> (bool, bool) {
         let boundary = obj
             .type_annotation
             .as_ref()
@@ -480,6 +508,7 @@ impl<'a> Printer<'a> {
             obj.span.start,
             boundary,
             obj.properties,
+            has_comments,
             ObjectPatternProperty::span,
         )
     }
@@ -757,9 +786,32 @@ impl<'a> Printer<'a> {
             return self.build_empty_array_pattern_doc(arr);
         }
 
-        // Check if we need to expand due to line comments or own-line block comments
-        let has_line_comments = self.array_pattern_has_line_comments(arr);
-        let has_own_line_block = self.array_pattern_has_own_line_block_comments(arr);
+        // Expand if line comments or own-line block comments. One whole-span
+        // comment pre-check gates both scans; array patterns don't force-expand on
+        // blank lines, so a comment-free pattern skips the element scan entirely.
+        let boundary = arr
+            .type_annotation
+            .as_ref()
+            .map_or(arr.span.end, |t| t.span.start);
+        let (has_line_comments, has_own_line_block) = if self
+            .has_comments_between(arr.span.start, boundary)
+        {
+            // Flatten once (skip holes) and share across both scans.
+            let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
+            let has_line_comments = self
+                .collection_formatting_hints(arr.span.start, boundary, &non_null, true, |elem| {
+                    elem.span()
+                })
+                .0;
+            let has_own_line_block = self.has_own_line_block_comments_in_bracket_list(
+                Span::new(arr.span.start, boundary),
+                &non_null,
+                |elem| elem.span(),
+            );
+            (has_line_comments, has_own_line_block)
+        } else {
+            (false, false)
+        };
 
         if has_line_comments || has_own_line_block {
             self.build_expanded_array_pattern_doc(arr)
@@ -783,39 +835,6 @@ impl<'a> Printer<'a> {
         let tail =
             self.build_pattern_optional_type_tail(arr.optional, arr.type_annotation.as_ref());
         d.concat(&[body_doc, tail])
-    }
-
-    /// Check if array pattern has any line comments
-    fn array_pattern_has_line_comments(&self, arr: &internal::ArrayPattern<'_>) -> bool {
-        let boundary = arr
-            .type_annotation
-            .as_ref()
-            .map_or(arr.span.end, |t| t.span.start);
-
-        // Flatten elements (skip holes) for checking
-        let non_null_elements: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
-
-        self.collection_formatting_hints(arr.span.start, boundary, &non_null_elements, |elem| {
-            elem.span()
-        })
-        .0 // Return just the has_line_comments flag
-    }
-
-    /// Check if array pattern has any own-line single-line block comments
-    fn array_pattern_has_own_line_block_comments(&self, arr: &internal::ArrayPattern<'_>) -> bool {
-        let boundary = arr
-            .type_annotation
-            .as_ref()
-            .map_or(arr.span.end, |t| t.span.start);
-
-        let span = Span::new(arr.span.start, boundary);
-
-        // Collect non-hole element spans for boundary checking
-        let non_null_elements: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
-
-        self.has_own_line_block_comments_in_bracket_list(span, &non_null_elements, |elem| {
-            elem.span()
-        })
     }
 
     /// Build grouped array pattern doc (width-based expansion)
