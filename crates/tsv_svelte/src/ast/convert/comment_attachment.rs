@@ -35,6 +35,16 @@ pub(super) struct CommentAttachmentContext<'a, 's> {
     /// sharing a span and type, matches their close order — the consume-once
     /// contract of `WriterComments`).
     nodes: Vec<NodeAssignments<'a>>,
+    /// Last-touched `(node, idx)` into `nodes`, a one-entry cache for the
+    /// dominant call shape: several consecutive `assign` calls to the *same*
+    /// node (a node with stacked leading comments, or comments trailing the
+    /// root at EOF). New entries push to the tail while the lookup scans from
+    /// the front, so re-finding a just-touched entry is an O(N) rescan and a
+    /// comment-dense island pays O(N²); the cache makes each repeat O(1).
+    /// Sound because `nodes` is strictly find-or-insert (one entry per node)
+    /// and never removes or reorders an entry, so a cached idx stays valid and
+    /// equals what a fresh `position` scan would return.
+    last: Option<(u32, usize)>,
 }
 
 /// One node's accumulated comment assignments.
@@ -55,24 +65,34 @@ impl<'a, 's> CommentAttachmentContext<'a, 's> {
             comments,
             source,
             nodes: Vec::new(),
+            last: None,
         }
     }
 
     /// Record one comment assignment (matching the `Value` walk's
     /// `leadingComments`/`trailingComments` key insertion).
     fn assign(&mut self, node: u32, trailing: bool, comment: &'a Comment) {
-        let idx = match self.nodes.iter().position(|n| n.node == node) {
-            Some(idx) => idx,
-            None => {
-                self.nodes.push(NodeAssignments {
-                    node,
-                    leading: Vec::new(),
-                    trailing: Vec::new(),
-                    trailing_first: trailing,
-                });
-                self.nodes.len() - 1
+        let idx = if let Some((last_node, last_idx)) = self.last
+            && last_node == node
+        {
+            // Consecutive assign to the same node — reuse the resolved index
+            // rather than rescanning the tail-growing `nodes` from the front.
+            last_idx
+        } else {
+            match self.nodes.iter().position(|n| n.node == node) {
+                Some(idx) => idx,
+                None => {
+                    self.nodes.push(NodeAssignments {
+                        node,
+                        leading: Vec::new(),
+                        trailing: Vec::new(),
+                        trailing_first: trailing,
+                    });
+                    self.nodes.len() - 1
+                }
             }
         };
+        self.last = Some((node, idx));
         let entry = &mut self.nodes[idx];
         if trailing {
             entry.trailing.push(comment);
