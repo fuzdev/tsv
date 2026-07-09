@@ -70,9 +70,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let mut members = self.bvec();
         while !matches!(self.current_kind(), TokenKind::BraceClose | TokenKind::Eof) {
             let mut element = self.parse_type_element()?;
-            // Consume separator (; or ,) if present, extending the element span to include it
+            // A type member ends at a `;`/`,` separator, the body's `}`/EOF, or a
+            // line terminator (ASI) — acorn's `tsExpectStatementEnd`. Without one,
+            // two members are glued on the same line (`interface I { a b }`,
+            // `interface I { async x() }`, `type T = { m() n() }`), which acorn and
+            // tsc reject; there is no valid parse, so tsv rejects too rather than
+            // silently splitting the run into separate signatures. Same class as
+            // the class-field ASI check in `finish_property_member`.
             if self.eat(TokenKind::Semicolon) || self.eat(TokenKind::Comma) {
                 element.extend_span_to(self.prev_token_end() as u32);
+            } else if !self.can_insert_semicolon() {
+                return Err(self.error_expected("';'"));
             }
             members.push(element);
         }
