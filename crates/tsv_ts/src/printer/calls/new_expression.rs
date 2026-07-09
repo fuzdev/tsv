@@ -102,10 +102,24 @@ impl<'a> Printer<'a> {
         // Build callee with type args: `new Foo<K, V>`
         let callee_with_types = d.concat(&[d.text("new "), callee_with_types_base]);
 
+        // Position just before `(` (after the callee and any type arguments).
+        let paren_open = new_expr
+            .type_arguments
+            .as_ref()
+            .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
+        // Zero-comment fast gate: one binary search over the whole argument window
+        // (`(` … `)`) short-circuits every per-branch argument-comment predicate
+        // below (trailing-line / trailing-block / inter-argument / leading), each of
+        // which scans a sub-range within it. The callee and type-argument gap
+        // comments live before `paren_open` and are handled unconditionally above.
+        // Canonical reference: build_params_doc_with_comments.
+        let new_has_comments = self.has_comments_between(paren_open, new_expr.span.end);
+
         // Single huggable argument: object literal or function
         // These stay on the same line as the opening paren: `new Cls({...})` not `new Cls(\n{...})`
         // Skip hugging if there are trailing comments (line OR block) - let the comment handling below handle it
         let single_arg_has_trailing_comment = new_expr.arguments.len() == 1
+            && new_has_comments
             && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self);
 
         if new_expr.arguments.len() == 1 && !single_arg_has_trailing_comment {
@@ -136,17 +150,16 @@ impl<'a> Printer<'a> {
 
                     // Prepend leading comments (e.g., /** @param {any} x */ before arrow)
                     // and force wrapped state when present (prettier expands args with leading comments)
-                    let paren_open = new_expr
-                        .type_arguments
-                        .as_ref()
-                        .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
                     let arg_start = new_expr.arguments[0].span().start;
                     // Glued like the regular-call leading-arg paths (prettier shares
                     // one `printCallArguments` for Call and New): a single-line block
                     // hugged to `(` stays with the argument across a source newline.
-                    let has_leading_comment = if let Some(leading) =
+                    let glued = if new_has_comments {
                         self.build_rhs_comments_glued_opt(paren_open, arg_start)
-                    {
+                    } else {
+                        None
+                    };
+                    let has_leading_comment = if let Some(leading) = glued {
                         arrow_doc = d.concat(&[leading, arrow_doc]);
                         true
                     } else {
@@ -156,8 +169,8 @@ impl<'a> Printer<'a> {
                     // If the arrow has trailing param comments or leading comments,
                     // force wrapped state
                     let arrow_token = self.find_arrow_token_for(arrow);
-                    let has_trailing_param_comments =
-                        arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
+                    let has_trailing_param_comments = new_has_comments
+                        && arrow_has_trailing_param_comments(arrow, arrow_token, |start, end| {
                             self.has_comments_between(start, end)
                         });
 
@@ -285,19 +298,14 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Compute paren_open: position after callee and type args (just before `(`)
-        let paren_open = new_expr
-            .type_arguments
-            .as_ref()
-            .map_or_else(|| new_expr.callee.span().end, |ta| ta.span.end);
-
         // Function composition pattern: when any argument is a call containing a callback
         // OR when there are multiple function arguments
         // e.g., new Cls(arr.map((x) => x), b) → new Cls(\n\t...,\n)
         // e.g., new Cls(() => a, () => b) → new Cls(\n\t...,\n)
         // Skip this path if there are trailing comments - let the comment handling paths handle it
         if is_function_composition_args(new_expr.arguments)
-            && !has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self)
+            && !(new_has_comments
+                && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self))
         {
             let arg_parts = build_args_joined_with_comments(
                 self,
@@ -376,7 +384,9 @@ impl<'a> Printer<'a> {
         // Must check this BEFORE the "last arg is array/object" pattern below,
         // otherwise trailing comments on the last arg cause it to be hugged incorrectly.
         // e.g., new Class(arg1, // comment\n  arg2)
-        if has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self) {
+        if new_has_comments
+            && has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self)
+        {
             let mut arg_parts = DocBuf::new();
 
             for (i, arg) in new_expr.arguments.iter().enumerate() {
@@ -443,12 +453,13 @@ impl<'a> Printer<'a> {
         // Check for trailing BLOCK comments only (no line comments)
         // Block comments should stay inline for simple args: new A(a, b /* comment */)
         // But function composition cases should expand: new A(() => {}, () => {} /* comment */,)
-        let has_trailing_block_only = new_expr.arguments.last().is_some_and(|last_arg| {
-            let arg_end = last_arg.span().end;
-            let paren_close = new_expr.span.end;
-            self.has_comments_between(arg_end, paren_close)
-                && !self.has_line_comments_between(arg_end, paren_close)
-        });
+        let has_trailing_block_only = new_has_comments
+            && new_expr.arguments.last().is_some_and(|last_arg| {
+                let arg_end = last_arg.span().end;
+                let paren_close = new_expr.span.end;
+                self.has_comments_between(arg_end, paren_close)
+                    && !self.has_line_comments_between(arg_end, paren_close)
+            });
 
         if has_trailing_block_only {
             // Build args with trailing block comment
@@ -589,14 +600,11 @@ impl<'a> Printer<'a> {
             if new_expr.arguments.len() >= 2
                 && (last_is_function || last_is_expandable_collection)
                 && preceding_args_allow_expand_last(new_expr.arguments, self.line_breaks)
-                && !has_inter_argument_comments_slice(new_expr.arguments, self)
+                && !(new_has_comments
+                    && has_inter_argument_comments_slice(new_expr.arguments, self))
             {
-                let (head_parts, last_arg_doc, all_args_broken) = build_args_split_last(
-                    new_expr.arguments,
-                    self,
-                    paren_open,
-                    self.has_comments_between(paren_open, new_expr.span.end),
-                );
+                let (head_parts, last_arg_doc, all_args_broken) =
+                    build_args_split_last(new_expr.arguments, self, paren_open, new_has_comments);
 
                 // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
                 if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -698,9 +706,11 @@ impl<'a> Printer<'a> {
 
         // Check for leading comments or inter-argument block comments
         // These need explicit handling that the simple join_doc path doesn't provide
-        let has_leading_comments = !new_expr.arguments.is_empty()
+        let has_leading_comments = new_has_comments
+            && !new_expr.arguments.is_empty()
             && self.has_comments_between(paren_open, new_expr.arguments[0].span().start);
-        let has_inter_arg_comments = has_inter_argument_comments_slice(new_expr.arguments, self);
+        let has_inter_arg_comments =
+            new_has_comments && has_inter_argument_comments_slice(new_expr.arguments, self);
 
         // Comments trailing the `(` on the same line stay on the `(` line, with
         // own-line comments on their own lines before the first arg — preserving
