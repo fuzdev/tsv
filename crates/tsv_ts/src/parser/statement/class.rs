@@ -601,13 +601,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for index signature: [key: Type]: ValueType
         // Index signatures look like `[ident: Type]` followed by `: ValueType`
         if self.is_index_signature_start() {
-            // An accessibility modifier (public/private/protected) cannot appear on
-            // an index signature — acorn and prettier both reject it (tsc TS1071).
-            // Unconditional-local grammar violation → reject inline. (`readonly` and
-            // `static` are the only modifiers an index signature accepts.)
+            // `readonly` and `static` are the ONLY modifiers an index signature
+            // accepts. An accessibility modifier (public/private/protected — tsc
+            // TS1071) or a `declare`/`abstract`/`override` modifier (tsc TS1031 /
+            // TS1244-position / TS4113-position family) on an index signature is an
+            // unconditional-local grammar violation — acorn and prettier both reject
+            // it at parse, regardless of class context (`abstract` is rejected even in
+            // an abstract class, `override` even with a base class), so tsv rejects
+            // inline too. (These are distinct from the *member*-position `abstract` /
+            // `override` early-errors, which ARE context-dependent and stay deferred.)
             if accessibility.is_some() {
                 return Err(
                     self.error_msg("Index signatures cannot have an accessibility modifier")
+                );
+            }
+            if is_declare {
+                return Err(self.error_msg("Index signatures cannot have the 'declare' modifier"));
+            }
+            if is_abstract {
+                return Err(self.error_msg("Index signatures cannot have the 'abstract' modifier"));
+            }
+            if is_override {
+                return Err(
+                    self.error_msg("'override' modifier cannot appear on an index signature")
                 );
             }
             return self.parse_class_index_signature(start, is_static, readonly);
@@ -742,8 +758,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             decorators,
             accessibility,
             is_static,
+            is_declare,
             is_override,
             is_abstract,
+            readonly,
             is_generator,
             is_async,
             accessor_kind,
@@ -754,6 +772,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             type_parameters,
             ..
         } = header;
+
+        // `readonly` and `declare` are field-only modifiers: a method / getter /
+        // setter / constructor may not carry either (tsc TS1024 / TS1031; acorn and
+        // prettier both reject at parse). Unconditional-local grammar violation →
+        // reject inline. (These sit on a class *method*; the same keywords stay valid
+        // on a field — `readonly a = 1`, `declare b: number` — which never reaches
+        // this method path. `abstract` / `override` are deliberately NOT rejected
+        // here: on a member they are context-dependent early-errors — legal in an
+        // abstract class / with a base class — so tsv defers them.)
+        if readonly {
+            return Err(self.error_msg("Class methods cannot have the 'readonly' modifier"));
+        }
+        if is_declare {
+            return Err(
+                self.error_msg("'declare' modifier cannot appear on class elements of this kind")
+            );
+        }
 
         // A `get`/`set` accessor is neither a GeneratorMethod nor an AsyncMethod:
         // ecma262's MethodDefinition productions are disjoint, so the method-only
@@ -790,6 +825,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         } else {
             MethodKind::Method
         });
+
+        // A constructor is a plain method: it may not carry type parameters (tsc
+        // TS1092) and — per ecma262's `SpecialMethod` rule (§15.7.1) — may not be a
+        // generator or async method (the `get`/`set` accessor forms are rejected just
+        // above). acorn rejects all three at parse; prettier/tsc reject them too
+        // (`constructor<T>()` is TS1092, `async constructor` is "'async' modifier
+        // cannot be used here", `*constructor` is TS1089-family). Unconditional-local
+        // grammar violations → reject inline. A *static* method named `constructor`
+        // is an ordinary method (`kind == Method`), so its type params / async / `*`
+        // stay valid.
+        if matches!(kind, MethodKind::Constructor) {
+            if type_parameters.is_some() {
+                return Err(
+                    self.error_msg("Type parameters cannot appear on a constructor declaration")
+                );
+            }
+            if is_generator {
+                return Err(self.error_msg("Constructor cannot be a generator"));
+            }
+            if is_async {
+                return Err(self.error_msg("Constructor cannot be an async method"));
+            }
+        }
 
         // Capture paren position before parsing params (for comment detection)
         let (params_start, _) = self.current_pos();
@@ -1034,10 +1092,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             None
         };
 
-        // Consume semicolon, including it in the span
+        // Consume semicolon, including it in the span. Like a class field (and a
+        // type-member signature), an index signature must be terminated before the
+        // next member: an explicit `;`, or ASI at `}` / EOF / a line break. A member
+        // glued on the same line with no separator (`[a: string]: number v: number`)
+        // is rejected (acorn "Unexpected token" / tsc TS1005) — the class-body analog
+        // of the type-member ASI rule.
         let mut end = value_type.as_ref().map_or(bracket_end, |t| t.span.end);
         if self.eat(TokenKind::Semicolon) {
             end = self.prev_token_end() as u32;
+        } else if !self.can_insert_semicolon() {
+            return Err(self.error_expected("';'"));
         }
 
         let mut parameters = self.bvec();
