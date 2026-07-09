@@ -86,19 +86,33 @@ impl<'a> Printer<'a> {
                     // Extract comments between `:` and the intersection first
                     self.build_intersection_type_annotation_doc(i, colon_end)
                 }
-                _ => {
-                    // Block comments stay inline: `: /* comment */ Type`
-                    let mut parts: DocBuf = smallvec![d.text(": ")];
-                    parts.push(self.build_comments_between(
-                        colon_end,
-                        type_start,
-                        CommentSpacing::Trailing,
-                    ));
-                    parts.push(self.build_type_doc(annotation.type_annotation));
-                    d.concat(&parts)
-                }
+                _ => self.build_simple_type_annotation_doc(
+                    colon_end,
+                    type_start,
+                    annotation.type_annotation,
+                ),
             }
         }
+    }
+
+    /// Emit `: <block-comments> <type>` for a simple annotation — the fall-through
+    /// shared by `build_type_annotation_doc`'s `_` match arm and
+    /// `build_type_annotation_doc_with_wrapping` (once its wrapping-TypeReference /
+    /// Union / Intersection branches are ruled out). Block comments in the `:`→type
+    /// gap stay inline (`: /* c */ Type`). Takes the caller's already-computed
+    /// `colon_end` / `type_start` so neither re-derives them, and the raw `ty` (not an
+    /// unwrapped form) so redundant parens like `: (string)` are preserved.
+    fn build_simple_type_annotation_doc(
+        &self,
+        colon_end: u32,
+        type_start: u32,
+        ty: &TSType<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![d.text(": ")];
+        parts.push(self.build_comments_between(colon_end, type_start, CommentSpacing::Trailing));
+        parts.push(self.build_type_doc(ty));
+        d.concat(&parts)
     }
 
     /// Build type annotation doc with width-aware type argument wrapping.
@@ -222,7 +236,12 @@ impl<'a> Printer<'a> {
             return self.build_intersection_type_annotation_doc(i, colon_end);
         }
 
-        self.build_type_annotation_doc(annotation)
+        // Fall-through: reached on every simple annotation (`: string`, `: Foo`,
+        // `: Foo[]`, …), the common case. Emit the shared `: <comments> <type>` path
+        // directly instead of delegating to `build_type_annotation_doc`, which would
+        // re-derive what we already know here: no line comments (proven false above),
+        // and `unwrap_redundant_parens` + the Union/Intersection match (ruled out above).
+        self.build_simple_type_annotation_doc(colon_end, type_start, annotation.type_annotation)
     }
 
     /// Build intersection type annotation with proper indentation.
