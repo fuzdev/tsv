@@ -95,11 +95,22 @@ pub(crate) fn format_color_from_source<'s>(
     // Named and hex colors are recovered verbatim from source (span-for-verbatim). A
     // named color keeps its source casing, so it borrows the slice unchanged and
     // `build_color_doc` emits it as a zero-allocation `DocText::SourceSpan` — like the
-    // identifier / dimension paths. Hex owns its lowercased form, and the function
-    // syntaxes below own their reconstructed text (genuine transforms).
+    // identifier / dimension paths. Hex borrows too when it is already lowercase (the
+    // common case), owning a lowercased copy only when the source has uppercase A–F; the
+    // function syntaxes below own their reconstructed text (genuine transforms).
     match color {
         Color::Named => return Cow::Borrowed(span.extract(source)),
-        Color::Hex => return Cow::Owned(span.extract(source).to_lowercase()),
+        Color::Hex => {
+            // A hex color is ASCII `#` + hex digits, so `to_lowercase` only rewrites A–F.
+            // An uppercase-free slice is already canonical — borrow it verbatim (no alloc),
+            // like the `canonical_unit` / `lowercase_property_name` siblings.
+            let raw = span.extract(source);
+            return if raw.bytes().any(|b| b.is_ascii_uppercase()) {
+                Cow::Owned(raw.to_lowercase())
+            } else {
+                Cow::Borrowed(raw)
+            };
+        }
         _ => {}
     }
 
