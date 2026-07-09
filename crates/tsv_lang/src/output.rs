@@ -78,9 +78,17 @@ impl OutputBuffer {
     /// imperative printing. Tabs are counted as `tab_width` characters.
     #[inline]
     pub fn current_column(&self, tab_width: usize) -> usize {
-        // Find the last newline and count chars after it
-        let last_newline = self.buffer.rfind('\n');
-        let line_start = last_newline.map_or(0, |pos| pos + 1);
+        // Find the last newline and count chars after it. A manual reverse byte
+        // scan avoids `str::rfind('\n')`'s `CharSearcher` encode/`memrchr` setup —
+        // the current line is short, so there is no SIMD payoff, only the
+        // per-call tax. `\n` is single-byte ASCII, so its byte index is a char
+        // boundary and the resulting slice is identical.
+        let line_start = self
+            .buffer
+            .as_bytes()
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map_or(0, |pos| pos + 1);
         let line = &self.buffer[line_start..];
 
         visual_width(line, tab_width)
