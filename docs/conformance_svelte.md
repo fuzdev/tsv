@@ -124,14 +124,32 @@ Where the two goals conflict on conformant input, Svelte-parity wins for now.
   LESS, CSS Modules (`:global`, `composes`), PostCSS plugin syntax, YAML
   front-matter, and IE hacks. "Skipped CSS" is **not** a synonym for "SCSS" — most
   are other non-CSS dialects.
+- **A leading combinator is accepted in every context (contextual invalidity,
+  deferred to diagnostics).** A complex selector may begin with a combinator
+  (`> span {}`, `+ p {}`, `~ p {}`) at the top level, in an `@media`/`@supports`/
+  `@layer` body, in a functional pseudo-class arg (`:not(> .a)`, `:is(> .a)`,
+  `:where(> .a)`), and in an `@scope` prelude (`@scope (> .b)`, `to (> .b)`).
+  Outside a relative-selector context (nesting, `:has()`, the `@scope` *body*) a
+  leading combinator has no anchor element, so it is spec-invalid per Selectors 4
+  (a top-level `<complex-selector>` / non-relative `<scope-start>`/`<scope-end>`
+  cannot lead with `>`/`+`/`~`). But this is a **contextual** invalidity — valid
+  combinator grammar in an invalid position — not a malformed token, so tsv parses
+  it into the same `RelativeSelector`-with-combinator AST Svelte's `parseCss`
+  produces (dropping the empty implied anchor, exactly as `read_selector` does) and
+  defers the "no anchor here" judgment to the future diagnostics layer. This is the
+  same permissive-parser posture tsv takes for TS early-errors: Svelte's own
+  *validator* (a stage tsv doesn't run) rejects these with `css-selector-invalid` —
+  they are its `validator/samples/css-invalid-combinator-selector` fixtures, which
+  its *parser* accepts — and prettier formats them unchanged. A **trailing**
+  combinator (`p > {}`, a combinator with nothing after it) is a genuine parse
+  error both parsers reject. Distinct from the grammar-invalid tokens/values in the
+  bullet below, which tsv still rejects. Fixture:
+  [css/selectors/leading_combinator](../tests/fixtures/css/selectors/leading_combinator/input.svelte).
 - **The "Svelte over-accepts" cases are not a tsv correctness win.** Svelte
   accepts some grammar-invalid CSS that tsv rejects — an invalid attribute
   case-flag (`[type=a x]`; Selectors 4 allows only `i`/`s`), a function token as
   an attribute value (`[id=func("foo")]`), a `url` keyword split across whitespace
-  in `@import`, a leading combinator in an `@scope` prelude selector
-  (`@scope (> .b)`, `to (> .b)`; CSS Cascade 6 defines `<scope-start>`/`<scope-end>`
-  as a non-relative `<selector-list>`, so a leading `>`/`+`/`~` is invalid there —
-  unlike the `@scope` *body*, whose relative-selector-list tsv accepts), and a
+  in `@import`, and a
   backslash immediately before a newline outside a string
   (`color: red\` + newline — an invalid escape per CSS Syntax 3 §4.3.7; Svelte
   reads the `\` into the value, and prettier never converges on it). tsv is

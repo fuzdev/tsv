@@ -1,0 +1,176 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 317,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 91,
+				"end": 134,
+				"name": "page",
+				"prelude": ":first",
+				"block": {
+					"type": "Block",
+					"start": 104,
+					"end": 134,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 108,
+								"end": 110,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 108,
+										"end": 110,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "h1",
+														"start": 108,
+														"end": 110
+													}
+												],
+												"start": 108,
+												"end": 110
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 111,
+								"end": 131,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 116,
+										"end": 126,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 108,
+							"end": 131
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 219,
+				"end": 308,
+				"name": "page",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 225,
+					"end": 308,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 229,
+							"end": 240,
+							"property": "margin",
+							"value": "1cm"
+						},
+						{
+							"type": "Atrule",
+							"start": 244,
+							"end": 278,
+							"name": "top-center",
+							"prelude": "",
+							"block": {
+								"type": "Block",
+								"start": 256,
+								"end": 278,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 261,
+										"end": 273,
+										"property": "content",
+										"value": "'x'"
+									}
+								]
+							}
+						},
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 281,
+								"end": 283,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 281,
+										"end": 283,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "h1",
+														"start": 281,
+														"end": 283
+													}
+												],
+												"start": 281,
+												"end": 283
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 284,
+								"end": 305,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 289,
+										"end": 300,
+										"property": "color",
+										"value": "blue"
+									}
+								]
+							},
+							"start": 281,
+							"end": 305
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 309,
+			"styles": "\n\t/* @page block is agnostic: a nested style rule parses alongside declarations */\n\t@page :first {\n\t\th1 {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* declarations, margin at-rules, and nested rules coexist in one @page block */\n\t@page {\n\t\tmargin: 1cm;\n\t\t@top-center {\n\t\t\tcontent: 'x';\n\t\t}\n\t\th1 {\n\t\t\tcolor: blue;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 318,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

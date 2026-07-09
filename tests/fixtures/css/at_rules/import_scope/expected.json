@@ -1,0 +1,50 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 165,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 46,
+				"name": "import",
+				"prelude": "url('x.css') scope((.scope))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 48,
+				"end": 98,
+				"name": "import",
+				"prelude": "url('x.css') layer(a) scope((.a) to (.b))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 100,
+				"end": 156,
+				"name": "import",
+				"prelude": "'y.css' supports(display: flex) scope((.scope))",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 157,
+			"styles": "\n\t@import url('x.css') scope((.scope));\n\t@import url('x.css') layer(a) scope((.a) to (.b));\n\t@import 'y.css' supports(display: flex) scope((.scope));\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 166,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

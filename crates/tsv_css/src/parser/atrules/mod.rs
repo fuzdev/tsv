@@ -248,20 +248,20 @@ fn parse_atrule_block<'arena>(
         "media" | "supports" | "layer" | "container" | "starting-style" | "font-feature-values"
     ) || is_keyframes_atrule(atrule_name))
         && !nested_in_rule;
-    let expect_declarations = matches!(
-        atrule_name,
-        "font-face" | "page" | "property" | "counter-style" | "color-profile" | "position-try" | "font-palette-values"
-        // @font-feature-values nested at-rules (all contain declarations)
-        | "stylistic" | "styleset" | "character-variant" | "swash" | "ornaments" | "annotation"
-        // Page margin boxes (nested within @page, all contain declarations)
-        | "top-left-corner" | "top-left" | "top-center" | "top-right" | "top-right-corner"
-        | "left-top" | "left-middle" | "left-bottom"
-        | "right-top" | "right-middle" | "right-bottom"
-        | "bottom-left-corner" | "bottom-left" | "bottom-center" | "bottom-right" | "bottom-right-corner"
-    );
-    // Conditional group at-rules (@media, @supports, etc.) nested inside a rule
-    // can contain BOTH declarations and nested rules — they fall through to the
-    // generic fallback which uses is_nested_rule_start() to disambiguate.
+    // Everything that is NOT a top-level rule-list block flows through the generic
+    // block-agnostic fallback below (`parse_block_child`), which disambiguates a bare
+    // declaration from a nested rule via `is_nested_rule_start()` per CSS Syntax 3
+    // §"consume a block's contents". This covers the declaration-context at-rules
+    // (`@font-face`, `@page`, `@property`, `@counter-style`, `@color-profile`,
+    // `@position-try`, `@font-palette-values`, the `@font-feature-values` sub-rules, and
+    // the `@page` margin boxes like `@top-center`) as well as unknown at-rules and
+    // `@scope`. Making them agnostic matches parseCss, which is a pure scan-to-terminator
+    // classifier: `@page :first { h1 {} }` parses the `h1 {}` as a nested style rule
+    // (declarations end at `;`/`}`, a nested rule at `{`), while `margin: 1cm;` stays a
+    // declaration. "Invalid in this context" (a style rule inside `@font-face`) is a later
+    // validity concern, deferred to diagnostics — the same permissive-parser posture as
+    // elsewhere. Conditional group at-rules (@media/@supports/@layer/@container) nested
+    // inside a rule likewise fall through here.
 
     while !parser.check(TokenKind::RightBrace) && !parser.check(TokenKind::Eof) {
         if matches!(&parser.current_kind, TokenKind::Comment) {
@@ -282,14 +282,6 @@ fn parse_atrule_block<'arena>(
             continue;
         }
 
-        // For @font-face and @page, parse declarations
-        if expect_declarations && parser.check(TokenKind::Identifier) {
-            let decl = super::declarations::parse_declaration(parser)?;
-            children.push(CssBlockChild::Declaration(decl));
-            parser.skip_whitespace()?;
-            continue;
-        }
-
         // @media/@supports/@layer/@container/keyframes/… block — a rule-list context.
         // But CSS block parsing is agnostic (CSS Syntax 3 §"consume a block's contents"):
         // a bare declaration still parses here (invalid-in-context, dropped by a later
@@ -303,9 +295,10 @@ fn parse_atrule_block<'arena>(
             continue;
         }
 
-        // Nested-declarations fallback (unknown at-rules + `@scope`): the same
-        // declaration-vs-rule disambiguation, but `true` allows leading combinators
-        // (relative selectors, e.g. a `> .child {}` in a `@scope` body).
+        // Nested-declarations fallback (declaration-context at-rules like `@page`/
+        // `@font-face`, unknown at-rules, `@scope`): declaration-vs-rule disambiguation
+        // via `is_nested_rule_start`. `true` allows a leading combinator (a `> .child {}`
+        // relative selector in a `@scope` body).
         children.push(parse_block_child(parser, true, atrule_name)?);
         parser.skip_whitespace()?;
     }
