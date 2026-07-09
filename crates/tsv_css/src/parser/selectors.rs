@@ -26,12 +26,12 @@ fn skip_comments_before_comma(parser: &mut CssParser<'_, '_>) -> Result<(), Pars
 }
 
 /// Parse a comma-separated selector list, applying `parse_item` to every selector — the
-/// first, and each one after a comma. A complex list and a relative list differ ONLY in
-/// that per-item parser — a complex item never leads with a combinator, a relative one may
-/// — and within either list the first item and the tail items parse identically, so the
-/// entire list body is shared here. `parse_item` is passed as a fn pointer
-/// (`parse_complex_selector` / `parse_relative_complex_selector`, both
-/// `fn(&mut CssParser) -> Result<ComplexSelector, ParseError>`) rather than a closure.
+/// first, and each one after a comma. Within a list the first item and the tail items
+/// parse identically, so the entire list body is shared here. `parse_item` is passed as a
+/// fn pointer (`parse_complex_selector`, `fn(&mut CssParser) -> Result<ComplexSelector,
+/// ParseError>`) rather than a closure — the complex and relative lists share one per-item
+/// parser now that a leading combinator is accepted everywhere (see
+/// `parse_complex_selector`).
 ///
 /// Deliberately NOT shared with `parse_forgiving_selector_list`, whose loop has different
 /// semantics — it wraps parse errors as `Invalid` selectors, terminates on `)` rather than
@@ -77,13 +77,14 @@ fn parse_selector_list_with<'arena>(
 /// Parse a complex selector list: `div, span > a, .class#id`
 ///
 /// This parses a comma-separated list of complex selectors.
-/// Complex selectors can contain combinators (>, +, ~, descendant) but CANNOT start with them.
+/// Complex selectors can contain combinators (>, +, ~, descendant); tsv also accepts one
+/// *leading* the selector (spec-invalid outside a relative context, but parseCss accepts
+/// it — see `parse_complex_selector`).
 ///
 /// Used in:
 /// - Top-level CSS rules: `div, span { }`
-/// - :is(), :where(), :not() pseudo-classes (they accept complex selectors but not relative selectors)
+/// - :is(), :where(), :not() pseudo-classes
 ///
-/// For selectors that CAN start with combinators, use `parse_relative_selector_list()` instead.
 /// See: CSS Selectors Level 4 - <<complex-selector-list>> vs <<relative-selector-list>>
 pub(crate) fn parse_complex_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
@@ -251,63 +252,61 @@ fn extract_selector_until_comma_or_end<'a>(
 
 /// Parse a relative selector list: `:has(> img, + li, div)`
 ///
-/// Relative selectors can start with combinators (>, +, ~) or have implied descendant.
-/// Used in :has() pseudo-class arguments.
-///
-/// Per CSS Selectors Level 4: "Relative selectors begin with a combinator,
-/// with a selector representing the anchor element implied at the start of the selector.
-/// If no combinator is present, the descendant combinator is implied."
-///
-/// Note: :is(), :where(), :not() do NOT use relative selectors - they use complex selectors.
-/// Only :has() uses relative selectors because it needs to express relationships from the element.
+/// A thin alias for `parse_complex_selector_list` — kept as the name `:has()` (and
+/// nested-rule discovery) reads at its callsite. tsv accepts a leading combinator in
+/// **every** selector-list context (see `parse_complex_selector`), so the relative and
+/// complex lists no longer differ; the `<<relative-selector-list>>` vs
+/// `<<complex-selector-list>>` distinction (a leading combinator is *grammatically*
+/// valid only in a relative context) is a static-semantic rule deferred to diagnostics.
 ///
 /// See: CSS Selectors Level 4 - <<relative-selector-list>>
 pub(crate) fn parse_relative_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
-    parse_selector_list_with(parser, parse_relative_complex_selector)
+    parse_selector_list_with(parser, parse_complex_selector)
 }
 
-/// Parse a relative complex selector: `> div > span` or `+ li` or just `div`
+/// Parse a complex selector: `div > span + .class`, or one leading with a combinator
+/// (`> span`, `+ li`, `~ p`).
 ///
-/// This handles the core difference between relative and regular complex selectors:
-/// - Relative: CAN start with a combinator (>, +, ~) - used in :has()
-/// - Regular: CANNOT start with a combinator - used in :is(), :not(), :where()
+/// A complex selector's first compound leads with a combinator only in a
+/// `<<relative-selector>>` context (`:has(> img)`, a nested rule). tsv nonetheless
+/// **accepts** a leading combinator in every context — matching Svelte's `parseCss`,
+/// which parses `> span { }` at the top level into a `ComplexSelector` whose first
+/// `RelativeSelector` carries the combinator (then leaves the "leading combinator has no
+/// anchor here" judgment to its *validator*, a stage tsv doesn't run). Rejecting it is a
+/// static-semantic early-error deferred to the diagnostics layer, not a parse concern —
+/// the same permissive-parser posture tsv takes elsewhere. prettier likewise formats it.
 ///
 /// Examples:
-/// - `> img` - starts with > combinator (relative)
-/// - `+ li` - starts with + combinator (relative)
+/// - `> img` / `+ li` / `~ p` - leads with an explicit combinator
 /// - `span` - no leading combinator, combinator field is null (NOT descendant!)
-/// - `div > span` - combinator in middle (relative or regular)
+/// - `div > span` - combinator in the middle
 ///
-/// See: CSS Selectors Level 4 - <<relative-selector>> vs <<complex-selector>>
-fn parse_relative_complex_selector<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-) -> Result<ComplexSelector<'arena>, ParseError> {
-    let start = parser.span_pos(parser.current_start());
-
-    // A relative selector MAY begin with an explicit combinator (`:has(> img)`).
-    // parse_explicit_combinator (NOT parse_combinator) returns None for a bare compound,
-    // so its combinator field stays null rather than becoming an implicit Descendant.
-    let first = match parse_explicit_combinator(parser)? {
-        Some((combinator, combinator_span)) => {
-            parse_relative_selector(parser, Some(combinator), Some(combinator_span))?
-        }
-        None => parse_relative_selector(parser, None, None)?,
-    };
-
-    parse_complex_selector_tail(parser, start, first)
-}
-
-/// Parse a complex selector: `div > span + .class`
+/// See: CSS Selectors Level 4 - <<complex-selector>> vs <<relative-selector>>
 pub(crate) fn parse_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<ComplexSelector<'arena>, ParseError> {
     let start = parser.span_pos(parser.current_start());
 
-    // A complex selector's first compound never leads with a combinator (unlike a
-    // relative selector), so its combinator field stays null.
-    let first = parse_relative_selector(parser, None, None)?;
+    // The first compound MAY begin with an explicit combinator (`> span`, a nested/`:has()`
+    // relative selector or a top-level leading combinator parseCss accepts).
+    // parse_explicit_combinator (NOT parse_combinator) returns None for a bare compound,
+    // so its combinator field stays null rather than becoming an implicit Descendant.
+    //
+    // EXCEPT a leading `<an+b>` term in a pseudo-class arg (`:is(+3)`, `:not(+n)`,
+    // `:foo(+2n + 1)`): the leading `+`/`-` binds to the coefficient, not a next-sibling
+    // combinator. Svelte's `read_selector` tries `REGEX_NTH_OF` before the combinator
+    // (gated on `inside_pseudo_class`); `pseudo_arg_terminal_nth` is that exact gate (the
+    // same `in_pseudo_args && match_nth_value` the `Nth` reader in `parse_simple_selector`
+    // uses), so deferring to the bare compound there lets the `Nth` reader claim the term.
+    let first = if !pseudo_arg_terminal_nth(parser)
+        && let Some((combinator, combinator_span)) = parse_explicit_combinator(parser)?
+    {
+        parse_relative_selector(parser, Some(combinator), Some(combinator_span))?
+    } else {
+        parse_relative_selector(parser, None, None)?
+    };
 
     parse_complex_selector_tail(parser, start, first)
 }

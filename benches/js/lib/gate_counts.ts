@@ -70,7 +70,12 @@ export interface GatePins {
 }
 
 /**
- * conformance:svelte-fixtures — measured 2026-07-07: ../svelte at 8fb7ceeba (svelte@5.56.4-3), oracle svelte@5.56.4.
+ * conformance:svelte-fixtures — measured 2026-07-09: ../svelte at 8fb7ceeba (svelte@5.56.4), oracle svelte@5.56.4.
+ * both_accept 3277→3280: a top-level leading combinator (`> span {}`, `+ p {}`, and the `@media`-body form)
+ * now parses — tsv's CSS selector parser accepts a leading combinator in every context, matching parseCss
+ * (spec-invalidity deferred to diagnostics; see selectors.rs `parse_complex_selector`). The three
+ * `validator/samples/css-invalid-combinator-selector-{1,2,3}` fixtures move from over-rejection to
+ * both-accept (the `-4` trailing-combinator form stays parity — both reject). Last Svelte KNOWN_GAP closed.
  * both_accept 3276→3277: legacy `<!-- -->` HTML comments (CDO/CDC) in `<style>` now parse (css-cdo-cdc gap
  * fixed — parseCss swallows the marker span; tsv matches), so `css/samples/comment-html` moved from
  * over-rejection to both-accept.
@@ -79,7 +84,7 @@ export interface GatePins {
  * both_accept 3273→3274: leading-symbol attribute names (`<p }>`) now parse (svelte-attr-name gap fixed),
  * so `validator/samples/attribute-invalid-name` moved from over-rejection to both-accept.
  */
-export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3277 };
+export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3280 };
 
 /** conformance:ts-fixtures — measured 2026-07-08: ../acorn-typescript at 312d079 (v1.0.11), oracle @sveltejs/acorn-typescript@1.0.11. */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 207, both_accept: 186 };
