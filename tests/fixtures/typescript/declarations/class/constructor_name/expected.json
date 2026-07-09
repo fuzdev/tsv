@@ -1,0 +1,453 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 421,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a `constructor` METHOD is the class constructor — valid",
+			"start": 32,
+			"end": 90,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `static constructor` is a static method, not the constructor — valid",
+			"start": 112,
+			"end": 183,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a computed `['constructor']` key is a normal member, not the reserved name — valid",
+			"start": 212,
+			"end": 297,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a normal private field (contrast with the illegal #constructor) — valid",
+			"start": 323,
+			"end": 397,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 76
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 420,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 411,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 410,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 28,
+						"end": 410,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 93,
+								"end": 109,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 18
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 93,
+									"end": 104,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 13
+										}
+									},
+									"name": "constructor"
+								},
+								"kind": "constructor",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 104,
+									"end": 109,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 13
+										},
+										"end": {
+											"line": 4,
+											"column": 18
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 107,
+										"end": 109,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 16
+											},
+											"end": {
+												"line": 4,
+												"column": 18
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a `constructor` METHOD is the class constructor — valid",
+										"start": 32,
+										"end": 90
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 186,
+								"end": 209,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 25
+									}
+								},
+								"static": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 193,
+									"end": 204,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 9
+										},
+										"end": {
+											"line": 6,
+											"column": 20
+										}
+									},
+									"name": "constructor"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 204,
+									"end": 209,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 20
+										},
+										"end": {
+											"line": 6,
+											"column": 25
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 207,
+										"end": 209,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 23
+											},
+											"end": {
+												"line": 6,
+												"column": 25
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " `static constructor` is a static method, not the constructor — valid",
+										"start": 112,
+										"end": 183
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 300,
+								"end": 320,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 22
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "Literal",
+									"start": 301,
+									"end": 314,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 8,
+											"column": 16
+										}
+									},
+									"value": "constructor",
+									"raw": "'constructor'"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 318,
+									"end": 319,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 20
+										},
+										"end": {
+											"line": 8,
+											"column": 21
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a computed `['constructor']` key is a normal member, not the reserved name — valid",
+										"start": 212,
+										"end": 297
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 400,
+								"end": 407,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "PrivateIdentifier",
+									"start": 400,
+									"end": 402,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 4
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 405,
+									"end": 406,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 7
+										},
+										"end": {
+											"line": 10,
+											"column": 8
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " a normal private field (contrast with the illegal #constructor) — valid",
+										"start": 323,
+										"end": 397
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
