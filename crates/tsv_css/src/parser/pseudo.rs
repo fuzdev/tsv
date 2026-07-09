@@ -83,6 +83,14 @@ pub(crate) fn parse_pseudo_selector<'arena>(
 /// `classify_pseudo_args` maps each selector-list pseudo to one of these once, so
 /// `parse_selector_list_args` dispatches on an exhaustive enum rather than re-matching the
 /// pseudo name (no stringly-typed `unreachable!` fallback).
+///
+/// `Relative` and `Complex` dispatch to *identical* parsing today: tsv accepts a leading
+/// combinator in every selector-list context (see `selectors::parse_complex_selector`), so
+/// the `<<relative-selector-list>>` vs `<<complex-selector-list>>` split no longer changes
+/// what parses. The variants are kept distinct because they name a real grammar-context
+/// boundary — a leading combinator is *legal* only in a relative context (`:has()`) and
+/// contextually-invalid in a complex one (`:not()`) — the exact distinction the deferred
+/// diagnostics layer will consume. Only `Forgiving` (`:is()`/`:where()`) parses differently.
 #[derive(Clone, Copy)]
 enum SelectorListGrammar {
     /// `:has()` — relative selectors, which may lead with a combinator (`:has(> img)`).
