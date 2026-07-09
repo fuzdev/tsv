@@ -431,8 +431,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// diagnostics layer — an optional/default param is an `Identifier` /
     /// `AssignmentPattern`, not a `RestElement`, so it passes unchanged. (A
     /// *type-member* setter's optional-param rejection, which acorn does enforce
-    /// at parse, is applied at that call site.) Shared by the class-member,
-    /// object-literal, and type-member accessor parsers.
+    /// at parse, lives in `check_type_member_accessor_params`.) Shared by the
+    /// class-member, object-literal, and type-member accessor parsers.
     pub(super) fn check_accessor_param_arity(
         &self,
         is_getter: bool,
@@ -456,6 +456,68 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(())
     }
 
+    /// Validate a **type-member accessor** signature's parameters — the
+    /// type-member-specific composite over `check_accessor_param_arity`, matching
+    /// the get/set checks in acorn's `tsParsePropertyOrMethodSignature`. Beyond
+    /// the shared arity rule (getter: no params; setter: exactly one non-rest
+    /// param; a `this` param counts toward arity here, `allow_this_param = false`),
+    /// a type-member **setter** also rejects — at parse, unlike a value-position
+    /// setter — a `this` parameter (`AccesorCannotDeclareThisParameter`; the getter
+    /// form is already caught by the 0-param arity check) and an optional parameter
+    /// (`SetAccesorCannotHaveOptionalParameter`, TS1051, which tsv otherwise defers).
+    pub(super) fn check_type_member_accessor_params(
+        &self,
+        kind: MethodKind,
+        params: &[Expression<'arena>],
+    ) -> Result<(), ParseError> {
+        let is_getter = matches!(kind, MethodKind::Get);
+        self.check_accessor_param_arity(is_getter, params, false)?;
+        if !is_getter {
+            if self.is_this_param(&params[0]) {
+                return Err(
+                    self.error_msg("'get' and 'set' accessors cannot declare 'this' parameters")
+                );
+            }
+            if let Expression::Identifier(id) = &params[0]
+                && id.optional
+            {
+                return Err(self.error_msg("A 'set' accessor cannot have an optional parameter"));
+            }
+        }
+        Ok(())
+    }
+
+    /// Restrict a **type-member signature**'s parameters to plain bindings —
+    /// `Identifier` / `RestElement` / `ObjectPattern` / `ArrayPattern` — a
+    /// faithful port of acorn's `tsParseBindingListForSignature`. A signature has
+    /// no implementation, so a default (`AssignmentPattern`, `set a(v = 1)`) or a
+    /// parameter property (`TSParameterProperty`, `m(public v)`) is an
+    /// unconditional-local grammar error acorn rejects at parse; tsv matches for
+    /// drop-in parity. Only type-member signatures (interface / type-literal
+    /// method, call, construct, accessor) call this — an *implementation*, an
+    /// *ambient* declaration (`declare function f(v = 1)`, TS1039 deferred), and an
+    /// *overload* keep their defaults (all acorn-accepts). Function *types* reject
+    /// defaults already via their own param parser (`parse_function_type_params`).
+    pub(super) fn check_signature_params(
+        &self,
+        params: &[Expression<'arena>],
+    ) -> Result<(), ParseError> {
+        for param in params {
+            if !matches!(
+                param,
+                Expression::Identifier(_)
+                    | Expression::RestElement(_)
+                    | Expression::ObjectPattern(_)
+                    | Expression::ArrayPattern(_)
+            ) {
+                return Err(self.error_msg(
+                    "Name in a signature must be an Identifier, ObjectPattern or ArrayPattern",
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Whether a parameter is the TypeScript `this` pseudo-parameter (`this: T`)
     /// — a bare `this` identifier binding, matching acorn's `isThisParam`. Never
     /// escaped (it's the reserved word), so a raw source-slice compare on the
@@ -463,7 +525,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// (`base_offset` added), so it shifts back before slicing `self.source` (the
     /// local, possibly Svelte-embedded slice) — same discipline as
     /// `resolve_cooked`; `.get` keeps a stray span from panicking.
-    fn is_this_param(&self, param: &Expression<'arena>) -> bool {
+    pub(super) fn is_this_param(&self, param: &Expression<'arena>) -> bool {
         let Expression::Identifier(id) = param else {
             return false;
         };

@@ -89,8 +89,17 @@ export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3375, both_accept: 3280
 /** conformance:ts-fixtures — measured 2026-07-08: ../acorn-typescript at 312d079 (v1.0.11), oracle @sveltejs/acorn-typescript@1.0.11. */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 207, both_accept: 186 };
 
-/** conformance:ts-repo — measured 2026-07-06: ../typescript at 637d5746b. */
-export const TS_REPO_PINS = { scanned: 768, accept_parity: 424 };
+/**
+ * conformance:ts-repo — measured 2026-07-06: ../typescript at 637d5746b.
+ * accept_parity 424→423 (2026-07-09, branch bug3): the type-member signature-param grammar fix
+ * now rejects a parameter-property / default in a signature (acorn's tsParseBindingListForSignature).
+ * `ParameterLists/parserParameterList13.ts` (`interface I { new (public x) }`) is flagged TS2369 — a
+ * tsc *checker* error (TS2xxx), so tsc's parser accepts it; acorn rejects it at parse and tsv now
+ * matches, moving it accept-parity → gap-beyond-acorn (case ii: tsv+acorn correctly reject at parse
+ * what tsc flags later as a semantic error). over-acceptance unchanged (the corpus has no tsc-TS1xxx
+ * form of these rules).
+ */
+export const TS_REPO_PINS = { scanned: 768, accept_parity: 423 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
