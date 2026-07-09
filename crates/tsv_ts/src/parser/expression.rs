@@ -1144,6 +1144,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         && (mode == SubscriptMode::Normal || self.is_type_args_followed_by_call());
                     if consume {
                         left = self.parse_instantiation_expression(left)?;
+                        // A TS instantiation expression (`f<T>`, `a.b<T>`, `new C<T>`
+                        // — type arguments NOT immediately applied by a call) cannot be
+                        // followed by a property access: acorn rejects `f<T>.x` /
+                        // `f<T>?.x` / `f<T>?.[x]` ("Invalid property access after an
+                        // instantiation expression"). A call (`f<T>()` / `f<T>?.()`) or
+                        // tagged template (`` f<T>`x` ``) stays valid — the loop below
+                        // flattens those. Mirrors acorn's post-`TSInstantiationExpression`
+                        // check (`.` or `?.` whose next token is not `(`).
+                        if matches!(self.current_kind(), TokenKind::Dot)
+                            || (matches!(self.current_kind(), TokenKind::QuestionDot)
+                                && !self.peek_is(&TokenKind::ParenOpen))
+                        {
+                            return Err(Box::new(self.error_msg(
+                                "Invalid property access after an instantiation expression",
+                            )));
+                        }
                     } else {
                         break;
                     }
@@ -2087,7 +2103,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 (args.into_bump_slice(), paren_end as u32)
             } else {
                 // new Date without parens - valid JS; bare instantiation type args
-                // (`new A<T>`) extend the span past the callee
+                // (`new A<T>`) extend the span past the callee.
+                //
+                // A bare `new A<T>` (type args, no call arguments) is an
+                // instantiation-style new: like `f<T>`, it cannot be followed by a
+                // property access. `new A<T>.x` is rejected (acorn "Invalid property
+                // access after an instantiation expression"); `new A<T>()` takes the
+                // `(` branch above, so its later `.prop` is an ordinary member access.
+                // Mirrors the `TSInstantiationExpression` check in the subscript loop.
+                if type_arguments.is_some()
+                    && (matches!(self.current_kind(), TokenKind::Dot)
+                        || (matches!(self.current_kind(), TokenKind::QuestionDot)
+                            && !self.peek_is(&TokenKind::ParenOpen)))
+                {
+                    return Err(
+                        self.error_msg("Invalid property access after an instantiation expression")
+                    );
+                }
                 let end = type_arguments
                     .as_ref()
                     .map_or(callee.actual_end, |ta| ta.span.end);
