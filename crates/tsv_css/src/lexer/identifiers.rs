@@ -14,6 +14,23 @@ fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
     ch as u32 >= 0xA0
 }
 
+/// 256-entry lookup table for the ASCII identifier-continuation fast path in
+/// `read_identifier`. Each entry is computed from the same byte predicate the
+/// per-char continuation arm expands to for ASCII (`[a-zA-Z0-9_-]`), so a lookup
+/// replaces the alnum/eq OR-chain plus a full UTF-8 decode with one L1 load on the
+/// hot identifier-body loop. Non-ASCII bytes are all `false`, so the fast path stops
+/// at the first non-ASCII byte and the char loop decodes it — byte-identical.
+const IDENT_CONTINUE_LUT: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0;
+    while i < 256 {
+        let b = i as u8;
+        t[i] = b.is_ascii_alphanumeric() || b == b'-' || b == b'_';
+        i += 1;
+    }
+    t
+};
+
 /// Whether `ch` can begin a CSS identifier token in the lexer dispatch.
 ///
 /// Covers ASCII letters, non-ASCII identifier code points (see
@@ -59,13 +76,35 @@ pub(crate) fn read_identifier(
         *pos += 1;
     }
 
+    // Byte view for the ASCII continuation fast path (coexists with the `source`
+    // `&str` slices the escape arms take — both are immutable borrows).
+    let bytes = source.as_bytes();
+
     // CSS identifiers can contain escape sequences that must be decoded
     loop {
+        // ASCII fast path: while no `\` escape has yet forced a decoded buffer, scan a
+        // run of ASCII identifier-continuation bytes (`[a-zA-Z0-9_-]`) via the lookup
+        // table instead of decoding a UTF-8 char per byte. The table is `true` for
+        // exactly the ASCII bytes the char match arm below accepts and `false` for every
+        // non-ASCII byte, `\`, and terminator, so this advances to precisely the first
+        // byte that arm would not consume — byte-identical, skipping the per-char decode.
+        // Once an escape materializes the decoded buffer, each following char must be
+        // pushed, so the fast path yields to the char loop.
+        if decoded.is_none() {
+            let mut p = *pos;
+            while p < bytes.len() && IDENT_CONTINUE_LUT[bytes[p] as usize] {
+                p += 1;
+            }
+            *pos = p;
+        }
+
         let current_char = source[*pos..].chars().next();
         match current_char {
             // Continuation char: ASCII alphanumeric, a non-ASCII identifier code point,
             // `-`, or `_` — the same predicate Svelte's `read_identifier` applies per
-            // char (`codePointAt(0) >= 160 || [a-zA-Z0-9_-]`).
+            // char (`codePointAt(0) >= 160 || [a-zA-Z0-9_-]`). The ASCII cases are
+            // handled by the fast path above; this arm now fires for non-ASCII code
+            // points (and for the first char after an escape materialized the buffer).
             Some(ch)
                 if ch.is_ascii_alphanumeric()
                     || is_non_ascii_identifier_codepoint(ch)
