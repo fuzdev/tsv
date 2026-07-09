@@ -1,0 +1,276 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 180,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " async function expression — `async` and `function` on the same line (valid)",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 179,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 5,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 100,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 106,
+							"end": 130,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 106,
+								"end": 107,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "x"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 110,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 31
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 128,
+									"end": 130,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 29
+										},
+										"end": {
+											"line": 3,
+											"column": 31
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " async function expression — `async` and `function` on the same line (valid)",
+							"start": 20,
+							"end": 98
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 133,
+					"end": 169,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 139,
+							"end": 168,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 139,
+								"end": 140,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "y"
+							},
+							"init": {
+								"type": "FunctionExpression",
+								"start": 143,
+								"end": 168,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 4,
+										"column": 36
+									}
+								},
+								"id": {
+									"type": "Identifier",
+									"start": 158,
+									"end": 163,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 26
+										},
+										"end": {
+											"line": 4,
+											"column": 31
+										}
+									},
+									"name": "named"
+								},
+								"expression": false,
+								"generator": false,
+								"async": true,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 166,
+									"end": 168,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 34
+										},
+										"end": {
+											"line": 4,
+											"column": 36
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

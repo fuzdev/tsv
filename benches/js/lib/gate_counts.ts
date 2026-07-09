@@ -159,9 +159,18 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 181,
+	typescript: 177,
 	css: 23,
 };
+// typescript 181→177 (2026-07-09): the class-member modifier line-break fix (a contextual
+// TS modifier / `accessor` / `async` separated from its member by a line break is the member,
+// not a modifier — the `[no LineTerminator here]` guard in parser/statement/class.rs) resolved
+// the two `prettier/tests/format/typescript/**/decorator-auto-accessors-new-line.ts` `accessor⏎`
+// hunks (unknown→match). A before/after --all diff on the identical corpus confirmed exactly
+// those two files moved (0 new unknowns, 0 new errors, SAFETY 0); the pinned framework checkouts
+// (svelte 8fb7ceeba, kit 1b4adccf7, svelte.dev fb5a4e2, prettier-plugin-svelte 7809486) are
+// unchanged, so the 181→179 remainder is pre-existing real-tier/prettier-suite churn since the
+// 2026-07-08 pin, folded in here per the "re-pin to current" ritual.
 // typescript 65→64 (2026-07-08): the single-object-type-param signature hug
 // (bodyless declare/overload + method/call/construct signatures now hug `(o: {`
 // like value-param functions — `build_signature_params_doc`) resolved the residual
