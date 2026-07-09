@@ -19,21 +19,6 @@ use std::borrow::Cow;
 
 use numbers::{canonical_unit, is_known_css_unit, normalize_css_number};
 use tsv_lang::printing::format_string_literal;
-use tsv_lang::source_scan::{TriviaProfile, find_char};
-
-/// Find the declaration's `property : value` colon — the first `:` that is not
-/// inside a comment or string. A property comment may itself contain a colon
-/// (`color /* x:y */: red`), which a naive `find(':')` would mis-match. Shared by
-/// the printer's declaration sites (`declarations.rs`, `mod.rs`).
-pub(crate) fn find_declaration_colon(decl_source: &str) -> Option<usize> {
-    find_char(
-        decl_source.as_bytes(),
-        0,
-        decl_source.len(),
-        b':',
-        TriviaProfile::CSS,
-    )
-}
 
 /// Normalize CSS numbers and string quotes within a raw prelude string,
 /// mirroring prettier's `adjustNumbers(adjustStrings(...))` for at-rule preludes
@@ -420,6 +405,10 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 ///
 /// # Arguments
 /// * `decl_source` - Full declaration source (e.g., `color /* test */: red;`)
+/// * `colon_pos` - Byte offset of the `property : value` colon within `decl_source`
+///   (the parser's `CssDeclaration::colon_offset`, minus the declaration span start —
+///   no re-scan; a property comment may itself hold a `:` that a naive scan would
+///   mis-match, which the parser-recorded colon already skips)
 ///
 /// # Returns
 /// * Normalized property name (e.g., `color /* test */`)
@@ -431,11 +420,12 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 ///
 /// # Example
 /// ```ignore
+/// // colon_pos = the parser's recorded colon offset within decl_source
 /// let source = "color/* comment */:red;";
-/// assert_eq!(extract_property_name(source), "color /* comment */");
+/// assert_eq!(extract_property_name(source, 18), "color /* comment */");
 ///
 /// let source = "margin: 10px;";
-/// assert_eq!(extract_property_name(source), "margin");
+/// assert_eq!(extract_property_name(source, 6), "margin");
 /// ```
 ///
 /// # Svelte Quirk
@@ -447,11 +437,7 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// - Input: `color/* comment */:red;`
 /// - Output: `color /* comment */` (normalized spacing)
 /// - Prettier: `color/* comment */` (no space before comment)
-pub(crate) fn extract_property_name(decl_source: &str) -> Cow<'_, str> {
-    let Some(colon_pos) = find_declaration_colon(decl_source) else {
-        // Fallback: no colon found (malformed declaration).
-        return Cow::Borrowed(decl_source.trim());
-    };
+pub(crate) fn extract_property_name(decl_source: &str, colon_pos: usize) -> Cow<'_, str> {
     let property_part = &decl_source[..colon_pos];
 
     // Check if property contains a comment
@@ -563,26 +549,30 @@ fn ends_with_hex_escape(name: &str) -> bool {
 ///
 /// # Arguments
 /// * `decl_source` - Full declaration source (e.g., `content: "test\n";`)
+/// * `colon_pos` - Byte offset of the declaration colon within `decl_source`
+///   (the parser's recorded `colon_offset`, so no re-scan)
 /// * `quote` - Quote character to use (' or ")
 ///
 /// # Returns
 /// * `Some(formatted_string)` if extraction successful
-/// * `None` if extraction failed (malformed source)
+/// * `None` if the value isn't a well-formed quoted string (len < 2)
 ///
 /// # Example
 /// ```ignore
 /// let source = "content: 'hello\\nworld';";
-/// assert_eq!(extract_string_value(source, '\''), Some("'hello\\nworld'".to_string()));
+/// assert_eq!(extract_string_value(source, 7, '\''), Some("'hello\\nworld'".to_string()));
 /// ```
-pub(crate) fn extract_string_value(decl_source: &str, quote: char) -> Option<String> {
-    if let Some(colon_pos) = find_declaration_colon(decl_source) {
-        let value_part = decl_source[colon_pos + 1..].trim();
-        // String should be quoted
-        if value_part.len() >= 2 {
-            let raw_content = &value_part[1..value_part.len() - 1];
-            let formatted = format_string_literal(raw_content, quote);
-            return Some(formatted);
-        }
+pub(crate) fn extract_string_value(
+    decl_source: &str,
+    colon_pos: usize,
+    quote: char,
+) -> Option<String> {
+    let value_part = decl_source[colon_pos + 1..].trim();
+    // String should be quoted
+    if value_part.len() >= 2 {
+        let raw_content = &value_part[1..value_part.len() - 1];
+        let formatted = format_string_literal(raw_content, quote);
+        return Some(formatted);
     }
 
     None
@@ -594,24 +584,20 @@ pub(crate) fn extract_string_value(decl_source: &str, quote: char) -> Option<Str
 ///
 /// # Arguments
 /// * `decl_source` - Full declaration source (e.g., `margin: 10px /* test */ 20px;`)
+/// * `colon_pos` - Byte offset of the declaration colon within `decl_source`
+///   (the parser's recorded `colon_offset`, so no re-scan)
 ///
 /// # Returns
-/// * `Some(normalized_value)` if extraction successful (e.g., `10px /* test */ 20px`)
-/// * `None` if extraction failed (no colon found)
+/// * the normalized post-colon value text (e.g., `10px /* test */ 20px`)
 ///
 /// # Example
 /// ```ignore
 /// let source = "margin: 10px  /* test */  20px;";
-/// assert_eq!(extract_value_with_comments(source), Some("10px /* test */ 20px".to_string()));
+/// assert_eq!(extract_value_with_comments(source, 6), "10px /* test */ 20px");
 /// ```
-pub(crate) fn extract_value_with_comments(decl_source: &str) -> Option<String> {
-    if let Some(colon_pos) = find_declaration_colon(decl_source) {
-        let value_with_ws = &decl_source[colon_pos + 1..];
-        let normalized = normalize_css_whitespace(value_with_ws);
-        Some(normalized.into_owned())
-    } else {
-        None
-    }
+pub(crate) fn extract_value_with_comments(decl_source: &str, colon_pos: usize) -> String {
+    let value_with_ws = &decl_source[colon_pos + 1..];
+    normalize_css_whitespace(value_with_ws).into_owned()
 }
 
 #[cfg(test)]
@@ -623,22 +609,31 @@ mod tests {
         // The overwhelmingly-common case: a bare property name with no comment and
         // no significant trailing whitespace borrows a sub-slice of the input — no
         // per-declaration allocation.
+        // `colon_pos` is the parser's recorded `colon_offset` in production; these
+        // inputs carry no colon inside a comment, so the first `:` is that colon.
+        let colon = |s: &str| s.find(':').unwrap();
         for src in [
             "margin: 10px",
             "color:red",
             "--custom-prop: var(--x)",
             "grid-template-columns: 1fr 2fr",
         ] {
-            let got = extract_property_name(src);
+            let got = extract_property_name(src, colon(src));
             assert!(
                 matches!(got, Cow::Borrowed(_)),
                 "bare property in {src:?} must borrow, got owned {got:?}"
             );
         }
-        assert_eq!(extract_property_name("margin: 10px"), "margin");
-        assert_eq!(extract_property_name("color:red"), "color");
         assert_eq!(
-            extract_property_name("--custom-prop: var(--x)"),
+            extract_property_name("margin: 10px", colon("margin: 10px")),
+            "margin"
+        );
+        assert_eq!(
+            extract_property_name("color:red", colon("color:red")),
+            "color"
+        );
+        assert_eq!(
+            extract_property_name("--custom-prop: var(--x)", colon("--custom-prop: var(--x)")),
             "--custom-prop"
         );
     }
@@ -647,7 +642,8 @@ mod tests {
     fn test_extract_property_name_trims_but_still_borrows() {
         // Insignificant whitespace around the property name is trimmed; the result
         // is still a borrowed sub-slice (trim returns a sub-slice, no alloc).
-        let got = extract_property_name("color : red");
+        let src = "color : red";
+        let got = extract_property_name(src, src.find(':').unwrap());
         assert_eq!(got, "color");
         assert!(matches!(got, Cow::Borrowed(_)));
     }
@@ -655,7 +651,9 @@ mod tests {
     #[test]
     fn test_extract_property_name_comment_owns() {
         // A comment in the property name reconstructs an owned, space-normalized form.
-        let got = extract_property_name("color/* comment */:red");
+        // The comment holds no `:`, so the real colon is the first `:`.
+        let src = "color/* comment */:red";
+        let got = extract_property_name(src, src.find(':').unwrap());
         assert_eq!(got, "color /* comment */");
         assert!(matches!(got, Cow::Owned(_)));
     }
@@ -664,21 +662,15 @@ mod tests {
     fn test_extract_property_name_hex_escape_terminator_owns() {
         // A property name ending in a hex escape consumes one trailing whitespace as
         // the escape's terminator — that space is preserved, so the result owns.
-        let got = extract_property_name("\\41 : red");
+        let src = "\\41 : red";
+        let got = extract_property_name(src, src.find(':').unwrap());
         assert_eq!(got, "\\41 ");
         assert!(matches!(got, Cow::Owned(_)));
 
         // A non-escape trailing space is trimmed (borrowed).
-        let got = extract_property_name("color : red");
+        let src = "color : red";
+        let got = extract_property_name(src, src.find(':').unwrap());
         assert_eq!(got, "color");
-        assert!(matches!(got, Cow::Borrowed(_)));
-    }
-
-    #[test]
-    fn test_extract_property_name_no_colon_fallback() {
-        // Malformed declaration with no colon: trim the whole source (borrowed).
-        let got = extract_property_name("  orphan  ");
-        assert_eq!(got, "orphan");
         assert!(matches!(got, Cow::Borrowed(_)));
     }
 

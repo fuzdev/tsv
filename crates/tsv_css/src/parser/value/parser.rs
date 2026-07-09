@@ -56,6 +56,16 @@ enum FastScan<'arena> {
     Comment,
 }
 
+/// ASCII bytes that `str::trim` (via `char::is_whitespace`) strips: the CSS
+/// whitespace set plus U+000B (vertical tab), which `char::is_whitespace`
+/// includes and `is_css_whitespace` does not. Used only to check — from a value
+/// range's boundary bytes — whether it is already trimmed, so the fast path can
+/// skip a redundant `str::trim`; any non-ASCII boundary byte conservatively takes
+/// the trimming path instead.
+const fn is_trim_boundary_ws(b: u8) -> bool {
+    matches!(b, b'\t' | b'\n' | 0x0B | 0x0C | b'\r' | b' ')
+}
+
 impl<'a> ValueParser<'a> {
     /// Create parser from value string and its span in full CSS
     ///
@@ -135,32 +145,36 @@ impl<'a> ValueParser<'a> {
 
     /// Main parse entry point
     ///
-    /// Determines the value's structure and delegates. A comment-free value takes a
-    /// single fused pass (`fast_scan`): a comma list is split and its elements built
-    /// inline (no second `ValueCursor` walk), while a whitespace list or single leaf
-    /// dispatches to the same builders as before. A value with a `/* */` comment
-    /// falls back to the original two-pass path — `classify_separators` is
-    /// comment-*aware* while the `ValueCursor` split is comment-*blind*, and the two
-    /// deliberately disagree on a comment between value tokens, so the single-string
-    /// fast pass hands such a value off unchanged.
+    /// Determines the value's structure and delegates. The parse range is trimmed
+    /// at every level (both `ValueParser::new` entry points pass a trimmed string,
+    /// and every `sub_parser` slice trims its bounds), so a value whose boundary
+    /// bytes are ASCII and non-whitespace takes a single fused pass (`fast_scan`):
+    /// a comma list is split and its elements built inline (no second `ValueCursor`
+    /// walk), a whitespace list or single leaf dispatches to the same builders as
+    /// before, and — because `text` is already trimmed — the leaf is built without
+    /// re-trimming. A value with a `/* */` comment falls back to the original
+    /// two-pass path — `classify_separators` is comment-*aware* while the
+    /// `ValueCursor` split is comment-*blind*, and the two deliberately disagree on
+    /// a comment between value tokens, so the single-string fast pass hands such a
+    /// value off unchanged. A whitespace or non-ASCII boundary byte (rare, since the
+    /// range is trimmed) also takes the two-pass path, which trims first; the value
+    /// it produces is identical either way.
     pub fn parse<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         let text = self.text();
-        let trimmed = text.trim();
+        let bytes = text.as_bytes();
 
-        // Empty value
-        if trimmed.is_empty() {
-            return CssValue::Identifier {
-                span: self.absolute_span(),
-            };
-        }
-
-        // Fast path: the parse range is already trimmed at every level (the top
-        // parser and every `sub_parser` slice off surrounding whitespace), so
-        // `text == trimmed` and one string serves both the comment-aware kind and
-        // the comment-blind split. The guard makes that assumption explicit — an
-        // untrimmed range (were one ever passed) takes the original two-pass path
-        // below, which classifies on `trimmed` and splits on the untrimmed text.
-        if trimmed.len() == text.len() {
+        // Fast path: confirm `text` is already trimmed straight from its boundary
+        // bytes (ASCII and non-whitespace ends ⇒ `str::trim` is a no-op) and skip
+        // the redundant `str::trim` the two-pass path runs. A whitespace boundary
+        // (`text` is trimmed in practice, so this is rare) or a non-ASCII boundary
+        // byte (possibly a Unicode space like NBSP that `str::trim` strips) falls
+        // through to the trimming path below, which yields the same value.
+        if let (Some(&first), Some(&last)) = (bytes.first(), bytes.last())
+            && first < 0x80
+            && last < 0x80
+            && !is_trim_boundary_ws(first)
+            && !is_trim_boundary_ws(last)
+        {
             match self.fast_scan(text, arena) {
                 FastScan::Comma(values) => {
                     return CssValue::CommaSeparated {
@@ -169,14 +183,21 @@ impl<'a> ValueParser<'a> {
                     };
                 }
                 FastScan::Whitespace => return self.parse_space_separated(arena),
-                FastScan::Leaf => return self.parse_single(arena),
+                FastScan::Leaf => return self.build_leaf(text, arena),
                 // A `/* */` comment was found — defer to the comment-aware path.
                 FastScan::Comment => {}
             }
         }
 
-        // Fallback (comment present, or a non-trimmed range): classify comment-aware,
-        // then split with the comment-blind `ValueCursor` — the original behaviour.
+        // Fallback (comment present, a non-ASCII/whitespace boundary, or a
+        // non-trimmed range): trim, then classify comment-aware and split with the
+        // comment-blind `ValueCursor` — the original behaviour.
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return CssValue::Identifier {
+                span: self.absolute_span(),
+            };
+        }
         match classify_separators(trimmed) {
             ValueSeparator::Comma => self.parse_comma_separated(arena),
             ValueSeparator::Whitespace => self.parse_space_separated(arena),
@@ -381,17 +402,23 @@ impl<'a> ValueParser<'a> {
         values.into_bump_slice()
     }
 
-    /// Parse single value (leaf node)
+    /// Build a leaf (single value) from already-trimmed `text`.
     ///
-    /// Delegates to existing single-value parsers.
-    /// Trims whitespace before parsing.
-    fn parse_single<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
-        let text = self.text().trim();
+    /// The fast path passes `self.text()` directly (the range is trimmed), skipping
+    /// the redundant `str::trim` that `parse_single` runs for the two-pass path.
+    /// Identifier text is recovered from `span` at print time, so the fallback
+    /// stores no copied string.
+    fn build_leaf<'arena>(&self, text: &'a str, arena: &'arena Bump) -> CssValue<'arena> {
         let span = self.absolute_span();
-
-        // Delegate to existing single-value parsers (identifier text recovered from
-        // `span` at print time, so the fallback stores no copied string).
         super::parse_single_value(text, span, arena).unwrap_or(CssValue::Identifier { span })
+    }
+
+    /// Parse single value (leaf node), trimming first.
+    ///
+    /// Used by the two-pass fallback, where the range may carry surrounding
+    /// whitespace; the fast path calls `build_leaf` directly.
+    fn parse_single<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
+        self.build_leaf(self.text().trim(), arena)
     }
 }
 

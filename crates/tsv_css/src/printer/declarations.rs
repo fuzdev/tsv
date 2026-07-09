@@ -108,15 +108,15 @@ impl<'a> Printer<'a> {
 
         // Check source: is there a newline between `:` and the first value?
         let decl_source = decl.span.extract(self.source);
-        if let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) {
-            let after_colon = &decl_source[colon_pos + 1..];
-            for ch in after_colon.chars() {
-                if ch == '\n' {
-                    return true;
-                }
-                if !ch.is_whitespace() {
-                    break;
-                }
+        // The parser recorded the colon; rebase it to the declaration slice (no re-scan).
+        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
+        let after_colon = &decl_source[colon_pos + 1..];
+        for ch in after_colon.chars() {
+            if ch == '\n' {
+                return true;
+            }
+            if !ch.is_whitespace() {
+                break;
             }
         }
 
@@ -181,8 +181,11 @@ impl<'a> Printer<'a> {
         // lowercases — custom properties and escaped/comment-bearing names are
         // preserved by `lowercase_property_name`).
         let decl_source = decl.span.extract(self.source);
+        // The parser recorded the `property : value` colon; rebase it to the
+        // declaration slice so the source-extracting paths never re-scan for it.
+        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
         let property_normalized = value_normalization::lowercase_property_name(
-            value_normalization::extract_property_name(decl_source),
+            value_normalization::extract_property_name(decl_source, colon_pos),
         );
         self.write(&property_normalized);
 
@@ -315,23 +318,20 @@ impl<'a> Printer<'a> {
             self.write("\n");
             self.write_indent();
             self.write(")");
-        } else if let Some(normalized) =
-            value_normalization::extract_value_with_comments(decl_source)
-        {
-            self.write(&normalized);
         } else {
-            self.print_css_value(&decl.value);
+            let colon_pos = (decl.colon_offset - decl.span.start) as usize;
+            let normalized =
+                value_normalization::extract_value_with_comments(decl_source, colon_pos);
+            self.write(&normalized);
         }
     }
 
     /// Print declaration with comments in value (non-function)
     fn print_decl_with_comments(&mut self, decl: &internal::CssDeclaration<'_>, decl_source: &str) {
         self.write(": ");
-        if let Some(normalized) = value_normalization::extract_value_with_comments(decl_source) {
-            self.write(&normalized);
-        } else {
-            self.write(decl_source);
-        }
+        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
+        let normalized = value_normalization::extract_value_with_comments(decl_source, colon_pos);
+        self.write(&normalized);
         self.write_declaration_end(decl);
     }
 
@@ -341,7 +341,10 @@ impl<'a> Printer<'a> {
         // from source, not stored).
         let quote = self.source.as_bytes()[decl.value.span().start_usize()] as char;
         self.write(": ");
-        if let Some(formatted) = value_normalization::extract_string_value(decl_source, quote) {
+        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
+        if let Some(formatted) =
+            value_normalization::extract_string_value(decl_source, colon_pos, quote)
+        {
             self.write(&formatted);
         } else {
             let formatted = value_normalization::format_string_value("", quote);

@@ -161,9 +161,9 @@ impl<'a> Printer<'a> {
             return false;
         }
         let decl_source = decl.span.extract(self.source);
-        let Some(colon_pos) = value_normalization::find_declaration_colon(decl_source) else {
-            return false;
-        };
+        // The parser recorded the `property : value` colon; rebase it to the
+        // declaration slice instead of re-scanning (see `CssDeclaration::colon_offset`).
+        let colon_pos = (decl.colon_offset - decl.span.start) as usize;
         let value_part = &decl_source[colon_pos + 1..];
         // Fast path: no `/*` at all → no block comment possible.
         if !value_part.contains("/*") {
