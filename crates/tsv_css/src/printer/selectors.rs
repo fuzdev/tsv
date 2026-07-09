@@ -205,7 +205,18 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         for (i, rel) in complex.children.iter().enumerate() {
             if let Some(combinator) = rel.combinator {
-                if i == 0 {
+                // A preserved anchorless combinator (an empty compound — a consecutive
+                // combinator like the leading `>` of `> > .a`) emits just its symbol, with
+                // no trailing space: the following relative selector's separator supplies
+                // the single space, so the run reads `> > .a`, not `>  > .a`. Such an RS
+                // always carries an explicit combinator (Descendant is never anchorless).
+                if rel.selectors.is_empty() {
+                    if i == 0 {
+                        parts.push(d.text(combinator.as_str()));
+                    } else {
+                        parts.push(d.concat(&[d.line(), d.text(combinator.as_str())]));
+                    }
+                } else if i == 0 {
                     // Leading combinator (e.g. `:has(> img)`): no break before it.
                     let s = Self::leading_combinator_str(combinator);
                     if !s.is_empty() {
@@ -267,6 +278,29 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         let mut prev_end = complex.span.start;
         for (i, rel) in complex.children.iter().enumerate() {
+            // A preserved anchorless combinator (empty compound — a consecutive combinator
+            // like the leading `>` of `> > .a`) has no simple selector to anchor `first_start`
+            // on. Emit any comment in the gap before it, then the combinator symbol with no
+            // trailing space (the next relative selector's separator supplies the space, and
+            // its before-range picks up any comment sitting after this combinator).
+            if rel.selectors.is_empty() {
+                if let Some(combinator) = rel.combinator {
+                    if i > 0 {
+                        // Explicit space (this path renders inline, no `line()` break points).
+                        parts.push(d.text(" "));
+                    }
+                    if let Some(cs) = rel.combinator_span {
+                        let before = self.comment_blocks_in_range(prev_end, cs.start);
+                        if !before.is_empty() {
+                            parts.push(d.text_pooled(&before));
+                            parts.push(d.text(" "));
+                        }
+                    }
+                    parts.push(d.text(combinator.as_str()));
+                }
+                prev_end = rel.span.end;
+                continue;
+            }
             let first_start = rel.selectors[0].span().start;
             if let Some(combinator) = rel.combinator {
                 if i == 0 {
@@ -875,6 +909,32 @@ fn lowercase_an_plus_b_n(s: &str) -> Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::lowercase_an_plus_b_n;
+
+    /// Preserved consecutive combinators produce empty-compound `RelativeSelector`s, which
+    /// both selector printer paths must handle without panicking or losing idempotency. The
+    /// comment-bearing cases exercise `build_complex_selector_doc_with_comments`, whose
+    /// `selectors[0]` index panicked on the empty compound (a `_svelte_prettier_divergence`
+    /// that can't be a fixture — parseCss rejects a combinator-boundary comment).
+    #[test]
+    fn preserved_consecutive_combinator_printing_is_stable() {
+        use bumpalo::Bump;
+        for input in [
+            "> > .a { color: red }",
+            "+ ~ .d { color: red }",
+            ".a > > .b { color: red }",
+            "> /* c */ > .a { color: red }",
+            ".a > /* c */ > .b { color: red }",
+            "> > /* c */ .a { color: red }",
+        ] {
+            let arena = Bump::new();
+            let ast = crate::parse(input, &arena).expect("parses");
+            let once = crate::format(&ast, input);
+            let arena2 = Bump::new();
+            let ast2 = crate::parse(&once, &arena2).expect("reparses");
+            let twice = crate::format(&ast2, &once);
+            assert_eq!(once, twice, "not idempotent for {input:?}");
+        }
+    }
 
     #[test]
     fn test_lowercase_an_plus_b_n() {

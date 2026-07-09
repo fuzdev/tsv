@@ -91,6 +91,8 @@ Spec: `selectors-4` (CR - core features in REC via CSS2.1)
 - Adjacent sibling combinator (`+`)
 - General sibling combinator (`~`)
 - Column combinator (`||`) - _at risk in spec_
+- Leading combinator (`> .a`, `+ .a`) - accepted in every context; contextual invalidity deferred to diagnostics
+- Consecutive combinators (`> > .a`, `+ ~ .d`) - preserved (parseCss collapses the run); see [conformance_svelte.md §CSS Corrections](conformance_svelte.md#css-corrections)
 
 ### Attribute Selectors
 
