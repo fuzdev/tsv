@@ -436,15 +436,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Consume the contextual keyword `kw` as a class-member modifier iff the
     /// current token is the identifier `kw` and the next token begins a member
-    /// name or a generator `*` — otherwise `kw` is itself the member's name
-    /// (e.g. `readonly = 1`). Returns whether it was consumed. Shared by the
-    /// `declare`/`override`/`abstract`/`readonly` detectors; `declare` is
+    /// name or a generator `*` **on the same line** — otherwise `kw` is itself
+    /// the member's name (`readonly = 1`, or `readonly⏎x = 1` where the line
+    /// break makes `readonly` a bodiless field via ASI and `x` the next member).
+    /// The same-line requirement mirrors acorn's `tsTokenCanFollowModifier`
+    /// (`!hasPrecedingLineBreak()`). Returns whether it was consumed. Shared by
+    /// the `declare`/`override`/`abstract`/`readonly` detectors; `declare` is
     /// probed in three positions (before/after accessibility, after `static`).
     #[inline]
     fn eat_modifier_keyword(&mut self, kw: &str) -> bool {
         if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == kw
             && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+            && !self.peek_preceded_by_line_terminator()
         {
             self.advance().ok();
             true
@@ -492,6 +496,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Handle 'static' contextual keyword - only if followed by a class member name or `{` (static block)
         // Otherwise `static` itself is the property name: `static = 2;`
         // Stays inline: unlike the shared detectors, `static {` (a static block) is also a valid follow.
+        // Note: `static` is deliberately NOT line-break-guarded (unlike the contextual TS
+        // modifiers and `async`). ECMAScript's `ClassElement: static FieldDefinition` has no
+        // `[no LineTerminator here]`, so `static⏎x = 1` is the static field `x` — matching the
+        // spec, tsc, and prettier's parser. (acorn's parser quirkily ASI-splits it into two
+        // fields; here tsv follows the spec/tsc over that acorn shape quirk.)
         let is_static = if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "static"
             && (self.peek_is_class_member_name()
@@ -537,11 +546,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let readonly = self.eat_modifier_keyword("readonly");
 
         // Handle 'accessor' contextual keyword (ES decorator proposal)
-        // Only consume as modifier if followed by a class member name.
+        // Only consume as modifier if followed by a class member name on the same line.
         // Stays inline: `accessor` may not prefix a generator, so it omits the `*` follow.
+        // A line break makes `accessor` a bodiless field via ASI (acorn parses it as a
+        // class-accessor modifier, subject to the same `!hasPrecedingLineBreak()` rule).
         let accessor = if matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "accessor"
             && self.peek_is_class_member_name()
+            && !self.peek_preceded_by_line_terminator()
         {
             self.advance().ok();
             true
@@ -550,10 +562,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         };
 
         // Handle 'async' keyword for async methods
-        // async is only a modifier if followed by: identifier, [, #, or *
+        // async is only a modifier if followed by: identifier, [, #, or * on the same line
+        // (ECMAScript `async [no LineTerminator here] MethodDefinition` — a line break makes
+        // `async` a bodiless field via ASI, `async⏎x = 1` → two members).
         // Stays inline: `async` is a reserved Keyword token, not an Identifier.
         let is_async = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
             && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+            && !self.peek_preceded_by_line_terminator()
         {
             self.advance().ok();
             true

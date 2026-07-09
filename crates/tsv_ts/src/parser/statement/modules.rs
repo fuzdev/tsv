@@ -276,8 +276,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let is_default_interface =
             self.current_value() == "interface" && self.peek_is_same_line_name_word();
 
+        // `export default async⏎function () {}` — the `async` function keyword requires
+        // `function` on the *same line* (ECMAScript `async [no LineTerminator here] function`);
+        // a line break demotes `async` to the default-exported expression (then the following
+        // `function () {}` is a nameless declaration → rejected), matching acorn. Computed before
+        // the match for the same borrow reason as `is_default_interface`.
+        let is_default_async_function =
+            matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
+                && self.peek_is(&TokenKind::Keyword(KeywordKind::Function))
+                && !self.peek_preceded_by_line_terminator();
+
         let (declaration, end) = match self.current_kind() {
-            TokenKind::Keyword(KeywordKind::Async) => {
+            TokenKind::Keyword(KeywordKind::Async) if is_default_async_function => {
                 // export default async function() {}
                 let async_start = self.current_pos().0 as u32;
                 self.advance()?; // consume 'async'

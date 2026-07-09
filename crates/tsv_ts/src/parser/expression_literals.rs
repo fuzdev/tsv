@@ -73,10 +73,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
 
             // Check for async method: `async foo() {}` or `async *gen() {}`
-            // async is tokenized as a keyword, and is treated as method when followed by property name or *
+            // async is tokenized as a keyword, and is treated as method when followed by a
+            // property name or `*` on the same line. A line break makes `async` an ordinary
+            // shorthand property (ECMAScript `async [no LineTerminator here] MethodDefinition`);
+            // `{ async⏎m() {} }` is then a syntax error (a stray `m` with no separator), matching
+            // acorn/prettier — not a silently-accepted async method.
             let is_async_method =
                 if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
                     && (self.peek_is_property_name() || self.peek_is(&TokenKind::Star))
+                    && !self.peek_preceded_by_line_terminator()
                 {
                     self.advance()?; // consume 'async'
                     true
