@@ -54,8 +54,10 @@ impl<'a> Printer<'a> {
     /// Comments that force the `<...>` list to the multiline layout: line
     /// comments anywhere (including before the first argument, e.g.
     /// `Foo<// leading\n  a>`) or own-line block comments — neither can render
-    /// inline.
-    fn type_arguments_force_expansion(
+    /// inline. Shared by both type-argument builders (the type-position
+    /// `build_type_arguments_doc*` and the call/`new` instantiation
+    /// `build_type_parameter_instantiation_doc`).
+    pub(in crate::printer) fn type_arguments_force_expansion(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> bool {

@@ -475,25 +475,11 @@ impl<'a> Printer<'a> {
             return d.text("<>");
         }
 
-        // Check for comments that force expansion: line comments or own-line block
-        // comments. Also check for a line comment BETWEEN `<` and the first argument
-        // (e.g. `foo<// c\n A>(x)`); without this the comment falls through to the
-        // block-comment-only group path below and is dropped (content loss).
-        let has_leading_line_comment = inst.params.first().is_some_and(|first| {
-            self.has_line_comments_between(inst.span.start + 1, first.span().start)
-        });
-        if has_leading_line_comment
-            || self.has_line_comments_in_delimited_list(
-                inst.params,
-                TSType::span,
-                inst.span.end - 1,
-            )
-            || self.has_own_line_block_comments_in_bracket_list(
-                inst.span,
-                inst.params,
-                TSType::span,
-            )
-        {
+        // Line comments (anywhere, including a leading `foo<// c\n A>(x)` — which
+        // would otherwise fall through to the block-comment-only group path below and
+        // be dropped) or own-line block comments force the multiline layout. Shared
+        // predicate with the type-position builder, incl. its zero-comment window gate.
+        if self.type_arguments_force_expansion(inst) {
             return self.build_type_parameter_instantiation_doc_with_line_comments(inst);
         }
 
