@@ -787,13 +787,32 @@ pub(crate) fn format_css_embedded(
     line_breaks: &[u32],
     embed: EmbedContext,
 ) -> String {
-    // Embedded `<style>` formats to its own string with its own column-0 render
-    // pass, so it can't share the host svelte printer's arena; a fresh per-block
-    // arena is the deliberate scope boundary (per-`<style>`, not per-file).
-    // `source` is the whole host document (spans are absolute), so the caller's
-    // `line_breaks` is the host's whole-source table — never island-local.
+    // Fresh-arena wrapper (top-level embedding tests / any caller without a host
+    // arena to lend). The Svelte host reuses its own document arena via
+    // `format_css_embedded_in`. `source` is the whole host document (spans are
+    // absolute), so the caller's `line_breaks` is the host's whole-source table —
+    // never island-local.
     let arena = DocArena::for_source(source);
-    let mut printer = Printer::with_embed(&arena, source, &stylesheet.comments, line_breaks, embed);
+    format_css_embedded_in(stylesheet, source, line_breaks, embed, &arena)
+}
+
+/// Embedded CSS formatting into a caller-provided doc arena — the arena-sharing
+/// path the Svelte host uses so a `<style>` block reuses the host document's
+/// `DocArena` instead of allocating a second whole-host-sized one per block.
+///
+/// The embedded CSS still renders through its own column-0 render pass to an
+/// owned `String`; only the doc-node *storage* is shared. The arena is not
+/// reset, so the host's in-flight nodes remain valid, and the CSS's transient
+/// nodes are reclaimed at the host driver's next `DocArena::reset()` (between
+/// files) like any other island's.
+pub(crate) fn format_css_embedded_in(
+    stylesheet: &CssStyleSheet<'_>,
+    source: &str,
+    line_breaks: &[u32],
+    embed: EmbedContext,
+    arena: &DocArena,
+) -> String {
+    let mut printer = Printer::with_embed(arena, source, &stylesheet.comments, line_breaks, embed);
     printer.print_css_nodes(stylesheet.nodes);
     printer.into_string()
 }

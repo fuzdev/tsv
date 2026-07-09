@@ -113,7 +113,7 @@ impl<'a> Printer<'a> {
     ) -> Self {
         // The document's one whole-source line-break table: every embedded
         // island borrows it (`build_program_doc` for `<script>`/`{expr}` TS,
-        // `tsv_css::format_embedded` for `<style>` CSS) — never rebuild it
+        // `tsv_css::format_embedded_in` for `<style>` CSS) — never rebuild it
         // per island. Filled into the arena-parked scratch (one warm table
         // across a multi-file driver's files); `into_string` parks it back.
         let mut line_breaks = arena.take_line_breaks_scratch();
