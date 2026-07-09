@@ -349,7 +349,9 @@ impl<'a> Printer<'a> {
             test_start: stmt.test.as_ref().map(|t| t.span().start),
             test_end,
             update_start: stmt.update.as_ref().map(|u| u.span().start),
-            close_paren: open_paren.and_then(|o| self.matching_close_paren(o)),
+            // Reuse the close-paren already found above (`matching_close_paren` is a
+            // depth-tracked scan over the whole header) instead of recomputing it.
+            close_paren: close_paren_approx,
         };
 
         // Check if we have any own-line comments that force expansion. A line

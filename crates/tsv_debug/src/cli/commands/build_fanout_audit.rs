@@ -51,6 +51,18 @@ fn gen_svelte_elements(depth: usize) -> String {
     format!("<div>{opens}{closes}</div>\n")
 }
 
+/// Nested padded **inline** elements (`<b> <i> … </i> </b>`) — routes through
+/// `build_content_element_doc`'s `(_, Hug)` / standard arms, where a padded inline
+/// element (`is_inline && !trim_boundaries`) selects a `trim=true` children variant.
+/// Distinct from `gen_svelte_elements` (block elements, `(Hard,Hard)`): the boundary
+/// whitespace is what makes these inline, and a per-arm children rebuild here recurses
+/// into children that ALSO rebuild — the element/inline-side twin of the block blowup.
+fn gen_svelte_inline_elements(depth: usize) -> String {
+    let opens = "<b> <i> ".repeat(depth);
+    let closes = " </i> </b>".repeat(depth);
+    format!("{opens}text{closes}\n")
+}
+
 /// Nested `{#if}` blocks (single-child consequents) — the if-block fast path
 /// (`build_if_pieces` / `compose_if_tail`), which composes both expanding-construct
 /// tails from one shared set of body pieces.
@@ -92,6 +104,48 @@ fn gen_ts_chain(depth: usize) -> String {
     let mut expr = String::from("x");
     for _ in 0..depth {
         expr = format!("obj.method({expr}).prop");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// Nested ternaries in the alternate (`a ? b : (c ? d : …)`) — the conditional
+/// expression printer's `conditional_group` (flat vs broken chain). A per-candidate
+/// re-invoke of the recursive builder on the nested conditional would be exponential.
+fn gen_ts_ternary(depth: usize) -> String {
+    let mut expr = String::from("z");
+    for i in 0..depth {
+        expr = format!("cond{i} ? val{i} : {expr}");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// Nested conditional TYPES in the false branch (`A extends B ? C : (D extends E ? …)`)
+/// — the conditional-type printer's own flat/broken group.
+fn gen_ts_conditional_type(depth: usize) -> String {
+    let mut ty = String::from("never");
+    for i in 0..depth {
+        ty = format!("T{i} extends U{i} ? R{i} : {ty}");
+    }
+    format!("type X = {ty};\n")
+}
+
+/// Nested call args that are themselves object literals (`f({{ a: g({{ b: h(…) }}) }})`)
+/// — call-argument wrapping (`arg_wrapping`/`call_formatting`) composed with the object
+/// printer, each a `conditional_group`/group with a flat-vs-expanded choice.
+fn gen_ts_nested_call_obj(depth: usize) -> String {
+    let mut expr = String::from("leaf");
+    for i in 0..depth {
+        expr = format!("fn{i}({{ key{i}: {expr} }})");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// Nested arrow last-argument hug (`a(x => b(y => c(…)))`) — the last-arg-arrow
+/// expansion path, another per-call flat-vs-expanded candidate site.
+fn gen_ts_nested_arrow(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} => {expr})");
     }
     format!("const v = {expr};\n")
 }
@@ -194,6 +248,12 @@ impl BuildFanoutAuditCommand {
                 depths: &[4, 8, 12],
             },
             Construct {
+                name: "svelte_inline_elements",
+                parser: ParserType::Svelte,
+                generate: gen_svelte_inline_elements,
+                depths: &[4, 8, 12],
+            },
+            Construct {
                 name: "svelte_if_nested",
                 parser: ParserType::Svelte,
                 generate: gen_svelte_if,
@@ -222,6 +282,30 @@ impl BuildFanoutAuditCommand {
                 parser: ParserType::TypeScript,
                 generate: gen_ts_chain,
                 depths: &[2, 4, 6],
+            },
+            Construct {
+                name: "ts_ternary_nested",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_ternary,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_conditional_type_nested",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_conditional_type,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_call_obj",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_call_obj,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow,
+                depths: &[4, 8, 12],
             },
         ];
 

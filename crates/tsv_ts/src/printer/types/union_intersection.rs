@@ -566,6 +566,13 @@ impl<'a> Printer<'a> {
     /// (a line comment is always own-line here) and additionally catches own-line
     /// *block* comments, which the default (groupable) path would otherwise keep flat.
     fn union_has_own_line_member_comment(&self, union: &TSUnionType<'_>) -> bool {
+        // Zero-comment window gate (see `union_has_comments_between_members`): every
+        // pairwise range lies within the union span, so no comment inside the union
+        // means every `comments_in_range` below is empty — skip the N-1 scans on the
+        // common comment-free union.
+        if !self.has_comments_between(union.span.start, union.span.end) {
+            return false;
+        }
         union.types.windows(2).any(|pair| {
             let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
             comments_in_range(self.comments, prev_end, next_start)
@@ -591,6 +598,12 @@ impl<'a> Printer<'a> {
         &self,
         intersection: &TSIntersectionType<'_>,
     ) -> bool {
+        // Zero-comment window gate (see `union_has_comments_between_members`): every
+        // pairwise range lies within the intersection span, so no comment inside it
+        // means every `comments_in_range` below is empty — skip the N-1 scans.
+        if !self.has_comments_between(intersection.span.start, intersection.span.end) {
+            return false;
+        }
         intersection.types.windows(2).any(|pair| {
             let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
             comments_in_range(self.comments, prev_end, next_start)
