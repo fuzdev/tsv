@@ -36,6 +36,7 @@ use super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use crate::ast::internal::Expression;
 use crate::printer::calls::arg_predicates::contains_call_expression;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Cutoff for short chains when groups should NOT be merged
@@ -92,18 +93,26 @@ fn call_has_breaking_single_arg<P: ChainPrinter>(
 /// - Short chains (≤cutoff groups): simple group with softlines
 /// - Longer chains: conditionalGroup([oneLine, expanded])
 /// - 3+ calls with complex args: force expanded (no width-based decision)
-pub fn build_chain_doc<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocId {
+pub fn build_chain_doc<'a, P: ChainPrinter>(
+    groups: &[ChainGroup<'a>],
+    chain_span: Span,
+    printer: &P,
+) -> DocId {
     // Activate arg-doc sharing for the outermost chain only (nested chains observe it
     // already active and reuse the map), so the flat and expanded group builds across
     // every `conditional_group` candidate share one recursive arg build instead of
     // rebuilding — the member-chain rebuild fix.
     let was_active = printer.enter_chain_arg_share();
-    let result = build_chain_doc_impl(groups, printer);
+    let result = build_chain_doc_impl(groups, chain_span, printer);
     printer.exit_chain_arg_share(was_active);
     result
 }
 
-fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> DocId {
+fn build_chain_doc_impl<'a, P: ChainPrinter>(
+    groups: &[ChainGroup<'a>],
+    chain_span: Span,
+    printer: &P,
+) -> DocId {
     let d = printer.arena();
     if groups.is_empty() {
         return d.empty();
@@ -123,6 +132,15 @@ fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer:
         .iter()
         .flat_map(|g| g.nodes.iter())
         .any(ChainNode::is_call);
+
+    // Zero-comment fast gate: one binary search over the whole chain window
+    // short-circuits every per-node comment scan below — the expansion-forcing
+    // check, the member-only line-comment check, and the inside-bracket comment
+    // check, each of which otherwise runs a comment lookup per chain node. Sound
+    // because every per-node comment sub-range lies within the chain's span, so no
+    // comment anywhere in the window means every sub-query is empty. Chains are
+    // comment-sparse between segments, so the gate nearly always fires.
+    let chain_has_comments = printer.has_comments_between(chain_span.start, chain_span.end);
 
     // Prettier's logic (member-chain.js:351-359):
     // If groups.length <= cutoff && !nodeHasComment:
@@ -161,17 +179,18 @@ fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer:
     // Member-only chains with inside-bracket comments in computed members need the
     // conditional_group path (not fill), so the bracket content can break when the
     // chain expands. Fill can't break inside a computed member's brackets.
-    let has_bracket_comments = groups
-        .iter()
-        .flat_map(|g| g.nodes.iter())
-        .any(|n| has_inside_bracket_comments(n, printer));
+    let has_bracket_comments = chain_has_comments
+        && groups
+            .iter()
+            .flat_map(|g| g.nodes.iter())
+            .any(|n| has_inside_bracket_comments(n, printer));
 
     if !has_calls && !first_has_parens && !has_bracket_comments {
         // Member-only chain with interior line comments: break the chain and emit
         // each comment in place (shared comment-aware path), instead of the fill
         // path's line_suffix — which defers mid-chain line comments to end of line,
         // merging/reversing multiple. Prettier hoists these; tsv preserves position.
-        if member_only_has_interior_line_comments(groups, printer) {
+        if chain_has_comments && member_only_has_interior_line_comments(groups, printer) {
             return build_member_only_chain_with_comments_doc(groups, printer);
         }
         // Member-only chain: use fill for greedy packing
@@ -191,7 +210,9 @@ fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer:
     // with complex args" only apply to long chains (member-chain.js:400-407).
     // Comments between chain segments DO block the short chain path (matching
     // Prettier's nodeHasComment check).
-    if groups.len() <= cutoff && !(has_calls && has_comments_forcing_expansion(groups, printer)) {
+    if groups.len() <= cutoff
+        && !(has_calls && chain_has_comments && has_comments_forcing_expansion(groups, printer))
+    {
         return build_short_chain_doc(
             first_groups,
             rest_groups,
@@ -203,7 +224,7 @@ fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer:
     }
 
     // Long chains: force expand conditions (Prettier member-chain.js:400-407)
-    let force_expand = has_calls && should_force_chain_expand(groups, printer);
+    let force_expand = has_calls && should_force_chain_expand(groups, chain_has_comments, printer);
     build_long_chain_doc(
         groups,
         first_groups,
@@ -215,7 +236,11 @@ fn build_chain_doc_impl<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer:
 }
 
 /// Check if chain expansion should be forced
-fn should_force_chain_expand<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], printer: &P) -> bool {
+fn should_force_chain_expand<'a, P: ChainPrinter>(
+    groups: &[ChainGroup<'a>],
+    chain_has_comments: bool,
+    printer: &P,
+) -> bool {
     // Iterate call nodes in place — no materialized Vec
     let call_nodes = || {
         groups
@@ -246,7 +271,8 @@ fn should_force_chain_expand<'a, P: ChainPrinter>(groups: &[ChainGroup<'a>], pri
 
     // Comments between chain segments force expansion, EXCEPT for comments before
     // trailing members (which are handled specially by add_group_no_break)
-    let has_forcing_comments = has_comments_forcing_expansion(groups, printer);
+    let has_forcing_comments =
+        chain_has_comments && has_comments_forcing_expansion(groups, printer);
 
     has_blank_lines_between
         || has_forcing_comments
