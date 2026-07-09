@@ -126,11 +126,6 @@ const ALLOW: &[Allow] = &[
         "css-value",
     ),
     (
-        "tsv_css/src/parser/value/mod.rs",
-        "if let Some(paren_pos) = s.find('(')",
-        "css-value",
-    ),
-    (
         "tsv_css/src/printer/declarations.rs",
         ".find(\"*/\")",
         "comment-marker",
@@ -208,21 +203,6 @@ const ALLOW: &[Allow] = &[
         "tsv_ts/src/parser/expression.rs",
         "while let Some(rel) = value[from..].find(tag) {",
         "jsdoc-tag",
-    ),
-    (
-        "tsv_ts/src/printer/expressions/literals.rs",
-        "let Some(e_idx) = s.find('e') else {",
-        "number-literal",
-    ),
-    (
-        "tsv_ts/src/printer/expressions/literals.rs",
-        "let Some(dot) = s.find('.') else {",
-        "number-literal",
-    ),
-    (
-        "tsv_ts/src/printer/expressions/literals.rs",
-        "if let Some(dot) = s.find('.') {",
-        "number-literal",
     ),
     (
         "tsv_ts/src/printer/expressions/template_literal.rs",
