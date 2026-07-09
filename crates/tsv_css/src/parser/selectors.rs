@@ -288,6 +288,7 @@ pub(crate) fn parse_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<ComplexSelector<'arena>, ParseError> {
     let start = parser.span_pos(parser.current_start());
+    let mut children = parser.bvec();
 
     // The first compound MAY begin with an explicit combinator (`> span`, a nested/`:has()`
     // relative selector or a top-level leading combinator parseCss accepts).
@@ -300,34 +301,60 @@ pub(crate) fn parse_complex_selector<'arena>(
     // (gated on `inside_pseudo_class`); `pseudo_arg_terminal_nth` is that exact gate (the
     // same `in_pseudo_args && match_nth_value` the `Nth` reader in `parse_simple_selector`
     // uses), so deferring to the bare compound there lets the `Nth` reader claim the term.
-    let first = if !pseudo_arg_terminal_nth(parser)
-        && let Some((combinator, combinator_span)) = parse_explicit_combinator(parser)?
+    // The combinator pending on the current compound (kept paired with its span). `None`
+    // is a null combinator (a bare compound / the leading anchor).
+    let mut pending: Option<(Combinator, Span)> = if !pseudo_arg_terminal_nth(parser)
+        && let Some(cs) = parse_explicit_combinator(parser)?
     {
-        parse_relative_selector(parser, Some(combinator), Some(combinator_span))?
+        Some(cs)
     } else {
-        parse_relative_selector(parser, None, None)?
+        None
     };
 
-    parse_complex_selector_tail(parser, start, first)
-}
-
-/// Assemble a `ComplexSelector` from an already-parsed first compound plus the trailing
-/// `combinator + compound` sequence. A complex selector and a relative selector differ
-/// only in that first compound (a relative one may lead with an explicit combinator), so
-/// both share this tail. The loop stops at `{`/`,`/`)`/EOF or when no further combinator
-/// follows; a gap comment is registered inside `parse_combinator` (`div /* c */ p`) and
-/// is never itself a terminator — a trailing comment before a stop token is left
-/// unconsumed for the caller's pre-brace / pseudo-arg handling.
-fn parse_complex_selector_tail<'arena>(
-    parser: &mut CssParser<'_, 'arena>,
-    start: u32,
-    first: RelativeSelector<'arena>,
-) -> Result<ComplexSelector<'arena>, ParseError> {
-    let mut end = first.span.end;
-    let mut children = parser.bvec();
-    children.push(first);
-
     loop {
+        // A combinator immediately followed by ANOTHER combinator has no compound. tsv
+        // PRESERVES it as an empty-compound `RelativeSelector` and moves to the next
+        // combinator, keeping every authored combinator (`+ ~ .d` → `[+, []], [~, [.d]]`).
+        // This DIVERGES from parseCss, whose `read_selector` never emits an empty relative
+        // selector — it drops all but the last combinator of a run — a lossy recovery tsv
+        // declines: the dropped combinator is authorship the future diagnostics layer needs
+        // to flag the invalid double (in a relative context the collapse even masks it
+        // entirely, `:has(+ ~ .d)` → valid `:has(~ .d)`). The leading null-anchor with no
+        // compound is still dropped (an RS is emitted only for an actual combinator here).
+        // `!pseudo_arg_terminal_nth` keeps a following `<an+b>` term (`:is(> +3)`) out of
+        // the run so its `+`/`-` binds to the coefficient, not a next-sibling combinator.
+        if let Some((c, c_span)) = pending
+            && !pseudo_arg_terminal_nth(parser)
+            && let Some(next) = explicit_combinator_kind(parser.current_kind)
+        {
+            children.push(RelativeSelector {
+                combinator: Some(c),
+                combinator_span: Some(c_span),
+                selectors: &[],
+                span: c_span,
+            });
+            let next_span = Span {
+                start: parser.span_pos(parser.current_start()),
+                end: parser.span_pos(parser.current_end),
+            };
+            pending = Some((next, next_span));
+            parser.advance()?; // consume the combinator token
+            skip_combinator_gap(parser)?;
+            continue;
+        }
+
+        // Parse the compound with the current (possibly null) combinator. A trailing
+        // combinator — one followed by a `{`/`,`/`)` terminator rather than a compound —
+        // errors here on the missing compound, which both parsers reject.
+        let (combinator, combinator_span) = pending.unzip();
+        let child = parse_relative_selector(parser, combinator, combinator_span)?;
+        children.push(child);
+
+        // Continue with the next combinator, or stop. The loop ends at `{`/`,`/`)`/EOF or
+        // when no further combinator follows; a gap comment is registered inside
+        // `parse_combinator` (`div /* c */ p`) and is never itself a terminator — a trailing
+        // comment before a stop token is left unconsumed for the caller's pre-brace /
+        // pseudo-arg handling.
         if parser.check(TokenKind::LeftBrace)
             || parser.check(TokenKind::Comma)
             || parser.check(TokenKind::RightParen)
@@ -335,18 +362,18 @@ fn parse_complex_selector_tail<'arena>(
         {
             break;
         }
-
-        let Some((combinator, combinator_span)) = parse_combinator(parser)? else {
+        let Some(cs) = parse_combinator(parser)? else {
             break; // No more combinators, we're done
         };
-
-        let child = parse_relative_selector(parser, Some(combinator), Some(combinator_span))?;
-        end = child.span.end;
-        children.push(child);
+        pending = Some(cs);
     }
 
+    // The complex selector ends at its last relative selector (always a compound — a
+    // combinator run ends in one, else `parse_relative_selector` errored above).
+    let children = children.into_bump_slice();
+    let end = children.last().map_or(start, |rel| rel.span.end);
     Ok(ComplexSelector {
-        children: children.into_bump_slice(),
+        children,
         span: Span { start, end },
     })
 }
