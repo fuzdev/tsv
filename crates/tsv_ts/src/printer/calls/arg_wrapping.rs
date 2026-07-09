@@ -641,16 +641,20 @@ pub(crate) fn build_break_body_state(
 /// - State 0 (flat): `callee((params) => body)`
 /// - State 1 (break): `callee((params) =>\n  body,\n)`
 ///
+/// Both states compose the same `sig_doc`/`body_doc` (the body is built ONCE by the
+/// caller) — the flat state is `sig => body`, so the caller does NOT build a separate
+/// whole-arrow doc. Building the whole arrow *and* the body was a redundant double-build
+/// that recursed into itself for a call-bodied arrow whose body is another such call
+/// (`a(x => b(y => …))`), making the doc-node count O(2^depth). See the build-fanout audit.
+///
 /// Parameters:
 /// - `callee`: The call expression's callee doc
-/// - `arrow_doc`: The full arrow expression doc (for flat state)
-/// - `sig_doc`: The arrow's signature doc (for break state)
+/// - `sig_doc`: The arrow's signature doc (`(params)`)
 /// - `body_doc`: The arrow body expression doc
 #[inline]
 pub(crate) fn build_arrow_call_body_states(
     d: &DocArena,
     callee: DocId,
-    arrow_doc: DocId,
     sig_doc: DocId,
     body_doc: DocId,
 ) -> DocId {
@@ -668,7 +672,14 @@ pub(crate) fn build_arrow_call_body_states(
 
     d.conditional_group(&[
         // Flat: callee((params) => body)
-        d.concat(&[callee, d.text("("), arrow_doc, d.text(")")]),
+        d.concat(&[
+            callee,
+            d.text("("),
+            sig_doc,
+            d.text(" => "),
+            body_doc,
+            d.text(")"),
+        ]),
         // Break: callee((params) =>\n  body,\n)
         d.concat(&[
             callee,

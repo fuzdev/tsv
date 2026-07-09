@@ -663,15 +663,15 @@ fn try_single_arg_hug(
             // the body type and ignores the return-type annotation, so typed-return
             // arrows (`(x): T => call()`) hug too.
             if arrow_body_is_call_through_non_null(body_expr) {
-                let arrow_doc = printer.build_expression_doc(&call.arguments[0]);
+                // Build the body ONCE and compose both hug/wrap states from it; building
+                // the whole arrow separately for the flat state re-built this same body
+                // and recursed into itself → O(2^depth) for `a(x => b(y => …))`.
                 let body_doc = printer.build_expression_doc(body_expr);
                 let body_doc =
                     prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
                 let sig_doc = build_arrow_sig_doc(printer, arrow);
 
-                return Some(build_arrow_call_body_states(
-                    d, callee, arrow_doc, sig_doc, body_doc,
-                ));
+                return Some(build_arrow_call_body_states(d, callee, sig_doc, body_doc));
             }
             // Other expression types: fall through to standard wrapping
         }
