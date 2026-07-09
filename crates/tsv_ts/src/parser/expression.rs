@@ -99,20 +99,27 @@ impl<'arena> ParsedExpr<'arena> {
         }
     }
 
-    /// Create a ParsedExpr with explicit actual_end (for parenthesized expressions).
-    /// `actual_end` is a `usize` source position (narrowed to the `u32` field here, at
-    /// the boundary), so the parser's `usize`-position call sites pass it directly.
-    fn with_end(arena: &'arena bumpalo::Bump, expr: Expression<'arena>, actual_end: usize) -> Self {
-        let expr = arena.alloc(expr);
+    /// Create a ParsedExpr with explicit start and end positions. Every caller
+    /// already holds the semantic start (it just built the node's `span` from it),
+    /// so it's passed directly rather than re-derived — `Expression::span()` is a
+    /// wide match over every variant, and re-reading it through the fresh arena
+    /// pointer on this hot expression-construction path is pure overhead. `actual_end`
+    /// is a `usize` source position (narrowed to the `u32` field here, at the boundary).
+    fn with_start_end(
+        arena: &'arena bumpalo::Bump,
+        expr: Expression<'arena>,
+        actual_start: u32,
+        actual_end: usize,
+    ) -> Self {
         Self {
-            actual_start: expr.span().start,
+            expr: arena.alloc(expr),
+            actual_start,
             actual_end: actual_end as u32,
-            expr,
         }
     }
 
     /// Create a ParsedExpr from an already-arena-boxed expression with explicit
-    /// paren bounds. Unlike `from_expr`/`with_end`, the caller supplies the
+    /// paren bounds. Unlike `from_expr`/`with_start_end`, the caller supplies the
     /// `&'arena Expression` — the inner's own allocation reused (a discarded
     /// grouping paren) or a freshly built wrapper node (a JSDoc cast, or a
     /// preserved `ParenthesizedExpression`).
@@ -754,7 +761,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?; // consume '.'
                 let (property, prop_end) = self.parse_dot_property()?;
                 let span = Span::new(expr.actual_start, prop_end as u32);
-                expr = ParsedExpr::with_end(
+                expr = ParsedExpr::with_start_end(
                     self.arena,
                     Expression::MemberExpression(MemberExpression {
                         object: expr.expr,
@@ -763,6 +770,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         optional: false,
                         span,
                     }),
+                    expr.actual_start,
                     prop_end,
                 );
             }
@@ -777,8 +785,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let arguments = arguments.into_bump_slice();
             // The call node starts at the callee's own start (acorn's
             // `startNodeAtNode(expr)`), not at any stripped wrapping paren.
-            let span = Span::new(expr.expr.span().start, paren_end as u32);
-            expr = ParsedExpr::with_end(
+            let start = expr.expr.span().start;
+            let span = Span::new(start, paren_end as u32);
+            expr = ParsedExpr::with_start_end(
                 self.arena,
                 Expression::CallExpression(CallExpression {
                     callee: expr.expr,
@@ -787,6 +796,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     optional: false,
                     span,
                 }),
+                start,
                 paren_end,
             );
         }
@@ -808,12 +818,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (_, op_end) = self.current_pos();
         self.advance()?; // consume '!'
         let span = Span::new(expr.actual_start, op_end as u32);
-        Ok(ParsedExpr::with_end(
+        Ok(ParsedExpr::with_start_end(
             self.arena,
             Expression::TSNonNullExpression(TSNonNullExpression {
                 expression: expr.expr,
                 span,
             }),
+            expr.actual_start,
             op_end,
         ))
     }
@@ -868,7 +879,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let (property, prop_end) = self.parse_dot_property()?;
 
                     let span = Span::new(left.actual_start, prop_end as u32);
-                    left = ParsedExpr::with_end(
+                    left = ParsedExpr::with_start_end(
                         self.arena,
                         Expression::MemberExpression(MemberExpression {
                             object: left.expr,
@@ -877,6 +888,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             optional: false,
                             span,
                         }),
+                        left.actual_start,
                         prop_end,
                     );
                 }
@@ -891,7 +903,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             let (property, prop_end) = self.parse_dot_property()?;
 
                             let span = Span::new(left.actual_start, prop_end as u32);
-                            left = ParsedExpr::with_end(
+                            left = ParsedExpr::with_start_end(
                                 self.arena,
                                 Expression::MemberExpression(MemberExpression {
                                     object: left.expr,
@@ -900,6 +912,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     optional: true,
                                     span,
                                 }),
+                                left.actual_start,
                                 prop_end,
                             );
                         }
@@ -915,7 +928,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             self.grouping_depth -= 1;
 
                             let span = Span::new(left.actual_start, bracket_end as u32);
-                            left = ParsedExpr::with_end(
+                            left = ParsedExpr::with_start_end(
                                 self.arena,
                                 Expression::MemberExpression(MemberExpression {
                                     object: left.expr,
@@ -924,6 +937,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     optional: true,
                                     span,
                                 }),
+                                left.actual_start,
                                 bracket_end,
                             );
                         }
@@ -934,7 +948,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             let arguments = arguments.into_bump_slice();
 
                             let span = Span::new(left.actual_start, paren_end as u32);
-                            left = ParsedExpr::with_end(
+                            left = ParsedExpr::with_start_end(
                                 self.arena,
                                 Expression::CallExpression(CallExpression {
                                     callee: left.expr,
@@ -943,6 +957,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     optional: true,
                                     span,
                                 }),
+                                left.actual_start,
                                 paren_end,
                             );
                         }
@@ -963,7 +978,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             let arguments = arguments.into_bump_slice();
 
                             let span = Span::new(left.actual_start, paren_end as u32);
-                            left = ParsedExpr::with_end(
+                            left = ParsedExpr::with_start_end(
                                 self.arena,
                                 Expression::CallExpression(CallExpression {
                                     callee: left.expr,
@@ -972,6 +987,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                     optional: true,
                                     span,
                                 }),
+                                left.actual_start,
                                 paren_end,
                             );
                         }
@@ -994,7 +1010,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.grouping_depth -= 1;
 
                     let span = Span::new(left.actual_start, bracket_end as u32);
-                    left = ParsedExpr::with_end(
+                    left = ParsedExpr::with_start_end(
                         self.arena,
                         Expression::MemberExpression(MemberExpression {
                             object: left.expr,
@@ -1003,6 +1019,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             optional: false,
                             span,
                         }),
+                        left.actual_start,
                         bracket_end,
                     );
                 }
@@ -1021,7 +1038,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         }
                         other => (other, None),
                     };
-                    left = ParsedExpr::with_end(
+                    left = ParsedExpr::with_start_end(
                         self.arena,
                         Expression::CallExpression(CallExpression {
                             callee,
@@ -1030,6 +1047,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             optional: false,
                             span,
                         }),
+                        left.actual_start,
                         paren_end,
                     );
                 }
@@ -1056,7 +1074,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             }
                             other => (other, None),
                         };
-                        left = ParsedExpr::with_end(
+                        left = ParsedExpr::with_start_end(
                             self.arena,
                             Expression::TaggedTemplateExpression(TaggedTemplateExpression {
                                 tag,
@@ -1064,6 +1082,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 quasi: template,
                                 span,
                             }),
+                            left.actual_start,
                             quasi_span.end_usize(),
                         );
                     }
@@ -1085,7 +1104,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.advance()?;
 
                     let span = Span::new(left.actual_start, op_end as u32);
-                    left = ParsedExpr::with_end(
+                    left = ParsedExpr::with_start_end(
                         self.arena,
                         Expression::UpdateExpression(UpdateExpression {
                             operator,
@@ -1093,6 +1112,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             prefix: false,
                             span,
                         }),
+                        left.actual_start,
                         op_end,
                     );
                     // A postfix `++`/`--` yields an UpdateExpression, which is not a
@@ -1260,9 +1280,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Number => {
                 let literal = self.parse_number_or_bigint_literal()?;
                 let end = self.current_pos().1;
+                let start = literal.span.start;
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::Literal(literal),
+                    start,
                     end,
                 ))
             }
@@ -1270,11 +1292,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (start, end) = self.current_pos();
                 let cooked = self.extract_string_cooked();
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::Literal(Literal {
                         value: LiteralValue::String(cooked),
                         span: Span::new(start as u32, end as u32),
                     }),
+                    start as u32,
                     end,
                 ))
             }
@@ -1282,11 +1305,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (start, end) = self.current_pos();
                 let name = self.current_ident_name();
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::Identifier(Identifier::simple(
                         name,
                         Span::new(start as u32, end as u32),
                     )),
+                    start as u32,
                     end,
                 ))
             }
@@ -1300,53 +1324,58 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::True) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::Literal(Literal {
                         value: LiteralValue::Boolean(true),
                         span: Span::new(start as u32, end as u32),
                     }),
+                    start as u32,
                     end,
                 ))
             }
             TokenKind::Keyword(KeywordKind::False) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::Literal(Literal {
                         value: LiteralValue::Boolean(false),
                         span: Span::new(start as u32, end as u32),
                     }),
+                    start as u32,
                     end,
                 ))
             }
             TokenKind::Keyword(KeywordKind::Null) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::Literal(Literal {
                         value: LiteralValue::Null,
                         span: Span::new(start as u32, end as u32),
                     }),
+                    start as u32,
                     end,
                 ))
             }
             TokenKind::Keyword(KeywordKind::This) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::ThisExpression(ThisExpression {
                         span: Span::new(start as u32, end as u32),
                     }),
+                    start as u32,
                     end,
                 ))
             }
             TokenKind::Keyword(KeywordKind::Super) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::Super(Super {
                         span: Span::new(start as u32, end as u32),
                     }),
+                    start as u32,
                     end,
                 ))
             }
@@ -1411,13 +1440,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.had_line_terminator = self.lexer.had_line_terminator();
                 self.collect_comments()?;
 
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::RegexLiteral(RegexLiteral {
                         pattern_span,
                         flags_span,
                         pattern_width,
                         span: Span::new(self.span_pos(lexer_start), self.span_pos(lexer_end)),
                     }),
+                    self.span_pos(lexer_start),
                     lexer_end + self.base_offset,
                 ))
             }
@@ -1425,8 +1455,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Private identifier as standalone expression (for brand check: #field in obj)
                 let private_id = self.parse_private_identifier()?;
                 let end = private_id.span.end_usize();
-                Ok(ParsedExpr::with_end(self.arena,
+                let start = private_id.span.start;
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::PrivateIdentifier(private_id),
+                    start,
                     end,
                 ))
             }
@@ -1454,11 +1486,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 let (start, end) = self.current_pos();
                 let name = self.current_raw_ident_name();
                 self.advance()?;
-                Ok(ParsedExpr::with_end(self.arena,
+                Ok(ParsedExpr::with_start_end(self.arena,
                     Expression::Identifier(Identifier::simple(
                         name,
                         Span::new(start as u32, end as u32),
                     )),
+                    start as u32,
                     end,
                 ))
             }
@@ -1639,9 +1672,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             span: Span::new(left.actual_start, end),
         };
 
-        Ok(ParsedExpr::with_end(
+        Ok(ParsedExpr::with_start_end(
             self.arena,
             Expression::TSInstantiationExpression(inst),
+            left.actual_start,
             end as usize,
         ))
     }
@@ -1733,12 +1767,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (start, end) = self.current_pos();
         let name = self.current_raw_ident_name();
         self.advance()?;
-        Ok(ParsedExpr::with_end(
+        Ok(ParsedExpr::with_start_end(
             self.arena,
             Expression::Identifier(Identifier::simple(
                 name,
                 Span::new(start as u32, end as u32),
             )),
+            start as u32,
             end,
         ))
     }
@@ -1964,7 +1999,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                     // actual_start covers a parenthesized callee's `(` (`new (a()).b`)
                     let span = Span::new(callee.actual_start, prop_end as u32);
-                    callee = ParsedExpr::with_end(
+                    callee = ParsedExpr::with_start_end(
                         self.arena,
                         Expression::MemberExpression(MemberExpression {
                             object: callee.expr,
@@ -1976,6 +2011,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             optional: false,
                             span,
                         }),
+                        callee.actual_start,
                         prop_end,
                     );
                 }
@@ -1986,7 +2022,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     self.expect(&TokenKind::BracketClose)?;
 
                     let span = Span::new(callee.actual_start, bracket_end as u32);
-                    callee = ParsedExpr::with_end(
+                    callee = ParsedExpr::with_start_end(
                         self.arena,
                         Expression::MemberExpression(MemberExpression {
                             object: callee.expr,
@@ -1995,6 +2031,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             optional: false,
                             span,
                         }),
+                        callee.actual_start,
                         bracket_end,
                     );
                 }
