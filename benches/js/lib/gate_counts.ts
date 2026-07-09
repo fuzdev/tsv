@@ -128,7 +128,7 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 1111,
-	typescript: 4084,
+	typescript: 4085,
 	css: 126,
 };
 

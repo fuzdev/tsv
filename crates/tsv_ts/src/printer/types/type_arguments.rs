@@ -1,7 +1,7 @@
 // Type-argument instantiation (`<T, U>`) rendering
 
 use super::Printer;
-use super::helpers::{should_hug_union_type, unwrap_parenthesized};
+use super::helpers::{is_simple_type_arg, should_hug_union_type, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -124,8 +124,8 @@ impl<'a> Printer<'a> {
         // Single type argument inlining, matching Prettier's `shouldInline` logic.
         // Three categories are inlined (no group/softlines):
         //
-        // 1. Simple types: keywords (`string`, `number`) and TypeReference without
-        //    type args (`T`, `MyType`). These are atomic and never need breaking.
+        // 1. Simple types (`is_simple_type_arg`): keywords, literals, `this`, and a
+        //    bare TypeReference without type args. Atomic — never need breaking.
         // 2. Object types: TypeLiteral and Mapped types handle their own breaking.
         // 3. Hugged unions: unions with a brace-delimited member like `{...} | null`.
         //
@@ -135,9 +135,7 @@ impl<'a> Printer<'a> {
         // returns true from `fits()`, short-circuiting the width check.
         if args.params.len() == 1 {
             let unwrapped = unwrap_parenthesized(&args.params[0]);
-            let is_simple = matches!(unwrapped, TSType::Keyword(_))
-                || matches!(unwrapped, TSType::TypeReference(r) if r.type_arguments.is_none());
-            let is_huggable = is_simple
+            let is_huggable = is_simple_type_arg(&args.params[0])
                 || matches!(unwrapped, TSType::TypeLiteral(_) | TSType::Mapped(_))
                 || matches!(unwrapped, TSType::Union(u) if
                     should_hug_union_type(u)
