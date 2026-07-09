@@ -96,6 +96,20 @@ pub fn is_simple_type_arg(ty: &TSType<'_>) -> bool {
         || matches!(unwrapped, TSType::TypeReference(r) if r.type_arguments.is_none())
 }
 
+/// Prettier's `shouldHugUnionType` criterion for a single type argument: a union with
+/// exactly one brace-delimited member and only void-like siblings (`{…} | null`,
+/// `null | {…}`, `{…} | void`), per [`should_hug_union_type`]. Such a union inlines
+/// atomically — the object member carries its own group and breaks block-style inside
+/// the hugged `<…>`, so the `<…>` itself never needs a break point. Parenthesized
+/// wrappers are unwrapped first. The single source of truth shared by the
+/// call/`new`/instantiation type-argument builder and the type-position builder so the
+/// two agree by construction. Prettier ref: `shouldHugType` → `shouldHugUnionType`.
+pub fn is_hugging_union_type_arg(ty: &TSType<'_>) -> bool {
+    matches!(unwrap_parenthesized(ty), TSType::Union(u)
+        if should_hug_union_type(u)
+            && u.types.iter().any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_))))
+}
+
 /// Find the `TSParenthesizedType` that directly wraps a union, walking through any
 /// redundant nested parens. Returns `None` when `ts_type` is a bare union (the parens
 /// are synthetic, added by the printer for precedence — no source comments to preserve).

@@ -1,7 +1,7 @@
 // Type-argument instantiation (`<T, U>`) rendering
 
 use super::Printer;
-use super::helpers::{is_simple_type_arg, should_hug_union_type, unwrap_parenthesized};
+use super::helpers::{is_hugging_union_type_arg, is_simple_type_arg, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -22,6 +22,33 @@ impl<'a> Printer<'a> {
         } else {
             self.build_type_doc(param)
         }
+    }
+
+    /// Emit a single type argument inline: `<` + leading inline block comments + the
+    /// type doc + trailing inline block comments + `>`. No group, no softlines — the
+    /// argument is atomic, so an overflowing head breaks *around* the `<…>` (the call
+    /// arguments, the assignment `=`) rather than inside it; any brace-delimited member
+    /// carries its own group and still breaks block-style within the hugged `<…>`.
+    ///
+    /// Assumes `args.params.len() == 1`; the caller gates on its own single-arg inline
+    /// predicate (`is_simple_type_arg`, `is_hugging_union_type_arg`, a huggable object,
+    /// or always-inline). Own-line and line comments are routed to the multiline path
+    /// before this runs, so only inline block comments remain to preserve here. Shared by
+    /// the type-position builder and the call/`new`/instantiation builder.
+    pub(in crate::printer) fn build_single_type_arg_inline(
+        &self,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let param = &args.params[0];
+        let mut parts = smallvec![d.text("<")];
+        let after_open = args.span.start + 1; // After the opening `<`
+        let before_close = args.span.end - 1; // Before the closing `>`
+        self.append_leading_inline_block_comments(&mut parts, after_open, param.span().start);
+        parts.push(self.build_type_doc(param));
+        self.append_trailing_inline_block_comments(&mut parts, param.span().end, before_close);
+        parts.push(d.text(">"));
+        d.concat(&parts)
     }
 
     /// Comments that force the `<...>` list to the multiline layout: line
@@ -76,16 +103,7 @@ impl<'a> Printer<'a> {
 
         // Single type argument: inline (matches Prettier's shouldInline for len==1)
         if args.params.len() == 1 {
-            let mut parts = DocBuf::new();
-            let prev_end = args.span.start + 1; // After the opening `<`
-            let param_start = args.params[0].span().start;
-            let param_end = args.params[0].span().end;
-            let before_close = args.span.end - 1;
-
-            self.append_leading_inline_block_comments(&mut parts, prev_end, param_start);
-            parts.push(self.build_type_arg_doc(&args.params[0], false));
-            self.append_trailing_inline_block_comments(&mut parts, param_end, before_close);
-            return d.concat(&[d.text("<"), d.concat(&parts), d.text(">")]);
+            return self.build_single_type_arg_inline(args);
         }
 
         // Multiple type arguments: use group so they can break at print width.
@@ -137,27 +155,9 @@ impl<'a> Printer<'a> {
             let unwrapped = unwrap_parenthesized(&args.params[0]);
             let is_huggable = is_simple_type_arg(&args.params[0])
                 || matches!(unwrapped, TSType::TypeLiteral(_) | TSType::Mapped(_))
-                || matches!(unwrapped, TSType::Union(u) if
-                    should_hug_union_type(u)
-                    && u.types.iter().any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_)))
-                );
+                || is_hugging_union_type_arg(&args.params[0]);
             if is_huggable {
-                let mut parts = smallvec![d.text("<")];
-
-                // Include leading comments: `Array</* comment */ {...}>`
-                let param_start = args.params[0].span().start;
-                let param_end = args.params[0].span().end;
-                let after_open = args.span.start + 1; // After the opening `<`
-                let before_close = args.span.end - 1; // Before the closing `>`
-                self.append_leading_inline_block_comments(&mut parts, after_open, param_start);
-
-                parts.push(self.build_type_arg_doc(&args.params[0], false));
-
-                // Include trailing comments: `Array<{...} /* trailing */>`
-                self.append_trailing_inline_block_comments(&mut parts, param_end, before_close);
-
-                parts.push(d.text(">"));
-                return d.concat(&parts);
+                return self.build_single_type_arg_inline(args);
             }
         }
 
