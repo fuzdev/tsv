@@ -440,7 +440,7 @@ ES2015 module syntax with ES2024 additions.
 - Decorators on ambient class members (`declare class C { @dec m() {} }`)
 - Decorators after `export` (`export @dec class C {}`) — position preserved relative to `export`
 
-Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 decorator standard), but tsv parses them — the parser attaches them to the parameter's `decorators`, covered by `tests/fixtures/typescript/typescript_specific/decorators/parameter/`.
+Note: Parameter decorators are legacy-TypeScript syntax (not part of the ES2023 decorator standard), but tsv parses them — the parser attaches them to the parameter's `decorators`, covered by `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. They are accepted in exactly the positions acorn's `parseAssignableListItem` reaches: function declarations/expressions, class methods and the constructor, object-literal methods, and ambient `declare function`s. They are **rejected** on arrow-function parameters (`(@dec a) => a`) and in type-member signatures (interface / type-literal method, call, construct, and accessor signatures) — grammar errors acorn, tsc, and prettier all reject — covered by `tests/fixtures/typescript/typescript_specific/decorators/{parameter_arrow,type_member_signature}/`. The lone divergence is `async <T>(@dec a) => a`, which acorn accepts only because of its async-generic param-drop bug; tsv rejects it to match tsc (see `tests/fixtures/typescript/expressions/arrow/async_generic/param_decorator_svelte_divergence/`).
 
 Note: An ambient (`declare class`) member parses decorators exactly like a concrete member — TS's "decorators are not valid here" (TS1206) is a config-dependent early-error (tsc accepts `@dec declare field` under `experimentalDecorators`, rejects it under ES decorators), so the parser accepts structurally and defers the check to the diagnostics layer. Covered by `tests/fixtures/typescript/typescript_specific/declare/class/member_decorators/`.
 
@@ -733,7 +733,7 @@ Parse output matches acorn-typescript (the parser Svelte uses for `<script lang=
 
 **`<const T>` in classes**: The tsv parser supports const type parameters on classes (`class Foo<const T>`), but acorn-typescript doesn't. See `typescript/generics/const_type_param_class_svelte_divergence/`.
 
-**Parameter decorators**: Parsed as syntax (legacy-TypeScript, predating the ES2023 decorator standard) and attached to the parameter's `decorators` — see `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. tsv accepts all decorator positions: class, method, field, accessor, auto-accessor, and parameter.
+**Parameter decorators**: Parsed as syntax (legacy-TypeScript, predating the ES2023 decorator standard) and attached to the parameter's `decorators` — see `tests/fixtures/typescript/typescript_specific/decorators/parameter/`. tsv accepts decorators in every member position (class, method, field, accessor, auto-accessor) and on parameters in the positions acorn parses them (function/method/constructor/object-method/ambient params), while **rejecting** parameter decorators where acorn + tsc + prettier all reject — arrow parameters and type-member signatures (see the boundary note under §Decorators).
 
 ---
 

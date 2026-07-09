@@ -82,7 +82,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Params + body in the arrow's `[~Await]` context (a non-async arrow is
         // `[~Await]`; the return type between them is await-free).
         let (params, return_type, body) = self.with_in_await(false, |p| {
-            let params = p.parse_parameter_list()?.into_bump_slice();
+            let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Return type annotation: <T>(): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
             p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
@@ -142,7 +142,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Params + body in the arrow's `[~Await]` context (non-async).
         let (params, return_type, body) = self.with_in_await(false, |p| {
-            let params = p.parse_parameter_list()?.into_bump_slice();
+            let params = p.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Return type annotation: (): type => ... or type predicate
             let return_type = p.parse_optional_return_type()?;
             p.expect_arrow()?; // consume '=>' (no LineTerminator before it)
@@ -221,7 +221,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let (paren_pos, _) = self.current_pos();
             (
                 // Async arrow params are `[+Await]`.
-                self.with_in_await(true, Self::parse_parameter_list)?
+                self.with_in_await(true, Self::parse_parameter_list_no_decorators)?
                     .into_bump_slice(),
                 Some(paren_pos as u32),
             )

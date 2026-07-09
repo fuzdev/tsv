@@ -196,12 +196,39 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Parse a parenthesized parameter list: `(a, b, c)`
+    /// Parse a parenthesized parameter list: `(a, b, c)`, **allowing** parameter
+    /// decorators (`@dec a`).
     ///
-    /// Used by function declarations, method shorthand, and arrow functions.
+    /// Used by function declarations/expressions, class methods and the
+    /// constructor, object-literal methods, and ambient `declare function`s —
+    /// every position acorn's `parseAssignableListItem` parses decorators in.
     /// Consumes both opening and closing parentheses.
     pub(super) fn parse_parameter_list(
         &mut self,
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+        self.parse_parameter_list_inner(true)
+    }
+
+    /// Parse a parenthesized parameter list that **rejects** parameter decorators.
+    ///
+    /// Used where a decorator is a grammar error acorn also rejects: arrow-function
+    /// parameters (acorn parses the `(…)` as a parenthesized expression first, where
+    /// a leading `@` is a class decorator — "Leading decorators must be attached to a
+    /// class declaration") and type-member signatures (interface / type-literal
+    /// method, call, construct, and accessor signatures — "Unexpected character
+    /// '@'"). tsc and prettier reject both ("Decorators are not valid here"), so this
+    /// is an unconditional-local grammar violation rejected inline for drop-in parity.
+    pub(super) fn parse_parameter_list_no_decorators(
+        &mut self,
+    ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
+        self.parse_parameter_list_inner(false)
+    }
+
+    /// Shared parameter-list body. `allow_decorators` gates whether a leading `@` on
+    /// a parameter is parsed as a decorator (`true`) or rejected (`false`).
+    fn parse_parameter_list_inner(
+        &mut self,
+        allow_decorators: bool,
     ) -> Result<bumpalo::collections::Vec<'arena, Expression<'arena>>, ParseError> {
         self.expect(&TokenKind::ParenOpen)?;
 
@@ -213,6 +240,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // (`@dec private a`) or a destructuring pattern (`@dec { a }: T`), not
                 // just a bare identifier — and the decorators are attached afterwards.
                 let decorators: &'arena [Decorator<'arena>] = if self.check(&TokenKind::At) {
+                    // Reject decorators where the position forbids them (arrow
+                    // parameters, type-member signatures). Checked per-parameter, so
+                    // a mid-list decorator (`(a, @dec b)`) rejects too.
+                    if !allow_decorators {
+                        return Err(self.error_msg("Decorators are not valid here"));
+                    }
                     // Uses the shared restricted ES decorators grammar
                     // (`parse_decorator_expression`), NOT a full assignment
                     // expression — so `@dec [a, b]` reads as a decorator on `dec`
