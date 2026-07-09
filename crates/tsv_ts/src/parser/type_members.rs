@@ -122,7 +122,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.check(&TokenKind::ParenOpen) || self.check(&TokenKind::LessThan) {
             // Parse optional type parameters: <T>
             let type_parameters = self.parse_optional_type_parameters()?;
-            let params = self.parse_parameter_list()?.into_bump_slice();
+            let params = self.parse_parameter_list_no_decorators()?.into_bump_slice();
             self.check_signature_params(params)?;
             let (return_type, end) = self.parse_signature_return_type(true)?;
             return Ok(TSTypeElement::CallSignature(TSCallSignatureDeclaration {
@@ -144,7 +144,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.advance()?;
                 // Parse optional type parameters: <T>
                 let type_parameters = self.parse_optional_type_parameters()?;
-                let params = self.parse_parameter_list()?.into_bump_slice();
+                let params = self.parse_parameter_list_no_decorators()?.into_bump_slice();
                 self.check_signature_params(params)?;
                 let (return_type, end) = self.parse_signature_return_type(false)?;
                 return Ok(TSTypeElement::ConstructSignature(
@@ -262,7 +262,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 return Err(self.error_msg("An accessor cannot have type parameters"));
             }
 
-            let params = self.parse_parameter_list()?.into_bump_slice();
+            let params = self.parse_parameter_list_no_decorators()?.into_bump_slice();
             // Every signature param must be a plain binding (no default / parameter
             // property) — acorn's `tsParseBindingListForSignature`.
             self.check_signature_params(params)?;
