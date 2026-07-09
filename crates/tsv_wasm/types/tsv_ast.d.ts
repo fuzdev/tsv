@@ -1505,7 +1505,8 @@ export interface TSIndexSignature {
 	/** Omitted from JSON when false. */
 	readonly?: boolean;
 	parameters: Identifier[];
-	typeAnnotation: TSTypeAnnotation;
+	/** Omitted from JSON for a typeless index signature (`[key: string]`). */
+	typeAnnotation?: TSTypeAnnotation;
 }
 
 export interface TSUnionType {

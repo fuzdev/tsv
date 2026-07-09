@@ -601,6 +601,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Check for index signature: [key: Type]: ValueType
         // Index signatures look like `[ident: Type]` followed by `: ValueType`
         if self.is_index_signature_start() {
+            // An accessibility modifier (public/private/protected) cannot appear on
+            // an index signature — acorn and prettier both reject it (tsc TS1071).
+            // Unconditional-local grammar violation → reject inline. (`readonly` and
+            // `static` are the only modifiers an index signature accepts.)
+            if accessibility.is_some() {
+                return Err(
+                    self.error_msg("Index signatures cannot have an accessibility modifier")
+                );
+            }
             return self.parse_class_index_signature(start, is_static, readonly);
         }
 
@@ -1014,16 +1023,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Consume `]`
         self.expect(&TokenKind::BracketClose)?;
+        let bracket_end = self.prev_token_end() as u32;
 
-        // Parse value type annotation: `: ValueType`
+        // The value type annotation is optional — a typeless index signature
+        // (`[key: string]`) is valid grammar (see `parse_index_signature_body`);
+        // the missing type is a deferred tsc checker error (TS1021), not a parse error.
         let value_type = if self.check(&TokenKind::Colon) {
-            self.parse_type_annotation()?
+            Some(self.parse_type_annotation()?)
         } else {
-            return Err(self.error_expected("type annotation for index signature value"));
+            None
         };
 
         // Consume semicolon, including it in the span
-        let mut end = value_type.span.end;
+        let mut end = value_type.as_ref().map_or(bracket_end, |t| t.span.end);
         if self.eat(TokenKind::Semicolon) {
             end = self.prev_token_end() as u32;
         }

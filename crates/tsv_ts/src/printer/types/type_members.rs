@@ -583,58 +583,67 @@ impl<'a> Printer<'a> {
         };
         parts.push(bracket_group);
 
-        // Detect comments between `]` and the value `:` (search only up to the colon,
-        // not the type start). Emission is below, after the value type is built.
-        let val_colon_pos = idx.type_annotation.span.start;
-        let has_bracket_colon_comment =
-            bracket_close_pos.is_some_and(|cp| self.has_comments_between(cp + 1, val_colon_pos));
-        let bracket_colon_has_line = bracket_close_pos
-            .is_some_and(|cp| self.has_line_comments_between(cp + 1, val_colon_pos));
+        // Build the value type annotation when present, then record where the
+        // content→`;` gap begins for the shared terminator handling below. A typeless
+        // index signature (`[key: string]`) has no value `:`/type, so its gap starts
+        // just past `]`.
+        let gap_start = if let Some(type_annotation) = &idx.type_annotation {
+            // Detect comments between `]` and the value `:` (search only up to the colon,
+            // not the type start). Emission is below, after the value type is built.
+            let val_colon_pos = type_annotation.span.start;
+            let has_bracket_colon_comment = bracket_close_pos
+                .is_some_and(|cp| self.has_comments_between(cp + 1, val_colon_pos));
+            let bracket_colon_has_line = bracket_close_pos
+                .is_some_and(|cp| self.has_line_comments_between(cp + 1, val_colon_pos));
 
-        // Build the value type annotation. Both branches delegate to the shared
-        // `build_type_annotation_doc`, which owns the value-`:`→type comment handling
-        // (a line comment breaks + indents so the `//` can't swallow the type), the
-        // redundant comment-free paren stripping, and the union (break-after-`:` to
-        // leading-`|`) / intersection (hug `:`, continuations wrap) layouts. The only
-        // difference is the `]`→value-`:` comment, emitted here: it sits after `]`
-        // (prettier relocates it into the brackets).
-        let val_annotation = self.build_type_annotation_doc(&idx.type_annotation);
-        match bracket_close_pos {
-            Some(close_pos) if has_bracket_colon_comment && bracket_colon_has_line => {
-                // A line comment in this gap: the first comment trails `]` on its line,
-                // then the remaining comments and the value `:` drop to continuation
-                // lines indented one level (uniform forced-continuation indent, the
-                // shared `build_continuation_indent` — each line comment ends its own
-                // line so a `//` can't swallow the next comment or the `: V`). Mirrors
-                // the `: Type` line-comment layout in `build_type_annotation_doc`.
-                parts.push(self.build_continuation_indent(
-                    close_pos + 1,
-                    val_colon_pos,
-                    val_annotation,
-                ));
-            }
-            Some(close_pos) if has_bracket_colon_comment => {
-                // Block-only comment(s): stay inline before the value `:`, which keeps
-                // its own line (`[k: T] /* c */ : V`).
-                for comment in comments_in_range(self.comments, close_pos + 1, val_colon_pos) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
+            // Build the value type annotation. Both branches delegate to the shared
+            // `build_type_annotation_doc`, which owns the value-`:`→type comment handling
+            // (a line comment breaks + indents so the `//` can't swallow the type), the
+            // redundant comment-free paren stripping, and the union (break-after-`:` to
+            // leading-`|`) / intersection (hug `:`, continuations wrap) layouts. The only
+            // difference is the `]`→value-`:` comment, emitted here: it sits after `]`
+            // (prettier relocates it into the brackets).
+            let val_annotation = self.build_type_annotation_doc(type_annotation);
+            match bracket_close_pos {
+                Some(close_pos) if has_bracket_colon_comment && bracket_colon_has_line => {
+                    // A line comment in this gap: the first comment trails `]` on its line,
+                    // then the remaining comments and the value `:` drop to continuation
+                    // lines indented one level (uniform forced-continuation indent, the
+                    // shared `build_continuation_indent` — each line comment ends its own
+                    // line so a `//` can't swallow the next comment or the `: V`). Mirrors
+                    // the `: Type` line-comment layout in `build_type_annotation_doc`.
+                    parts.push(self.build_continuation_indent(
+                        close_pos + 1,
+                        val_colon_pos,
+                        val_annotation,
+                    ));
                 }
-                parts.push(d.text(" "));
-                parts.push(val_annotation);
+                Some(close_pos) if has_bracket_colon_comment => {
+                    // Block-only comment(s): stay inline before the value `:`, which keeps
+                    // its own line (`[k: T] /* c */ : V`).
+                    for comment in comments_in_range(self.comments, close_pos + 1, val_colon_pos) {
+                        parts.push(d.text(" "));
+                        parts.push(self.build_comment_doc(comment));
+                    }
+                    parts.push(d.text(" "));
+                    parts.push(val_annotation);
+                }
+                _ => parts.push(val_annotation),
             }
-            _ => parts.push(val_annotation),
-        }
+            type_annotation.span.end
+        } else {
+            bracket_close_pos.map_or(idx.span.end, |cp| cp + 1)
+        };
 
-        // Comments in the value-type→`;` gap (`[k: string]: T /* c */;`). Without this
-        // they were dropped (content loss) — nothing else covers this gap: the member
-        // doc ends at the value type, and the joiner's `content_end` starts at the `;`.
-        // Same-line comments stay before the `;` (a block inline, a line via
-        // `line_suffix`); an own-line comment defers to `deferred` for the joiner to
-        // emit after the `;`, matching prettier.
+        // Comments in the content→`;` gap (`[k: string]: T /* c */;`, or a typeless
+        // `[k: string] /* c */;`). Without this they were dropped (content loss) —
+        // nothing else covers this gap: the member doc ends at the content, and the
+        // joiner's `content_end` starts at the `;`. Same-line comments stay before the
+        // `;` (a block inline, a line via `line_suffix`); an own-line comment defers to
+        // `deferred` for the joiner to emit after the `;`, matching prettier.
         deferred.extend(self.split_member_terminator_gap_comments(
             &mut parts,
-            idx.type_annotation.span.end,
+            gap_start,
             idx.span.end,
         ));
 
