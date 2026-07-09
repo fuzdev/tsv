@@ -666,8 +666,20 @@ fn parse_function_value<'arena>(
 
         parser.skip_whitespace()?;
     } else {
-        // Other unknown functions - consume everything until )
-        while !parser.check(TokenKind::RightParen) && !parser.check(TokenKind::Eof) {
+        // Other unknown functions (e.g. `scope((.a) to (.b))`, css-cascade-6 scoped
+        // `@import`) — consume the args opaquely to the MATCHING `)`. Per CSS Syntax 3
+        // §consume-a-function the contents are a component-value list, so a nested
+        // `(…)`/`fn(…)` must not end the arg at its first inner `)`; track paren depth
+        // like the `supports` branch above. Args stay empty — the printer and public-AST
+        // conversion reconstruct the function verbatim from its span.
+        let mut depth: u32 = 0;
+        while !parser.check(TokenKind::Eof) {
+            match parser.current_kind {
+                TokenKind::RightParen if depth == 0 => break,
+                TokenKind::LeftParen => depth += 1,
+                TokenKind::RightParen => depth -= 1,
+                _ => {}
+            }
             parser.advance()?;
         }
     }
