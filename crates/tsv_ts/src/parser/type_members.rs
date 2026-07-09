@@ -247,6 +247,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let type_parameters = self.parse_optional_type_parameters()?;
 
             let params = self.parse_parameter_list()?.into_bump_slice();
+
+            // A `get`/`set` accessor signature must obey the accessor arity grammar
+            // (getter: no params; setter: exactly one non-rest param) — acorn rejects
+            // a violation at parse, so tsv does too (drop-in parity).
+            if let Some(k) = accessor_kind {
+                let is_getter = matches!(k, MethodKind::Get);
+                // A type-member accessor counts a `this` param toward arity (acorn
+                // rejects such a `this` param, and the count check does too for the
+                // getter / 2-param setter forms), so `allow_this_param = false`.
+                self.check_accessor_param_arity(is_getter, params, false)?;
+                // A type-member setter additionally rejects an optional parameter at
+                // parse (acorn's `SetAccesorCannotHaveOptionalParameter`, TS1051) —
+                // unlike a value-position setter, where tsv defers TS1051 to the
+                // diagnostics layer.
+                if !is_getter
+                    && let Expression::Identifier(id) = &params[0]
+                    && id.optional
+                {
+                    return Err(
+                        self.error_msg("A 'set' accessor cannot have an optional parameter")
+                    );
+                }
+            }
+
             let (return_type, end) = self.parse_signature_return_type(true)?;
 
             return Ok(TSTypeElement::MethodSignature(TSMethodSignature {

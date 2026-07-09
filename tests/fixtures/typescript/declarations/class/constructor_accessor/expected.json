@@ -1,0 +1,392 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 297,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `static` accessor named `constructor` is not the constructor — valid.",
+			"start": 32,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A computed `['constructor']` key is a normal accessor, not the constructor — valid.",
+			"start": 170,
+			"end": 256,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 88
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 296,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 287,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 9,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 286,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 28,
+						"end": 286,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "MethodDefinition",
+								"start": 109,
+								"end": 136,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 29
+									}
+								},
+								"static": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 120,
+									"end": 131,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 13
+										},
+										"end": {
+											"line": 4,
+											"column": 24
+										}
+									},
+									"name": "constructor"
+								},
+								"kind": "get",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 131,
+									"end": 136,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 24
+										},
+										"end": {
+											"line": 4,
+											"column": 29
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 134,
+										"end": 136,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 27
+											},
+											"end": {
+												"line": 4,
+												"column": 29
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A `static` accessor named `constructor` is not the constructor — valid.",
+										"start": 32,
+										"end": 106
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 139,
+								"end": 167,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 30
+									}
+								},
+								"static": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 150,
+									"end": 161,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 13
+										},
+										"end": {
+											"line": 5,
+											"column": 24
+										}
+									},
+									"name": "constructor"
+								},
+								"kind": "set",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 161,
+									"end": 167,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 24
+										},
+										"end": {
+											"line": 5,
+											"column": 30
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 162,
+											"end": 163,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 25
+												},
+												"end": {
+													"line": 5,
+													"column": 26
+												}
+											},
+											"name": "v"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 165,
+										"end": 167,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 28
+											},
+											"end": {
+												"line": 5,
+												"column": 30
+											}
+										},
+										"body": []
+									}
+								}
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 259,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 26
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "Literal",
+									"start": 264,
+									"end": 277,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 7
+										},
+										"end": {
+											"line": 7,
+											"column": 20
+										}
+									},
+									"value": "constructor",
+									"raw": "'constructor'"
+								},
+								"kind": "get",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 278,
+									"end": 283,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 21
+										},
+										"end": {
+											"line": 7,
+											"column": 26
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 281,
+										"end": 283,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 24
+											},
+											"end": {
+												"line": 7,
+												"column": 26
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A computed `['constructor']` key is a normal accessor, not the constructor — valid.",
+										"start": 170,
+										"end": 256
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

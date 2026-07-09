@@ -188,6 +188,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Getter/setter: `get x() {}` or `set x(v) {}`
                 // Note: getters/setters cannot be async
                 let func_expr = self.parse_method_body(false, false)?;
+                // Enforce accessor arity (getter: no params; setter: exactly one
+                // non-rest param) — acorn rejects a violation at parse, tsv matches
+                // (see `check_accessor_param_arity`). An object-literal accessor
+                // excludes a leading `this` param from the count (`allow_this_param`).
+                self.check_accessor_param_arity(
+                    accessor == PropertyKind::Get,
+                    func_expr.params,
+                    true,
+                )?;
                 (
                     accessor,
                     Expression::FunctionExpression(func_expr),

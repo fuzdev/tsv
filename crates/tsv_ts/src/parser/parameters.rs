@@ -411,4 +411,65 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::ParenClose)?;
         Ok(params)
     }
+
+    /// Enforce accessor parameter arity: a getter takes no parameters and a
+    /// setter takes exactly one non-rest parameter. A faithful port of acorn's
+    /// getter/setter param checks (JS grammar, mode-independent) — these are
+    /// unconditional-local early-errors acorn rejects at parse, so tsv rejects
+    /// too for drop-in parity.
+    ///
+    /// `allow_this_param` mirrors acorn's per-context `this`-parameter handling:
+    /// an object-literal accessor excludes a leading `this` pseudo-parameter
+    /// (`this: T`) from the count — `get x(this)` / `set x(this, v)` are valid —
+    /// whereas a class-member accessor counts it (acorn's class path has no such
+    /// exclusion), and a type-member accessor likewise counts it (so `this`
+    /// pushes a getter to 1 / a setter to 2 and rejects on count).
+    ///
+    /// NOT enforced here: the TS-checker-only rules on the single setter
+    /// parameter (optional `set x(a?)` = TS1051, default `set x(a = 1)` =
+    /// TS1052), which acorn accepts in value positions and tsv defers to the
+    /// diagnostics layer — an optional/default param is an `Identifier` /
+    /// `AssignmentPattern`, not a `RestElement`, so it passes unchanged. (A
+    /// *type-member* setter's optional-param rejection, which acorn does enforce
+    /// at parse, is applied at that call site.) Shared by the class-member,
+    /// object-literal, and type-member accessor parsers.
+    pub(super) fn check_accessor_param_arity(
+        &self,
+        is_getter: bool,
+        params: &[Expression<'arena>],
+        allow_this_param: bool,
+    ) -> Result<(), ParseError> {
+        let mut expected = if is_getter { 0 } else { 1 };
+        if allow_this_param && params.first().is_some_and(|p| self.is_this_param(p)) {
+            expected += 1;
+        }
+        if params.len() != expected {
+            return Err(self.error_msg(if is_getter {
+                "getter should have no params"
+            } else {
+                "setter should have exactly one param"
+            }));
+        }
+        if !is_getter && matches!(params.first(), Some(Expression::RestElement(_))) {
+            return Err(self.error_msg("Setter cannot use rest params"));
+        }
+        Ok(())
+    }
+
+    /// Whether a parameter is the TypeScript `this` pseudo-parameter (`this: T`)
+    /// — a bare `this` identifier binding, matching acorn's `isThisParam`. Never
+    /// escaped (it's the reserved word), so a raw source-slice compare on the
+    /// name sub-span suffices. The node span is in **host** coordinates
+    /// (`base_offset` added), so it shifts back before slicing `self.source` (the
+    /// local, possibly Svelte-embedded slice) — same discipline as
+    /// `resolve_cooked`; `.get` keeps a stray span from panicking.
+    fn is_this_param(&self, param: &Expression<'arena>) -> bool {
+        let Expression::Identifier(id) = param else {
+            return false;
+        };
+        let name = id.name_span();
+        let start = (name.start as usize).saturating_sub(self.base_offset);
+        let end = (name.end as usize).saturating_sub(self.base_offset);
+        self.source.get(start..end) == Some("this")
+    }
 }
