@@ -318,8 +318,9 @@ if (no_check) {
 // them here means a release can't ship a parse/format regression the in-repo gate
 // is structurally blind to. Skipped by --no-check alongside Step 3.
 //
-// The gates need the ../svelte + ../acorn-typescript + ../typescript checkouts
-// and the benches/js `node_modules` sidecar (`deno task bench:install`). The
+// The gates need the ../svelte + ../acorn-typescript + ../typescript +
+// ../typescript-go checkouts and the benches/js `node_modules` sidecar
+// (`deno task bench:install`). The
 // probe must cover every oracle the aggregate's legs need — the gates
 // themselves fail closed on a missing checkout, so the probe is the ONE
 // tolerance point: a dry-run warn-and-skips (clean machines can still
@@ -337,6 +338,9 @@ if (no_check) {
 		exists('../svelte/packages/svelte/tests') ? null : '../svelte checkout',
 		exists('../acorn-typescript/test') ? null : '../acorn-typescript checkout',
 		exists('../typescript/tests') ? null : '../typescript checkout',
+		exists('../typescript-go/testdata/baselines/reference/submodule')
+			? null
+			: '../typescript-go checkout',
 		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)',
 	].filter((m): m is string => m !== null);
 	if (missing.length > 0 && wetrun) {

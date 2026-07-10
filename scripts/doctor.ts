@@ -163,6 +163,15 @@ if (exists('../typescript/tests/baselines/reference')) {
 	warn('../typescript present but tests/baselines/reference missing — conformance:ts-repo will FAIL (partial checkout)');
 } else warn('../typescript checkout missing — conformance:ts-repo needs it');
 
+// Git-SHA-pinned like ../typescript (not npm-versioned), so — same as ../typescript
+// — it isn't in pins:audit; presence is checked here, and its pinned tsgo commit is
+// enforced by the Rust roundtrip count-pins (ROUNDTRIP_PASS_PIN / BASELINE_COUNT_PIN).
+if (exists('../typescript-go/testdata/baselines/reference/submodule')) {
+	ok('../typescript-go checkout (tsgo baselines present)');
+} else if (exists('../typescript-go')) {
+	warn('../typescript-go present but testdata/baselines/reference/submodule missing — conformance:tsc-roundtrip will FAIL (partial checkout)');
+} else warn('../typescript-go checkout missing — conformance:tsc-roundtrip needs it');
+
 // Informational (NOT gated by pins:audit — see its docstring): the prettier
 // checkout is a reading reference + corpus-suite source whose oracle output is
 // computed live per file, and it legitimately rides `-dev` versions.

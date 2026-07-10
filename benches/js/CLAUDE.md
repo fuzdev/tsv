@@ -399,18 +399,21 @@ green-skipping (the baselines are the oracle; publish Step 3b's probe is the
 tolerance point). Full-corpus runs freshness-check `KNOWN_GAPS` (stale entries fail).
 
 **Pre-release aggregate — `deno task conformance`.** The three parse-conformance
-gates (svelte-fixtures, ts-fixtures, ts-repo), plus
-`corpus:compare:parse --all` and `corpus:compare:format --all`, are the
-release-cadence correctness gates that run against external oracles (and so can't
-live in `deno task check`). `deno task conformance` builds the corpus FFI once and
-runs all five legs in **ONE process** (`conformance.ts`, the driver): the canonical
-oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) load
-once via the module cache instead of once per leg, each leg gets a timing line, and
-failure semantics match a `&&` chain exactly (every leg exits the process on a
-finding — fail-fast). The driver takes no arguments; the per-leg tasks remain the
-scoped/triage entries. It is wired into `scripts/publish.ts` **Step 3b**
-(skipped by `--no-check`). Step 3b preflights the oracles (`../svelte`,
-`../acorn-typescript`, `../typescript`, this dir's `node_modules`): a missing one
+gates (svelte-fixtures, ts-fixtures, ts-repo), the `tsc_conformance` roundtrip
+self-check (`tsc-roundtrip` — checker-conformance vs tsgo's `.errors.txt`
+baselines, not parse; the one pure-Rust leg, shelled out via `cargo`, so the task
+carries `--allow-run=cargo`), plus `corpus:compare:parse --all` and
+`corpus:compare:format --all`, are the release-cadence correctness gates that run
+against external oracles (and so can't live in `deno task check`). `deno task
+conformance` builds the corpus FFI once and runs all six legs in **ONE process**
+(`conformance.ts`, the driver): the canonical oracle modules (prettier, the svelte
+plugin, svelte/compiler, acorn, acorn-ts) load once via the module cache instead of
+once per leg, each leg gets a timing line, and failure semantics match a `&&` chain
+exactly (every leg exits the process on a finding — fail-fast). The driver takes no
+arguments; the per-leg tasks remain the scoped/triage entries. It is wired into
+`scripts/publish.ts` **Step 3b** (skipped by `--no-check`). Step 3b preflights the
+oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../typescript-go`,
+this dir's `node_modules`): a missing one
 **FAILS a `--wetrun`** (only the explicit `--no-check` releases without gates),
 warn-and-skips a dry-run, and any skip is re-warned in the run's final summary.
 The gates themselves fail closed on a missing checkout (0 scanned = FAIL), so a

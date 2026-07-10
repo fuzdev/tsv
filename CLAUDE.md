@@ -246,7 +246,7 @@ Package shape: built from the wasm-pack `web` target, then `scripts/patch_npm_pa
 
 `scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → conformance → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). The user keeps it updated as work lands — agents don't touch `CHANGELOG.md` (see [Committing](#committing)). A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
 
-**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`) and the tsc corpus (`conformance:ts-repo`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript` checkouts + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format is re-run and must reproduce byte-identically), so treat it as real; the historical FFI heisenbug now surfaces as a loud `native format nondeterminism` per-file error instead (see ./benches/js/CLAUDE.md §Known Issues).
+**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`) and the tsc corpus (`conformance:ts-repo`), the `tsc_conformance` roundtrip self-check vs tsgo's `.errors.txt` baselines (`conformance:tsc-roundtrip`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../typescript-go` checkouts + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format is re-run and must reproduce byte-identically), so treat it as real; the historical FFI heisenbug now surfaces as a loud `native format nondeterminism` per-file error instead (see ./benches/js/CLAUDE.md §Known Issues).
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation
@@ -806,15 +806,22 @@ cargo run -p tsv_debug tsc_conformance query denominators        # test-identity
 # roundtrip - parse every baseline → re-render → byte-compare (the P0 self-check):
 # proves the .errors.txt parser + renderer port in one move, no checker involved.
 cargo run -p tsv_debug tsc_conformance roundtrip                 # full self-check (all baselines)
+deno task conformance:tsc-roundtrip                              # the same, as a deno task
 cargo run -p tsv_debug tsc_conformance roundtrip compiler/async  # filter by path substring (skips the pins)
 # Options: --path, --json, --verbose (list every failing path). A full (unfiltered)
 # run enforces two exact regression pins — total baselines and byte-identical count —
 # and fails the process on drift; a re-pin is deliberate (a code change or a tsgo pull).
 ```
 
-A manual harness (self-checking pins on a full run), not part of `deno task check`
-or the automated release conformance step. Failing baselines are bucketed by their
-most salient format feature (a triage taxonomy, not a proof of cause).
+`roundtrip` is a **leg of `deno task conformance`** (the pre-release aggregate) and
+so runs in publish **Step 3b** — its two exact pins fail a release on drift.
+`../typescript-go` is therefore a release-required oracle there (a missing checkout
+FAILS a `--wetrun`, warn-skips a dry-run, is re-warned in the final summary), and
+`deno task doctor` reports its readiness. Like `../typescript` it is a git-SHA
+checkout, so — matching that precedent — it is **not** in `pins:audit` (npm-version
+only); its tsgo commit is pinned by the Rust count-pins. It stays out of
+`deno task check` (which is external-oracle-free). Failing baselines are bucketed by
+their most salient format feature (a triage taxonomy, not a proof of cause).
 
 **Performance Profiling Commands:**
 
