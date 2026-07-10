@@ -5,9 +5,10 @@
 //! submodule that is often unmaterialized.
 
 use crate::cli::CliError;
+use crate::tsc_conformance::index::IndexReport;
 use crate::tsc_conformance::{
-    baselines_dir, corpus_materialized, denominators, discover_baselines, histogram, run_roundtrip,
-    tests_by_code,
+    baselines_dir, corpus_materialized, denominators, discover_baselines, histogram, run_index,
+    run_roundtrip, tests_by_code,
 };
 use argh::FromArgs;
 use std::path::PathBuf;
@@ -31,6 +32,37 @@ const ROUNDTRIP_PASS_PIN: usize = 7033;
 /// typescript-go pull.
 const PRETTY_PATH_PIN: usize = 14;
 
+/// REGRESSION PINS (exact, two-sided) for the `index` corpus-input self-checks.
+/// Measured 2026-07-10, ../typescript-go at 168e7015 (`_submodules/TypeScript`
+/// corpus materialized). Every move is a deliberate re-pin (a harness-port change,
+/// or a typescript-go pull). The corpus files:
+const INDEX_TOTAL_SCANNED_PIN: usize = 12445;
+const INDEX_TS_PIN: usize = 12114;
+const INDEX_TSX_PIN: usize = 330;
+const INDEX_JS_PIN: usize = 1;
+/// Static test-level skips (`skippedTests`) and per-directory sizing.
+const INDEX_SKIPPED_TESTS_PIN: usize = 45;
+const INDEX_SINGLE_FILE_PIN: usize = 10388;
+const INDEX_MULTI_FILE_PIN: usize = 2012;
+/// Selection-predicate denominators.
+const INDEX_JSX_SCOPED_PIN: usize = 379;
+const INDEX_JS_FLAVORED_PIN: usize = 934;
+const INDEX_PRETTY_TESTS_PIN: usize = 14;
+const INDEX_BASENAME_COLLISIONS_PIN: usize = 0;
+const INDEX_CAP_EXCEEDED_PIN: usize = 0;
+/// Variant sizing: total variants, the variant-level (unsupported-option) skips,
+/// the non-skipped variants, and the expect-clean count.
+const INDEX_VARIANT_TOTAL_PIN: usize = 14916;
+const INDEX_SKIPPED_VARIANTS_PIN: usize = 2068;
+const INDEX_NONSKIP_VARIANTS_PIN: usize = 12848;
+const INDEX_EXPECT_CLEAN_PIN: usize = 5815;
+/// Gate 1 (baseline join): every on-disk baseline matches one non-skipped variant.
+const INDEX_JOIN_MATCHED_PIN: usize = 7033;
+/// Gate 2 (unit-text round-trip): non-pretty baselined tests whose units reproduce
+/// their section bodies, and the pretty baselines carved out.
+const INDEX_UNIT_ROUNDTRIP_PIN: usize = 7019;
+const INDEX_UNIT_ROUNDTRIP_PRETTY_PIN: usize = 14;
+
 /// Query the tsgo TypeScript conformance baselines.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "tsc_conformance")]
@@ -44,6 +76,7 @@ pub struct TscConformanceCommand {
 enum TscConformanceSub {
     Query(QueryCommand),
     Roundtrip(RoundtripCommand),
+    Index(IndexCommand),
 }
 
 /// Answer an ad-hoc question over the baselines.
@@ -93,12 +126,175 @@ pub struct RoundtripCommand {
     filters: Vec<String>,
 }
 
+/// Corpus-input self-check (the S1 gates): index the tsc corpus, expand every
+/// test's varyBy variants, and prove three invariants against the on-disk
+/// baselines — the join (every baseline maps to one non-skipped variant), the
+/// unit-text round-trip (units reproduce the `====` section bodies), and the
+/// denominator pins. Zero checker code. Exit 0 only when all three pass and the
+/// pins hold (two-sided); filters are not offered — the pins need the full run.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "index")]
+pub struct IndexCommand {
+    /// path to the typescript-go checkout (default: ../typescript-go)
+    #[argh(option, default = "PathBuf::from(\"../typescript-go\")")]
+    path: PathBuf,
+
+    /// emit a JSON report instead of the human summary
+    #[argh(switch)]
+    json: bool,
+
+    /// list every unmatched baseline, mismatch, and unknown directive
+    #[argh(switch)]
+    verbose: bool,
+}
+
 impl TscConformanceCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         match self.nested {
             TscConformanceSub::Query(query) => query.run(),
             TscConformanceSub::Roundtrip(rt) => rt.run(),
+            TscConformanceSub::Index(index) => index.run(),
         }
+    }
+}
+
+impl IndexCommand {
+    fn run(self) -> Result<(), CliError> {
+        // The corpus inputs must be materialized (unlike the baseline-only query
+        // and roundtrip tools).
+        if !corpus_materialized(&self.path) {
+            eprintln!(
+                "Error: the tsc corpus inputs are not materialized under {}.",
+                self.path.display()
+            );
+            eprintln!("Run `git submodule update --init` in ../typescript-go to materialize them.");
+            return Err(CliError::Failed);
+        }
+        let report = run_index(&self.path).map_err(|e| {
+            eprintln!("Error indexing corpus: {e}");
+            CliError::Failed
+        })?;
+
+        if self.json {
+            print_json(&report)?;
+        } else {
+            report.print(self.verbose);
+        }
+
+        enforce_index_pins(&report)
+    }
+}
+
+/// Enforce the `index` gates and denominator pins (all two-sided). Any failure
+/// prints the offending checks and exits non-zero.
+fn enforce_index_pins(report: &IndexReport) -> Result<(), CliError> {
+    let mut errs: Vec<String> = Vec::new();
+    let pin = |errs: &mut Vec<String>, label: &str, got: usize, want: usize| {
+        if got != want {
+            errs.push(format!("{label} {got} != pinned {want}"));
+        }
+    };
+
+    // Denominators (gate 3).
+    pin(&mut errs, "total scanned", report.total_scanned, INDEX_TOTAL_SCANNED_PIN);
+    pin(&mut errs, ".ts count", report.ts_count, INDEX_TS_PIN);
+    pin(&mut errs, ".tsx count", report.tsx_count, INDEX_TSX_PIN);
+    pin(&mut errs, ".js count", report.js_count, INDEX_JS_PIN);
+    pin(&mut errs, "skipped tests", report.skipped_tests, INDEX_SKIPPED_TESTS_PIN);
+    pin(&mut errs, "single-file", report.single_file, INDEX_SINGLE_FILE_PIN);
+    pin(&mut errs, "multi-file", report.multi_file, INDEX_MULTI_FILE_PIN);
+    pin(&mut errs, "jsx-scoped", report.jsx_scoped, INDEX_JSX_SCOPED_PIN);
+    pin(&mut errs, "js-flavored", report.js_flavored, INDEX_JS_FLAVORED_PIN);
+    pin(&mut errs, "pretty tests", report.pretty_tests, INDEX_PRETTY_TESTS_PIN);
+    pin(
+        &mut errs,
+        "basename collisions",
+        report.basename_collisions,
+        INDEX_BASENAME_COLLISIONS_PIN,
+    );
+    pin(&mut errs, "cap-exceeded", report.cap_exceeded, INDEX_CAP_EXCEEDED_PIN);
+    pin(&mut errs, "variant total", report.variant_total, INDEX_VARIANT_TOTAL_PIN);
+    pin(
+        &mut errs,
+        "skipped variants",
+        report.skipped_variants,
+        INDEX_SKIPPED_VARIANTS_PIN,
+    );
+    pin(
+        &mut errs,
+        "non-skipped variants",
+        report.nonskip_variants,
+        INDEX_NONSKIP_VARIANTS_PIN,
+    );
+    pin(&mut errs, "expect-clean", report.expect_clean, INDEX_EXPECT_CLEAN_PIN);
+
+    // Gate 1: baseline join.
+    pin(&mut errs, "baselines total", report.baselines_total, INDEX_JOIN_MATCHED_PIN);
+    pin(&mut errs, "join matched", report.join_matched, INDEX_JOIN_MATCHED_PIN);
+    if !report.join_unmatched.is_empty() {
+        errs.push(format!(
+            "{} unmatched baseline(s), e.g. {}",
+            report.join_unmatched.len(),
+            report.join_unmatched.first().map_or("", String::as_str)
+        ));
+    }
+    if !report.join_skipped_with_baseline.is_empty() {
+        errs.push(format!(
+            "{} baseline(s) map only to skipped variants, e.g. {}",
+            report.join_skipped_with_baseline.len(),
+            report.join_skipped_with_baseline.first().map_or("", String::as_str)
+        ));
+    }
+    if !report.join_ambiguous.is_empty() {
+        errs.push(format!(
+            "{} ambiguous baseline(s), e.g. {}",
+            report.join_ambiguous.len(),
+            report.join_ambiguous.first().map_or("", String::as_str)
+        ));
+    }
+
+    // Gate 2: unit-text round-trip.
+    pin(
+        &mut errs,
+        "unit round-trip checked",
+        report.unit_roundtrip_checked,
+        INDEX_UNIT_ROUNDTRIP_PIN,
+    );
+    pin(
+        &mut errs,
+        "unit round-trip pretty",
+        report.unit_roundtrip_pretty_skipped,
+        INDEX_UNIT_ROUNDTRIP_PRETTY_PIN,
+    );
+    if !report.unit_roundtrip_mismatches.is_empty() {
+        errs.push(format!(
+            "{} unit round-trip mismatch(es), e.g. {}",
+            report.unit_roundtrip_mismatches.len(),
+            report
+                .unit_roundtrip_mismatches
+                .first()
+                .map_or(String::new(), |m| m.baseline.clone())
+        ));
+    }
+
+    // Directive universe.
+    if !report.unknown_directives.is_empty() {
+        errs.push(format!(
+            "{} unknown directive(s): {}",
+            report.unknown_directives.len(),
+            report.unknown_directives.join(", ")
+        ));
+    }
+
+    if errs.is_empty() {
+        Ok(())
+    } else {
+        eprintln!(
+            "\nError: {}. If deliberate (a harness-port change, or a typescript-go pull), \
+             re-pin the INDEX_* constants.",
+            errs.join("; ")
+        );
+        Err(CliError::Failed)
     }
 }
 

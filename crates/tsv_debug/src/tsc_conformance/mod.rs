@@ -12,14 +12,26 @@
 //! [`pretty`] is its ANSI-colored `pretty=true` counterpart (model + parser +
 //! renderer); [`roundtrip`] parses → renders → byte-compares every baseline
 //! (the P0 self-check, `zero` checker code).
+//!
+//! The corpus-*input* side ([`corpus`], [`directives`], [`variants`],
+//! [`options_meta`], [`index`]) ports the tsgo test harness: it indexes the
+//! `tests/cases` inputs, parses their `// @` directives, expands their varyBy
+//! variants, and joins the derived variants back to the on-disk baselines — the
+//! substrate a future checker will drive, still zero checker code.
 
 pub mod baseline;
+pub mod corpus;
+pub mod directives;
 pub mod discovery;
+pub mod index;
+pub mod options_meta;
 pub mod pretty;
 pub mod query;
 pub mod render;
 pub mod roundtrip;
+pub mod variants;
 
 pub use discovery::{baselines_dir, corpus_materialized, discover_baselines};
+pub use index::run_index;
 pub use query::{denominators, histogram, tests_by_code};
 pub use roundtrip::run_roundtrip;

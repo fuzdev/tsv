@@ -789,11 +789,13 @@ See ./docs/conformance_test262.md.
 
 Pure-Rust harness over tsgo's committed `.errors.txt` error baselines (in
 `../typescript-go`, oracle pin `168e7015`, read from the checked-in
-`testdata/baselines/reference/submodule` — **not** the large, often-unmaterialized
-`_submodules/TypeScript` corpus, so it runs on a bare checkout). No Deno, **zero
-checker code**. Distinct from the parser-conformance surfaces: `conformance:ts-repo`
-grades tsv's *parser* against the tsc corpus, whereas this reads tsgo's *checker*
-error output — the seam a future tsv checker will emit through.
+`testdata/baselines/reference/submodule`). No Deno, **zero checker code**.
+`query`/`roundtrip` need only the baselines, so they run on a bare checkout;
+`index` additionally requires the materialized `_submodules/TypeScript` corpus
+(`git submodule update --init`). Distinct from the parser-conformance surfaces:
+`conformance:ts-repo` grades tsv's *parser* against the tsc corpus, whereas this
+reads tsgo's *checker* error output — the seam a future tsv checker will emit
+through.
 
 ```bash
 # query - aggregations over every baseline's summary block
@@ -815,6 +817,18 @@ cargo run -p tsv_debug tsc_conformance roundtrip compiler/async  # filter by pat
 # enforces three exact pins — total baselines, byte-identical count, and the
 # pretty-path count — plus a 100% invariant, failing on any drift; a re-pin is
 # deliberate (a code change or a tsgo pull).
+
+# index - the corpus-INPUT side: indexes tests/cases/{compiler,conformance},
+# parses directives, splits @filename units, expands each test's varyBy variants
+# (ported option-metadata table; `*`/exclusion syntax; cap 25), applies the
+# Removed-in-TS7 + static skip lists, and proves three gates against the on-disk
+# baselines: the baseline join (every baseline ↔ exactly one derived non-skipped
+# variant), the unit-text round-trip (units reproduce the ==== section bodies;
+# pretty carved out), and the exact denominator pins. Zero checker code; requires
+# the materialized corpus submodule (unlike query/roundtrip). The INDEX_* pins
+# move only on a deliberate re-pin (a tsgo pull or a harness-logic change).
+cargo run -p tsv_debug tsc_conformance index                     # full run (enforces all pins)
+# Options: --path, --json.
 ```
 
 `roundtrip` is a **leg of `deno task conformance`** (the pre-release aggregate) and

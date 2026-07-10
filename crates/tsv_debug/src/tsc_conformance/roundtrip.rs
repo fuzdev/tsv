@@ -219,7 +219,7 @@ pub fn run_roundtrip(baselines: &[Baseline]) -> RoundtripReport {
 /// An ANSI-colored `pretty=true` baseline — a separate renderer path carved out
 /// of the round-trip scope. The ESC byte is present iff tsgo's colored renderer
 /// (not the ported `pretty=false` rune path) produced the baseline.
-fn is_pretty(content: &str) -> bool {
+pub(super) fn is_pretty(content: &str) -> bool {
     content.contains('\u{1b}')
 }
 
