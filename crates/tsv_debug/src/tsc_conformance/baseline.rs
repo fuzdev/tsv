@@ -273,16 +273,7 @@ pub fn parse_baseline(content: &str) -> Result<ParsedBaseline, String> {
                 _ => return Err("global !!! message underflow".to_string()),
             }
         }
-        let mut related = Vec::new();
-        while let Some(l) = lines.get(i) {
-            if l.starts_with("!!! related ") {
-                related.push((*l).to_string());
-                i += 1;
-            } else {
-                break;
-            }
-        }
-        d.related = related;
+        d.related = collect_related(&lines, &mut i);
     }
 
     // --- 4. `==== ` sections ---
@@ -302,6 +293,47 @@ pub fn parse_baseline(content: &str) -> Result<ParsedBaseline, String> {
     }
 
     Ok(ParsedBaseline { diags, sections })
+}
+
+/// Collect a diagnostic's related-info block from `lines` starting at `*i`: each
+/// `!!! related …` line, plus the raw continuation lines of that related info's
+/// **own** message chain.
+///
+/// A related info can itself be a message chain; `FlattenDiagnosticMessage`
+/// renders its first line onto the `!!! related …:` line and its deeper levels as
+/// bare continuation lines — 2-space-per-level indent, **no** `!!!` prefix and no
+/// 4-space section indent (`diagnosticwriter.go`'s chain flattening). Those lines
+/// are re-emitted verbatim by the renderer, so recovering them is a capture
+/// question. The chain opens at indent 2 (level 1) and increases by exactly 2 per
+/// level, which disambiguates it from a section source line — every source line
+/// carries the ≥4-space section indent, so a line at the next expected chain
+/// indent that also holds content is a continuation. The strict `+2` run stops the
+/// moment a line breaks the pattern (e.g. the next source line, `!!!` block, or a
+/// blank line), so a source line can't be swallowed unless it sits at exactly the
+/// pending chain indent *and* the chain didn't already terminate — a case the
+/// round-trip over every baseline confirms does not arise.
+fn collect_related(lines: &[&str], i: &mut usize) -> Vec<String> {
+    let mut related = Vec::new();
+    while lines.get(*i).is_some_and(|l| l.starts_with("!!! related ")) {
+        related.push(lines[*i].to_string());
+        *i += 1;
+        // The related info's own message-chain continuation lines.
+        let mut expected = 2usize;
+        while let Some(cont) = lines.get(*i) {
+            if cont.starts_with("!!! ") {
+                break;
+            }
+            let indent = cont.bytes().take_while(|&b| b == b' ').count();
+            if indent == expected && cont.len() > indent {
+                related.push((*cont).to_string());
+                *i += 1;
+                expected += 2;
+            } else {
+                break;
+            }
+        }
+    }
+    related
 }
 
 /// The head fields of a summary line, before message text.
@@ -495,16 +527,7 @@ fn parse_section_body(name: String, body: &[&str], diags: &mut [Diag]) -> Result
                         _ => return Err(format!("section {name}: !!! message underflow")),
                     }
                 }
-                let mut related = Vec::new();
-                while let Some(l) = body.get(bi) {
-                    if l.starts_with("!!! related ") {
-                        related.push((*l).to_string());
-                        bi += 1;
-                    } else {
-                        break;
-                    }
-                }
-                diags[works[w].diag_index].related = related;
+                diags[works[w].diag_index].related = collect_related(body, &mut bi);
             } else if !active.contains(&w) {
                 newly_active.push(w);
             }
@@ -692,5 +715,40 @@ mod tests {
         // Start at byte 0 (col 1), 4 tildes → length 4.
         assert_eq!(sec.diags[0].pos_abs, 0);
         assert_eq!(sec.diags[0].len, 4);
+    }
+
+    #[test]
+    fn parse_baseline_recovers_nested_related_message_chain() {
+        // A `!!! related` diagnostic that is itself a message chain: its deeper
+        // levels render as bare 2/4/6-space continuation lines (no `!!!` prefix,
+        // no section indent). The parser must capture them into `related` so the
+        // baseline round-trips — this is the async/iterator case that was once the
+        // last in-scope residual. The trailing `    next;` (4-space source indent)
+        // must NOT be swallowed: the chain has terminated at level 3 (expected
+        // indent 8), so a 4-space line breaks the run.
+        let content = concat!(
+            "a.ts(1,1): error TS2504: bad iter.\r\n",
+            "\r\n\r\n",
+            "==== a.ts (1 errors) ====\r\n",
+            "    iter;\r\n",
+            "    ~~~~\r\n",
+            "!!! error TS2504: bad iter.\r\n",
+            "!!! related TS2322 a.ts:1:1: Type X not assignable to Y.\r\n",
+            "  Types of property 'p' are incompatible.\r\n",
+            "    Type A is not assignable to type B.\r\n",
+            "      Deep level three.\r\n",
+            "    next;",
+        );
+        let parsed = parse_baseline(content).expect("parse");
+        assert_eq!(parsed.diags.len(), 1);
+        // 1 `!!! related` line + 3 chain-continuation lines.
+        assert_eq!(parsed.diags[0].related.len(), 4);
+        // The trailing source line survived as its own section source line.
+        assert_eq!(parsed.sections[0].src_lines, vec!["iter;", "next;"]);
+        assert_eq!(
+            super::super::render::render_baseline(&parsed),
+            content,
+            "nested related chain must round-trip byte-identically"
+        );
     }
 }

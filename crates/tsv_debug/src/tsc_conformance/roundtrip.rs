@@ -7,11 +7,11 @@
 //! salient format feature (the P0 work-list); the pass count is a two-sided
 //! regression pin.
 //!
-//! Known residual (measured 2026-07-09 vs pin `168e7015`): a small set of
-//! ANSI-colored `pretty=true` baselines (out of the ported rune-path scope) and
-//! a couple of baselines whose related-info carries a message chain whose deeper
-//! (4-space) continuation lines are byte-ambiguous with source lines. Both are
-//! reported honestly rather than hidden by loosening the comparison.
+//! Known residual (measured vs pin `168e7015`): the ANSI-colored `pretty=true`
+//! baselines, which are out of the ported rune-path scope. In-scope round-trip is
+//! 100%; the pretty set is reported honestly rather than hidden by loosening the
+//! comparison. (Related-info diagnostics that carry their own message chain — once
+//! a residual — are now recovered by [`super::baseline`]'s continuation capture.)
 
 use super::baseline::parse_baseline;
 use super::discovery::Baseline;

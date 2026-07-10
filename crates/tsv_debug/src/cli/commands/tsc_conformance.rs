@@ -19,13 +19,13 @@ use std::path::PathBuf;
 const BASELINE_COUNT_PIN: usize = 7033;
 
 /// REGRESSION PIN (exact): baselines that round-trip byte-identically
-/// (`parse → render == input`). Measured 2026-07-09 vs pin 168e7015: 7017 of
-/// 7033. The 16-baseline residual is fully accounted for — 14 ANSI-colored
-/// `pretty=true` baselines (out of the ported rune-path scope) and 2 whose
-/// related-info message chains have byte-ambiguous deep continuation lines. A
-/// move in either direction is a deliberate re-pin (a parser/renderer change, or
-/// a typescript-go pull); pin two-sided so drift can't hide.
-const ROUNDTRIP_PASS_PIN: usize = 7017;
+/// (`parse → render == input`). Measured vs pin 168e7015: 7019 of 7033 — the
+/// full in-scope set. The 14-baseline residual is entirely the ANSI-colored
+/// `pretty=true` baselines (out of the ported rune-path scope); in-scope
+/// round-trip is 100%. A move in either direction is a deliberate re-pin (a
+/// parser/renderer change, or a typescript-go pull); pin two-sided so drift
+/// can't hide.
+const ROUNDTRIP_PASS_PIN: usize = 7019;
 
 /// Query the tsgo TypeScript conformance baselines.
 #[derive(FromArgs, Debug)]
