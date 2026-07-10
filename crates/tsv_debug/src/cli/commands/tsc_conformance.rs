@@ -6,7 +6,8 @@
 
 use crate::cli::CliError;
 use crate::tsc_conformance::{
-    baselines_dir, corpus_materialized, denominators, discover_baselines, histogram, tests_by_code,
+    baselines_dir, corpus_materialized, denominators, discover_baselines, histogram, run_roundtrip,
+    tests_by_code,
 };
 use argh::FromArgs;
 use std::path::PathBuf;
@@ -16,6 +17,15 @@ use std::path::PathBuf;
 /// 4d4f005c, may be unmaterialized). The checkout is updated deliberately, so any
 /// move (a discovery bug, or a typescript-go pull) must be re-pinned here.
 const BASELINE_COUNT_PIN: usize = 7033;
+
+/// REGRESSION PIN (exact): baselines that round-trip byte-identically
+/// (`parse → render == input`). Measured 2026-07-09 vs pin 168e7015: 7017 of
+/// 7033. The 16-baseline residual is fully accounted for — 14 ANSI-colored
+/// `pretty=true` baselines (out of the ported rune-path scope) and 2 whose
+/// related-info message chains have byte-ambiguous deep continuation lines. A
+/// move in either direction is a deliberate re-pin (a parser/renderer change, or
+/// a typescript-go pull); pin two-sided so drift can't hide.
+const ROUNDTRIP_PASS_PIN: usize = 7017;
 
 /// Query the tsgo TypeScript conformance baselines.
 #[derive(FromArgs, Debug)]
@@ -29,6 +39,7 @@ pub struct TscConformanceCommand {
 #[argh(subcommand)]
 enum TscConformanceSub {
     Query(QueryCommand),
+    Roundtrip(RoundtripCommand),
 }
 
 /// Answer an ad-hoc question over the baselines.
@@ -55,42 +66,119 @@ pub struct QueryCommand {
     args: Vec<String>,
 }
 
+/// Round-trip self-check (the P0 gate): parse → re-render → byte-compare every
+/// tsgo baseline. Prints files checked, byte-identical count, pass rate, and a
+/// failure-bucket taxonomy. Exit 0 only on the pinned pass count (two-sided).
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "roundtrip")]
+pub struct RoundtripCommand {
+    /// path to the typescript-go checkout (default: ../typescript-go)
+    #[argh(option, default = "PathBuf::from(\"../typescript-go\")")]
+    path: PathBuf,
+
+    /// emit a JSON report instead of the human summary
+    #[argh(switch)]
+    json: bool,
+
+    /// list every failing baseline path
+    #[argh(switch)]
+    verbose: bool,
+
+    /// baseline path substrings to include (OR); default: all baselines
+    #[argh(positional)]
+    filters: Vec<String>,
+}
+
 impl TscConformanceCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         match self.nested {
             TscConformanceSub::Query(query) => query.run(),
+            TscConformanceSub::Roundtrip(rt) => rt.run(),
         }
     }
 }
 
-impl QueryCommand {
+impl RoundtripCommand {
     fn run(self) -> Result<(), CliError> {
-        let dir = baselines_dir(&self.path);
-        if !dir.exists() {
+        let baselines = load_baselines(&self.path, "roundtrip")?;
+        let filtered = filter_baselines(baselines, &self.filters);
+        let unfiltered = self.filters.is_empty();
+
+        // The pins only apply to a full (unfiltered) run.
+        if unfiltered {
+            enforce_pin(filtered.len())?;
+        }
+
+        let report = run_roundtrip(&filtered);
+        if self.json {
+            print_json(&report)?;
+        } else {
+            report.print(self.verbose);
+        }
+
+        // On a full run, gate on the exact pinned pass count (two-sided).
+        if unfiltered && report.byte_identical != ROUNDTRIP_PASS_PIN {
             eprintln!(
-                "Error: tsgo baselines directory not found: {}",
-                dir.display()
-            );
-            eprintln!();
-            eprintln!("Expected a typescript-go checkout with committed baselines. To set it up:");
-            eprintln!("  cd .. && git clone https://github.com/microsoft/typescript-go");
-            eprintln!("  cd typescript-go && git submodule update --init");
-            eprintln!();
-            eprintln!("Or specify a custom path:");
-            eprintln!(
-                "  cargo run -p tsv_debug tsc_conformance query {} --path /path/to/typescript-go",
-                self.kind
+                "\nError: round-trip pass count {} != pinned {ROUNDTRIP_PASS_PIN}. \
+                 If deliberate (a parser/renderer change, or a typescript-go pull), re-pin \
+                 ROUNDTRIP_PASS_PIN.",
+                report.byte_identical
             );
             return Err(CliError::Failed);
         }
+        Ok(())
+    }
+}
 
-        let baselines = match discover_baselines(&dir) {
-            Ok(baselines) => baselines,
-            Err(e) => {
-                eprintln!("Error discovering baselines: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+/// Keep only baselines whose relative path contains any filter substring (OR);
+/// an empty filter list keeps everything.
+fn filter_baselines(
+    baselines: Vec<crate::tsc_conformance::discovery::Baseline>,
+    filters: &[String],
+) -> Vec<crate::tsc_conformance::discovery::Baseline> {
+    if filters.is_empty() {
+        return baselines;
+    }
+    baselines
+        .into_iter()
+        .filter(|b| filters.iter().any(|f| b.relative_path.contains(f.as_str())))
+        .collect()
+}
+
+/// Discover the tsgo baselines under `checkout`, printing the setup help and
+/// failing if the checkout (or its baselines directory) is missing.
+///
+/// `example` names the subcommand for the "Or specify a custom path" hint.
+fn load_baselines(
+    checkout: &std::path::Path,
+    example: &str,
+) -> Result<Vec<crate::tsc_conformance::discovery::Baseline>, CliError> {
+    let dir = baselines_dir(checkout);
+    if !dir.exists() {
+        eprintln!(
+            "Error: tsgo baselines directory not found: {}",
+            dir.display()
+        );
+        eprintln!();
+        eprintln!("Expected a typescript-go checkout with committed baselines. To set it up:");
+        eprintln!("  cd .. && git clone https://github.com/microsoft/typescript-go");
+        eprintln!("  cd typescript-go && git submodule update --init");
+        eprintln!();
+        eprintln!("Or specify a custom path:");
+        eprintln!(
+            "  cargo run -p tsv_debug tsc_conformance {example} --path /path/to/typescript-go"
+        );
+        return Err(CliError::Failed);
+    }
+    discover_baselines(&dir).map_err(|e| {
+        eprintln!("Error discovering baselines: {e}");
+        CliError::Failed
+    })
+}
+
+impl QueryCommand {
+    fn run(self) -> Result<(), CliError> {
+        let baselines = load_baselines(&self.path, &format!("query {}", self.kind))?;
 
         match self.kind.as_str() {
             "histogram" => {

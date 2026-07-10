@@ -6,12 +6,18 @@
 //! submodule that is often unmaterialized, so any question needing test inputs or
 //! directives degrades gracefully rather than crashing.
 //!
-//! The shared `.errors.txt` summary-block parser in [`baseline`] is the seed a
-//! later slice extends into a full round-trip renderer.
+//! [`baseline`] holds both the summary-block parser (the `query` tool's seed)
+//! and the full-baseline parser ([`baseline::parse_baseline`]); [`render`] is
+//! the faithful `.errors.txt` renderer ported from typescript-go; [`roundtrip`]
+//! parses → renders → byte-compares every baseline (the P0 self-check, `zero`
+//! checker code).
 
 pub mod baseline;
 pub mod discovery;
 pub mod query;
+pub mod render;
+pub mod roundtrip;
 
 pub use discovery::{baselines_dir, corpus_materialized, discover_baselines};
 pub use query::{denominators, histogram, tests_by_code};
+pub use roundtrip::run_roundtrip;
