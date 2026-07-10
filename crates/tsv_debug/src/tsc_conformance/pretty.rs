@@ -781,13 +781,16 @@ fn numbered_loc(loc: Option<Loc>) -> Option<(u32, u32)> {
     }
 }
 
-/// UTF-16 code-unit length of `s`.
+/// UTF-16 code-unit length of `s` — the pretty path's width unit, kept distinct
+/// from the plain path's rune count and never merged with it (see `advance_utf16`).
 fn utf16_len(s: &str) -> u32 {
     s.chars().map(|c| c.len_utf16() as u32).sum()
 }
 
 /// Line index and UTF-16 column of the LF-content byte offset `pos` over
-/// `src_lines` (mirrors `scanner.GetECMALineAndUTF16CharacterOfPosition`).
+/// `src_lines` (mirrors `scanner.GetECMALineAndUTF16CharacterOfPosition`). Measures
+/// in UTF-16 code units — the pretty path's unit, not interchangeable with the
+/// plain rune path (see `advance_utf16`).
 fn line_and_utf16col(src_lines: &[String], starts: &[usize], pos: usize) -> (usize, u32) {
     let line = match starts.binary_search(&pos) {
         Ok(i) => i,
@@ -801,6 +804,12 @@ fn line_and_utf16col(src_lines: &[String], starts: &[usize], pos: usize) -> (usi
 
 /// Advance `units` UTF-16 code units from `start_byte` in `line`, returning the
 /// number of bytes covered.
+///
+/// Unit-system guard: this and `render.rs`'s `advance_runes` measure in different
+/// units and must never be merged or deduplicated. The pretty path counts UTF-16
+/// code units (tsgo's `writeCodeSnippet` / `core.UTF16Len`); the plain path counts
+/// runes (`error_baseline.go`'s `utf8.RuneCountInString`). An astral char is two
+/// units here but one rune there, so the same span squiggles a different width.
 fn advance_utf16(line: &str, start_byte: usize, units: u32) -> usize {
     let Some(slice) = line.get(start_byte..) else {
         return 0;
@@ -1117,5 +1126,189 @@ mod tests {
             c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
         );
         assert_eq!(render_pretty(&b).expect("render"), expected);
+    }
+
+    // --- write_code_snippet branches no in-corpus pretty baseline reaches ---
+
+    #[test]
+    fn write_code_snippet_over_five_lines_elides_middle() {
+        // A >5-line span (last_line - first_line >= 4) shows the first 2 and last 2
+        // lines with an ellipsis gutter between them (diagnosticwriter.go:187-197).
+        // gutter_width widens to max(len("..."), digits(last_line + 1)) = max(3, 1)
+        // = 3 (:180-182), so the line numbers right-justify to width 3. Exercised on
+        // write_code_snippet directly to isolate the elision branch.
+        let src: Vec<String> = ["aaa", "bbb", "ccc", "ddd", "eee", "fff"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        // The span (0, 23) covers all six 3-char lines of "aaa\n…\nfff".
+        let mut out = String::new();
+        write_code_snippet(&mut out, &src, 0, 23, RED, "");
+        let expected = format!(
+            concat!(
+                "\r\n",
+                "{gs}  1{r} aaa\r\n",
+                "{gs}   {r} {red}~~~{r}",
+                "\r\n",
+                "{gs}  2{r} bbb\r\n",
+                "{gs}   {r} {red}~~~{r}",
+                "\r\n",
+                "{gs}...{r} \r\n",
+                "{gs}  5{r} eee\r\n",
+                "{gs}   {r} {red}~~~{r}",
+                "\r\n",
+                "{gs}  6{r} fff\r\n",
+                "{gs}   {r} {red}~~~{r}",
+            ),
+            r = RESET, red = RED, gs = GUTTER_STYLE
+        );
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn write_code_snippet_zero_length_squiggles_one_char() {
+        // A zero-length span squiggles a single character: last_char is bumped by
+        // one (diagnosticwriter.go:172-174) so exactly one tilde is emitted, at the
+        // start column (byte 1 of "abc" → one leading space, then one tilde).
+        let src = vec!["abc".to_string()];
+        let mut out = String::new();
+        write_code_snippet(&mut out, &src, 1, 0, RED, "");
+        let expected = format!(
+            concat!("\r\n", "{gs}1{r} abc\r\n", "{gs} {r} {red} ~{r}",),
+            r = RESET, red = RED, gs = GUTTER_STYLE
+        );
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn standalone_render_astral_utf16_vs_rune_squiggle() {
+        // Crux unit-system distinction, end to end: U+10437 (𐐷) is one rune but two
+        // UTF-16 code units. The colored top block counts the squiggle in UTF-16
+        // units (writeCodeSnippet / core.UTF16Len → two tildes); the plain middle
+        // counts runes (error_baseline.go's utf8.RuneCountInString → one tilde).
+        let b = PrettyBaseline {
+            base: ParsedBaseline {
+                diags: vec![diag(
+                    Some("a.ts"),
+                    Some(Loc::Numbered { line: 1, col: 1 }),
+                    2304,
+                    &["Cannot find name."],
+                    &[],
+                )],
+                // The astral char is 4 bytes; the span (0, 4) covers exactly it.
+                sections: vec![section("a.ts", &["\u{10437};"], &[(0, 0, 4)])],
+            },
+            related_lens: vec![vec![]],
+        };
+        let expected = format!(
+            concat!(
+                "{c}a.ts{r}:{y}1{r}:{y}1{r} - {red}error{r}{g} TS2304: {r}Cannot find name.\r\n",
+                "\r\n",
+                "{gs}1{r} \u{10437};\r\n",
+                "{gs} {r} {red}~~{r}\r\n",
+                "\r\n\r\n",
+                "==== a.ts (1 errors) ====\r\n",
+                "    \u{10437};\r\n",
+                "    ~\r\n",
+                "!!! error TS2304: Cannot find name.",
+                "\r\nFound 1 error in a.ts{g}:1{r}\r\n\r\n",
+            ),
+            c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
+        );
+        assert_eq!(render_pretty(&b).expect("render"), expected);
+        assert!(self_assertion_violations(&b.base).is_empty());
+    }
+
+    #[test]
+    fn standalone_render_level_two_message_chain() {
+        // A message chain nested two levels deep: the top block joins the head with
+        // a 2-space (level-1) then 4-space (level-2) continuation via
+        // write_flattened_message (diagnosticwriter.go:271-281, "  " per level), and
+        // each non-empty line re-renders `!!!`-prefixed in the plain middle.
+        let b = PrettyBaseline {
+            base: ParsedBaseline {
+                diags: vec![diag(
+                    Some("a.ts"),
+                    Some(Loc::Numbered { line: 1, col: 1 }),
+                    2322,
+                    &[
+                        "Type 'A' is not assignable to type 'B'.",
+                        "  The types are incompatible.",
+                        "    Property 'x' is missing.",
+                    ],
+                    &[],
+                )],
+                sections: vec![section("a.ts", &["x;"], &[(0, 0, 1)])],
+            },
+            related_lens: vec![vec![]],
+        };
+        let expected = format!(
+            concat!(
+                "{c}a.ts{r}:{y}1{r}:{y}1{r} - {red}error{r}{g} TS2322: {r}Type 'A' is not assignable to type 'B'.\r\n",
+                "  The types are incompatible.\r\n",
+                "    Property 'x' is missing.\r\n",
+                "\r\n",
+                "{gs}1{r} x;\r\n",
+                "{gs} {r} {red}~{r}\r\n",
+                "\r\n\r\n",
+                "==== a.ts (1 errors) ====\r\n",
+                "    x;\r\n",
+                "    ~\r\n",
+                "!!! error TS2322: Type 'A' is not assignable to type 'B'.\r\n",
+                "!!! error TS2322:   The types are incompatible.\r\n",
+                "!!! error TS2322:     Property 'x' is missing.",
+                "\r\nFound 1 error in a.ts{g}:1{r}\r\n\r\n",
+            ),
+            c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
+        );
+        assert_eq!(render_pretty(&b).expect("render"), expected);
+        assert!(self_assertion_violations(&b.base).is_empty());
+    }
+
+    #[test]
+    fn standalone_summary_tabular_multi_digit_count() {
+        // The tabular errors display right-justifies each file's error count in a
+        // column max(len("Errors"), digits(maxCount)) = max(6, 2) = 6 wide
+        // (diagnosticwriter.go:423-437). A 10-error file exercises the multi-digit
+        // count "    10" (four spaces + two digits) beside the single-digit "     1".
+        // Driven through render_pretty_summary (the summary never reads sections).
+        let mut diags: Vec<Diag> = Vec::new();
+        for _ in 0..10 {
+            diags.push(diag(
+                Some("a.ts"),
+                Some(Loc::Numbered { line: 3, col: 1 }),
+                2304,
+                &["e"],
+                &[],
+            ));
+        }
+        // Only the first error's line drives each file's pretty path.
+        diags.push(diag(
+            Some("b.ts"),
+            Some(Loc::Numbered { line: 7, col: 1 }),
+            2304,
+            &["e"],
+            &[],
+        ));
+        let base = ParsedBaseline {
+            diags,
+            sections: vec![],
+        };
+
+        let mut out = String::new();
+        render_pretty_summary(&mut out, &base);
+        let expected = format!(
+            concat!(
+                "\r\n",
+                "Found 11 errors in 2 files.\r\n",
+                "\r\n",
+                "Errors  Files\r\n",
+                "    10  a.ts{g}:3{r}\r\n",
+                "     1  b.ts{g}:7{r}\r\n",
+                "\r\n",
+            ),
+            g = GREY, r = RESET
+        );
+        assert_eq!(out, expected);
     }
 }

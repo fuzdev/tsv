@@ -54,6 +54,12 @@ pub(crate) fn col_to_byte(line: &str, col: u32) -> usize {
 /// of bytes covered. Used to recover a span's end offset from a squiggle's tilde
 /// count. `start_byte` must be a char boundary; a non-boundary or `n` beyond the
 /// line end degrades gracefully (returns the remaining byte length).
+///
+/// Unit-system guard: this and `pretty.rs`'s `advance_utf16` measure in different
+/// units and must never be merged or deduplicated. The plain path counts runes
+/// (`error_baseline.go`'s `utf8.RuneCountInString`); the pretty path counts UTF-16
+/// code units (tsgo's `writeCodeSnippet`). The same astral char is one rune here
+/// but two units there.
 pub(crate) fn advance_runes(line: &str, start_byte: usize, n: usize) -> usize {
     let Some(slice) = line.get(start_byte..) else {
         return 0;
