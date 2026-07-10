@@ -259,6 +259,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(self.parse_expression_bp(BP_ASSIGNMENT)?.expr.clone())
     }
 
+    /// Parse a computed property/member name `[ AssignmentExpression ]`, assuming the
+    /// opening `[` has already been consumed and consuming the closing `]`.
+    ///
+    /// A computed key is a single `AssignmentExpression` (ecma262 `ComputedPropertyName`
+    /// / `ClassElementName`), so a comma `SequenceExpression` (`[a, b]`, TS1171) and a
+    /// spread (`[...a]`) are grammar violations acorn rejects at parse — tsv rejects too
+    /// for drop-in parity. The comma falls out of `parse_assignment_expression` (which
+    /// stops before `,`, then `expect(']')` fails on it); the spread parses as a primary
+    /// expression tsv accepts in array/object/call positions, so it needs an explicit
+    /// guard. A member-access *subscript* (`obj[a, b]`) is a full `Expression` and uses
+    /// `parse_expression` directly — not this helper.
+    pub(super) fn parse_computed_member_key(&mut self) -> Result<Expression<'arena>, ParseError> {
+        if matches!(self.current_kind(), TokenKind::DotDotDot) {
+            return Err(self.error_msg("A computed property name cannot be a spread element"));
+        }
+        let key = self.parse_assignment_expression()?;
+        self.expect(&TokenKind::BracketClose)?;
+        Ok(key)
+    }
+
     /// `parse_expression`'s ref-returning sibling: hands back the spine's arena
     /// ref directly, for consumers whose AST field is `&'arena Expression` —
     /// skipping the owned boundary's shallow clone + re-alloc round trip.

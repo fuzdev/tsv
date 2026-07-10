@@ -728,10 +728,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             );
         }
 
-        // Validate it's a valid identifier (simple check - no spaces or special chars)
-        if !name_str
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+        // Validate it's a valid identifier: every char is an identifier char and it does
+        // not start with a digit (`svelte.parse`'s `read_identifier` reads an empty
+        // identifier from `{123}` / `{1a}` and rejects). Only an ASCII-digit start is
+        // rejected — a non-ASCII start stays permissive so no valid Unicode identifier is
+        // over-rejected.
+        if name_str.starts_with(|c: char| c.is_ascii_digit())
+            || !name_str
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
         {
             return Err(self.error_msg_at(
                 &format!("Invalid shorthand attribute: '{name_str}'"),
