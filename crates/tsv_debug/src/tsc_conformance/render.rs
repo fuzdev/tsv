@@ -470,4 +470,145 @@ mod tests {
         );
         assert!(self_assertion_violations(&parsed).is_empty());
     }
+
+    // --- standalone renderer tests (model built by hand, not via the parser) ---
+    //
+    // The roundtrip tests all feed `render_baseline` a *parser-recovered* model, so
+    // parser and renderer are only ever exercised as a pair. These build a
+    // `ParsedBaseline` directly — the path a future tsv checker takes, emitting a
+    // model it assembled rather than one recovered from a baseline — so the
+    // renderer's byte contract is pinned independently of the parser.
+
+    use super::super::baseline::SectionDiag;
+
+    /// Build an `error`-category diagnostic (the only category these tests need).
+    fn diag(file: Option<&str>, loc: Option<Loc>, code: i32, msgs: &[&str]) -> Diag {
+        Diag {
+            file: file.map(str::to_string),
+            loc,
+            category: "error".to_string(),
+            code,
+            msg_lines: msgs.iter().map(|s| (*s).to_string()).collect(),
+            related: Vec::new(),
+        }
+    }
+
+    /// Build a section from source lines and `(diag_index, pos_abs, len)` spans.
+    fn section(name: &str, src: &[&str], spans: &[(usize, usize, usize)]) -> Section {
+        Section {
+            name: name.to_string(),
+            src_lines: src.iter().map(|s| (*s).to_string()).collect(),
+            diags: spans
+                .iter()
+                .map(|&(diag_index, pos_abs, len)| SectionDiag {
+                    diag_index,
+                    pos_abs,
+                    len,
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn standalone_render_positional_single_diag() {
+        // `const x = 1;` — the `x` is a length-1 span at byte 6 (col 7); the
+        // squiggle prefix blanks `const ` to six spaces (plus the 4-space indent).
+        let b = ParsedBaseline {
+            diags: vec![diag(
+                Some("a.ts"),
+                Some(Loc::Numbered { line: 1, col: 7 }),
+                2304,
+                &["Cannot find name 'x'."],
+            )],
+            sections: vec![section("a.ts", &["const x = 1;"], &[(0, 6, 1)])],
+        };
+        let expected = concat!(
+            "a.ts(1,7): error TS2304: Cannot find name 'x'.\r\n",
+            "\r\n\r\n",
+            "==== a.ts (1 errors) ====\r\n",
+            "    const x = 1;\r\n",
+            "          ~\r\n",
+            "!!! error TS2304: Cannot find name 'x'.",
+        );
+        assert_eq!(render_baseline(&b), expected);
+        assert!(self_assertion_violations(&b).is_empty());
+    }
+
+    #[test]
+    fn standalone_render_global_diag_renders_twice() {
+        // A fileless diagnostic prints bare in the summary AND `!!!`-prefixed in
+        // the re-render; the shared first-line flag means that first `!!!` carries
+        // no leading CRLF (it opens the stateful-newLine region).
+        let b = ParsedBaseline {
+            diags: vec![diag(None, None, 5102, &["Option 'x' has been removed."])],
+            sections: vec![],
+        };
+        let expected = concat!(
+            "error TS5102: Option 'x' has been removed.\r\n",
+            "\r\n\r\n",
+            "!!! error TS5102: Option 'x' has been removed.",
+        );
+        assert_eq!(render_baseline(&b), expected);
+        assert!(self_assertion_violations(&b).is_empty());
+    }
+
+    #[test]
+    fn standalone_render_message_chain() {
+        // A two-line message chain: the continuation joins the summary head with
+        // CRLF, and each non-empty line gets its own `!!!` prefix in the block.
+        let b = ParsedBaseline {
+            diags: vec![diag(
+                Some("a.ts"),
+                Some(Loc::Numbered { line: 1, col: 1 }),
+                2322,
+                &[
+                    "Type 'A' is not assignable to 'B'.",
+                    "  Type 'A' is missing prop.",
+                ],
+            )],
+            sections: vec![section("a.ts", &["let a: B = x;"], &[(0, 0, 3)])],
+        };
+        let expected = concat!(
+            "a.ts(1,1): error TS2322: Type 'A' is not assignable to 'B'.\r\n",
+            "  Type 'A' is missing prop.\r\n",
+            "\r\n\r\n",
+            "==== a.ts (1 errors) ====\r\n",
+            "    let a: B = x;\r\n",
+            "    ~~~\r\n",
+            "!!! error TS2322: Type 'A' is not assignable to 'B'.\r\n",
+            "!!! error TS2322:   Type 'A' is missing prop.",
+        );
+        assert_eq!(render_baseline(&b), expected);
+        assert!(self_assertion_violations(&b).is_empty());
+    }
+
+    #[test]
+    fn standalone_render_multiline_span_message_on_end_line() {
+        // A span covering the whole `foo(\n  bar\n)` squiggles every touched line
+        // (continuations squiggle from column 0) but emits its `!!!` message only
+        // on the end line — the forward clip math, exercised without the parser.
+        let b = ParsedBaseline {
+            diags: vec![diag(
+                Some("a.ts"),
+                Some(Loc::Numbered { line: 1, col: 1 }),
+                2554,
+                &["Expected 0 arguments."],
+            )],
+            sections: vec![section("a.ts", &["foo(", "  bar", ")"], &[(0, 0, 12)])],
+        };
+        let expected = concat!(
+            "a.ts(1,1): error TS2554: Expected 0 arguments.\r\n",
+            "\r\n\r\n",
+            "==== a.ts (1 errors) ====\r\n",
+            "    foo(\r\n",
+            "    ~~~~\r\n",
+            "      bar\r\n",
+            "    ~~~~~\r\n",
+            "    )\r\n",
+            "    ~\r\n",
+            "!!! error TS2554: Expected 0 arguments.",
+        );
+        assert_eq!(render_baseline(&b), expected);
+        assert!(self_assertion_violations(&b).is_empty());
+    }
 }
