@@ -671,6 +671,8 @@ name = "tsv_check"
 version = "0.1.0"
 dependencies = [
  "bumpalo",
+ "smallvec",
+ "string-interner",
  "tsv_lang",
  "tsv_ts",
 ]

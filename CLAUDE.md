@@ -819,10 +819,13 @@ cargo run -p tsv_debug tsc_conformance roundtrip compiler/async  # filter by pat
 # pretty-path count — plus a 100% invariant, failing on any drift; a re-pin is
 # deliberate (a code change or a tsgo pull).
 
-# run - the walking-skeleton gate over tsv_check: sweeps every in-scope variant
+# run - the conformance gate over tsv_check: sweeps every in-scope variant
 # (single-file, non-JSX, non-JS-flavored, non-skipped), drives parse → lower+bind
-# → no-op check → sort/dedup via the tsv_check crate, grades expect-clean variants
-# (must be zero-diagnostic), and publishes the parse-divergence census (tsv
+# → check → sort/dedup via the tsv_check crate, grades expect-clean variants
+# (must be zero-diagnostic) AND the bind/merge duplicate-conflict family
+# (TS2300/2451/2567/2528 + merge-path codes) as codes+spans multisets — extra=0
+# is a hard gate, missing is classified by deferred cause (check-time family /
+# merge / lib) — and publishes the parse-divergence census (tsv
 # parse-rejections bucketed by baseline shape + Script-goal retries). Each test
 # runs catch_unwind-wrapped on a generous-stack worker; tracked parser crashes
 # live in a pinned CRASH_EXCLUSIONS ledger. Exact two-sided RUN_* pins on full
@@ -864,7 +867,8 @@ their most salient format feature (a triage taxonomy, not a proof of cause).
 # profile - measure parse vs format phase timing (pure Rust, no Deno needed)
 cargo run -p tsv_debug profile ~/dev/zzz/src/lib      # profile a directory
 cargo run -p tsv_debug profile file1.ts file2.svelte  # profile specific files
-# Options: --iterations <n> (default: 10), --json
+cargo run -p tsv_debug profile --bind ~/dev/zzz/src   # parse vs lower+bind timing (TS-only) + peak RSS (VmHWM)
+# Options: --iterations <n> (default: 10), --json, --bind
 
 # json_profile - time the FFI parse path (parse + convert_ast_json_bytes) per
 # file: parse vs the wire-JSON write (the sole emission path — one internal-AST

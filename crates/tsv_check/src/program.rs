@@ -1,13 +1,21 @@
 //! Program pipeline assembly: parse (goal rule) -> bind -> check -> sort/dedup.
 //!
-//! Ports the shape of tsgo's `GetDiagnosticsOfAnyProgram`, in particular the
-//! **parse-error short-circuit**: when any unit fails to parse, the program
-//! emits no bind/check diagnostics at all (tsgo `program.go:1770` — the
-//! syntactic-append-added-nothing guard). This matters because tsv's parser is
-//! deliberately permissive: on a program tsgo parse-rejects, tsv can parse
-//! clean and would otherwise emit family diagnostics the baseline lacks. tsv's
-//! suppression mirrors the short-circuit exactly — a parse rejection anywhere
-//! yields zero semantic output for the program.
+//! **Two assembly modes, and this is the parity one.** The conformance harness
+//! grades against tsgo's committed `.errors.txt` **baselines**, whose oracle path
+//! is `harnessutil.go CompileFilesEx` (:634-645): it concatenates each unit's
+//! syntactic + semantic diagnostics **unconditionally — no short-circuit**. So a
+//! unit tsv parse-rejects contributes only its parse verdict (no AST to bind),
+//! while every unit that parses contributes its bind/check diagnostics regardless
+//! of a sibling's rejection. For the single-file tests this slice grades that
+//! means a rejected file is simply ungradeable — its `CheckResult` has no
+//! diagnostics because there is no AST, not because a program-wide guard fired.
+//!
+//! The **product path** (`tsv check`, mirroring the tsc CLI) is instead tsgo's
+//! `GetDiagnosticsOfAnyProgram` (`program.go:1755`), which **short-circuits** at
+//! :1770 — if syntactic diagnostics exist, semantic diagnostics are skipped
+//! program-wide. Porting that short-circuit into this parity pipeline would
+//! manufacture false `missing`s the moment multi-file grading starts, so it is a
+//! deliberate mode distinction deferred to the product path, not modelled here.
 //!
 //! Each unit parses via the **goal rule**: `Goal::Module` first (correct for
 //! ~all real TS), and on failure a `Goal::Script` retry (top-level `await` as an
@@ -18,10 +26,12 @@
 //! (diagnostics carry owned strings and `Copy` spans; nothing borrows the
 //! arena), so the caller may reset and reuse the arena the moment this returns.
 //
-// tsgo: internal/compiler/program.go GetDiagnosticsOfAnyProgram (:1755),
-//       the syntactic short-circuit at :1770; the bind-then-check concat at
-//       getBindAndCheckDiagnosticsWithChecker (:1337); final sort+dedup is
-//       caller-side (execute/tsc/emit.go:120).
+// tsgo: internal/testutil/harnessutil.go CompileFilesEx (:634-645) — the
+//       baseline-oracle parity path (unconditional syntactic+semantic concat);
+//       the bind-then-check concat is getBindAndCheckDiagnosticsWithChecker
+//       (program.go:1337); final sort+dedup is caller-side (execute/tsc/emit.go:120).
+//       The product-mode short-circuit lives at GetDiagnosticsOfAnyProgram
+//       (program.go:1755, :1770) and is deliberately NOT ported here.
 
 use crate::binder::{bind_file, module_ness, ModuleNess};
 use crate::diag::{sort_and_deduplicate, Diagnostic};
@@ -47,14 +57,15 @@ impl<'a> SourceUnit<'a> {
 }
 
 /// The result of checking a program: its (sorted, deduped) diagnostics, a
-/// per-unit report, and whether the parse-error short-circuit fired.
+/// per-unit report, and whether any unit parse-rejected.
 pub struct CheckResult {
-    /// Diagnostics in canonical sorted order — always empty at this slice (the
-    /// checker is a no-op), and empty by construction whenever `parse_rejected`.
+    /// Diagnostics in canonical sorted order — the unconditional concat of every
+    /// unit that parsed (a rejected unit contributes none, having no AST).
     pub diagnostics: Vec<Diagnostic>,
     /// Per-unit parse/bind report, in input order.
     pub files: Vec<FileReport>,
-    /// Whether any unit parse-rejected (the program short-circuit fired).
+    /// Whether any unit parse-rejected (a reported fact; it does **not** suppress
+    /// the other units' diagnostics — see the module header's parity note).
     pub parse_rejected: bool,
 }
 
@@ -128,24 +139,25 @@ pub fn check_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> CheckResu
         }
     }
 
-    // The parse-error short-circuit: any rejection -> no bind/check diagnostics.
+    // Unconditional concat (the CompileFilesEx parity path): every unit that
+    // parsed contributes its bind/check diagnostics, independent of a sibling's
+    // rejection. A rejected unit has no AST, so it contributes none.
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
-    if !parse_rejected {
-        for attempt in &mut attempts {
-            if let Some(program) = &attempt.program {
-                let bound = bind_file(program, attempt.file);
-                attempt.node_count = bound.node_count;
-                // Per file: bind diagnostics then check diagnostics (both empty
-                // at this slice) — the getBindAndCheckDiagnostics concat.
-                let check_diags = check_file(&bound);
-                diagnostics.extend(bound.diagnostics);
-                diagnostics.extend(check_diags);
-            }
+    for attempt in &mut attempts {
+        if let Some(program) = &attempt.program {
+            let source = units[attempt.file.index()].source;
+            let bound = bind_file(program, source, attempt.file);
+            attempt.node_count = bound.node_count;
+            // Per file: bind diagnostics then check diagnostics (check is a no-op
+            // this slice) — the getBindAndCheckDiagnostics concat.
+            let check_diags = check_file(&bound);
+            diagnostics.extend(bound.diagnostics);
+            diagnostics.extend(check_diags);
         }
-        // Final caller-side sort + dedup over the whole program's diagnostics.
-        let paths: Vec<String> = units.iter().map(|u| u.name.to_string()).collect();
-        sort_and_deduplicate(&mut diagnostics, &paths);
     }
+    // Final caller-side sort + dedup over the whole program's diagnostics.
+    let paths: Vec<String> = units.iter().map(|u| u.name.to_string()).collect();
+    sort_and_deduplicate(&mut diagnostics, &paths);
 
     let files = attempts.into_iter().map(Attempt::into_report).collect();
     CheckResult { diagnostics, files, parse_rejected }
@@ -229,8 +241,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_rejection_short_circuits() {
-        // A hard syntax error both goals reject.
+    fn parse_rejection_yields_no_diagnostics() {
+        // A hard syntax error both goals reject: no AST to bind, so no diagnostics
+        // (the single-file "ungradeable" case).
         let result = check("const = = = ;");
         assert!(result.parse_rejected);
         assert!(result.diagnostics.is_empty());
@@ -252,16 +265,18 @@ mod tests {
     }
 
     #[test]
-    fn multi_unit_short_circuit_is_program_wide() {
-        // One clean unit, one rejected unit -> the whole program short-circuits.
+    fn sibling_rejection_does_not_suppress_a_parsed_unit() {
+        // The CompileFilesEx parity: a rejected sibling does NOT short-circuit the
+        // program — the unit that parsed still contributes its bind diagnostics.
         let arena = Bump::new();
         let result = check_program(
-            &[SourceUnit::new("a.ts", "const x = 1;"), SourceUnit::new("b.ts", "const = ;")],
+            &[SourceUnit::new("a.ts", "let x; let x;"), SourceUnit::new("b.ts", "const = ;")],
             &arena,
         );
         assert!(result.parse_rejected);
-        assert!(result.diagnostics.is_empty());
-        assert_eq!(result.files.len(), 2);
+        // a.ts's two TS2451 survive despite b.ts rejecting.
+        assert_eq!(result.diagnostics.len(), 2);
+        assert!(result.diagnostics.iter().all(|d| d.code == 2451));
         assert!(matches!(result.files[0].parse, ParseReport::Parsed(_)));
         assert!(matches!(result.files[1].parse, ParseReport::Rejected { .. }));
     }

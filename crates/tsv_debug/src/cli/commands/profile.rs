@@ -17,6 +17,11 @@ pub struct ProfileCommand {
     #[argh(switch)]
     json: bool,
 
+    /// measure parse vs lower+bind (tsv_check) instead of parse vs format;
+    /// TypeScript files only. Prints peak RSS (VmHWM) once at the end.
+    #[argh(switch)]
+    bind: bool,
+
     /// file paths, directories, or glob patterns
     #[argh(positional)]
     paths: Vec<String>,
@@ -24,7 +29,11 @@ pub struct ProfileCommand {
 
 impl ProfileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let (files, skipped) = resolve_profile_files(&self.paths, |_| false)?;
+        // Bind mode is TypeScript-only (the checker binds no Svelte/CSS): exclude
+        // the other languages up front so the "format" column is a bind time.
+        let (files, skipped) = resolve_profile_files(&self.paths, |p| {
+            self.bind && ParserType::from_extension(&p.to_string_lossy()) != ParserType::TypeScript
+        })?;
 
         let mut results = Vec::new();
 
@@ -37,7 +46,7 @@ impl ProfileCommand {
         let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
 
         for path in &files {
-            match profile_file(path, self.iterations, &mut arena, &mut doc_arena) {
+            match profile_file(path, self.iterations, self.bind, &mut arena, &mut doc_arena) {
                 Ok(result) => results.push(result),
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
@@ -66,8 +75,30 @@ impl ProfileCommand {
             print_table(&results, self.iterations, skipped);
         }
 
+        // Peak resident set (VmHWM), printed once — the checker's memory anchor.
+        if self.bind {
+            #[allow(clippy::cast_precision_loss)]
+            match read_vm_hwm_kb() {
+                Some(kb) => eprintln!("peak RSS (VmHWM): {:.1} MiB", kb as f64 / 1024.0),
+                None => eprintln!("peak RSS (VmHWM): unavailable"),
+            }
+            eprintln!("(the `format` column is parse->bind time)");
+        }
+
         Ok(())
     }
+}
+
+/// Peak resident set size in KiB from `/proc/self/status` (`VmHWM`), or `None`
+/// off Linux / when the field is absent.
+fn read_vm_hwm_kb() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("VmHWM:") {
+            return rest.split_whitespace().next()?.parse().ok();
+        }
+    }
+    None
 }
 
 /// Timing results for a single file
@@ -172,6 +203,7 @@ fn files_label(n: usize) -> String {
 fn profile_file(
     path: &Path,
     iterations: usize,
+    bind: bool,
     arena: &mut bumpalo::Bump,
     doc_arena: &mut tsv_lang::doc::arena::DocArena,
 ) -> Result<FileResult, String> {
@@ -182,7 +214,11 @@ fn profile_file(
     let mut format_times = Vec::with_capacity(iterations);
 
     for _ in 0..iterations {
-        let (parse_dur, format_dur) = profile_once(&source, parser_type, arena, doc_arena)?;
+        let (parse_dur, format_dur) = if bind {
+            profile_bind_once(&source, arena)?
+        } else {
+            profile_once(&source, parser_type, arena, doc_arena)?
+        };
         parse_times.push(parse_dur);
         format_times.push(format_dur);
         // Arena teardown outside the timed regions, mirroring how arena setup is
@@ -205,6 +241,21 @@ fn profile_file(
         format_us,
         total_us: parse_us + format_us,
     })
+}
+
+/// Run one parse + lower+bind iteration for TypeScript, returning
+/// `(parse_duration, bind_duration)`. The bind phase runs the `tsv_check` binder
+/// (SoA walk + symbol bind) over the parsed program.
+fn profile_bind_once(source: &str, arena: &bumpalo::Bump) -> Result<(Duration, Duration), String> {
+    let t0 = Instant::now();
+    let ast = tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+    let parse_dur = t0.elapsed();
+
+    let t1 = Instant::now();
+    let _ = tsv_check::bind_file(&ast, source, tsv_check::FileId::ROOT);
+    let bind_dur = t1.elapsed();
+
+    Ok((parse_dur, bind_dur))
 }
 
 /// Run one parse + format iteration, return (parse_duration, format_duration).

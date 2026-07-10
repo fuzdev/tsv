@@ -47,26 +47,71 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::time::Instant;
 use tsv_check::{check_program, ParseReport, SourceUnit};
+use tsv_lang::{LocationMapper, LocationTracker};
+
+/// The bind-time duplicate/conflict family this slice grades: TS2300 (duplicate
+/// identifier), TS2451 (block-scoped redeclare), TS2567 (enum-merge), TS2528
+/// (multiple default exports), plus the merge-path codes TS2397/2649/2664/2671
+/// (emitted only from the merge phase, out of this slice — they land as *misses*).
+const FAMILY_CODES: [u32; 8] = [2300, 2451, 2567, 2528, 2397, 2649, 2664, 2671];
+
+/// The merge-path family codes — a *missing* of one of these is a merge-phase gap
+/// (S4), not a same-table cascade bug.
+const MERGE_CODES: [u32; 4] = [2397, 2649, 2664, 2671];
+
+/// The TS1xxx codes the binder itself emits (strict-mode + private-identifier
+/// checks) — they prove nothing about parse state, so a baseline carrying only
+/// these does not trigger the recovery-AST carve-out (predicate v1, rule a).
+const BIND_EMITTED_TS1XXX: [u32; 12] =
+    [1100, 1101, 1102, 1210, 1212, 1213, 1214, 1215, 1262, 1344, 1359, 18012];
+
+/// The five P1-family baselines whose family diagnostics need lib binding (S5).
+/// A *missing* in one of these is attributed to the absent lib, not a cascade bug.
+const LIB_CONFLICT_BASELINES: [&str; 5] = [
+    "intersectionsOfLargeUnions2.ts",
+    "jsExportMemberMergedWithModuleAugmentation2.ts",
+    "promiseDefinitionTest.ts",
+    "recursiveComplicatedClasses.ts",
+    "variableDeclarationInStrictMode1.ts",
+];
 
 /// Worker-thread stack for the sweep: the corpus has deeply-nested tests and
 /// tsv's recursive-descent parser has no depth guard, so the default 8 MiB
 /// overflows. 512 MiB is virtual-only reserve on Linux.
 const SKELETON_STACK: usize = 512 * 1024 * 1024;
 
+/// How a crash-excluded test fails, and whether its liveness is probeable.
+// `GenuineAbort` is the designed flag for a future stack-overflow entry (none on
+// the pinned corpus); it is un-probeable, so it is never re-run.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+enum CrashKind {
+    /// A debug-build `debug_assert!` panic `catch_unwind` contains — probeable:
+    /// the sweep re-runs it under `catch_unwind` and FAILS if it no longer
+    /// panics (a fix landed, so the entry is stale and must be dropped).
+    CatchablePanic,
+    /// An uncatchable stack-overflow *abort* even on [`SKELETON_STACK`] — not
+    /// probeable (probing would abort the whole run), so it is trusted, not tested.
+    GenuineAbort,
+}
+
 /// Tests that crash the tsv parser — carved out by basename, counted, and
-/// reported (never silently). Two crash classes land here: uncatchable
-/// stack-overflow aborts (even on [`SKELETON_STACK`]), and debug-build
-/// `debug_assert!` panics in `tsv_ts` that `catch_unwind` *does* contain but
-/// which are tracked parser bugs to fix rather than absorb. Each entry names its
-/// cause; the list is a tracked-defect ledger, not a way to hide bugs.
-const CRASH_EXCLUSIONS: &[&str] = &[
+/// reported (never silently). Each entry names its cause + kind; the list is a
+/// tracked-defect ledger, not a way to hide bugs. A [`CrashKind::CatchablePanic`]
+/// entry is liveness-probed every run (see [`probe_crash_exclusion`]).
+const CRASH_EXCLUSIONS: &[(&str, CrashKind)] = &[
     // tsv_ts robustness bug: `export * from <identifier>;` (a non-string module
     // specifier) trips a `debug_assert!(TokenKind::String)` in
     // `parse_string_literal` (parser/mod.rs). Dev-profile only (debug_assert is
     // compiled out in release), so `cargo run` — the gate's profile — panics.
     // A future tsv_ts fix should reject the form gracefully; then drop this entry.
-    "exportDeclarationInInternalModule.ts",
+    ("exportDeclarationInInternalModule.ts", CrashKind::CatchablePanic),
 ];
+
+/// The [`CrashKind`] of a crash-excluded test, or `None` if not excluded.
+fn crash_exclusion_kind(basename: &str) -> Option<CrashKind> {
+    CRASH_EXCLUSIONS.iter().find(|(n, _)| *n == basename).map(|(_, k)| *k)
+}
 
 /// One expect-clean variant that graded non-clean (should never happen while the
 /// checker is a no-op — a non-empty list is a gate failure).
@@ -100,9 +145,44 @@ pub struct SkeletonReport {
     pub clean_pass: usize,
     /// Expect-clean variants that graded non-clean (gate failure list).
     pub clean_fail: Vec<CleanFail>,
-    /// In-scope variants that parsed and DO have a baseline (informational — the
-    /// checker emits nothing, so these would all be "missing"; not gated yet).
+    /// In-scope variants that parsed and DO have a baseline.
     pub baselined_parsed: usize,
+
+    // --- family grading (the S3 gate) ---
+    /// Parsed-with-baseline variants family-graded (not carved by predicate v1).
+    pub family_graded_variants: usize,
+    /// ...of those, whose baseline carries at least one family code.
+    pub family_positive_variants: usize,
+    /// Family diagnostics that matched (file, line, col, code).
+    pub family_match: usize,
+    /// Family baseline diagnostics with no matching diagnostic of ours (classified
+    /// below). Expected to be all merge/lib until S4/S5 land.
+    pub family_missing: usize,
+    /// Family diagnostics we emit that the baseline lacks. **Gate: must be 0.**
+    pub family_extra: usize,
+    /// Right code + file, wrong position (greedy-paired).
+    pub family_span_mismatch: usize,
+    /// ...missing attributed to the merge phase (TS2397/2649/2664/2671).
+    pub missing_merge: usize,
+    /// ...missing attributed to absent lib binding (a `LIB_CONFLICT_BASELINES` test).
+    pub missing_lib: usize,
+    /// ...missing not attributable to merge/lib — investigate (a same-table miss
+    /// is a cascade bug).
+    pub missing_other: usize,
+    /// Variants carved out by predicate v1 rule (a): tsv parses clean but the
+    /// baseline carries a non-bind TS1xxx code (recovery-AST incomparability).
+    pub carve_out_rule_a: usize,
+    /// ...of those, whose baseline also carries a family code.
+    pub carve_out_rule_a_family: usize,
+    /// In-scope variants that set `moduleDetection` (a watch item — module-ness is
+    /// inert for the family cascade, so the parse-once shortcut stays valid).
+    pub module_detection_variants: usize,
+    /// Sample extra diagnostics (gate failures to fix).
+    pub extra_samples: Vec<String>,
+    /// Sample unattributed misses (candidate cascade bugs).
+    pub missing_other_samples: Vec<String>,
+    /// Sample span mismatches.
+    pub span_mismatch_samples: Vec<String>,
     /// In-scope variants tsv parse-rejected (census; informational).
     pub parse_rejected_total: usize,
     /// ...of those, with no on-disk baseline (a likely tsv over-rejection).
@@ -118,6 +198,9 @@ pub struct SkeletonReport {
     pub panics: Vec<PanicRecord>,
     /// Tests skipped by the crash-exclusion ledger (tracked parser aborts/panics).
     pub excluded_crashes: usize,
+    /// Catchable-panic exclusions that no longer panic (a fix landed) — the entry
+    /// is stale and must be dropped. **Gate: must be empty.**
+    pub stale_exclusions: Vec<String>,
     /// Total bound nodes across in-scope tests (informational).
     pub total_nodes: u64,
     /// Wall-clock of the sweep in milliseconds.
@@ -166,8 +249,13 @@ fn run_skeleton_inner(checkout: &Path) -> Result<SkeletonReport, String> {
         if SKIPPED_TESTS.contains(&test.basename.as_str()) {
             continue;
         }
-        if CRASH_EXCLUSIONS.contains(&test.basename.as_str()) {
+        if let Some(kind) = crash_exclusion_kind(&test.basename) {
             report.excluded_crashes += 1;
+            // Liveness probe: a catchable-panic entry must still panic; if it no
+            // longer does, the ledger entry is stale and the run fails.
+            if kind == CrashKind::CatchablePanic && !probe_crash_exclusion(test) {
+                report.stale_exclusions.push(test.basename.clone());
+            }
             continue;
         }
 
@@ -202,6 +290,30 @@ fn run_skeleton_inner(checkout: &Path) -> Result<SkeletonReport, String> {
     Ok(report)
 }
 
+/// Re-run a catchable-panic crash exclusion under `catch_unwind`, returning
+/// whether it **still panics**. A `false` (it completed) means the tracked defect
+/// is fixed and the ledger entry is stale.
+fn probe_crash_exclusion(test: &CorpusTest) -> bool {
+    let Ok(content) = read_corpus_file(&test.path) else {
+        // Can't read it -> can't disprove the panic; treat as still-live.
+        return true;
+    };
+    let units = split_units(&content, &test.basename);
+    let arena = Bump::new();
+    let source_units: Vec<SourceUnit<'_>> =
+        units.iter().map(|u| SourceUnit::new(&u.name, &u.content)).collect();
+    // Silence the default panic hook for the deliberate probe (we expect it to
+    // panic; the message would otherwise leak to stderr and read as a failure).
+    let prev = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let panicked = catch_unwind(AssertUnwindSafe(|| {
+        let _ = check_program(&source_units, &arena);
+    }))
+    .is_err();
+    std::panic::set_hook(prev);
+    panicked
+}
+
 /// Parse+check one single-file test once and attribute the outcome to each of
 /// its in-scope variants.
 fn grade_test(
@@ -223,8 +335,36 @@ fn grade_test(
 
     // The single unit's parse outcome (files is never empty for one input).
     let Some(file) = result.files.first() else { return };
+
+    // Our family diagnostics are variant-independent (the checker consults no
+    // directives, and module-ness is inert for the cascade), so build the
+    // (file, line, col, code) multiset once per test via the unit's line map.
+    let ours_family: Vec<FamilyDiag> = if matches!(file.parse, ParseReport::Parsed(_)) {
+        let (tracker, map) = LocationTracker::new_ecmascript_with_map(&unit.content);
+        let mapper = LocationMapper { tracker: &tracker, map: &map };
+        result
+            .diagnostics
+            .iter()
+            .filter(|d| FAMILY_CODES.contains(&d.code))
+            .map(|d| {
+                let (_, pos) = mapper.pos_and_position(d.span.start);
+                FamilyDiag {
+                    file: unit.name.clone(),
+                    line: pos.line as u32,
+                    col: pos.column as u32 + 1,
+                    code: d.code,
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     for variant in in_scope {
         report.in_scope_variants += 1;
+        if variant.config.contains_key("moduledetection") {
+            report.module_detection_variants += 1;
+        }
         let name = config_name(&test.basename, &variant.description);
         let baseline = ondisk.get(&(test.suite, name.clone())).copied();
 
@@ -241,18 +381,22 @@ fn grade_test(
                 if facts.used_script_retry {
                     report.script_retry += 1;
                 }
-                if baseline.is_none() {
-                    report.expect_clean_graded += 1;
-                    if result.diagnostics.is_empty() {
-                        report.clean_pass += 1;
-                    } else {
-                        report.clean_fail.push(CleanFail {
-                            variant: format!("{}/{name}", test.suite),
-                            diagnostics: result.diagnostics.len(),
-                        });
+                match baseline {
+                    None => {
+                        report.expect_clean_graded += 1;
+                        if result.diagnostics.is_empty() {
+                            report.clean_pass += 1;
+                        } else {
+                            report.clean_fail.push(CleanFail {
+                                variant: format!("{}/{name}", test.suite),
+                                diagnostics: result.diagnostics.len(),
+                            });
+                        }
                     }
-                } else {
-                    report.baselined_parsed += 1;
+                    Some(b) => {
+                        report.baselined_parsed += 1;
+                        grade_family(test, &name, b, &ours_family, report);
+                    }
                 }
             }
         }
@@ -262,6 +406,155 @@ fn grade_test(
     if let ParseReport::Parsed(facts) = &file.parse {
         report.total_nodes += u64::from(facts.node_count);
     }
+}
+
+/// One family diagnostic in baseline coordinates: `(file, 1-based line, 1-based
+/// UTF-16 col, code)`.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct FamilyDiag {
+    file: String,
+    line: u32,
+    col: u32,
+    code: u32,
+}
+
+/// Grade one parsed-with-baseline variant's family diagnostics against its
+/// baseline, folding the buckets into `report`. Applies predicate v1 rule (a)
+/// (recovery-AST carve-out) first.
+fn grade_family(
+    test: &CorpusTest,
+    name: &str,
+    baseline: &Baseline,
+    ours: &[FamilyDiag],
+    report: &mut SkeletonReport,
+) {
+    let Ok(content) = std::fs::read_to_string(&baseline.path) else { return };
+    let base_all = parse_summary_block(&content);
+
+    // Predicate v1 rule (a): tsv parses clean (it did — this variant parsed) and
+    // the baseline carries a non-bind TS1xxx code -> recovery-AST incomparable.
+    let has_nonbind_ts1xxx = base_all
+        .iter()
+        .any(|d| (1000..2000).contains(&d.code) && !BIND_EMITTED_TS1XXX.contains(&d.code));
+    let base_family: Vec<FamilyDiag> = base_all
+        .iter()
+        .filter(|d| FAMILY_CODES.contains(&d.code))
+        .filter_map(|d| {
+            Some(FamilyDiag {
+                file: d.file.clone()?,
+                line: d.line?,
+                col: d.col?,
+                code: d.code,
+            })
+        })
+        .collect();
+    let has_family = !base_family.is_empty();
+
+    if has_nonbind_ts1xxx {
+        report.carve_out_rule_a += 1;
+        if has_family {
+            report.carve_out_rule_a_family += 1;
+        }
+        return;
+    }
+
+    report.family_graded_variants += 1;
+    if has_family {
+        report.family_positive_variants += 1;
+    }
+
+    let buckets = family_buckets(ours, &base_family);
+    report.family_match += buckets.matched;
+    report.family_span_mismatch += buckets.span_mismatch;
+    report.family_extra += buckets.extra;
+    if buckets.extra > 0 && report.extra_samples.len() < 20 {
+        report.extra_samples.push(format!("{}/{name} (+{})", test.suite, buckets.extra));
+    }
+    if buckets.span_mismatch > 0 && report.span_mismatch_samples.len() < 20 {
+        report
+            .span_mismatch_samples
+            .push(format!("{}/{name} (~{})", test.suite, buckets.span_mismatch));
+    }
+    let is_lib = LIB_CONFLICT_BASELINES.contains(&test.basename.as_str());
+    for (code, count) in buckets.missing_by_code {
+        report.family_missing += count;
+        if MERGE_CODES.contains(&code) {
+            report.missing_merge += count;
+        } else if is_lib {
+            report.missing_lib += count;
+        } else {
+            report.missing_other += count;
+            if report.missing_other_samples.len() < 20 {
+                report
+                    .missing_other_samples
+                    .push(format!("{}/{name} TS{code} x{count}", test.suite));
+            }
+        }
+    }
+}
+
+/// The four family buckets for one variant.
+struct FamilyBuckets {
+    matched: usize,
+    extra: usize,
+    span_mismatch: usize,
+    /// The unattributed misses, per code (for cause classification).
+    missing_by_code: HashMap<u32, usize>,
+}
+
+/// Compare our family multiset against the baseline's: exact `(file,line,col,code)`
+/// matches, then greedy `(file,code)` span-mismatch pairing of the leftovers, with
+/// the residue split into extra (ours) and missing (baseline).
+fn family_buckets(ours: &[FamilyDiag], base: &[FamilyDiag]) -> FamilyBuckets {
+    let mut ours_counts: HashMap<&FamilyDiag, usize> = HashMap::new();
+    for d in ours {
+        *ours_counts.entry(d).or_default() += 1;
+    }
+    let mut base_counts: HashMap<&FamilyDiag, usize> = HashMap::new();
+    for d in base {
+        *base_counts.entry(d).or_default() += 1;
+    }
+
+    let mut matched = 0usize;
+    // Leftover counts grouped by (file, code) for span-mismatch pairing.
+    let mut left_ours: HashMap<(&str, u32), usize> = HashMap::new();
+    let mut left_base: HashMap<(&str, u32), usize> = HashMap::new();
+
+    for (d, &oc) in &ours_counts {
+        let bc = base_counts.get(d).copied().unwrap_or(0);
+        let m = oc.min(bc);
+        matched += m;
+        if oc > m {
+            *left_ours.entry((d.file.as_str(), d.code)).or_default() += oc - m;
+        }
+    }
+    for (d, &bc) in &base_counts {
+        let oc = ours_counts.get(d).copied().unwrap_or(0);
+        let m = oc.min(bc);
+        if bc > m {
+            *left_base.entry((d.file.as_str(), d.code)).or_default() += bc - m;
+        }
+    }
+
+    // Pair leftovers within each (file, code) group: min = span mismatch, the
+    // ours residue = extra, the baseline residue = missing.
+    let mut span_mismatch = 0usize;
+    let mut extra = 0usize;
+    let mut missing_by_code: HashMap<u32, usize> = HashMap::new();
+    let keys: std::collections::HashSet<(&str, u32)> =
+        left_ours.keys().chain(left_base.keys()).copied().collect();
+    for &(file, code) in &keys {
+        let oc = left_ours.get(&(file, code)).copied().unwrap_or(0);
+        let bc = left_base.get(&(file, code)).copied().unwrap_or(0);
+        let sm = oc.min(bc);
+        span_mismatch += sm;
+        extra += oc - sm;
+        if bc - sm > 0 {
+            *missing_by_code.entry(code).or_default() += bc - sm;
+        }
+    }
+
+    FamilyBuckets { matched, extra, span_mismatch, missing_by_code }
 }
 
 /// Classify a parse-rejected variant's baseline shape for the census.
@@ -290,7 +583,7 @@ impl SkeletonReport {
         println!("  parsed, expect-clean:    {}", self.expect_clean_graded);
         println!("    graded clean:          {}", self.clean_pass);
         println!("    graded NON-clean:      {}", self.clean_fail.len());
-        println!("  parsed, baselined:       {} (informational)", self.baselined_parsed);
+        println!("  parsed, baselined:       {}", self.baselined_parsed);
         println!("  parse-rejected:          {}", self.parse_rejected_total);
         println!("    no baseline:           {}", self.parse_rejected_no_baseline);
         println!("    TS1xxx-only baseline:  {}", self.parse_rejected_ts1xxx_only);
@@ -298,8 +591,35 @@ impl SkeletonReport {
         println!("Script-goal retries:       {}", self.script_retry);
         println!("Bound nodes (total):       {}", self.total_nodes);
         println!();
+        println!("Family grading (2300/2451/2567/2528 + merge 2397/2649/2664/2671)");
+        println!("---------------------------------------------------------------");
+        println!("Graded variants:           {}", self.family_graded_variants);
+        println!("  ...family-positive:      {}", self.family_positive_variants);
+        println!("  match:                   {}", self.family_match);
+        println!("  missing:                 {}", self.family_missing);
+        println!("    merge-path (S4):       {}", self.missing_merge);
+        println!("    lib-conflict (S5):     {}", self.missing_lib);
+        println!("    check-time (S3+):      {} (checker-emitted TS2300/2451: duplicate members, type params, computed/private names)", self.missing_other);
+        println!("  extra (GATE=0):          {}", self.family_extra);
+        println!("  span_mismatch:           {}", self.family_span_mismatch);
+        println!("Carve-out rule (a):        {}", self.carve_out_rule_a);
+        println!("  ...family-positive:      {}", self.carve_out_rule_a_family);
+        println!("moduleDetection variants:  {} (watch; inert for family)", self.module_detection_variants);
+        for s in &self.extra_samples {
+            println!("  EXTRA {s}");
+        }
+        for s in &self.missing_other_samples {
+            println!("  MISSING-OTHER {s}");
+        }
+        for s in &self.span_mismatch_samples {
+            println!("  SPAN {s}");
+        }
+        println!();
         println!("Panics (caught):           {}", self.panics.len());
         println!("Crash-excluded (tracked):  {}", self.excluded_crashes);
+        if !self.stale_exclusions.is_empty() {
+            println!("Stale crash-exclusions:    {} (drop them)", self.stale_exclusions.len());
+        }
         println!("Wall-clock:                {} ms", self.wall_ms);
         if !self.clean_fail.is_empty() {
             println!();
@@ -407,14 +727,22 @@ pub fn check_one(
         units.iter().map(|u| SourceUnit::new(&u.name, &u.content)).collect();
     let result = check_program(&source_units, &arena);
 
+    // Byte-span -> (1-based line, 1-based UTF-16 col) per the owning unit.
     let ours: Vec<DiagLine> = result
         .diagnostics
         .iter()
-        .map(|d| DiagLine {
-            file: d.file.and_then(|f| source_units.get(f.index()).map(|u| u.name.to_string())),
-            line: None,
-            col: None,
-            code: d.code,
+        .map(|d| {
+            let (line, col) = d.file.and_then(|f| units.get(f.index())).map_or((None, None), |u| {
+                let (t, m) = LocationTracker::new_ecmascript_with_map(&u.content);
+                let (_, pos) = LocationMapper { tracker: &t, map: &m }.pos_and_position(d.span.start);
+                (Some(pos.line as u32), Some(pos.column as u32 + 1))
+            });
+            DiagLine {
+                file: d.file.and_then(|f| source_units.get(f.index()).map(|u| u.name.to_string())),
+                line,
+                col,
+                code: d.code,
+            }
         })
         .collect();
     let parse_error = result.files.iter().find_map(|f| match &f.parse {

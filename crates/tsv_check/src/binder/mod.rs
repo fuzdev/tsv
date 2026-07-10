@@ -1,28 +1,41 @@
-//! The fused lower+bind walk (skeleton).
+//! The lower+bind pass: node identity (SoA columns) plus the symbol bind.
 //!
-//! One pre-order walk per file assigns dense pre-order [`NodeId`]s to the node
-//! kinds the checker addresses — for now statements, the declarations nested in
-//! them, and declared-name identifiers — records each node's parent, kind, and
-//! span in struct-of-arrays side columns, computes the pre-order `subtree_end`
-//! interval (so "is X a descendant of Y" is an O(1) id-range test), and maps
-//! each node's arena address to its id. This is tsc's own architecture made
-//! eager: tsc's binder is a single walk that stamps parents and lazily mints
-//! per-node ids into flat link arrays; we assign the ids eagerly in the same
-//! walk (unobservable, and it makes every column dense from the start). Symbol
-//! tables and bind diagnostics are later slices; this walk returns none.
+//! Two cooperating walks run per file, kept in one module:
+//!
+//! - **the SoA walk** ([`SoaWalk`]) — one pre-order descent assigning dense
+//!   pre-order [`NodeId`]s to the node kinds the future checker addresses,
+//!   filling the parent/kind/span/`subtree_end` side columns and the address→id
+//!   map. Source order, so the `subtree_end` interval test (`is X a descendant of
+//!   Y`) stays valid.
+//! - **the symbol bind** ([`sym::SymbolBinder`]) — a container-threaded walk that
+//!   ports tsgo's binder: `declareSymbolEx` conflict cascade (TS2300/2451/2567/
+//!   2528), the module-member routing, class/enum/interface member tables, and
+//!   the **functions-first** statement-list ordering (`bindEachStatementFunctionsFirst`).
+//!   It reaches every binding-introducing position and emits the bind-time
+//!   duplicate/conflict family.
+//!
+//! The two are separate passes rather than one fused walk because functions-first
+//! symbol binding reorders symbol *creation* within a statement list, which would
+//! break the SoA walk's strict pre-order id intervals. The symbol bind resolves a
+//! declaration's [`NodeId`] through the SoA walk's address map (a best-effort link;
+//! positions the SoA walk does not cover fall back to the root id — the id is not
+//! consumed by the family cascade, which keys on name spans).
 //!
 //! **Borrow-only discipline (load-bearing).** Every visitor takes `&'arena`
 //! references and NEVER clones an AST node. The address map keys on
 //! `std::ptr::from_ref(node) as usize` (a safe reference-to-integer cast — the
 //! crate keeps `unsafe_code = "forbid"`), and arena addresses are stable for the
-//! program's lifetime, which is exactly the checking scope. Every tsv AST type
-//! derives `Clone`, so one accidental `.clone()` in a visitor would mint a
-//! differently-addressed copy and silently break the map. Nothing type-level
-//! enforces this — the discipline is the contract.
+//! program's lifetime. Every tsv AST type derives `Clone`, so one accidental
+//! `.clone()` in a visitor would mint a differently-addressed copy and silently
+//! break the map. Nothing type-level enforces this — the discipline is the contract.
 //
-// tsgo: internal/binder/binder.go bindSourceFile / bindChildren / bindEachChild
+// tsgo: internal/binder/binder.go bindSourceFile / bindChildren / bindContainer
 //       (single-walk parent stamping; tsgo stamps in the parser, we stamp here —
 //       a recorded deviation with identical results)
+
+mod atoms;
+pub mod symbols;
+mod sym;
 
 use crate::diag::Diagnostic;
 use crate::hash::FxHashMap;
@@ -31,9 +44,9 @@ use tsv_lang::Span;
 use tsv_ts::ast::internal::{ForInOfLeft, ForInit};
 use tsv_ts::ast::{Expression, Program, Statement, VariableDeclaration, VariableDeclarator};
 
-/// The pre-order node kinds the skeleton walk assigns. Mirrors the tsv_ts
-/// `Statement` variants plus the program root and declared-name identifiers;
-/// the set grows as checks address more node kinds.
+/// The pre-order node kinds the SoA walk assigns. Mirrors the tsv_ts `Statement`
+/// variants plus the program root and declared-name identifiers; the set grows as
+/// the checker addresses more node kinds.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u16)]
 pub enum NodeKind {
@@ -76,14 +89,15 @@ pub enum NodeKind {
     DebuggerStatement,
 }
 
-/// Whether a file is an external module (has a top-level `import`/`export`) — the
-/// tsgo `externalModuleIndicator`, derived post-parse. Nothing consumes it yet;
-/// recorded so the future binder's module-vs-script gating has the fact ready.
+/// Whether a file is an external module — tsgo's `externalModuleIndicator`,
+/// derived post-parse (`getExternalModuleIndicator`). Recorded so the binder's
+/// module-vs-script member routing has the fact ready.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ModuleNess {
-    /// Has a top-level `import`/`export` (or `export =` / `import =`).
+    /// Has a top-level module indicator (`import`/`export`/`export =`/an
+    /// `import =` with an external-module reference/`import.meta`).
     Module,
-    /// No module indicator at the top level.
+    /// No module indicator.
     Script,
 }
 
@@ -94,8 +108,8 @@ pub struct FileFacts {
     pub module_ness: ModuleNess,
 }
 
-/// The product of binding one file: the pre-order node columns, the
-/// address->id map, per-file facts, and (empty for now) bind diagnostics.
+/// The product of binding one file: the pre-order node columns, the address->id
+/// map, per-file facts, and the bind diagnostics.
 pub struct BoundFile {
     /// The file these nodes belong to.
     pub file: FileId,
@@ -112,7 +126,8 @@ pub struct BoundFile {
     pub subtree_end: Vec<NodeId>,
     /// Node arena address -> id (the random-access escape hatch).
     pub address_map: FxHashMap<usize, NodeId>,
-    /// Bind diagnostics — empty at this slice.
+    /// Bind diagnostics — the duplicate/conflict family, in emission order (the
+    /// caller sorts + dedups across the whole program).
     pub diagnostics: Vec<Diagnostic>,
     /// Per-file facts.
     pub facts: FileFacts,
@@ -127,59 +142,203 @@ impl BoundFile {
     }
 }
 
-/// Derive a file's [`ModuleNess`] from its top-level statements (import/export
-/// presence). A cheap body scan — no bind state needed.
+/// Derive a file's [`ModuleNess`] — a faithful port of tsgo's
+/// `getExternalModuleIndicator` / `isAnExternalModuleIndicatorNode`: a top-level
+/// statement is an indicator when it carries an `export` modifier, is an
+/// `import`/`export`/`export =` declaration, or is an `import =` with an external
+/// (`require(...)`) module reference; failing that, an `import.meta` anywhere in
+/// the file counts. Notably `export as namespace` (a UMD export) does **not**
+/// count, and an `import =` with an entity-name reference (`import x = A.B`) does
+/// not.
+///
+/// `source` and the program's interner are unused here (the indicators are all
+/// structural); they are accepted for signature symmetry with the binder.
 #[must_use]
 pub fn module_ness(program: &Program<'_>) -> ModuleNess {
     for stmt in program.body {
-        if matches!(
-            stmt,
-            Statement::ImportDeclaration(_)
-                | Statement::TSImportEqualsDeclaration(_)
-                | Statement::ExportNamedDeclaration(_)
-                | Statement::ExportDefaultDeclaration(_)
-                | Statement::ExportAllDeclaration(_)
-                | Statement::TSExportAssignment(_)
-                | Statement::TSNamespaceExportDeclaration(_)
-        ) {
+        if is_external_module_indicator(stmt) {
             return ModuleNess::Module;
         }
+    }
+    if program.body.iter().any(stmt_contains_import_meta) {
+        return ModuleNess::Module;
     }
     ModuleNess::Script
 }
 
-/// Bind one file: run the fused lower+bind walk and return its [`BoundFile`].
-#[must_use]
-pub fn bind_file<'arena>(program: &'arena Program<'arena>, file: FileId) -> BoundFile {
-    let mut binder = Binder::default();
-    let root = binder.add(NodeKind::Program, program.span, None, addr_of(program));
-    for stmt in program.body {
-        binder.visit_statement(stmt, root);
+/// tsgo's `isAnExternalModuleIndicatorNode` over one top-level statement.
+fn is_external_module_indicator(stmt: &Statement<'_>) -> bool {
+    match stmt {
+        // `import ...` / `export ... from` / `export {}` / `export *`.
+        Statement::ImportDeclaration(_)
+        | Statement::ExportNamedDeclaration(_)
+        | Statement::ExportAllDeclaration(_)
+        // `export = x` and `export default ...` are both `ExportAssignment` in
+        // tsgo, both indicators.
+        | Statement::TSExportAssignment(_)
+        | Statement::ExportDefaultDeclaration(_) => true,
+        // `import x = require('y')` counts only with an external-module reference;
+        // `import x = A.B` (an entity name) does not.
+        Statement::TSImportEqualsDeclaration(decl) => matches!(
+            decl.module_reference,
+            tsv_ts::ast::internal::TSModuleReference::ExternalModuleReference(_)
+        ),
+        _ => false,
     }
-    binder.close(root);
+}
+
+/// Whether a statement subtree contains an `import.meta` meta-property (tsgo's
+/// `getImportMetaIfNecessary`). A bounded structural walk over the statement and
+/// its nested expressions/blocks — `import.meta` is inert for the bind cascade,
+/// so this only refines the recorded [`ModuleNess`] fact.
+fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
+    use Statement as S;
+    match stmt {
+        S::ExpressionStatement(s) => expr_contains_import_meta(&s.expression),
+        S::VariableDeclaration(d) => d
+            .declarations
+            .iter()
+            .any(|decl| decl.init.as_ref().is_some_and(expr_contains_import_meta)),
+        S::ReturnStatement(s) => s.argument.as_ref().is_some_and(expr_contains_import_meta),
+        S::ThrowStatement(s) => expr_contains_import_meta(&s.argument),
+        S::BlockStatement(b) => b.body.iter().any(stmt_contains_import_meta),
+        S::IfStatement(s) => {
+            expr_contains_import_meta(&s.test)
+                || stmt_contains_import_meta(s.consequent)
+                || s.alternate.is_some_and(stmt_contains_import_meta)
+        }
+        S::ForStatement(s) => {
+            s.test.as_ref().is_some_and(expr_contains_import_meta) || stmt_contains_import_meta(s.body)
+        }
+        S::ForInStatement(s) => {
+            expr_contains_import_meta(&s.right) || stmt_contains_import_meta(s.body)
+        }
+        S::ForOfStatement(s) => {
+            expr_contains_import_meta(&s.right) || stmt_contains_import_meta(s.body)
+        }
+        S::WhileStatement(s) => {
+            expr_contains_import_meta(&s.test) || stmt_contains_import_meta(s.body)
+        }
+        S::DoWhileStatement(s) => {
+            expr_contains_import_meta(&s.test) || stmt_contains_import_meta(s.body)
+        }
+        S::SwitchStatement(s) => {
+            expr_contains_import_meta(&s.discriminant)
+                || s.cases.iter().any(|c| {
+                    c.test.as_ref().is_some_and(expr_contains_import_meta)
+                        || c.consequent.iter().any(stmt_contains_import_meta)
+                })
+        }
+        S::TryStatement(s) => {
+            s.block.body.iter().any(stmt_contains_import_meta)
+                || s
+                    .handler
+                    .as_ref()
+                    .is_some_and(|h| h.body.body.iter().any(stmt_contains_import_meta))
+                || s
+                    .finalizer
+                    .as_ref()
+                    .is_some_and(|f| f.body.iter().any(stmt_contains_import_meta))
+        }
+        S::LabeledStatement(s) => stmt_contains_import_meta(s.body),
+        _ => false,
+    }
+}
+
+/// Whether an expression subtree contains an `import.meta` meta-property. Covers
+/// the common expression positions; deliberately not exhaustive over every type
+/// node (types never carry `import.meta`).
+fn expr_contains_import_meta(expr: &Expression<'_>) -> bool {
+    use Expression as E;
+    match expr {
+        // `import.meta` vs `new.target`: the only two meta-properties, told apart
+        // by the meta keyword's name length (`import` = 6, `new` = 3).
+        E::MetaProperty(m) => m.meta.name_len == 6,
+        E::ParenthesizedExpression(p) => expr_contains_import_meta(p.expression),
+        E::UnaryExpression(u) => expr_contains_import_meta(u.argument),
+        E::UpdateExpression(u) => expr_contains_import_meta(u.argument),
+        E::AwaitExpression(a) => expr_contains_import_meta(a.argument),
+        E::YieldExpression(y) => y.argument.is_some_and(expr_contains_import_meta),
+        E::BinaryExpression(b) => {
+            expr_contains_import_meta(b.left) || expr_contains_import_meta(b.right)
+        }
+        E::AssignmentExpression(a) => {
+            expr_contains_import_meta(a.left) || expr_contains_import_meta(a.right)
+        }
+        E::ConditionalExpression(c) => {
+            expr_contains_import_meta(c.test)
+                || expr_contains_import_meta(c.consequent)
+                || expr_contains_import_meta(c.alternate)
+        }
+        E::SequenceExpression(s) => s.expressions.iter().any(expr_contains_import_meta),
+        E::CallExpression(c) => {
+            expr_contains_import_meta(c.callee) || c.arguments.iter().any(expr_contains_import_meta)
+        }
+        E::NewExpression(n) => {
+            expr_contains_import_meta(n.callee) || n.arguments.iter().any(expr_contains_import_meta)
+        }
+        E::MemberExpression(m) => {
+            expr_contains_import_meta(m.object) || expr_contains_import_meta(m.property)
+        }
+        E::TSNonNullExpression(t) => expr_contains_import_meta(t.expression),
+        E::TSAsExpression(t) => expr_contains_import_meta(t.expression),
+        E::TSSatisfiesExpression(t) => expr_contains_import_meta(t.expression),
+        E::ArrayExpression(a) => a.elements.iter().flatten().any(expr_contains_import_meta),
+        _ => false,
+    }
+}
+
+/// Bind one file: run the SoA walk and the symbol bind, returning the [`BoundFile`].
+///
+/// `source` is the host document the AST spans index into (the binder resolves
+/// declared names by slicing it, matching the parser's span-identity names).
+#[must_use]
+pub fn bind_file<'arena>(
+    program: &'arena Program<'arena>,
+    source: &str,
+    file: FileId,
+) -> BoundFile {
+    // Pass 1: the SoA node-identity walk (source pre-order).
+    let mut walk = SoaWalk::default();
+    let root = walk.add(NodeKind::Program, program.span, None, addr_of(program));
+    for stmt in program.body {
+        walk.visit_statement(stmt, root);
+    }
+    walk.close(root);
+
+    let facts = FileFacts { module_ness: module_ness(program) };
+
+    // Pass 2: the symbol bind (functions-first, container-threaded).
+    let diagnostics = {
+        let interner = program.interner.borrow();
+        let mut binder = sym::SymbolBinder::new(source, &interner, &walk.address_map, file, facts);
+        binder.bind_program(program);
+        binder.finish()
+    };
+
     BoundFile {
         file,
-        node_count: binder.kinds.len() as u32,
-        parents: binder.parents,
-        kinds: binder.kinds,
-        spans: binder.spans,
-        subtree_end: binder.subtree_end,
-        address_map: binder.address_map,
-        diagnostics: Vec::new(),
-        facts: FileFacts { module_ness: module_ness(program) },
+        node_count: walk.kinds.len() as u32,
+        parents: walk.parents,
+        kinds: walk.kinds,
+        spans: walk.spans,
+        subtree_end: walk.subtree_end,
+        address_map: walk.address_map,
+        diagnostics,
+        facts,
     }
 }
 
 /// The address key of an arena node: a reference-to-integer cast (safe — no
 /// dereference, so `unsafe_code = "forbid"` holds). Stable for the arena's life.
 #[inline]
-fn addr_of<T>(node: &T) -> usize {
+pub(crate) fn addr_of<T>(node: &T) -> usize {
     std::ptr::from_ref(node) as usize
 }
 
-/// The mutable SoA columns being filled by the walk.
+/// The mutable SoA columns being filled by pass 1.
 #[derive(Default)]
-struct Binder {
+struct SoaWalk {
     parents: Vec<Option<NodeId>>,
     kinds: Vec<NodeKind>,
     spans: Vec<Span>,
@@ -187,15 +346,9 @@ struct Binder {
     address_map: FxHashMap<usize, NodeId>,
 }
 
-impl Binder {
+impl SoaWalk {
     /// Assign the next pre-order id to a node, recording its columns and address.
-    fn add(
-        &mut self,
-        kind: NodeKind,
-        span: Span,
-        parent: Option<NodeId>,
-        address: usize,
-    ) -> NodeId {
+    fn add(&mut self, kind: NodeKind, span: Span, parent: Option<NodeId>, address: usize) -> NodeId {
         let id = NodeId::from_index(self.kinds.len());
         self.parents.push(parent);
         self.kinds.push(kind);
@@ -213,7 +366,7 @@ impl Binder {
     }
 
     /// Visit a statement: assign its id, then descend into the declarations and
-    /// nested statements the skeleton tracks.
+    /// nested statements the SoA walk tracks.
     fn visit_statement(&mut self, stmt: &Statement<'_>, parent: NodeId) {
         let id = self.add(statement_kind(stmt), stmt.span(), Some(parent), addr_of(stmt));
         match stmt {
@@ -270,9 +423,6 @@ impl Binder {
                 self.visit_identifier(&labeled.label, id);
                 self.visit_statement(labeled.body, id);
             }
-            // The remaining statement kinds carry no nested statement or
-            // declared-name node the skeleton tracks yet (expressions, types,
-            // module items, throw/return arguments): assigned an id, no descent.
             Statement::ExpressionStatement(_)
             | Statement::TSTypeAliasDeclaration(_)
             | Statement::TSInterfaceDeclaration(_)
@@ -296,30 +446,24 @@ impl Binder {
         self.close(id);
     }
 
-    /// Visit a slice of statements under a parent.
     fn visit_statements(&mut self, stmts: &[Statement<'_>], parent: NodeId) {
         for stmt in stmts {
             self.visit_statement(stmt, parent);
         }
     }
 
-    /// Visit a `VariableDeclaration` node (used by a `for` init clause, which is
-    /// not itself a `Statement`).
     fn visit_variable_declaration(&mut self, decl: &VariableDeclaration<'_>, parent: NodeId) {
         let id = self.add(NodeKind::VariableDeclaration, decl.span, Some(parent), addr_of(decl));
         self.visit_declarators(decl, id);
         self.close(id);
     }
 
-    /// Visit the declarators of a `VariableDeclaration` (already-assigned parent).
     fn visit_declarators(&mut self, decl: &VariableDeclaration<'_>, parent: NodeId) {
         for declarator in decl.declarations {
             self.visit_declarator(declarator, parent);
         }
     }
 
-    /// Visit one declarator, recording its declared-name identifier when the
-    /// binding is a plain identifier (destructuring patterns are a later slice).
     fn visit_declarator(&mut self, declarator: &VariableDeclarator<'_>, parent: NodeId) {
         let id = self.add(
             NodeKind::VariableDeclarator,
@@ -333,15 +477,12 @@ impl Binder {
         self.close(id);
     }
 
-    /// Visit a `for-in`/`for-of` left-hand side (its declarator id when it is a
-    /// variable declaration).
     fn visit_for_left(&mut self, left: &ForInOfLeft<'_>, parent: NodeId) {
         if let ForInOfLeft::VariableDeclaration(decl) = left {
             self.visit_variable_declaration(decl, parent);
         }
     }
 
-    /// Visit a declared-name identifier (a leaf).
     fn visit_identifier(&mut self, ident: &tsv_ts::ast::Identifier<'_>, parent: NodeId) {
         let id = self.add(NodeKind::Identifier, ident.span, Some(parent), addr_of(ident));
         self.close(id);
@@ -394,7 +535,7 @@ mod tests {
     fn bind(source: &str) -> BoundFile {
         let arena = Bump::new();
         let program = tsv_ts::parse(source, &arena).expect("parse");
-        bind_file(&program, FileId::ROOT)
+        bind_file(&program, source, FileId::ROOT)
     }
 
     #[test]
@@ -407,8 +548,8 @@ mod tests {
         assert_eq!(bound.kinds[2], NodeKind::VariableDeclarator);
         assert_eq!(bound.kinds[3], NodeKind::Identifier);
         assert_eq!(bound.parents[0], None);
-        assert_eq!(bound.parents[1], Some(NodeId::FIRST)); // parent is Program
-        assert_eq!(bound.parents[3], Some(NodeId::from_index(2))); // Identifier under declarator
+        assert_eq!(bound.parents[1], Some(NodeId::FIRST));
+        assert_eq!(bound.parents[3], Some(NodeId::from_index(2)));
     }
 
     #[test]
@@ -417,7 +558,6 @@ mod tests {
         let root = NodeId::FIRST;
         let ident = NodeId::from_index(3);
         let decl = NodeId::from_index(1);
-        // Whole program's subtree ends at the identifier.
         assert_eq!(bound.subtree_end[root.index()], ident);
         assert!(bound.is_descendant_of(ident, root));
         assert!(bound.is_descendant_of(ident, decl));
@@ -429,8 +569,7 @@ mod tests {
     fn address_map_resolves_a_statement() {
         let arena = Bump::new();
         let program = tsv_ts::parse("let a = 1; let b = 2;", &arena).expect("parse");
-        let bound = bind_file(&program, FileId::ROOT);
-        // The second top-level statement's address resolves to its id.
+        let bound = bind_file(&program, "let a = 1; let b = 2;", FileId::ROOT);
         let second = &program.body[1];
         let addr = std::ptr::from_ref(second) as usize;
         let id = bound.address_map.get(&addr).copied().expect("mapped");
@@ -439,11 +578,9 @@ mod tests {
 
     #[test]
     fn nested_statements_are_walked() {
-        // Program, function decl, its id, and the nested return statement.
         let bound = bind("function f() { return; }");
         assert!(bound.kinds.contains(&NodeKind::FunctionDeclaration));
         assert!(bound.kinds.contains(&NodeKind::ReturnStatement));
-        // The return sits inside the function's pre-order subtree.
         let func = NodeId::from_index(1);
         let ret = bound
             .kinds
@@ -454,9 +591,101 @@ mod tests {
         assert!(bound.is_descendant_of(ret, func));
     }
 
+    /// The sorted family diagnostic codes a source produces — via the full
+    /// program pipeline, so the canonical sort + dedup applies (a conflict emits
+    /// one diagnostic per position after collapsing the repeated prior-decl ones).
+    fn diag_codes(source: &str) -> Vec<u32> {
+        let arena = Bump::new();
+        let result = crate::program::check_program(
+            &[crate::program::SourceUnit::new("t.ts", source)],
+            &arena,
+        );
+        result.diagnostics.iter().map(|d| d.code).collect()
+    }
+
     #[test]
-    fn module_ness_detects_exports() {
+    fn cascade_block_scoped_redeclare_is_2451() {
+        assert_eq!(diag_codes("let x; let x;"), vec![2451, 2451]);
+        assert_eq!(diag_codes("const y = 1; const y = 2;"), vec![2451, 2451]);
+    }
+
+    #[test]
+    fn cascade_functions_first_picks_2300_over_2451() {
+        // The function hoists first, so the table symbol is the function (not
+        // block-scoped) -> TS2300 for the whole `x` run.
+        assert_eq!(diag_codes("let x; var x; function x() {}"), vec![2300, 2300, 2300]);
+        // No same-scope function: `let` is first -> TS2451.
+        assert_eq!(diag_codes("function f() { let y; { var y; } }"), vec![2451, 2451]);
+    }
+
+    #[test]
+    fn cascade_class_and_method_conflicts_are_2300() {
+        assert_eq!(diag_codes("class C {} class C {}"), vec![2300, 2300]);
+        // A method vs a same-named property conflicts (Method in PropertyExcludes).
+        assert_eq!(diag_codes("class C { m() {} m: number; }"), vec![2300, 2300]);
+        // Duplicate parameters conflict via ParameterExcludes.
+        assert_eq!(diag_codes("function f(a, a) {}"), vec![2300, 2300]);
+    }
+
+    #[test]
+    fn cascade_enum_merge_is_2567() {
+        // A regular enum and a const enum cannot merge -> the enum-merge message.
+        assert_eq!(diag_codes("enum E {} const enum E {}"), vec![2567, 2567]);
+        // Two regular enums merge cleanly (no diagnostic).
+        assert!(diag_codes("enum F {} enum F {}").is_empty());
+    }
+
+    #[test]
+    fn cascade_multiple_default_exports_is_2528() {
+        assert_eq!(diag_codes("export default 0; export default 1;"), vec![2528, 2528]);
+    }
+
+    #[test]
+    fn uninstantiated_namespace_does_not_conflict_with_var() {
+        // A types-only namespace binds as the inert NamespaceModule, so a same-named
+        // `var` merges without a diagnostic.
+        assert!(diag_codes("namespace N { interface I {} } declare var N: any;").is_empty());
+        // A value-content namespace is a ValueModule and conflicts with a `let`
+        // (TS2300 — the namespace, first in the table, is not block-scoped).
+        assert_eq!(diag_codes("namespace M { const v = 1; } let M;"), vec![2300, 2300]);
+    }
+
+    #[test]
+    fn private_name_mangling_collides_at_hash() {
+        // A private method vs a same-named private field is a bind-time conflict
+        // (Method in PropertyExcludes); the mangling (class symbol id + name) makes
+        // the two `#x` share a table key, and the squiggle covers the `#`. (Two
+        // private *fields* would be property-vs-property — a check-time TS2300.)
+        let src = "class C { #x() {} #x = 1; }";
+        let bound = bind(src);
+        let mut diags: Vec<(u32, u32)> =
+            bound.diagnostics.iter().map(|d| (d.code, d.span.start)).collect();
+        diags.sort_unstable();
+        assert_eq!(diags.iter().map(|d| d.0).collect::<Vec<_>>(), vec![2300, 2300]);
+        for (_, start) in &diags {
+            assert_eq!(&src[*start as usize..=*start as usize], "#");
+        }
+    }
+
+    #[test]
+    fn export_default_identifier_is_alias_no_2528() {
+        // `export default <identifier>` binds as an inert alias, so a following
+        // default declaration does not conflict (matches tsgo; the redeclare is a
+        // check-time TS2323, not a bind-time TS2528).
+        assert!(diag_codes("const foo = 1; export default foo; export default class Foo {}").is_empty());
+    }
+
+    #[test]
+    fn module_ness_detects_indicators() {
         assert_eq!(bind("export const x = 1;").facts.module_ness, ModuleNess::Module);
+        assert_eq!(bind("import x from 'y';").facts.module_ness, ModuleNess::Module);
         assert_eq!(bind("const x = 1;").facts.module_ness, ModuleNess::Script);
+        // `import x = require('y')` counts; `import x = A.B` and `export as
+        // namespace N` do not.
+        assert_eq!(bind("import x = require('y');").facts.module_ness, ModuleNess::Module);
+        assert_eq!(bind("import x = A.B;").facts.module_ness, ModuleNess::Script);
+        assert_eq!(bind("export as namespace N;").facts.module_ness, ModuleNess::Script);
+        // `import.meta` anywhere counts.
+        assert_eq!(bind("const u = import.meta.url;").facts.module_ness, ModuleNess::Module);
     }
 }

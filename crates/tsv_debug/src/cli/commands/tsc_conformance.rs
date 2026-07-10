@@ -89,6 +89,27 @@ const RUN_SCRIPT_RETRY_PIN: usize = 25;
 /// tsv parser robustness change (a fix removes an entry; a regression adds one).
 const RUN_CRASH_EXCLUDED_PIN: usize = 1;
 
+/// REGRESSION PINS (exact, two-sided) for the family grading (the S3 gate).
+/// Measured 2026-07-10 vs pin 168e7015. `family_extra` is gated to 0 (hard); the
+/// rest pin the buckets so any move (a cascade change, a tsv parser change, a
+/// typescript-go pull) forces a deliberate re-pin. The missing bucket is
+/// classified: `merge` (merge-phase family, S4), `lib` (absent-lib conflicts,
+/// S5), and `check-time` (checker-emitted TS2300/2451 the bind-only slice can't
+/// produce — duplicate members, type parameters, computed/private names). A drop
+/// in `check-time` (matches gained) or `merge`/`lib` is a real improvement that
+/// re-pins; a rise is a regression to explain.
+const RUN_FAMILY_GRADED_PIN: usize = 4066;
+const RUN_FAMILY_POSITIVE_PIN: usize = 125;
+const RUN_FAMILY_MATCH_PIN: usize = 414;
+const RUN_FAMILY_MISSING_PIN: usize = 136;
+const RUN_MISSING_MERGE_PIN: usize = 7;
+const RUN_MISSING_LIB_PIN: usize = 4;
+const RUN_MISSING_CHECKTIME_PIN: usize = 125;
+const RUN_FAMILY_SPAN_MISMATCH_PIN: usize = 0;
+const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
+const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 9;
+const RUN_MODULE_DETECTION_PIN: usize = 1;
+
 /// Query the tsgo TypeScript conformance baselines.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "tsc_conformance")]
@@ -267,6 +288,22 @@ fn enforce_run_gates(report: &SkeletonReport) -> Result<(), CliError> {
             report.panics.first().map_or("", |p| p.test.as_str())
         ));
     }
+    // A stale crash-exclusion (a fixed defect that no longer panics) must be dropped.
+    if !report.stale_exclusions.is_empty() {
+        errs.push(format!(
+            "{} crash-exclusion(s) no longer panic — drop from CRASH_EXCLUSIONS: {}",
+            report.stale_exclusions.len(),
+            report.stale_exclusions.join(", ")
+        ));
+    }
+    // The hard family gate: never emit a family diagnostic the baseline lacks.
+    if report.family_extra != 0 {
+        errs.push(format!(
+            "family EXTRA {} != 0 (a bind-time over-emission — fix the cascade), e.g. {}",
+            report.family_extra,
+            report.extra_samples.first().map_or("", String::as_str)
+        ));
+    }
 
     // Exact two-sided pins.
     let pin = |errs: &mut Vec<String>, label: &str, got: usize, want: usize| {
@@ -300,6 +337,34 @@ fn enforce_run_gates(report: &SkeletonReport) -> Result<(), CliError> {
     );
     pin(&mut errs, "script retries", report.script_retry, RUN_SCRIPT_RETRY_PIN);
     pin(&mut errs, "crash-excluded", report.excluded_crashes, RUN_CRASH_EXCLUDED_PIN);
+
+    // Family grading pins.
+    pin(&mut errs, "family graded", report.family_graded_variants, RUN_FAMILY_GRADED_PIN);
+    pin(&mut errs, "family positive", report.family_positive_variants, RUN_FAMILY_POSITIVE_PIN);
+    pin(&mut errs, "family match", report.family_match, RUN_FAMILY_MATCH_PIN);
+    pin(&mut errs, "family missing", report.family_missing, RUN_FAMILY_MISSING_PIN);
+    pin(&mut errs, "missing merge", report.missing_merge, RUN_MISSING_MERGE_PIN);
+    pin(&mut errs, "missing lib", report.missing_lib, RUN_MISSING_LIB_PIN);
+    pin(&mut errs, "missing check-time", report.missing_other, RUN_MISSING_CHECKTIME_PIN);
+    pin(
+        &mut errs,
+        "family span_mismatch",
+        report.family_span_mismatch,
+        RUN_FAMILY_SPAN_MISMATCH_PIN,
+    );
+    pin(&mut errs, "carve-out rule (a)", report.carve_out_rule_a, RUN_CARVE_OUT_RULE_A_PIN);
+    pin(
+        &mut errs,
+        "carve-out rule (a) family",
+        report.carve_out_rule_a_family,
+        RUN_CARVE_OUT_RULE_A_FAMILY_PIN,
+    );
+    pin(
+        &mut errs,
+        "moduleDetection variants",
+        report.module_detection_variants,
+        RUN_MODULE_DETECTION_PIN,
+    );
 
     if errs.is_empty() {
         Ok(())

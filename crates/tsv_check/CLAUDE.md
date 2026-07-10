@@ -74,8 +74,12 @@ result is fully owned — nothing borrows out.
 
 - `tsv_debug tsc_conformance run` — the standing gate: sweeps the in-scope
   corpus (single-file, non-JSX, non-JS-flavored, non-skipped), grades
-  expect-clean variants, publishes the parse-divergence census; exact
-  `RUN_*` pins.
+  expect-clean variants AND the bind/merge duplicate-conflict family
+  (TS2300/2451/2567/2528 + merge-path codes) as codes+spans multisets
+  (extra = 0 is a hard gate; missing is classified by deferred cause),
+  publishes the parse-divergence census; exact `RUN_*` pins.
+- `tsv_debug profile --bind <paths>` — parse vs lower+bind timing + peak
+  RSS (VmHWM); the binder's standing perf anchor form.
 - `tsv_debug tsc_conformance check-test <name> [--variant k=v] [--json]` —
   the inner dev loop: one test, our diagnostics vs the baseline summary.
 - `tsv_debug tsc_conformance query|roundtrip|index` — the oracle-side
