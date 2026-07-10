@@ -93,6 +93,52 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.format_block_comments(&block_comments, spacing)
     }
 
+    fn build_computed_member_line_comment_bracket(
+        &self,
+        open: &'static str,
+        inside_start: u32,
+        prop_start: u32,
+        prop_end: u32,
+        bracket_end: u32,
+        inner: DocId,
+    ) -> Option<DocId> {
+        // Only the break path — a line comment before the index or after it (before
+        // `]`). A block-only or comment-free bracket falls through to the caller.
+        if !self.has_line_comments_between(inside_start, prop_start)
+            && !self.has_line_comments_between(prop_end, bracket_end)
+        {
+            return None;
+        }
+        let d = self.d();
+        // The `[` is the char just before the index region (past `?.` for `?.[`).
+        let bracket_char_pos = inside_start - 1;
+        // `[`→index: a `[`-line comment is pulled onto the `[` line, an own-line one
+        // stays on its own line (blank-preserving), mirroring the computed-key bracket.
+        let (line_prefix, pull_pos) =
+            self.delimiter_line_comment_prefix(bracket_char_pos, prop_start);
+        let mut inner_parts =
+            self.build_leading_comments_multiline_opt(inside_start, prop_start, pull_pos);
+        inner_parts.push(inner);
+        // index→`]`: a same-line comment trails the index, an own-line one keeps its line.
+        let mut prev = prop_end;
+        for comment in comments_in_range(self.comments, prop_end, bracket_end) {
+            if self.is_same_line(prev, comment.span.start) {
+                inner_parts.push(d.text(" "));
+            } else {
+                inner_parts.push(d.hardline());
+            }
+            inner_parts.push(self.build_comment_doc(comment));
+            prev = comment.span.end;
+        }
+        Some(d.group_break(d.concat(&[
+            d.text(open),
+            d.concat(&line_prefix),
+            d.indent_softline(d.concat(&inner_parts)),
+            d.softline(),
+            d.text("]"),
+        ])))
+    }
+
     fn get_property_span(&self, expr: &internal::Expression<'_>) -> Span {
         expr.span()
     }
