@@ -150,6 +150,136 @@ fn gen_ts_nested_arrow(depth: usize) -> String {
     format!("const v = {expr};\n")
 }
 
+/// MULTI-arg last-arg arrow whose body is another such call — a leading arg at every
+/// level routes through `try_expand_last_function_arg` (the `build_args_split_last` /
+/// `build_break_body_state` expand-last path). The multi-arg twin of `gen_ts_nested_arrow`:
+/// with a leading argument the whole-arrow arg doc and the break-body state each recurse
+/// into the body unless the body build is shared.
+fn gen_ts_nested_arrow_multiarg(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(lead{i}, p{i} => {expr})");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// MULTI-arg last-arg arrow via a MEMBER callee (`p.then(a, x => q.then(a, …))`) —
+/// routes through `build_chain_args_multi` (chain_args.rs), the chain variant.
+fn gen_ts_nested_arrow_multiarg_chain(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("obj{i}.then(lead{i}, p{i} => {expr})");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// MULTI-arg last-arg arrow via a `new` callee — routes through new_expression.rs.
+fn gen_ts_nested_arrow_multiarg_new(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("new Cls{i}(lead{i}, p{i} => {expr})");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// MULTI-arg last-arg arrow whose body is an OBJECT literal containing the next call
+/// (`f(lead, x => ({{ k: f(lead, y => ({{ … }}) ) }}))`) — the arrow-object-body
+/// variant (`call_formatting.rs:960` / `chain_args.rs:1131`, `d.parens(build_expression_doc(body))`).
+fn gen_ts_nested_arrow_obj_multiarg(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(lead{i}, p{i} => ({{ k{i}: {expr} }}))");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// SINGLE-arg last-arg arrow whose body is an OBJECT literal containing the next call
+/// (`f(x => ({{ k: f(y => ({{ … }}) ) }}))`) — the single-arg arrow-object-body path
+/// (`call_formatting.rs:629` object/array hug in `try_single_arg_hug`).
+fn gen_ts_nested_arrow_obj_single(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} => ({{ k{i}: {expr} }}))");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// Nested assignment RHS (`a = (b = (c = …))`) — the assignment-layout
+/// `conditional_group`/fluid-layout candidate site.
+fn gen_ts_assignment_nested(depth: usize) -> String {
+    let mut expr = String::from("z");
+    for i in 0..depth {
+        expr = format!("(v{i} = {expr})");
+    }
+    format!("let z = {expr};\n")
+}
+
+/// Nested ternary as the sole call ARG (`f(a ? b : f(c ? d : …))`) — ternary-in-arg
+/// routes through `build_arg_expression_doc`'s conditional-with-binary-indent path.
+fn gen_ts_ternary_call_arg(depth: usize) -> String {
+    let mut expr = String::from("z");
+    for i in 0..depth {
+        expr = format!("call{i}(c{i} ? v{i} : {expr})");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// Nested arrays each holding a callback whose body is the next array
+/// (`[x => [y => [ … ]]]`) — array-of-callback expansion candidate.
+fn gen_ts_nested_array_callback(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("[p{i} => {expr}]");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// Nested `{#snippet}` blocks (each body a single child) — the snippet piece-composer.
+fn gen_svelte_snippet_nested(depth: usize) -> String {
+    let opens = "{#snippet s()}".repeat(depth);
+    let closes = "{/snippet}".repeat(depth);
+    format!("{opens}x{closes}\n")
+}
+
+/// Nested `{#key}` blocks (each body a single child) — the key piece-composer.
+fn gen_svelte_key_nested(depth: usize) -> String {
+    let opens = "{#key e}".repeat(depth);
+    let closes = "{/key}".repeat(depth);
+    format!("{opens}x{closes}\n")
+}
+
+/// MULTI-arg last-arg arrow whose body is a CONDITIONAL (ternary) that recurses in a
+/// branch (`f(lead, x => (c ? f(lead, y => …) : z))`) — the expand-last conditional-body
+/// sub-branch (the sibling of the call-body branch, sharing `build_break_body_state`).
+fn gen_ts_nested_arrow_cond_multiarg(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(lead{i}, p{i} => (c{i} ? {expr} : z{i}))");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// SINGLE-arg last-arg arrow with a recursive CONDITIONAL body — the single-arg ternary hug
+/// (`build_ternary_arrow_hug_states`), which builds the body once and reuses it across states.
+fn gen_ts_nested_arrow_cond_single(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(p{i} => (c{i} ? {expr} : z{i}))");
+    }
+    format!("const v = {expr};\n")
+}
+
+/// MULTI-arg last-arg FUNCTION expression (block body) that recurses in its `return`
+/// (`f(lead, function (x) {{ return f(lead, function (y) {{ … }}); }})`) — the block-body
+/// last-arg path (`build_inline_or_expand_all`).
+fn gen_ts_nested_fn_expr_multiarg(depth: usize) -> String {
+    let mut expr = String::from("done");
+    for i in 0..depth {
+        expr = format!("call{i}(lead{i}, function (p{i}) {{ return {expr}; }})");
+    }
+    format!("const v = {expr};\n")
+}
+
 struct Point {
     depth: usize,
     nodes: usize,
@@ -305,6 +435,84 @@ impl BuildFanoutAuditCommand {
                 name: "ts_nested_arrow",
                 parser: ParserType::TypeScript,
                 generate: gen_ts_nested_arrow,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_multiarg",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_multiarg,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_multiarg_chain",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_multiarg_chain,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_multiarg_new",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_multiarg_new,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_obj_multiarg",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_obj_multiarg,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_obj_single",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_obj_single,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_assignment_nested",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_assignment_nested,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_ternary_call_arg",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_ternary_call_arg,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_array_callback",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_array_callback,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "svelte_snippet_nested",
+                parser: ParserType::Svelte,
+                generate: gen_svelte_snippet_nested,
+                depths: &[3, 6, 9],
+            },
+            Construct {
+                name: "svelte_key_nested",
+                parser: ParserType::Svelte,
+                generate: gen_svelte_key_nested,
+                depths: &[3, 6, 9],
+            },
+            Construct {
+                name: "ts_nested_arrow_cond_multiarg",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_cond_multiarg,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_arrow_cond_single",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_arrow_cond_single,
+                depths: &[4, 8, 12],
+            },
+            Construct {
+                name: "ts_nested_fn_expr_multiarg",
+                parser: ParserType::TypeScript,
+                generate: gen_ts_nested_fn_expr_multiarg,
                 depths: &[4, 8, 12],
             },
         ];
