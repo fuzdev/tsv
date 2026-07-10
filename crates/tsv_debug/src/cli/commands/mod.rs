@@ -24,6 +24,7 @@ pub mod scan_audit;
 pub mod swallow_audit;
 pub mod test262;
 pub mod ts_fixture_audit;
+pub mod tsc_conformance;
 
 use crate::cli::CliError;
 use crate::fixtures::Fixture;

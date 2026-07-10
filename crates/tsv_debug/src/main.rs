@@ -5,6 +5,7 @@ mod error;
 mod fixtures;
 mod render_normalize;
 mod test262;
+mod tsc_conformance;
 
 use std::process::ExitCode;
 

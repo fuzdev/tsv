@@ -16,6 +16,7 @@ use commands::{
     json_profile::JsonProfileCommand, lex_diff::LexDiffCommand, line_width::LineWidthCommand,
     metrics::MetricsCommand, profile::ProfileCommand, scan_audit::ScanAuditCommand,
     test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
+    tsc_conformance::TscConformanceCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -84,6 +85,7 @@ pub enum Subcommand {
     #[cfg(feature = "swallow_check")]
     SwallowAudit(SwallowAuditCommand),
     Test262(Test262Command),
+    TscConformance(TscConformanceCommand),
     TsFixtureAudit(TsFixtureAuditCommand),
 }
 
@@ -121,6 +123,7 @@ impl TopLevel {
             #[cfg(feature = "swallow_check")]
             Subcommand::SwallowAudit(c) => c.run(),
             Subcommand::Test262(c) => c.run(),
+            Subcommand::TscConformance(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),
         }
     }
