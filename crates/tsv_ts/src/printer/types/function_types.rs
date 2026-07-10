@@ -8,10 +8,7 @@
 
 use super::super::comments_in_range;
 use super::super::expressions::functions::{has_huggable_type_annotation, is_huggable_pattern};
-use super::helpers::{
-    intersection_has_expanding_first_type, intersection_has_huggable_last_type,
-    type_args_should_wrap_for_return_type,
-};
+use super::helpers::type_args_should_wrap_for_return_type;
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::layout::hang_after_operator;
@@ -181,18 +178,14 @@ impl<'a> Printer<'a> {
             ]);
         }
         if let TSType::Intersection(i) = value_type {
-            // Trailing `&`: the first member stays at base and the bare printer owns the
-            // continuation indent (like the type-alias RHS), so a first member that
-            // breaks internally isn't double-indented. A huggable/expanding boundary
-            // owns its own expansion — keep the outer `indent(...)` for it.
-            let type_doc = self.build_intersection_type_doc(i, false);
-            let wrapped = if intersection_has_huggable_last_type(i)
-                || intersection_has_expanding_first_type(i)
-            {
-                d.group(d.indent(type_doc))
-            } else {
-                d.group(type_doc)
-            };
+            // Delegate to the shared bare hanging printer (same layout the type-alias
+            // RHS / `as` cast use): a huggable/expanding boundary returns bare
+            // `type_doc` (the object owns its own expansion — no extra indent), and a
+            // pure-non-object intersection gets `group(type_doc)` with the bare printer
+            // owning its continuation indent (a first member that breaks internally
+            // isn't double-indented). The old inline `group(indent(type_doc))` for the
+            // huggable branch double-indented the object body.
+            let wrapped = self.intersection_hanging_with_indent(i);
             return d.concat(&[d.text(arrow_sp), comments_doc, wrapped]);
         }
         match return_type.type_annotation {
