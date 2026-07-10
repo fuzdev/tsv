@@ -82,13 +82,16 @@ impl<'a> Printer<'a> {
                 self.has_line_comments_in_delimited_list(attributes, |a| a.span, stmt_end)
                     || self.has_line_comments_between(brace_start + 1, attributes[0].span.start);
             if has_line_comments {
-                // `None`: the import-attribute `with {…}` brace keeps relocating
-                // a same-line comment (separate, rarer delimiter — scoped out).
+                // A same-line comment trailing the `with {` brace stays on the
+                // brace line, like the import/export specifier brace
+                // (`import { // c`). Prettier floats it past `;`; tsv keeps the
+                // author's placement. See
+                // with_open_brace_line_comment_prettier_divergence.
                 self.build_braced_hardline_comma_list(
                     attributes,
                     brace_start,
                     stmt_end,
-                    None,
+                    attributes[0].span.start,
                     |a| a.span,
                     |a| self.build_import_attribute_doc(a),
                 )
