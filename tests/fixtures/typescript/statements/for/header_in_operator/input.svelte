@@ -15,4 +15,6 @@
 		d;
 		e
 	) {}
+	for (f((a in b)); d; e) {}
+	for (new C((a in b)); d; e) {}
 </script>
