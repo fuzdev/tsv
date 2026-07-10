@@ -20,8 +20,9 @@ use super::arg_wrapping::{
     build_args_split_last, build_args_with_blank_lines, build_arrow_call_body_states,
     build_arrow_sig_doc, build_break_body_state, build_empty_args_doc, build_expand_all_args,
     build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    last_two_args_same_type, prepend_arrow_body_comments, should_expand_first_arg,
-    try_hug_multiline_template_arg, wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
+    prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
+    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
 use super::test_patterns::{build_test_callee_flat_doc, is_test_call};
@@ -897,8 +898,26 @@ fn try_expand_last_function_arg(
         && !(call_has_comments
             && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
     {
+        // Expand-last arrow whose body is a call / object / array: build the body ONCE and
+        // inject it so the whole-arrow arg doc reuses it (the break-body / hug state below
+        // reuses it too). Building it in both places recurses into itself → O(2^depth).
+        let body_reuse =
+            prebuild_expand_last_break_body(printer, call.arguments.last(), call_has_comments);
+        let obj_reuse = if body_reuse.is_none() {
+            prebuild_expand_last_obj_array_body(printer, call.arguments.last(), call_has_comments)
+        } else {
+            None
+        };
+        let inject =
+            body_reuse.or_else(|| obj_reuse.map(|(span, inject_doc, _)| (span, inject_doc)));
+        let inject_prev = inject.map(|(span, doc)| printer.inject_arrow_body(span, doc));
+
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(call.arguments, printer, paren_open, call_has_comments);
+
+        if let Some(prev) = inject_prev {
+            printer.restore_arrow_body_inject(prev);
+        }
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         // When any head arg's doc will break (e.g., new Map([...multiline...])),
@@ -922,7 +941,9 @@ fn try_expand_last_function_arg(
                 || matches!(&**body_expr, internal::Expression::ConditionalExpression(_)))
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
-            let body_doc = printer.build_expression_doc(body_expr);
+            // Reuse the pre-built call body (see above); conditional bodies build fresh.
+            let body_doc =
+                body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
             let body_doc =
                 prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
@@ -958,7 +979,11 @@ fn try_expand_last_function_arg(
             )
         {
             let sig_doc = build_arrow_sig_doc(printer, arrow);
-            let body_doc = d.parens(printer.build_expression_doc(body_expr));
+            // Reuse the pre-built object/array body (see above).
+            let body_doc = obj_reuse.map_or_else(
+                || d.parens(printer.build_expression_doc(body_expr)),
+                |(_, _, hug)| hug,
+            );
             let body_doc =
                 prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 

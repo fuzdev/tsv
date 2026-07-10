@@ -200,6 +200,20 @@ pub struct Printer<'a> {
     /// during formatting).
     pub(crate) chain_arg_share: RefCell<HashMap<usize, DocId>>,
     pub(crate) chain_arg_share_active: Cell<bool>,
+    /// Expand-last-arg body reuse: `(body-expr span start, pre-built body DocId)`.
+    /// The call/new expand-last paths build an arrow's call body **once** up front
+    /// and set this before building the whole-arrow argument doc via
+    /// `build_args_split_last`; [`Self::build_arrow_body_doc`] then returns the
+    /// pre-built DocId for that exact node instead of rebuilding it. Building the
+    /// body twice — inside the whole arrow *and* separately for the break-body
+    /// state — recurses into itself for a call-bodied arrow whose body is another
+    /// such call (`f(lead, x => f(lead, y => …))`), making the doc-node count
+    /// O(2^depth). Reusing the one build keeps it linear and is byte-identical (the
+    /// injected DocId is exactly what the arrow's own body build would produce for a
+    /// call body — `build_arrow_body_doc` returns `build_expression_doc` there).
+    /// Keyed by span (unique per source position); nested expand-last calls
+    /// save/restore, so only the node currently being reused ever matches.
+    pub(crate) arrow_body_inject: Cell<Option<(u32, DocId)>>,
 }
 
 impl<'a> Printer<'a> {
@@ -236,7 +250,21 @@ impl<'a> Printer<'a> {
             in_for_init: Cell::new(false),
             chain_arg_share: RefCell::new(HashMap::new()),
             chain_arg_share_active: Cell::new(false),
+            arrow_body_inject: Cell::new(None),
         }
+    }
+
+    /// Arm expand-last-arg body reuse for the node at `span`: the next
+    /// [`Self::build_arrow_body_doc`] for that exact node returns `doc` instead of
+    /// rebuilding it. Returns the previous injection (nested expand-last calls each
+    /// arm their own, restoring the outer one after). See the `arrow_body_inject` field.
+    pub(crate) fn inject_arrow_body(&self, span: u32, doc: DocId) -> Option<(u32, DocId)> {
+        self.arrow_body_inject.replace(Some((span, doc)))
+    }
+
+    /// Restore the previous expand-last-arg body injection (from `inject_arrow_body`).
+    pub(crate) fn restore_arrow_body_inject(&self, prev: Option<(u32, DocId)>) {
+        self.arrow_body_inject.set(prev);
     }
 
     /// Wrap `doc` in parens when `expr` is an `in` binary built directly inside a

@@ -20,8 +20,8 @@ use crate::printer::calls::{
     build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
     emit_first_arg_leading_comments, has_blank_line_between_args,
     has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, last_two_args_same_type, prepend_arrow_body_comments,
-    should_force_expansion_for_comments, wrap_call_with_hard_breaks,
+    has_trailing_line_comments_slice, last_two_args_same_type, prebuild_expand_last_break_body,
+    prepend_arrow_body_comments, should_force_expansion_for_comments, wrap_call_with_hard_breaks,
     wrap_call_with_will_break_guard,
 };
 use crate::printer::{CommentVec, ParenContext, Printer, has_multiline_content};
@@ -587,8 +587,22 @@ impl<'a> Printer<'a> {
                 && !(new_has_comments
                     && has_inter_argument_comments_slice(new_expr.arguments, self))
             {
+                // Expand-last arrow with a call body: build the body ONCE and inject it so
+                // the whole-arrow arg doc reuses it (the break-body state below reuses it
+                // too) — building it in both places recurses into itself → O(2^depth).
+                let body_reuse = prebuild_expand_last_break_body(
+                    self,
+                    new_expr.arguments.last(),
+                    new_has_comments,
+                );
+                let inject_prev = body_reuse.map(|(span, doc)| self.inject_arrow_body(span, doc));
+
                 let (head_parts, last_arg_doc, all_args_broken) =
                     build_args_split_last(new_expr.arguments, self, paren_open, new_has_comments);
+
+                if let Some(prev) = inject_prev {
+                    self.restore_arrow_body_inject(prev);
+                }
 
                 // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
                 if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -608,7 +622,9 @@ impl<'a> Printer<'a> {
                             ))
                     {
                         let sig_doc = build_arrow_sig_doc(self, arrow);
-                        let body_doc = self.build_expression_doc(body_expr);
+                        // Reuse the pre-built call body (see above); conditional bodies build fresh.
+                        let body_doc = body_reuse
+                            .map_or_else(|| self.build_expression_doc(body_expr), |(_, doc)| doc);
                         let body_doc = prepend_arrow_body_comments(
                             self,
                             arrow,
