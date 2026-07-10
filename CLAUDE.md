@@ -785,6 +785,37 @@ deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys \
 
 See ./docs/conformance_test262.md.
 
+**tsgo Typechecker-Conformance Harness (tsc_conformance):**
+
+Pure-Rust harness over tsgo's committed `.errors.txt` error baselines (in
+`../typescript-go`, oracle pin `168e7015`, read from the checked-in
+`testdata/baselines/reference/submodule` — **not** the large, often-unmaterialized
+`_submodules/TypeScript` corpus, so it runs on a bare checkout). No Deno, **zero
+checker code**. Distinct from the parser-conformance surfaces: `conformance:ts-repo`
+grades tsv's *parser* against the tsc corpus, whereas this reads tsgo's *checker*
+error output — the seam a future tsv checker will emit through.
+
+```bash
+# query - aggregations over every baseline's summary block
+cargo run -p tsv_debug tsc_conformance query histogram           # per-TS-code instance counts + totals
+cargo run -p tsv_debug tsc_conformance query tests-by-code 2454  # baselines mentioning a code
+cargo run -p tsv_debug tsc_conformance query denominators        # test-identity / variant / JSX sizing
+# Options: --path <typescript-go> (default ../typescript-go), --json.
+# histogram/denominators enforce the exact baseline-count pin; tests-by-code does not.
+
+# roundtrip - parse every baseline → re-render → byte-compare (the P0 self-check):
+# proves the .errors.txt parser + renderer port in one move, no checker involved.
+cargo run -p tsv_debug tsc_conformance roundtrip                 # full self-check (all baselines)
+cargo run -p tsv_debug tsc_conformance roundtrip compiler/async  # filter by path substring (skips the pins)
+# Options: --path, --json, --verbose (list every failing path). A full (unfiltered)
+# run enforces two exact regression pins — total baselines and byte-identical count —
+# and fails the process on drift; a re-pin is deliberate (a code change or a tsgo pull).
+```
+
+A manual harness (self-checking pins on a full run), not part of `deno task check`
+or the automated release conformance step. Failing baselines are bucketed by their
+most salient format feature (a triage taxonomy, not a proof of cause).
+
 **Performance Profiling Commands:**
 
 ```bash
