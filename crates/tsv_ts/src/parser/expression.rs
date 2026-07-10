@@ -2109,26 +2109,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             None
         };
 
-        // Parse optional arguments: new Date() vs new Date
+        // Parse optional arguments: new Date() vs new Date. `new`'s argument list is an
+        // `Arguments` grouping delimiter, so it shares `parse_call_arguments` (which
+        // bumps `grouping_depth`) — `in` is a binary operator inside the arguments even
+        // in a for-header init, matching call arguments (ecma262 `ArgumentList[+In]`).
         let (arguments, end): (&'arena [Expression<'arena>], u32) =
             if self.eat(TokenKind::ParenOpen) {
-                let mut args = self.bvec();
-
-                if !self.check(&TokenKind::ParenClose) {
-                    loop {
-                        // assignment_expression because comma separates arguments; a
-                        // leading `...` is a SpreadElement (ecma262 ArgumentList).
-                        let arg = self.parse_spread_or_assignment_element()?;
-                        args.push(arg);
-
-                        if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
-                            break;
-                        }
-                    }
-                }
-
-                let (_, paren_end) = self.current_pos();
-                self.expect(&TokenKind::ParenClose)?;
+                let (args, paren_end) = self.parse_call_arguments()?;
                 (args.into_bump_slice(), paren_end as u32)
             } else {
                 // new Date without parens - valid JS; bare instantiation type args
