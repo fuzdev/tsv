@@ -669,40 +669,6 @@ impl<'a> PartitionedComments<'a> {
         }
     }
 
-    /// Emit the **last** argument's same-line trailing comments split around its source
-    /// comma position: before-comma blocks — and, when the source has no comma, every
-    /// block — trail the arg; after-comma blocks stay past where the comma was
-    /// (`b /* c */`, the tsv divergence prettier relocates to `b /* c */`); the same-line
-    /// line comment follows via `line_suffix`. No trailing comma is emitted
-    /// (trailingComma: 'none').
-    ///
-    /// The last-argument analogue of [`emit_trailing_comments_around_comma`]: that one
-    /// assumes a real separating comma exists (a non-last gap) and drops a before-comma
-    /// block if none is found, whereas the last arg has no trailing comma, so a block
-    /// with no source comma must still precede the closing paren. Shared by the
-    /// member-chain and `new` last-arg paths so the split rule lives in one place.
-    pub fn emit_last_arg_trailing_around_comma(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
-        let d = printer.d();
-        let comma_pos = find_comma_pos(printer.source, self.start, self.end);
-        for comment in &self.trailing_block {
-            if comma_pos.is_none_or(|cp| is_comment_before_comma(comment, cp)) {
-                parts.push(d.text(" "));
-                parts.push(printer.build_comment_doc(comment));
-            }
-        }
-        if let Some(cp) = comma_pos {
-            for comment in &self.trailing_block {
-                if is_comment_after_comma(comment, cp) {
-                    parts.push(d.text(" "));
-                    parts.push(printer.build_comment_doc(comment));
-                }
-            }
-        }
-        for comment in &self.trailing_line {
-            parts.push(printer.build_trailing_line_comment_doc(comment));
-        }
-    }
-
     /// Emit own-line ("leading") comments each on its own line (hardline before),
     /// with no comma. The bare dangling-comment emission shared by every last-argument
     /// path (no trailing comma precedes them — trailingComma: 'none') and by comma-less
@@ -722,19 +688,19 @@ impl<'a> PartitionedComments<'a> {
         }
     }
 
-    /// Emit a last argument's complete trailing-comment region: same-line comments split
-    /// around the source comma position when any are present (via
-    /// [`emit_last_arg_trailing_around_comma`]), then own-line dangling comments (via
-    /// [`emit_dangling_comments`]). No trailing comma is emitted (trailingComma: 'none').
+    /// Emit a last argument's complete trailing-comment region: same-line comments (via
+    /// [`emit_trailing_comments`]), then own-line dangling comments (via
+    /// [`emit_dangling_comments`]). No trailing comma is emitted (trailingComma: 'none'),
+    /// so a same-line block trails the arg in source order whether it sat before or after
+    /// the source comma — the last arg needs no split around the never-emitted comma.
     ///
     /// The last-argument counterpart to [`Printer::open_inter_arg_gap`] (the non-last
     /// gap): shared by the `new` and member-chain last-arg paths so the ordering lives in
-    /// one place. (`call_formatting` keeps its own same-line handling — it defers
-    /// after-comma blocks into a separate doc and feeds `force_expansion` — and so calls
-    /// only `emit_dangling_comments` directly.)
+    /// one place. (`call_formatting` keeps its own same-line loop, feeding
+    /// `force_expansion`, and calls only [`emit_dangling_comments`] directly.)
     pub fn emit_last_arg_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         if self.has_trailing_line() || self.has_trailing_block() {
-            self.emit_last_arg_trailing_around_comma(parts, printer);
+            self.emit_trailing_comments(parts, printer);
         }
         self.emit_dangling_comments(parts, printer);
     }
