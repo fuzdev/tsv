@@ -270,7 +270,6 @@ impl<'a> SymbolBinder<'a> {
                     .map(|d| MergeDecl {
                         file: self.file,
                         error_span: d.error_span,
-                        display: self.atoms.resolve(d.display).to_string(),
                         is_type_decl: d.is_type_decl,
                     })
                     .collect();

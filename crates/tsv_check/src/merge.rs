@@ -52,6 +52,16 @@ use tsv_lang::Span;
 const NAME_GLOBAL_THIS: &str = "globalThis";
 const NAME_UNDEFINED: &str = "undefined";
 
+/// The `Module` composite (tsgo `SymbolFlagsModule`): a namespace/ambient module.
+const MODULE_FLAGS: SymbolFlags =
+    SymbolFlags(SymbolFlags::VALUE_MODULE.0 | SymbolFlags::NAMESPACE_MODULE.0);
+
+/// tsgo `ast.IsAmbientModuleSymbolName` — a quoted module name (`"X"`), the key of
+/// a `declare module "X"` symbol.
+fn is_ambient_module_symbol_name(name: &str) -> bool {
+    name.starts_with('"') && name.ends_with('"')
+}
+
 /// The merge-relevant product of binding one file — program-independent (a C15
 /// requirement), fully resolved to owned strings so cross-file names reconcile by
 /// value with no shared interner.
@@ -91,8 +101,6 @@ pub struct MergeDecl {
     pub file: FileId,
     /// The span a diagnostic points at (the declaration name).
     pub error_span: Span,
-    /// The display name for the `{0}` message argument.
-    pub display: String,
     /// tsgo `IsTypeDeclaration` (class / interface / enum / type-alias /
     /// type-parameter) — the `undefined` check skips these.
     pub is_type_decl: bool,
@@ -116,41 +124,25 @@ struct GlobalEntry {
     decls: Vec<MergeDecl>,
 }
 
-/// The merge phase's diagnostic sink with tsgo's `lookupOrIssueError` dedup: a
-/// diagnostic already issued at a `(file, span, code, args)` key is reused so its
-/// related info accretes instead of a second copy being emitted.
+/// The merge phase's diagnostic sink.
+///
+/// tsgo's `lookupOrIssueError` keys its dedup on the **full** `CompareDiagnostics`
+/// (related-info length is a sort key), so a primary that has already accreted
+/// related info is never found again — every conflicting merge issues a *fresh*
+/// primary carrying its own leading TS6203, and the caller's final
+/// `compact_and_merge_related_infos` unions the related infos across the duplicate
+/// primaries at each node (the one-primary-per-node, all-6203, uncapped result).
+/// So the merge just pushes fresh primaries; there is no issued-index map here.
 struct MergeOut {
     diags: Vec<Diagnostic>,
-    /// `(file, start, end, code, args-joined)` -> index into `diags`.
-    issued: FxHashMap<(Option<FileId>, u32, u32, u32, String), usize>,
 }
 
 impl MergeOut {
     fn new() -> MergeOut {
-        MergeOut { diags: Vec::new(), issued: FxHashMap::default() }
+        MergeOut { diags: Vec::new() }
     }
 
-    /// tsgo `lookupOrIssueError`: return the index of an existing equal diagnostic,
-    /// else push a fresh one and return its index. Dedup keys on the fields the
-    /// checker's `diagnostics.Lookup` compares (file, span, code, args).
-    fn lookup_or_issue(&mut self, diag: Diagnostic) -> usize {
-        let key = (
-            diag.file,
-            diag.span.start,
-            diag.span.end,
-            diag.code,
-            diag.args.join("\u{1}"),
-        );
-        if let Some(&i) = self.issued.get(&key) {
-            return i;
-        }
-        let i = self.diags.len();
-        self.issued.insert(key, i);
-        self.diags.push(diag);
-        i
-    }
-
-    /// Push a diagnostic that is never a dedup target (TS2397 / TS2664).
+    /// Push a diagnostic.
     fn push(&mut self, diag: Diagnostic) {
         self.diags.push(diag);
     }
@@ -162,6 +154,11 @@ impl MergeOut {
 pub fn merge_program(files: &[FileMerge]) -> Vec<Diagnostic> {
     let mut out = MergeOut::new();
     let mut globals: FxHashMap<String, GlobalEntry> = FxHashMap::default();
+
+    // Ambient-module-name Module symbols (`declare module "X"` in a script) are
+    // deferred from phase 1 to the post-global-type phase — they may need other
+    // global symbols/types resolved first (tsgo regression #2953).
+    let mut deferred_ambient: Vec<&MergeSymbol> = Vec::new();
 
     // --- Phase 1: script locals + the globalThis check (file order) ---
     for file in files {
@@ -175,7 +172,11 @@ pub fn merge_program(files: &[FileMerge]) -> Vec<Diagnostic> {
             }
         }
         for sym in &file.source_locals {
-            merge_global_symbol(&mut globals, sym, &mut out);
+            if sym.flags.intersects(MODULE_FLAGS) && is_ambient_module_symbol_name(&sym.name) {
+                deferred_ambient.push(sym);
+            } else {
+                merge_global_symbol(&mut globals, sym, &mut out);
+            }
         }
     }
 
@@ -201,11 +202,13 @@ pub fn merge_program(files: &[FileMerge]) -> Vec<Diagnostic> {
     }
 
     // --- Phase 4: global ambient-module declarations (deferred) ---
-    // tsgo defers these past global-type creation (regression #2953). At single-
-    // file P1 no ambient module reaches global scope with a conflict (an external
-    // module's string-literal modules are augmentations, handled below; a script's
-    // ambient module merges into empty globals), so this phase is structurally
-    // present but produces nothing here — it lands with lib + multi-file (S5).
+    // tsgo merges these past global-type creation (regression #2953). A script's
+    // `declare module "X"` merges into globals here; a conflict needs another
+    // globals symbol of the same quoted name (multi-file or lib), so at single-file
+    // scope it merges into empty globals with no diagnostic.
+    for sym in deferred_ambient {
+        merge_global_symbol(&mut globals, sym, &mut out);
+    }
 
     // --- Phase 5: non-global module augmentations (`declare module "X"`) ---
     for file in files {
@@ -255,11 +258,13 @@ fn merge_symbol(target: &mut GlobalEntry, source: &MergeSymbol, out: &mut MergeO
         target.decls.extend(source.decls.iter().cloned());
     } else if target.flags.intersects(SymbolFlags::NAMESPACE_MODULE) {
         // A value merging into a non-instantiated namespace: "cannot augment module
-        // with value exports" (TS2649). Reachable only through a resolved
-        // augmentation target (multi-file); at single-file P1 the globals table
-        // holds no NamespaceModule the merge reaches, so this arm is faithful but
-        // dormant.
-        if let Some(decl) = source.decls.first() {
+        // with value exports" (TS2649) — but NOT when the target is the built-in
+        // `globalThis` (tsgo `mergeSymbol`'s `target != globalThisSymbol` guard):
+        // the phase-1 TS2397 already reports that conflict, and a second TS2649
+        // would not make sense.
+        if target.name != NAME_GLOBAL_THIS
+            && let Some(decl) = source.decls.first()
+        {
             out.push(augment_error(decl.file, decl.error_span, 2649, &target.name));
         }
     } else {
@@ -287,9 +292,9 @@ fn report_merge_symbol_error(target: &GlobalEntry, source: &MergeSymbol, out: &m
     add_dup_errors(&target.decls, code, &symbol_name, &source.decls, out);
 }
 
-/// tsgo `addDuplicateDeclarationErrorsForSymbols` — one diagnostic per declaration
-/// node (deduped), each carrying related info pointing at the *other* symbol's
-/// declarations.
+/// tsgo `addDuplicateDeclarationErrorsForSymbols` — one call to
+/// [`add_duplicate_declaration_error`] per declaration node of `decls`, each
+/// carrying related info pointing at the *other* symbol's declarations.
 fn add_dup_errors(
     decls: &[MergeDecl],
     code: u32,
@@ -297,43 +302,60 @@ fn add_dup_errors(
     related_nodes: &[MergeDecl],
     out: &mut MergeOut,
 ) {
-    let needs_name = code != 2567;
     for decl in decls {
-        let args = if needs_name { vec![symbol_name.to_string()] } else { Vec::new() };
-        let primary = Diagnostic {
-            file: Some(decl.file),
-            span: decl.error_span,
-            code,
-            category: Category::Error,
-            message: message_for(code, Some(symbol_name)),
-            args,
-            chain: Vec::new(),
-            related: Vec::new(),
-        };
-        let idx = out.lookup_or_issue(primary);
-        // tsgo `addDuplicateDeclarationError`: related info for each *other*
-        // declaration — leading (TS6203) for the first, follow-on (TS6204) after,
-        // capped at 5 and deduped by target node.
-        for related in related_nodes {
-            if related.file == decl.file && related.error_span == decl.error_span {
-                continue;
-            }
-            let existing = &out.diags[idx].related;
-            if existing.len() >= 5
-                || existing
-                    .iter()
-                    .any(|r| r.file == Some(related.file) && r.span == related.error_span)
-            {
-                continue;
-            }
-            let related_diag = if existing.is_empty() {
-                related_info(related, 6203, Some(symbol_name))
-            } else {
-                related_info(related, 6204, None)
-            };
-            out.diags[idx].related.push(related_diag);
-        }
+        add_duplicate_declaration_error(decl, code, symbol_name, related_nodes, out);
     }
+}
+
+/// tsgo `addDuplicateDeclarationError`: issue a **fresh** primary at `decl` and
+/// attach its related info — leading (TS6203) for the first related node, follow-on
+/// (TS6204) after, capped at 5 *within this primary* and deduped by target node.
+///
+/// Every conflicting merge issues a fresh primary (tsgo's `lookupOrIssueError`
+/// never re-finds a primary that has accreted related info — related-length is a
+/// `CompareDiagnostics` sort key), so the cross-merge union of related info across
+/// duplicate primaries at one node is left to the caller's final
+/// `compact_and_merge_related_infos`. That union is uncapped and all-TS6203 (each
+/// primary's related loop starts empty, so each leads with a TS6203).
+fn add_duplicate_declaration_error(
+    decl: &MergeDecl,
+    code: u32,
+    symbol_name: &str,
+    related_nodes: &[MergeDecl],
+    out: &mut MergeOut,
+) {
+    let needs_name = code != 2567;
+    let args = if needs_name { vec![symbol_name.to_string()] } else { Vec::new() };
+    let mut primary = Diagnostic {
+        file: Some(decl.file),
+        span: decl.error_span,
+        code,
+        category: Category::Error,
+        message: message_for(code, Some(symbol_name)),
+        args,
+        chain: Vec::new(),
+        related: Vec::new(),
+    };
+    for related in related_nodes {
+        if related.file == decl.file && related.error_span == decl.error_span {
+            continue;
+        }
+        if primary.related.len() >= 5
+            || primary
+                .related
+                .iter()
+                .any(|r| r.file == Some(related.file) && r.span == related.error_span)
+        {
+            continue;
+        }
+        let related_diag = if primary.related.is_empty() {
+            related_info(related, 6203, Some(symbol_name))
+        } else {
+            related_info(related, 6204, None)
+        };
+        primary.related.push(related_diag);
+    }
+    out.push(primary);
 }
 
 /// tsgo `mergeModuleAugmentation` (the non-global arm) at single-file scope: the
@@ -458,11 +480,12 @@ fn message_for(code: u32, name: Option<&str>) -> String {
 mod tests {
     use super::*;
 
+    use crate::diag::sort_and_deduplicate;
+
     fn decl(file: u32, start: u32, name: &str, is_type_decl: bool) -> MergeDecl {
         MergeDecl {
             file: FileId(file),
             error_span: Span::new(start, start + name.len() as u32),
-            display: name.to_string(),
             is_type_decl,
         }
     }
@@ -551,13 +574,18 @@ mod tests {
         assert!(diags.iter().all(|d| d.args.is_empty()));
     }
 
-    /// The lookupOrIssueError dedup: a name conflicting three ways across files
-    /// yields one diagnostic per declaration node with accreting related info,
-    /// capped at 5.
+    /// A name conflicting across many files: the merge pushes a fresh primary per
+    /// conflicting merge (so the raw pool has duplicates at the first file's node),
+    /// and the caller's `sort_and_deduplicate` unions them into one primary per
+    /// node. The first file's node accretes a related entry per *other* file — all
+    /// **TS6203** (each fresh primary leads with a TS6203), uncapped by the
+    /// per-primary cap of 5.
     #[test]
-    fn dedup_and_related_cap() {
-        // Five files each declaring `let x` — the sixth+ related info is dropped.
-        let files: Vec<FileMerge> = (0..6)
+    fn cross_merge_related_union_is_all_6203_uncapped() {
+        // Seven files each declaring `let x`. File 0 (globals[x]) is the recurring
+        // merge target, so its node accretes six related entries after the union.
+        let paths: Vec<String> = (0..7).map(|f| format!("f{f}.ts")).collect();
+        let files: Vec<FileMerge> = (0..7)
             .map(|f| {
                 script(
                     f,
@@ -569,11 +597,47 @@ mod tests {
                 )
             })
             .collect();
-        let diags = merge_program(&files);
-        // One diagnostic per file (no duplicate emission at a node).
-        assert_eq!(diags.len(), 6);
-        // Related info capped at 5.
-        assert!(diags.iter().all(|d| d.related.len() <= 5));
+        let mut diags = merge_program(&files);
+        // Raw pool: every conflicting merge pushes a fresh primary (six merges,
+        // each emitting a source-side and a target-side primary = twelve).
+        assert_eq!(diags.len(), 12);
+        // After the caller's canonical sort + related-info union.
+        sort_and_deduplicate(&mut diags, &paths);
+        assert_eq!(diags.len(), 7); // one primary per file's node
+        let head = &diags[0]; // f0.ts, the recurring target
+        assert_eq!(head.file, Some(FileId(0)));
+        assert_eq!(head.related.len(), 6); // one per *other* file — uncapped
+        assert!(
+            head.related.iter().all(|r| r.code == 6203),
+            "every unioned related entry leads with TS6203"
+        );
+    }
+
+    /// The review's prescribed case: a name conflicting across three files whose
+    /// declarations sit in distinct files, asserting the related **codes** are all
+    /// TS6203 after the union (never a TS6204 on the accreting node).
+    #[test]
+    fn three_way_cross_file_conflict_related_codes_all_6203() {
+        let paths = vec!["a.ts".to_string(), "b.ts".to_string(), "c.ts".to_string()];
+        let mk = |f: u32| {
+            script(
+                f,
+                vec![MergeSymbol {
+                    name: "C".to_string(),
+                    flags: SymbolFlags::CLASS,
+                    decls: vec![decl(f, 6, "C", true)],
+                }],
+            )
+        };
+        let mut diags = merge_program(&[mk(0), mk(1), mk(2)]);
+        sort_and_deduplicate(&mut diags, &paths);
+        assert_eq!(diags.len(), 3);
+        // All primaries are TS2300; a.ts (the recurring target) carries two related
+        // entries, both TS6203 (the union of two fresh single-related primaries).
+        assert!(diags.iter().all(|d| d.code == 2300));
+        let a = diags.iter().find(|d| d.file == Some(FileId(0))).expect("a.ts primary");
+        assert_eq!(a.related.len(), 2);
+        assert!(a.related.iter().all(|r| r.code == 6203));
     }
 
     /// A single script declaring `var globalThis` triggers TS2397 per declaration.
