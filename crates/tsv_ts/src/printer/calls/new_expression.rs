@@ -425,11 +425,11 @@ impl<'a> Printer<'a> {
                         paren_close,
                     );
 
-                    // Same-line trailing comments split around the source comma position
-                    // (after-comma blocks stay past it, `b /* c */` — the tsv divergence —
-                    // and a line comment follows via `line_suffix`), then own-line dangling
-                    // comments. No trailing comma (trailingComma: 'none'). Matches the
-                    // call/member-chain last-arg paths.
+                    // Same-line trailing comments trail the arg in source order (a block
+                    // that sat after the source comma just trails past where the comma was,
+                    // `b /* c */` — the tsv divergence; a line comment follows via
+                    // `line_suffix`), then own-line dangling comments. No trailing comma
+                    // (trailingComma: 'none'). Matches the call/member-chain last-arg paths.
                     pc.emit_last_arg_comments(&mut arg_parts, self);
                 }
             }

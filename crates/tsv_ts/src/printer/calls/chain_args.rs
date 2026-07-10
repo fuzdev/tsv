@@ -642,10 +642,10 @@ fn build_chain_args_force_expand(
                 arg_end,
                 next_boundary,
             );
-            // Last argument - same-line trailing comments split around the source comma
-            // position (before-comma blocks trail the arg, after-comma blocks + line
-            // stay past it), then own-line dangling comments. No trailing comma
-            // (trailingComma: 'none').
+            // Last argument - same-line trailing comments trail the arg in source order
+            // (a block that sat after the source comma just trails past where the comma
+            // was; a line comment follows via `line_suffix`), then own-line dangling
+            // comments. No trailing comma (trailingComma: 'none').
             pc.emit_last_arg_comments(&mut arg_parts, printer);
         }
     }
@@ -653,8 +653,8 @@ fn build_chain_args_force_expand(
     parts.push(d.text(prefix));
     parts.push(d.concat(&paren_line_prefix_parts));
     // No trailing comma after the last arg (trailingComma: 'none') — the last-arg
-    // comment emit splits same-line comments around the source comma position but
-    // emits no comma, and nothing is appended here.
+    // comment emit trails same-line comments after the arg and emits no comma, so
+    // nothing is appended here.
     parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&arg_parts)])));
     parts.push(d.hardline());
     parts.push(d.text(")"));

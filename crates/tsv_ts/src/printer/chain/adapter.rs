@@ -110,33 +110,30 @@ impl<'a> ChainPrinter for Printer<'a> {
             return None;
         }
         let d = self.d();
-        // The `[` is the char just before the index region (past `?.` for `?.[`).
-        let bracket_char_pos = inside_start - 1;
-        // `[`→index: a `[`-line comment is pulled onto the `[` line, an own-line one
-        // stays on its own line (blank-preserving), mirroring the computed-key bracket.
-        let (line_prefix, pull_pos) =
-            self.delimiter_line_comment_prefix(bracket_char_pos, prop_start);
-        let mut inner_parts =
-            self.build_leading_comments_multiline_opt(inside_start, prop_start, pull_pos);
-        inner_parts.push(inner);
+        // Build the body (index + any index→`]` trailing comments), then hand it to the
+        // shared bracket-break helper (it owns the `[`→index line-comment prefix and the
+        // break shell, mirroring the computed-key bracket). `[`→index: a `[`-line comment
+        // is pulled onto the `[` line, an own-line one keeps its line (blank-preserving).
         // index→`]`: a same-line comment trails the index, an own-line one keeps its line.
+        let mut body_parts = DocBuf::new();
+        body_parts.push(inner);
         let mut prev = prop_end;
         for comment in comments_in_range(self.comments, prop_end, bracket_end) {
             if self.is_same_line(prev, comment.span.start) {
-                inner_parts.push(d.text(" "));
+                body_parts.push(d.text(" "));
             } else {
-                inner_parts.push(d.hardline());
+                body_parts.push(d.hardline());
             }
-            inner_parts.push(self.build_comment_doc(comment));
+            body_parts.push(self.build_comment_doc(comment));
             prev = comment.span.end;
         }
-        Some(d.group_break(d.concat(&[
-            d.text(open),
-            d.concat(&line_prefix),
-            d.indent_softline(d.concat(&inner_parts)),
-            d.softline(),
-            d.text("]"),
-        ])))
+        // The `[` is the char just before the index region (past `?.` for `?.[`).
+        Some(self.build_bracket_line_comment_break(
+            open,
+            inside_start - 1,
+            prop_start,
+            d.concat(&body_parts),
+        ))
     }
 
     fn get_property_span(&self, expr: &internal::Expression<'_>) -> Span {

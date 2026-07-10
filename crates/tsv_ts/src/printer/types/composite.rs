@@ -678,21 +678,15 @@ impl<'a> Printer<'a> {
         let bracket_leading_line =
             self.has_line_comments_between(bracket_pos + 1, param_name_start);
         if bracket_leading_line {
-            let (bracket_line_prefix, bracket_pull_pos) =
-                self.delimiter_line_comment_prefix(bracket_pos, param_name_start);
-            let mut inner = self.build_leading_comments_multiline_opt(
-                bracket_pos + 1,
+            // The pre-`]` comments are already inside `interior_parts` (built above via
+            // `build_comments_between`), so the shared helper takes the whole interior as
+            // the body and owns only the `[`→key prefix and the break shell.
+            body_parts.push(self.build_bracket_line_comment_break(
+                "[",
+                bracket_pos,
                 param_name_start,
-                bracket_pull_pos,
-            );
-            inner.push(d.concat(&interior_parts));
-            body_parts.push(d.group_break(d.concat(&[
-                d.text("["),
-                d.concat(&bracket_line_prefix),
-                d.indent_softline(d.concat(&inner)),
-                d.softline(),
-                d.text("]"),
-            ])));
+                d.concat(&interior_parts),
+            ));
         } else {
             body_parts.push(d.text("["));
             // Same-line block comments before the key stay inline (`[/* c */ K in T]`).

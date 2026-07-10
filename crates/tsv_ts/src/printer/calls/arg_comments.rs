@@ -699,9 +699,9 @@ impl<'a> PartitionedComments<'a> {
     /// one place. (`call_formatting` keeps its own same-line loop, feeding
     /// `force_expansion`, and calls only [`emit_dangling_comments`] directly.)
     pub fn emit_last_arg_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
-        if self.has_trailing_line() || self.has_trailing_block() {
-            self.emit_trailing_comments(parts, printer);
-        }
+        // `emit_trailing_comments` already no-ops when there are no trailing comments,
+        // so no presence guard is needed.
+        self.emit_trailing_comments(parts, printer);
         self.emit_dangling_comments(parts, printer);
     }
 
