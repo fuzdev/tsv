@@ -9,8 +9,12 @@
 //! The directive grammar is tsgo's `optionRegex`
 //! (`(?m)^//\s*@(\w+)\s*:\s*([^\r\n]*)`), reproduced without a regex engine: a
 //! match anchors at a physical line start (after `\n`, never a lone `\r`), the
-//! value runs to the next `\r`/`\n`. This hand port is byte-for-byte equivalent to
-//! the regex over the pinned corpus.
+//! value runs to the next `\r`/`\n`. This hand port is equivalent to the regex over
+//! the pinned corpus, not universally: the regex's `\s` also matches `\r`/`\n`, so
+//! the intra-line skips here (`skip_hspace`) diverge on pathological forms a lone
+//! `\r`/`\n` could reach (e.g. `//\r@x:` / `//\n@x:` splitting a directive across a
+//! physical-line boundary). Those don't occur in the corpus — the round-trip and
+//! index gates pin that.
 //
 // tsgo: internal/testrunner/test_case_parser.go optionRegex / extractCompilerSettings
 // tsgo: internal/testrunner/test_case_parser.go ParseTestFilesAndSymlinksWithOptions
@@ -252,6 +256,147 @@ pub fn classify_units(units: Vec<Unit>, settings: &BTreeMap<String, String>) -> 
     }
 }
 
+// ===========================================================================
+// Section display-name derivation (the `==== <name> ====` header the baseline
+// prints for each input file). tsgo builds it as
+// `removeTestPathPrefixes(GetNormalizedAbsolutePath(unit.name, currentDirectory))`,
+// so a relative `@filename` like `./a.ts` (or one with redundant `//`) resolves to
+// the normalized form the header carries. Ported scoped to the roots the corpus
+// uses (POSIX `/`, DOS `X:/`); the index gate's positional pin guards any form
+// beyond that (a URL/UNC name would surface as a mismatch and force a port).
+// ===========================================================================
+//
+// tsgo: internal/testrunner/compiler_runner.go (srcFolder, createHarnessTestFile UnitName)
+// tsgo: internal/testutil/tsbaseline/error_baseline.go (==== header via removeTestPathPrefixes)
+// tsgo: internal/testutil/tsbaseline/util.go removeTestPathPrefixes
+// tsgo: internal/tspath/path.go GetNormalizedAbsolutePath / GetEncodedRootLength
+
+/// The harness src root (`compiler_runner.go` `srcFolder`) that a `@currentDirectory`
+/// (or a bare relative `@filename`) resolves against.
+const SRC_FOLDER: &str = "/.src";
+
+/// The test-path prefix strips the baseline applies (`tsbaseline` `testPathPrefixReplacer`),
+/// in argument order — a single left-to-right pass, first pattern matching at a
+/// position wins (Go `strings.NewReplacer` semantics).
+const TEST_PATH_PREFIX_REPLACEMENTS: &[(&str, &str)] = &[
+    ("/.ts/", ""),
+    ("/.lib/", ""),
+    ("/.src/", ""),
+    ("bundled:///libs/", ""),
+    ("file:///./ts/", "file:///"),
+    ("file:///./lib/", "file:///"),
+    ("file:///./src/", "file:///"),
+];
+
+/// The root-prefix length of a path (`GetEncodedRootLength`, scoped to the corpus's
+/// POSIX and DOS roots): `1` for a leading `/`, `2`/`3` for a DOS `X:` / `X:/`
+/// volume, else `0` (relative). URL/UNC/untitled roots don't occur in the corpus.
+fn root_length(path: &str) -> usize {
+    let b = path.as_bytes();
+    let Some(&c0) = b.first() else { return 0 };
+    if c0 == b'/' {
+        return 1;
+    }
+    if c0.is_ascii_alphabetic() && b.len() > 1 && b[1] == b':' {
+        if b.len() == 2 {
+            return 2;
+        }
+        if b[2] == b'/' || b[2] == b'\\' {
+            return 3;
+        }
+    }
+    0
+}
+
+/// Join a relative path onto a base directory (`CombinePaths`, scoped): a rooted
+/// `rel` replaces the base, an empty `rel` keeps the base, else the two join with a
+/// single `/`.
+fn combine_paths(dir: &str, rel: &str) -> String {
+    if rel.is_empty() {
+        return dir.to_string();
+    }
+    if root_length(rel) != 0 || dir.is_empty() {
+        return rel.to_string();
+    }
+    format!("{}/{}", dir.trim_end_matches('/'), rel)
+}
+
+/// Resolve `.`/`..` and collapse redundant `/` in the path's non-root portion,
+/// preserving the root (`normalizePath`'s segment reduction). A `..` that would
+/// escape a rooted path is dropped; on a relative path a leading `..` is kept.
+fn normalize_path_segments(path: &str) -> String {
+    let root_len = root_length(path);
+    let root = &path[..root_len];
+    let mut segments: Vec<&str> = Vec::new();
+    for seg in path[root_len..].split('/') {
+        match seg {
+            "" | "." => {}
+            ".." => {
+                if segments.last().is_some_and(|&last| last != "..") {
+                    segments.pop();
+                } else if root_len == 0 {
+                    segments.push("..");
+                }
+            }
+            s => segments.push(s),
+        }
+    }
+    let joined = segments.join("/");
+    if root.is_empty() {
+        joined
+    } else if joined.is_empty() {
+        root.to_string()
+    } else {
+        format!("{root}{joined}")
+    }
+}
+
+/// Root `file_name` against `current_directory` (when relative) and normalize its
+/// segments (`GetNormalizedAbsolutePath`).
+fn normalized_absolute_path(file_name: &str, current_directory: &str) -> String {
+    let joined = if root_length(file_name) == 0 && !current_directory.is_empty() {
+        combine_paths(current_directory, file_name)
+    } else {
+        file_name.to_string()
+    };
+    normalize_path_segments(&joined)
+}
+
+/// Strip the harness's test-path prefixes (`removeTestPathPrefixes`), a single
+/// left-to-right pass matching [`TEST_PATH_PREFIX_REPLACEMENTS`] in order.
+fn remove_test_path_prefixes(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    'scan: while !rest.is_empty() {
+        for (pat, rep) in TEST_PATH_PREFIX_REPLACEMENTS {
+            if let Some(after) = rest.strip_prefix(pat) {
+                out.push_str(rep);
+                rest = after;
+                continue 'scan;
+            }
+        }
+        let ch = rest.chars().next().unwrap_or_default();
+        out.push(ch);
+        rest = &rest[ch.len_utf8()..];
+    }
+    out
+}
+
+/// The harness current directory for a test (`@currentDirectory` resolved against
+/// the src root, or the src root itself when unset).
+#[must_use]
+pub fn harness_current_directory(settings: &BTreeMap<String, String>) -> String {
+    let cd = settings.get("currentdirectory").map_or("", String::as_str);
+    normalized_absolute_path(cd, SRC_FOLDER)
+}
+
+/// The baseline `==== <name> ====` display name for a unit, given the test's
+/// resolved current directory (from [`harness_current_directory`]).
+#[must_use]
+pub fn section_display_name(unit_name: &str, current_directory: &str) -> String {
+    remove_test_path_prefixes(&normalized_absolute_path(unit_name, current_directory))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330,12 +475,66 @@ mod tests {
     }
 
     #[test]
+    fn classify_last_unit_on_require() {
+        // A `require(` in the last unit forces the last-unit split, exactly like a
+        // triple-slash reference: to_be_compiled = [last], the rest → other_files.
+        let src = "// @filename: a.ts\nlet a = 1;\n// @filename: b.ts\nconst dep = require('./a');";
+        let units = split_units(src, "test.ts");
+        let c = classify_units(units, &BTreeMap::new());
+        assert!(c.tsconfig.is_none());
+        assert_eq!(c.to_be_compiled.len(), 1);
+        assert_eq!(c.to_be_compiled[0].name, "b.ts");
+        assert_eq!(c.other_files.len(), 1);
+        assert_eq!(c.other_files[0].name, "a.ts");
+    }
+
+    #[test]
+    fn classify_last_unit_on_noimplicitreferences() {
+        // `@noImplicitReferences` forces the last-unit split even with no require /
+        // reference in the content.
+        let src = "// @filename: a.ts\nlet a = 1;\n// @filename: b.ts\nlet b = 2;";
+        let units = split_units(src, "test.ts");
+        let mut settings = BTreeMap::new();
+        settings.insert("noimplicitreferences".to_string(), "true".to_string());
+        let c = classify_units(units, &settings);
+        assert_eq!(c.to_be_compiled.len(), 1);
+        assert_eq!(c.to_be_compiled[0].name, "b.ts");
+        assert_eq!(c.other_files.len(), 1);
+        assert_eq!(c.other_files[0].name, "a.ts");
+    }
+
+    #[test]
     fn classify_all_when_no_reference() {
         let src = "// @filename: a.ts\nlet a = 1;\n// @filename: b.ts\nlet b = 2;";
         let units = split_units(src, "test.ts");
         let c = classify_units(units, &BTreeMap::new());
         assert_eq!(c.to_be_compiled.len(), 2);
         assert!(c.other_files.is_empty());
+    }
+
+    #[test]
+    fn display_name_relative_and_redundant_slash() {
+        // No @currentDirectory: relative names resolve against /.src, then the
+        // /.src/ prefix is stripped — so `./a.d.ts` → `a.d.ts` and a redundant `//`
+        // collapses. These are the exact forms the section header carries.
+        let cwd = harness_current_directory(&BTreeMap::new());
+        assert_eq!(section_display_name("./a.d.ts", &cwd), "a.d.ts");
+        assert_eq!(section_display_name("plain.ts", &cwd), "plain.ts");
+        assert_eq!(
+            section_display_name("node_modules/x/development//x.d.ts", &cwd),
+            "node_modules/x/development/x.d.ts"
+        );
+    }
+
+    #[test]
+    fn display_name_rooted_names_unchanged() {
+        // A rooted `@filename` ignores the current directory and carries no /.src
+        // prefix, so it round-trips verbatim.
+        let mut settings = BTreeMap::new();
+        settings.insert("currentdirectory".to_string(), "/".to_string());
+        let cwd = harness_current_directory(&settings);
+        assert_eq!(section_display_name("/deps/dep/dep.d.ts", &cwd), "/deps/dep/dep.d.ts");
+        assert_eq!(section_display_name("/app.ts", &cwd), "/app.ts");
     }
 
     #[test]

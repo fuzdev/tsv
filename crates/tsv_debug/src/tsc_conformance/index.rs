@@ -21,7 +21,9 @@
 use crate::tsc_conformance::corpus::{
     basename_collisions, discover_corpus, read_corpus_file, BasenameCollision, CorpusTest,
 };
-use crate::tsc_conformance::directives::{classify_units, extract_settings, split_units};
+use crate::tsc_conformance::directives::{
+    classify_units, extract_settings, harness_current_directory, section_display_name, split_units,
+};
 use crate::tsc_conformance::discovery::{discover_baselines, Baseline};
 use crate::tsc_conformance::options_meta::{
     is_known_directive, strict_members, variant_is_unsupported, DEFAULT_USE_CASE_SENSITIVE_FILE_NAMES,
@@ -41,12 +43,18 @@ struct Derived {
 }
 
 /// Per-test record retained for the unit round-trip gate: the section-ordered
-/// unit bodies (each split into physical lines) that a baseline's `====` sections
+/// units — each a `(name, body-lines)` pair — that a baseline's `====` sections
 /// must reproduce.
 struct TestRecord {
     relative_path: String,
     unit_count: usize,
-    unit_line_sets: Vec<Vec<String>>,
+    /// Whether the test carried a tsconfig unit. Its `FileNames` glob resolution is
+    /// out of scope, so the section order isn't authoritative; the gate falls back
+    /// to a body multiset for these (name/order comparison deferred).
+    tsconfig_unresolved: bool,
+    /// `(unit name, body physical lines)` in baseline-section order
+    /// (`Concatenate(tsConfigFiles, toBeCompiled, otherFiles)`).
+    units: Vec<(String, Vec<String>)>,
 }
 
 /// A unit round-trip mismatch (a test whose split units don't reproduce its
@@ -100,6 +108,10 @@ pub struct IndexReport {
     pub collisions: Vec<BasenameCollision>,
     /// Tests whose variant product exceeded the cap (a harness failure).
     pub cap_exceeded: usize,
+    /// varyBy include values with no normalized identity across all expanded tests
+    /// (tsgo hard-fails on each; this harness keeps them as graceful `Other`
+    /// variants). Pinned so a corpus pull can't slip in phantom variants unseen.
+    pub unknown_includes: usize,
     /// Tests carrying a tsconfig/jsconfig unit (whose `FileNames` glob resolution
     /// is out of scope; their section split is by multiset, not order).
     pub tests_with_tsconfig: usize,
@@ -168,6 +180,7 @@ pub fn run_index(checkout: &Path) -> Result<IndexReport, String> {
         basename_collisions: collisions.len(),
         collisions,
         cap_exceeded: 0,
+        unknown_includes: 0,
         tests_with_tsconfig: 0,
         baselines_total: baselines.len(),
         join_matched: 0,
@@ -230,18 +243,26 @@ pub fn run_index(checkout: &Path) -> Result<IndexReport, String> {
             report.cap_exceeded += 1;
             continue;
         }
+        report.unknown_includes += expansion.unknown_includes;
 
         // Order the units per the baseline `====` section order
-        // (`Concatenate(tsConfigFiles, toBeCompiled, otherFiles)`), then reduce to
-        // their line bodies for the round-trip multiset.
+        // (`Concatenate(tsConfigFiles, toBeCompiled, otherFiles)`), resolving each
+        // unit's baseline display name so the round-trip can compare `(name, body)`
+        // positionally.
+        let current_directory = harness_current_directory(&settings);
         let classified = classify_units(units, &settings);
         if classified.tsconfig_unresolved {
             report.tests_with_tsconfig += 1;
         }
-        let unit_line_sets: Vec<Vec<String>> = classified
+        let unit_pairs: Vec<(String, Vec<String>)> = classified
             .section_order()
             .iter()
-            .map(|u| split_content_lines(&u.content))
+            .map(|u| {
+                (
+                    section_display_name(&u.name, &current_directory),
+                    split_content_lines(&u.content),
+                )
+            })
             .collect();
 
         let test_idx = tests.len();
@@ -262,7 +283,8 @@ pub fn run_index(checkout: &Path) -> Result<IndexReport, String> {
         tests.push(TestRecord {
             relative_path: test.relative_path.clone(),
             unit_count,
-            unit_line_sets,
+            tsconfig_unresolved: classified.tsconfig_unresolved,
+            units: unit_pairs,
         });
     }
 
@@ -296,16 +318,12 @@ pub fn run_index(checkout: &Path) -> Result<IndexReport, String> {
     }
 
     // Expect-clean: every non-skipped derived name with no on-disk baseline.
-    let mut seen_names: std::collections::HashSet<(&str, &str)> = std::collections::HashSet::new();
+    // `derived` is keyed by `(suite, name)`, so each iteration is a distinct name.
     for ((suite, name), entries) in &derived {
         if entries.iter().all(|d| d.skipped) {
             continue;
         }
-        if !seen_names.insert((suite, name.as_str())) {
-            continue;
-        }
-        let has = ondisk.contains_key(&(*suite, name.clone()));
-        if !has {
+        if !ondisk.contains_key(&(*suite, name.clone())) {
             report.expect_clean += 1;
         }
     }
@@ -316,9 +334,15 @@ pub fn run_index(checkout: &Path) -> Result<IndexReport, String> {
     Ok(report)
 }
 
-/// Compare a test's split units to its baseline's `====` section bodies as a
-/// multiset. Pretty baselines are counted and skipped (their body layout is a
-/// separate renderer path).
+/// Compare a test's split units to its baseline's `====` sections. For a test
+/// without a tsconfig unit the comparison is **positional** — each section's
+/// `(name, body)` must equal the derived unit at the same index, in
+/// `Concatenate(toBeCompiled, otherFiles)` order — so section naming and ordering
+/// are proven, not just body content. For a tsconfig test the `FileNames` glob
+/// resolution is out of scope (the `toBeCompiled`/`otherFiles` split isn't
+/// authoritative), so the comparison falls back to a body multiset. Pretty
+/// baselines are counted and skipped (their body layout is a separate renderer
+/// path).
 fn check_unit_roundtrip(baseline: &Baseline, record: &TestRecord, report: &mut IndexReport) {
     let content = match std::fs::read_to_string(&baseline.path) {
         Ok(c) => c,
@@ -349,23 +373,59 @@ fn check_unit_roundtrip(baseline: &Baseline, record: &TestRecord, report: &mut I
 
     report.unit_roundtrip_checked += 1;
 
-    let mut unit_lines: Vec<Vec<String>> = record.unit_line_sets.clone();
-    let mut section_lines: Vec<Vec<String>> =
-        parsed.sections.iter().map(|s| s.src_lines.clone()).collect();
-    unit_lines.sort();
-    section_lines.sort();
-
-    if unit_lines != section_lines {
-        report.unit_roundtrip_mismatches.push(UnitMismatch {
-            baseline: baseline.relative_path.clone(),
-            test: record.relative_path.clone(),
-            reason: format!(
+    let reason = if record.tsconfig_unresolved {
+        // Body multiset only (FileNames ordering deferred).
+        let mut unit_lines: Vec<&Vec<String>> = record.units.iter().map(|(_, body)| body).collect();
+        let mut section_lines: Vec<&Vec<String>> = parsed.sections.iter().map(|s| &s.src_lines).collect();
+        unit_lines.sort();
+        section_lines.sort();
+        (unit_lines != section_lines).then(|| {
+            format!(
                 "unit/section body mismatch ({} units vs {} sections)",
                 record.unit_count,
                 parsed.sections.len()
-            ),
+            )
+        })
+    } else {
+        // Positional `(name, body)` comparison.
+        positional_mismatch(record, &parsed.sections)
+    };
+
+    if let Some(reason) = reason {
+        report.unit_roundtrip_mismatches.push(UnitMismatch {
+            baseline: baseline.relative_path.clone(),
+            test: record.relative_path.clone(),
+            reason,
         });
     }
+}
+
+/// Positionally compare a non-tsconfig test's section-ordered units against a
+/// baseline's `====` sections; `None` on an exact match, else a short reason
+/// naming the first divergence.
+fn positional_mismatch(
+    record: &TestRecord,
+    sections: &[crate::tsc_conformance::baseline::Section],
+) -> Option<String> {
+    if record.units.len() != sections.len() {
+        return Some(format!(
+            "unit/section count mismatch ({} units vs {} sections)",
+            record.units.len(),
+            sections.len()
+        ));
+    }
+    for (i, ((name, body), section)) in record.units.iter().zip(sections).enumerate() {
+        if name != &section.name {
+            return Some(format!(
+                "section {i} name mismatch (unit {name:?} vs section {:?})",
+                section.name
+            ));
+        }
+        if body != &section.src_lines {
+            return Some(format!("section {i} ({name:?}) body mismatch"));
+        }
+    }
+    None
 }
 
 /// Split a unit's content into physical lines on `\r?\n` (the section-body
@@ -424,6 +484,7 @@ impl IndexReport {
         println!("Pretty tests:             {}", self.pretty_tests);
         println!("Basename collisions:      {}", self.basename_collisions);
         println!("Cap-exceeded tests:       {}", self.cap_exceeded);
+        println!("Unknown includes:         {}", self.unknown_includes);
         println!("Tests with tsconfig:      {}", self.tests_with_tsconfig);
         println!();
         println!("Variants (non-skipped tests): {}", self.variant_total);

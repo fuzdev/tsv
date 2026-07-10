@@ -38,15 +38,39 @@ pub struct Expansion {
     /// Whether the variant product exceeded the cap (tsgo `t.Fatal`). Never true
     /// on the valid corpus.
     pub cap_exceeded: bool,
+    /// Include values with no normalized identity, summed across this test's varyBy
+    /// options. tsgo hard-fails on such an include (`getValueOfOptionString`'s
+    /// `t.Fatalf`); this harness keeps a graceful `Other` identity so the value
+    /// still expands, and counts it here so the corpus index can pin the total (a
+    /// nonzero count means a corpus pull introduced values the ported option
+    /// universe doesn't know, i.e. phantom variants).
+    pub unknown_includes: usize,
+}
+
+/// The outcome of splitting a varyBy option's directive value: its distinct
+/// writable values plus the count of include values with no normalized identity.
+#[derive(Debug, Clone, Default)]
+pub struct SplitOutcome {
+    /// The original include strings, deduped by normalized identity (first wins).
+    pub values: Vec<String>,
+    /// Include values `normalize_value` did not recognize (the graceful-`Other`
+    /// fallbacks); tsgo hard-fails on each of these instead.
+    pub unknown_includes: usize,
 }
 
 /// Split a varyBy option's directive value into its distinct writable values,
 /// handling `*` (all values), `-x`/`!x` (exclusion), and typed dedup — the
 /// original include strings, deduped by normalized identity (first wins).
+///
+/// An include the option universe doesn't recognize keeps its own lowercased
+/// identity (so the variant count is never silently reduced) and is tallied in
+/// [`SplitOutcome::unknown_includes`]; unrecognized *excludes* are skipped
+/// silently, matching tsgo (`tryGetValueOfOptionString` returns "not ok" and the
+/// exclude is a no-op).
 #[must_use]
-pub fn split_option_values(value: &str, option_lower: &str) -> Vec<String> {
+pub fn split_option_values(value: &str, option_lower: &str) -> SplitOutcome {
     if value.is_empty() {
-        return Vec::new();
+        return SplitOutcome::default();
     }
     let mut star = false;
     let mut includes: Vec<&str> = Vec::new();
@@ -65,7 +89,7 @@ pub fn split_option_values(value: &str, option_lower: &str) -> Vec<String> {
         }
     }
     if includes.is_empty() && !star && excludes.is_empty() {
-        return Vec::new();
+        return SplitOutcome::default();
     }
 
     // Insertion-ordered dedup by normalized identity; unrecognized includes keep
@@ -76,9 +100,15 @@ pub fn split_option_values(value: &str, option_lower: &str) -> Vec<String> {
             order.push((canon, original.to_string()));
         }
     };
+    let mut unknown_includes = 0usize;
     for inc in &includes {
-        let canon =
-            normalize_value(option_lower, inc).unwrap_or_else(|| NormValue::Other(inc.to_lowercase()));
+        let canon = match normalize_value(option_lower, inc) {
+            Some(canon) => canon,
+            None => {
+                unknown_includes += 1;
+                NormValue::Other(inc.to_lowercase())
+            }
+        };
         insert(canon, inc);
     }
     if star {
@@ -93,7 +123,10 @@ pub fn split_option_values(value: &str, option_lower: &str) -> Vec<String> {
             order.retain(|(c, _)| *c != canon);
         }
     }
-    order.into_iter().map(|(_, original)| original).collect()
+    SplitOutcome {
+        values: order.into_iter().map(|(_, original)| original).collect(),
+        unknown_includes,
+    }
 }
 
 /// Expand a settings map into its variant configurations
@@ -103,16 +136,20 @@ pub fn expand(settings: &BTreeMap<String, String>) -> Expansion {
     let mut option_entries: Vec<(String, Vec<String>)> = Vec::new();
     let mut variation_count = 1usize;
     let mut non_varying: BTreeMap<String, String> = BTreeMap::new();
+    let mut unknown_includes = 0usize;
 
     for (opt, value) in settings {
         if is_vary_by(opt) {
-            let entries = split_option_values(value, opt);
+            let outcome = split_option_values(value, opt);
+            unknown_includes += outcome.unknown_includes;
+            let entries = outcome.values;
             if entries.len() > 1 {
                 variation_count = variation_count.saturating_mul(entries.len());
                 if variation_count > VARIATION_CAP {
                     return Expansion {
                         variants: Vec::new(),
                         cap_exceeded: true,
+                        unknown_includes,
                     };
                 }
                 option_entries.push((opt.clone(), entries));
@@ -172,6 +209,7 @@ pub fn expand(settings: &BTreeMap<String, String>) -> Expansion {
     Expansion {
         variants,
         cap_exceeded: false,
+        unknown_includes,
     }
 }
 
@@ -219,23 +257,50 @@ mod tests {
 
     #[test]
     fn split_star_and_exclusion() {
-        // `*` expands to all bool values, exclusion removes one.
-        let mut v = split_option_values("*, -true", "strict");
+        // `*` expands to all bool values, `-` exclusion removes one.
+        let mut v = split_option_values("*, -true", "strict").values;
         v.sort();
         assert_eq!(v, vec!["false"]);
     }
 
     #[test]
+    fn split_bang_exclusion() {
+        // `!x` is the exclusion form alongside `-x` (both strip one value).
+        let out = split_option_values("*, !true", "strict");
+        assert_eq!(out.values, vec!["false"]);
+        assert_eq!(out.unknown_includes, 0);
+    }
+
+    #[test]
+    fn split_empty_set_after_exclusion() {
+        // `*` minus every value: tsgo panics ("resulted in an empty set"); this
+        // harness returns an empty value list gracefully (the option is then
+        // dropped by `expand`, not a variant).
+        let out = split_option_values("*, -true, -false", "strict");
+        assert!(out.values.is_empty());
+        assert_eq!(out.unknown_includes, 0);
+    }
+
+    #[test]
+    fn split_unknown_include_fallback_is_counted() {
+        // An include the option universe doesn't recognize still expands (graceful
+        // `Other` identity) but is tallied — tsgo hard-fails on it instead.
+        let out = split_option_values("es5, notarealtarget", "target");
+        assert_eq!(out.values, vec!["es5", "notarealtarget"]);
+        assert_eq!(out.unknown_includes, 1);
+    }
+
+    #[test]
     fn split_dedup_aliases() {
         // es6 and es2015 alias; first (es6) wins, so one value.
-        assert_eq!(split_option_values("es6, es2015", "target"), vec!["es6"]);
+        assert_eq!(split_option_values("es6, es2015", "target").values, vec!["es6"]);
     }
 
     #[test]
     fn split_list_typed_is_single() {
         // A list option is never a varyBy option, so this helper is not called for
         // it; but a plain multi-value on a scalar enum splits.
-        assert_eq!(split_option_values("es5, es2015", "target").len(), 2);
+        assert_eq!(split_option_values("es5, es2015", "target").values.len(), 2);
     }
 
     #[test]
@@ -267,6 +332,37 @@ mod tests {
         assert_eq!(e.variants[0].description, "");
         assert_eq!(e.variants[0].config.get("target").map(String::as_str), Some("es2015"));
         assert_eq!(e.variants[0].config.get("jsxfactory").map(String::as_str), Some("h"));
+    }
+
+    #[test]
+    fn expand_cap_exceeded() {
+        // target `*` (13 distinct) × strict `true,false` (2) = 26 > the cap of 25:
+        // a hard harness failure (tsgo `t.Fatal`), here surfaced as `cap_exceeded`
+        // with no variants.
+        let e = expand(&settings(&[("target", "*"), ("strict", "true, false")]));
+        assert!(e.cap_exceeded);
+        assert!(e.variants.is_empty());
+    }
+
+    #[test]
+    fn expand_surfaces_unknown_includes() {
+        // The unknown-include tally propagates from `split_option_values` up to the
+        // expansion (the F1 phantom-variant guard).
+        let e = expand(&settings(&[("target", "es2015, notarealtarget")]));
+        assert!(!e.cap_exceeded);
+        assert_eq!(e.unknown_includes, 1);
+        assert_eq!(e.variants.len(), 2);
+    }
+
+    #[test]
+    fn expand_empty_after_exclusion_drops_option() {
+        // A varyBy option that reduces to an empty set is dropped entirely, leaving
+        // the single unvaried configuration.
+        let e = expand(&settings(&[("strict", "*, -true, -false")]));
+        assert!(!e.cap_exceeded);
+        assert_eq!(e.variants.len(), 1);
+        assert_eq!(e.variants[0].description, "");
+        assert!(e.variants[0].config.is_empty());
     }
 
     #[test]

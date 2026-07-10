@@ -50,6 +50,10 @@ const INDEX_JS_FLAVORED_PIN: usize = 934;
 const INDEX_PRETTY_TESTS_PIN: usize = 14;
 const INDEX_BASENAME_COLLISIONS_PIN: usize = 0;
 const INDEX_CAP_EXCEEDED_PIN: usize = 0;
+/// varyBy include values with no normalized identity (tsgo hard-fails on each; the
+/// harness keeps them as graceful `Other` variants). Zero on the pinned corpus — a
+/// nonzero count is a phantom-variant signal from a corpus pull, not a clean move.
+const INDEX_UNKNOWN_INCLUDES_PIN: usize = 0;
 /// Variant sizing: total variants, the variant-level (unsupported-option) skips,
 /// the non-skipped variants, and the expect-clean count.
 const INDEX_VARIANT_TOTAL_PIN: usize = 14916;
@@ -213,6 +217,7 @@ fn enforce_index_pins(report: &IndexReport) -> Result<(), CliError> {
         INDEX_BASENAME_COLLISIONS_PIN,
     );
     pin(&mut errs, "cap-exceeded", report.cap_exceeded, INDEX_CAP_EXCEEDED_PIN);
+    pin(&mut errs, "unknown includes", report.unknown_includes, INDEX_UNKNOWN_INCLUDES_PIN);
     pin(&mut errs, "variant total", report.variant_total, INDEX_VARIANT_TOTAL_PIN);
     pin(
         &mut errs,
