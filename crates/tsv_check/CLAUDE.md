@@ -50,11 +50,27 @@
   seeded), and the base-aware merge (`merge_symbol_against_base` — programs
   consult overlay-then-base; test symbols never mutate the base; base decls
   translate into program FileId space only on a conflict).
-- `binder/` — the fused lower+bind pre-order walk: assigns dense 1-based
-  `NodeId`s, fills SoA side columns (`parents`/`kinds`/`spans`/
-  `subtree_end` — the latter makes descendant tests O(1) interval checks),
-  builds the address→NodeId map, derives per-file facts (module-ness from
-  import/export presence). **Borrow-only discipline**: visitors take
+- `binder/` — **two cooperating walks per file** (deliberately NOT one
+  fused walk — functions-first symbol binding reorders symbol creation
+  within a statement list, which would break strict pre-order id
+  intervals; see `binder/mod.rs`'s header):
+  - `mod.rs` — the SoA lowering walk: dense 1-based `NodeId`s, side columns
+    (`parents`/`kinds`/`spans`/`subtree_end` — the latter makes descendant
+    tests O(1) interval checks), the address→NodeId map, per-file facts
+    (module-ness via the `isAnExternalModuleIndicatorNode` port).
+  - `sym.rs` — the container-threaded, functions-first symbol-bind walk:
+    `getContainerFlags`, `declareSymbolEx` + the duplicate/conflict cascade
+    (TS2451/2300/2567/2528 with per-prior-declaration related info),
+    internal-name mangling (incl. private `#` names), the dual local/export
+    collapse (documented at the site; revisited at multi-file).
+  - `symbols.rs` — `Symbol`, `SymbolFlags` + the `*Excludes` conflict-mask
+    const tables (ported bit-for-bit from tsgo's `symbolflags.go`), pooled
+    declaration lists, `TableId` symbol tables.
+  - `atoms.rs` — the checker's own program-scoped name interner (a fresh
+    `string-interner` instance — never the parser's per-document
+    `SharedInterner`), reserved internal-name atoms.
+
+  **Borrow-only discipline**: visitors take
   `&'arena` references and never clone AST nodes — the AST derives `Clone`,
   and one accidental `.clone()` silently mints differently-addressed copies
   that break the address map; nothing type-level enforces this, so it is a

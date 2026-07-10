@@ -67,6 +67,9 @@ Four tools, in order of use:
 ### 1. `tsv_debug profile` — phase timing
 
 Measures parse vs format timing across files. Pure Rust, no external dependencies.
+The `--bind` form instead measures parse vs lower+bind timing through the
+`tsv_check` crate (TypeScript files only) and reports peak RSS (`VmHWM` from
+`/proc/self/status`) — the binder's standing perf-anchor form.
 
 ```bash
 # Profile a directory

@@ -454,8 +454,10 @@ every real move in a number is a deliberate, visible edit.
   small shrink warns and still writes, only a >10% collapse fails).
 - Rust-side counts are consts in their commands — grep `REGRESSION PIN`:
   test262 (discovered + graded-manifest), `fixtures_validate` (total fixtures —
-  protects the primary gate against a discovery collapse), and `swallow_audit`
-  (formatted files — closes its vacuous-pass).
+  protects the primary gate against a discovery collapse), `swallow_audit`
+  (formatted files — closes its vacuous-pass), and `tsc_conformance` (the
+  largest set: baseline/roundtrip/pretty pins + the `INDEX_*` denominators +
+  the `RUN_*` family-gate pins, all in `cli/commands/tsc_conformance.rs`).
 
 **Semantics — three pin categories, chosen per surface:**
 
@@ -697,9 +699,9 @@ deno task bench:deno:run -- --compare-baseline  # Compare against saved baseline
 
 # Wipe local-only bench state (gitignored): baseline.json, timestamped
 # results pairs, and the harvest caches (benches/js/.cache). Preserves the
-# committed `report.<runtime>.{json,md}` / `report.conformance.node.*`
-# because the glob is anchored on a leading digit (timestamped files start
-# with a year).
+# committed `report.<runtime>.{json,md}` / `report.conformance.node.*` /
+# `report.tsc-conformance.{json,md}` because the glob is anchored on a
+# leading digit (timestamped files start with a year).
 deno task bench:clean
 
 # Environment variables (apply to any runtime's :run)
@@ -1089,7 +1091,7 @@ benches/js/
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
 ├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache/test262_files.json (Deno-only)
 ├── bench.ts               # Benchmark entry point (runtime-neutral — runs under Deno AND Node)
-├── conformance.ts         # Single-process pre-release aggregate driver (deno task conformance): all five legs, one module cache
+├── conformance.ts         # Single-process pre-release aggregate driver (deno task conformance): all seven legs, one module cache
 ├── smoke.ts               # Smoke test for formatters and parsers (runtime-neutral: smoke / smoke:node / smoke:bun)
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md} (bench:compose)
 ├── corpus_compare_format.ts  # Formatting comparison vs prettier (Deno-only entry point)

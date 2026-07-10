@@ -301,10 +301,12 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../t
 # point). Options: -v, --json, <subtree>. See ./benches/js/CLAUDE.md.
 
 deno task conformance                  # the pre-release aggregate: svelte-fixtures + ts-fixtures + ts-repo +
-# corpus:compare:parse --all + corpus:compare:format --all — ONE process (benches/js/conformance.ts;
-# oracle modules load once, per-leg timings, fail-fast like a && chain), corpus FFI built once. The
+# conformance:tsc-roundtrip + conformance:tsc-check + corpus:compare:parse --all +
+# corpus:compare:format --all — ONE process (benches/js/conformance.ts;
+# oracle modules load once, per-leg timings, fail-fast like a && chain; the two tsc legs are
+# pure-Rust cargo shell-outs), corpus FFI built once. The
 # release-cadence correctness gates across Svelte/CSS/TS that need external oracles (svelte/compiler,
-# acorn-ts/parseCss, tsc baselines, prettier) so they can't live in `deno task check`. The format leg's
+# acorn-ts/parseCss, tsgo baselines, prettier) so they can't live in `deno task check`. The format leg's
 # prettier calls ride a content-addressed output cache (benches/js/lib/prettier_cache.ts — repeat runs
 # skip re-formatting unchanged files; TSV_PRETTIER_CACHE=0 disables). Wired into `publish.ts` Step 3b;
 # test262 (../test262) + CSS-WPT harvest stay manual.
@@ -792,13 +794,15 @@ See ./docs/conformance_test262.md.
 
 Pure-Rust harness over tsgo's committed `.errors.txt` error baselines (in
 `../typescript-go`, oracle pin `168e7015`, read from the checked-in
-`testdata/baselines/reference/submodule`). No Deno, **zero checker code**.
+`testdata/baselines/reference/submodule`). No Deno. The oracle-side tools
+(`query`/`roundtrip`/`index`) are **zero checker code**; `run`/`check-test`
+drive the in-development **`tsv_check`** crate against the same baselines.
 `query`/`roundtrip` need only the baselines, so they run on a bare checkout;
-`index` additionally requires the materialized `_submodules/TypeScript` corpus
-(`git submodule update --init`). Distinct from the parser-conformance surfaces:
-`conformance:ts-repo` grades tsv's *parser* against the tsc corpus, whereas this
-reads tsgo's *checker* error output — the seam a future tsv checker will emit
-through.
+`index`/`run` additionally require the materialized `_submodules/TypeScript`
+corpus (`git submodule update --init`), and `run` the bundled libs. Distinct
+from the parser-conformance surfaces: `conformance:ts-repo` grades tsv's
+*parser* against the tsc corpus, whereas this reads tsgo's *checker* error
+output — the seam `tsv_check` emits through.
 
 ```bash
 # query - aggregations over every baseline's summary block
@@ -1163,14 +1167,14 @@ Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/
 ### Rust Crates (minimal deps)
 
 - `serde_json` — wire-JSON emission: the writer's exact string-escape / `f64` formatting, and reparsing bytes to a `Value` (CLI `--pretty`, tests). The language crates no longer depend on `serde` directly (only transitively, without its `derive`); `serde`'s derive is dev-tooling only (`tsv_debug` / `tsv_cli`)
-- `smallvec` — Stack-allocated vectors
-- `string-interner` — String interning for the residual symbol tenants (Svelte element/attribute names, escaped identifiers); identifier names are span-identity (`IdentName`)
+- `smallvec` — Stack-allocated vectors (printers + `tsv_check`)
+- `string-interner` — String interning for the residual symbol tenants (Svelte element/attribute names, escaped identifiers); identifier names are span-identity (`IdentName`). `tsv_check` runs its own separate program-scoped instance for binder name atoms (never the parser's per-document `SharedInterner`)
 - `thiserror` — Error type derivation
 - `phf` — Compile-time perfect hash maps (keywords, entities)
 - `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers
 - `unicode-segmentation` — Grapheme clustering for visual width measurement
 - `unicode-width` — Character display width (CJK, zero-width)
-- `bumpalo` — Bump arena for the internal AST (and, via the `tsv_arena` crate, the bindings' per-thread `reset()` reuse — `tsv_ffi`/`tsv_napi`/`tsv_wasm`)
+- `bumpalo` — Bump arena for the internal AST (and, via the `tsv_arena` crate, the bindings' per-thread `reset()` reuse — `tsv_ffi`/`tsv_napi`/`tsv_wasm`; `tsv_check`'s caller-owned check arenas follow the same contract)
 - `talc` — WASM global allocator (`tsv_wasm` only, wasm32-only target dep): pure-Rust `no_std` allocator replacing std's default dlmalloc; the `WasmGrowAndExtend` source keeps the warm instance's linear-memory high-water at dlmalloc parity. Pulls `lock_api` + `allocator-api2` (+ `scopeguard`) into the wasm32 graph only; native builds unaffected
 - `napi` / `napi-derive` / `napi-build` — N-API bindings for `tsv_napi` (Node/Bun native addon; tsv-scoped carve-out)
 

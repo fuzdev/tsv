@@ -62,7 +62,9 @@ Future features (unknown order):
 - JS parsing diagnostics (test262 negative cases)
 - CSS error recovery (recover past invalid CSS per the spec)
 - later:
-  - TypeScript 7 integration (the Go impl), unlocking:
+  - TypeScript type checking (`tsv_check`, in development — a from-scratch Rust
+    binder/checker graded for exact conformance against TypeScript 7 (the Go
+    impl)'s own test baselines), unlocking:
     - svelte-check replacement
     - LSP
     - linter - type aware, initially focused on serializable data-only plugins for extensibility
@@ -245,6 +247,7 @@ tsv/
 │   ├── tsv_ts/        # TypeScript parser/formatter (standalone)
 │   ├── tsv_css/       # CSS parser/formatter (standalone)
 │   ├── tsv_svelte/    # Svelte parser/formatter (uses tsv_ts + tsv_css)
+│   ├── tsv_check/     # TypeScript binder/checker (in development; not in any shipped artifact)
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
 │   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
 │   ├── tsv_ffi/       # C FFI bindings
