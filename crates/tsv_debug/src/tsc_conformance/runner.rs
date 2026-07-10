@@ -43,7 +43,7 @@ use crate::tsc_conformance::options_meta::{
 };
 use crate::tsc_conformance::variants::{config_name, expand, Variant};
 use bumpalo::Bump;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::time::Instant;
@@ -135,6 +135,69 @@ pub struct PanicRecord {
     pub test: String,
     /// The panic payload's message (downcast to `&str`/`String`), for triage.
     pub payload: String,
+}
+
+/// Filters for a scoped `run` sweep. Any active filter SKIPS the exact pins (the
+/// `roundtrip`/`query` convention), so a filtered run is a triage view — the
+/// invariant gates (clean grading, no panics, `family_extra == 0`) still hold.
+#[derive(Default, Clone)]
+pub struct RunFilter {
+    /// Keep only tests whose relative path contains this substring.
+    pub test: Option<String>,
+    /// Keep only variants whose joined baseline carries this TS code.
+    pub code: Option<u32>,
+    /// Keep only variants whose config has this `key=value` (key lowercased).
+    pub variant: Option<(String, String)>,
+}
+
+impl RunFilter {
+    /// Whether any filter is active (drives pin skipping).
+    #[must_use]
+    pub fn is_active(&self) -> bool {
+        self.test.is_some() || self.code.is_some() || self.variant.is_some()
+    }
+}
+
+/// Options for the skeleton sweep.
+#[derive(Default, Clone)]
+pub struct RunOptions {
+    /// The triage filter (empty = full pinned run).
+    pub filter: RunFilter,
+    /// Collect the per-variant verdict rows (for `--emit-manifest`).
+    pub collect_manifest: bool,
+}
+
+/// One graded variant's verdict for the `--emit-manifest` JSON (the per-variant
+/// row — the test262-manifest analog). Collected only when a manifest is requested.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ManifestEntry {
+    /// The suite (`compiler` / `conformance`).
+    pub suite: String,
+    /// The corpus test's relative path.
+    pub test: String,
+    /// The joined baseline name (the variant identity).
+    pub config: String,
+    /// Whether the variant has an on-disk baseline.
+    pub baselined: bool,
+    /// Whether tsv parsed the unit (`false` = parse-rejected).
+    pub parsed: bool,
+    /// The per-variant verdict (see [`grade_test`] / [`grade_family`]).
+    pub verdict: &'static str,
+}
+
+/// One failing variant with a pre-rendered ours-vs-baseline diff — written to a
+/// `.diff` artifact when a run's gates fail (a regression aid; empty when green).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct FailingVariant {
+    /// The suite (`compiler` / `conformance`).
+    pub suite: String,
+    /// The joined baseline name (the artifact basename).
+    pub config: String,
+    /// Why it failed (`family_extra` / `span_mismatch` / `clean_fail` / `panic`).
+    pub reason: &'static str,
+    /// The rendered ours-vs-baseline text (file-artifact only — not in `--json`).
+    #[serde(skip)]
+    pub diff: String,
 }
 
 /// The skeleton sweep report.
@@ -238,8 +301,24 @@ pub struct SkeletonReport {
     pub stale_exclusions: Vec<String>,
     /// Total bound nodes across in-scope tests (informational).
     pub total_nodes: u64,
-    /// Wall-clock of the sweep in milliseconds.
+    /// Wall-clock of the sweep in milliseconds (EXCLUDED from the committed report —
+    /// machine-varying).
     pub wall_ms: u128,
+
+    // --- deterministic per-code breakdown (the committed report's per-code table) ---
+    /// Family diagnostics that matched, keyed by TS code (sorted for determinism).
+    pub family_match_by_code: BTreeMap<u32, usize>,
+    /// Family baseline diagnostics with no match, keyed by TS code (sorted).
+    pub family_missing_by_code: BTreeMap<u32, usize>,
+
+    // --- optional artifacts (empty on a normal green run) ---
+    /// Per-variant verdict rows for `--emit-manifest` (empty unless requested).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub manifest_entries: Vec<ManifestEntry>,
+    /// Failing variants with a pre-rendered diff — written to `.diff` artifacts when
+    /// the gates fail (empty when green).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failing_variants: Vec<FailingVariant>,
 }
 
 /// The baseline shape used to bucket a parse-rejected variant.
@@ -255,17 +334,18 @@ enum BaselineShape {
 ///
 /// Returns an error string if the worker cannot spawn, the worker panics
 /// outside a contained per-test check, or corpus discovery fails.
-pub fn run_skeleton(checkout: &Path) -> Result<SkeletonReport, String> {
+pub fn run_skeleton(checkout: &Path, options: &RunOptions) -> Result<SkeletonReport, String> {
     let checkout = checkout.to_path_buf();
+    let options = options.clone();
     let handle = std::thread::Builder::new()
         .stack_size(SKELETON_STACK)
         .name("tsc-skeleton".to_string())
-        .spawn(move || run_skeleton_inner(&checkout))
+        .spawn(move || run_skeleton_inner(&checkout, &options))
         .map_err(|e| format!("spawn skeleton worker: {e}"))?;
     handle.join().map_err(|_| "skeleton worker panicked".to_string())?
 }
 
-fn run_skeleton_inner(checkout: &Path) -> Result<SkeletonReport, String> {
+fn run_skeleton_inner(checkout: &Path, options: &RunOptions) -> Result<SkeletonReport, String> {
     let start = Instant::now();
     let corpus = discover_corpus(checkout)?;
     let baselines = discover_baselines(&baselines_dir(checkout))?;
@@ -282,6 +362,12 @@ fn run_skeleton_inner(checkout: &Path) -> Result<SkeletonReport, String> {
     let mut resolver = LibResolver::new(checkout);
 
     for test in &corpus {
+        // Test-level triage filter (`--test <substr>`): match the roundtrip identity.
+        if let Some(sub) = &options.filter.test
+            && !test.relative_path.contains(sub.as_str())
+        {
+            continue;
+        }
         if SKIPPED_TESTS.contains(&test.basename.as_str()) {
             continue;
         }
@@ -319,7 +405,7 @@ fn run_skeleton_inner(checkout: &Path) -> Result<SkeletonReport, String> {
         }
 
         report.in_scope_tests += 1;
-        grade_test(test, &units[0], &in_scope, &ondisk, &mut resolver, &mut report);
+        grade_test(test, &units[0], &in_scope, &ondisk, &mut resolver, options, &mut report);
     }
 
     // Fold in the resolver's lib-base census (parse-once/fold-once counts + gates).
@@ -386,6 +472,7 @@ fn grade_test(
     in_scope: &[&Variant],
     ondisk: &HashMap<(&str, String), &Baseline>,
     resolver: &mut LibResolver,
+    options: &RunOptions,
     report: &mut SkeletonReport,
 ) {
     // Parse + bind on a fresh arena, contained against panics (the tsv parser is the
@@ -413,14 +500,28 @@ fn grade_test(
     let line_map = parsed.then(|| LocationTracker::new_ecmascript_with_map(&unit.content));
 
     for variant in in_scope {
+        let name = config_name(&test.basename, &variant.description);
+        let baseline = ondisk.get(&(test.suite, name.clone())).copied();
+
+        // Variant-level triage filters, applied BEFORE counting so a filtered sweep's
+        // denominators reflect only the graded slice (any active filter skips the pins).
+        if let Some((k, v)) = &options.filter.variant
+            && variant.config.get(k).map(String::as_str) != Some(v.as_str())
+        {
+            continue;
+        }
+        if let Some(code) = options.filter.code
+            && !baseline.is_some_and(|b| baseline_carries_code(b, code))
+        {
+            continue;
+        }
+
         report.in_scope_variants += 1;
         if variant.config.contains_key("moduledetection") {
             report.module_detection_variants += 1;
         }
-        let name = config_name(&test.basename, &variant.description);
-        let baseline = ondisk.get(&(test.suite, name.clone())).copied();
 
-        match parse {
+        let verdict: &'static str = match parse {
             ParseReport::Rejected { .. } => {
                 report.parse_rejected_total += 1;
                 match baseline_shape(baseline) {
@@ -428,15 +529,39 @@ fn grade_test(
                     BaselineShape::Ts1xxxOnly => report.parse_rejected_ts1xxx_only += 1,
                     BaselineShape::Other => report.parse_rejected_other += 1,
                 }
+                "parse_rejected"
             }
             ParseReport::Parsed(facts) => {
                 if facts.used_script_retry {
                     report.script_retry += 1;
                 }
                 // Resolve this variant's lib set (cached) and merge the bound program
-                // against it — the merge diagnostics are the lib-conflict family.
-                let base = resolver.base_for(&variant.config);
-                let result = check_bound(&bound, base.as_deref());
+                // against it — the merge diagnostics are the lib-conflict family. The
+                // lib resolution (parse+bind of each `.d.ts`) is the only remaining
+                // panic source past the initial bind, so contain it per variant: a
+                // future lib parse panic is recorded, not sweep-fatal.
+                let checked = catch_unwind(AssertUnwindSafe(|| {
+                    let base = resolver.base_for(&variant.config);
+                    let result = check_bound(&bound, base.as_deref());
+                    (base, result)
+                }));
+                let (base, result) = match checked {
+                    Ok(pair) => pair,
+                    Err(payload) => {
+                        report.panics.push(PanicRecord {
+                            test: test.relative_path.clone(),
+                            payload: panic_payload_message(&*payload),
+                        });
+                        report.failing_variants.push(FailingVariant {
+                            suite: test.suite.to_string(),
+                            config: name.clone(),
+                            reason: "panic",
+                            diff: format!("# {}/{name}  (lib-resolution panic)\n", test.suite),
+                        });
+                        record_manifest(report, options, test, &name, baseline.is_some(), true, "panic");
+                        continue;
+                    }
+                };
                 let lib_files = base.as_ref().map_or(&[][..], |b| b.lib_files.as_slice());
 
                 match baseline {
@@ -444,11 +569,19 @@ fn grade_test(
                         report.expect_clean_graded += 1;
                         if result.diagnostics.is_empty() {
                             report.clean_pass += 1;
+                            "clean_pass"
                         } else {
                             report.clean_fail.push(CleanFail {
                                 variant: format!("{}/{name}", test.suite),
                                 diagnostics: result.diagnostics.len(),
                             });
+                            report.failing_variants.push(FailingVariant {
+                                suite: test.suite.to_string(),
+                                config: name.clone(),
+                                reason: "clean_fail",
+                                diff: render_clean_fail_diff(test, &name, &result.diagnostics),
+                            });
+                            "clean_fail"
                         }
                     }
                     Some(b) => {
@@ -461,15 +594,84 @@ fn grade_test(
                             }
                             None => Vec::new(),
                         };
-                        grade_family(test, &name, b, &ours_family, report);
+                        grade_family(test, &name, b, &ours_family, report)
                     }
                 }
             }
-        }
+        };
+
+        record_manifest(report, options, test, &name, baseline.is_some(), parsed, verdict);
     }
 
     // Node total: counted once per test (all variants share the parse+bind).
     report.total_nodes += bound.total_node_count();
+}
+
+/// Record one per-variant verdict row for `--emit-manifest` (a no-op unless a
+/// manifest is being collected).
+fn record_manifest(
+    report: &mut SkeletonReport,
+    options: &RunOptions,
+    test: &CorpusTest,
+    config: &str,
+    baselined: bool,
+    parsed: bool,
+    verdict: &'static str,
+) {
+    if options.collect_manifest {
+        report.manifest_entries.push(ManifestEntry {
+            suite: test.suite.to_string(),
+            test: test.relative_path.clone(),
+            config: config.to_string(),
+            baselined,
+            parsed,
+            verdict,
+        });
+    }
+}
+
+/// Whether a baseline's summary block carries a given TS code (the `--code` filter).
+fn baseline_carries_code(baseline: &Baseline, code: u32) -> bool {
+    let Ok(content) = std::fs::read_to_string(&baseline.path) else {
+        return false;
+    };
+    parse_summary_block(&content).iter().any(|d| d.code == code)
+}
+
+/// Render one failing family variant's ours-vs-baseline diff for a `.diff` artifact.
+fn render_family_diff(
+    test: &CorpusTest,
+    name: &str,
+    reason: &str,
+    ours: &[FamilyEntry],
+    base: &[FamilyEntry],
+) -> String {
+    use std::fmt::Write as _;
+    let mut s = format!("# {}/{name}  ({reason})\n", test.suite);
+    let _ = writeln!(s, "## ours family ({})", ours.len());
+    for e in ours {
+        let _ = writeln!(s, "  {}({},{}): TS{}", e.key.file, e.key.line, e.key.col, e.key.code);
+    }
+    let _ = writeln!(s, "## baseline family ({})", base.len());
+    for e in base {
+        let _ = writeln!(s, "  {}({},{}): TS{}", e.key.file, e.key.line, e.key.col, e.key.code);
+    }
+    s
+}
+
+/// Render an expect-clean variant's spurious diagnostics for a `.diff` artifact.
+fn render_clean_fail_diff(test: &CorpusTest, name: &str, diags: &[Diagnostic]) -> String {
+    use std::fmt::Write as _;
+    let mut s = format!(
+        "# {}/{name}  (clean_fail — expect-clean but {} diagnostic(s))\n## ours ({})\n",
+        test.suite,
+        diags.len(),
+        diags.len(),
+    );
+    for d in diags {
+        let _ = writeln!(s, "  TS{} @ [{}..{}]", d.code, d.span.start, d.span.end);
+    }
+    s
 }
 
 /// The number of program units in the single-file sweep (a lib FileId is
@@ -570,7 +772,8 @@ struct FamilyEntry {
 }
 
 /// Grade one parsed-with-baseline variant's family diagnostics against its
-/// baseline, folding the buckets into `report`. Applies predicate v1 rule (a)
+/// baseline, folding the buckets into `report` and returning the per-variant
+/// verdict (for the `--emit-manifest` row). Applies predicate v1 rule (a)
 /// (recovery-AST carve-out) first, then the primary-code channel and — for the
 /// matched primaries — the independent related-info channel.
 fn grade_family(
@@ -579,8 +782,10 @@ fn grade_family(
     baseline: &Baseline,
     ours: &[FamilyEntry],
     report: &mut SkeletonReport,
-) {
-    let Ok(content) = std::fs::read_to_string(&baseline.path) else { return };
+) -> &'static str {
+    let Ok(content) = std::fs::read_to_string(&baseline.path) else {
+        return "baseline_unreadable";
+    };
     let base_all = parse_base_diags(&content);
 
     // Predicate v1 rule (a): tsv parses clean (it did — this variant parsed) and
@@ -609,7 +814,7 @@ fn grade_family(
         if has_family {
             report.carve_out_rule_a_family += 1;
         }
-        return;
+        return "carve_out";
     }
 
     report.family_graded_variants += 1;
@@ -623,6 +828,9 @@ fn grade_family(
     report.family_match += buckets.matched;
     report.family_span_mismatch += buckets.span_mismatch;
     report.family_extra += buckets.extra;
+    for (code, count) in &buckets.matched_by_code {
+        *report.family_match_by_code.entry(*code).or_default() += *count;
+    }
     if buckets.extra > 0 && report.extra_samples.len() < 20 {
         report.extra_samples.push(format!("{}/{name} (+{})", test.suite, buckets.extra));
     }
@@ -631,15 +839,28 @@ fn grade_family(
             .span_mismatch_samples
             .push(format!("{}/{name} (~{})", test.suite, buckets.span_mismatch));
     }
+    // An unexplained hard-fail bucket (extra / span mismatch) gets a rendered
+    // ours-vs-baseline diff artifact; the pinned check-time `missing` is expected,
+    // so it does not.
+    if buckets.extra > 0 || buckets.span_mismatch > 0 {
+        let reason = if buckets.extra > 0 { "family_extra" } else { "span_mismatch" };
+        report.failing_variants.push(FailingVariant {
+            suite: test.suite.to_string(),
+            config: name.to_string(),
+            reason,
+            diff: render_family_diff(test, name, reason, ours, &base_family),
+        });
+    }
     let is_lib = LIB_CONFLICT_BASELINES.contains(&test.basename.as_str());
-    for (code, count) in buckets.missing_by_code {
-        report.family_missing += count;
-        if MERGE_CODES.contains(&code) {
-            report.missing_merge += count;
+    for (code, count) in &buckets.missing_by_code {
+        report.family_missing += *count;
+        *report.family_missing_by_code.entry(*code).or_default() += *count;
+        if MERGE_CODES.contains(code) {
+            report.missing_merge += *count;
         } else if is_lib {
-            report.missing_lib += count;
+            report.missing_lib += *count;
         } else {
-            report.missing_other += count;
+            report.missing_other += *count;
             if report.missing_other_samples.len() < 20 {
                 report
                     .missing_other_samples
@@ -660,6 +881,19 @@ fn grade_family(
     }
     if rel.missing > 0 && report.related_missing_samples.len() < 20 {
         report.related_missing_samples.push(format!("{}/{name} (-{})", test.suite, rel.missing));
+    }
+
+    // The per-variant verdict (extra dominates — it is the hard gate).
+    if buckets.extra > 0 {
+        "family_extra"
+    } else if buckets.span_mismatch > 0 {
+        "family_span_mismatch"
+    } else if !buckets.missing_by_code.is_empty() {
+        "family_missing"
+    } else if has_family {
+        "family_match"
+    } else {
+        "baselined_clean"
     }
 }
 
@@ -829,6 +1063,8 @@ struct FamilyBuckets {
     matched: usize,
     extra: usize,
     span_mismatch: usize,
+    /// The exact matches, per code (for the committed report's per-code table).
+    matched_by_code: HashMap<u32, usize>,
     /// The unattributed misses, per code (for cause classification).
     missing_by_code: HashMap<u32, usize>,
 }
@@ -847,6 +1083,7 @@ fn family_buckets(ours: &[FamilyDiag], base: &[FamilyDiag]) -> FamilyBuckets {
     }
 
     let mut matched = 0usize;
+    let mut matched_by_code: HashMap<u32, usize> = HashMap::new();
     // Leftover counts grouped by (file, code) for span-mismatch pairing.
     let mut left_ours: HashMap<(&str, u32), usize> = HashMap::new();
     let mut left_base: HashMap<(&str, u32), usize> = HashMap::new();
@@ -855,6 +1092,9 @@ fn family_buckets(ours: &[FamilyDiag], base: &[FamilyDiag]) -> FamilyBuckets {
         let bc = base_counts.get(d).copied().unwrap_or(0);
         let m = oc.min(bc);
         matched += m;
+        if m > 0 {
+            *matched_by_code.entry(d.code).or_default() += m;
+        }
         if oc > m {
             *left_ours.entry((d.file.as_str(), d.code)).or_default() += oc - m;
         }
@@ -885,7 +1125,7 @@ fn family_buckets(ours: &[FamilyDiag], base: &[FamilyDiag]) -> FamilyBuckets {
         }
     }
 
-    FamilyBuckets { matched, extra, span_mismatch, missing_by_code }
+    FamilyBuckets { matched, extra, span_mismatch, matched_by_code, missing_by_code }
 }
 
 /// Classify a parse-rejected variant's baseline shape for the census.

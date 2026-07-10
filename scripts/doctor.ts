@@ -172,6 +172,22 @@ if (exists('../typescript-go/testdata/baselines/reference/submodule')) {
 	warn('../typescript-go present but testdata/baselines/reference/submodule missing — conformance:tsc-roundtrip will FAIL (partial checkout)');
 } else warn('../typescript-go checkout missing — conformance:tsc-roundtrip needs it');
 
+// The tsc-check leg additionally sweeps the corpus INPUTS + bundled libs (unlike
+// roundtrip, which reads only the committed baselines). The corpus is the
+// often-unmaterialized _submodules/TypeScript submodule.
+if (exists('../typescript-go')) {
+	if (exists('../typescript-go/_submodules/TypeScript/tests/cases')) {
+		ok('../typescript-go corpus inputs (_submodules/TypeScript materialized)');
+	} else {
+		warn('../typescript-go corpus inputs missing — conformance:tsc-check needs them (git submodule update --init in ../typescript-go)');
+	}
+	if (exists('../typescript-go/internal/bundled/libs')) {
+		ok('../typescript-go bundled libs present');
+	} else {
+		warn('../typescript-go bundled libs (internal/bundled/libs) missing — conformance:tsc-check needs them');
+	}
+}
+
 // Informational (NOT gated by pins:audit — see its docstring): the prettier
 // checkout is a reading reference + corpus-suite source whose oracle output is
 // computed live per file, and it legitimately rides `-dev` versions.

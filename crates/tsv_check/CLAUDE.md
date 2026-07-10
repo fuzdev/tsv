@@ -97,6 +97,10 @@ result is fully owned — nothing borrows out. For lib-aware checking:
   multisets (extra = 0 is a hard gate; missing is classified by deferred
   cause), grades related-info on matched primaries as its own pinned
   channel, and publishes the parse-divergence census; exact `RUN_*` pins.
+  Triage filters (`--test`/`--code`/`--variant`) skip the pins;
+  `--emit-manifest` and `--report` (the committed
+  `benches/js/results/report.tsc-conformance.{json,md}`) serve tooling. A
+  release-gating leg of `deno task conformance` (`conformance:tsc-check`).
 - `tsv_debug profile --bind <paths>` — parse vs lower+bind timing + peak
   RSS (VmHWM); the binder's standing perf anchor form.
 - `tsv_debug tsc_conformance check-test <name> [--variant k=v] [--json]` —

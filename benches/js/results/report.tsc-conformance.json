@@ -1,0 +1,86 @@
+{
+  "oracle": "tsgo committed .errors.txt baselines (bind + merge family)",
+  "denominators": {
+    "in_scope_tests": 9388,
+    "in_scope_variants": 9887,
+    "expect_clean_graded": 4435,
+    "clean_pass": 4435,
+    "baselined_parsed": 4446,
+    "family_graded_variants": 4066,
+    "family_positive_variants": 125
+  },
+  "family": {
+    "match": 425,
+    "missing": {
+      "total": 125,
+      "merge_path": 0,
+      "lib_conflict": 0,
+      "check_time": 125
+    },
+    "extra": 0,
+    "span_mismatch": 0
+  },
+  "per_code": {
+    "match": {
+      "2300": 301,
+      "2397": 4,
+      "2451": 56,
+      "2528": 35,
+      "2567": 26,
+      "2664": 3
+    },
+    "missing": {
+      "2300": 125
+    }
+  },
+  "related": {
+    "match": 51,
+    "missing": 0,
+    "extra": 0,
+    "span_mismatch": 0
+  },
+  "carve_outs": {
+    "recovery_ast_rule_a": 380,
+    "recovery_ast_rule_a_family": 9,
+    "module_detection_variants": 1
+  },
+  "census": {
+    "parse_rejected_total": 1006,
+    "parse_rejected_no_baseline": 45,
+    "parse_rejected_ts1xxx_only": 451,
+    "parse_rejected_other": 510,
+    "script_retry": 25,
+    "crash_excluded": 1
+  },
+  "lib": {
+    "files_bound": 107,
+    "sets_folded": 50
+  },
+  "pins": {
+    "in_scope_tests": 9388,
+    "in_scope_variants": 9887,
+    "expect_clean": 4435,
+    "baselined_parsed": 4446,
+    "parse_rejected": 1006,
+    "family_graded": 4066,
+    "family_positive": 125,
+    "family_match": 425,
+    "family_missing": 125,
+    "missing_merge": 0,
+    "missing_lib": 0,
+    "missing_check_time": 125,
+    "family_extra": 0,
+    "family_span_mismatch": 0,
+    "related_match": 51,
+    "related_missing": 0,
+    "related_extra": 0,
+    "related_span_mismatch": 0,
+    "carve_out_rule_a": 380,
+    "carve_out_rule_a_family": 9,
+    "module_detection": 1,
+    "script_retry": 25,
+    "crash_excluded": 1,
+    "lib_files_bound": 107,
+    "lib_sets": 50
+  }
+}

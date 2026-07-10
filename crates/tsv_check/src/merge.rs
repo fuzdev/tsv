@@ -377,10 +377,19 @@ fn merge_global_symbol(
         return;
     }
     if let Some(base) = lib.and_then(|l| l.get(&source.name)) {
-        // Conflict-or-merge against the base without mutating it. A clean merge
-        // emits nothing; the in-file cascade already collapsed same-name test
-        // symbols to one, so (at the single-file scope this grades) not cloning the
-        // base into the overlay is sound — a later same-name symbol cannot arise.
+        // Conflict-or-merge against the immutable base without mutating it. This does
+        // NOT copy the base entry into the overlay, so a *later* phase that re-presents
+        // this name — a phase-2 `declare global` export or a phase-4 deferred ambient
+        // module — again finds it absent from the overlay and re-merges against the
+        // bare base, dropping this phase-1 symbol's contributed flags. Because the
+        // merge is a monotonic flag-union, losing an accumulated flag can only FAIL to
+        // detect a conflict the union would have caught: it can only under-report (a
+        // `missing`), never over-report (a `family_extra`, the hard gate). So the
+        // clean invariant holds at the single-file scope this slice grades. The
+        // multi-file slice — where the same global name legitimately recurs across
+        // files — needs the real fix.
+        // TODO: copy-on-write the base entry into the overlay on the first base-merge,
+        // so a subsequent same-name symbol accumulates against the union, not the bare base.
         merge_symbol_against_base(base, &source.name, lib_file_offset, source, out);
         return;
     }
@@ -850,6 +859,49 @@ mod tests {
         let a = diags.iter().find(|d| d.file == Some(FileId(0))).expect("a.ts primary");
         assert_eq!(a.related.len(), 2);
         assert!(a.related.iter().all(|r| r.code == 6203));
+    }
+
+    /// The WITHIN-primary related cap (five), distinct from the uncapped cross-merge
+    /// union. A single conflicting merge whose target already accreted six clean
+    /// declarations issues ONE primary carrying a leading TS6203 + four TS6204 — the
+    /// sixth related node is DROPPED at emission (tsgo `addDuplicateDeclarationError`
+    /// caps a single primary's related chain at five). Contrast
+    /// `cross_merge_related_union_is_all_6203_uncapped`, where the cap never bites
+    /// because each fresh primary starts its own chain.
+    #[test]
+    fn within_primary_related_cap_drops_the_sixth() {
+        // Six files declare `enum E` (regular enums merge cleanly), so globals[E]
+        // accretes six declarations; a seventh file's `const enum E` conflicts
+        // (TS2567) and its single primary points related info at all six — capped.
+        let mut files: Vec<FileMerge> = (0..6)
+            .map(|f| {
+                script(
+                    f,
+                    vec![MergeSymbol {
+                        name: "E".to_string(),
+                        flags: SymbolFlags::REGULAR_ENUM,
+                        decls: vec![decl(f, 5, "E", true)],
+                    }],
+                )
+            })
+            .collect();
+        files.push(script(
+            6,
+            vec![MergeSymbol {
+                name: "E".to_string(),
+                flags: SymbolFlags::CONST_ENUM,
+                decls: vec![decl(6, 11, "E", true)],
+            }],
+        ));
+        let diags = merge_program(&files, None, 0);
+        // The const-enum primary (file 6) carries the capped chain (asserted on the
+        // raw pool, before any cross-merge union, to isolate the within-primary cap).
+        let source_primary =
+            diags.iter().find(|d| d.file == Some(FileId(6))).expect("a const-enum primary at file 6");
+        assert_eq!(source_primary.code, 2567);
+        let codes: Vec<u32> = source_primary.related.iter().map(|r| r.code).collect();
+        // Leading TS6203 + four TS6204 = five related; the sixth conflicting decl is dropped.
+        assert_eq!(codes, vec![6203, 6204, 6204, 6204, 6204]);
     }
 
     /// A single script declaring `var globalThis` triggers TS2397 per declaration.

@@ -257,6 +257,16 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
     let arena = Bump::new();
     let (program, _goal, _retry) = parse_unit(source, &arena)?;
     let bound = bind_file(&program, source, FileId::ROOT);
+    // A lib contributes its globals through the merge either as an ambient script
+    // (globals in `source_locals`) or, when the lib file is itself a module — e.g.
+    // `lib.es2025.iterator.d.ts`, which carries a top-level `export {}` and so binds
+    // external — through a `declare global {}` block (`global_augmentations`). A lib
+    // that bound external with NEITHER would silently fold to nothing; guard the
+    // no-op the census can't see.
+    debug_assert!(
+        !bound.merge.is_external || !bound.merge.global_augmentations.is_empty(),
+        "lib {name} bound as an external module with no `declare global` block — its globals would be silently dropped",
+    );
     Ok(LibFile { name: name.to_string(), merge: bound.merge })
 }
 

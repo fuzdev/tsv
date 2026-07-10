@@ -399,13 +399,16 @@ green-skipping (the baselines are the oracle; publish Step 3b's probe is the
 tolerance point). Full-corpus runs freshness-check `KNOWN_GAPS` (stale entries fail).
 
 **Pre-release aggregate — `deno task conformance`.** The three parse-conformance
-gates (svelte-fixtures, ts-fixtures, ts-repo), the `tsc_conformance` roundtrip
-self-check (`tsc-roundtrip` — checker-conformance vs tsgo's `.errors.txt`
-baselines, not parse; the one pure-Rust leg, shelled out via `cargo`, so the task
-carries `--allow-run=cargo`), plus `corpus:compare:parse --all` and
-`corpus:compare:format --all`, are the release-cadence correctness gates that run
-against external oracles (and so can't live in `deno task check`). `deno task
-conformance` builds the corpus FFI once and runs all six legs in **ONE process**
+gates (svelte-fixtures, ts-fixtures, ts-repo), the two `tsc_conformance` legs
+(`tsc-roundtrip` — the baseline parse↔render self-check — then `tsc-check` — the
+tsv_check binder-family conformance gate, which also writes the committed
+`results/report.tsc-conformance.{json,md}`; both pure-Rust, shelled out via
+`cargo`, so the task carries `--allow-run=cargo`; `tsc-check` additionally needs
+the materialized `_submodules/TypeScript` corpus + `internal/bundled/libs`), plus
+`corpus:compare:parse --all` and `corpus:compare:format --all`, are the
+release-cadence correctness gates that run against external oracles (and so
+can't live in `deno task check`). `deno task
+conformance` builds the corpus FFI once and runs the legs in **ONE process**
 (`conformance.ts`, the driver): the canonical oracle modules (prettier, the svelte
 plugin, svelte/compiler, acorn, acorn-ts) load once via the module cache instead of
 once per leg, each leg gets a timing line, and failure semantics match a `&&` chain

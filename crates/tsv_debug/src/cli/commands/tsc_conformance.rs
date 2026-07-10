@@ -9,10 +9,10 @@ use crate::tsc_conformance::index::IndexReport;
 use crate::tsc_conformance::runner::SkeletonReport;
 use crate::tsc_conformance::{
     baselines_dir, check_one, corpus_materialized, denominators, discover_baselines, histogram,
-    run_index, run_roundtrip, run_skeleton, tests_by_code,
+    run_index, run_roundtrip, run_skeleton, tests_by_code, RunFilter, RunOptions,
 };
 use argh::FromArgs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// REGRESSION PIN (exact): total tsgo .errors.txt baselines. Measured
 /// 2026-07-09, ../typescript-go at 168e7015 (_submodules/TypeScript corpus pin
@@ -242,6 +242,31 @@ pub struct RunCommand {
     /// emit a JSON report instead of the human summary
     #[argh(switch)]
     json: bool,
+
+    /// triage filter: keep only tests whose relative path contains this substring
+    /// (SKIPS the pins)
+    #[argh(option)]
+    test: Option<String>,
+
+    /// triage filter: keep only variants whose baseline carries this TS code
+    /// (SKIPS the pins)
+    #[argh(option)]
+    code: Option<u32>,
+
+    /// triage filter: keep only variants whose config has this `key=value`
+    /// (SKIPS the pins)
+    #[argh(option)]
+    variant: Option<String>,
+
+    /// write a JSON manifest of every graded variant (per-variant verdict + buckets
+    /// + census + pins) to this path — the tsc analog of `test262 --emit-manifest`
+    #[argh(option)]
+    emit_manifest: Option<PathBuf>,
+
+    /// write the committed compact report to `<path>.json` + `<path>.md` (full runs
+    /// only; deterministic, wall-clock excluded)
+    #[argh(option)]
+    report: Option<PathBuf>,
 }
 
 /// Inner dev loop: run one corpus test (optionally one variant) through
@@ -281,7 +306,20 @@ impl TscConformanceCommand {
 impl RunCommand {
     fn run(self) -> Result<(), CliError> {
         require_corpus(&self.path)?;
-        let report = run_skeleton(&self.path).map_err(|e| {
+
+        let filter = self.build_filter()?;
+        let filtered = filter.is_active();
+        // The committed report is the full-run artifact; refuse to write a partial one.
+        if self.report.is_some() && filtered {
+            eprintln!(
+                "Error: --report writes the committed full report; it cannot be combined with \
+                 --test/--code/--variant filters."
+            );
+            return Err(CliError::Failed);
+        }
+
+        let options = RunOptions { filter, collect_manifest: self.emit_manifest.is_some() };
+        let report = run_skeleton(&self.path, &options).map_err(|e| {
             eprintln!("Error running skeleton sweep: {e}");
             CliError::Failed
         })?;
@@ -290,16 +328,50 @@ impl RunCommand {
         } else {
             report.print();
         }
-        enforce_run_gates(&report)
+
+        // Filters skip the exact pins (the roundtrip/query convention); the invariant
+        // gates still hold. Committed artifacts land only when the gates pass (so a
+        // pin miss never writes a bad manifest/report), while a failure dumps per-test
+        // diff artifacts for triage.
+        match enforce_run_gates(&report, !filtered) {
+            Ok(()) => {
+                if let Some(path) = &self.emit_manifest {
+                    write_manifest(&report, path)?;
+                }
+                if let Some(path) = &self.report {
+                    write_report(&report, path)?;
+                }
+                Ok(())
+            }
+            Err(e) => {
+                write_diff_artifacts(&report);
+                Err(e)
+            }
+        }
+    }
+
+    /// Build the triage filter from the CLI flags (lowercasing the `--variant` key,
+    /// which the config maps store lowercased).
+    fn build_filter(&self) -> Result<RunFilter, CliError> {
+        let variant = match self.variant.as_deref().map(parse_variant_filter) {
+            Some(Ok((k, v))) => Some((k.to_lowercase(), v)),
+            Some(Err(e)) => {
+                eprintln!("{e}");
+                return Err(CliError::Failed);
+            }
+            None => None,
+        };
+        Ok(RunFilter { test: self.test.clone(), code: self.code, variant })
     }
 }
 
-/// Enforce the skeleton gates: the clean-grade invariant, zero panics, and (a
-/// full run's) exact denominator + census pins.
-fn enforce_run_gates(report: &SkeletonReport) -> Result<(), CliError> {
+/// Enforce the skeleton gates: the clean-grade + empty-channel invariants and zero
+/// panics (always), plus — on a full run (`enforce_pins`) — the exact denominator,
+/// family, related, and census pins. A filtered (triage) run skips the pins.
+fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), CliError> {
     let mut errs: Vec<String> = Vec::new();
 
-    // Invariant gates (always).
+    // --- Invariant gates (always, even on a filtered run) ---
     if report.clean_pass != report.expect_clean_graded {
         errs.push(format!(
             "clean pass {} != expect-clean graded {} ({} non-clean)",
@@ -331,43 +403,8 @@ fn enforce_run_gates(report: &SkeletonReport) -> Result<(), CliError> {
             report.extra_samples.first().map_or("", String::as_str)
         ));
     }
-
-    // Exact two-sided pins.
-    let pin = |errs: &mut Vec<String>, label: &str, got: usize, want: usize| {
-        if got != want {
-            errs.push(format!("{label} {got} != pinned {want}"));
-        }
-    };
-    pin(&mut errs, "in-scope tests", report.in_scope_tests, RUN_IN_SCOPE_TESTS_PIN);
-    pin(&mut errs, "in-scope variants", report.in_scope_variants, RUN_IN_SCOPE_VARIANTS_PIN);
-    pin(&mut errs, "expect-clean graded", report.expect_clean_graded, RUN_EXPECT_CLEAN_PIN);
-    pin(&mut errs, "clean pass", report.clean_pass, RUN_EXPECT_CLEAN_PIN);
-    pin(&mut errs, "baselined parsed", report.baselined_parsed, RUN_BASELINED_PARSED_PIN);
-    pin(&mut errs, "parse-rejected", report.parse_rejected_total, RUN_PARSE_REJECTED_PIN);
-    pin(
-        &mut errs,
-        "parse-rejected (no baseline)",
-        report.parse_rejected_no_baseline,
-        RUN_PARSE_REJECTED_NO_BASELINE_PIN,
-    );
-    pin(
-        &mut errs,
-        "parse-rejected (TS1xxx-only)",
-        report.parse_rejected_ts1xxx_only,
-        RUN_PARSE_REJECTED_TS1XXX_PIN,
-    );
-    pin(
-        &mut errs,
-        "parse-rejected (other)",
-        report.parse_rejected_other,
-        RUN_PARSE_REJECTED_OTHER_PIN,
-    );
-    pin(&mut errs, "script retries", report.script_retry, RUN_SCRIPT_RETRY_PIN);
-    pin(&mut errs, "crash-excluded", report.excluded_crashes, RUN_CRASH_EXCLUDED_PIN);
-
-    // Lib-base (S5) sizing pins + the empty-error-channel invariants.
-    pin(&mut errs, "lib files bound", report.lib_files_bound, RUN_LIB_FILES_BOUND_PIN);
-    pin(&mut errs, "lib sets folded", report.lib_sets_built, RUN_LIB_SETS_PIN);
+    // The lib error channels must stay empty (a lib parse-reject, a missing referenced
+    // lib, or an unrecognized `@lib`/reference name).
     if !report.lib_parse_errors.is_empty() {
         errs.push(format!(
             "{} lib file(s) failed to parse, e.g. {}",
@@ -390,45 +427,84 @@ fn enforce_run_gates(report: &SkeletonReport) -> Result<(), CliError> {
         ));
     }
 
-    // Family grading pins.
-    pin(&mut errs, "family graded", report.family_graded_variants, RUN_FAMILY_GRADED_PIN);
-    pin(&mut errs, "family positive", report.family_positive_variants, RUN_FAMILY_POSITIVE_PIN);
-    pin(&mut errs, "family match", report.family_match, RUN_FAMILY_MATCH_PIN);
-    pin(&mut errs, "family missing", report.family_missing, RUN_FAMILY_MISSING_PIN);
-    pin(&mut errs, "missing merge", report.missing_merge, RUN_MISSING_MERGE_PIN);
-    pin(&mut errs, "missing lib", report.missing_lib, RUN_MISSING_LIB_PIN);
-    pin(&mut errs, "missing check-time", report.missing_other, RUN_MISSING_CHECKTIME_PIN);
-    pin(
-        &mut errs,
-        "family span_mismatch",
-        report.family_span_mismatch,
-        RUN_FAMILY_SPAN_MISMATCH_PIN,
-    );
+    // --- Exact two-sided pins (full run only; filters skip them) ---
+    if enforce_pins {
+        let pin = |errs: &mut Vec<String>, label: &str, got: usize, want: usize| {
+            if got != want {
+                errs.push(format!("{label} {got} != pinned {want}"));
+            }
+        };
+        pin(&mut errs, "in-scope tests", report.in_scope_tests, RUN_IN_SCOPE_TESTS_PIN);
+        pin(&mut errs, "in-scope variants", report.in_scope_variants, RUN_IN_SCOPE_VARIANTS_PIN);
+        pin(&mut errs, "expect-clean graded", report.expect_clean_graded, RUN_EXPECT_CLEAN_PIN);
+        pin(&mut errs, "clean pass", report.clean_pass, RUN_EXPECT_CLEAN_PIN);
+        pin(&mut errs, "baselined parsed", report.baselined_parsed, RUN_BASELINED_PARSED_PIN);
+        pin(&mut errs, "parse-rejected", report.parse_rejected_total, RUN_PARSE_REJECTED_PIN);
+        pin(
+            &mut errs,
+            "parse-rejected (no baseline)",
+            report.parse_rejected_no_baseline,
+            RUN_PARSE_REJECTED_NO_BASELINE_PIN,
+        );
+        pin(
+            &mut errs,
+            "parse-rejected (TS1xxx-only)",
+            report.parse_rejected_ts1xxx_only,
+            RUN_PARSE_REJECTED_TS1XXX_PIN,
+        );
+        pin(
+            &mut errs,
+            "parse-rejected (other)",
+            report.parse_rejected_other,
+            RUN_PARSE_REJECTED_OTHER_PIN,
+        );
+        pin(&mut errs, "script retries", report.script_retry, RUN_SCRIPT_RETRY_PIN);
+        pin(&mut errs, "crash-excluded", report.excluded_crashes, RUN_CRASH_EXCLUDED_PIN);
 
-    // Related-info channel pins (two-sided; does not gate the primary verdict).
-    pin(&mut errs, "related match", report.related_match, RUN_RELATED_MATCH_PIN);
-    pin(&mut errs, "related missing", report.related_missing, RUN_RELATED_MISSING_PIN);
-    pin(&mut errs, "related extra", report.related_extra, RUN_RELATED_EXTRA_PIN);
-    pin(
-        &mut errs,
-        "related span_mismatch",
-        report.related_span_mismatch,
-        RUN_RELATED_SPAN_MISMATCH_PIN,
-    );
+        // Lib-base (S5) sizing pins.
+        pin(&mut errs, "lib files bound", report.lib_files_bound, RUN_LIB_FILES_BOUND_PIN);
+        pin(&mut errs, "lib sets folded", report.lib_sets_built, RUN_LIB_SETS_PIN);
 
-    pin(&mut errs, "carve-out rule (a)", report.carve_out_rule_a, RUN_CARVE_OUT_RULE_A_PIN);
-    pin(
-        &mut errs,
-        "carve-out rule (a) family",
-        report.carve_out_rule_a_family,
-        RUN_CARVE_OUT_RULE_A_FAMILY_PIN,
-    );
-    pin(
-        &mut errs,
-        "moduleDetection variants",
-        report.module_detection_variants,
-        RUN_MODULE_DETECTION_PIN,
-    );
+        // Family grading pins.
+        pin(&mut errs, "family graded", report.family_graded_variants, RUN_FAMILY_GRADED_PIN);
+        pin(&mut errs, "family positive", report.family_positive_variants, RUN_FAMILY_POSITIVE_PIN);
+        pin(&mut errs, "family match", report.family_match, RUN_FAMILY_MATCH_PIN);
+        pin(&mut errs, "family missing", report.family_missing, RUN_FAMILY_MISSING_PIN);
+        pin(&mut errs, "missing merge", report.missing_merge, RUN_MISSING_MERGE_PIN);
+        pin(&mut errs, "missing lib", report.missing_lib, RUN_MISSING_LIB_PIN);
+        pin(&mut errs, "missing check-time", report.missing_other, RUN_MISSING_CHECKTIME_PIN);
+        pin(
+            &mut errs,
+            "family span_mismatch",
+            report.family_span_mismatch,
+            RUN_FAMILY_SPAN_MISMATCH_PIN,
+        );
+
+        // Related-info channel pins (two-sided; does not gate the primary verdict).
+        pin(&mut errs, "related match", report.related_match, RUN_RELATED_MATCH_PIN);
+        pin(&mut errs, "related missing", report.related_missing, RUN_RELATED_MISSING_PIN);
+        pin(&mut errs, "related extra", report.related_extra, RUN_RELATED_EXTRA_PIN);
+        pin(
+            &mut errs,
+            "related span_mismatch",
+            report.related_span_mismatch,
+            RUN_RELATED_SPAN_MISMATCH_PIN,
+        );
+
+        pin(&mut errs, "carve-out rule (a)", report.carve_out_rule_a, RUN_CARVE_OUT_RULE_A_PIN);
+        pin(
+            &mut errs,
+            "carve-out rule (a) family",
+            report.carve_out_rule_a_family,
+            RUN_CARVE_OUT_RULE_A_FAMILY_PIN,
+        );
+        pin(
+            &mut errs,
+            "moduleDetection variants",
+            report.module_detection_variants,
+            RUN_MODULE_DETECTION_PIN,
+        );
+    }
 
     if errs.is_empty() {
         Ok(())
@@ -440,6 +516,303 @@ fn enforce_run_gates(report: &SkeletonReport) -> Result<(), CliError> {
         );
         Err(CliError::Failed)
     }
+}
+
+/// The exact `RUN_*` pins this run is held to — recorded in the committed report and
+/// the manifest so the artifact states what it was measured against.
+#[derive(serde::Serialize)]
+struct RunPins {
+    in_scope_tests: usize,
+    in_scope_variants: usize,
+    expect_clean: usize,
+    baselined_parsed: usize,
+    parse_rejected: usize,
+    family_graded: usize,
+    family_positive: usize,
+    family_match: usize,
+    family_missing: usize,
+    missing_merge: usize,
+    missing_lib: usize,
+    missing_check_time: usize,
+    family_extra: usize,
+    family_span_mismatch: usize,
+    related_match: usize,
+    related_missing: usize,
+    related_extra: usize,
+    related_span_mismatch: usize,
+    carve_out_rule_a: usize,
+    carve_out_rule_a_family: usize,
+    module_detection: usize,
+    script_retry: usize,
+    crash_excluded: usize,
+    lib_files_bound: usize,
+    lib_sets: usize,
+}
+
+/// Snapshot the `RUN_*` pin constants (the hard family gate `family_extra` is a fixed
+/// zero, folded in for a complete record).
+fn run_pins() -> RunPins {
+    RunPins {
+        in_scope_tests: RUN_IN_SCOPE_TESTS_PIN,
+        in_scope_variants: RUN_IN_SCOPE_VARIANTS_PIN,
+        expect_clean: RUN_EXPECT_CLEAN_PIN,
+        baselined_parsed: RUN_BASELINED_PARSED_PIN,
+        parse_rejected: RUN_PARSE_REJECTED_PIN,
+        family_graded: RUN_FAMILY_GRADED_PIN,
+        family_positive: RUN_FAMILY_POSITIVE_PIN,
+        family_match: RUN_FAMILY_MATCH_PIN,
+        family_missing: RUN_FAMILY_MISSING_PIN,
+        missing_merge: RUN_MISSING_MERGE_PIN,
+        missing_lib: RUN_MISSING_LIB_PIN,
+        missing_check_time: RUN_MISSING_CHECKTIME_PIN,
+        family_extra: 0,
+        family_span_mismatch: RUN_FAMILY_SPAN_MISMATCH_PIN,
+        related_match: RUN_RELATED_MATCH_PIN,
+        related_missing: RUN_RELATED_MISSING_PIN,
+        related_extra: RUN_RELATED_EXTRA_PIN,
+        related_span_mismatch: RUN_RELATED_SPAN_MISMATCH_PIN,
+        carve_out_rule_a: RUN_CARVE_OUT_RULE_A_PIN,
+        carve_out_rule_a_family: RUN_CARVE_OUT_RULE_A_FAMILY_PIN,
+        module_detection: RUN_MODULE_DETECTION_PIN,
+        script_retry: RUN_SCRIPT_RETRY_PIN,
+        crash_excluded: RUN_CRASH_EXCLUDED_PIN,
+        lib_files_bound: RUN_LIB_FILES_BOUND_PIN,
+        lib_sets: RUN_LIB_SETS_PIN,
+    }
+}
+
+/// The `--emit-manifest` wrapper: the full per-variant report plus the pins snapshot.
+#[derive(serde::Serialize)]
+struct RunManifest<'a> {
+    pins: RunPins,
+    report: &'a SkeletonReport,
+}
+
+/// Write the `--emit-manifest` JSON (per-variant verdicts + buckets + census + pins).
+/// Called only after the gates pass, so a bad manifest never lands.
+fn write_manifest(report: &SkeletonReport, path: &Path) -> Result<(), CliError> {
+    let manifest = RunManifest { pins: run_pins(), report };
+    let file = std::fs::File::create(path).map_err(|e| {
+        eprintln!("Error creating manifest {}: {e}", path.display());
+        CliError::Failed
+    })?;
+    serde_json::to_writer(std::io::BufWriter::new(file), &manifest).map_err(|e| {
+        eprintln!("Error writing manifest: {e}");
+        CliError::Failed
+    })?;
+    println!(
+        "Wrote manifest ({} variant rows) to {}",
+        report.manifest_entries.len(),
+        path.display()
+    );
+    Ok(())
+}
+
+/// Build the committed compact report as a JSON value — deterministic (sorted
+/// per-code maps, wall-clock excluded) so re-runs are diff-clean.
+fn build_report_value(report: &SkeletonReport) -> serde_json::Value {
+    serde_json::json!({
+        "oracle": "tsgo committed .errors.txt baselines (bind + merge family)",
+        "denominators": {
+            "in_scope_tests": report.in_scope_tests,
+            "in_scope_variants": report.in_scope_variants,
+            "expect_clean_graded": report.expect_clean_graded,
+            "clean_pass": report.clean_pass,
+            "baselined_parsed": report.baselined_parsed,
+            "family_graded_variants": report.family_graded_variants,
+            "family_positive_variants": report.family_positive_variants,
+        },
+        "family": {
+            "match": report.family_match,
+            "missing": {
+                "total": report.family_missing,
+                "merge_path": report.missing_merge,
+                "lib_conflict": report.missing_lib,
+                "check_time": report.missing_other,
+            },
+            "extra": report.family_extra,
+            "span_mismatch": report.family_span_mismatch,
+        },
+        "per_code": {
+            "match": report.family_match_by_code,
+            "missing": report.family_missing_by_code,
+        },
+        "related": {
+            "match": report.related_match,
+            "missing": report.related_missing,
+            "extra": report.related_extra,
+            "span_mismatch": report.related_span_mismatch,
+        },
+        "carve_outs": {
+            "recovery_ast_rule_a": report.carve_out_rule_a,
+            "recovery_ast_rule_a_family": report.carve_out_rule_a_family,
+            "module_detection_variants": report.module_detection_variants,
+        },
+        "census": {
+            "parse_rejected_total": report.parse_rejected_total,
+            "parse_rejected_no_baseline": report.parse_rejected_no_baseline,
+            "parse_rejected_ts1xxx_only": report.parse_rejected_ts1xxx_only,
+            "parse_rejected_other": report.parse_rejected_other,
+            "script_retry": report.script_retry,
+            "crash_excluded": report.excluded_crashes,
+        },
+        "lib": {
+            "files_bound": report.lib_files_bound,
+            "sets_folded": report.lib_sets_built,
+        },
+        "pins": run_pins(),
+    })
+}
+
+/// Render the committed report's compact Markdown (the same deterministic data as
+/// [`build_report_value`], for readers).
+fn render_report_md(report: &SkeletonReport) -> String {
+    use std::collections::BTreeSet;
+    use std::fmt::Write as _;
+    let mut s = String::new();
+    s.push_str("# tsc_conformance run — committed report\n\n");
+    s.push_str(
+        "Oracle: tsgo committed `.errors.txt` baselines (bind + merge family). \
+         Deterministic — wall-clock excluded.\n\n",
+    );
+
+    s.push_str("## Denominators\n\n");
+    let _ = writeln!(s, "- in-scope tests: {}", report.in_scope_tests);
+    let _ = writeln!(s, "- in-scope variants: {}", report.in_scope_variants);
+    let _ = writeln!(
+        s,
+        "- expect-clean graded / clean pass: {} / {}",
+        report.expect_clean_graded, report.clean_pass
+    );
+    let _ = writeln!(s, "- baselined + parsed: {}", report.baselined_parsed);
+    let _ = writeln!(
+        s,
+        "- family graded / family-positive: {} / {}\n",
+        report.family_graded_variants, report.family_positive_variants
+    );
+
+    s.push_str("## Family (2300 / 2451 / 2567 / 2528 + merge 2397 / 2649 / 2664 / 2671)\n\n");
+    let _ = writeln!(s, "- match: {}", report.family_match);
+    let _ = writeln!(
+        s,
+        "- missing: {} (merge-path {}, lib-conflict {}, check-time {})",
+        report.family_missing, report.missing_merge, report.missing_lib, report.missing_other
+    );
+    let _ = writeln!(s, "- extra (GATE=0): {}", report.family_extra);
+    let _ = writeln!(s, "- span mismatch: {}\n", report.family_span_mismatch);
+
+    s.push_str("## Per-code table\n\n");
+    s.push_str("| code | match | missing |\n| --- | --- | --- |\n");
+    let codes: BTreeSet<u32> = report
+        .family_match_by_code
+        .keys()
+        .chain(report.family_missing_by_code.keys())
+        .copied()
+        .collect();
+    for code in codes {
+        let m = report.family_match_by_code.get(&code).copied().unwrap_or(0);
+        let miss = report.family_missing_by_code.get(&code).copied().unwrap_or(0);
+        let _ = writeln!(s, "| TS{code} | {m} | {miss} |");
+    }
+    s.push('\n');
+
+    s.push_str("## Related-info channel (matched primaries)\n\n");
+    let _ = writeln!(
+        s,
+        "- match / missing / extra / span-mismatch: {} / {} / {} / {}\n",
+        report.related_match,
+        report.related_missing,
+        report.related_extra,
+        report.related_span_mismatch
+    );
+
+    s.push_str("## Carve-outs\n\n");
+    let _ = writeln!(
+        s,
+        "- recovery-AST rule (a): {} (family-positive {})",
+        report.carve_out_rule_a, report.carve_out_rule_a_family
+    );
+    let _ = writeln!(
+        s,
+        "- moduleDetection variants (inert for family): {}\n",
+        report.module_detection_variants
+    );
+
+    s.push_str("## Parse-divergence census\n\n");
+    let _ = writeln!(
+        s,
+        "- parse-rejected: {} (no baseline {}, TS1xxx-only {}, other {})",
+        report.parse_rejected_total,
+        report.parse_rejected_no_baseline,
+        report.parse_rejected_ts1xxx_only,
+        report.parse_rejected_other
+    );
+    let _ = writeln!(s, "- script-goal retries: {}", report.script_retry);
+    let _ = writeln!(s, "- crash-excluded (tracked): {}\n", report.excluded_crashes);
+
+    s.push_str("## Lib base\n\n");
+    let _ = writeln!(
+        s,
+        "- lib files bound / sets folded: {} / {}",
+        report.lib_files_bound, report.lib_sets_built
+    );
+
+    s
+}
+
+/// Write the committed compact report to `<base>.json` + `<base>.md` (full runs only;
+/// deterministic). Called only after the gates pass.
+fn write_report(report: &SkeletonReport, base: &Path) -> Result<(), CliError> {
+    let json_path = PathBuf::from(format!("{}.json", base.display()));
+    let md_path = PathBuf::from(format!("{}.md", base.display()));
+    let value = build_report_value(report);
+    let mut json = serde_json::to_string_pretty(&value).map_err(|e| {
+        eprintln!("Error serializing report JSON: {e}");
+        CliError::Failed
+    })?;
+    json.push('\n');
+    std::fs::write(&json_path, json).map_err(|e| {
+        eprintln!("Error writing {}: {e}", json_path.display());
+        CliError::Failed
+    })?;
+    std::fs::write(&md_path, render_report_md(report)).map_err(|e| {
+        eprintln!("Error writing {}: {e}", md_path.display());
+        CliError::Failed
+    })?;
+    println!("Wrote committed report to {} + {}", json_path.display(), md_path.display());
+    Ok(())
+}
+
+/// Dump each failing variant's ours-vs-baseline diff under
+/// `target/tsc_conformance/diffs/` (a regression aid; a no-op when the run is green).
+fn write_diff_artifacts(report: &SkeletonReport) {
+    if report.failing_variants.is_empty() {
+        return;
+    }
+    let dir = Path::new("target/tsc_conformance/diffs");
+    if let Err(e) = std::fs::create_dir_all(dir) {
+        eprintln!("  (could not create {}: {e})", dir.display());
+        return;
+    }
+    eprintln!(
+        "\nWrote {} failure diff artifact(s) under {}/:",
+        report.failing_variants.len(),
+        dir.display()
+    );
+    for fv in &report.failing_variants {
+        let path = dir.join(format!("{}__{}.diff", fv.suite, sanitize_artifact_name(&fv.config)));
+        match std::fs::write(&path, &fv.diff) {
+            Ok(()) => eprintln!("  {} ({})", path.display(), fv.reason),
+            Err(e) => eprintln!("  (failed to write {}: {e})", path.display()),
+        }
+    }
+}
+
+/// Replace path-hostile characters so a baseline identity is a safe artifact basename.
+fn sanitize_artifact_name(name: &str) -> String {
+    name.chars()
+        .map(|c| if c == '/' || c == '\\' || c.is_whitespace() { '_' } else { c })
+        .collect()
 }
 
 impl CheckTestCommand {
@@ -475,7 +848,7 @@ fn parse_variant_filter(arg: &str) -> Result<(String, String), String> {
 
 /// Fail (with the submodule hint) when the corpus inputs are not materialized —
 /// both `run` and `check-test` need them, unlike the baseline-only tools.
-fn require_corpus(path: &std::path::Path) -> Result<(), CliError> {
+fn require_corpus(path: &Path) -> Result<(), CliError> {
     if corpus_materialized(path) {
         return Ok(());
     }
@@ -703,7 +1076,7 @@ fn filter_baselines(
 ///
 /// `example` names the subcommand for the "Or specify a custom path" hint.
 fn load_baselines(
-    checkout: &std::path::Path,
+    checkout: &Path,
     example: &str,
 ) -> Result<Vec<crate::tsc_conformance::discovery::Baseline>, CliError> {
     let dir = baselines_dir(checkout);

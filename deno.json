@@ -78,6 +78,7 @@
 		"conformance:ts-repo": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus deno task conformance:ts-repo:run",
 		"conformance:ts-repo:run": "deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/ts_repo_compare.ts",
 		"conformance:tsc-roundtrip": "cargo run -p tsv_debug --quiet tsc_conformance roundtrip",
+		"conformance:tsc-check": "cargo run -p tsv_debug --quiet tsc_conformance run --report benches/js/results/report.tsc-conformance",
 		"conformance": "deno task build:ffi:corpus && TSV_FFI_PROFILE=corpus PRETTIER_DEBUG=1 deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys --allow-run=cargo --allow-write=benches/js/.cache benches/js/conformance.ts",
 		"divergence:audit": "deno run --allow-read benches/js/divergence_audit.ts",
 		"test:deno": "deno test --allow-read benches/js/lib/divergence/",

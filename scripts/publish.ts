@@ -340,7 +340,16 @@ if (no_check) {
 		exists('../typescript/tests') ? null : '../typescript checkout',
 		exists('../typescript-go/testdata/baselines/reference/submodule')
 			? null
-			: '../typescript-go checkout',
+			: '../typescript-go baselines (tsc-roundtrip)',
+		// The tsc-check leg additionally sweeps the corpus INPUTS + bundled libs
+		// (unlike roundtrip, which reads only the committed baselines) — the corpus is
+		// the often-unmaterialized _submodules/TypeScript submodule.
+		exists('../typescript-go/_submodules/TypeScript/tests/cases')
+			? null
+			: '../typescript-go corpus inputs (git submodule update --init in ../typescript-go)',
+		exists('../typescript-go/internal/bundled/libs')
+			? null
+			: '../typescript-go bundled libs (internal/bundled/libs)',
 		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)',
 	].filter((m): m is string => m !== null);
 	if (missing.length > 0 && wetrun) {
