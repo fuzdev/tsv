@@ -341,8 +341,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 break;
             }
 
-            // Parse element expression (use assignment_expression because comma separates elements)
-            let elem = self.parse_assignment_expression()?;
+            // Parse element expression (assignment_expression because comma separates
+            // elements); a leading `...` is a SpreadElement (ecma262 ElementList).
+            let elem = self.parse_spread_or_assignment_element()?;
             elements.push(Some(elem));
 
             // Check for comma or closing bracket
