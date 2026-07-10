@@ -8,7 +8,10 @@
 
 use super::super::comments_in_range;
 use super::super::expressions::functions::{has_huggable_type_annotation, is_huggable_pattern};
-use super::helpers::type_args_should_wrap_for_return_type;
+use super::helpers::{
+    intersection_has_expanding_first_type, intersection_has_huggable_last_type,
+    type_args_should_wrap_for_return_type,
+};
 use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSConstructorType, TSFunctionType, TSType};
 use crate::printer::layout::hang_after_operator;
@@ -178,9 +181,19 @@ impl<'a> Printer<'a> {
             ]);
         }
         if let TSType::Intersection(i) = value_type {
-            // Intersections use trailing `&` - first type NOT indented, continuations indented
+            // Trailing `&`: the first member stays at base and the bare printer owns the
+            // continuation indent (like the type-alias RHS), so a first member that
+            // breaks internally isn't double-indented. A huggable/expanding boundary
+            // owns its own expansion — keep the outer `indent(...)` for it.
             let type_doc = self.build_intersection_type_doc(i, false);
-            return d.concat(&[d.text(arrow_sp), comments_doc, d.group(d.indent(type_doc))]);
+            let wrapped = if intersection_has_huggable_last_type(i)
+                || intersection_has_expanding_first_type(i)
+            {
+                d.group(d.indent(type_doc))
+            } else {
+                d.group(type_doc)
+            };
+            return d.concat(&[d.text(arrow_sp), comments_doc, wrapped]);
         }
         match return_type.type_annotation {
             // TypeReference with complex type args (like Promise<Result<...>>):
