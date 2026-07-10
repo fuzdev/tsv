@@ -57,23 +57,18 @@ impl<'a> Printer<'a> {
         let brace_start = body_open_brace
             .unwrap_or_else(|| close_paren.map_or_else(|| stmt.discriminant.span().end, |p| p + 1));
         let mut prev_end = brace_start + 1;
-        let mut prev_case_label_end: Option<u32> = None;
         let mut is_first_item = true;
         for (i, case) in stmt.cases.iter().enumerate() {
-            // Handle comments between previous position and this case
-            // (includes comments before first case, and between subsequent cases)
-            // Skip inline comments that belong to the previous case label (fallthrough cases)
+            // Own-line comments between the previous case and this one. Same-line
+            // trailing comments on the previous case's last statement — and a
+            // fallthrough case's own label comment (`case 3: // fallthrough`) — were
+            // emitted by the case builder and are not seen here: `prev_end` was
+            // advanced past them via `find_end_with_trailing_comments` (the case-cursor
+            // update below), so this range holds only genuine own-line comments.
             let comments: CommentVec<'_> =
                 comments_in_range(self.comments, prev_end, case.span.start).collect();
             let mut last_content_end = prev_end;
             for comment in &comments {
-                // Skip comments that are on the same line as the previous case label
-                // Those are inline comments for the case (e.g., `case 3: // fallthrough`)
-                if prev_case_label_end
-                    .is_some_and(|label_end| self.is_same_line(label_end, comment.span.start))
-                {
-                    continue;
-                }
                 // Add hardline before comment (except for very first item - body_doc handles that)
                 // Preserve blank lines before comments (e.g., between `return;` and `// comment`)
                 if !is_first_item {
@@ -104,9 +99,11 @@ impl<'a> Printer<'a> {
 
             case_parts.push(self.build_switch_case_doc_inner(case, inline_comment_boundary));
 
-            // Track case label end for filtering inline comments in next iteration
-            prev_case_label_end = Some(self.get_case_label_end(case));
-            prev_end = case.span.end;
+            // Advance past any same-line trailing comment on the case's last
+            // statement — the case builder already emitted it (trailing), so the
+            // between-cases / after-last-case comment loops must not re-emit it on
+            // its own line.
+            prev_end = self.find_end_with_trailing_comments(case.span.end);
         }
 
         // Handle trailing comments after the last case (before closing `}`)
@@ -276,6 +273,23 @@ impl<'a> Printer<'a> {
                     .collect()
             };
 
+            // Trailing same-line comments on THIS statement (mirrors the block
+            // statement joiner `build_statement_list_docs_into`). Without this the
+            // switch-case consequent silently DROPS interior trailing comments, and
+            // the last statement's trailing comment (which falls outside the
+            // SwitchCase span) gets relocated to its own line by the switch printer.
+            // A line comment trails via `line_suffix`; a block comment renders inline
+            // — its continuation lines indent to the statement, so the docs must sit
+            // INSIDE the statement's `indent`. Bound the scan by the next statement's
+            // start, or `inline_comment_boundary` (next case / switch end) for the
+            // last statement, so a comment attaches only to the statement it follows.
+            let stmt_end = stmt.span().end;
+            let next_bound = case
+                .consequent
+                .get(i + 1)
+                .map_or(inline_comment_boundary, |s| s.span().start);
+            let trailing = self.build_trailing_same_line_comment_docs(stmt_end, next_bound);
+
             // First block statement hugs the case label: `case 'a': { ... }`
             // Unless there are line comments (inline after label or between label and block)
             if i == 0 && first_is_block {
@@ -288,11 +302,13 @@ impl<'a> Printer<'a> {
                     }
                     parts.push(d.text(" "));
                     parts.push(self.build_statement_doc(stmt));
+                    parts.extend(trailing);
                 } else if has_inline_line_comment && leading_comments.is_empty() {
                     // Inline line comment, no leading: `case 'a': // comment\n{`
                     // Block at case level (no indent)
                     parts.push(d.hardline());
                     parts.push(self.build_statement_doc(stmt));
+                    parts.extend(trailing);
                 } else {
                     // Leading comments exist - indent both comments and block
                     // e.g., `case 'b':\n  // comment\n  {`
@@ -302,6 +318,7 @@ impl<'a> Printer<'a> {
                         stmt_parts.push(d.hardline());
                     }
                     stmt_parts.push(self.build_statement_doc(stmt));
+                    stmt_parts.extend(trailing);
                     parts.push(d.indent(d.concat(&stmt_parts)));
                 }
             } else {
@@ -334,16 +351,20 @@ impl<'a> Printer<'a> {
                 }
 
                 stmt_parts.push(self.build_statement_doc(stmt));
+                stmt_parts.extend(trailing);
 
                 parts.push(d.indent(d.concat(&stmt_parts)));
             }
 
-            prev_end = stmt.span().end;
-            prev_stmt_end = Some(stmt.span().end);
+            // Advance past the trailing comments so the next statement's leading
+            // scan and blank-line detection start after them.
+            prev_end = self.find_end_with_trailing_comments(stmt_end);
+            prev_stmt_end = Some(stmt_end);
         }
 
-        // Note: Trailing comments after the last statement are handled by the switch statement
-        // printer since they fall outside the SwitchCase span.
+        // Note: a same-line trailing comment on the *last* statement is consumed
+        // above; the switch printer advances its case cursor past it (via
+        // `find_end_with_trailing_comments`) so it is not re-emitted there.
 
         d.concat(&parts)
     }
