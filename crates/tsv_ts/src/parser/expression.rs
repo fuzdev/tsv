@@ -717,7 +717,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         if !self.check(&TokenKind::ParenClose) {
             loop {
-                let arg = self.parse_assignment_expression()?;
+                // A leading `...` is a SpreadElement (ecma262 ArgumentList); everywhere
+                // else falls through to a plain AssignmentExpression.
+                let arg = self.parse_spread_or_assignment_element()?;
                 arguments.push(arg);
 
                 if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
@@ -1414,7 +1416,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Could be: arrow function `() => ...` or parenthesized expression `(expr)`
                 self.parse_paren_expression()
             }
-            TokenKind::DotDotDot => Ok(ParsedExpr::from_expr(self.arena,self.parse_spread_element()?)),
             TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                 // Untagged template literal (a primary expression): invalid escapes
                 // are a syntax error (only tagged templates tolerate them).
@@ -2115,8 +2116,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
                 if !self.check(&TokenKind::ParenClose) {
                     loop {
-                        // Use assignment_expression because comma separates arguments
-                        let arg = self.parse_assignment_expression()?;
+                        // assignment_expression because comma separates arguments; a
+                        // leading `...` is a SpreadElement (ecma262 ArgumentList).
+                        let arg = self.parse_spread_or_assignment_element()?;
                         args.push(arg);
 
                         if !self.expect_list_separator(&TokenKind::Comma, &TokenKind::ParenClose)? {
@@ -2154,9 +2156,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Reject a spread element where an `ImportCall` argument (an
     /// `AssignmentExpression`) is expected — `import(...x)` / `import.source(...x)`
-    /// are syntax errors (acorn agrees). Guards both argument positions, because the
-    /// primary-expression parser otherwise accepts a leading `...` as a
-    /// `SpreadElement` (valid only in array/object/call-argument contexts).
+    /// are syntax errors (acorn agrees). An `import(...)` argument is a bare
+    /// `AssignmentExpression`, not an `ArgumentList`, so a leading `...` is invalid;
+    /// this guard reports it precisely (guarding both argument positions) rather than
+    /// letting it fall through to the generic primary-expression error.
     fn reject_import_call_spread(&self) -> Result<(), ParseError> {
         if matches!(self.current_kind(), TokenKind::DotDotDot) {
             return Err(self.error_msg("Cannot use spread element in import() argument"));
@@ -2306,6 +2309,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.expect(&TokenKind::BraceClose)?; // consume '}'
 
         Ok((body, Span::new(start as u32, end as u32)))
+    }
+
+    /// Parse an array-element / argument that permits a leading spread
+    /// (`...AssignmentExpression`) — the array-literal, call-argument, and
+    /// new-argument positions where a `SpreadElement` is grammatical (ecma262
+    /// `ElementList` / `ArgumentList`). Everywhere else a bare `...` is a syntax
+    /// error: `parse_primary_expression` does not accept it, so spread stays
+    /// confined to exactly these list contexts (object literals and parameter
+    /// lists build their own spread/rest nodes inline).
+    pub(super) fn parse_spread_or_assignment_element(
+        &mut self,
+    ) -> Result<Expression<'arena>, ParseError> {
+        if matches!(self.current_kind(), TokenKind::DotDotDot) {
+            self.parse_spread_element()
+        } else {
+            self.parse_assignment_expression()
+        }
     }
 
     /// Parse spread element: `...expr`
