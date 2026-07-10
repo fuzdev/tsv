@@ -22,6 +22,22 @@ fn is_component(name: &str) -> bool {
     name.contains('.') || name.chars().next().is_some_and(char::is_uppercase)
 }
 
+/// Whether `name` can begin a valid Svelte element/component tag name. Svelte's full
+/// grammar (`is_valid_element_name` + `regex_valid_component_name`,
+/// `1-parse/state/element.js`) accepts only names starting with an ASCII letter
+/// (HTML/SVG/custom/namespaced tags), an uppercase or `ID_Start` letter (components), or
+/// `!` (doctype); `svelte.parse` rejects a name starting with a digit, `_`, `$`, etc.
+/// (`<1>`, `<_x>`) as a parse error. tsv's tag lexer reads a raw name run, so it would
+/// otherwise over-accept these. Only the unambiguous ASCII non-starters are rejected;
+/// non-ASCII starts stay permissive so no valid Unicode component name is ever
+/// over-rejected (full Unicode `is_valid_element_name` parity is a deferred follow-up).
+fn tag_name_starts_valid(name: &str) -> bool {
+    match name.as_bytes().first() {
+        Some(&b) if b.is_ascii() => b.is_ascii_alphabetic() || b == b'!',
+        _ => true,
+    }
+}
+
 /// Result type for parsing elements - either a regular element or a special element.
 pub(crate) enum ParsedElement<'arena> {
     Element(Element<'arena>),
@@ -67,6 +83,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             start: self.current_start as u32,
             end: self.current_end as u32,
         };
+
+        // The tag name must immediately follow `<` and begin a valid element/component
+        // name; `svelte.parse` rejects `< div>` (whitespace after `<`, which tsv's tag
+        // lexer skips) and `<1>` / `<_x>` / `<$x>` (invalid start char) at parse.
+        if name_span.start as usize != start + 1 || !tag_name_starts_valid(tag_name) {
+            return Err(self.error_msg_at("Expected a valid element or component name", start + 1));
+        }
+
         self.advance()?;
 
         // Check if this is a special element. `title`/`slot` classification depends on the

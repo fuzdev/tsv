@@ -635,9 +635,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Computed key: [expr] — never the constructor (`['constructor']` is a
                 // normal computed method, unlike the bare/string `constructor`).
                 self.advance()?;
-                let expr = self.parse_expression()?;
-                self.expect(&TokenKind::BracketClose)?;
-                (true, expr, false)
+                (true, self.parse_computed_member_key()?, false)
             } else if matches!(self.current_kind(), TokenKind::Hash) {
                 // Private identifier key: #name
                 let private_id = self.parse_private_identifier()?;
