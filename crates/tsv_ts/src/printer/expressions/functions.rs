@@ -1235,6 +1235,22 @@ impl<'a> Printer<'a> {
             return d.parens(param_doc);
         }
 
+        // A line comment trailing the opening `(` (`fn( // c`) is kept on the `(`
+        // line, matching the function-type / call-signature `(` and the whole
+        // open-delimiter family — via the same `delimiter_line_comment_prefix`
+        // helper as `build_type_params_multiline_parts`. Prettier relocates it to
+        // the first param's own line (function expression / arrow) or floats it
+        // past the declaration (function declaration). The pull fires only for a
+        // same-line comment forcing expansion, so it always forces the break path
+        // below. See conformance_prettier.md §Comment relocation and
+        // open_paren_line_comment_prettier_divergence.
+        let (paren_prefix, paren_pull_pos) = match params_start {
+            Some(open) if comments_present => {
+                self.delimiter_line_comment_prefix(open, params[0].span().start)
+            }
+            _ => (DocBuf::new(), None),
+        };
+
         // Check if any trailing line comments exist on params
         // If so, we must use hardlines to force the group to break
         let has_trailing_line_comment = comments_present
@@ -1263,7 +1279,8 @@ impl<'a> Printer<'a> {
         let force_break = has_trailing_line_comment
             || has_leading_own_line_comment
             || should_break_for_param_properties
-            || has_blank_line_between_params;
+            || has_blank_line_between_params
+            || paren_pull_pos.is_some();
 
         let mut inner_parts = d.pooled_docbuf();
         // Block comment trailing the last param after its source comma — emitted past
@@ -1312,10 +1329,14 @@ impl<'a> Printer<'a> {
                 } else {
                     None
                 };
+                // The first param excludes any comment already pulled onto the `(`
+                // line by `delimiter_line_comment_prefix`, so it isn't emitted twice.
+                let skip_delim = if i == 0 { paren_pull_pos } else { None };
                 inner_parts.push(self.build_leading_param_comments(
                     search_start,
                     self.param_start_with_decorators(param),
                     prev_comma_pos,
+                    skip_delim,
                 ));
             }
 
@@ -1418,6 +1439,8 @@ impl<'a> Printer<'a> {
 
         // No group - outer signature group controls breaking
         let mut result: DocBuf = smallvec![d.text("(")];
+        // A pulled `( // c` comment renders on the `(` line before the break.
+        result.extend(paren_prefix);
 
         if force_break {
             // When forcing break (trailing comments or param properties), use hardlines.
@@ -1513,10 +1536,18 @@ impl<'a> Printer<'a> {
         start: u32,
         param_render_start: u32,
         prev_comma_pos: Option<u32>,
+        skip_delim: Option<u32>,
     ) -> DocId {
         let d = self.d();
         let comments: CommentVec<'_> = comments_in_range(self.comments, start, param_render_start)
             .filter(|c| {
+                // A comment already pulled onto the opening `(` line (first param)
+                // must not be re-emitted as a leading comment here.
+                if let Some(dpos) = skip_delim
+                    && self.comment_on_delimiter_line(dpos, c)
+                {
+                    return false;
+                }
                 let Some(comma) = prev_comma_pos else {
                     return true; // First param - keep all comments
                 };

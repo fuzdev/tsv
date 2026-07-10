@@ -525,10 +525,12 @@ is a deliberate choice, **not** a gap to close. (Contrast the name→`=`/`:`/`?`
 binding cases, where two comments *would* collide on one trailing line — there tsv
 preserves + continuation-indents to stay lossless, diverging from Prettier's merge.)
 
-Separately, a few spots where tsv still matches a Prettier relocation that genuinely
-moves a comment across a semantic boundary (the method/call/construct-signature `(`,
-the union-member alignment rendering, the `with {…}` import-attribute brace) are
-un-converted implementation gaps being closed incrementally. When a fix changes
+Separately, the union-member / parenthesized-intersection alignment rendering
+(`type T = | { // c } | B`) is the one remaining spot where tsv still matches a
+Prettier relocation that crosses a semantic boundary — an un-converted
+implementation gap whose fix is coupled to the intersection-printer convergence.
+(The value-level function-definition parameter `(` and the `with {…}`
+import-attribute brace, formerly in this list, now preserve.) When a fix changes
 comment handling, default to preserving position; matching Prettier is fine only
 when trailing is lossless and the position carries no signal — otherwise add a
 `_prettier_divergence` fixture. Full principles + the divergence catalog:

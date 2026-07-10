@@ -209,14 +209,14 @@ impl<'a> Printer<'a> {
                 ));
 
         let braces_doc = if has_expanding_comments {
-            // `Some(first_start)` keeps a same-line `{` comment on the brace line
+            // `first_start` keeps a same-line `{` comment on the brace line
             // (divergence from prettier, which relocates it as the first
             // specifier's leading comment).
             self.build_braced_hardline_comma_list(
                 specifiers,
                 brace_start,
                 brace_close,
-                Some(first_start),
+                first_start,
                 &get_span,
                 &build_item,
             )
@@ -429,24 +429,23 @@ impl<'a> Printer<'a> {
     /// comments have forced multiline: opening brace, optional brace-line comment
     /// prefix, the indented hardline comma-list, and the closing brace.
     ///
-    /// `brace_comment_first` is `Some(first_item_start)` to keep a same-line `{`
-    /// comment on the brace line (the open-brace divergence — import/export
-    /// specifiers), or `None` to let it relocate to its own line (the `with {…}`
-    /// import-attribute brace). See conformance_prettier.md §Comment relocation.
+    /// A same-line `{` comment (`import { // c`, `with { // c`) is kept on the
+    /// brace line — the open-brace divergence, shared by the import/export
+    /// specifier brace and the `with {…}` import-attribute brace. `first_item_start`
+    /// bounds the `{`→first-item gap the brace-line pull scans. See
+    /// conformance_prettier.md §Comment relocation.
     pub(super) fn build_braced_hardline_comma_list<T>(
         &self,
         items: &[T],
         brace_start: u32,
         end_boundary: u32,
-        brace_comment_first: Option<u32>,
+        first_item_start: u32,
         get_span: impl Fn(&T) -> Span,
         build_item_doc: impl Fn(&T) -> DocId,
     ) -> DocId {
         let d = self.d();
-        let (brace_line_prefix, delimiter_pull_pos) = match brace_comment_first {
-            Some(first) => self.delimiter_line_comment_prefix(brace_start, first),
-            None => (DocBuf::new(), None),
-        };
+        let (brace_line_prefix, delimiter_pull_pos) =
+            self.delimiter_line_comment_prefix(brace_start, first_item_start);
         let inner_doc = self.build_hardline_comma_list(
             items,
             brace_start,
@@ -493,8 +492,8 @@ impl<'a> Printer<'a> {
                     })
                     .collect();
             // First item: drop comments pulled onto the `{` line (emitted as the
-            // brace-line prefix by the caller). No-op when `delimiter_pull_pos`
-            // is `None` (the import-attribute `with {…}` caller).
+            // brace-line prefix by the caller). No-op when nothing was pulled
+            // (`delimiter_pull_pos` is `None`).
             let comments = if is_first {
                 self.first_member_leading_comments(comments, delimiter_pull_pos)
             } else {
