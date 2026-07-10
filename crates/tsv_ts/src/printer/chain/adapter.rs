@@ -93,6 +93,49 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.format_block_comments(&block_comments, spacing)
     }
 
+    fn build_computed_member_line_comment_bracket(
+        &self,
+        open: &'static str,
+        inside_start: u32,
+        prop_start: u32,
+        prop_end: u32,
+        bracket_end: u32,
+        inner: DocId,
+    ) -> Option<DocId> {
+        // Only the break path — a line comment before the index or after it (before
+        // `]`). A block-only or comment-free bracket falls through to the caller.
+        if !self.has_line_comments_between(inside_start, prop_start)
+            && !self.has_line_comments_between(prop_end, bracket_end)
+        {
+            return None;
+        }
+        let d = self.d();
+        // Build the body (index + any index→`]` trailing comments), then hand it to the
+        // shared bracket-break helper (it owns the `[`→index line-comment prefix and the
+        // break shell, mirroring the computed-key bracket). `[`→index: a `[`-line comment
+        // is pulled onto the `[` line, an own-line one keeps its line (blank-preserving).
+        // index→`]`: a same-line comment trails the index, an own-line one keeps its line.
+        let mut body_parts = DocBuf::new();
+        body_parts.push(inner);
+        let mut prev = prop_end;
+        for comment in comments_in_range(self.comments, prop_end, bracket_end) {
+            if self.is_same_line(prev, comment.span.start) {
+                body_parts.push(d.text(" "));
+            } else {
+                body_parts.push(d.hardline());
+            }
+            body_parts.push(self.build_comment_doc(comment));
+            prev = comment.span.end;
+        }
+        // The `[` is the char just before the index region (past `?.` for `?.[`).
+        Some(self.build_bracket_line_comment_break(
+            open,
+            inside_start - 1,
+            prop_start,
+            d.concat(&body_parts),
+        ))
+    }
+
     fn get_property_span(&self, expr: &internal::Expression<'_>) -> Span {
         expr.span()
     }

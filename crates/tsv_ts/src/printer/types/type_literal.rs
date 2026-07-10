@@ -371,20 +371,11 @@ impl<'a> Printer<'a> {
         // (`{ /* c */ a: 1 } | B`). Mirrors the width-aware branch of
         // `build_type_literal_doc_inner`.
         if !force_multiline {
-            member_parts.push(d.line());
-            if comments_present && let Some(first) = t.members.first() {
-                member_parts.extend(
-                    self.build_type_literal_leading_comments_inline(
-                        t.span.start,
-                        first.span().start,
-                    ),
-                );
-            }
+            self.push_width_aware_type_literal_opener(&mut member_parts, t, comments_present);
         }
 
         for (i, m) in t.members.iter().enumerate() {
             let is_first = i == 0;
-            let is_last = i == t.members.len() - 1;
             // Use content_end for comment detection (before trailing separator)
             let member_content_end = m.content_end(self.source);
 
@@ -422,47 +413,7 @@ impl<'a> Printer<'a> {
                 // Own-line comments from the member→`;` gap, deferred past the `;`.
                 member_parts.extend(deferred);
             } else {
-                // Width-aware: softlines, conditional semicolons. The opening
-                // bracketSpacing boundary precedes the first member (emitted before
-                // the loop); subsequent members keep a softline (the inter-member
-                // flat space is the non-last `if_break(empty, " ")` below).
-                if !is_first {
-                    member_parts.push(d.softline());
-                }
-                let mut deferred = DocBuf::new();
-                member_parts.push(self.build_type_member_doc_inner(m, &mut deferred));
-
-                // Handle trailing comments - preserve position relative to semicolon
-                let upper_bound = t
-                    .members
-                    .get(i + 1)
-                    .map_or(t.span.end, |next| next.span().start);
-                let trailing: CommentVec<'_> = if comments_present {
-                    comments_in_range(self.comments, member_content_end, upper_bound).collect()
-                } else {
-                    CommentVec::new()
-                };
-
-                if is_last {
-                    // Last member: semicolon only when broken
-                    // In flat mode there's no semicolon, so all comments are "after"
-                    // In break mode semicolon is added, comments still come after
-                    member_parts.push(d.if_break(d.text(";"), d.empty()));
-                    member_parts.extend(deferred);
-                    for comment in &trailing {
-                        member_parts.push(self.build_trailing_comment_doc(comment));
-                    }
-                } else {
-                    // Non-last: semicolon always present, preserve comment position
-                    member_parts.extend(self.build_comments_around_semicolon_doc(
-                        &trailing,
-                        member_content_end,
-                        upper_bound,
-                    ));
-                    member_parts.extend(deferred);
-                    // Space before next member only when flat
-                    member_parts.push(d.if_break(d.empty(), d.text(" ")));
-                }
+                self.push_width_aware_type_member(&mut member_parts, t, i, m, comments_present);
             }
 
             prev_end = m.span().end;
@@ -475,6 +426,89 @@ impl<'a> Printer<'a> {
         }
 
         d.concat(&member_parts)
+    }
+
+    /// Emit the width-aware opening boundary for a type-literal member list:
+    /// the `line()` bracketSpacing boundary (a space when flat `{ a }`, a
+    /// newline when broken), then the first member's interior leading block
+    /// comments, so the padding sits before the comment (`{ /* c */ a }`).
+    /// Shared by the width-aware branch of
+    /// `build_type_literal_members_only_doc_for_alignment` and
+    /// `build_type_literal_doc_inner`.
+    fn push_width_aware_type_literal_opener(
+        &self,
+        member_parts: &mut DocBuf,
+        t: &TSTypeLiteral<'_>,
+        comments_present: bool,
+    ) {
+        let d = self.d();
+        member_parts.push(d.line());
+        if comments_present && let Some(first) = t.members.first() {
+            member_parts.extend(
+                self.build_type_literal_leading_comments_inline(t.span.start, first.span().start),
+            );
+        }
+    }
+
+    /// Emit one member in the width-aware (non-force-multiline) type-literal
+    /// layout: a softline before non-first members, the member doc, then the
+    /// member→`;` gap comments split around the conditional semicolon (present
+    /// only when broken). Shared by the width-aware branch of
+    /// `build_type_literal_members_only_doc_for_alignment` and
+    /// `build_type_literal_doc_inner`. (The force_multiline branches differ and
+    /// stay separate.)
+    fn push_width_aware_type_member(
+        &self,
+        member_parts: &mut DocBuf,
+        t: &TSTypeLiteral<'_>,
+        i: usize,
+        m: &TSTypeElement<'_>,
+        comments_present: bool,
+    ) {
+        let d = self.d();
+        let is_first = i == 0;
+        let is_last = i == t.members.len() - 1;
+        // Use content_end for comment detection (before trailing separator)
+        let member_content_end = m.content_end(self.source);
+        // First member follows the opening boundary directly; subsequent
+        // members keep a softline — the inter-member flat space is emitted
+        // by the non-last `if_break(empty, " ")` below.
+        if !is_first {
+            member_parts.push(d.softline());
+        }
+        let mut deferred = DocBuf::new();
+        member_parts.push(self.build_type_member_doc_inner(m, &mut deferred));
+
+        // Handle trailing comments - preserve position relative to semicolon
+        let upper_bound = t
+            .members
+            .get(i + 1)
+            .map_or(t.span.end, |next| next.span().start);
+        let trailing: CommentVec<'_> = if comments_present {
+            comments_in_range(self.comments, member_content_end, upper_bound).collect()
+        } else {
+            CommentVec::new()
+        };
+
+        if is_last {
+            // Last member: semicolon only when broken, comments after
+            member_parts.push(d.if_break(d.text(";"), d.empty()));
+            member_parts.extend(deferred);
+            for comment in &trailing {
+                member_parts.push(self.build_trailing_comment_doc(comment));
+            }
+        } else {
+            // Non-last: preserve comment position relative to semicolon
+            member_parts.extend(self.build_comments_around_semicolon_doc(
+                &trailing,
+                member_content_end,
+                upper_bound,
+            ));
+            // Own-line comments from the member→`;` gap, deferred past the `;`.
+            member_parts.extend(deferred);
+            // Space before next member only when flat
+            member_parts.push(d.if_break(d.empty(), d.text(" ")));
+        }
     }
 
     /// Check if a TypeLiteral should be forced to multiline format.
@@ -682,59 +716,9 @@ impl<'a> Printer<'a> {
             // a newline when broken), THEN any interior leading comments, so the
             // padding sits before the comment (`{ /* c */ a }`, not `{/* c */ a }`).
             let mut member_parts = d.pooled_docbuf();
-            member_parts.push(d.line());
-            if comments_present && let Some(first) = t.members.first() {
-                member_parts.extend(
-                    self.build_type_literal_leading_comments_inline(
-                        t.span.start,
-                        first.span().start,
-                    ),
-                );
-            }
+            self.push_width_aware_type_literal_opener(&mut member_parts, t, comments_present);
             for (i, m) in t.members.iter().enumerate() {
-                let is_first = i == 0;
-                let is_last = i == t.members.len() - 1;
-                // Use content_end for comment detection (before trailing separator)
-                let member_content_end = m.content_end(self.source);
-
-                // First member follows the opening boundary directly; subsequent
-                // members keep a softline — the inter-member flat space is emitted
-                // by the non-last `if_break(empty, " ")` below.
-                if !is_first {
-                    member_parts.push(d.softline());
-                }
-                let mut deferred = DocBuf::new();
-                member_parts.push(self.build_type_member_doc_inner(m, &mut deferred));
-
-                let upper_bound = t
-                    .members
-                    .get(i + 1)
-                    .map_or(t.span.end, |next| next.span().start);
-                let trailing: CommentVec<'_> = if comments_present {
-                    comments_in_range(self.comments, member_content_end, upper_bound).collect()
-                } else {
-                    CommentVec::new()
-                };
-
-                if is_last {
-                    // Last member: semicolon only when broken, comments after
-                    member_parts.push(d.if_break(d.text(";"), d.empty()));
-                    member_parts.extend(deferred);
-                    for comment in &trailing {
-                        member_parts.push(self.build_trailing_comment_doc(comment));
-                    }
-                } else {
-                    // Non-last: preserve comment position relative to semicolon
-                    member_parts.extend(self.build_comments_around_semicolon_doc(
-                        &trailing,
-                        member_content_end,
-                        upper_bound,
-                    ));
-                    // Own-line comments from the member→`;` gap, deferred past the `;`.
-                    member_parts.extend(deferred);
-                    // Space before next member only when flat
-                    member_parts.push(d.if_break(d.empty(), d.text(" ")));
-                }
+                self.push_width_aware_type_member(&mut member_parts, t, i, m, comments_present);
             }
             parts.push(d.indent(d.concat(&member_parts)));
             parts.push(d.line());

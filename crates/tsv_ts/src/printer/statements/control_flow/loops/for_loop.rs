@@ -700,17 +700,67 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Build a for-header init/update clause that is a `SequenceExpression`
+    /// (`for (a = 1, b = 2; …)` / `for (…; a++, b++)`), preserving comments in the
+    /// inter-operand comma gaps — a same-line block leads the next operand inline
+    /// (`, /* c */ b`), a line comment trails the comma and forces the per-operand
+    /// break (`a, // c⏎\tb`) — the same gap handling as a multi-declarator init
+    /// clause (`push_for_clause_comma_gap`). The comment-free case stays a flat
+    /// `", "` join. `build_elem` renders one operand: the init clause wraps it in
+    /// `wrap_for_init_in` for the `[~In]` restriction, the update clause does not.
+    ///
+    /// Before this, both sequence branches emitted a comment-blind `", "` join,
+    /// silently dropping every inter-operand comment (`for (a = 1, /* c */ b = 2;
+    /// …)` lost `/* c */`).
+    fn build_for_sequence_clause_doc(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+        build_elem: impl Fn(&Expression<'_>) -> DocId,
+    ) -> DocId {
+        let d = self.d();
+        let first = seq.expressions[0].span().start;
+        let last = seq.expressions[seq.expressions.len() - 1].span().end;
+        if !self.has_comments_between(first, last) {
+            return d.join(seq.expressions.iter().map(&build_elem), ", ");
+        }
+        let mut docs = DocBuf::new();
+        for (i, e) in seq.expressions.iter().enumerate() {
+            if i > 0 {
+                self.push_for_clause_comma_gap(
+                    &mut docs,
+                    seq.expressions[i - 1].span().end,
+                    e.span().start,
+                );
+            }
+            docs.push(build_elem(e));
+        }
+        // Group + indent so a line-comment break continuation-indents one level,
+        // matching the multi-declarator init clause.
+        d.group(d.indent(d.concat(&docs)))
+    }
+
+    /// Render a for-header init/update clause expression. A `SequenceExpression`
+    /// (`a = 1, b = 2`) routes through `build_for_sequence_clause_doc` for
+    /// inter-operand comment handling; any other expression is rendered directly
+    /// by `build_elem`. Sharing this dispatch keeps the init and update clauses
+    /// from diverging on how a comma sequence is detected and routed. `build_elem`
+    /// renders one operand — the init clause wraps it in `wrap_for_init_in` for the
+    /// `[~In]` restriction, the update clause does not.
+    fn build_for_expr_clause(
+        &self,
+        expr: &Expression<'_>,
+        build_elem: impl Fn(&Expression<'_>) -> DocId,
+    ) -> DocId {
+        if let Expression::SequenceExpression(seq) = expr {
+            self.build_for_sequence_clause_doc(seq, build_elem)
+        } else {
+            build_elem(expr)
+        }
+    }
+
     /// Build a Doc for a for loop update expression
     fn build_for_update_doc(&self, expr: &Expression<'_>) -> DocId {
-        let d = self.d();
-        if let Expression::SequenceExpression(seq) = expr {
-            d.join(
-                seq.expressions.iter().map(|e| self.build_expression_doc(e)),
-                ", ",
-            )
-        } else {
-            self.build_expression_doc(expr)
-        }
+        self.build_for_expr_clause(expr, |e| self.build_expression_doc(e))
     }
 
     /// Build a complete for-in statement doc including the body
@@ -1235,15 +1285,17 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Emit the separator between two for-init declarators (the `prev_end →
-    /// curr_start` gap): the comma plus any inter-declarator comments, kept on the
-    /// author's side of the comma — a before-comma block trails the previous
-    /// initializer (`… = 0 /* c */,`), an after-comma comment leads the next
-    /// declarator (`, /* c */ x`). A line comment trails the comma via `line_suffix`
-    /// and, like an own-line block, forces the per-declarator break; inline blocks
-    /// stay width-based (the `line` collapses when the group fits). Mirrors the
-    /// variable-declarator inter-declarator comment placement.
-    fn push_for_init_declarator_gap(&self, decl_docs: &mut DocBuf, prev_end: u32, curr_start: u32) {
+    /// Emit the separator between two comma-separated for-header operands (the
+    /// `prev_end → curr_start` gap): the comma plus any inter-operand comments,
+    /// kept on the author's side of the comma — a before-comma block trails the
+    /// previous operand (`… = 0 /* c */,`), an after-comma comment leads the next
+    /// one (`, /* c */ x`). A line comment trails the comma via `line_suffix` and,
+    /// like an own-line block, forces the per-operand break; inline blocks stay
+    /// width-based (the `line` collapses when the group fits). Mirrors the
+    /// variable-declarator inter-declarator comment placement. Shared by the
+    /// multi-declarator init clause and the init/update `SequenceExpression`
+    /// clauses (`build_for_sequence_clause_doc`).
+    fn push_for_clause_comma_gap(&self, decl_docs: &mut DocBuf, prev_end: u32, curr_start: u32) {
         let d = self.d();
         if !self.has_comments_between(prev_end, curr_start) {
             decl_docs.push(d.text(","));
@@ -1302,7 +1354,7 @@ impl<'a> Printer<'a> {
                 for (i, declarator) in decl.declarations.iter().enumerate() {
                     if i > 0 {
                         let prev_end = decl.declarations[i - 1].span.end;
-                        self.push_for_init_declarator_gap(
+                        self.push_for_clause_comma_gap(
                             &mut decl_docs,
                             prev_end,
                             declarator.span.start,
@@ -1352,18 +1404,12 @@ impl<'a> Printer<'a> {
             }
             internal::ForInit::Expression(expr) => {
                 // Sequence expressions in for loop init don't need outer parens
-                // e.g., `for (i = 0, j = 0; ...)` not `for ((i = 0, j = 0); ...)`
-                // Same handling as build_for_update_doc
-                if let Expression::SequenceExpression(seq) = expr {
-                    d.join(
-                        seq.expressions
-                            .iter()
-                            .map(|e| self.wrap_for_init_in(e, self.build_expression_doc(e))),
-                        ", ",
-                    )
-                } else {
-                    self.wrap_for_init_in(expr, self.build_expression_doc(expr))
-                }
+                // e.g., `for (i = 0, j = 0; ...)` not `for ((i = 0, j = 0); ...)`.
+                // Same dispatch as build_for_update_doc, but each operand is `[~In]`
+                // wrapped (`wrap_for_init_in`).
+                self.build_for_expr_clause(expr, |e| {
+                    self.wrap_for_init_in(e, self.build_expression_doc(e))
+                })
             }
         };
         self.in_for_init.set(saved_in_for_init);

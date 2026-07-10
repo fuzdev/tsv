@@ -517,49 +517,7 @@ impl<'a> Printer<'a> {
             if let Some(cont) = preserve {
                 parts.push(cont);
             } else {
-                // Comments before `=` stay before `=` (e.g., `b /* c */ = 1;`)
-                if self.has_comments_between(before_eq, eq_pos) {
-                    parts.push(self.build_inline_comments_between_doc(before_eq, eq_pos));
-                }
-
-                // Comments after `=`
-                if self.has_line_comments_between(eq_pos + 1, value_start) {
-                    // A same-line comment stays inline with `=` (line comment via
-                    // `line_suffix`, so its width never force-breaks a preceding type
-                    // union); own-line comments stay on their own lines (not merged);
-                    // the value is indented on the next line. `= // comment\n      c`.
-                    parts.push(d.text(" ="));
-                    let expr_doc = self.build_expression_doc(value);
-                    self.append_keyword_value_line_comments(
-                        &mut parts,
-                        eq_pos + 1,
-                        value_start,
-                        expr_doc,
-                    );
-                } else {
-                    // Use assignment layout for proper line-breaking (handles
-                    // both no-comment and inline block comment cases).
-                    // Inline block comments are passed as rhs_comments so
-                    // choose_layout still applies (e.g., ternary with binaryish
-                    // test → BreakAfterOperator).
-                    let rhs_comments = self.build_rhs_comments_opt(eq_pos + 1, value_start);
-                    let left_doc = d.concat(&parts);
-                    // An assignment value keeps its parens (`a = (this.a = b);`) —
-                    // built manually like object property values, since the layout
-                    // chooser takes the bare expression
-                    let assignment_doc =
-                        if self.needs_parens(value, super::ParenContext::DefaultValue) {
-                            let value_doc = d.parens(self.build_expression_doc(value));
-                            let value_doc = match rhs_comments {
-                                Some(comments_doc) => d.concat(&[comments_doc, value_doc]),
-                                None => value_doc,
-                            };
-                            d.concat(&[left_doc, d.text(" = "), value_doc])
-                        } else {
-                            self.build_assignment_layout(left_doc, " =", value, false, rhs_comments)
-                        };
-                    parts = smallvec![assignment_doc];
-                }
+                self.build_property_assignment_layout(&mut parts, before_eq, eq_pos, value);
             }
         }
 
@@ -579,6 +537,59 @@ impl<'a> Printer<'a> {
         parts.extend(after);
 
         d.concat(&parts)
+    }
+
+    /// Emit a class property's `= value` layout into `parts` (which already holds the
+    /// property's LHS). The line-comment-before-`=` fast path is handled by the caller;
+    /// this covers before-`=` block comments, a line comment after `=`, and the
+    /// no-comment / inline-block assignment layout.
+    fn build_property_assignment_layout(
+        &self,
+        parts: &mut DocBuf,
+        before_eq: u32,
+        eq_pos: u32,
+        value: &internal::Expression<'_>,
+    ) {
+        let d = self.d();
+        let value_start = value.span().start;
+
+        // Comments before `=` stay before `=` (e.g., `b /* c */ = 1;`)
+        if self.has_comments_between(before_eq, eq_pos) {
+            parts.push(self.build_inline_comments_between_doc(before_eq, eq_pos));
+        }
+
+        // Comments after `=`
+        if self.has_line_comments_between(eq_pos + 1, value_start) {
+            // A same-line comment stays inline with `=` (line comment via
+            // `line_suffix`, so its width never force-breaks a preceding type
+            // union); own-line comments stay on their own lines (not merged);
+            // the value is indented on the next line. `= // comment\n      c`.
+            parts.push(d.text(" ="));
+            let expr_doc = self.build_expression_doc(value);
+            self.append_keyword_value_line_comments(parts, eq_pos + 1, value_start, expr_doc);
+        } else {
+            // Use assignment layout for proper line-breaking (handles
+            // both no-comment and inline block comment cases).
+            // Inline block comments are passed as rhs_comments so
+            // choose_layout still applies (e.g., ternary with binaryish
+            // test → BreakAfterOperator).
+            let rhs_comments = self.build_rhs_comments_opt(eq_pos + 1, value_start);
+            let left_doc = d.concat(&parts[..]);
+            // An assignment value keeps its parens (`a = (this.a = b);`) —
+            // built manually like object property values, since the layout
+            // chooser takes the bare expression
+            let assignment_doc = if self.needs_parens(value, super::ParenContext::DefaultValue) {
+                let value_doc = d.parens(self.build_expression_doc(value));
+                let value_doc = match rhs_comments {
+                    Some(comments_doc) => d.concat(&[comments_doc, value_doc]),
+                    None => value_doc,
+                };
+                d.concat(&[left_doc, d.text(" = "), value_doc])
+            } else {
+                self.build_assignment_layout(left_doc, " =", value, false, rhs_comments)
+            };
+            *parts = smallvec![assignment_doc];
+        }
     }
 
     /// Build a Doc for a method definition

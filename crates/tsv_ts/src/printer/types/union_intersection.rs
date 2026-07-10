@@ -8,7 +8,7 @@
 use super::super::comments_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, should_hug_union_type,
+    intersection_has_huggable_last_type, is_hugging_union_type_arg, should_hug_union_type,
     type_needs_parens_in_union_or_intersection, type_never_needs_parens, unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
@@ -325,7 +325,9 @@ impl<'a> Printer<'a> {
         {
             type_doc
         } else {
-            d.group(d.indent(type_doc))
+            // The bare printer owns the continuation indent; the first member stays at
+            // base (a first member that breaks internally is no longer double-indented).
+            d.group(type_doc)
         }
     }
 
@@ -528,7 +530,33 @@ impl<'a> Printer<'a> {
     /// Matches prettier's `hasComment(node)` for the detached comment model:
     /// comments between member spans correspond to attached trailing/leading
     /// comments in prettier's AST.
-    fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
+    /// True when a return-type union hugs its brace member block-style
+    /// (`{ … } | null` / `| void`) instead of breaking before it — the object owns
+    /// its own expansion, the same layout the type-alias RHS / `as` cast use. The
+    /// single source of truth shared by the function-type `=>` return
+    /// (`build_function_type_return_doc`) and the `: Type` annotation return
+    /// (`build_type_annotation_doc_with_wrapping`), so the two arms can't drift (the
+    /// drift is exactly what let the hug miss those contexts before).
+    ///
+    /// Requires a brace member with only void siblings (`is_hugging_union_type_arg` —
+    /// a `TypeLiteral`/`Mapped`; excludes the `Promise<…> | null` `TSTypeReference`
+    /// print-width family). A comment prettier's `shouldHugUnionType` would bail on —
+    /// between two members, or in the operator→union gap `[gap_start, gap_end]` —
+    /// disqualifies the hug; an *inside-object* comment (`{ /* c */ … }`) does not.
+    /// `gap_start`/`gap_end` bound the source between the `=>`/`:` and the union.
+    pub(crate) fn union_return_hugs(
+        &self,
+        value_type: &TSType<'_>,
+        union: &TSUnionType<'_>,
+        gap_start: u32,
+        gap_end: u32,
+    ) -> bool {
+        is_hugging_union_type_arg(value_type)
+            && !self.union_has_comments_between_members(union)
+            && !self.has_comments_between(gap_start, gap_end)
+    }
+
+    pub(crate) fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
         // Zero-comment window gate: one binary search over the whole union span before
         // the N-1 pairwise between-member searches. Each pairwise range lies within
         // `[union.span.start, union.span.end]`, so with no comment inside the union
@@ -548,6 +576,13 @@ impl<'a> Printer<'a> {
     /// Used by callers (e.g., mapped types) to decide whether the union needs
     /// extra indentation wrapping, and internally to force multiline formatting.
     pub(crate) fn union_has_line_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
+        // Zero-comment window gate (as in `union_has_comments_between_members`): every
+        // pairwise range lies within the union span, so no comment inside the union
+        // means every pairwise scan below is provably false — skip them on the common
+        // comment-free `A | B | C`.
+        if !self.has_comments_between(union.span.start, union.span.end) {
+            return false;
+        }
         union
             .types
             .windows(2)
@@ -642,6 +677,16 @@ impl<'a> Printer<'a> {
         // below still preserve comments around the `&`/parens.
         let member_parens = union_member_parens(intersection.types.len());
 
+        // A huggable/expanding boundary type (TypeLiteral/Mapped at the first or last
+        // position) owns its own expansion, so the hanging callers keep it un-indented.
+        // Every other layout owns its continuation indent here (the first member stays
+        // at base, only the `&`-continuations indent) — mirroring Prettier's
+        // `printIntersectionType` and the `: Type` annotation printer — so a first
+        // member that breaks internally is not swept into an outer `indent(...)`.
+        let last_is_huggable = intersection_has_huggable_last_type(intersection);
+        let first_is_expanding = intersection_has_expanding_first_type(intersection);
+        let boundary_owns_expansion = last_is_huggable || first_is_expanding;
+
         // Hoist leading line comments inside the first member's stripped parens
         // OUT of the intersection (e.g., `(// c\n a) & b` → `// c\n a & b`).
         // The comment goes on its own line BEFORE the intersection so the
@@ -686,18 +731,18 @@ impl<'a> Printer<'a> {
         });
         if has_isolated_comment_between_members || has_nonfirst_paren_leading_line_comment {
             let doc = self.build_intersection_type_doc_with_line_comments(intersection);
-            // The line-comment layout emits continuation members with a bare hardline
-            // and no indent, relying on the caller to supply the hanging indent. When
-            // `wrap_in_group` is set — the generic `build_type_doc` path used for type
-            // arguments, tuple elements, mapped-type values, and conditional branches —
-            // there is no such caller, so own the continuation indent here, mirroring
-            // Prettier's `printIntersectionType` (each continuation member is wrapped in
-            // `indent([" &", line, doc])`). When unset, the type-alias / annotation /
-            // function-return callers already wrap the result in `indent(...)`.
+            // The line-comment layout emits members with a bare hardline and no
+            // indent. Own the continuation indent here — mirroring Prettier's
+            // `printIntersectionType` — except when a huggable/expanding boundary owns
+            // its own expansion (the hanging caller keeps that un-indented). The
+            // `wrap_in_group` path (type arguments, tuple elements, mapped-type values,
+            // conditional branches) also groups it; the hanging callers add the group.
             return if wrap_in_group {
                 d.group(d.indent(doc))
-            } else {
+            } else if boundary_owns_expansion {
                 doc
+            } else {
+                d.indent(doc)
             };
         }
 
@@ -712,8 +757,6 @@ impl<'a> Printer<'a> {
         // or last position in a 2-type intersection), use a space instead of line() to
         // keep `& {` or `} &` hugged. The TypeLiteral handles its own expansion.
         let last_idx = intersection.types.len() - 1;
-        let last_is_huggable = intersection_has_huggable_last_type(intersection);
-        let first_is_expanding = intersection_has_expanding_first_type(intersection);
         let is_huggable_pair =
             intersection.types.len() == 2 && (last_is_huggable || first_is_expanding);
 
@@ -812,28 +855,16 @@ impl<'a> Printer<'a> {
 
         // Combine: first_parts + continuation
         //
-        // Indentation logic:
-        // - If huggable is ONLY continuation (A & {b}): no indent
-        //   TypeLiteral handles its own expansion, no extra indent needed
-        // - If huggable with other continuations (A & B & {c}): wrap in indent
-        //   When intersection breaks, TypeLiteral content needs continuation indentation
-        // - Pure non-object in a `wrap_in_group` context (type argument, tuple
-        //   element, mapped-type value, conditional branch): own the continuation
-        //   indent here. The caller puts the first member on its own line but
-        //   supplies no hanging indent, so continuations must indent one level
-        //   deeper — mirroring the line-comment path above and prettier's
-        //   `printIntersectionType` (each continuation `indent([" &", line, doc])`).
-        // - Pure non-object otherwise (type alias / annotation / return): no indent.
-        //   The caller wraps the whole result in `indent(...)` (e.g. type alias
-        //   wraps at =), so the first member stays on the `=` line and the caller's
-        //   indent already covers the continuations.
+        // Indentation logic — the first member always stays at base (on the `=`/opening
+        // line); only the `&`-continuations indent, matching Prettier's
+        // `printIntersectionType`. Every layout owns this indent EXCEPT a 2-type huggable
+        // pair (`A & {b}`), which space-hugs and lets the boundary object expand itself.
+        // Owning the indent here — rather than letting the hanging callers wrap the whole
+        // doc in `indent(...)` — keeps a first member that breaks internally at base
+        // instead of double-indenting it.
         let mut parts = first_parts;
         let has_non_huggable_continuations = last_is_huggable && intersection.types.len() > 2;
-        // Own the continuation indent when the caller can't: a huggable-at-end
-        // continuation set, or a pure non-object set in a `wrap_in_group` position
-        // (first member on its own line, no caller-supplied hanging indent).
-        let indent_continuations =
-            has_non_huggable_continuations || (wrap_in_group && !is_huggable_pair);
+        let indent_continuations = !is_huggable_pair;
         if !continuation_parts.is_empty() {
             if indent_continuations {
                 parts.push(d.indent(d.concat(&continuation_parts)));

@@ -906,32 +906,26 @@ impl<'a> Printer<'a> {
         // block to the key). key→`]`: a same-line comment trails the key with a
         // space, an own-line comment keeps its own line. Prettier relocates instead
         // (conformance_prettier.md §Comment relocation).
-        let (bracket_line_prefix, bracket_pull_pos) =
-            self.delimiter_line_comment_prefix(bracket_start, key_start);
-        let mut inner_parts = self.build_leading_comments_multiline_opt(
-            bracket_start + 1,
-            key_start,
-            bracket_pull_pos,
-        );
-        inner_parts.push(key_doc);
+        // Build the body (key + any key→`]` trailing comments) into a buffer; the shared
+        // bracket-break helper owns the `[`→key line-comment prefix and the break shell.
+        let mut body_parts: DocBuf = smallvec![key_doc];
         let mut prev = key_end;
         for comment in comments_in_range(self.comments, key_end, bracket_end) {
             if self.is_same_line(prev, comment.span.start) {
-                inner_parts.push(d.text(" "));
+                body_parts.push(d.text(" "));
             } else {
-                inner_parts.push(d.hardline());
+                body_parts.push(d.hardline());
             }
-            inner_parts.push(self.build_comment_doc(comment));
+            body_parts.push(self.build_comment_doc(comment));
             prev = comment.span.end;
         }
-        let bracket_body = d.concat(&[
-            d.text("["),
-            d.concat(&bracket_line_prefix),
-            d.indent_softline(d.concat(&inner_parts)),
-            d.softline(),
-            d.text("]"),
-        ]);
-        (d.group_break(bracket_body), bracket_end + 1)
+        let bracket = self.build_bracket_line_comment_break(
+            "[",
+            bracket_start,
+            key_start,
+            d.concat(&body_parts),
+        );
+        (bracket, bracket_end + 1)
     }
 
     /// Find the opening `[` bracket between two positions (for computed properties).

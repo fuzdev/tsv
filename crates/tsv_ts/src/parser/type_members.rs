@@ -97,30 +97,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ) -> Result<TSTypeElement<'arena>, ParseError> {
         let start = self.current_pos().0;
 
-        // Check for readonly modifier - only if followed by a property name or bracket
-        // Otherwise `readonly` itself is the property name: `readonly: string` or `readonly?: boolean`
-        let readonly = if matches!(self.current_kind(), TokenKind::Identifier)
+        // `readonly` is a modifier only when a property key follows — an identifier,
+        // keyword, string/number literal, or `[` (a computed key or index signature):
+        // the same `LiteralPropertyName`-or-computed test `get`/`set` use
+        // (`peek_is_property_name`), matching tsc's `canFollowModifier`. Otherwise
+        // `readonly` is the member's own name: `readonly: T` / `readonly?: T` (property),
+        // `readonly(): T` / `readonly<T>()` (method) — a following `(`/`<` keeps it a name,
+        // and a following string/number key (`readonly 'a': T`, `readonly 1: T`) is a
+        // modifier, not a parse error.
+        let readonly = matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "readonly"
-        {
-            // Peek ahead to see what follows
-            match self.peek_kind() {
-                TokenKind::Identifier
-                | TokenKind::Keyword(_)
-                | TokenKind::BracketOpen
-                | TokenKind::ParenOpen
-                | TokenKind::LessThan => {
-                    // 'readonly' is a modifier - consume it
-                    self.advance().ok();
-                    true
-                }
-                _ => {
-                    // 'readonly' is a property name - don't consume
-                    false
-                }
-            }
-        } else {
-            false
-        };
+            && self.peek_is_property_name();
+        if readonly {
+            self.advance().ok(); // consume the `readonly` modifier
+        }
 
         // Check for call signature: `(): T` or `<T>(): T`
         if self.check(&TokenKind::ParenOpen) || self.check(&TokenKind::LessThan) {

@@ -245,29 +245,25 @@ impl<'a> Printer<'a> {
         on_new_line: bool,
     ) -> DocId {
         let d = self.d();
+        // Union and intersection branches share one hang: the inner doc sits one
+        // level past the operator (`indent`) — on a fresh line after an
+        // operator-line comment (`on_new_line`, first union member then taking its
+        // leading `| `), or glued after the operator's space.
+        let hang = |inner: DocId| {
+            if on_new_line {
+                d.indent(d.concat(&[d.hardline(), inner]))
+            } else {
+                d.concat(&[d.text(" "), d.indent(inner)])
+            }
+        };
         match self.unwrap_redundant_parens(branch_type) {
             TSType::Union(u) if !should_hug_union_type(u) => {
                 // `build_union_type_doc` already returns `group(members)` (the bare
                 // `printed`); the branch supplies only one `indent`, so the member
                 // group breaks its continuations one level past the operator.
-                let union_doc = self.build_union_type_doc(u);
-                if on_new_line {
-                    // A comment ended the operator's line; the union starts on a
-                    // fresh line one level in, its first member taking the `| `.
-                    d.indent(d.concat(&[d.hardline(), union_doc]))
-                } else {
-                    // First member glues after the operator's space.
-                    d.concat(&[d.text(" "), d.indent(union_doc)])
-                }
+                hang(self.build_union_type_doc(u))
             }
-            TSType::Intersection(i) => {
-                let hanging = self.intersection_hanging_with_indent(i);
-                if on_new_line {
-                    d.indent(d.concat(&[d.hardline(), hanging]))
-                } else {
-                    d.concat(&[d.text(" "), d.indent(hanging)])
-                }
-            }
+            TSType::Intersection(i) => hang(self.intersection_hanging_with_indent(i)),
             _ => {
                 if on_new_line {
                     // Literal tab text (not d.indent) shifts only the first line
@@ -603,17 +599,13 @@ impl<'a> Printer<'a> {
             }));
         }
 
-        // [K in constraint]
-        body_parts.push(d.text("["));
+        // [K in constraint] — build the bracket interior (key + `in` + constraint +
+        // optional `as` + pre-`]` comments) into a buffer so a leading line comment in
+        // the `[`→key gap can break the whole `[…]` (mirrors `build_computed_key_bracket_doc`).
+        let mut interior_parts: DocBuf = smallvec![];
 
-        // Comments inside the brackets, before the key (`[/* c */ K in T]`) stay
-        // after `[`, inline ahead of the key.
-        for comment in &bracket_inner_comments {
-            body_parts.push(self.build_comment_doc(comment));
-            body_parts.push(d.text(" "));
-        }
-
-        body_parts.push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
+        interior_parts
+            .push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
         // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
         let name_len =
             self.with_ident_name_at(m.type_parameter.name, m.type_parameter.span.start, str::len);
@@ -631,10 +623,10 @@ impl<'a> Printer<'a> {
         // Comments between key name and `in` keyword
         // Comment gaps break a line comment onto its own line so it can't swallow the
         // following `in`/constraint.
-        body_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
-        body_parts.push(d.text(" in "));
-        body_parts.push(self.build_trailing_comments_break_for_line(in_end, constraint_start));
-        body_parts.push(self.build_type_doc(m.type_parameter.constraint));
+        interior_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
+        interior_parts.push(d.text(" in "));
+        interior_parts.push(self.build_trailing_comments_break_for_line(in_end, constraint_start));
+        interior_parts.push(self.build_type_doc(m.type_parameter.constraint));
 
         // as clause: `as NewKeyType`
         // Track the end of the last element inside brackets (for bracket-close comments)
@@ -653,10 +645,12 @@ impl<'a> Printer<'a> {
             let as_end = as_start.map_or(constraint_end, |p| (p + "as".len()) as u32);
             let as_start = as_start.map_or(constraint_end, |p| p as u32);
             // Comment gaps break a line comment so it can't swallow `as`/the name type.
-            body_parts.push(self.build_leading_comments_break_for_line(constraint_end, as_start));
-            body_parts.push(d.text(" as "));
-            body_parts.push(self.build_trailing_comments_break_for_line(as_end, name_type_start));
-            body_parts.push(self.build_type_doc(name_type));
+            interior_parts
+                .push(self.build_leading_comments_break_for_line(constraint_end, as_start));
+            interior_parts.push(d.text(" as "));
+            interior_parts
+                .push(self.build_trailing_comments_break_for_line(as_end, name_type_start));
+            interior_parts.push(self.build_type_doc(name_type));
             last_inner_end = name_type.span().end;
         }
 
@@ -664,18 +658,46 @@ impl<'a> Printer<'a> {
         let bracket_close = self
             .find_char_outside_comments(last_inner_end, m.span.end, b']')
             .unwrap_or(last_inner_end);
-        body_parts.push(self.build_comments_between(
+        interior_parts.push(self.build_comments_between(
             last_inner_end,
             bracket_close,
             CommentSpacing::Leading,
         ));
-        // A line comment trailing the key constraint (before `]`) must drop `]` to its
-        // own line: emitting `]` inline right after a `//` would swallow it (content
-        // loss). `[K in T // c⏎]` rather than `[K in T // c]`.
-        if self.has_line_comments_between(last_inner_end, bracket_close) {
-            body_parts.push(d.hardline());
+        let after_key_line = self.has_line_comments_between(last_inner_end, bracket_close);
+
+        // A line comment in the `[`→key gap (`[ // c⏎K in T]`) forces the whole bracket
+        // to break: emitting the key inline right after a `//` would swallow `K in T`
+        // (content loss, non-idempotent). Break so each comment and the key take their
+        // own line and `]` drops — the same in-place break index signatures already use
+        // (both match prettier); prettier only relocates the comment for value positions.
+        // A same-line block comment (`[/* c */ K in T]`) keeps the flat inline form.
+        let bracket_leading_line =
+            self.has_line_comments_between(bracket_pos + 1, param_name_start);
+        if bracket_leading_line {
+            // The pre-`]` comments are already inside `interior_parts` (built above via
+            // `build_comments_between`), so the shared helper takes the whole interior as
+            // the body and owns only the `[`→key prefix and the break shell.
+            body_parts.push(self.build_bracket_line_comment_break(
+                "[",
+                bracket_pos,
+                param_name_start,
+                d.concat(&interior_parts),
+            ));
+        } else {
+            body_parts.push(d.text("["));
+            // Same-line block comments before the key stay inline (`[/* c */ K in T]`).
+            for comment in &bracket_inner_comments {
+                body_parts.push(self.build_comment_doc(comment));
+                body_parts.push(d.text(" "));
+            }
+            body_parts.push(d.concat(&interior_parts));
+            // A line comment trailing the key constraint (before `]`) drops `]` to its
+            // own line (`[K in T // c⏎]`) so emitting `]` inline can't swallow it.
+            if after_key_line {
+                body_parts.push(d.hardline());
+            }
+            body_parts.push(d.text("]"));
         }
-        body_parts.push(d.text("]"));
 
         // optional modifier: `?`, `+?`, or `-?`
         if let Some(optional) = m.optional {

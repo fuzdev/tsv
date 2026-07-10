@@ -75,6 +75,27 @@ pub trait ChainPrinter: SymbolLookup {
         same_line_only: bool,
     ) -> DocId;
 
+    /// Build the break-path doc for a computed member's `[…]` when it carries a
+    /// **line** comment inside the brackets — before the index (`arr[// c⏎i]`) or
+    /// after it, before `]` (`arr[i // c⏎]`). Returns `None` when there is no such
+    /// line comment, so the caller falls through to the existing block-only
+    /// inline/group behavior.
+    ///
+    /// A line comment inside `arr[…]` is otherwise dropped (the block-only paths
+    /// skip it) — content loss. This breaks the bracket so each comment and the
+    /// index take their own line, preserving the comment in place (`open` is `[`
+    /// or `?.[`). Prettier relocates the comment before the whole expression
+    /// instead — a deliberate divergence (conformance_prettier.md §Comment relocation).
+    fn build_computed_member_line_comment_bracket(
+        &self,
+        open: &'static str,
+        inside_start: u32,
+        prop_start: u32,
+        prop_end: u32,
+        bracket_end: u32,
+        inner: DocId,
+    ) -> Option<DocId>;
+
     /// Get the span for a given expression
     fn get_property_span(&self, expr: &Expression<'_>) -> Span;
 
@@ -320,46 +341,66 @@ pub(crate) fn print_node_inner<'a, P: ChainPrinter>(
                 true,
             );
 
-            // Block comments inside brackets: [/* c */ key] and [key /* c */]
-            // No same-line filter because when the input is already broken across
-            // lines, the comment may be on a different line from the bracket opening
-            // (e.g., `?.[` on one line, `/** @type {string} */ d` on the next).
             let inside_start = bracket_open_pos + if *optional { 3 } else { 1 };
-            let leading_comments_doc = printer.build_block_comments_doc(
-                inside_start,
-                prop_span.start,
-                crate::printer::CommentSpacing::Trailing,
-                false,
-            );
-            let trailing_comments_doc = printer.build_block_comments_doc(
-                prop_span.end,
-                *bracket_end,
-                crate::printer::CommentSpacing::Leading,
-                false,
-            );
+            let open = if *optional { "?.[" } else { "[" };
 
-            let inner_with_comments =
-                d.concat(&[leading_comments_doc, inner, trailing_comments_doc]);
-
-            // When there are block comments inside brackets (e.g., `?.[/** @type {string} */ d]`),
-            // use a group with indent/softline so the bracket content can break:
-            //   obj.chain?.[
-            //       /** @type {string} */ d
-            //   ]
-            // Without comments, keep the flat form (existing behavior).
-            let has_inside_comments = printer.has_comments_between(inside_start, prop_span.start)
-                || printer.has_comments_between(prop_span.end, *bracket_end);
-            let bracket_doc = if has_inside_comments {
-                let open = if *optional { "?.[" } else { "[" };
-                let sl = d.softline();
-                let content = d.concat(&[sl, inner_with_comments]);
-                let indented = d.indent(content);
-                let sl2 = d.softline();
-                d.group(d.concat(&[d.text(open), indented, sl2, d.text("]")]))
-            } else if *optional {
-                d.concat(&[d.text("?.["), inner_with_comments, d.text("]")])
+            // A line comment inside the brackets (before the index, or after it before
+            // `]`) forces the whole bracket to break so the `//` can't swallow the index
+            // or `]` — the block-only paths below would drop it (content loss). `[` is
+            // at `inside_start - 1` (the char before the index region, past `?.` for the
+            // optional form). Prettier relocates the comment before the expression instead.
+            let bracket_doc = if let Some(broken) = printer
+                .build_computed_member_line_comment_bracket(
+                    open,
+                    inside_start,
+                    prop_span.start,
+                    prop_span.end,
+                    *bracket_end,
+                    inner,
+                ) {
+                broken
             } else {
-                d.brackets(inner_with_comments)
+                // Block comments inside brackets: [/* c */ key] and [key /* c */]
+                // No same-line filter because when the input is already broken across
+                // lines, the comment may be on a different line from the bracket opening
+                // (e.g., `?.[` on one line, `/** @type {string} */ d` on the next).
+                let leading_comments_doc = printer.build_block_comments_doc(
+                    inside_start,
+                    prop_span.start,
+                    crate::printer::CommentSpacing::Trailing,
+                    false,
+                );
+                let trailing_comments_doc = printer.build_block_comments_doc(
+                    prop_span.end,
+                    *bracket_end,
+                    crate::printer::CommentSpacing::Leading,
+                    false,
+                );
+
+                let inner_with_comments =
+                    d.concat(&[leading_comments_doc, inner, trailing_comments_doc]);
+
+                // When there are block comments inside brackets (e.g.,
+                // `?.[/** @type {string} */ d]`), use a group with indent/softline so
+                // the bracket content can break:
+                //   obj.chain?.[
+                //       /** @type {string} */ d
+                //   ]
+                // Without comments, keep the flat form (existing behavior).
+                let has_inside_comments = printer
+                    .has_comments_between(inside_start, prop_span.start)
+                    || printer.has_comments_between(prop_span.end, *bracket_end);
+                if has_inside_comments {
+                    let sl = d.softline();
+                    let content = d.concat(&[sl, inner_with_comments]);
+                    let indented = d.indent(content);
+                    let sl2 = d.softline();
+                    d.group(d.concat(&[d.text(open), indented, sl2, d.text("]")]))
+                } else if *optional {
+                    d.concat(&[d.text("?.["), inner_with_comments, d.text("]")])
+                } else {
+                    d.brackets(inner_with_comments)
+                }
             };
 
             // Emit: pre-bracket line comments, pre-bracket block comments, then brackets

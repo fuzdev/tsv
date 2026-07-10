@@ -172,15 +172,32 @@ impl<'a> Printer<'a> {
         let value_type = self.unwrap_redundant_parens(return_type.type_annotation);
         if let TSType::Union(u) = value_type {
             let type_doc = self.build_union_type_doc(u);
+            // A brace-hugging union return (`{ … } | null` / `| void`) hugs `=>`
+            // block-style: the object owns its own expansion and the void member
+            // trails the `}`, the same layout the type-alias RHS / `as` cast use
+            // (`build_union_type_doc`'s hug path). See `union_return_hugs` for the
+            // scope: a `Promise<…> | null` `TSTypeReference` member is deliberately
+            // NOT hugged (the sanctioned `return_type_generic_union` print-width
+            // family), and a member/gap comment disqualifies the hug — those fall
+            // through to the break-after-operator layout that matches prettier there.
+            if self.union_return_hugs(value_type, u, arrow_end, type_start) {
+                return d.concat(&[d.text(arrow_sp), comments_doc, type_doc]);
+            }
             return d.concat(&[
                 d.text(arrow),
                 hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
             ]);
         }
         if let TSType::Intersection(i) = value_type {
-            // Intersections use trailing `&` - first type NOT indented, continuations indented
-            let type_doc = self.build_intersection_type_doc(i, false);
-            return d.concat(&[d.text(arrow_sp), comments_doc, d.group(d.indent(type_doc))]);
+            // Delegate to the shared bare hanging printer (same layout the type-alias
+            // RHS / `as` cast use): a huggable/expanding boundary returns bare
+            // `type_doc` (the object owns its own expansion — no extra indent), and a
+            // pure-non-object intersection gets `group(type_doc)` with the bare printer
+            // owning its continuation indent (a first member that breaks internally
+            // isn't double-indented). The old inline `group(indent(type_doc))` for the
+            // huggable branch double-indented the object body.
+            let wrapped = self.intersection_hanging_with_indent(i);
+            return d.concat(&[d.text(arrow_sp), comments_doc, wrapped]);
         }
         match return_type.type_annotation {
             // TypeReference with complex type args (like Promise<Result<...>>):

@@ -5,13 +5,8 @@
 // - Width-aware wrapping for type arguments
 // - Return type annotations
 
-use super::helpers::{
-    find_separator_position, immediate_union_paren, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, should_hug_union_type,
-    type_args_should_wrap_for_return_type, type_needs_parens_in_union_or_intersection,
-    unwrap_parenthesized,
-};
-use super::{CommentFilter, CommentSpacing, Printer};
+use super::helpers::{should_hug_union_type, type_args_should_wrap_for_return_type};
+use super::{CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
@@ -211,14 +206,29 @@ impl<'a> Printer<'a> {
             let comments_doc =
                 self.build_comments_between(colon_end, value_type_start, CommentSpacing::Trailing);
 
+            // A brace-hugging union return (`{ … } | null` / `| void`) hugs `:`
+            // block-style, like the type-alias RHS — the object owns its own expansion
+            // and the void member trails the `}`. Prettier never breaks after `:` here
+            // (it hugs even behind a very long method name), so there is no
+            // break-after-colon fallback. `union_return_hugs` scopes it: a
+            // `Promise<…> | null` `TSTypeReference` member is excluded (the sanctioned
+            // `return_type_generic_union` print-width family, handled by the
+            // `should_hug_union_type` branch below), and a member/gap comment
+            // disqualifies the hug.
+            if self.union_return_hugs(value_type, u, colon_end, value_type_start) {
+                return d.concat(&[d.text(": "), comments_doc, type_doc]);
+            }
+
             if should_hug_union_type(u) {
-                // Hugged unions (e.g., `null | { ... }`) use conditional_group to bypass
-                // the renderer's will_break check. The object type inside the union has
-                // hardlines for multiline members, but those shouldn't force the type
-                // annotation to break after `:`. The conditional_group calls fits()
+                // A should-hug union that didn't take the brace-hug above: a
+                // `TSTypeReference` object-like member with only void siblings
+                // (`Promise<…> | null`), or a brace union whose member/gap comment
+                // disqualified the hug. Uses conditional_group to bypass the renderer's
+                // will_break check: an inner group may break, but that shouldn't force
+                // the annotation to break after `:`. The conditional_group calls fits()
                 // directly, which correctly handles nested hardlines (returns true).
-                // State 0: `: null | { ... }` (inline, no break after colon)
-                // State 1: `:\n  null | { ... }` (break after colon, for very long names)
+                // State 0: `: Promise<…> | null` (inline, no break after colon)
+                // State 1: `:\n  Promise<…> | null` (break after colon, for long names)
                 let flat_state = d.concat(&[d.text(": "), comments_doc, type_doc]);
                 let break_state = d.concat(&[
                     d.text(":"),
@@ -286,150 +296,25 @@ impl<'a> Printer<'a> {
             ]);
         }
 
-        // Line comments between members force the multiline layout. Delegate to the
-        // shared bare-intersection path (which handles them) instead of the
-        // continuation loop below, which has no line-comment handling and would
-        // silently drop the comments. Mirrors the type-alias layout: `: ` + the
-        // huggable-aware `group(indent(...))` wrapper.
-        let has_line_comments_between_members = intersection
-            .types
-            .windows(2)
-            .any(|pair| self.has_line_comments_between(pair[0].span().end, pair[1].span().start));
-        if has_line_comments_between_members {
-            let first_type_start = intersection.types[0].span().start;
-            let comments_doc =
-                self.build_comments_between(colon_end, first_type_start, CommentSpacing::Trailing);
-            let wrapped = self.intersection_hanging_with_indent(intersection);
-            return d.concat(&[d.text(": "), comments_doc, wrapped]);
-        }
-
-        // Check for huggable boundary types (TypeLiteral/MappedType at first or last position)
-        let last_is_huggable = intersection_has_huggable_last_type(intersection);
-        let first_is_expanding = intersection_has_expanding_first_type(intersection);
-        let is_huggable_pair =
-            intersection.types.len() == 2 && (last_is_huggable || first_is_expanding);
-        let last_idx = intersection.types.len() - 1;
-
-        // Build first type (stays on same line as `:`)
-        // Use wrapping type args so GenericType<...> can break at print width
-        let first_type = &intersection.types[0];
-        let first_type_doc = self.build_intersection_member_type_doc(first_type);
-
-        // Extract comments between `:` and the first type (e.g., `: /* c */ A & B`)
-        let first_type_start = first_type.span().start;
-        let comments_doc =
-            self.build_comments_between(colon_end, first_type_start, CommentSpacing::Trailing);
-        let mut first_parts: DocBuf = smallvec![d.text(": "), comments_doc, first_type_doc];
-
-        // Add trailing block comments after first type (before the `&`)
-        let first_type_end = first_type.span().end;
-        let second_type_start = intersection.types[1].span().start;
-        if let Some(amp_pos) =
-            find_separator_position(self.source, first_type_end, second_type_start, b'&')
-        {
-            first_parts.push(self.build_comments_between_filtered(
-                first_type_end,
-                amp_pos,
-                CommentSpacing::Leading,
-                CommentFilter::BlockOnly,
-            ));
-        }
-        first_parts.push(d.text(" &"));
-
-        // Build continuation types (indented when breaking)
-        let mut continuation_parts: DocBuf = DocBuf::new();
-        for (i, t) in intersection.types.iter().enumerate().skip(1) {
-            let type_start = t.span().start;
-            let type_end = t.span().end;
-            let is_last = i == last_idx;
-
-            // Space/line before this type
-            // Huggable pair: always space (TypeLiteral handles its own expansion)
-            // Multi-type with huggable last: space only for the last type
-            if is_huggable_pair || (is_last && last_is_huggable) {
-                continuation_parts.push(d.text(" "));
-            } else {
-                continuation_parts.push(d.line());
-            }
-
-            // Add leading block comments (after `&`)
-            let prev_type_end = intersection.types[i - 1].span().end;
-            if let Some(amp_pos) =
-                find_separator_position(self.source, prev_type_end, type_start, b'&')
-            {
-                continuation_parts.push(self.build_comments_between_filtered(
-                    amp_pos + 1,
-                    type_start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::BlockOnly,
-                ));
-            }
-
-            // The type itself (with wrapping type args so generics can break)
-            continuation_parts.push(self.build_intersection_member_type_doc(t));
-
-            // Trailing block comments and `&` separator (except for last type)
-            if !is_last {
-                let next_type_start = intersection.types[i + 1].span().start;
-                if let Some(amp_pos) =
-                    find_separator_position(self.source, type_end, next_type_start, b'&')
-                {
-                    continuation_parts.push(self.build_comments_between_filtered(
-                        type_end,
-                        amp_pos,
-                        CommentSpacing::Leading,
-                        CommentFilter::BlockOnly,
-                    ));
-                }
-                continuation_parts.push(d.text(" &"));
-            } else {
-                // Last type - trailing comments
-                continuation_parts.push(self.build_comments_between_filtered(
-                    type_end,
-                    intersection.span.end,
-                    CommentSpacing::Leading,
-                    CommentFilter::BlockOnly,
-                ));
-            }
-        }
-
-        // Combine: first_parts + indented continuation
-        let mut parts = first_parts;
-        if !continuation_parts.is_empty() {
-            // Huggable pair: no indent, TypeLiteral handles its own expansion
-            // All other cases: wrap continuation in indent
-            if is_huggable_pair {
-                parts.extend(continuation_parts);
-            } else {
-                parts.push(d.indent(d.concat(&continuation_parts)));
-            }
-        }
-
-        // Huggable pair: no group needed, TypeLiteral expands itself.
-        // All other cases: group controls line() flat/break behavior.
-        if is_huggable_pair {
-            d.concat(&parts)
-        } else {
-            d.group(d.concat(&parts))
-        }
-    }
-
-    /// Build intersection member type with optional parens and wrapping type args.
-    fn build_intersection_member_type_doc(&self, t: &TSType<'_>) -> DocId {
-        let d = self.d();
-        if type_needs_parens_in_union_or_intersection(t) {
-            // Special case: parenthesized union type
-            if let TSType::Union(union) = unwrap_parenthesized(t) {
-                return self.build_parenthesized_union_doc(union, immediate_union_paren(t), false);
-            }
-
-            d.concat(&[
-                d.text("("),
-                self.build_type_doc_with_wrapping_type_args(t),
-                d.text(")"),
-            ])
-        } else {
-            self.build_type_doc_with_wrapping_type_args(t)
-        }
+        // Multi-member: `: ` + any colon→first-member comment, then delegate the whole
+        // intersection body to the shared bare-intersection printer
+        // (`intersection_hanging_with_indent`). The first member hugs `:` and
+        // continuations indent, exactly like the type-alias RHS — huggable boundaries,
+        // the expanding-first hug, and block + line comments are all handled uniformly
+        // there (a single source of truth; the bare and annotation contexts can't drift).
+        // Emit only the comment between `:` and the intersection's span start. A leading
+        // block comment INSIDE the intersection (`: & /* c */ A`, where the span starts at
+        // the leading `&`) is emitted by the bare printer, so bounding at `types[0]` here
+        // would double-emit it.
+        let comments_doc = self.build_comments_between(
+            colon_end,
+            intersection.span.start,
+            CommentSpacing::Trailing,
+        );
+        d.concat(&[
+            d.text(": "),
+            comments_doc,
+            self.intersection_hanging_with_indent(intersection),
+        ])
     }
 }

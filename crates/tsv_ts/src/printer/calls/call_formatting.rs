@@ -5,9 +5,9 @@
 
 use super::super::{ParenContext, Printer, has_multiline_content};
 use super::arg_comments::{
-    PartitionedComments, any_comment_forces_expansion, find_comma_pos, first_arg_has_any_comments,
+    PartitionedComments, any_comment_forces_expansion, first_arg_has_any_comments,
     has_blank_line_between_args, has_inter_argument_comments, has_trailing_comments_on_args,
-    is_comment_after_comma, last_arg_has_comments, should_force_expansion_for_comments,
+    last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
@@ -1214,10 +1214,6 @@ fn build_call_with_arg_comments(
     // line). Injected after `(` in the force-expansion wrap below.
     let mut paren_line_prefix_parts: DocBuf = DocBuf::new();
     let mut force_expansion = false;
-    // Block comment trailing the last arg after its source comma — preserved past
-    // where the comma was (no trailing comma; prettier relocates before; see
-    // conformance_prettier.md).
-    let mut last_after_comma: DocBuf = DocBuf::new();
 
     for (i, arg) in call.arguments.iter().enumerate() {
         // Handle leading comments before first argument
@@ -1377,28 +1373,21 @@ fn build_call_with_arg_comments(
             );
 
             // Trailing comments after the last arg, before the closing paren, in
-            // source order: same-line block comments first (split around the source
-            // comma), then the same-line line comment (after the comma, via
-            // `line_suffix`), then own-line comments (each on its own line). Emitting
-            // same-line comments before own-line ones — and never dropping a block —
-            // avoids merging consecutive comments onto one line (which reverses their
-            // order) and content loss. The `new`/member-chain last-arg paths do the
-            // same via the shared emit_* helpers; this path keeps its own loop only
-            // for the block comma-split (before- vs after-comma; no trailing comma).
+            // source order: same-line block comments first, then the same-line line
+            // comment (via `line_suffix`), then own-line comments (each on its own
+            // line). Emitting same-line comments before own-line ones — and never
+            // dropping a block — avoids merging consecutive comments onto one line
+            // (which reverses their order) and content loss.
 
-            // (1) Same-line block comments: before-comma blocks trail the arg, after-
-            // comma blocks are preserved past where the comma was (no trailing comma).
-            // Don't force expansion on their own — let width/source newlines decide.
-            // e.g., fn({short} /* c */) stays inline, fn({long...} /* c */) expands.
-            let comma_pos = find_comma_pos(printer.source, effective_arg_end, paren_close);
+            // (1) Same-line block comments trail the arg in source order. With no
+            // trailing comma emitted (trailingComma: 'none'), a block that sat after
+            // the source comma simply trails the arg past where the comma was — no
+            // split around the never-emitted comma. Don't force expansion on their own
+            // — let width/source newlines decide: fn({short} /* c */) stays inline,
+            // fn({long...} /* c */) expands.
             for comment in &pc.trailing_block {
-                if comma_pos.is_some_and(|cp| is_comment_after_comma(comment, cp)) {
-                    last_after_comma.push(d.text(" "));
-                    last_after_comma.push(printer.build_comment_doc(comment));
-                } else {
-                    arg_parts.push(d.text(" "));
-                    arg_parts.push(printer.build_comment_doc(comment));
-                }
+                arg_parts.push(d.text(" "));
+                arg_parts.push(printer.build_comment_doc(comment));
             }
 
             // (2) Same-line line comment after the last arg, via `line_suffix`.
@@ -1449,25 +1438,8 @@ fn build_call_with_arg_comments(
             callee,
             d.text("("),
             d.concat(&paren_line_prefix_parts),
-            d.group_break(d.concat(&[
-                d.indent(d.concat(&[d.hardline(), arg_doc, d.concat(&last_after_comma)])),
-                d.hardline(),
-            ])),
+            d.group_break(d.concat(&[d.indent(d.concat(&[d.hardline(), arg_doc])), d.hardline()])),
             d.text(")"),
-        ]));
-    }
-
-    // After-comma block comment on the last arg: preserved past where the comma
-    // was (soft-break wrapper; no trailing comma, trailingComma: 'none').
-    if !last_after_comma.is_empty() {
-        return Some(d.concat(&[
-            callee,
-            d.group(d.concat(&[
-                d.text("("),
-                d.indent_softline(d.concat(&[arg_doc, d.concat(&last_after_comma)])),
-                d.softline(),
-                d.text(")"),
-            ])),
         ]));
     }
 
