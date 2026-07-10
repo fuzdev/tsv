@@ -424,7 +424,6 @@ impl<'a> Printer<'a> {
     /// token — a separate deliberate divergence (see conformance_prettier.md §Svelte:
     /// destructuring literal normalization).
     pub(super) fn build_pattern_doc(&self, expr: &Expression<'_>) -> DocId {
-        let d = self.d();
         match expr {
             // Comments thread through every gap so a comment in any pattern position is
             // preserved in place — a `_svelte_prettier_divergence` from prettier-plugin-svelte,
@@ -467,26 +466,10 @@ impl<'a> Printer<'a> {
             // (`a /* c */ = 1` vs `a = /* c */ 1`). The `Expression` variant is the
             // default-value form of the same `=`.
             Expression::AssignmentPattern(assign) => {
-                let left = self.build_pattern_doc(assign.left);
-                let eq = self.build_pattern_delim_gap(
-                    assign.left.span().end,
-                    assign.right.span().start,
-                    b'=',
-                    " = ",
-                );
-                let right = self.build_pattern_doc(assign.right);
-                d.concat(&[left, eq, right])
+                self.build_pattern_assignment(assign.left, assign.right)
             }
             Expression::AssignmentExpression(assign) => {
-                let left = self.build_pattern_doc(assign.left);
-                let eq = self.build_pattern_delim_gap(
-                    assign.left.span().end,
-                    assign.right.span().start,
-                    b'=',
-                    " = ",
-                );
-                let right = self.build_pattern_doc(assign.right);
-                d.concat(&[left, eq, right])
+                self.build_pattern_assignment(assign.left, assign.right)
             }
             // Default: build doc directly in shared arena. Literals route here too,
             // so string and numeric defaults normalize through the TS printer
@@ -498,6 +481,18 @@ impl<'a> Printer<'a> {
             // §Svelte: destructuring literal normalization).
             _ => self.build_ts_expression_doc_no_comments(expr),
         }
+    }
+
+    /// Build a doc for a binding assignment (`left = right`) — the shared body of
+    /// the `AssignmentPattern` (default-value binding) and `AssignmentExpression`
+    /// pattern arms. Comments around the `=` stay on the side the author wrote
+    /// them (`a /* c */ = 1` vs `a = /* c */ 1`) via `build_pattern_delim_gap`.
+    fn build_pattern_assignment(&self, left: &Expression<'_>, right: &Expression<'_>) -> DocId {
+        let d = self.d();
+        let left_doc = self.build_pattern_doc(left);
+        let eq = self.build_pattern_delim_gap(left.span().end, right.span().start, b'=', " = ");
+        let right_doc = self.build_pattern_doc(right);
+        d.concat(&[left_doc, eq, right_doc])
     }
 
     /// Build a doc for an expression with leading and trailing comments
