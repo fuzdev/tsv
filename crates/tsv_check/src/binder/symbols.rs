@@ -1,10 +1,16 @@
 //! Symbols, symbol flags, and symbol tables — the binder's substrate.
 //!
-//! Ported from tsgo's `internal/ast`: [`SymbolFlags`] is the exact bit table plus
-//! the `*Excludes` conflict masks (a construct's flags cannot coexist in one table
+//! Ported from tsgo's `internal/ast`: [`SymbolFlags`] is the bit table plus the
+//! `*Excludes` conflict masks (a construct's flags cannot coexist in one table
 //! with any flag in its excludes mask — the whole basis of the duplicate-identifier
-//! cascade), reproduced verbatim so the merge-vs-conflict verdict matches tsgo by
-//! construction. A [`Symbol`] carries its accumulated flags, name [`Atom`], the
+//! cascade), reproduced so the merge-vs-conflict verdict matches tsgo by
+//! construction. The port covers every flag the binder + merge classify with and
+//! every `*Excludes` mask; it deliberately omits the flags no ported path reads —
+//! `ConstEnumOnlyModule` (`1 << 28`, only a `getModuleInstanceState` refinement the
+//! `module_instantiated` approximation folds away), `GlobalLookup` (`1 << 30`, the
+//! name-resolver's global-scope marker), and the convenience composites
+//! (`Module`, `ExportHasLocal`, `BlockScoped`, `PropertyOrAccessor`, `ClassMember`,
+//! …) whose members are all present. A [`Symbol`] carries its accumulated flags, name [`Atom`], the
 //! declaration list the cascade points errors at, and the `members`/`exports`
 //! child tables containers own. Tables ([`TableId`] into the binder's pool) are
 //! `Atom → SymbolId` maps.
@@ -193,6 +199,10 @@ pub struct Decl {
     pub error_span: Span,
     /// The display name for the `{0}` message argument (the declaration's text).
     pub display: Atom,
+    /// Whether this declaration is a *type* declaration (tsgo `IsTypeDeclaration`:
+    /// class / interface / enum / type-alias / type-parameter). The merge phase's
+    /// `undefined`-redeclaration check (TS2397) skips type declarations.
+    pub is_type_decl: bool,
 }
 
 /// A bound symbol: accumulated flags, its table key, its declarations, and the

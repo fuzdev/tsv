@@ -12,17 +12,39 @@
 //!
 //! Deliberate simplifications from the full binder, each sound for the family:
 //! - the exported-member **dual local+export split** is collapsed to a single
-//!   export symbol. tsgo's local half carries only `ExportValue`, which appears
-//!   in **no** `*Excludes` mask, so it can never trigger a conflict — routing
-//!   exported members straight to the exports table is observationally identical
-//!   for the cascade.
+//!   export symbol. tsgo gives an exported module member two symbols
+//!   (`declareModuleMember`, binder.go:387-414): an export symbol with the full
+//!   flags, and a **local** symbol declared into the container's `locals` with
+//!   only `ExportValue` as its *includes* but the **full `symbolExcludes`** mask
+//!   (binder.go:409-411). That local half exists **precisely to conflict** — when
+//!   an exported member follows a same-name **non-exported** local, the export's
+//!   local half (full excludes) collides with the prior plain local in the
+//!   `locals` table and issues a duplicate-identifier error. Collapsing to
+//!   export-only drops that one collision, but it is sound for the **P1 family**
+//!   because the local↔export mixing it would catch surfaces instead as the
+//!   check-time **TS2395** ("individual declarations … must be all exported or all
+//!   local"), which is out of the bind/merge family; and the functions-first pass
+//!   defuses the common function-overload cases before they reach the locals
+//!   table. It is sound for the **S4 merge** for a separate reason: the global
+//!   merge folds a *script's* `file.Locals` (no dual split — scripts declare
+//!   straight into locals with full flags) and `declare global` / augmentation
+//!   *exports* (the export halves, full flags), and **never** an external module's
+//!   locals (they don't reach global scope), so the merge never reads a
+//!   dual-split local half at all.
 //! - module instantiation state (`getModuleInstanceState`) is approximated:
 //!   specifier-only named exports are treated as non-instantiated rather than
 //!   resolving each alias target, and const-enum-only propagation is folded into
 //!   the instantiated verdict (a const enum makes a namespace `ValueModule`).
-//! - the merge phase (cross-declaration-space / cross-file) is out of scope, so
-//!   the merge-path family codes (TS2397/2649/2664/2671 and merge-only
-//!   TS2300/2451/2567) are not emitted here — they land as graded *misses*.
+//! - the JS-only `declareSymbolEx` branches (`isReplaceableByMethod`
+//!   constructor-vs-prototype discard, and the assignment-merge escape that lets
+//!   `SymbolFlagsAssignment` declarations coexist with variables) are deliberately
+//!   unported: the tsc conformance corpus this grades is TS-only, so those
+//!   JS-expando paths are unreachable. Revisit if a `.js`-flavored suite enters scope.
+//!
+//! The same-table cascade lands here; the **cross-declaration-space merge** (a
+//! script's `file.Locals` folded into global scope, `declare global` and
+//! `declare module "X"` augmentations) runs in [`crate::merge`] over the
+//! [`FileMerge`] product this bind returns.
 //
 // tsgo: internal/binder/binder.go declareSymbolEx (the cascade),
 //       declareSymbolAndAddToSymbolTable / declareModuleMember / declareClassMember
@@ -43,6 +65,7 @@ use super::{addr_of, FileFacts};
 use crate::diag::{Category, Diagnostic};
 use crate::hash::FxHashMap;
 use crate::ids::{FileId, NodeId};
+use crate::merge::{FileMerge, MergeDecl, MergeSymbol, ModuleAug};
 use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
@@ -118,6 +141,7 @@ pub(super) struct SymbolBinder<'a> {
     interner: &'a DefaultStringInterner,
     address_map: &'a FxHashMap<usize, NodeId>,
     file: FileId,
+    is_external: bool,
 
     atoms: Atoms,
     symbols: Vec<Symbol>,
@@ -126,6 +150,13 @@ pub(super) struct SymbolBinder<'a> {
 
     container: Scope,
     block_scope: Scope,
+
+    /// The source-file `locals` table — a **script**'s globals-eligible symbols.
+    source_file_locals: TableId,
+    /// `declare global {}` augmentation symbols (their exports merge into globals).
+    global_aug_symbols: Vec<SymbolId>,
+    /// Non-global `declare module "X"` augmentations: `(unquoted-name atom, span)`.
+    module_augs: Vec<(Atom, Span)>,
 }
 
 impl<'a> SymbolBinder<'a> {
@@ -143,6 +174,7 @@ impl<'a> SymbolBinder<'a> {
             interner,
             address_map,
             file,
+            is_external: is_external_module,
             atoms: Atoms::new(),
             symbols: Vec::new(),
             tables: Vec::new(),
@@ -161,8 +193,13 @@ impl<'a> SymbolBinder<'a> {
                 is_external_module,
                 is_export_context: false,
             },
+            // Provisional; overwritten with the real source-file locals below.
+            source_file_locals: TableId(0),
+            global_aug_symbols: Vec::new(),
+            module_augs: Vec::new(),
         };
         let locals = binder.new_table();
+        binder.source_file_locals = locals;
         let symbol = if is_external_module {
             // The file's own module symbol owns the `exports` table.
             let name = binder.atoms.intern("\"module\"");
@@ -184,9 +221,68 @@ impl<'a> SymbolBinder<'a> {
         self.bind_statement_list(program.body, true);
     }
 
-    /// Finish, returning the collected bind diagnostics.
-    pub(super) fn finish(self) -> Vec<Diagnostic> {
-        self.diagnostics
+    /// Finish, returning the collected bind diagnostics and the merge product.
+    pub(super) fn finish(self) -> (Vec<Diagnostic>, FileMerge) {
+        // A script's source-file locals reach global scope; an external module's
+        // do not (its members live in the module's exports).
+        let source_locals = if self.is_external {
+            Vec::new()
+        } else {
+            self.resolve_table(self.source_file_locals)
+        };
+        let global_augmentations = self
+            .global_aug_symbols
+            .iter()
+            .map(|&sid| match self.symbols[sid.index()].exports {
+                Some(t) => self.resolve_table(t),
+                None => Vec::new(),
+            })
+            .collect();
+        let module_augmentations = self
+            .module_augs
+            .iter()
+            .map(|&(name, span)| ModuleAug {
+                file: self.file,
+                name: self.atoms.resolve(name).to_string(),
+                name_span: span,
+            })
+            .collect();
+        let merge = FileMerge {
+            file: self.file,
+            is_external: self.is_external,
+            source_locals,
+            global_augmentations,
+            module_augmentations,
+        };
+        (self.diagnostics, merge)
+    }
+
+    /// Resolve a symbol table into merge symbols, in **declaration order** (first
+    /// declaration's span start) — deterministic iteration, never the hash-map's.
+    fn resolve_table(&self, table: TableId) -> Vec<MergeSymbol> {
+        let mut symbols: Vec<MergeSymbol> = self.tables[table.index()]
+            .values()
+            .map(|&sid| {
+                let sym = &self.symbols[sid.index()];
+                let decls = sym
+                    .decls
+                    .iter()
+                    .map(|d| MergeDecl {
+                        file: self.file,
+                        error_span: d.error_span,
+                        display: self.atoms.resolve(d.display).to_string(),
+                        is_type_decl: d.is_type_decl,
+                    })
+                    .collect();
+                MergeSymbol {
+                    name: self.atoms.resolve(sym.name).to_string(),
+                    flags: sym.flags,
+                    decls,
+                }
+            })
+            .collect();
+        symbols.sort_by_key(|s| s.decls.first().map_or(u32::MAX, |d| d.error_span.start));
+        symbols
     }
 
     // --- table / symbol pool -------------------------------------------------
@@ -305,9 +401,15 @@ impl<'a> SymbolBinder<'a> {
     }
 
     fn add_declaration(&mut self, symbol: SymbolId, decl: &DeclInput, includes: SymbolFlags) {
+        let is_type_decl = is_type_declaration(includes);
         let s = &mut self.symbols[symbol.index()];
         s.flags.insert(includes);
-        s.decls.push(Decl { node: decl.node, error_span: decl.error_span, display: decl.display });
+        s.decls.push(Decl {
+            node: decl.node,
+            error_span: decl.error_span,
+            display: decl.display,
+            is_type_decl,
+        });
     }
 
     /// Emit the duplicate/conflict diagnostics for `decl` against `existing`.
@@ -370,7 +472,14 @@ impl<'a> SymbolBinder<'a> {
             file: Some(self.file),
             span,
             code,
-            category: Category::Message,
+            // The two `export default` related codes are `Error` category in tsgo's
+            // diagnosticMessages; `and here.` (6204) and the `Did you mean` hint
+            // (1369) are `Message`. (Category is unobservable in code+span grading;
+            // this stays faithful to the oracle.)
+            category: match code {
+                2752 | 2753 => Category::Error,
+                _ => Category::Message,
+            },
             message: message_for(code, None),
             args: Vec::new(),
             chain: Vec::new(),
@@ -608,6 +717,14 @@ impl<'a> SymbolBinder<'a> {
             }
             Statement::TSModuleDeclaration(m) => self.bind_module(m, mods),
             Statement::TSTypeAliasDeclaration(t) => {
+                // tsgo's `declareSymbolEx` adds a TS1369 "Did you mean
+                // 'export type { T }'?" related info when a conflicting declaration
+                // is `export type T;` — a type alias with a *missing* `= type`
+                // (binder.go:260). That shape is deliberately unported: tsv's parser
+                // rejects `export type T;` ("Expected '='"), so the declaration never
+                // reaches this cascade. The sole corpus baseline exercising the hint
+                // (`exportDeclaration_missingBraces.ts`) is therefore a tsv
+                // parse-rejection, not a gradeable bind.
                 let d = self.decl_from_ident(&t.id, t.span, mods);
                 self.declare_block_scoped(d, SymbolFlags::TYPE_ALIAS, SymbolFlags::TYPE_ALIAS_EXCLUDES);
                 self.bind_type_params_in_new_locals(t.type_parameters.as_ref());
@@ -1324,6 +1441,22 @@ impl<'a> SymbolBinder<'a> {
         };
         let sym = self.declare_block_scoped(d, inc, exc);
 
+        // Record cross-declaration-space augmentations for the merge phase — only
+        // top-level ones (container still the source file). `declare global {}` is
+        // a global-scope augmentation (its exports merge into globals);
+        // `declare module "X"` in an external module is a module augmentation
+        // (tsgo `IsModuleAugmentationExternal`, the `KindSourceFile` arm).
+        if self.container.kind == ContainerKind::SourceFile {
+            if m.global {
+                self.global_aug_symbols.push(sym);
+            } else if self.is_external
+                && let TSModuleName::Literal(lit) = &m.id
+            {
+                let unquoted = self.string_atom(lit);
+                self.module_augs.push((unquoted, lit.span));
+            }
+        }
+
         let saved = (self.container, self.block_scope);
         let locals = self.new_table();
         let scope = Scope {
@@ -1601,6 +1734,20 @@ fn var_flags(kind: tsv_ts::ast::internal::VariableDeclarationKind) -> (SymbolFla
             true,
         ),
     }
+}
+
+/// Whether a declaration's `includes` flags mark it a *type* declaration (tsgo
+/// `IsTypeDeclaration`: class / interface / enum / type-alias / type-parameter) —
+/// each of those flag families corresponds one-to-one to a type-declaration node
+/// kind. The merge's `undefined`-redeclaration check (TS2397) skips these.
+fn is_type_declaration(includes: SymbolFlags) -> bool {
+    includes.intersects(SymbolFlags(
+        SymbolFlags::CLASS.0
+            | SymbolFlags::INTERFACE.0
+            | SymbolFlags::ENUM.0
+            | SymbolFlags::TYPE_ALIAS.0
+            | SymbolFlags::TYPE_PARAMETER.0,
+    ))
 }
 
 /// Whether a statement is a function declaration (possibly `export`-wrapped) —

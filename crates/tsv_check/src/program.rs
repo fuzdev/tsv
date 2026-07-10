@@ -36,6 +36,7 @@
 use crate::binder::{bind_file, module_ness, ModuleNess};
 use crate::diag::{sort_and_deduplicate, Diagnostic};
 use crate::ids::FileId;
+use crate::merge::{merge_program, FileMerge};
 use bumpalo::Bump;
 use tsv_ts::ast::Program;
 use tsv_ts::{parse_with_goal, Goal};
@@ -143,6 +144,7 @@ pub fn check_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> CheckResu
     // parsed contributes its bind/check diagnostics, independent of a sibling's
     // rejection. A rejected unit has no AST, so it contributes none.
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut merges: Vec<FileMerge> = Vec::new();
     for attempt in &mut attempts {
         if let Some(program) = &attempt.program {
             let source = units[attempt.file.index()].source;
@@ -153,8 +155,15 @@ pub fn check_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> CheckResu
             let check_diags = check_file(&bound);
             diagnostics.extend(bound.diagnostics);
             diagnostics.extend(check_diags);
+            merges.push(bound.merge);
         }
     }
+    // The single-threaded global merge (checker-init phase) over every parsed
+    // file's bind product — cross-declaration-space conflicts, the
+    // globalThis/undefined checks, and module augmentations. Its diagnostics join
+    // the pool before the canonical sort (order-independent).
+    diagnostics.extend(merge_program(&merges));
+
     // Final caller-side sort + dedup over the whole program's diagnostics.
     let paths: Vec<String> = units.iter().map(|u| u.name.to_string()).collect();
     sort_and_deduplicate(&mut diagnostics, &paths);

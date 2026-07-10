@@ -390,6 +390,56 @@ mod tests {
     }
 
     #[test]
+    fn equality_and_order_ignore_message_text() {
+        // Message text is display-only — the comparer keys on `args`, never the
+        // rendered string (the template-catalog codegen is a later phase).
+        let p = paths();
+        let mut a = with_args(diag(Some(0), 0, 0, 2300), &["x"]);
+        a.message = "Duplicate identifier 'x'.".to_string();
+        let mut b = with_args(diag(Some(0), 0, 0, 2300), &["x"]);
+        b.message = "a completely different rendering".to_string();
+        assert!(equal_no_related_info(&a, &b, &p));
+        assert!(equal_diagnostics(&a, &b, &p));
+        assert_eq!(compare_diagnostics(&a, &b, &p), Ordering::Equal);
+    }
+
+    #[test]
+    fn depth_2_chain_recursion() {
+        // Two-level chains: outer -> mid -> leaf. Equal chains compare Equal;
+        // a differing leaf arg two levels down orders by that arg.
+        let p = paths();
+        let mid = with_chain(diag(Some(0), 0, 0, 2), vec![with_args(diag(Some(0), 0, 0, 3), &["x"])]);
+        let a = with_chain(diag(Some(0), 0, 0, 1), vec![mid.clone()]);
+        let b = with_chain(diag(Some(0), 0, 0, 1), vec![mid]);
+        assert!(equal_no_related_info(&a, &b, &p));
+        assert_eq!(compare_diagnostics(&a, &b, &p), Ordering::Equal);
+
+        let mid_y = with_chain(diag(Some(0), 0, 0, 2), vec![with_args(diag(Some(0), 0, 0, 3), &["y"])]);
+        let c = with_chain(diag(Some(0), 0, 0, 1), vec![mid_y]);
+        assert!(!equal_no_related_info(&a, &c, &p));
+        // Same chain sizes; the depth-2 content ("x" < "y") breaks the tie.
+        assert_eq!(compare_diagnostics(&a, &c, &p), Ordering::Less);
+    }
+
+    #[test]
+    fn depth_2_related_recursion() {
+        // Related info compares recursively as full diagnostics — including a
+        // related entry's own nested related.
+        let p = paths();
+        let outer_r = with_related(diag(Some(0), 3, 4, 5), vec![diag(Some(0), 7, 8, 9)]);
+        let a = with_related(diag(Some(0), 0, 0, 1), vec![outer_r.clone()]);
+        let b = with_related(diag(Some(0), 0, 0, 1), vec![outer_r]);
+        assert!(equal_diagnostics(&a, &b, &p));
+
+        // A differing nested related span breaks full equality — but related info
+        // is excluded from `equal_no_related_info`, so that stays true.
+        let outer_r2 = with_related(diag(Some(0), 3, 4, 5), vec![diag(Some(0), 100, 101, 9)]);
+        let c = with_related(diag(Some(0), 0, 0, 1), vec![outer_r2]);
+        assert!(!equal_diagnostics(&a, &c, &p));
+        assert!(equal_no_related_info(&a, &c, &p));
+    }
+
+    #[test]
     fn sort_is_stable_total_order() {
         let p = paths();
         let mut v = vec![

@@ -35,6 +35,16 @@
   program parse-rejection), the **parse-error short-circuit** (any unit
   rejects ⇒ zero bind/check diagnostics program-wide), per-file
   bind-then-check concatenation, final sort+dedup.
+- `merge.rs` — the single-threaded globals merge between bind and check,
+  ported from tsgo `initializeChecker`'s phase order (script locals +
+  globalThis check → global augmentations → undefined check → deferred
+  ambient modules → module augmentations), with `mergeSymbol` /
+  `reportMergeSymbolError` (the same three-way conflict selection as the
+  binder cascade), `getExcludedSymbolFlags`, and the `lookupOrIssueError`
+  dedup. Operates on scripts' file locals and `declare global` /
+  ambient-module augmentation exports — never an external module's locals.
+  Per-file `FileMerge` inputs are program-independent (owned strings,
+  declaration-order iteration — never map order).
 - `binder/` — the fused lower+bind pre-order walk: assigns dense 1-based
   `NodeId`s, fills SoA side columns (`parents`/`kinds`/`spans`/
   `subtree_end` — the latter makes descendant tests O(1) interval checks),
@@ -75,9 +85,10 @@ result is fully owned — nothing borrows out.
 - `tsv_debug tsc_conformance run` — the standing gate: sweeps the in-scope
   corpus (single-file, non-JSX, non-JS-flavored, non-skipped), grades
   expect-clean variants AND the bind/merge duplicate-conflict family
-  (TS2300/2451/2567/2528 + merge-path codes) as codes+spans multisets
-  (extra = 0 is a hard gate; missing is classified by deferred cause),
-  publishes the parse-divergence census; exact `RUN_*` pins.
+  (TS2300/2451/2567/2528 + merge-path TS2397/2649/2664/2671) as codes+spans
+  multisets (extra = 0 is a hard gate; missing is classified by deferred
+  cause), grades related-info on matched primaries as its own pinned
+  channel, and publishes the parse-divergence census; exact `RUN_*` pins.
 - `tsv_debug profile --bind <paths>` — parse vs lower+bind timing + peak
   RSS (VmHWM); the binder's standing perf anchor form.
 - `tsv_debug tsc_conformance check-test <name> [--variant k=v] [--json]` —

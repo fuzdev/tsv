@@ -31,8 +31,9 @@ impl NodeId {
     /// Build a `NodeId` from a 0-based dense index (`index + 1`).
     ///
     /// Total by construction: real ASTs never approach `u32::MAX` nodes, but a
-    /// wrap is clamped to [`NodeId::FIRST`] rather than panicking (the crate
-    /// forbids `unwrap`/`panic`).
+    /// wrap is clamped to [`NodeId::FIRST`] rather than panicking — the crate's
+    /// `unwrap_used` / `panic` clippy lints are warn-level, so this stays
+    /// panic-free by construction rather than by an `#[allow]` at a fallible call.
     #[inline]
     #[must_use]
     pub fn from_index(index: usize) -> NodeId {

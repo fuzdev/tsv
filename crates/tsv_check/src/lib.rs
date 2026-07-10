@@ -16,6 +16,7 @@
 //! source units (+ arena)
 //!   -> parse (goal rule: Module first, Script retry)   [program]
 //!   -> lower + bind (one fused pre-order walk per file) [binder]
+//!   -> merge (single-threaded global-scope fold)        [merge]
 //!   -> check (no-op skeleton)                           [program]
 //!   -> sort + dedup (tsgo's comparer)                   [diag]
 //!   -> owned diagnostics
@@ -31,6 +32,8 @@
 //! - [`diag`] — the `Diagnostic` shape and the canonical sort/dedup kernel.
 //! - `hash` (private) — the crate's Fx-style hasher and `FxHashMap`/`FxHashSet`.
 //! - `binder` (private) — the fused lower+bind pre-order walk.
+//! - [`merge`] — the single-threaded global-scope fold (cross-declaration-space
+//!   conflicts, `globalThis`/`undefined`, module augmentations).
 //! - `program` (private) — pipeline assembly and the parse-error short-circuit.
 //!
 //! ## Reference-anchor convention
@@ -45,6 +48,7 @@ mod program;
 
 pub mod diag;
 pub mod ids;
+pub mod merge;
 
 pub use binder::{
     bind_file, module_ness, BoundFile, FileFacts, ModuleNess, NodeKind,

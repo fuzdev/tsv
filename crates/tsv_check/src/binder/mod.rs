@@ -40,6 +40,7 @@ mod sym;
 use crate::diag::Diagnostic;
 use crate::hash::FxHashMap;
 use crate::ids::{FileId, NodeId};
+use crate::merge::FileMerge;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{ForInOfLeft, ForInit};
 use tsv_ts::ast::{Expression, Program, Statement, VariableDeclaration, VariableDeclarator};
@@ -131,6 +132,9 @@ pub struct BoundFile {
     pub diagnostics: Vec<Diagnostic>,
     /// Per-file facts.
     pub facts: FileFacts,
+    /// The program-independent merge product ([`crate::merge`] folds these across
+    /// files into the global scope).
+    pub merge: FileMerge,
 }
 
 impl BoundFile {
@@ -309,7 +313,7 @@ pub fn bind_file<'arena>(
     let facts = FileFacts { module_ness: module_ness(program) };
 
     // Pass 2: the symbol bind (functions-first, container-threaded).
-    let diagnostics = {
+    let (diagnostics, merge) = {
         let interner = program.interner.borrow();
         let mut binder = sym::SymbolBinder::new(source, &interner, &walk.address_map, file, facts);
         binder.bind_program(program);
@@ -326,6 +330,7 @@ pub fn bind_file<'arena>(
         address_map: walk.address_map,
         diagnostics,
         facts,
+        merge,
     }
 }
 

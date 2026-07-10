@@ -32,7 +32,7 @@
 // tsgo: internal/compiler/program.go GetDiagnosticsOfAnyProgram (the pipeline)
 // tsgo: internal/testrunner/compiler_runner.go (the in-scope selection)
 
-use crate::tsc_conformance::baseline::parse_summary_block;
+use crate::tsc_conformance::baseline::{parse_baseline, parse_summary_block};
 use crate::tsc_conformance::corpus::{discover_corpus, read_corpus_file, CorpusTest};
 use crate::tsc_conformance::directives::{extract_settings, split_units, Unit};
 use crate::tsc_conformance::discovery::{baselines_dir, discover_baselines, Baseline};
@@ -128,6 +128,8 @@ pub struct CleanFail {
 pub struct PanicRecord {
     /// The corpus test's relative path.
     pub test: String,
+    /// The panic payload's message (downcast to `&str`/`String`), for triage.
+    pub payload: String,
 }
 
 /// The skeleton sweep report.
@@ -162,6 +164,22 @@ pub struct SkeletonReport {
     pub family_extra: usize,
     /// Right code + file, wrong position (greedy-paired).
     pub family_span_mismatch: usize,
+
+    // --- related-info grading (its own pinned channel; does NOT gate the
+    // per-variant primary verdict) — graded only for matched primaries ---
+    /// Related-info entries that matched (code, file, line, col).
+    pub related_match: usize,
+    /// Baseline related entries with no matching related of ours.
+    pub related_missing: usize,
+    /// Related entries we emit the baseline lacks.
+    pub related_extra: usize,
+    /// Right code + file, wrong position (greedy-paired).
+    pub related_span_mismatch: usize,
+    /// Sample related over-emissions.
+    pub related_extra_samples: Vec<String>,
+    /// Sample related misses.
+    pub related_missing_samples: Vec<String>,
+
     /// ...missing attributed to the merge phase (TS2397/2649/2664/2671).
     pub missing_merge: usize,
     /// ...missing attributed to absent lib binding (a `LIB_CONFLICT_BASELINES` test).
@@ -314,6 +332,18 @@ fn probe_crash_exclusion(test: &CorpusTest) -> bool {
     panicked
 }
 
+/// Extract a caught panic payload's message (the `&str` / `String` cases the
+/// standard panic machinery produces).
+fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "(non-string panic payload)".to_string()
+    }
+}
+
 /// Parse+check one single-file test once and attribute the outcome to each of
 /// its in-scope variants.
 fn grade_test(
@@ -328,9 +358,15 @@ fn grade_test(
     let checked = catch_unwind(AssertUnwindSafe(|| {
         check_program(&[SourceUnit::new(&unit.name, &unit.content)], &arena)
     }));
-    let Ok(result) = checked else {
-        report.panics.push(PanicRecord { test: test.relative_path.clone() });
-        return;
+    let result = match checked {
+        Ok(result) => result,
+        Err(payload) => {
+            report.panics.push(PanicRecord {
+                test: test.relative_path.clone(),
+                payload: panic_payload_message(&*payload),
+            });
+            return;
+        }
     };
 
     // The single unit's parse outcome (files is never empty for one input).
@@ -338,22 +374,35 @@ fn grade_test(
 
     // Our family diagnostics are variant-independent (the checker consults no
     // directives, and module-ness is inert for the cascade), so build the
-    // (file, line, col, code) multiset once per test via the unit's line map.
-    let ours_family: Vec<FamilyDiag> = if matches!(file.parse, ParseReport::Parsed(_)) {
+    // (file, line, col, code) multiset — plus each diagnostic's related info —
+    // once per test via the unit's line map.
+    let ours_family: Vec<FamilyEntry> = if matches!(file.parse, ParseReport::Parsed(_)) {
         let (tracker, map) = LocationTracker::new_ecmascript_with_map(&unit.content);
         let mapper = LocationMapper { tracker: &tracker, map: &map };
+        let family = |code: u32, span: tsv_lang::Span, file_name: &str| {
+            let (_, pos) = mapper.pos_and_position(span.start);
+            (pos.line as u32, pos.column as u32 + 1, code, file_name.to_string())
+        };
         result
             .diagnostics
             .iter()
             .filter(|d| FAMILY_CODES.contains(&d.code))
             .map(|d| {
-                let (_, pos) = mapper.pos_and_position(d.span.start);
-                FamilyDiag {
-                    file: unit.name.clone(),
-                    line: pos.line as u32,
-                    col: pos.column as u32 + 1,
-                    code: d.code,
-                }
+                let (line, col, code, file_name) = family(d.code, d.span, &unit.name);
+                // Single-file: every related node lives in the one unit.
+                let related = d
+                    .related
+                    .iter()
+                    .map(|r| {
+                        let (_, pos) = mapper.pos_and_position(r.span.start);
+                        RelatedKey {
+                            code: r.code,
+                            file: unit.name.clone(),
+                            loc: Some((pos.line as u32, pos.column as u32 + 1)),
+                        }
+                    })
+                    .collect();
+                FamilyEntry { key: FamilyDiag { file: file_name, line, col, code }, related }
             })
             .collect()
     } else {
@@ -418,33 +467,52 @@ struct FamilyDiag {
     code: u32,
 }
 
+/// One related-info entry in baseline coordinates: `(code, file, location)`. A
+/// `--,--` (default-library) location is [`None`] and compares by code+file only.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct RelatedKey {
+    code: u32,
+    file: String,
+    loc: Option<(u32, u32)>,
+}
+
+/// A family primary plus its related-info entries — the unit the related-info
+/// channel grades (a matched primary's related sets are compared as multisets).
+struct FamilyEntry {
+    key: FamilyDiag,
+    related: Vec<RelatedKey>,
+}
+
 /// Grade one parsed-with-baseline variant's family diagnostics against its
 /// baseline, folding the buckets into `report`. Applies predicate v1 rule (a)
-/// (recovery-AST carve-out) first.
+/// (recovery-AST carve-out) first, then the primary-code channel and — for the
+/// matched primaries — the independent related-info channel.
 fn grade_family(
     test: &CorpusTest,
     name: &str,
     baseline: &Baseline,
-    ours: &[FamilyDiag],
+    ours: &[FamilyEntry],
     report: &mut SkeletonReport,
 ) {
     let Ok(content) = std::fs::read_to_string(&baseline.path) else { return };
-    let base_all = parse_summary_block(&content);
+    let base_all = parse_base_diags(&content);
 
     // Predicate v1 rule (a): tsv parses clean (it did — this variant parsed) and
     // the baseline carries a non-bind TS1xxx code -> recovery-AST incomparable.
-    let has_nonbind_ts1xxx = base_all
+    let has_nonbind_ts1xxx = base_all.iter().any(|d| {
+        (1000..2000).contains(&d.code)
+            && u32::try_from(d.code).is_ok_and(|c| !BIND_EMITTED_TS1XXX.contains(&c))
+    });
+    let base_family: Vec<FamilyEntry> = base_all
         .iter()
-        .any(|d| (1000..2000).contains(&d.code) && !BIND_EMITTED_TS1XXX.contains(&d.code));
-    let base_family: Vec<FamilyDiag> = base_all
-        .iter()
-        .filter(|d| FAMILY_CODES.contains(&d.code))
         .filter_map(|d| {
-            Some(FamilyDiag {
-                file: d.file.clone()?,
-                line: d.line?,
-                col: d.col?,
-                code: d.code,
+            let code = u32::try_from(d.code).ok()?;
+            if !FAMILY_CODES.contains(&code) {
+                return None;
+            }
+            Some(FamilyEntry {
+                key: FamilyDiag { file: d.file.clone()?, line: d.line?, col: d.col?, code },
+                related: d.related.clone(),
             })
         })
         .collect();
@@ -463,7 +531,9 @@ fn grade_family(
         report.family_positive_variants += 1;
     }
 
-    let buckets = family_buckets(ours, &base_family);
+    let ours_keys: Vec<FamilyDiag> = ours.iter().map(|e| e.key.clone()).collect();
+    let base_keys: Vec<FamilyDiag> = base_family.iter().map(|e| e.key.clone()).collect();
+    let buckets = family_buckets(&ours_keys, &base_keys);
     report.family_match += buckets.matched;
     report.family_span_mismatch += buckets.span_mismatch;
     report.family_extra += buckets.extra;
@@ -490,6 +560,181 @@ fn grade_family(
                     .push(format!("{}/{name} TS{code} x{count}", test.suite));
             }
         }
+    }
+
+    // The related-info channel (independent of the primary verdict): grade related
+    // multisets only for the primaries that matched.
+    let rel = grade_related(ours, &base_family);
+    report.related_match += rel.matched;
+    report.related_span_mismatch += rel.span_mismatch;
+    report.related_extra += rel.extra;
+    report.related_missing += rel.missing;
+    if rel.extra > 0 && report.related_extra_samples.len() < 20 {
+        report.related_extra_samples.push(format!("{}/{name} (+{})", test.suite, rel.extra));
+    }
+    if rel.missing > 0 && report.related_missing_samples.len() < 20 {
+        report.related_missing_samples.push(format!("{}/{name} (-{})", test.suite, rel.missing));
+    }
+}
+
+/// A baseline summary diagnostic with its parsed related-info entries.
+struct BaseDiag {
+    file: Option<String>,
+    line: Option<u32>,
+    col: Option<u32>,
+    /// The `TS<code>` (i32 — the harness's `TS-1` and non-family codes appear here).
+    code: i32,
+    related: Vec<RelatedKey>,
+}
+
+/// Parse a baseline into summary diagnostics with related info, via the full
+/// [`parse_baseline`] model (100% of the pinned baselines round-trip through it).
+/// Falls back to the related-free summary parse on the rare structural surprise,
+/// so the primary channel never shifts.
+fn parse_base_diags(content: &str) -> Vec<BaseDiag> {
+    use crate::tsc_conformance::baseline::Loc;
+    match parse_baseline(content) {
+        Ok(parsed) => parsed
+            .diags
+            .iter()
+            .map(|d| {
+                let (line, col) = match d.loc {
+                    Some(Loc::Numbered { line, col }) => (Some(line), Some(col)),
+                    _ => (None, None),
+                };
+                let related = d.related.iter().filter_map(|s| parse_related_line(s)).collect();
+                BaseDiag { file: d.file.clone(), line, col, code: d.code, related }
+            })
+            .collect(),
+        Err(_) => parse_summary_block(content)
+            .into_iter()
+            .map(|d| BaseDiag {
+                file: d.file,
+                line: d.line,
+                col: d.col,
+                code: d.code as i32,
+                related: Vec::new(),
+            })
+            .collect(),
+    }
+}
+
+/// Parse one `!!! related TS<code> <file>:<line>:<col>: <msg>` line into a
+/// [`RelatedKey`], or `None` for a chain-continuation line (no `!!! related`
+/// prefix). A `--:--` location parses to [`None`] (a masked default-lib position).
+fn parse_related_line(line: &str) -> Option<RelatedKey> {
+    let rest = line.strip_prefix("!!! related TS")?;
+    let end = rest.find(|c: char| !c.is_ascii_digit())?;
+    let code: u32 = rest.get(..end)?.parse().ok()?;
+    let after = rest.get(end..)?.strip_prefix(' ')?; // `<file>:<line>:<col>: <msg>`
+    // The first `": "` separates the location from the message (a filename holds
+    // no space, and line/col are digits-or-`--`).
+    let boundary = after.find(": ")?;
+    let locpart = after.get(..boundary)?; // `<file>:<line>:<col>`
+    let (rest2, col) = locpart.rsplit_once(':')?;
+    let (file, line_s) = rest2.rsplit_once(':')?;
+    let loc = if line_s == "--" && col == "--" {
+        None
+    } else {
+        Some((line_s.parse().ok()?, col.parse().ok()?))
+    };
+    Some(RelatedKey { code, file: file.to_string(), loc })
+}
+
+/// The related-info buckets across a variant's matched primaries.
+#[derive(Default)]
+struct RelatedBuckets {
+    matched: usize,
+    extra: usize,
+    span_mismatch: usize,
+    missing: usize,
+}
+
+/// Grade related-info multisets for the primaries that match by
+/// `(file,line,col,code)`. Ours and the baseline are grouped by primary key;
+/// matched primaries are paired positionally and their related sets diffed
+/// (exact `(code,file,loc)` match, masked `--,--` by `(code,file)`, then
+/// `(code,file)` span-mismatch pairing of the leftovers).
+fn grade_related(ours: &[FamilyEntry], base: &[FamilyEntry]) -> RelatedBuckets {
+    let mut ours_by: HashMap<&FamilyDiag, Vec<&[RelatedKey]>> = HashMap::new();
+    for e in ours {
+        ours_by.entry(&e.key).or_default().push(&e.related);
+    }
+    let mut base_by: HashMap<&FamilyDiag, Vec<&[RelatedKey]>> = HashMap::new();
+    for e in base {
+        base_by.entry(&e.key).or_default().push(&e.related);
+    }
+
+    let mut out = RelatedBuckets::default();
+    for (key, ours_sets) in &ours_by {
+        let Some(base_sets) = base_by.get(key) else { continue };
+        let paired = ours_sets.len().min(base_sets.len());
+        for i in 0..paired {
+            related_diff(ours_sets[i], base_sets[i], &mut out);
+        }
+    }
+    out
+}
+
+/// Diff one matched primary's related multisets, folding into `out`.
+fn related_diff(ours: &[RelatedKey], base: &[RelatedKey], out: &mut RelatedBuckets) {
+    // Exact `(code,file,loc)` matches first.
+    let mut ours_counts: HashMap<&RelatedKey, usize> = HashMap::new();
+    for r in ours {
+        *ours_counts.entry(r).or_default() += 1;
+    }
+    let mut base_counts: HashMap<&RelatedKey, usize> = HashMap::new();
+    for r in base {
+        *base_counts.entry(r).or_default() += 1;
+    }
+    // Leftovers grouped by `(code, file)` for masked-match and span-mismatch pairing.
+    let mut left_ours: HashMap<(u32, &str), usize> = HashMap::new();
+    let mut left_base_located: HashMap<(u32, &str), usize> = HashMap::new();
+    let mut left_base_masked: HashMap<(u32, &str), usize> = HashMap::new();
+
+    for (r, &oc) in &ours_counts {
+        let bc = base_counts.get(*r).copied().unwrap_or(0);
+        let m = oc.min(bc);
+        out.matched += m;
+        if oc > m {
+            *left_ours.entry((r.code, r.file.as_str())).or_default() += oc - m;
+        }
+    }
+    for (r, &bc) in &base_counts {
+        let oc = ours_counts.get(*r).copied().unwrap_or(0);
+        let m = oc.min(bc);
+        if bc > m {
+            let bucket = if r.loc.is_none() { &mut left_base_masked } else { &mut left_base_located };
+            *bucket.entry((r.code, r.file.as_str())).or_default() += bc - m;
+        }
+    }
+
+    // Masked baseline related (default-lib `--,--`) matches ours by `(code,file)`.
+    for (key, bcount) in &mut left_base_masked {
+        if let Some(ocount) = left_ours.get_mut(key) {
+            let m = (*ocount).min(*bcount);
+            out.matched += m;
+            *ocount -= m;
+            *bcount -= m;
+        }
+    }
+
+    // Remaining located leftovers: `(code,file)` pairing = span mismatch; the rest
+    // is extra (ours) / missing (baseline).
+    let keys: std::collections::HashSet<(u32, &str)> = left_ours
+        .keys()
+        .chain(left_base_located.keys())
+        .chain(left_base_masked.keys())
+        .copied()
+        .collect();
+    for key in keys {
+        let oc = left_ours.get(&key).copied().unwrap_or(0);
+        let bc = left_base_located.get(&key).copied().unwrap_or(0)
+            + left_base_masked.get(&key).copied().unwrap_or(0);
+        let sm = oc.min(bc);
+        out.span_mismatch += sm;
+        out.extra += oc - sm;
+        out.missing += bc - sm;
     }
 }
 
@@ -602,6 +847,17 @@ impl SkeletonReport {
         println!("    check-time (S3+):      {} (checker-emitted TS2300/2451: duplicate members, type params, computed/private names)", self.missing_other);
         println!("  extra (GATE=0):          {}", self.family_extra);
         println!("  span_mismatch:           {}", self.family_span_mismatch);
+        println!("Related-info (matched primaries; own channel, non-gating)");
+        println!("  related match:           {}", self.related_match);
+        println!("  related missing:         {}", self.related_missing);
+        println!("  related extra:           {}", self.related_extra);
+        println!("  related span_mismatch:   {}", self.related_span_mismatch);
+        for s in &self.related_missing_samples {
+            println!("  REL-MISSING {s}");
+        }
+        for s in &self.related_extra_samples {
+            println!("  REL-EXTRA {s}");
+        }
         println!("Carve-out rule (a):        {}", self.carve_out_rule_a);
         println!("  ...family-positive:      {}", self.carve_out_rule_a_family);
         println!("moduleDetection variants:  {} (watch; inert for family)", self.module_detection_variants);
@@ -628,7 +884,7 @@ impl SkeletonReport {
             }
         }
         for p in &self.panics {
-            println!("  PANIC {}", p.test);
+            println!("  PANIC {} — {}", p.test, p.payload);
         }
     }
 }
