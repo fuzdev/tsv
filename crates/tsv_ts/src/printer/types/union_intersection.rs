@@ -8,8 +8,9 @@
 use super::super::comments_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, is_hugging_union_type_arg, should_hug_union_type,
-    type_needs_parens_in_union_or_intersection, type_never_needs_parens, unwrap_parenthesized,
+    intersection_has_huggable_last_type, is_huggable_type, is_hugging_union_type_arg,
+    should_hug_union_type, type_needs_parens_in_union_or_intersection, type_never_needs_parens,
+    unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
@@ -752,13 +753,9 @@ impl<'a> Printer<'a> {
         // Break: A &
         //            B &
         //            C
-        //
-        // Special case: when a boundary type is huggable (TypeLiteral/MappedType at first
-        // or last position in a 2-type intersection), use a space instead of line() to
-        // keep `& {` or `} &` hugged. The TypeLiteral handles its own expansion.
-        let last_idx = intersection.types.len() - 1;
-        let is_huggable_pair =
-            intersection.types.len() == 2 && (last_is_huggable || first_is_expanding);
+        // The per-member separator/indent below (object-adjacency + `was_indented`)
+        // keeps a huggable boundary (`& {` / `} &`) space-hugged and un-indented —
+        // uniformly, whether the object is first, middle, or last.
 
         // Build first type separately (not indented)
         let mut first_parts = DocBuf::new();
@@ -812,73 +809,71 @@ impl<'a> Printer<'a> {
         //       a: A;
         //   } & B &
         //       C;
-        let first_expanding_multi =
-            first_is_expanding && !is_huggable_pair && intersection.types.len() > 2;
-        if first_expanding_multi {
-            let mut parts = first_parts;
-
-            for (i, _) in intersection.types.iter().enumerate().skip(1) {
-                let body = self.build_intersection_member_body_doc(intersection, i);
-                let sep = if i == 1 { d.text(" ") } else { d.line() };
-                let mut member: DocBuf = smallvec![sep];
-                member.extend(body);
-
-                if i == 1 {
-                    // Hugged to first type: no indent
-                    parts.extend(member);
-                } else {
-                    // Per-member indent
-                    parts.push(d.indent(d.concat(&member)));
-                }
-            }
-
-            // Always need a group for line() in index 2+ members
-            return d.group(d.concat(&parts));
-        }
-
-        // Build continuation types (indented when breaking)
-        let mut continuation_parts = DocBuf::new();
-
-        for (i, _) in intersection.types.iter().enumerate().skip(1) {
-            let is_last = i == last_idx;
-
-            // Huggable pair: always space (TypeLiteral handles its own expansion)
-            // Multi-type with huggable last: space only for the last type
-            if is_huggable_pair || (is_last && last_is_huggable) {
-                continuation_parts.push(d.text(" "));
-            } else {
-                continuation_parts.push(d.line());
-            }
-
-            continuation_parts.extend(self.build_intersection_member_body_doc(intersection, i));
-        }
-
-        // Combine: first_parts + continuation
+        // Continuation members follow Prettier's `printIntersectionType`
+        // (`intersection-type.js`) per boundary between member `i - 1` and `i`:
         //
-        // Indentation logic — the first member always stays at base (on the `=`/opening
-        // line); only the `&`-continuations indent, matching Prettier's
-        // `printIntersectionType`. Every layout owns this indent EXCEPT a 2-type huggable
-        // pair (`A & {b}`), which space-hugs and lets the boundary object expand itself.
-        // Owning the indent here — rather than letting the hanging callers wrap the whole
-        // doc in `indent(...)` — keeps a first member that breaks internally at base
-        // instead of double-indenting it.
+        // - **neither is an object** — a breakable `line` and the member indented
+        //   (`indent([" &", line, doc])`); this is the only spot the intersection
+        //   itself breaks.
+        // - **object-adjacent** (a transition object↔non-object, or object↔object)
+        //   — a hard `& ` (never breaks; the object owns its own expansion), and the
+        //   member indented only once the `was_indented` latch is set.
+        //
+        // `was_indented` mirrors Prettier's flag: it flips on the first *transition
+        // past index 1*, and gates the indent of every object-adjacent member. So an
+        // object hugging the first member (`A & { … }`) — or a run of objects
+        // starting at index 1 (`A & { … } & { … }`) — stays at base and its body
+        // indents just one level, while a `}`→non-object tail and every later member
+        // carry the continuation indent. `is_huggable_type` is Prettier's
+        // `isObjectType` (`TSTypeLiteral`/`TSMappedType`), read on the raw member (no
+        // paren-unwrap) to match Prettier's node check.
+        //
+        // This subsumes the old huggable-pair / last-huggable separator special-cases
+        // and the blanket `indent(continuations)`; the first member always stays at
+        // base (built into `first_parts`), so a first member that breaks internally
+        // is never double-indented.
         let mut parts = first_parts;
-        let has_non_huggable_continuations = last_is_huggable && intersection.types.len() > 2;
-        let indent_continuations = !is_huggable_pair;
-        if !continuation_parts.is_empty() {
-            if indent_continuations {
-                parts.push(d.indent(d.concat(&continuation_parts)));
+        let mut was_indented = false;
+        let mut needs_group = wrap_in_group;
+        for i in 1..intersection.types.len() {
+            let prev_is_object = is_huggable_type(&intersection.types[i - 1]);
+            let cur_is_object = is_huggable_type(&intersection.types[i]);
+            let neither_is_object = !prev_is_object && !cur_is_object;
+
+            let sep = if neither_is_object {
+                // A breakable line is the only thing that needs the group to choose
+                // between flat and broken.
+                needs_group = true;
+                d.line()
             } else {
-                // Huggable-only pair (`A & {b}`) or a caller-indented context - no internal indent
-                parts.extend(continuation_parts);
+                d.text(" ")
+            };
+
+            let indent_member = if neither_is_object {
+                true
+            } else if prev_is_object && cur_is_object {
+                was_indented
+            } else {
+                // object↔non-object transition: indented (and opens the latch) only
+                // past index 1; the index-1 transition hugs the first member at base.
+                if i > 1 {
+                    was_indented = true;
+                    true
+                } else {
+                    false
+                }
+            };
+
+            let mut member: DocBuf = smallvec![sep];
+            member.extend(self.build_intersection_member_body_doc(intersection, i));
+            if indent_member {
+                parts.push(d.indent(d.concat(&member)));
+            } else {
+                parts.extend(member);
             }
         }
 
-        // Need a group when:
-        // - wrap_in_group requested by caller, OR
-        // - non-huggable continuations exist (line() between them needs a group
-        //   to go flat when content fits on one line)
-        if wrap_in_group || has_non_huggable_continuations {
+        if needs_group {
             d.group(d.concat(&parts))
         } else {
             d.concat(&parts)
