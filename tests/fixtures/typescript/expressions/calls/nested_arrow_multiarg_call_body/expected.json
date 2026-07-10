@@ -1,0 +1,1064 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 688,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Multi-arg call whose last arg is an arrow with a call body: the expand-last",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " break-body state (head arg stays inline, arrow body breaks after =>).",
+			"start": 100,
+			"end": 172,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multi-arg arrow with a CONDITIONAL (ternary) body: parens inline, breaks after =>.",
+			"start": 310,
+			"end": 395,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested multi-arg arrow-call bodies stay inline when they fit.",
+			"start": 541,
+			"end": 605,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 65
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 687,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 678,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 174,
+					"end": 307,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 180,
+							"end": 306,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 180,
+								"end": 181,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 184,
+								"end": 306,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 184,
+									"end": 193,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 11
+										},
+										"end": {
+											"line": 4,
+											"column": 20
+										}
+									},
+									"name": "subscribe"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 194,
+										"end": 206,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 21
+											},
+											"end": {
+												"line": 4,
+												"column": 33
+											}
+										},
+										"name": "initialState"
+									},
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 208,
+										"end": 303,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 35
+											},
+											"end": {
+												"line": 5,
+												"column": 84
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 209,
+												"end": 214,
+												"loc": {
+													"start": {
+														"line": 4,
+														"column": 36
+													},
+													"end": {
+														"line": 4,
+														"column": 41
+													}
+												},
+												"name": "value"
+											}
+										],
+										"body": {
+											"type": "CallExpression",
+											"start": 221,
+											"end": 303,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 2
+												},
+												"end": {
+													"line": 5,
+													"column": 84
+												}
+											},
+											"callee": {
+												"type": "Identifier",
+												"start": 221,
+												"end": 230,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 2
+													},
+													"end": {
+														"line": 5,
+														"column": 11
+													}
+												},
+												"name": "transform"
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 231,
+													"end": 236,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 12
+														},
+														"end": {
+															"line": 5,
+															"column": 17
+														}
+													},
+													"name": "value"
+												},
+												{
+													"type": "Identifier",
+													"start": 238,
+													"end": 253,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 19
+														},
+														"end": {
+															"line": 5,
+															"column": 34
+														}
+													},
+													"name": "contextValueOne"
+												},
+												{
+													"type": "Identifier",
+													"start": 255,
+													"end": 270,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 36
+														},
+														"end": {
+															"line": 5,
+															"column": 51
+														}
+													},
+													"name": "contextValueTwo"
+												},
+												{
+													"type": "Identifier",
+													"start": 272,
+													"end": 289,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 53
+														},
+														"end": {
+															"line": 5,
+															"column": 70
+														}
+													},
+													"name": "contextValueThree"
+												},
+												{
+													"type": "Identifier",
+													"start": 291,
+													"end": 302,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 72
+														},
+														"end": {
+															"line": 5,
+															"column": 83
+														}
+													},
+													"name": "contextFour"
+												}
+											],
+											"optional": false
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multi-arg call whose last arg is an arrow with a call body: the expand-last",
+							"start": 20,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " break-body state (head arg stays inline, arrow body breaks after =>).",
+							"start": 100,
+							"end": 172
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 397,
+					"end": 538,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 403,
+							"end": 537,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 403,
+								"end": 404,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 407,
+								"end": 537,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 407,
+									"end": 416,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 11
+										},
+										"end": {
+											"line": 9,
+											"column": 20
+										}
+									},
+									"name": "subscribe"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 417,
+										"end": 429,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 21
+											},
+											"end": {
+												"line": 9,
+												"column": 33
+											}
+										},
+										"name": "initialState"
+									},
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 431,
+										"end": 534,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 35
+											},
+											"end": {
+												"line": 10,
+												"column": 92
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 432,
+												"end": 437,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 36
+													},
+													"end": {
+														"line": 9,
+														"column": 41
+													}
+												},
+												"name": "value"
+											}
+										],
+										"body": {
+											"type": "ConditionalExpression",
+											"start": 444,
+											"end": 534,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 2
+												},
+												"end": {
+													"line": 10,
+													"column": 92
+												}
+											},
+											"test": {
+												"type": "MemberExpression",
+												"start": 444,
+												"end": 455,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 2
+													},
+													"end": {
+														"line": 10,
+														"column": 13
+													}
+												},
+												"object": {
+													"type": "Identifier",
+													"start": 444,
+													"end": 449,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 2
+														},
+														"end": {
+															"line": 10,
+															"column": 7
+														}
+													},
+													"name": "value"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 450,
+													"end": 455,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 8
+														},
+														"end": {
+															"line": 10,
+															"column": 13
+														}
+													},
+													"name": "ready"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"consequent": {
+												"type": "CallExpression",
+												"start": 458,
+												"end": 522,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 16
+													},
+													"end": {
+														"line": 10,
+														"column": 80
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 458,
+													"end": 467,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 16
+														},
+														"end": {
+															"line": 10,
+															"column": 25
+														}
+													},
+													"name": "transform"
+												},
+												"arguments": [
+													{
+														"type": "Identifier",
+														"start": 468,
+														"end": 473,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 26
+															},
+															"end": {
+																"line": 10,
+																"column": 31
+															}
+														},
+														"name": "value"
+													},
+													{
+														"type": "Identifier",
+														"start": 475,
+														"end": 490,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 33
+															},
+															"end": {
+																"line": 10,
+																"column": 48
+															}
+														},
+														"name": "contextValueOne"
+													},
+													{
+														"type": "Identifier",
+														"start": 492,
+														"end": 507,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 50
+															},
+															"end": {
+																"line": 10,
+																"column": 65
+															}
+														},
+														"name": "contextValueTwo"
+													},
+													{
+														"type": "Identifier",
+														"start": 509,
+														"end": 521,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 67
+															},
+															"end": {
+																"line": 10,
+																"column": 79
+															}
+														},
+														"name": "contextThree"
+													}
+												],
+												"optional": false
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 525,
+												"end": 534,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 83
+													},
+													"end": {
+														"line": 10,
+														"column": 92
+													}
+												},
+												"name": "idleState"
+											}
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multi-arg arrow with a CONDITIONAL (ternary) body: parens inline, breaks after =>.",
+							"start": 310,
+							"end": 395
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 607,
+					"end": 677,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 71
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 613,
+							"end": 676,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 70
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 613,
+								"end": 614,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 617,
+								"end": 676,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 14,
+										"column": 70
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 617,
+									"end": 623,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 11
+										},
+										"end": {
+											"line": 14,
+											"column": 17
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 617,
+										"end": 618,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 11
+											},
+											"end": {
+												"line": 14,
+												"column": 12
+											}
+										},
+										"name": "p"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 619,
+										"end": 623,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 13
+											},
+											"end": {
+												"line": 14,
+												"column": 17
+											}
+										},
+										"name": "then"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 624,
+										"end": 631,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 18
+											},
+											"end": {
+												"line": 14,
+												"column": 25
+											}
+										},
+										"name": "handler"
+									},
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 633,
+										"end": 675,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 27
+											},
+											"end": {
+												"line": 14,
+												"column": 69
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 634,
+												"end": 635,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 28
+													},
+													"end": {
+														"line": 14,
+														"column": 29
+													}
+												},
+												"name": "x"
+											}
+										],
+										"body": {
+											"type": "CallExpression",
+											"start": 640,
+											"end": 675,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 34
+												},
+												"end": {
+													"line": 14,
+													"column": 69
+												}
+											},
+											"callee": {
+												"type": "MemberExpression",
+												"start": 640,
+												"end": 646,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 34
+													},
+													"end": {
+														"line": 14,
+														"column": 40
+													}
+												},
+												"object": {
+													"type": "Identifier",
+													"start": 640,
+													"end": 641,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 34
+														},
+														"end": {
+															"line": 14,
+															"column": 35
+														}
+													},
+													"name": "q"
+												},
+												"property": {
+													"type": "Identifier",
+													"start": 642,
+													"end": 646,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 36
+														},
+														"end": {
+															"line": 14,
+															"column": 40
+														}
+													},
+													"name": "then"
+												},
+												"computed": false,
+												"optional": false
+											},
+											"arguments": [
+												{
+													"type": "Identifier",
+													"start": 647,
+													"end": 654,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 41
+														},
+														"end": {
+															"line": 14,
+															"column": 48
+														}
+													},
+													"name": "handler"
+												},
+												{
+													"type": "ArrowFunctionExpression",
+													"start": 656,
+													"end": 674,
+													"loc": {
+														"start": {
+															"line": 14,
+															"column": 50
+														},
+														"end": {
+															"line": 14,
+															"column": 68
+														}
+													},
+													"id": null,
+													"expression": true,
+													"generator": false,
+													"async": false,
+													"params": [
+														{
+															"type": "Identifier",
+															"start": 657,
+															"end": 658,
+															"loc": {
+																"start": {
+																	"line": 14,
+																	"column": 51
+																},
+																"end": {
+																	"line": 14,
+																	"column": 52
+																}
+															},
+															"name": "y"
+														}
+													],
+													"body": {
+														"type": "CallExpression",
+														"start": 663,
+														"end": 674,
+														"loc": {
+															"start": {
+																"line": 14,
+																"column": 57
+															},
+															"end": {
+																"line": 14,
+																"column": 68
+															}
+														},
+														"callee": {
+															"type": "Identifier",
+															"start": 663,
+															"end": 671,
+															"loc": {
+																"start": {
+																	"line": 14,
+																	"column": 57
+																},
+																"end": {
+																	"line": 14,
+																	"column": 65
+																}
+															},
+															"name": "finalize"
+														},
+														"arguments": [
+															{
+																"type": "Identifier",
+																"start": 672,
+																"end": 673,
+																"loc": {
+																	"start": {
+																		"line": 14,
+																		"column": 66
+																	},
+																	"end": {
+																		"line": 14,
+																		"column": 67
+																	}
+																},
+																"name": "y"
+															}
+														],
+														"optional": false
+													}
+												}
+											],
+											"optional": false
+										}
+									}
+								],
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested multi-arg arrow-call bodies stay inline when they fit.",
+							"start": 541,
+							"end": 605
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

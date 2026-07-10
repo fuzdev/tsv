@@ -20,6 +20,7 @@ use super::arg_predicates::{
 use super::arg_wrapping::{
     ChainArgKind, build_args_split_last, build_arrow_sig_doc, build_break_body_state,
     build_chain_expand_all_args, classify_chain_arg, last_two_args_same_type,
+    prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, wrap_args_with_soft_breaks, wrap_huggable_arg,
 };
 use crate::ast::internal::{self, Expression};
@@ -1060,8 +1061,19 @@ fn build_chain_args_multi(
             Expression::CallExpression(_) | Expression::ConditionalExpression(_)
         )
     {
+        // Expand-last arrow with a call body: build the body ONCE and inject it so the
+        // whole-arrow arg doc reuses it (the break-body state below reuses it too) —
+        // building it in both places recurses into itself → O(2^depth).
+        let body_reuse =
+            prebuild_expand_last_break_body(printer, call.arguments.last(), has_any_comments);
+        let inject_prev = body_reuse.map(|(span, doc)| printer.inject_arrow_body(span, doc));
+
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
+
+        if let Some(prev) = inject_prev {
+            printer.restore_arrow_body_inject(prev);
+        }
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1070,7 +1082,9 @@ fn build_chain_args_multi(
         }
 
         let sig_doc = build_arrow_sig_doc(printer, arrow);
-        let body_doc = printer.build_expression_doc(body_expr);
+        // Reuse the pre-built call body (see above); conditional bodies build fresh.
+        let body_doc =
+            body_reuse.map_or_else(|| printer.build_expression_doc(body_expr), |(_, doc)| doc);
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 
@@ -1119,8 +1133,20 @@ fn build_chain_args_multi(
             Expression::ObjectExpression(_) | Expression::ArrayExpression(_)
         )
     {
+        // Expand-last arrow with an object/array body: build the body ONCE and inject it so
+        // the whole-arrow arg doc reuses it (the hug state below reuses it too) — building it
+        // in both places recurses into itself → O(2^depth).
+        let obj_reuse =
+            prebuild_expand_last_obj_array_body(printer, call.arguments.last(), has_any_comments);
+        let inject_prev =
+            obj_reuse.map(|(span, inject_doc, _)| printer.inject_arrow_body(span, inject_doc));
+
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
+
+        if let Some(prev) = inject_prev {
+            printer.restore_arrow_body_inject(prev);
+        }
 
         // Prettier: if (headArgs.some(willBreak)) return allArgsBrokenOut()
         if head_parts.iter().any(|&id| d.will_break(id)) {
@@ -1129,8 +1155,11 @@ fn build_chain_args_multi(
         }
 
         let sig_doc = build_arrow_sig_doc(printer, arrow);
-        // Object/array in arrow body needs parens: (x) => ({ ... })
-        let body_doc = d.parens(printer.build_expression_doc(body_expr));
+        // Reuse the pre-built object/array body (see above); `(x) => ({ ... })` parens included.
+        let body_doc = obj_reuse.map_or_else(
+            || d.parens(printer.build_expression_doc(body_expr)),
+            |(_, _, hug)| hug,
+        );
         let body_doc =
             prepend_arrow_body_comments(printer, arrow, body_expr.span().start, body_doc);
 

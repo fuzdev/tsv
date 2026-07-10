@@ -13,8 +13,11 @@ use super::arg_comments::{
     emit_first_arg_leading_comments, find_comma_pos, has_blank_line_between_args,
     is_inline_block_after_comma, is_inline_block_before_comma,
 };
-use super::arg_predicates::{is_block_function, is_short_second_arg_for_expand_first};
+use super::arg_predicates::{
+    arrow_body_is_call_through_non_null, is_block_function, is_short_second_arg_for_expand_first,
+};
 use crate::ast::internal;
+use crate::printer::expressions::functions::has_leftmost_object_expression;
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
@@ -380,6 +383,96 @@ pub(super) fn wrap_args_with_soft_breaks(d: &DocArena, prefix: &'static str, arg
 #[inline]
 pub(super) fn wrap_huggable_arg(d: &DocArena, prefix: &'static str, arg: DocId) -> DocId {
     d.group(d.concat(&[d.text(prefix), arg, d.softline(), d.text(")")]))
+}
+
+/// Build an arrow's expression body the same way the whole arrow's own body build does
+/// (`build_arrow_doc_wrapping` clears `arrow_chain_context` before building the body — a
+/// nested curried arrow in the body must not inherit the outer chain context), so the
+/// pre-built DocId is byte-identical to what the arrow would build.
+fn build_arrow_body_like_arrow(
+    printer: &Printer<'_>,
+    body_expr: &internal::Expression<'_>,
+) -> DocId {
+    let prev = printer.arrow_chain_context.replace(ArrowChainContext::None);
+    let doc = printer.build_expression_doc(body_expr);
+    printer.arrow_chain_context.set(prev);
+    doc
+}
+
+/// Pre-build an expand-last-arg arrow's **break-body-state** body **once** so the whole-arrow
+/// argument doc and the break-body state can share it, keeping the doc-node count linear
+/// instead of O(2^depth) (see the `arrow_body_inject` field on `Printer`).
+///
+/// Returns `(body-expr span start, body DocId)` when `last_arg` is an arrow whose expression
+/// body routes through `build_break_body_state` — a **call** (through a trailing `!`) or a
+/// **conditional** (ternary). The caller injects it via `Printer::inject_arrow_body` before
+/// `build_args_split_last`; the whole arrow reuses it (a call body via `build_arrow_body_doc`,
+/// a conditional body via the conditional arm of `build_arrow_expression_body`), and the
+/// break-body state reuses the same DocId. Leftmost-object conditionals are excluded — the
+/// whole arrow routes those through `build_arrow_body_doc`'s object-parens arm, not the
+/// conditional arm, so the injected raw wouldn't match. Returns `None` (unchanged behavior)
+/// when the last arg isn't such an arrow, or when the call carries any comment (the commented
+/// last-arg path composes the body differently; the exponential shapes are comment-free).
+pub(crate) fn prebuild_expand_last_break_body(
+    printer: &Printer<'_>,
+    last_arg: Option<&internal::Expression<'_>>,
+    call_has_comments: bool,
+) -> Option<(u32, DocId)> {
+    if call_has_comments {
+        return None;
+    }
+    if let Some(internal::Expression::ArrowFunctionExpression(arrow)) = last_arg
+        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+        && (arrow_body_is_call_through_non_null(body_expr)
+            || (matches!(&**body_expr, internal::Expression::ConditionalExpression(_))
+                && !has_leftmost_object_expression(body_expr)))
+    {
+        let body_doc = build_arrow_body_like_arrow(printer, body_expr);
+        return Some((body_expr.span().start, body_doc));
+    }
+    None
+}
+
+/// Pre-build an expand-last-arg arrow's **object/array** body once (the sibling of
+/// `prebuild_expand_last_break_body` for the object/array hug path). Returns
+/// `(body span, inject doc, hug body doc)`:
+/// - `inject doc` is what the whole arrow's `build_arrow_body_doc` produces for this body —
+///   `d.parens(obj)` for an object (the leftmost-object parens: `build_arrow_body_doc` wraps
+///   the whole-body object in `d.parens` exactly as this does), or the bare array doc for an
+///   array — and is injected so the whole-arrow arg doc reuses it;
+/// - `hug body doc` is `d.parens(body)`, matching the previous inline
+///   `d.parens(build_expression_doc(body))` the hug state wraps in `group_break`.
+///
+/// Both share the single body build, so `f(lead, x => ({{ k: f(lead, y => …) }}))` stays
+/// linear. Returns `None` (unchanged) when the last arg isn't an object/array-body arrow or
+/// the call carries comments.
+pub(crate) fn prebuild_expand_last_obj_array_body(
+    printer: &Printer<'_>,
+    last_arg: Option<&internal::Expression<'_>>,
+    call_has_comments: bool,
+) -> Option<(u32, DocId, DocId)> {
+    if call_has_comments {
+        return None;
+    }
+    let d = printer.d();
+    if let Some(internal::Expression::ArrowFunctionExpression(arrow)) = last_arg
+        && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
+    {
+        match &**body_expr {
+            internal::Expression::ObjectExpression(_) => {
+                let raw = build_arrow_body_like_arrow(printer, body_expr);
+                let parens = d.parens(raw);
+                Some((body_expr.span().start, parens, parens))
+            }
+            internal::Expression::ArrayExpression(_) => {
+                let raw = build_arrow_body_like_arrow(printer, body_expr);
+                Some((body_expr.span().start, raw, d.parens(raw)))
+            }
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
 
 /// Build argument docs split into head parts (with commas), last arg, and broken form

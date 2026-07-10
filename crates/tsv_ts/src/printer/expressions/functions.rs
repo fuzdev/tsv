@@ -87,7 +87,7 @@ fn leftmost_object_span(expr: &internal::Expression<'_>) -> Option<Span> {
 
 /// Whether an expression has an ObjectExpression at its leftmost position.
 /// See [`leftmost_object_span`].
-fn has_leftmost_object_expression(expr: &internal::Expression<'_>) -> bool {
+pub(in crate::printer) fn has_leftmost_object_expression(expr: &internal::Expression<'_>) -> bool {
     leftmost_object_span(expr).is_some()
 }
 
@@ -421,7 +421,17 @@ impl<'a> Printer<'a> {
             //
             // Flat:  ` => (cond ? a : b)` — parens, same line
             // Break: ` =>\n\tcond ? a : b` — no parens, next line
-            let body_doc = self.build_expression_doc(expr);
+            //
+            // Expand-last-arg body reuse: the multi-arg conditional-body break state builds
+            // this same ternary separately; reuse the pre-built DocId (span-keyed) to avoid an
+            // O(2^depth) double build when the ternary recurses. See the `arrow_body_inject` field.
+            let body_doc = if let Some((span, doc)) = self.arrow_body_inject.get()
+                && span == expr.span().start
+            {
+                doc
+            } else {
+                self.build_expression_doc(expr)
+            };
             if d.will_break(body_doc) {
                 // Body has hardlines (multiline template in ternary, etc.)
                 // Use normal break layout — no parens needed
@@ -876,6 +886,16 @@ impl<'a> Printer<'a> {
 
     /// Build doc for arrow function body expression.
     fn build_arrow_body_doc(&self, expr: &internal::Expression<'_>) -> DocId {
+        // Expand-last-arg body reuse: when the enclosing call/new expand-last path has
+        // pre-built this exact body (to also compose the break-body state), reuse that
+        // DocId instead of rebuilding — rebuilding here *and* separately recurses into
+        // itself for `f(lead, x => f(lead, y => …))`, making the doc-node count
+        // O(2^depth). See the `arrow_body_inject` field.
+        if let Some((span, doc)) = self.arrow_body_inject.get()
+            && span == expr.span().start
+        {
+            return doc;
+        }
         let d = self.d();
         // Object at leftmost position in arrow body needs parens to avoid block ambiguity.
         // Examples: `() => ({}) as T`, `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`.
