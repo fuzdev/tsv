@@ -808,9 +808,12 @@ cargo run -p tsv_debug tsc_conformance query denominators        # test-identity
 cargo run -p tsv_debug tsc_conformance roundtrip                 # full self-check (all baselines)
 deno task conformance:tsc-roundtrip                              # the same, as a deno task
 cargo run -p tsv_debug tsc_conformance roundtrip compiler/async  # filter by path substring (skips the pins)
-# Options: --path, --json, --verbose (list every failing path). A full (unfiltered)
-# run enforces two exact regression pins — total baselines and byte-identical count —
-# and fails the process on drift; a re-pin is deliberate (a code change or a tsgo pull).
+# Options: --path, --json, --verbose (list every failing path). The 14 ANSI
+# `pretty=true` baselines (a separate renderer path) are carved out of the
+# denominator, so in-scope round-trip is 100%. A full (unfiltered) run enforces
+# three exact pins — total baselines, in-scope byte-identical count, and the pretty
+# carve-out count — plus an in-scope-100% invariant, failing on any drift; a re-pin
+# is deliberate (a code change or a tsgo pull).
 ```
 
 `roundtrip` is a **leg of `deno task conformance`** (the pre-release aggregate) and
