@@ -7,16 +7,19 @@
 //! salient format feature (the P0 work-list); the pass count is a two-sided
 //! regression pin.
 //!
-//! Scope (measured vs pin `168e7015`): the ANSI-colored `pretty=true` baselines are
-//! a separate renderer path (not the ported `pretty=false` rune path), so they are
-//! **carved out of the denominator** — excluded from `files_checked`, counted under
-//! `pretty_carved_out`, and pinned so the set can't drift silently. In-scope
-//! round-trip is 100%; the carve-out is surfaced explicitly, not hidden by loosening
-//! the comparison. (Related-info diagnostics that carry their own message chain —
-//! once a residual — are now recovered by [`super::baseline`]'s continuation capture.)
+//! Scope (measured vs pin `168e7015`): every baseline is in scope. The plain
+//! `pretty=false` baselines go through [`super::baseline`] + [`super::render`];
+//! the ANSI-colored `pretty=true` baselines go through [`super::pretty`] (its own
+//! model, parser, and colored renderer). The count that took the pretty path is
+//! tracked (`pretty_path`) and pinned so the set can't drift silently, but both
+//! paths fold into the single `byte_identical` denominator — the in-scope
+//! round-trip is 100% across all baselines. (Related-info diagnostics that carry
+//! their own message chain — once a residual — are recovered by
+//! [`super::baseline`]'s continuation capture.)
 
 use super::baseline::parse_baseline;
 use super::discovery::Baseline;
+use super::pretty::{parse_pretty, render_pretty};
 use super::render::{render_baseline, self_assertion_violations};
 use std::collections::BTreeMap;
 
@@ -57,22 +60,22 @@ pub struct BucketCount {
 /// The round-trip report.
 #[derive(Debug, serde::Serialize)]
 pub struct RoundtripReport {
-    /// All `.errors.txt` baselines discovered (the in-scope set plus the carve-out).
+    /// All `.errors.txt` baselines discovered — the full in-scope set.
     pub files_discovered: usize,
-    /// ANSI-colored `pretty=true` baselines carved out of scope: a separate
-    /// renderer path (not the ported rune path), excluded from the denominator
-    /// rather than counted as failures. Pinned, so the set can't drift silently.
-    pub pretty_carved_out: usize,
-    /// In-scope baselines checked (`files_discovered - pretty_carved_out`).
+    /// Baselines that took the ANSI-colored `pretty=true` path
+    /// ([`super::pretty`]) rather than the plain path. In scope and folded into
+    /// `byte_identical`; pinned, so the set can't drift silently.
+    pub pretty_path: usize,
+    /// In-scope baselines checked (all of them: `files_discovered`).
     pub files_checked: usize,
-    /// In-scope baselines that round-tripped byte-identically.
+    /// Baselines that round-tripped byte-identically (plain + pretty paths).
     pub byte_identical: usize,
     /// `byte_identical / files_checked * 100` (in-scope pass rate).
     pub pass_rate: f64,
     /// Baselines whose parsed model tripped a ported self-assertion (should be 0).
     pub self_assertion_violations: usize,
-    /// In-scope failure buckets, sorted by descending count (pretty is carved out
-    /// upstream, so it never appears here).
+    /// Failure buckets, sorted by descending count (a pretty failure buckets
+    /// under `pretty`).
     pub buckets: Vec<BucketCount>,
     /// Every failing baseline's path (sorted); only shown in `--verbose`.
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -82,7 +85,7 @@ pub struct RoundtripReport {
 /// Parse → render → byte-compare every baseline, folding results into a report.
 pub fn run_roundtrip(baselines: &[Baseline]) -> RoundtripReport {
     let mut byte_identical = 0usize;
-    let mut pretty_carved_out = 0usize;
+    let mut pretty_path = 0usize;
     let mut assertion_violations = 0usize;
     let mut bucket_map: BTreeMap<&'static str, Vec<FailExample>> = BTreeMap::new();
     let mut failing_paths: Vec<String> = Vec::new();
@@ -107,25 +110,37 @@ pub fn run_roundtrip(baselines: &[Baseline]) -> RoundtripReport {
             }
         };
 
-        // Carve out the ANSI-colored pretty=true baselines: a separate renderer
-        // path (out of the ported rune-path scope), excluded from the denominator
-        // as a deliberate scope bound — not a failure. The count is pinned, so the
-        // pretty set can't grow or shrink without a conscious re-pin.
-        if is_pretty(&content) {
-            pretty_carved_out += 1;
-            continue;
+        // The ANSI-colored pretty=true baselines take their own model + colored
+        // renderer; they stay in the denominator and are counted here so the set
+        // can't drift without a conscious re-pin.
+        let (parse_ok, rendered, assertion_hit) = if is_pretty(&content) {
+            pretty_path += 1;
+            match parse_pretty(&content) {
+                Ok(pb) => {
+                    let hit = !self_assertion_violations(&pb.base).is_empty();
+                    (true, render_pretty(&pb), hit)
+                }
+                Err(reason) => (false, Err(reason), false),
+            }
+        } else {
+            match parse_baseline(&content) {
+                Ok(parsed) => {
+                    let hit = !self_assertion_violations(&parsed).is_empty();
+                    (true, Ok(render_baseline(&parsed)), hit)
+                }
+                Err(reason) => (false, Err(reason), false),
+            }
+        };
+
+        if assertion_hit {
+            assertion_violations += 1;
         }
 
-        match parse_baseline(&content) {
-            Ok(parsed) => {
-                if !self_assertion_violations(&parsed).is_empty() {
-                    assertion_violations += 1;
-                }
-                let rendered = render_baseline(&parsed);
-                if rendered == content {
-                    byte_identical += 1;
-                } else {
-                    let (line, expected, got) = first_diff(&content, &rendered);
+        if parse_ok {
+            match rendered {
+                Ok(r) if r == content => byte_identical += 1,
+                Ok(r) => {
+                    let (line, expected, got) = first_diff(&content, &r);
                     record(
                         &mut bucket_map,
                         &mut failing_paths,
@@ -139,26 +154,39 @@ pub fn run_roundtrip(baselines: &[Baseline]) -> RoundtripReport {
                         },
                     );
                 }
+                Err(reason) => {
+                    record(
+                        &mut bucket_map,
+                        &mut failing_paths,
+                        categorize(&content),
+                        FailExample {
+                            path: baseline.relative_path.clone(),
+                            reason: format!("render error: {reason}"),
+                            first_diff_line: None,
+                            expected: None,
+                            got: None,
+                        },
+                    );
+                }
             }
-            Err(reason) => {
-                record(
-                    &mut bucket_map,
-                    &mut failing_paths,
-                    categorize(&content),
-                    FailExample {
-                        path: baseline.relative_path.clone(),
-                        reason,
-                        first_diff_line: None,
-                        expected: None,
-                        got: None,
-                    },
-                );
-            }
+        } else if let Err(reason) = rendered {
+            record(
+                &mut bucket_map,
+                &mut failing_paths,
+                categorize(&content),
+                FailExample {
+                    path: baseline.relative_path.clone(),
+                    reason,
+                    first_diff_line: None,
+                    expected: None,
+                    got: None,
+                },
+            );
         }
     }
 
     let files_discovered = baselines.len();
-    let files_checked = files_discovered - pretty_carved_out;
+    let files_checked = files_discovered;
     let pass_rate = pct(byte_identical, files_checked);
 
     let mut buckets: Vec<BucketCount> = bucket_map
@@ -178,7 +206,7 @@ pub fn run_roundtrip(baselines: &[Baseline]) -> RoundtripReport {
 
     RoundtripReport {
         files_discovered,
-        pretty_carved_out,
+        pretty_path,
         files_checked,
         byte_identical,
         pass_rate,
@@ -244,8 +272,7 @@ fn truncate(s: &str) -> String {
 /// proof of its cause — and doubles as the P0 work-list.
 fn categorize(content: &str) -> &'static str {
     if is_pretty(content) {
-        // Defensive: pretty baselines are carved out before they reach here, so
-        // this only fires if a pretty baseline ever slipped through as a failure.
+        // A pretty-path baseline that failed its own model/parser/renderer.
         "pretty"
     } else if content.contains("!!! related") {
         "related_info"
@@ -296,8 +323,8 @@ impl RoundtripReport {
         println!("========================================");
         println!("Files discovered:  {}", self.files_discovered);
         println!(
-            "Pretty carved out: {}  (ANSI pretty=true — separate renderer path, out of scope)",
-            self.pretty_carved_out
+            "Pretty path:       {}  (ANSI pretty=true — colored model/parser/renderer)",
+            self.pretty_path
         );
         println!("In-scope checked:  {}", self.files_checked);
         println!("Byte-identical:    {}", self.byte_identical);

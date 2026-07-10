@@ -141,8 +141,8 @@ pub(crate) fn is_ts_config_file(path: &str) -> bool {
 }
 
 /// The hard-coded harness newline (`error_baseline.go:24`), the one const the
-/// three literal CRLF sites collapse to.
-const CRLF: &str = "\r\n";
+/// three literal CRLF sites collapse to. Shared with the pretty renderer.
+pub(crate) const CRLF: &str = "\r\n";
 
 /// Emit `CRLF` before every element except the first, mirroring tsgo's stateful
 /// `newLine()` closure (shared across the global block and every file section,
@@ -180,8 +180,9 @@ fn emit_bang_block(out: &mut String, first: &mut bool, d: &Diag) {
     }
 }
 
-/// Append `TS`-code digits (handles the negative harness code `TS-1`).
-fn push_code(out: &mut String, code: i32) {
+/// Append `TS`-code digits (handles the negative harness code `TS-1`). Shared
+/// with the pretty renderer.
+pub(crate) fn push_code(out: &mut String, code: i32) {
     use std::fmt::Write as _;
     let _ = write!(out, "{code}");
 }
@@ -228,19 +229,28 @@ pub fn render_baseline(b: &ParsedBaseline) -> String {
     out.push_str(CRLF);
     out.push_str(CRLF);
 
-    // --- 2 & 3: the stateful-newLine region ---
+    render_middle(&mut out, &b.diags, &b.sections);
+
+    out
+}
+
+/// Render the stateful-`newLine` region: the global (fileless) diagnostics'
+/// `!!!` re-render, then each `==== ` file section in input order. Shared by the
+/// plain [`render_baseline`] (after its summary block) and the pretty renderer
+/// (after its colored top block) — both produce a byte-identical middle.
+pub(crate) fn render_middle(out: &mut String, diags: &[Diag], sections: &[Section]) {
     let mut first = true;
 
     // Global (fileless) diagnostics re-render, in summary order.
-    for d in &b.diags {
+    for d in diags {
         if d.file.is_none() {
-            emit_bang_block(&mut out, &mut first, d);
+            emit_bang_block(out, &mut first, d);
         }
     }
 
     // File sections, in input order.
-    for sec in &b.sections {
-        push_nl(&mut out, &mut first);
+    for sec in sections {
+        push_nl(out, &mut first);
         out.push_str("==== ");
         out.push_str(&sec.name);
         out.push_str(" (");
@@ -249,10 +259,8 @@ pub fn render_baseline(b: &ParsedBaseline) -> String {
             let _ = write!(out, "{}", sec.diags.len());
         }
         out.push_str(" errors) ====");
-        render_section(&mut out, &mut first, sec, &b.diags);
+        render_section(out, &mut first, sec, diags);
     }
-
-    out
 }
 
 /// Render one file section: each source line (4-space-indented) followed by any

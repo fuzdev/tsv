@@ -809,15 +809,16 @@ cargo run -p tsv_debug tsc_conformance roundtrip                 # full self-che
 deno task conformance:tsc-roundtrip                              # the same, as a deno task
 cargo run -p tsv_debug tsc_conformance roundtrip compiler/async  # filter by path substring (skips the pins)
 # Options: --path, --json, --verbose (list every failing path). The 14 ANSI
-# `pretty=true` baselines (a separate renderer path) are carved out of the
-# denominator, so in-scope round-trip is 100%. A full (unfiltered) run enforces
-# three exact pins — total baselines, in-scope byte-identical count, and the pretty
-# carve-out count — plus an in-scope-100% invariant, failing on any drift; a re-pin
-# is deliberate (a code change or a tsgo pull).
+# `pretty=true` baselines take their own colored model/parser/renderer (UTF-16
+# columns, tab→space snippets, the error-summary trailer) but stay in the
+# denominator, so round-trip is 100% across all baselines. A full (unfiltered) run
+# enforces three exact pins — total baselines, byte-identical count, and the
+# pretty-path count — plus a 100% invariant, failing on any drift; a re-pin is
+# deliberate (a code change or a tsgo pull).
 ```
 
 `roundtrip` is a **leg of `deno task conformance`** (the pre-release aggregate) and
-so runs in publish **Step 3b** — its two exact pins fail a release on drift.
+so runs in publish **Step 3b** — its three exact pins fail a release on drift.
 `../typescript-go` is therefore a release-required oracle there (a missing checkout
 FAILS a `--wetrun`, warn-skips a dry-run, is re-warned in the final summary), and
 `deno task doctor` reports its readiness. Like `../typescript` it is a git-SHA

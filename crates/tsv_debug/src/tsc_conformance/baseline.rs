@@ -199,8 +199,9 @@ pub struct ParsedBaseline {
     pub sections: Vec<Section>,
 }
 
-/// The diagnostic categories that can head a summary line.
-const CATEGORIES: [&str; 4] = ["error", "warning", "message", "suggestion"];
+/// The diagnostic categories that can head a summary line. Shared with the
+/// pretty head parser.
+pub(super) const CATEGORIES: [&str; 4] = ["error", "warning", "message", "suggestion"];
 
 /// Parse a whole `.errors.txt` baseline into its [`ParsedBaseline`] model.
 ///
@@ -259,7 +260,34 @@ pub fn parse_baseline(content: &str) -> Result<ParsedBaseline, String> {
     if lines.get(summary_end) != Some(&"") || lines.get(summary_end + 1) != Some(&"") {
         return Err("expected two blank lines after summary block".to_string());
     }
-    i = summary_end + 2;
+
+    // --- 3 & 4: the global `!!!` re-render and `==== ` sections ---
+    let sections = parse_middle(&lines, summary_end + 2, lines.len(), &mut diags)?;
+
+    Ok(ParsedBaseline { diags, sections })
+}
+
+/// Parse the middle region — the global (fileless) `!!!` re-render followed by
+/// the `==== ` file sections — from `lines[start..end]`, filling each
+/// diagnostic's `related` and recovering every section's source and spans.
+///
+/// Shared by the plain [`parse_baseline`] (which reaches it after the summary
+/// block, with `end == lines.len()`) and the pretty parser (which reaches it
+/// after the colored top block, with `end` bounded at the summary trailer). The
+/// diagnostics' heads (file/loc/category/code/message) must already be present
+/// in `diags`, in canonical summary order; this recovers only the middle.
+///
+/// # Errors
+///
+/// Returns a short reason on a `!!!` underflow, a bad section header, or a
+/// section-body desync (the same buckets the round-trip driver reports).
+pub(super) fn parse_middle(
+    lines: &[&str],
+    start: usize,
+    end: usize,
+    diags: &mut [Diag],
+) -> Result<Vec<Section>, String> {
+    let mut i = start;
 
     // --- 3. global (fileless) `!!!` re-render ---
     for d in diags.iter_mut() {
@@ -273,26 +301,26 @@ pub fn parse_baseline(content: &str) -> Result<ParsedBaseline, String> {
                 _ => return Err("global !!! message underflow".to_string()),
             }
         }
-        d.related = collect_related(&lines, &mut i);
+        d.related = collect_related(lines, &mut i);
     }
 
     // --- 4. `==== ` sections ---
     let mut sections = Vec::new();
-    while i < lines.len() {
+    while i < end {
         let header = lines[i];
         let (name, _n_errors) = parse_section_header(header)
             .ok_or_else(|| format!("bad section header: {header:?}"))?;
         i += 1;
         let body_start = i;
-        while i < lines.len() && !lines[i].starts_with("==== ") {
+        while i < end && !lines[i].starts_with("==== ") {
             i += 1;
         }
         let body = &lines[body_start..i];
-        let section = parse_section_body(name, body, &mut diags)?;
+        let section = parse_section_body(name, body, diags)?;
         sections.push(section);
     }
 
-    Ok(ParsedBaseline { diags, sections })
+    Ok(sections)
 }
 
 /// Collect a diagnostic's related-info block from `lines` starting at `*i`: each
@@ -398,7 +426,8 @@ fn parse_summary_head(line: &str) -> Option<SummaryHead> {
 }
 
 /// Read a `-?\d+` code from the start of `s`, returning `(code, bytes_consumed)`.
-fn read_code(s: &str) -> Option<(i32, usize)> {
+/// Shared with the pretty head parser.
+pub(super) fn read_code(s: &str) -> Option<(i32, usize)> {
     let bytes = s.as_bytes();
     let mut i = usize::from(bytes.first() == Some(&b'-'));
     let digits_start = i;

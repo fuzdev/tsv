@@ -18,18 +18,18 @@ use std::path::PathBuf;
 /// move (a discovery bug, or a typescript-go pull) must be re-pinned here.
 const BASELINE_COUNT_PIN: usize = 7033;
 
-/// REGRESSION PIN (exact): in-scope baselines that round-trip byte-identically
-/// (`parse → render == input`). Measured vs pin 168e7015: 7019 — the **full**
-/// in-scope set (100%), i.e. `BASELINE_COUNT_PIN - PRETTY_CARVEOUT_PIN`. A move
-/// in either direction is a deliberate re-pin (a parser/renderer change, or a
-/// typescript-go pull); pin two-sided so drift can't hide.
-const ROUNDTRIP_PASS_PIN: usize = 7019;
+/// REGRESSION PIN (exact): baselines that round-trip byte-identically
+/// (`parse → render == input`). Measured vs pin 168e7015: 7033 — the **full**
+/// baseline set (100%, plain + pretty paths together, i.e. `BASELINE_COUNT_PIN`).
+/// A move in either direction is a deliberate re-pin (a parser/renderer change,
+/// or a typescript-go pull); pin two-sided so drift can't hide.
+const ROUNDTRIP_PASS_PIN: usize = 7033;
 
-/// REGRESSION PIN (exact): ANSI-colored `pretty=true` baselines carved out of the
-/// round-trip scope — a separate renderer path (not the ported rune path),
-/// excluded from the denominator rather than counted as failures. Pinned so the
-/// pretty set can't grow or shrink silently on a typescript-go pull.
-const PRETTY_CARVEOUT_PIN: usize = 14;
+/// REGRESSION PIN (exact): baselines that take the ANSI-colored `pretty=true`
+/// path (its own model, parser, and colored renderer). In scope and folded into
+/// the pass count; pinned so the pretty set can't grow or shrink silently on a
+/// typescript-go pull.
+const PRETTY_PATH_PIN: usize = 14;
 
 /// Query the tsgo TypeScript conformance baselines.
 #[derive(FromArgs, Debug)]
@@ -121,33 +121,33 @@ impl RoundtripCommand {
         }
 
         // On a full run, gate three exact invariants (all two-sided):
-        //  1. in-scope round-trip is 100% (no in-scope baseline regressed),
-        //  2. the in-scope pass count matches its pin,
-        //  3. the pretty carve-out count matches its pin (the excluded set is stable).
+        //  1. round-trip is 100% (no baseline regressed),
+        //  2. the pass count matches its pin,
+        //  3. the pretty-path count matches its pin (the colored set is stable).
         if unfiltered {
             let mut errs: Vec<String> = Vec::new();
             if report.byte_identical != report.files_checked {
                 errs.push(format!(
-                    "in-scope round-trip not 100% — {} of {} passed",
+                    "round-trip not 100% — {} of {} passed",
                     report.byte_identical, report.files_checked
                 ));
             }
             if report.byte_identical != ROUNDTRIP_PASS_PIN {
                 errs.push(format!(
-                    "in-scope pass count {} != pinned {ROUNDTRIP_PASS_PIN}",
+                    "pass count {} != pinned {ROUNDTRIP_PASS_PIN}",
                     report.byte_identical
                 ));
             }
-            if report.pretty_carved_out != PRETTY_CARVEOUT_PIN {
+            if report.pretty_path != PRETTY_PATH_PIN {
                 errs.push(format!(
-                    "pretty carve-out {} != pinned {PRETTY_CARVEOUT_PIN}",
-                    report.pretty_carved_out
+                    "pretty-path count {} != pinned {PRETTY_PATH_PIN}",
+                    report.pretty_path
                 ));
             }
             if !errs.is_empty() {
                 eprintln!(
                     "\nError: {}. If deliberate (a parser/renderer change, or a typescript-go \
-                     pull), re-pin ROUNDTRIP_PASS_PIN / PRETTY_CARVEOUT_PIN.",
+                     pull), re-pin ROUNDTRIP_PASS_PIN / PRETTY_PATH_PIN.",
                     errs.join("; ")
                 );
                 return Err(CliError::Failed);

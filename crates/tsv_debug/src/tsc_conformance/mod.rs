@@ -8,12 +8,14 @@
 //!
 //! [`baseline`] holds both the summary-block parser (the `query` tool's seed)
 //! and the full-baseline parser ([`baseline::parse_baseline`]); [`render`] is
-//! the faithful `.errors.txt` renderer ported from typescript-go; [`roundtrip`]
-//! parses → renders → byte-compares every baseline (the P0 self-check, `zero`
-//! checker code).
+//! the faithful plain `.errors.txt` renderer ported from typescript-go;
+//! [`pretty`] is its ANSI-colored `pretty=true` counterpart (model + parser +
+//! renderer); [`roundtrip`] parses → renders → byte-compares every baseline
+//! (the P0 self-check, `zero` checker code).
 
 pub mod baseline;
 pub mod discovery;
+pub mod pretty;
 pub mod query;
 pub mod render;
 pub mod roundtrip;
