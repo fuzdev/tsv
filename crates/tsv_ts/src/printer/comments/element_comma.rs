@@ -22,11 +22,12 @@ use tsv_lang::doc::arena::DocId;
 
 /// Trailing comments collected for a list element (property or array element)
 pub(in crate::printer) struct TrailingComments<'a> {
-    /// Block comments that go before the comma
+    /// Block comments emitted in source order, before the emitted comma. A last
+    /// element's after-comma block is included here too: with no trailing comma
+    /// emitted (trailingComma: 'none') the last comma is `d.empty()`, so before- and
+    /// after-comma blocks both trail the element in one run (prettier relocates an
+    /// after-comma block before the comma; see conformance_prettier.md).
     block: SmallVec<[&'a Comment; 2]>,
-    /// Block comments after the comma, preserved in place (last element only —
-    /// prettier relocates these before the comma; see conformance_prettier.md)
-    block_after: SmallVec<[&'a Comment; 2]>,
     /// Line comments that go after the comma (in line_suffix)
     line: SmallVec<[&'a Comment; 2]>,
     /// Position after all trailing comments (for updating prev_end)
@@ -51,7 +52,6 @@ impl<'a> Printer<'a> {
         if !self.has_comments_between(elem_end, upper_bound) {
             return TrailingComments {
                 block: SmallVec::new(),
-                block_after: SmallVec::new(),
                 line: SmallVec::new(),
                 end_pos: elem_end,
             };
@@ -67,7 +67,10 @@ impl<'a> Printer<'a> {
         // Collect same-line trailing comments. A block comment after the comma
         // normally belongs to the next element as leading — except on the LAST
         // element, where it is preserved after the comma (prettier relocates it
-        // before — see conformance_prettier.md §Comment relocation).
+        // before — see conformance_prettier.md §Comment relocation). With no trailing
+        // comma emitted, a last element's after-comma block trails the element in the
+        // same run as its before-comma blocks, so all same-line blocks collect into
+        // one source-ordered `block` (the comma between them is `d.empty()`).
         let all: CommentVec<'_> = comments_in_range(self.comments, elem_end, upper_bound)
             .filter(|c| {
                 self.is_same_line(elem_end, c.span.start)
@@ -77,21 +80,12 @@ impl<'a> Printer<'a> {
             })
             .collect();
 
-        let is_after_comma =
-            |c: &Comment| c.is_block && comma_pos.is_some_and(|comma| c.span.start > comma);
-
-        let block = all
-            .iter()
-            .filter(|c| c.is_block && !is_after_comma(c))
-            .copied()
-            .collect();
-        let block_after = all.iter().filter(|c| is_after_comma(c)).copied().collect();
+        let block = all.iter().filter(|c| c.is_block).copied().collect();
         let line = all.iter().filter(|c| !c.is_block).copied().collect();
         let end_pos = all.last().map_or(elem_end, |c| c.span.end);
 
         TrailingComments {
             block,
-            block_after,
             line,
             end_pos,
         }
@@ -119,11 +113,11 @@ impl<'a> Printer<'a> {
     }
 
     /// Push one element's trailing comments around its `comma` doc, in the order
-    /// that preserves comment position: block comments before the comma, the
-    /// comma, block comments after the comma (last-element case), then line
-    /// comments as a suffix. Shared by the object/array pattern element loops and
-    /// the object-literal loop so this ordering — the comment-position contract —
-    /// can't drift between them.
+    /// that preserves comment position: same-line block comments (source-ordered,
+    /// including a last element's after-comma block since its comma is `d.empty()`),
+    /// the comma, then line comments as a suffix. Shared by the object/array pattern
+    /// element loops and the object-literal loop so this ordering — the
+    /// comment-position contract — can't drift between them.
     pub(in crate::printer) fn push_element_comma_trailing(
         &self,
         parts: &mut DocBuf,
@@ -132,7 +126,6 @@ impl<'a> Printer<'a> {
     ) {
         parts.push(self.build_block_comments_doc(&trailing.block));
         parts.push(comma);
-        parts.push(self.build_block_comments_doc(&trailing.block_after));
         parts.push(self.build_line_comments_suffix_doc(&trailing.line));
     }
 }

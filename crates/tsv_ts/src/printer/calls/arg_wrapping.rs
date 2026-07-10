@@ -122,23 +122,15 @@ pub(super) enum CallBreakStyle {
 /// that if the callee contains hardlines (e.g., multiline array), they don't
 /// force the arguments to break. The args make their own flat/break decision.
 ///
-/// `post_comma` is emitted immediately after the last arg (before the closing `)`), so
-/// an after-comma trailing comment stays past where the comma was; pass `d.empty()` when
-/// there is none. No trailing comma is emitted (trailingComma: 'none').
+/// No trailing comma is emitted (trailingComma: 'none').
 #[inline]
-fn wrap_call(
-    d: &DocArena,
-    callee: DocId,
-    args: DocId,
-    post_comma: DocId,
-    style: CallBreakStyle,
-) -> DocId {
+fn wrap_call(d: &DocArena, callee: DocId, args: DocId, style: CallBreakStyle) -> DocId {
     match style {
         CallBreakStyle::Soft => d.concat(&[
             callee,
             d.group(d.concat(&[
                 d.text("("),
-                d.indent_softline(d.concat(&[args, post_comma])),
+                d.indent_softline(args),
                 d.softline(),
                 d.text(")"),
             ])),
@@ -146,7 +138,7 @@ fn wrap_call(
         CallBreakStyle::Hard => d.concat(&[
             callee,
             d.text("("),
-            d.indent(d.concat(&[d.hardline(), args, post_comma])),
+            d.indent(d.concat(&[d.hardline(), args])),
             d.hardline(),
             d.text(")"),
         ]),
@@ -157,39 +149,14 @@ fn wrap_call(
 /// Uses soft breaks so the call can collapse to a single line if it fits
 #[inline]
 pub(crate) fn wrap_call_with_soft_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
-    wrap_call(d, callee, args, d.empty(), CallBreakStyle::Soft)
+    wrap_call(d, callee, args, CallBreakStyle::Soft)
 }
 
 /// Wrap arguments in an expanded call expression: `callee(\n\targs,\n)`
 /// Uses hard breaks to force multi-line layout
 #[inline]
 pub(crate) fn wrap_call_with_hard_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
-    wrap_call(d, callee, args, d.empty(), CallBreakStyle::Hard)
-}
-
-/// Like [`wrap_call_with_soft_breaks`], but emits `post_comma` after the last arg so an
-/// after-comma trailing comment is preserved past where the comma was (`b /* c */`; no
-/// trailing comma, trailingComma: 'none').
-#[inline]
-pub(super) fn wrap_call_with_soft_breaks_suffix(
-    d: &DocArena,
-    callee: DocId,
-    args: DocId,
-    post_comma: DocId,
-) -> DocId {
-    wrap_call(d, callee, args, post_comma, CallBreakStyle::Soft)
-}
-
-/// Like [`wrap_call_with_hard_breaks`], but emits `post_comma` after the last arg (no
-/// trailing comma; trailingComma: 'none').
-#[inline]
-pub(super) fn wrap_call_with_hard_breaks_suffix(
-    d: &DocArena,
-    callee: DocId,
-    args: DocId,
-    post_comma: DocId,
-) -> DocId {
-    wrap_call(d, callee, args, post_comma, CallBreakStyle::Hard)
+    wrap_call(d, callee, args, CallBreakStyle::Hard)
 }
 
 /// Wrap arguments with a `will_break` guard: if any arg contains hardlines

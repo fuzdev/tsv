@@ -2,11 +2,9 @@
 //
 // Handles: new Foo(), new Foo(arg1, arg2), new Foo<T>()
 
-use super::arg_comments::{find_comma_pos, is_comment_after_comma};
 use super::arg_wrapping::{
     append_type_args_with_gap_comments, build_args_with_blank_lines, build_empty_args_doc,
-    should_expand_first_arg, try_hug_multiline_template_arg, wrap_call_with_hard_breaks_suffix,
-    wrap_call_with_soft_breaks_suffix,
+    should_expand_first_arg, try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
 };
 use crate::ast::internal;
 use crate::printer::calls::arg_predicates::{
@@ -427,11 +425,11 @@ impl<'a> Printer<'a> {
                         paren_close,
                     );
 
-                    // Same-line trailing comments split around the source comma position
-                    // (after-comma blocks stay past it, `b /* c */` — the tsv divergence —
-                    // and a line comment follows via `line_suffix`), then own-line dangling
-                    // comments. No trailing comma (trailingComma: 'none'). Matches the
-                    // call/member-chain last-arg paths.
+                    // Same-line trailing comments trail the arg in source order (a block
+                    // that sat after the source comma just trails past where the comma was,
+                    // `b /* c */` — the tsv divergence; a line comment follows via
+                    // `line_suffix`), then own-line dangling comments. No trailing comma
+                    // (trailingComma: 'none'). Matches the call/member-chain last-arg paths.
                     pc.emit_last_arg_comments(&mut arg_parts, self);
                 }
             }
@@ -520,48 +518,26 @@ impl<'a> Printer<'a> {
             }
 
             if let Some(last_doc) = arg_docs.pop() {
-                // Split same-line blocks around the last arg's source comma: before-comma
-                // blocks (and any block when the source has no comma) hug the arg; an
-                // after-comma block is preserved past where the comma was (`b /* c */`; no
-                // trailing comma, trailingComma: 'none').
+                // Same-line blocks trail the last arg in source order. With no trailing
+                // comma emitted (trailingComma: 'none'), a block that sat after the
+                // source comma simply trails the arg past where the comma was
+                // (`b /* c */`) — no split around the never-emitted comma.
                 // No line comments reach this block-only path.
-                let comma_pos = find_comma_pos(self.source, effective_arg_end, new_expr.span.end);
                 let mut last_with_comment: DocBuf = smallvec![last_doc];
-                let mut after_comma = DocBuf::new();
                 for comment in &pc.trailing_block {
-                    if comma_pos.is_some_and(|cp| is_comment_after_comma(comment, cp)) {
-                        after_comma.push(d.text(" "));
-                        after_comma.push(self.build_comment_doc(comment));
-                    } else {
-                        last_with_comment.push(d.text(" "));
-                        last_with_comment.push(self.build_comment_doc(comment));
-                    }
+                    last_with_comment.push(d.text(" "));
+                    last_with_comment.push(self.build_comment_doc(comment));
                 }
                 arg_docs.push(d.concat(&last_with_comment));
-
-                // The after-comma block (if any) is kept past where the comma was via the
-                // wrap's `post_comma` suffix: `b /* c */` (no trailing comma in either
-                // mode; trailingComma: 'none').
-                let post_comma = d.concat(&after_comma);
 
                 // For function composition (multiple callbacks), use hardlines
                 // For simple args, use soft breaks (can stay inline)
                 if is_function_composition_args(new_expr.arguments) {
                     let arg_parts = d.join_doc(arg_docs, d.comma_hardline());
-                    return wrap_call_with_hard_breaks_suffix(
-                        d,
-                        callee_with_types,
-                        arg_parts,
-                        post_comma,
-                    );
+                    return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
                 }
                 let arg_parts = d.join_doc(arg_docs, d.comma_line());
-                return wrap_call_with_soft_breaks_suffix(
-                    d,
-                    callee_with_types,
-                    arg_parts,
-                    post_comma,
-                );
+                return wrap_call_with_soft_breaks(d, callee_with_types, arg_parts);
             }
         }
 

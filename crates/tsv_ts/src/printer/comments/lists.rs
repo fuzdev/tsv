@@ -430,6 +430,36 @@ impl<'a> Printer<'a> {
         self.delimiter_line_comment_prefix_impl(delim_pos, first_elem_start, true)
     }
 
+    /// Assemble a computed `[…]` / `?.[…]` (or mapped-type `[K in T]`) that must BREAK
+    /// because a line comment sits in the open→body gap: pull a `[`-line comment onto the
+    /// open line (own-line ones keep their line, blank-preserving), emit `body`, and drop
+    /// `]`. `body` is pre-built by the caller (key/index/interior plus any body→`]`
+    /// trailing comments, per each printer's own rule), so this owns only the shared
+    /// shell. `open` is the emitted bracket text (`[` or `?.[`); `bracket_char` is the
+    /// source position of the `[` glyph (the scan/pull anchor), decoupled from `open` for
+    /// the `?.[` form (`bracket_char + 1` is the first inside-bracket position). Shared by
+    /// the computed-key, computed-member-access, and mapped-type break paths.
+    pub(in crate::printer) fn build_bracket_line_comment_break(
+        &self,
+        open: &'static str,
+        bracket_char: u32,
+        body_start: u32,
+        body: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let (line_prefix, pull_pos) = self.delimiter_line_comment_prefix(bracket_char, body_start);
+        let mut inner =
+            self.build_leading_comments_multiline_opt(bracket_char + 1, body_start, pull_pos);
+        inner.push(body);
+        d.group_break(d.concat(&[
+            d.text(open),
+            d.concat(&line_prefix),
+            d.indent_softline(d.concat(&inner)),
+            d.softline(),
+            d.text("]"),
+        ]))
+    }
+
     fn delimiter_line_comment_prefix_impl(
         &self,
         delim_pos: u32,
