@@ -33,13 +33,13 @@
 //       The product-mode short-circuit lives at GetDiagnosticsOfAnyProgram
 //       (program.go:1755, :1770) and is deliberately NOT ported here.
 
-use crate::binder::{bind_file, module_ness, ModuleNess};
-use crate::diag::{sort_and_deduplicate, Diagnostic};
+use crate::binder::{ModuleNess, bind_file, module_ness};
+use crate::diag::{Diagnostic, sort_and_deduplicate};
 use crate::ids::FileId;
-use crate::merge::{merge_program, FileMerge, LibBase, LibFile};
+use crate::merge::{FileMerge, LibBase, LibFile, merge_program};
 use bumpalo::Bump;
 use tsv_ts::ast::Program;
-use tsv_ts::{parse_with_goal, Goal};
+use tsv_ts::{Goal, parse_with_goal};
 
 /// One source unit to check — a file name (its diagnostic path) and its source.
 pub struct SourceUnit<'a> {
@@ -141,7 +141,10 @@ impl BoundProgram {
     /// that need not run [`check_bound`] to learn parse facts).
     #[must_use]
     pub fn parse_reports(&self) -> Vec<(&str, &ParseReport)> {
-        self.units.iter().map(|u| (u.name.as_str(), &u.parse)).collect()
+        self.units
+            .iter()
+            .map(|u| (u.name.as_str(), &u.parse))
+            .collect()
     }
 }
 
@@ -192,7 +195,11 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
         }
     }
 
-    BoundProgram { parse_rejected, units: bound_units, total_nodes }
+    BoundProgram {
+        parse_rejected,
+        units: bound_units,
+        total_nodes,
+    }
 }
 
 /// Merge a [`BoundProgram`] against an optional [`LibBase`] and return the final
@@ -223,9 +230,17 @@ pub fn check_bound(bound: &BoundProgram, lib: Option<&LibBase>) -> CheckResult {
     let files = bound
         .units
         .iter()
-        .map(|u| FileReport { file: u.file, name: u.name.clone(), parse: u.parse.clone() })
+        .map(|u| FileReport {
+            file: u.file,
+            name: u.name.clone(),
+            parse: u.parse.clone(),
+        })
         .collect();
-    CheckResult { diagnostics, files, parse_rejected: bound.parse_rejected }
+    CheckResult {
+        diagnostics,
+        files,
+        parse_rejected: bound.parse_rejected,
+    }
 }
 
 /// Check a program with no lib base — parse every unit via the goal rule, bind,
@@ -267,7 +282,10 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
         !bound.merge.is_external || !bound.merge.global_augmentations.is_empty(),
         "lib {name} bound as an external module with no `declare global` block — its globals would be silently dropped",
     );
-    Ok(LibFile { name: name.to_string(), merge: bound.merge })
+    Ok(LibFile {
+        name: name.to_string(),
+        merge: bound.merge,
+    })
 }
 
 /// Check one bound file — a no-op skeleton (no semantic diagnostics yet).
@@ -281,10 +299,7 @@ fn check_file(bound: &crate::binder::BoundFile) -> Vec<Diagnostic> {
 /// Parse a unit via the goal rule: `Module` first, `Script` on failure. Returns
 /// the program, the goal it parsed under, and whether the `Script` retry won; on
 /// double failure returns the `Module`-goal error message.
-fn parse_unit<'a>(
-    source: &'a str,
-    arena: &'a Bump,
-) -> Result<(Program<'a>, Goal, bool), String> {
+fn parse_unit<'a>(source: &'a str, arena: &'a Bump) -> Result<(Program<'a>, Goal, bool), String> {
     match parse_with_goal(source, Goal::Module, arena) {
         Ok(program) => Ok((program, Goal::Module, false)),
         Err(module_err) => match parse_with_goal(source, Goal::Script, arena) {
@@ -327,7 +342,10 @@ mod tests {
         let result = check("const = = = ;");
         assert!(result.parse_rejected);
         assert!(result.diagnostics.is_empty());
-        assert!(matches!(result.files[0].parse, ParseReport::Rejected { .. }));
+        assert!(matches!(
+            result.files[0].parse,
+            ParseReport::Rejected { .. }
+        ));
     }
 
     #[test]
@@ -350,7 +368,10 @@ mod tests {
         // program — the unit that parsed still contributes its bind diagnostics.
         let arena = Bump::new();
         let result = check_program(
-            &[SourceUnit::new("a.ts", "let x; let x;"), SourceUnit::new("b.ts", "const = ;")],
+            &[
+                SourceUnit::new("a.ts", "let x; let x;"),
+                SourceUnit::new("b.ts", "const = ;"),
+            ],
             &arena,
         );
         assert!(result.parse_rejected);
@@ -358,6 +379,9 @@ mod tests {
         assert_eq!(result.diagnostics.len(), 2);
         assert!(result.diagnostics.iter().all(|d| d.code == 2451));
         assert!(matches!(result.files[0].parse, ParseReport::Parsed(_)));
-        assert!(matches!(result.files[1].parse, ParseReport::Rejected { .. }));
+        assert!(matches!(
+            result.files[1].parse,
+            ParseReport::Rejected { .. }
+        ));
     }
 }

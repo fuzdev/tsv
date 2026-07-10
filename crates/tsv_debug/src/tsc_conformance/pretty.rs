@@ -41,8 +41,8 @@
 //!   displayed line (`diagnosticwriter.go:208`), where the plain path preserves
 //!   tabs in the reprinted source.
 
-use super::baseline::{read_code, Diag, Loc, ParsedBaseline, Section, CATEGORIES};
-use super::render::{col_to_byte, lf_line_starts, push_code, render_middle, CRLF};
+use super::baseline::{CATEGORIES, Diag, Loc, ParsedBaseline, Section, read_code};
+use super::render::{CRLF, col_to_byte, lf_line_starts, push_code, render_middle};
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
@@ -405,7 +405,14 @@ fn render_pretty_diagnostic(
         let (sec, pos, len) =
             diag_span(b, i).ok_or_else(|| format!("no section span for diagnostic {i}"))?;
         out.push_str(CRLF);
-        write_code_snippet(out, &sec.src_lines, pos, len, category_color(&d.category), "");
+        write_code_snippet(
+            out,
+            &sec.src_lines,
+            pos,
+            len,
+            category_color(&d.category),
+            "",
+        );
         out.push_str(CRLF);
     }
 
@@ -441,7 +448,10 @@ fn render_pretty_related(
             len_idx += 1;
             let (sec, pos, byte_len) = related_span(b, &loc.file, loc.line, loc.col, len_utf16)
                 .ok_or_else(|| {
-                    format!("no related source for {}:{}:{}", loc.file, loc.line, loc.col)
+                    format!(
+                        "no related source for {}:{}:{}",
+                        loc.file, loc.line, loc.col
+                    )
                 })?;
             write_code_snippet(out, &sec.src_lines, pos, byte_len, CYAN, "    ");
         }
@@ -553,7 +563,11 @@ fn write_code_snippet(
         out.push_str(squiggle_color);
         let content_units = utf16_len(&content);
         if i == first_line {
-            let last_char_for_line = if i == last_line { last_char } else { content_units };
+            let last_char_for_line = if i == last_line {
+                last_char
+            } else {
+                content_units
+            };
             push_repeat(out, ' ', first_char);
             push_repeat(out, '~', last_char_for_line.saturating_sub(first_char));
         } else if i == last_line {
@@ -799,7 +813,10 @@ fn line_and_utf16col(src_lines: &[String], starts: &[usize], pos: usize) -> (usi
     let line_start = *starts.get(line).unwrap_or(&0);
     let in_line = pos.saturating_sub(line_start);
     let src = src_lines.get(line).map_or("", String::as_str);
-    (line, utf16_len(src.get(..in_line.min(src.len())).unwrap_or("")))
+    (
+        line,
+        utf16_len(src.get(..in_line.min(src.len())).unwrap_or("")),
+    )
 }
 
 /// Advance `units` UTF-16 code units from `start_byte` in `line`, returning the
@@ -867,9 +884,10 @@ mod tests {
         assert_eq!(pos.code, 2345);
         assert_eq!(pos.first_msg, "Argument bad.");
 
-        let global =
-            parse_pretty_head("\u{1b}[91merror\u{1b}[0m\u{1b}[90m TS-1: \u{1b}[0mPre-emit mismatch!")
-                .expect("global");
+        let global = parse_pretty_head(
+            "\u{1b}[91merror\u{1b}[0m\u{1b}[90m TS-1: \u{1b}[0mPre-emit mismatch!",
+        )
+        .expect("global");
         assert!(global.file.is_none() && global.loc.is_none());
         assert_eq!(global.code, -1);
         assert_eq!(global.first_msg, "Pre-emit mismatch!");
@@ -877,7 +895,8 @@ mod tests {
 
     #[test]
     fn related_verbatim_file_and_fileless() {
-        let (loc, msg) = parse_related_verbatim("TS6203 file2.ts:1:6: 'Foo' was also declared here.");
+        let (loc, msg) =
+            parse_related_verbatim("TS6203 file2.ts:1:6: 'Foo' was also declared here.");
         let loc = loc.expect("file-bearing");
         assert_eq!((loc.file.as_str(), loc.line, loc.col), ("file2.ts", 1, 6));
         assert_eq!(msg, "'Foo' was also declared here.");
@@ -891,8 +910,13 @@ mod tests {
     fn gutter_and_tilde_classification() {
         // Content gutter (digit) vs squiggle gutter (blank).
         assert!(!gutter_is_blank("\u{1b}[7m3\u{1b}[0m const x;"));
-        assert!(gutter_is_blank("\u{1b}[7m \u{1b}[0m \u{1b}[91m ~~~\u{1b}[0m"));
-        assert_eq!(count_tildes("    \u{1b}[7m \u{1b}[0m \u{1b}[96m     ~~~\u{1b}[0m"), 3);
+        assert!(gutter_is_blank(
+            "\u{1b}[7m \u{1b}[0m \u{1b}[91m ~~~\u{1b}[0m"
+        ));
+        assert_eq!(
+            count_tildes("    \u{1b}[7m \u{1b}[0m \u{1b}[96m     ~~~\u{1b}[0m"),
+            3
+        );
     }
 
     // --- standalone renderer coverage (model built by hand, not via the parser) ---
@@ -902,7 +926,13 @@ mod tests {
     // byte contract is pinned independently of the parser.
 
     /// Build an `error`-category diagnostic.
-    fn diag(file: Option<&str>, loc: Option<Loc>, code: i32, msgs: &[&str], related: &[&str]) -> Diag {
+    fn diag(
+        file: Option<&str>,
+        loc: Option<Loc>,
+        code: i32,
+        msgs: &[&str],
+        related: &[&str],
+    ) -> Diag {
         Diag {
             file: file.map(str::to_string),
             loc,
@@ -961,7 +991,12 @@ mod tests {
                 // summary trailer
                 "\r\nFound 1 error in a.ts{g}:1{r}\r\n\r\n",
             ),
-            c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
+            c = CYAN,
+            r = RESET,
+            y = YELLOW,
+            red = RED,
+            g = GREY,
+            gs = GUTTER_STYLE
         );
         assert_eq!(render_pretty(&b).expect("render"), expected);
         assert!(self_assertion_violations(&b.base).is_empty());
@@ -1004,7 +1039,12 @@ mod tests {
                 "!!! related TS7038 index.ts:1:1: Type originates here.",
                 "\r\nFound 1 error in index.ts{g}:1{r}\r\n\r\n",
             ),
-            c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
+            c = CYAN,
+            r = RESET,
+            y = YELLOW,
+            red = RED,
+            g = GREY,
+            gs = GUTTER_STYLE
         );
         assert_eq!(render_pretty(&b).expect("render"), expected);
         assert!(self_assertion_violations(&b.base).is_empty());
@@ -1075,7 +1115,12 @@ mod tests {
                 "     1  b.ts{g}:1{r}\r\n",
                 "\r\n",
             ),
-            c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
+            c = CYAN,
+            r = RESET,
+            y = YELLOW,
+            red = RED,
+            g = GREY,
+            gs = GUTTER_STYLE
         );
         assert_eq!(render_pretty(&b).expect("render"), expected);
         assert!(self_assertion_violations(&b.base).is_empty());
@@ -1123,7 +1168,12 @@ mod tests {
                 "!!! error TS2554: Expected 0 arguments.",
                 "\r\nFound 1 error in a.ts{g}:1{r}\r\n\r\n",
             ),
-            c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
+            c = CYAN,
+            r = RESET,
+            y = YELLOW,
+            red = RED,
+            g = GREY,
+            gs = GUTTER_STYLE
         );
         assert_eq!(render_pretty(&b).expect("render"), expected);
     }
@@ -1160,7 +1210,9 @@ mod tests {
                 "{gs}  6{r} fff\r\n",
                 "{gs}   {r} {red}~~~{r}",
             ),
-            r = RESET, red = RED, gs = GUTTER_STYLE
+            r = RESET,
+            red = RED,
+            gs = GUTTER_STYLE
         );
         assert_eq!(out, expected);
     }
@@ -1175,7 +1227,9 @@ mod tests {
         write_code_snippet(&mut out, &src, 1, 0, RED, "");
         let expected = format!(
             concat!("\r\n", "{gs}1{r} abc\r\n", "{gs} {r} {red} ~{r}",),
-            r = RESET, red = RED, gs = GUTTER_STYLE
+            r = RESET,
+            red = RED,
+            gs = GUTTER_STYLE
         );
         assert_eq!(out, expected);
     }
@@ -1213,7 +1267,12 @@ mod tests {
                 "!!! error TS2304: Cannot find name.",
                 "\r\nFound 1 error in a.ts{g}:1{r}\r\n\r\n",
             ),
-            c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
+            c = CYAN,
+            r = RESET,
+            y = YELLOW,
+            red = RED,
+            g = GREY,
+            gs = GUTTER_STYLE
         );
         assert_eq!(render_pretty(&b).expect("render"), expected);
         assert!(self_assertion_violations(&b.base).is_empty());
@@ -1259,7 +1318,12 @@ mod tests {
                 "!!! error TS2322:     Property 'x' is missing.",
                 "\r\nFound 1 error in a.ts{g}:1{r}\r\n\r\n",
             ),
-            c = CYAN, r = RESET, y = YELLOW, red = RED, g = GREY, gs = GUTTER_STYLE
+            c = CYAN,
+            r = RESET,
+            y = YELLOW,
+            red = RED,
+            g = GREY,
+            gs = GUTTER_STYLE
         );
         assert_eq!(render_pretty(&b).expect("render"), expected);
         assert!(self_assertion_violations(&b.base).is_empty());
@@ -1307,7 +1371,8 @@ mod tests {
                 "     1  b.ts{g}:7{r}\r\n",
                 "\r\n",
             ),
-            g = GREY, r = RESET
+            g = GREY,
+            r = RESET
         );
         assert_eq!(out, expected);
     }

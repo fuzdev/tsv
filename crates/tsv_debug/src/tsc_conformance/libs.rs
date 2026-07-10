@@ -29,7 +29,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use tsv_check::{bind_lib, LibBase, LibFile};
+use tsv_check::{LibBase, LibFile, bind_lib};
 
 /// The ported `LibMap` (`enummaps.go`), in insertion order — the tuple order is the
 /// `Libs` slice the priority index reads. Maps a lib **name** (`@lib` /
@@ -54,9 +54,15 @@ const LIB_MAP: &[(&str, &str)] = &[
     ("dom.iterable", "lib.dom.iterable.d.ts"),
     ("dom.asynciterable", "lib.dom.asynciterable.d.ts"),
     ("webworker", "lib.webworker.d.ts"),
-    ("webworker.importscripts", "lib.webworker.importscripts.d.ts"),
+    (
+        "webworker.importscripts",
+        "lib.webworker.importscripts.d.ts",
+    ),
     ("webworker.iterable", "lib.webworker.iterable.d.ts"),
-    ("webworker.asynciterable", "lib.webworker.asynciterable.d.ts"),
+    (
+        "webworker.asynciterable",
+        "lib.webworker.asynciterable.d.ts",
+    ),
     ("scripthost", "lib.scripthost.d.ts"),
     ("es2015.core", "lib.es2015.core.d.ts"),
     ("es2015.collection", "lib.es2015.collection.d.ts"),
@@ -66,7 +72,10 @@ const LIB_MAP: &[(&str, &str)] = &[
     ("es2015.proxy", "lib.es2015.proxy.d.ts"),
     ("es2015.reflect", "lib.es2015.reflect.d.ts"),
     ("es2015.symbol", "lib.es2015.symbol.d.ts"),
-    ("es2015.symbol.wellknown", "lib.es2015.symbol.wellknown.d.ts"),
+    (
+        "es2015.symbol.wellknown",
+        "lib.es2015.symbol.wellknown.d.ts",
+    ),
     ("es2016.array.include", "lib.es2016.array.include.d.ts"),
     ("es2016.intl", "lib.es2016.intl.d.ts"),
     ("es2017.arraybuffer", "lib.es2017.arraybuffer.d.ts"),
@@ -91,7 +100,10 @@ const LIB_MAP: &[(&str, &str)] = &[
     ("es2020.promise", "lib.es2020.promise.d.ts"),
     ("es2020.sharedmemory", "lib.es2020.sharedmemory.d.ts"),
     ("es2020.string", "lib.es2020.string.d.ts"),
-    ("es2020.symbol.wellknown", "lib.es2020.symbol.wellknown.d.ts"),
+    (
+        "es2020.symbol.wellknown",
+        "lib.es2020.symbol.wellknown.d.ts",
+    ),
     ("es2020.intl", "lib.es2020.intl.d.ts"),
     ("es2020.number", "lib.es2020.number.d.ts"),
     ("es2021.promise", "lib.es2021.promise.d.ts"),
@@ -186,7 +198,10 @@ fn lib_priority(file: &str) -> i32 {
     if file == "lib.d.ts" || file == "lib.es6.d.ts" {
         return 0;
     }
-    let name = file.strip_prefix("lib.").and_then(|s| s.strip_suffix(".d.ts")).unwrap_or(file);
+    let name = file
+        .strip_prefix("lib.")
+        .and_then(|s| s.strip_suffix(".d.ts"))
+        .unwrap_or(file);
     match LIB_MAP.iter().position(|(k, _)| *k == name) {
         Some(i) => i32::try_from(i).unwrap_or(i32::MAX - 2) + 1,
         None => i32::try_from(LIB_MAP.len()).unwrap_or(i32::MAX - 2) + 2,
@@ -214,7 +229,9 @@ fn extract_lib_references(source: &str) -> Vec<String> {
 
 /// Whether `@noLib` is set truthily.
 fn is_no_lib(config: &BTreeMap<String, String>) -> bool {
-    config.get("nolib").is_some_and(|v| v.eq_ignore_ascii_case("true"))
+    config
+        .get("nolib")
+        .is_some_and(|v| v.eq_ignore_ascii_case("true"))
 }
 
 /// Per-run lib resolver + cache: parses + binds each lib file once, and folds each
@@ -273,7 +290,8 @@ impl LibResolver {
             }
             // An all-unrecognized @lib leaves no roots — nothing to resolve.
         } else {
-            roots.push(default_lib_for_target(config.get("target").map(String::as_str)).to_string());
+            roots
+                .push(default_lib_for_target(config.get("target").map(String::as_str)).to_string());
         }
 
         // Transitive `/// <reference lib>` closure.
@@ -392,7 +410,10 @@ mod tests {
     use super::*;
 
     fn cfg(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs.iter().map(|(k, v)| ((*k).to_string(), (*v).to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect()
     }
 
     #[test]
@@ -401,7 +422,10 @@ mod tests {
         assert_eq!(default_lib_for_target(Some("es2015")), "lib.es6.d.ts");
         assert_eq!(default_lib_for_target(Some("ES2015")), "lib.es6.d.ts");
         assert_eq!(default_lib_for_target(Some("es5")), "lib.d.ts");
-        assert_eq!(default_lib_for_target(Some("esnext")), "lib.esnext.full.d.ts");
+        assert_eq!(
+            default_lib_for_target(Some("esnext")),
+            "lib.esnext.full.d.ts"
+        );
     }
 
     #[test]
@@ -417,11 +441,17 @@ mod tests {
     fn priority_orders_symbol_and_promise_related_chains() {
         // es5 leads (priority 1); the es2015 features follow by LibMap-key index.
         assert!(lib_priority("lib.es5.d.ts") < lib_priority("lib.es2015.symbol.d.ts"));
-        assert!(lib_priority("lib.es2015.symbol.d.ts") < lib_priority("lib.es2015.symbol.wellknown.d.ts"));
+        assert!(
+            lib_priority("lib.es2015.symbol.d.ts")
+                < lib_priority("lib.es2015.symbol.wellknown.d.ts")
+        );
         // Promise chain: es5 < es2015.iterable < es2015.promise < es2015.symbol.wellknown.
         assert!(lib_priority("lib.es5.d.ts") < lib_priority("lib.es2015.iterable.d.ts"));
         assert!(lib_priority("lib.es2015.iterable.d.ts") < lib_priority("lib.es2015.promise.d.ts"));
-        assert!(lib_priority("lib.es2015.promise.d.ts") < lib_priority("lib.es2015.symbol.wellknown.d.ts"));
+        assert!(
+            lib_priority("lib.es2015.promise.d.ts")
+                < lib_priority("lib.es2015.symbol.wellknown.d.ts")
+        );
         // The aggregator roots (no declarations) sort last; lib.es6.d.ts is special.
         assert_eq!(lib_priority("lib.es6.d.ts"), 0);
         assert!(lib_priority("lib.es2025.full.d.ts") > lib_priority("lib.dom.d.ts"));
@@ -430,7 +460,10 @@ mod tests {
     #[test]
     fn reference_extraction() {
         let src = "/// <reference lib=\"es2015\" />\n/// <reference lib=\"dom\" />\ninterface X {}";
-        assert_eq!(extract_lib_references(src), vec!["es2015".to_string(), "dom".to_string()]);
+        assert_eq!(
+            extract_lib_references(src),
+            vec!["es2015".to_string(), "dom".to_string()]
+        );
     }
 
     #[test]

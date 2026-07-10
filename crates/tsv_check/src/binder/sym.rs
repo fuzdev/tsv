@@ -61,20 +61,20 @@
 
 use super::atoms::{Atom, Atoms};
 use super::symbols::{Decl, Symbol, SymbolFlags, SymbolId, TableId};
-use super::{addr_of, FileFacts};
+use super::{FileFacts, addr_of};
 use crate::diag::{Category, Diagnostic};
 use crate::hash::FxHashMap;
 use crate::ids::{FileId, NodeId};
 use crate::merge::{FileMerge, MergeDecl, MergeSymbol, ModuleAug};
 use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
+use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
-    ClassBody, ClassMember, Expression, ExportDefaultValue, ExportSpecifier, ForInOfLeft, ForInit,
+    ClassBody, ClassMember, ExportDefaultValue, ExportSpecifier, Expression, ForInOfLeft, ForInit,
     Identifier, ImportSpecifier, Literal, LiteralValue, MethodKind, ModuleExportName,
     ObjectPatternProperty, Statement, TSEnumMemberId, TSInterfaceBody, TSModuleDeclarationBody,
     TSModuleName, TSTypeElement, TSTypeParameterDeclaration,
 };
-use tsv_ts::ast::Program;
 
 /// The container kinds that route member declarations (a subset of tsgo's node
 /// kinds, enough to dispatch `declareSymbolAndAddToSymbolTable`).
@@ -319,7 +319,10 @@ impl<'a> SymbolBinder<'a> {
     }
 
     fn node_id_of<T>(&self, node: &T) -> NodeId {
-        self.address_map.get(&addr_of(node)).copied().unwrap_or(NodeId::FIRST)
+        self.address_map
+            .get(&addr_of(node))
+            .copied()
+            .unwrap_or(NodeId::FIRST)
     }
 
     // --- name resolution -----------------------------------------------------
@@ -378,9 +381,12 @@ impl<'a> SymbolBinder<'a> {
                     // so a get/non-accessor/set run all conflict.
                     let sflags = self.symbols[sid.index()].flags;
                     if sflags.intersects(SymbolFlags::ACCESSOR)
-                        && (sflags.0 & SymbolFlags::ACCESSOR.0) != (includes.0 & SymbolFlags::ACCESSOR.0)
+                        && (sflags.0 & SymbolFlags::ACCESSOR.0)
+                            != (includes.0 & SymbolFlags::ACCESSOR.0)
                     {
-                        self.symbols[sid.index()].flags.insert(SymbolFlags::ACCESSOR);
+                        self.symbols[sid.index()]
+                            .flags
+                            .insert(SymbolFlags::ACCESSOR);
                     }
                     // A fresh orphan (NOT inserted into the table): this
                     // declaration does not merge into the original, so the
@@ -414,8 +420,11 @@ impl<'a> SymbolBinder<'a> {
     /// Emit the duplicate/conflict diagnostics for `decl` against `existing`.
     fn report_conflict(&mut self, existing: SymbolId, decl: &DeclInput, includes: SymbolFlags) {
         let sym_flags = self.symbols[existing.index()].flags;
-        let mut code: u32 =
-            if sym_flags.intersects(SymbolFlags::BLOCK_SCOPED_VARIABLE) { 2451 } else { 2300 };
+        let mut code: u32 = if sym_flags.intersects(SymbolFlags::BLOCK_SCOPED_VARIABLE) {
+            2451
+        } else {
+            2300
+        };
         let mut needs_name = true;
         if sym_flags.intersects(SymbolFlags::ENUM) || includes.intersects(SymbolFlags::ENUM) {
             code = 2567;
@@ -431,13 +440,20 @@ impl<'a> SymbolBinder<'a> {
         }
 
         let new_span = decl.error_span;
-        let new_name = if needs_name { Some(self.atoms.resolve(decl.display).to_string()) } else { None };
+        let new_name = if needs_name {
+            Some(self.atoms.resolve(decl.display).to_string())
+        } else {
+            None
+        };
         let mut new_diag = self.make_diag(new_span, code, new_name.as_deref());
 
         let priors: Vec<Decl> = self.symbols[existing.index()].decls.to_vec();
         for (index, pdecl) in priors.iter().enumerate() {
-            let pname =
-                if needs_name { Some(self.atoms.resolve(pdecl.display).to_string()) } else { None };
+            let pname = if needs_name {
+                Some(self.atoms.resolve(pdecl.display).to_string())
+            } else {
+                None
+            };
             let mut d = self.make_diag(pdecl.error_span, code, pname.as_deref());
             if multiple_default {
                 let rcode = if index == 0 { 2753 } else { 6204 };
@@ -505,7 +521,10 @@ impl<'a> SymbolBinder<'a> {
                 self.declare_symbol(table, Some(sym), decl, includes, excludes)
             }
             ContainerKind::Interface => {
-                let sym = self.container.symbol.expect("members container has a symbol");
+                let sym = self
+                    .container
+                    .symbol
+                    .expect("members container has a symbol");
                 let table = self.members_of(sym);
                 self.declare_symbol(table, Some(sym), decl, includes, excludes)
             }
@@ -567,7 +586,10 @@ impl<'a> SymbolBinder<'a> {
         let to_exports =
             decl.exported || decl.is_default_export || self.container.is_export_context;
         if to_exports {
-            let sym = self.container.symbol.expect("module member exports needs a container symbol");
+            let sym = self
+                .container
+                .symbol
+                .expect("module member exports needs a container symbol");
             if decl.is_default_export {
                 // A default export forces the `"default"` table key.
                 decl.name = self.atoms.default_export();
@@ -589,7 +611,11 @@ impl<'a> SymbolBinder<'a> {
         is_static: bool,
     ) -> SymbolId {
         let sym = self.container.symbol.expect("class has a symbol");
-        let table = if is_static { self.exports_of(sym) } else { self.members_of(sym) };
+        let table = if is_static {
+            self.exports_of(sym)
+        } else {
+            self.members_of(sym)
+        };
         self.declare_symbol(table, Some(sym), decl, includes, excludes)
     }
 
@@ -623,11 +649,20 @@ impl<'a> SymbolBinder<'a> {
             }
             Statement::ExportNamedDeclaration(e) => {
                 if let Some(inner) = e.declaration {
-                    self.declare_hoisted_function_inner(inner, DeclMods { exported: true, default: false });
+                    self.declare_hoisted_function_inner(
+                        inner,
+                        DeclMods {
+                            exported: true,
+                            default: false,
+                        },
+                    );
                 }
             }
             Statement::ExportDefaultDeclaration(e) => {
-                let mods = DeclMods { exported: true, default: true };
+                let mods = DeclMods {
+                    exported: true,
+                    default: true,
+                };
                 match &e.declaration {
                     ExportDefaultValue::FunctionDeclaration(f) => {
                         self.bind_default_function(f.id.as_ref(), e.span, mods);
@@ -690,7 +725,11 @@ impl<'a> SymbolBinder<'a> {
                 } else {
                     c.id.as_ref().map(|id| {
                         let d = self.decl_from_ident(id, c.span, mods);
-                        self.declare_block_scoped(d, SymbolFlags::CLASS, SymbolFlags::CLASS_EXCLUDES)
+                        self.declare_block_scoped(
+                            d,
+                            SymbolFlags::CLASS,
+                            SymbolFlags::CLASS_EXCLUDES,
+                        )
                     })
                 };
                 self.bind_class_body(&c.body, sym, c.type_parameters.as_ref());
@@ -708,7 +747,10 @@ impl<'a> SymbolBinder<'a> {
                 let (inc, exc) = if e.r#const {
                     (SymbolFlags::CONST_ENUM, SymbolFlags::CONST_ENUM_EXCLUDES)
                 } else {
-                    (SymbolFlags::REGULAR_ENUM, SymbolFlags::REGULAR_ENUM_EXCLUDES)
+                    (
+                        SymbolFlags::REGULAR_ENUM,
+                        SymbolFlags::REGULAR_ENUM_EXCLUDES,
+                    )
                 };
                 let d = self.decl_from_ident(&e.id, e.span, mods);
                 let sym = self.declare_block_scoped(d, inc, exc);
@@ -725,7 +767,11 @@ impl<'a> SymbolBinder<'a> {
                 // (`exportDeclaration_missingBraces.ts`) is therefore a tsv
                 // parse-rejection, not a gradeable bind.
                 let d = self.decl_from_ident(&t.id, t.span, mods);
-                self.declare_block_scoped(d, SymbolFlags::TYPE_ALIAS, SymbolFlags::TYPE_ALIAS_EXCLUDES);
+                self.declare_block_scoped(
+                    d,
+                    SymbolFlags::TYPE_ALIAS,
+                    SymbolFlags::TYPE_ALIAS_EXCLUDES,
+                );
                 self.bind_type_params_in_new_locals(t.type_parameters.as_ref());
             }
             Statement::ImportDeclaration(imp) => {
@@ -734,7 +780,14 @@ impl<'a> SymbolBinder<'a> {
                 }
             }
             Statement::TSImportEqualsDeclaration(ie) => {
-                let d = self.decl_from_ident(&ie.id, ie.span, DeclMods { exported: ie.is_export, default: false });
+                let d = self.decl_from_ident(
+                    &ie.id,
+                    ie.span,
+                    DeclMods {
+                        exported: ie.is_export,
+                        default: false,
+                    },
+                );
                 // An `import =` with an external reference or a plain entity name
                 // is an alias either way for the family (locals unless exported).
                 let _ = &ie.module_reference;
@@ -742,7 +795,14 @@ impl<'a> SymbolBinder<'a> {
             }
             Statement::ExportNamedDeclaration(e) => {
                 if let Some(inner) = e.declaration {
-                    self.visit_statement(inner, DeclMods { exported: true, default: false }, skip_symbol);
+                    self.visit_statement(
+                        inner,
+                        DeclMods {
+                            exported: true,
+                            default: false,
+                        },
+                        skip_symbol,
+                    );
                 } else {
                     for spec in e.specifiers {
                         self.bind_export_specifier(spec);
@@ -751,7 +811,9 @@ impl<'a> SymbolBinder<'a> {
             }
             Statement::ExportDefaultDeclaration(e) => self.bind_export_default(e, skip_symbol),
             // Control flow: descend for nested bindings + block scopes.
-            Statement::BlockStatement(b) => self.with_block_scope(|bd| bd.bind_statement_list(b.body, true)),
+            Statement::BlockStatement(b) => {
+                self.with_block_scope(|bd| bd.bind_statement_list(b.body, true))
+            }
             Statement::IfStatement(s) => {
                 self.visit_expression(&s.test);
                 self.visit_statement(s.consequent, DeclMods::default(), false);
@@ -861,7 +923,13 @@ impl<'a> SymbolBinder<'a> {
                         node: self.node_id_of(ea),
                     };
                     let table = self.exports_of(sym);
-                    self.declare_symbol(table, Some(sym), d, SymbolFlags::PROPERTY, SymbolFlags::ALL);
+                    self.declare_symbol(
+                        table,
+                        Some(sym),
+                        d,
+                        SymbolFlags::PROPERTY,
+                        SymbolFlags::ALL,
+                    );
                 }
                 self.visit_expression(&ea.expression);
             }
@@ -877,7 +945,14 @@ impl<'a> SymbolBinder<'a> {
     fn bind_var_declaration(&mut self, decl: &tsv_ts::ast::internal::VariableDeclaration<'a>) {
         let (includes, excludes, block_scoped) = var_flags(decl.kind);
         for d in decl.declarations {
-            self.bind_binding(&d.id, includes, excludes, block_scoped, DeclMods::default(), decl.span);
+            self.bind_binding(
+                &d.id,
+                includes,
+                excludes,
+                block_scoped,
+                DeclMods::default(),
+                decl.span,
+            );
             if let Some(init) = &d.init {
                 self.visit_expression(init);
             }
@@ -898,7 +973,10 @@ impl<'a> SymbolBinder<'a> {
         e: &tsv_ts::ast::internal::ExportDefaultDeclaration<'a>,
         skip_symbol: bool,
     ) {
-        let mods = DeclMods { exported: true, default: true };
+        let mods = DeclMods {
+            exported: true,
+            default: true,
+        };
         match &e.declaration {
             ExportDefaultValue::Expression(expr) => {
                 // tsgo `bindExportAssignment` (non-`export =`): excludes = ALL. An
@@ -912,7 +990,11 @@ impl<'a> SymbolBinder<'a> {
                         expr,
                         Expression::Identifier(_) | Expression::MemberExpression(_)
                     );
-                    let flags = if is_alias { SymbolFlags::ALIAS } else { SymbolFlags::PROPERTY };
+                    let flags = if is_alias {
+                        SymbolFlags::ALIAS
+                    } else {
+                        SymbolFlags::PROPERTY
+                    };
                     // The name node is the expression only when it is a bare
                     // identifier (tsgo `getNonAssignedNameOfDeclaration`); otherwise
                     // the whole `export default` node.
@@ -951,20 +1033,29 @@ impl<'a> SymbolBinder<'a> {
             }
             ExportDefaultValue::ClassDeclaration(c) => {
                 let d = self.default_decl(c.id.as_ref(), e.span);
-                let sym = self
-                    .container
-                    .symbol
-                    .map(|cs| {
-                        let table = self.exports_of(cs);
-                        self.declare_symbol(table, Some(cs), d, SymbolFlags::CLASS, SymbolFlags::CLASS_EXCLUDES)
-                    });
+                let sym = self.container.symbol.map(|cs| {
+                    let table = self.exports_of(cs);
+                    self.declare_symbol(
+                        table,
+                        Some(cs),
+                        d,
+                        SymbolFlags::CLASS,
+                        SymbolFlags::CLASS_EXCLUDES,
+                    )
+                });
                 self.bind_class_body(&c.body, sym, c.type_parameters.as_ref());
             }
             ExportDefaultValue::TSInterfaceDeclaration(i) => {
                 let d = self.default_decl(Some(&i.id), e.span);
                 if let Some(cs) = self.container.symbol {
                     let table = self.exports_of(cs);
-                    self.declare_symbol(table, Some(cs), d, SymbolFlags::INTERFACE, SymbolFlags::INTERFACE_EXCLUDES);
+                    self.declare_symbol(
+                        table,
+                        Some(cs),
+                        d,
+                        SymbolFlags::INTERFACE,
+                        SymbolFlags::INTERFACE_EXCLUDES,
+                    );
                 }
                 self.bind_interface_body_symbol_less(&i.body, i.type_parameters.as_ref());
             }
@@ -990,11 +1081,22 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    fn bind_default_function(&mut self, id: Option<&Identifier<'a>>, node_span: Span, _mods: DeclMods) {
+    fn bind_default_function(
+        &mut self,
+        id: Option<&Identifier<'a>>,
+        node_span: Span,
+        _mods: DeclMods,
+    ) {
         if let Some(cs) = self.container.symbol {
             let d = self.default_decl(id, node_span);
             let table = self.exports_of(cs);
-            self.declare_symbol(table, Some(cs), d, SymbolFlags::FUNCTION, SymbolFlags::FUNCTION_EXCLUDES);
+            self.declare_symbol(
+                table,
+                Some(cs),
+                d,
+                SymbolFlags::FUNCTION,
+                SymbolFlags::FUNCTION_EXCLUDES,
+            );
         }
     }
 
@@ -1092,10 +1194,24 @@ impl<'a> SymbolBinder<'a> {
                 for prop in p.properties {
                     match prop {
                         ObjectPatternProperty::Property(pr) => {
-                            self.bind_binding(&pr.value, includes, excludes, block_scoped, mods, pr.span);
+                            self.bind_binding(
+                                &pr.value,
+                                includes,
+                                excludes,
+                                block_scoped,
+                                mods,
+                                pr.span,
+                            );
                         }
                         ObjectPatternProperty::RestElement(r) => {
-                            self.bind_binding(r.argument, includes, excludes, block_scoped, mods, r.span);
+                            self.bind_binding(
+                                r.argument,
+                                includes,
+                                excludes,
+                                block_scoped,
+                                mods,
+                                r.span,
+                            );
                         }
                     }
                 }
@@ -1116,7 +1232,12 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    fn decl_from_ident(&mut self, id: &Identifier<'a>, _node_span: Span, mods: DeclMods) -> DeclInput {
+    fn decl_from_ident(
+        &mut self,
+        id: &Identifier<'a>,
+        _node_span: Span,
+        mods: DeclMods,
+    ) -> DeclInput {
         let name = self.ident_atom(id);
         DeclInput {
             name,
@@ -1153,10 +1274,7 @@ impl<'a> SymbolBinder<'a> {
             let diag = self.make_diag(pdecl.error_span, 2300, Some(&name));
             self.diagnostics.push(diag);
         }
-        let proto_sym = self.new_symbol(
-            SymbolFlags::PROPERTY.union(SymbolFlags::PROTOTYPE),
-            proto,
-        );
+        let proto_sym = self.new_symbol(SymbolFlags::PROPERTY.union(SymbolFlags::PROTOTYPE), proto);
         self.symbols[proto_sym.index()].parent = Some(class_symbol);
         self.tables[exports.index()].insert(proto, proto_sym);
 
@@ -1184,10 +1302,20 @@ impl<'a> SymbolBinder<'a> {
                 let is_static = m.is_static;
                 let (inc, exc) = match m.kind {
                     MethodKind::Constructor => (SymbolFlags::CONSTRUCTOR, SymbolFlags::NONE),
-                    MethodKind::Get => (SymbolFlags::GET_ACCESSOR, SymbolFlags::GET_ACCESSOR_EXCLUDES),
-                    MethodKind::Set => (SymbolFlags::SET_ACCESSOR, SymbolFlags::SET_ACCESSOR_EXCLUDES),
+                    MethodKind::Get => (
+                        SymbolFlags::GET_ACCESSOR,
+                        SymbolFlags::GET_ACCESSOR_EXCLUDES,
+                    ),
+                    MethodKind::Set => (
+                        SymbolFlags::SET_ACCESSOR,
+                        SymbolFlags::SET_ACCESSOR_EXCLUDES,
+                    ),
                     MethodKind::Method => {
-                        let opt = if m.optional { SymbolFlags::OPTIONAL } else { SymbolFlags::NONE };
+                        let opt = if m.optional {
+                            SymbolFlags::OPTIONAL
+                        } else {
+                            SymbolFlags::NONE
+                        };
                         (SymbolFlags::METHOD.union(opt), SymbolFlags::METHOD_EXCLUDES)
                     }
                 };
@@ -1207,7 +1335,9 @@ impl<'a> SymbolBinder<'a> {
                         b.bind_constructor_params(m.value.params, class_symbol);
                         b.bind_statement_list(method_body(&m.value), true);
                     });
-                } else if let Some(key) = self.resolve_member_key(&m.key, m.computed, Some(class_symbol)) {
+                } else if let Some(key) =
+                    self.resolve_member_key(&m.key, m.computed, Some(class_symbol))
+                {
                     let d = DeclInput {
                         name: key.key,
                         display: key.display,
@@ -1240,7 +1370,10 @@ impl<'a> SymbolBinder<'a> {
                     } else {
                         SymbolFlags::NONE
                     };
-                    (SymbolFlags::PROPERTY.union(opt), SymbolFlags::PROPERTY_EXCLUDES)
+                    (
+                        SymbolFlags::PROPERTY.union(opt),
+                        SymbolFlags::PROPERTY_EXCLUDES,
+                    )
                 };
                 if let Some(key) = self.resolve_member_key(&p.key, p.computed, Some(class_symbol)) {
                     let d = DeclInput {
@@ -1273,7 +1406,11 @@ impl<'a> SymbolBinder<'a> {
                     self.bind_param(pp.parameter);
                     // ...and as a class instance member (tsgo bindParameter).
                     if let Expression::Identifier(id) = ident_of_param(pp.parameter) {
-                        let opt = if id.optional { SymbolFlags::OPTIONAL } else { SymbolFlags::NONE };
+                        let opt = if id.optional {
+                            SymbolFlags::OPTIONAL
+                        } else {
+                            SymbolFlags::NONE
+                        };
                         let d = self.decl_from_ident(id, pp.span, DeclMods::default());
                         let table = self.members_of(class_symbol);
                         self.declare_symbol(
@@ -1348,12 +1485,20 @@ impl<'a> SymbolBinder<'a> {
 
     fn bind_type_element(&mut self, element: &TSTypeElement<'a>) {
         let (key_expr, computed, span, inc, exc) = match element {
-            TSTypeElement::PropertySignature(p) => {
-                (&p.key, p.computed, p.span, SymbolFlags::PROPERTY, SymbolFlags::PROPERTY_EXCLUDES)
-            }
-            TSTypeElement::MethodSignature(m) => {
-                (&m.key, m.computed, m.span, SymbolFlags::METHOD, SymbolFlags::METHOD_EXCLUDES)
-            }
+            TSTypeElement::PropertySignature(p) => (
+                &p.key,
+                p.computed,
+                p.span,
+                SymbolFlags::PROPERTY,
+                SymbolFlags::PROPERTY_EXCLUDES,
+            ),
+            TSTypeElement::MethodSignature(m) => (
+                &m.key,
+                m.computed,
+                m.span,
+                SymbolFlags::METHOD,
+                SymbolFlags::METHOD_EXCLUDES,
+            ),
             // Call/construct/index signatures are anonymous (Signature, no conflict).
             TSTypeElement::CallSignature(_)
             | TSTypeElement::ConstructSignature(_)
@@ -1374,7 +1519,11 @@ impl<'a> SymbolBinder<'a> {
         }
     }
 
-    fn bind_enum_members(&mut self, members: &[tsv_ts::ast::internal::TSEnumMember<'a>], enum_symbol: SymbolId) {
+    fn bind_enum_members(
+        &mut self,
+        members: &[tsv_ts::ast::internal::TSEnumMember<'a>],
+        enum_symbol: SymbolId,
+    ) {
         let saved = (self.container, self.block_scope);
         let scope = Scope {
             kind: ContainerKind::Enum,
@@ -1399,7 +1548,11 @@ impl<'a> SymbolBinder<'a> {
                 exported: false,
                 node: NodeId::FIRST,
             };
-            self.declare_in_container(d, SymbolFlags::ENUM_MEMBER, SymbolFlags::ENUM_MEMBER_EXCLUDES);
+            self.declare_in_container(
+                d,
+                SymbolFlags::ENUM_MEMBER,
+                SymbolFlags::ENUM_MEMBER_EXCLUDES,
+            );
             if let Some(init) = &member.initializer {
                 self.visit_expression(init);
             }
@@ -1434,9 +1587,15 @@ impl<'a> SymbolBinder<'a> {
         // types binds as the inert `NamespaceModule`, so it never conflicts with a
         // `var`/`let`/`type` of the same name; one with value content is `ValueModule`.
         let (inc, exc) = if module_instantiated(m) {
-            (SymbolFlags::VALUE_MODULE, SymbolFlags::VALUE_MODULE_EXCLUDES)
+            (
+                SymbolFlags::VALUE_MODULE,
+                SymbolFlags::VALUE_MODULE_EXCLUDES,
+            )
         } else {
-            (SymbolFlags::NAMESPACE_MODULE, SymbolFlags::NAMESPACE_MODULE_EXCLUDES)
+            (
+                SymbolFlags::NAMESPACE_MODULE,
+                SymbolFlags::NAMESPACE_MODULE_EXCLUDES,
+            )
         };
         let sym = self.declare_block_scoped(d, inc, exc);
 
@@ -1514,7 +1673,9 @@ impl<'a> SymbolBinder<'a> {
     /// aliases route to `exports`, others to `locals`.
     fn declare_alias(&mut self, decl: DeclInput, to_exports: bool) {
         match self.container.kind {
-            ContainerKind::Module | ContainerKind::SourceFile if self.container.symbol.is_some() => {
+            ContainerKind::Module | ContainerKind::SourceFile
+                if self.container.symbol.is_some() =>
+            {
                 if to_exports {
                     let sym = self.container.symbol.unwrap();
                     let mut d = decl;
@@ -1522,15 +1683,33 @@ impl<'a> SymbolBinder<'a> {
                         d.name = self.atoms.default_export();
                     }
                     let table = self.exports_of(sym);
-                    self.declare_symbol(table, Some(sym), d, SymbolFlags::ALIAS, SymbolFlags::ALIAS_EXCLUDES);
+                    self.declare_symbol(
+                        table,
+                        Some(sym),
+                        d,
+                        SymbolFlags::ALIAS,
+                        SymbolFlags::ALIAS_EXCLUDES,
+                    );
                 } else {
                     let table = self.container.locals.expect("locals for alias");
-                    self.declare_symbol(table, None, decl, SymbolFlags::ALIAS, SymbolFlags::ALIAS_EXCLUDES);
+                    self.declare_symbol(
+                        table,
+                        None,
+                        decl,
+                        SymbolFlags::ALIAS,
+                        SymbolFlags::ALIAS_EXCLUDES,
+                    );
                 }
             }
             _ => {
                 if let Some(table) = self.container.locals {
-                    self.declare_symbol(table, None, decl, SymbolFlags::ALIAS, SymbolFlags::ALIAS_EXCLUDES);
+                    self.declare_symbol(
+                        table,
+                        None,
+                        decl,
+                        SymbolFlags::ALIAS,
+                        SymbolFlags::ALIAS_EXCLUDES,
+                    );
                 }
             }
         }
@@ -1542,12 +1721,19 @@ impl<'a> SymbolBinder<'a> {
         if let Some(tp) = type_params {
             for p in tp.params {
                 let d = self.decl_from_ident(&p.name, p.span, DeclMods::default());
-                self.declare_in_container(d, SymbolFlags::TYPE_PARAMETER, SymbolFlags::TYPE_PARAMETER_EXCLUDES);
+                self.declare_in_container(
+                    d,
+                    SymbolFlags::TYPE_PARAMETER,
+                    SymbolFlags::TYPE_PARAMETER_EXCLUDES,
+                );
             }
         }
     }
 
-    fn bind_type_params_in_new_locals(&mut self, type_params: Option<&TSTypeParameterDeclaration<'a>>) {
+    fn bind_type_params_in_new_locals(
+        &mut self,
+        type_params: Option<&TSTypeParameterDeclaration<'a>>,
+    ) {
         if type_params.is_none() {
             return;
         }
@@ -1569,7 +1755,9 @@ impl<'a> SymbolBinder<'a> {
                 self.with_function_scope(a.type_parameters.as_ref(), |b| {
                     b.bind_params(a.params);
                     match &a.body {
-                        tsv_ts::ast::internal::ArrowFunctionBody::Expression(e) => b.visit_expression(e),
+                        tsv_ts::ast::internal::ArrowFunctionBody::Expression(e) => {
+                            b.visit_expression(e)
+                        }
                         tsv_ts::ast::internal::ArrowFunctionBody::BlockStatement(block) => {
                             b.bind_statement_list(block.body, true);
                         }
@@ -1669,10 +1857,15 @@ impl<'a> SymbolBinder<'a> {
         if computed {
             // A computed key names a member only for a string/numeric literal.
             return match key {
-                Expression::Literal(lit) if matches!(lit.value, LiteralValue::String(_) | LiteralValue::Number(_)) =>
+                Expression::Literal(lit)
+                    if matches!(lit.value, LiteralValue::String(_) | LiteralValue::Number(_)) =>
                 {
                     let a = self.string_atom(lit);
-                    Some(KeyInfo { key: a, display: a, span: lit.span })
+                    Some(KeyInfo {
+                        key: a,
+                        display: a,
+                        span: lit.span,
+                    })
                 }
                 _ => None,
             };
@@ -1680,27 +1873,35 @@ impl<'a> SymbolBinder<'a> {
         match key {
             Expression::Identifier(id) => {
                 let a = self.ident_atom(id);
-                Some(KeyInfo { key: a, display: a, span: id.name_span() })
+                Some(KeyInfo {
+                    key: a,
+                    display: a,
+                    span: id.name_span(),
+                })
             }
             Expression::Literal(lit) => {
                 let a = self.string_atom(lit);
-                Some(KeyInfo { key: a, display: a, span: lit.span })
+                Some(KeyInfo {
+                    key: a,
+                    display: a,
+                    span: lit.span,
+                })
             }
             Expression::PrivateIdentifier(pid) => {
                 let raw = pid.name(self.source, self.interner);
                 let display = self.atoms.intern(raw);
                 // Mangle with the class symbol id so same-name privates in one
                 // class collide (tsgo GetSymbolNameForPrivateIdentifier).
-                let mangled = format!(
-                    "\u{FE}#{}@{}",
-                    class_symbol.map_or(0, |s| s.0),
-                    raw
-                );
+                let mangled = format!("\u{FE}#{}@{}", class_symbol.map_or(0, |s| s.0), raw);
                 let key = self.atoms.intern(&mangled);
                 // The diagnostic points at the whole `#name` node (tsgo's
                 // `getNameOfDeclaration` -> the PrivateIdentifier), so the squiggle
                 // covers the `#`.
-                Some(KeyInfo { key, display, span: pid.span })
+                Some(KeyInfo {
+                    key,
+                    display,
+                    span: pid.span,
+                })
             }
             _ => None,
         }
@@ -1717,7 +1918,9 @@ struct KeyInfo {
 /// A [`SymbolFlags`] triple for a variable declaration kind: `(includes,
 /// excludes, block_scoped)`. `block_scoped` selects `bindBlockScopedDeclaration`
 /// (block-scope routing) over `declareSymbolAndAddToSymbolTable` (container).
-fn var_flags(kind: tsv_ts::ast::internal::VariableDeclarationKind) -> (SymbolFlags, SymbolFlags, bool) {
+fn var_flags(
+    kind: tsv_ts::ast::internal::VariableDeclarationKind,
+) -> (SymbolFlags, SymbolFlags, bool) {
     use tsv_ts::ast::internal::VariableDeclarationKind as K;
     match kind {
         // `var` is function-scoped (routes through the container).
@@ -1755,7 +1958,10 @@ fn is_function_statement(stmt: &Statement<'_>) -> bool {
     match stmt {
         Statement::FunctionDeclaration(_) | Statement::TSDeclareFunction(_) => true,
         Statement::ExportNamedDeclaration(e) => e.declaration.is_some_and(|inner| {
-            matches!(inner, Statement::FunctionDeclaration(_) | Statement::TSDeclareFunction(_))
+            matches!(
+                inner,
+                Statement::FunctionDeclaration(_) | Statement::TSDeclareFunction(_)
+            )
         }),
         Statement::ExportDefaultDeclaration(e) => matches!(
             e.declaration,
@@ -1833,10 +2039,12 @@ fn statement_is_non_instantiated(stmt: &Statement<'_>) -> bool {
 fn message_for(code: u32, name: Option<&str>) -> String {
     match code {
         2300 => format!("Duplicate identifier '{}'.", name.unwrap_or("")),
-        2451 => format!("Cannot redeclare block-scoped variable '{}'.", name.unwrap_or("")),
-        2567 => {
-            "Enum declarations can only merge with namespace or other enum declarations.".to_string()
-        }
+        2451 => format!(
+            "Cannot redeclare block-scoped variable '{}'.",
+            name.unwrap_or("")
+        ),
+        2567 => "Enum declarations can only merge with namespace or other enum declarations."
+            .to_string(),
         2528 => "A module cannot have multiple default exports.".to_string(),
         2752 => "The first export default is here.".to_string(),
         2753 => "Another export default is here.".to_string(),

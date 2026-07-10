@@ -75,26 +75,56 @@ const fn om(
 pub const OPTIONS: &[OptionMeta] = &[
     om("help", OptionKind::Boolean, true, false, false),
     om("watch", OptionKind::Boolean, true, false, false),
-    om("preserveWatchOutput", OptionKind::Boolean, false, false, false),
+    om(
+        "preserveWatchOutput",
+        OptionKind::Boolean,
+        false,
+        false,
+        false,
+    ),
     om("listFiles", OptionKind::Boolean, false, false, false),
     om("explainFiles", OptionKind::Boolean, false, false, false),
     om("listEmittedFiles", OptionKind::Boolean, false, false, false),
     om("pretty", OptionKind::Boolean, false, false, false),
     om("traceResolution", OptionKind::Boolean, false, false, false),
     om("diagnostics", OptionKind::Boolean, false, false, false),
-    om("extendedDiagnostics", OptionKind::Boolean, false, false, false),
+    om(
+        "extendedDiagnostics",
+        OptionKind::Boolean,
+        false,
+        false,
+        false,
+    ),
     om("generateCpuProfile", OptionKind::Str, false, false, false),
     om("generateTrace", OptionKind::Str, false, false, false),
     om("incremental", OptionKind::Boolean, false, false, false),
     om("declaration", OptionKind::Boolean, false, true, false),
     om("declarationMap", OptionKind::Boolean, false, true, false),
-    om("emitDeclarationOnly", OptionKind::Boolean, false, true, false),
+    om(
+        "emitDeclarationOnly",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("sourceMap", OptionKind::Boolean, false, true, false),
     om("inlineSourceMap", OptionKind::Boolean, false, true, false),
     om("noCheck", OptionKind::Boolean, false, false, false),
-    om("deduplicatePackages", OptionKind::Boolean, false, true, false),
+    om(
+        "deduplicatePackages",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("noEmit", OptionKind::Boolean, false, false, false),
-    om("assumeChangesOnlyAffectDirectDependencies", OptionKind::Boolean, false, true, false),
+    om(
+        "assumeChangesOnlyAffectDirectDependencies",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("locale", OptionKind::Str, true, false, false),
     om("quiet", OptionKind::Boolean, false, false, false),
     om("singleThreaded", OptionKind::Boolean, false, false, false),
@@ -120,60 +150,222 @@ pub const OPTIONS: &[OptionMeta] = &[
     om("tsBuildInfoFile", OptionKind::Str, false, true, false),
     om("removeComments", OptionKind::Boolean, false, true, false),
     om("importHelpers", OptionKind::Boolean, false, true, false),
-    om("downlevelIteration", OptionKind::Boolean, false, true, false),
+    om(
+        "downlevelIteration",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("isolatedModules", OptionKind::Boolean, false, false, false),
-    om("verbatimModuleSyntax", OptionKind::Boolean, false, true, false),
-    om("isolatedDeclarations", OptionKind::Boolean, false, true, false),
-    om("erasableSyntaxOnly", OptionKind::Boolean, false, true, false),
+    om(
+        "verbatimModuleSyntax",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "isolatedDeclarations",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "erasableSyntaxOnly",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("libReplacement", OptionKind::Boolean, false, true, false),
     om("strict", OptionKind::Boolean, false, true, false),
     om("noImplicitAny", OptionKind::Boolean, false, true, true),
     om("strictNullChecks", OptionKind::Boolean, false, true, true),
-    om("strictFunctionTypes", OptionKind::Boolean, false, true, true),
-    om("strictBindCallApply", OptionKind::Boolean, false, true, true),
-    om("strictPropertyInitialization", OptionKind::Boolean, false, true, true),
-    om("strictBuiltinIteratorReturn", OptionKind::Boolean, false, true, true),
+    om(
+        "strictFunctionTypes",
+        OptionKind::Boolean,
+        false,
+        true,
+        true,
+    ),
+    om(
+        "strictBindCallApply",
+        OptionKind::Boolean,
+        false,
+        true,
+        true,
+    ),
+    om(
+        "strictPropertyInitialization",
+        OptionKind::Boolean,
+        false,
+        true,
+        true,
+    ),
+    om(
+        "strictBuiltinIteratorReturn",
+        OptionKind::Boolean,
+        false,
+        true,
+        true,
+    ),
     om("noImplicitThis", OptionKind::Boolean, false, true, true),
-    om("useUnknownInCatchVariables", OptionKind::Boolean, false, true, true),
+    om(
+        "useUnknownInCatchVariables",
+        OptionKind::Boolean,
+        false,
+        true,
+        true,
+    ),
     om("alwaysStrict", OptionKind::Boolean, false, true, false),
-    om("stableTypeOrdering", OptionKind::Boolean, false, true, false),
+    om(
+        "stableTypeOrdering",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("noUnusedLocals", OptionKind::Boolean, false, true, false),
-    om("noUnusedParameters", OptionKind::Boolean, false, true, false),
-    om("exactOptionalPropertyTypes", OptionKind::Boolean, false, true, false),
+    om(
+        "noUnusedParameters",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "exactOptionalPropertyTypes",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("noImplicitReturns", OptionKind::Boolean, false, true, false),
-    om("noFallthroughCasesInSwitch", OptionKind::Boolean, false, true, false),
-    om("noUncheckedIndexedAccess", OptionKind::Boolean, false, true, false),
-    om("noImplicitOverride", OptionKind::Boolean, false, true, false),
-    om("noPropertyAccessFromIndexSignature", OptionKind::Boolean, false, true, false),
+    om(
+        "noFallthroughCasesInSwitch",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "noUncheckedIndexedAccess",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "noImplicitOverride",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "noPropertyAccessFromIndexSignature",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("moduleResolution", OptionKind::Enum, false, true, false),
     om("baseUrl", OptionKind::Str, false, true, false),
     om("paths", OptionKind::Object, false, true, false),
     om("rootDirs", OptionKind::List, false, true, false),
     om("typeRoots", OptionKind::List, false, true, false),
     om("types", OptionKind::List, false, true, false),
-    om("allowSyntheticDefaultImports", OptionKind::Boolean, false, true, false),
+    om(
+        "allowSyntheticDefaultImports",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("esModuleInterop", OptionKind::Boolean, false, true, false),
     om("preserveSymlinks", OptionKind::Boolean, false, false, false),
-    om("allowUmdGlobalAccess", OptionKind::Boolean, false, true, false),
+    om(
+        "allowUmdGlobalAccess",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("moduleSuffixes", OptionKind::List, false, true, false),
-    om("allowImportingTsExtensions", OptionKind::Boolean, false, true, false),
-    om("rewriteRelativeImportExtensions", OptionKind::Boolean, false, true, false),
-    om("resolvePackageJsonExports", OptionKind::Boolean, false, true, false),
-    om("resolvePackageJsonImports", OptionKind::Boolean, false, true, false),
+    om(
+        "allowImportingTsExtensions",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "rewriteRelativeImportExtensions",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "resolvePackageJsonExports",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "resolvePackageJsonImports",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("customConditions", OptionKind::List, false, true, false),
-    om("noUncheckedSideEffectImports", OptionKind::Boolean, false, true, false),
+    om(
+        "noUncheckedSideEffectImports",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("sourceRoot", OptionKind::Str, false, true, false),
     om("mapRoot", OptionKind::Str, false, true, false),
     om("inlineSources", OptionKind::Boolean, false, true, false),
-    om("experimentalDecorators", OptionKind::Boolean, false, true, false),
-    om("emitDecoratorMetadata", OptionKind::Boolean, false, true, false),
+    om(
+        "experimentalDecorators",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "emitDecoratorMetadata",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("jsxFactory", OptionKind::Str, false, false, false),
     om("jsxFragmentFactory", OptionKind::Str, false, false, false),
     om("jsxImportSource", OptionKind::Str, false, true, false),
     om("resolveJsonModule", OptionKind::Boolean, false, true, false),
-    om("allowArbitraryExtensions", OptionKind::Boolean, false, true, false),
+    om(
+        "allowArbitraryExtensions",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("reactNamespace", OptionKind::Str, false, true, false),
-    om("skipDefaultLibCheck", OptionKind::Boolean, false, true, false),
+    om(
+        "skipDefaultLibCheck",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("emitBOM", OptionKind::Boolean, false, true, false),
     om("newLine", OptionKind::Enum, false, true, false),
     om("noErrorTruncation", OptionKind::Boolean, false, true, false),
@@ -181,19 +373,67 @@ pub const OPTIONS: &[OptionMeta] = &[
     om("noResolve", OptionKind::Boolean, false, true, false),
     om("stripInternal", OptionKind::Boolean, false, true, false),
     om("disableSizeLimit", OptionKind::Boolean, false, true, false),
-    om("disableSourceOfProjectReferenceRedirect", OptionKind::Boolean, false, false, false),
-    om("disableSolutionSearching", OptionKind::Boolean, false, false, false),
-    om("disableReferencedProjectLoad", OptionKind::Boolean, false, false, false),
+    om(
+        "disableSourceOfProjectReferenceRedirect",
+        OptionKind::Boolean,
+        false,
+        false,
+        false,
+    ),
+    om(
+        "disableSolutionSearching",
+        OptionKind::Boolean,
+        false,
+        false,
+        false,
+    ),
+    om(
+        "disableReferencedProjectLoad",
+        OptionKind::Boolean,
+        false,
+        false,
+        false,
+    ),
     om("noEmitHelpers", OptionKind::Boolean, false, true, false),
     om("noEmitOnError", OptionKind::Boolean, false, true, false),
-    om("preserveConstEnums", OptionKind::Boolean, false, true, false),
+    om(
+        "preserveConstEnums",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("declarationDir", OptionKind::Str, false, true, false),
     om("skipLibCheck", OptionKind::Boolean, false, true, false),
     om("allowUnusedLabels", OptionKind::Boolean, false, true, false),
-    om("allowUnreachableCode", OptionKind::Boolean, false, true, false),
-    om("forceConsistentCasingInFileNames", OptionKind::Boolean, false, true, false),
-    om("maxNodeModuleJsDepth", OptionKind::Number, false, true, false),
-    om("useDefineForClassFields", OptionKind::Boolean, false, true, false),
+    om(
+        "allowUnreachableCode",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "forceConsistentCasingInFileNames",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "maxNodeModuleJsDepth",
+        OptionKind::Number,
+        false,
+        true,
+        false,
+    ),
+    om(
+        "useDefineForClassFields",
+        OptionKind::Boolean,
+        false,
+        true,
+        false,
+    ),
     om("plugins", OptionKind::List, false, false, false),
     om("moduleDetection", OptionKind::Enum, false, true, false),
     om("ignoreDeprecations", OptionKind::Str, false, false, false),
@@ -250,19 +490,47 @@ pub const ENUM_ENTRIES: &[EnumEntry] = &[
     ee("module", "node20", "core.ModuleKindNode20"),
     ee("module", "nodenext", "core.ModuleKindNodeNext"),
     ee("module", "preserve", "core.ModuleKindPreserve"),
-    ee("moduleResolution", "node16", "core.ModuleResolutionKindNode16"),
-    ee("moduleResolution", "nodenext", "core.ModuleResolutionKindNodeNext"),
-    ee("moduleResolution", "bundler", "core.ModuleResolutionKindBundler"),
-    ee("moduleResolution", "classic", "core.ModuleResolutionKindClassic"),
-    ee("moduleResolution", "node", "core.ModuleResolutionKindNode10"),
-    ee("moduleResolution", "node10", "core.ModuleResolutionKindNode10"),
+    ee(
+        "moduleResolution",
+        "node16",
+        "core.ModuleResolutionKindNode16",
+    ),
+    ee(
+        "moduleResolution",
+        "nodenext",
+        "core.ModuleResolutionKindNodeNext",
+    ),
+    ee(
+        "moduleResolution",
+        "bundler",
+        "core.ModuleResolutionKindBundler",
+    ),
+    ee(
+        "moduleResolution",
+        "classic",
+        "core.ModuleResolutionKindClassic",
+    ),
+    ee(
+        "moduleResolution",
+        "node",
+        "core.ModuleResolutionKindNode10",
+    ),
+    ee(
+        "moduleResolution",
+        "node10",
+        "core.ModuleResolutionKindNode10",
+    ),
     ee("jsx", "preserve", "core.JsxEmitPreserve"),
     ee("jsx", "react-native", "core.JsxEmitReactNative"),
     ee("jsx", "react-jsx", "core.JsxEmitReactJSX"),
     ee("jsx", "react-jsxdev", "core.JsxEmitReactJSXDev"),
     ee("jsx", "react", "core.JsxEmitReact"),
     ee("moduleDetection", "auto", "core.ModuleDetectionKindAuto"),
-    ee("moduleDetection", "legacy", "core.ModuleDetectionKindLegacy"),
+    ee(
+        "moduleDetection",
+        "legacy",
+        "core.ModuleDetectionKindLegacy",
+    ),
     ee("moduleDetection", "force", "core.ModuleDetectionKindForce"),
     ee("newLine", "crlf", "core.NewLineKindCRLF"),
     ee("newLine", "lf", "core.NewLineKindLF"),
@@ -420,8 +688,12 @@ pub fn is_known_directive(name_lower: &str) -> bool {
         return true;
     }
     lookup(name_lower).is_some()
-        || SYNTHETIC_OPTIONS.iter().any(|s| s.eq_ignore_ascii_case(name_lower))
-        || HARNESS_OPTIONS.iter().any(|s| s.eq_ignore_ascii_case(name_lower))
+        || SYNTHETIC_OPTIONS
+            .iter()
+            .any(|s| s.eq_ignore_ascii_case(name_lower))
+        || HARNESS_OPTIONS
+            .iter()
+            .any(|s| s.eq_ignore_ascii_case(name_lower))
 }
 
 /// A normalized option value — the identity used for variant dedup within one
@@ -441,7 +713,10 @@ pub enum NormValue {
 #[must_use]
 pub fn normalize_value(option_lower: &str, value: &str) -> Option<NormValue> {
     let vlower = value.to_ascii_lowercase();
-    if ENUM_ENTRIES.iter().any(|e| e.option.eq_ignore_ascii_case(option_lower)) {
+    if ENUM_ENTRIES
+        .iter()
+        .any(|e| e.option.eq_ignore_ascii_case(option_lower))
+    {
         return ENUM_ENTRIES
             .iter()
             .find(|e| e.option.eq_ignore_ascii_case(option_lower) && e.key == vlower)
@@ -462,7 +737,10 @@ pub fn normalize_value(option_lower: &str, value: &str) -> Option<NormValue> {
 /// `getAllValuesForOption` (the `*` expansion source).
 #[must_use]
 pub fn all_values(option_lower: &str) -> Vec<&'static str> {
-    if ENUM_ENTRIES.iter().any(|e| e.option.eq_ignore_ascii_case(option_lower)) {
+    if ENUM_ENTRIES
+        .iter()
+        .any(|e| e.option.eq_ignore_ascii_case(option_lower))
+    {
         return ENUM_ENTRIES
             .iter()
             .filter(|e| e.option.eq_ignore_ascii_case(option_lower))
@@ -481,7 +759,11 @@ pub fn all_values(option_lower: &str) -> Vec<&'static str> {
 /// explicit tri-state).
 #[must_use]
 pub fn strict_members() -> Vec<&'static str> {
-    OPTIONS.iter().filter(|o| o.strict_flag).map(|o| o.name).collect()
+    OPTIONS
+        .iter()
+        .filter(|o| o.strict_flag)
+        .map(|o| o.name)
+        .collect()
 }
 
 /// Resolve a boolean option's explicit tri-state from a variant config: `True` /
@@ -538,7 +820,11 @@ pub fn variant_is_unsupported(config: &BTreeMap<String, String>) -> bool {
     }
     // Explicitly-false booleans (`IsFalse()`: an unset value inherits, so only an
     // explicit `False` triggers the skip).
-    for key in ["esmoduleinterop", "allowsyntheticdefaultimports", "alwaysstrict"] {
+    for key in [
+        "esmoduleinterop",
+        "allowsyntheticdefaultimports",
+        "alwaysstrict",
+    ] {
         if resolve_bool(config, key) == Tristate::False {
             return true;
         }
@@ -602,9 +888,15 @@ mod tests {
             normalize_value("target", "es6"),
             normalize_value("target", "ES2015")
         );
-        assert_eq!(normalize_value("strict", "TRUE"), Some(NormValue::Bool(true)));
+        assert_eq!(
+            normalize_value("strict", "TRUE"),
+            Some(NormValue::Bool(true))
+        );
         assert_eq!(normalize_value("target", "nope"), None);
-        assert_eq!(all_values("moduledetection"), vec!["auto", "legacy", "force"]);
+        assert_eq!(
+            all_values("moduledetection"),
+            vec!["auto", "legacy", "force"]
+        );
         assert_eq!(all_values("strict"), vec!["true", "false"]);
     }
 

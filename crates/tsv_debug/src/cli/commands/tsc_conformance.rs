@@ -8,8 +8,8 @@ use crate::cli::CliError;
 use crate::tsc_conformance::index::IndexReport;
 use crate::tsc_conformance::runner::SkeletonReport;
 use crate::tsc_conformance::{
-    baselines_dir, check_one, corpus_materialized, denominators, discover_baselines, histogram,
-    run_index, run_roundtrip, run_skeleton, tests_by_code, RunFilter, RunOptions,
+    RunFilter, RunOptions, baselines_dir, check_one, corpus_materialized, denominators,
+    discover_baselines, histogram, run_index, run_roundtrip, run_skeleton, tests_by_code,
 };
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
@@ -318,7 +318,10 @@ impl RunCommand {
             return Err(CliError::Failed);
         }
 
-        let options = RunOptions { filter, collect_manifest: self.emit_manifest.is_some() };
+        let options = RunOptions {
+            filter,
+            collect_manifest: self.emit_manifest.is_some(),
+        };
         let report = run_skeleton(&self.path, &options).map_err(|e| {
             eprintln!("Error running skeleton sweep: {e}");
             CliError::Failed
@@ -361,7 +364,11 @@ impl RunCommand {
             }
             None => None,
         };
-        Ok(RunFilter { test: self.test.clone(), code: self.code, variant })
+        Ok(RunFilter {
+            test: self.test.clone(),
+            code: self.code,
+            variant,
+        })
     }
 }
 
@@ -434,12 +441,42 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
                 errs.push(format!("{label} {got} != pinned {want}"));
             }
         };
-        pin(&mut errs, "in-scope tests", report.in_scope_tests, RUN_IN_SCOPE_TESTS_PIN);
-        pin(&mut errs, "in-scope variants", report.in_scope_variants, RUN_IN_SCOPE_VARIANTS_PIN);
-        pin(&mut errs, "expect-clean graded", report.expect_clean_graded, RUN_EXPECT_CLEAN_PIN);
-        pin(&mut errs, "clean pass", report.clean_pass, RUN_EXPECT_CLEAN_PIN);
-        pin(&mut errs, "baselined parsed", report.baselined_parsed, RUN_BASELINED_PARSED_PIN);
-        pin(&mut errs, "parse-rejected", report.parse_rejected_total, RUN_PARSE_REJECTED_PIN);
+        pin(
+            &mut errs,
+            "in-scope tests",
+            report.in_scope_tests,
+            RUN_IN_SCOPE_TESTS_PIN,
+        );
+        pin(
+            &mut errs,
+            "in-scope variants",
+            report.in_scope_variants,
+            RUN_IN_SCOPE_VARIANTS_PIN,
+        );
+        pin(
+            &mut errs,
+            "expect-clean graded",
+            report.expect_clean_graded,
+            RUN_EXPECT_CLEAN_PIN,
+        );
+        pin(
+            &mut errs,
+            "clean pass",
+            report.clean_pass,
+            RUN_EXPECT_CLEAN_PIN,
+        );
+        pin(
+            &mut errs,
+            "baselined parsed",
+            report.baselined_parsed,
+            RUN_BASELINED_PARSED_PIN,
+        );
+        pin(
+            &mut errs,
+            "parse-rejected",
+            report.parse_rejected_total,
+            RUN_PARSE_REJECTED_PIN,
+        );
         pin(
             &mut errs,
             "parse-rejected (no baseline)",
@@ -458,21 +495,76 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
             report.parse_rejected_other,
             RUN_PARSE_REJECTED_OTHER_PIN,
         );
-        pin(&mut errs, "script retries", report.script_retry, RUN_SCRIPT_RETRY_PIN);
-        pin(&mut errs, "crash-excluded", report.excluded_crashes, RUN_CRASH_EXCLUDED_PIN);
+        pin(
+            &mut errs,
+            "script retries",
+            report.script_retry,
+            RUN_SCRIPT_RETRY_PIN,
+        );
+        pin(
+            &mut errs,
+            "crash-excluded",
+            report.excluded_crashes,
+            RUN_CRASH_EXCLUDED_PIN,
+        );
 
         // Lib-base (S5) sizing pins.
-        pin(&mut errs, "lib files bound", report.lib_files_bound, RUN_LIB_FILES_BOUND_PIN);
-        pin(&mut errs, "lib sets folded", report.lib_sets_built, RUN_LIB_SETS_PIN);
+        pin(
+            &mut errs,
+            "lib files bound",
+            report.lib_files_bound,
+            RUN_LIB_FILES_BOUND_PIN,
+        );
+        pin(
+            &mut errs,
+            "lib sets folded",
+            report.lib_sets_built,
+            RUN_LIB_SETS_PIN,
+        );
 
         // Family grading pins.
-        pin(&mut errs, "family graded", report.family_graded_variants, RUN_FAMILY_GRADED_PIN);
-        pin(&mut errs, "family positive", report.family_positive_variants, RUN_FAMILY_POSITIVE_PIN);
-        pin(&mut errs, "family match", report.family_match, RUN_FAMILY_MATCH_PIN);
-        pin(&mut errs, "family missing", report.family_missing, RUN_FAMILY_MISSING_PIN);
-        pin(&mut errs, "missing merge", report.missing_merge, RUN_MISSING_MERGE_PIN);
-        pin(&mut errs, "missing lib", report.missing_lib, RUN_MISSING_LIB_PIN);
-        pin(&mut errs, "missing check-time", report.missing_other, RUN_MISSING_CHECKTIME_PIN);
+        pin(
+            &mut errs,
+            "family graded",
+            report.family_graded_variants,
+            RUN_FAMILY_GRADED_PIN,
+        );
+        pin(
+            &mut errs,
+            "family positive",
+            report.family_positive_variants,
+            RUN_FAMILY_POSITIVE_PIN,
+        );
+        pin(
+            &mut errs,
+            "family match",
+            report.family_match,
+            RUN_FAMILY_MATCH_PIN,
+        );
+        pin(
+            &mut errs,
+            "family missing",
+            report.family_missing,
+            RUN_FAMILY_MISSING_PIN,
+        );
+        pin(
+            &mut errs,
+            "missing merge",
+            report.missing_merge,
+            RUN_MISSING_MERGE_PIN,
+        );
+        pin(
+            &mut errs,
+            "missing lib",
+            report.missing_lib,
+            RUN_MISSING_LIB_PIN,
+        );
+        pin(
+            &mut errs,
+            "missing check-time",
+            report.missing_other,
+            RUN_MISSING_CHECKTIME_PIN,
+        );
         pin(
             &mut errs,
             "family span_mismatch",
@@ -481,9 +573,24 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
         );
 
         // Related-info channel pins (two-sided; does not gate the primary verdict).
-        pin(&mut errs, "related match", report.related_match, RUN_RELATED_MATCH_PIN);
-        pin(&mut errs, "related missing", report.related_missing, RUN_RELATED_MISSING_PIN);
-        pin(&mut errs, "related extra", report.related_extra, RUN_RELATED_EXTRA_PIN);
+        pin(
+            &mut errs,
+            "related match",
+            report.related_match,
+            RUN_RELATED_MATCH_PIN,
+        );
+        pin(
+            &mut errs,
+            "related missing",
+            report.related_missing,
+            RUN_RELATED_MISSING_PIN,
+        );
+        pin(
+            &mut errs,
+            "related extra",
+            report.related_extra,
+            RUN_RELATED_EXTRA_PIN,
+        );
         pin(
             &mut errs,
             "related span_mismatch",
@@ -491,7 +598,12 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
             RUN_RELATED_SPAN_MISMATCH_PIN,
         );
 
-        pin(&mut errs, "carve-out rule (a)", report.carve_out_rule_a, RUN_CARVE_OUT_RULE_A_PIN);
+        pin(
+            &mut errs,
+            "carve-out rule (a)",
+            report.carve_out_rule_a,
+            RUN_CARVE_OUT_RULE_A_PIN,
+        );
         pin(
             &mut errs,
             "carve-out rule (a) family",
@@ -591,7 +703,10 @@ struct RunManifest<'a> {
 /// Write the `--emit-manifest` JSON (per-variant verdicts + buckets + census + pins).
 /// Called only after the gates pass, so a bad manifest never lands.
 fn write_manifest(report: &SkeletonReport, path: &Path) -> Result<(), CliError> {
-    let manifest = RunManifest { pins: run_pins(), report };
+    let manifest = RunManifest {
+        pins: run_pins(),
+        report,
+    };
     let file = std::fs::File::create(path).map_err(|e| {
         eprintln!("Error creating manifest {}: {e}", path.display());
         CliError::Failed
@@ -711,7 +826,11 @@ fn render_report_md(report: &SkeletonReport) -> String {
         .collect();
     for code in codes {
         let m = report.family_match_by_code.get(&code).copied().unwrap_or(0);
-        let miss = report.family_missing_by_code.get(&code).copied().unwrap_or(0);
+        let miss = report
+            .family_missing_by_code
+            .get(&code)
+            .copied()
+            .unwrap_or(0);
         let _ = writeln!(s, "| TS{code} | {m} | {miss} |");
     }
     s.push('\n');
@@ -748,7 +867,11 @@ fn render_report_md(report: &SkeletonReport) -> String {
         report.parse_rejected_other
     );
     let _ = writeln!(s, "- script-goal retries: {}", report.script_retry);
-    let _ = writeln!(s, "- crash-excluded (tracked): {}\n", report.excluded_crashes);
+    let _ = writeln!(
+        s,
+        "- crash-excluded (tracked): {}\n",
+        report.excluded_crashes
+    );
 
     s.push_str("## Lib base\n\n");
     let _ = writeln!(
@@ -779,7 +902,11 @@ fn write_report(report: &SkeletonReport, base: &Path) -> Result<(), CliError> {
         eprintln!("Error writing {}: {e}", md_path.display());
         CliError::Failed
     })?;
-    println!("Wrote committed report to {} + {}", json_path.display(), md_path.display());
+    println!(
+        "Wrote committed report to {} + {}",
+        json_path.display(),
+        md_path.display()
+    );
     Ok(())
 }
 
@@ -800,7 +927,11 @@ fn write_diff_artifacts(report: &SkeletonReport) {
         dir.display()
     );
     for fv in &report.failing_variants {
-        let path = dir.join(format!("{}__{}.diff", fv.suite, sanitize_artifact_name(&fv.config)));
+        let path = dir.join(format!(
+            "{}__{}.diff",
+            fv.suite,
+            sanitize_artifact_name(&fv.config)
+        ));
         match std::fs::write(&path, &fv.diff) {
             Ok(()) => eprintln!("  {} ({})", path.display(), fv.reason),
             Err(e) => eprintln!("  (failed to write {}: {e})", path.display()),
@@ -811,7 +942,13 @@ fn write_diff_artifacts(report: &SkeletonReport) {
 /// Replace path-hostile characters so a baseline identity is a safe artifact basename.
 fn sanitize_artifact_name(name: &str) -> String {
     name.chars()
-        .map(|c| if c == '/' || c == '\\' || c.is_whitespace() { '_' } else { c })
+        .map(|c| {
+            if c == '/' || c == '\\' || c.is_whitespace() {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect()
 }
 
@@ -898,25 +1035,75 @@ fn enforce_index_pins(report: &IndexReport) -> Result<(), CliError> {
     };
 
     // Denominators (gate 3).
-    pin(&mut errs, "total scanned", report.total_scanned, INDEX_TOTAL_SCANNED_PIN);
+    pin(
+        &mut errs,
+        "total scanned",
+        report.total_scanned,
+        INDEX_TOTAL_SCANNED_PIN,
+    );
     pin(&mut errs, ".ts count", report.ts_count, INDEX_TS_PIN);
     pin(&mut errs, ".tsx count", report.tsx_count, INDEX_TSX_PIN);
     pin(&mut errs, ".js count", report.js_count, INDEX_JS_PIN);
-    pin(&mut errs, "skipped tests", report.skipped_tests, INDEX_SKIPPED_TESTS_PIN);
-    pin(&mut errs, "single-file", report.single_file, INDEX_SINGLE_FILE_PIN);
-    pin(&mut errs, "multi-file", report.multi_file, INDEX_MULTI_FILE_PIN);
-    pin(&mut errs, "jsx-scoped", report.jsx_scoped, INDEX_JSX_SCOPED_PIN);
-    pin(&mut errs, "js-flavored", report.js_flavored, INDEX_JS_FLAVORED_PIN);
-    pin(&mut errs, "pretty tests", report.pretty_tests, INDEX_PRETTY_TESTS_PIN);
+    pin(
+        &mut errs,
+        "skipped tests",
+        report.skipped_tests,
+        INDEX_SKIPPED_TESTS_PIN,
+    );
+    pin(
+        &mut errs,
+        "single-file",
+        report.single_file,
+        INDEX_SINGLE_FILE_PIN,
+    );
+    pin(
+        &mut errs,
+        "multi-file",
+        report.multi_file,
+        INDEX_MULTI_FILE_PIN,
+    );
+    pin(
+        &mut errs,
+        "jsx-scoped",
+        report.jsx_scoped,
+        INDEX_JSX_SCOPED_PIN,
+    );
+    pin(
+        &mut errs,
+        "js-flavored",
+        report.js_flavored,
+        INDEX_JS_FLAVORED_PIN,
+    );
+    pin(
+        &mut errs,
+        "pretty tests",
+        report.pretty_tests,
+        INDEX_PRETTY_TESTS_PIN,
+    );
     pin(
         &mut errs,
         "basename collisions",
         report.basename_collisions,
         INDEX_BASENAME_COLLISIONS_PIN,
     );
-    pin(&mut errs, "cap-exceeded", report.cap_exceeded, INDEX_CAP_EXCEEDED_PIN);
-    pin(&mut errs, "unknown includes", report.unknown_includes, INDEX_UNKNOWN_INCLUDES_PIN);
-    pin(&mut errs, "variant total", report.variant_total, INDEX_VARIANT_TOTAL_PIN);
+    pin(
+        &mut errs,
+        "cap-exceeded",
+        report.cap_exceeded,
+        INDEX_CAP_EXCEEDED_PIN,
+    );
+    pin(
+        &mut errs,
+        "unknown includes",
+        report.unknown_includes,
+        INDEX_UNKNOWN_INCLUDES_PIN,
+    );
+    pin(
+        &mut errs,
+        "variant total",
+        report.variant_total,
+        INDEX_VARIANT_TOTAL_PIN,
+    );
     pin(
         &mut errs,
         "skipped variants",
@@ -929,11 +1116,26 @@ fn enforce_index_pins(report: &IndexReport) -> Result<(), CliError> {
         report.nonskip_variants,
         INDEX_NONSKIP_VARIANTS_PIN,
     );
-    pin(&mut errs, "expect-clean", report.expect_clean, INDEX_EXPECT_CLEAN_PIN);
+    pin(
+        &mut errs,
+        "expect-clean",
+        report.expect_clean,
+        INDEX_EXPECT_CLEAN_PIN,
+    );
 
     // Gate 1: baseline join.
-    pin(&mut errs, "baselines total", report.baselines_total, INDEX_JOIN_MATCHED_PIN);
-    pin(&mut errs, "join matched", report.join_matched, INDEX_JOIN_MATCHED_PIN);
+    pin(
+        &mut errs,
+        "baselines total",
+        report.baselines_total,
+        INDEX_JOIN_MATCHED_PIN,
+    );
+    pin(
+        &mut errs,
+        "join matched",
+        report.join_matched,
+        INDEX_JOIN_MATCHED_PIN,
+    );
     if !report.join_unmatched.is_empty() {
         errs.push(format!(
             "{} unmatched baseline(s), e.g. {}",
@@ -945,7 +1147,10 @@ fn enforce_index_pins(report: &IndexReport) -> Result<(), CliError> {
         errs.push(format!(
             "{} baseline(s) map only to skipped variants, e.g. {}",
             report.join_skipped_with_baseline.len(),
-            report.join_skipped_with_baseline.first().map_or("", String::as_str)
+            report
+                .join_skipped_with_baseline
+                .first()
+                .map_or("", String::as_str)
         ));
     }
     if !report.join_ambiguous.is_empty() {

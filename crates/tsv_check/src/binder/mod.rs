@@ -34,8 +34,8 @@
 //       a recorded deviation with identical results)
 
 mod atoms;
-pub mod symbols;
 mod sym;
+pub mod symbols;
 
 use crate::diag::Diagnostic;
 use crate::hash::FxHashMap;
@@ -212,7 +212,8 @@ fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
                 || s.alternate.is_some_and(stmt_contains_import_meta)
         }
         S::ForStatement(s) => {
-            s.test.as_ref().is_some_and(expr_contains_import_meta) || stmt_contains_import_meta(s.body)
+            s.test.as_ref().is_some_and(expr_contains_import_meta)
+                || stmt_contains_import_meta(s.body)
         }
         S::ForInStatement(s) => {
             expr_contains_import_meta(&s.right) || stmt_contains_import_meta(s.body)
@@ -235,12 +236,10 @@ fn stmt_contains_import_meta(stmt: &Statement<'_>) -> bool {
         }
         S::TryStatement(s) => {
             s.block.body.iter().any(stmt_contains_import_meta)
-                || s
-                    .handler
+                || s.handler
                     .as_ref()
                     .is_some_and(|h| h.body.body.iter().any(stmt_contains_import_meta))
-                || s
-                    .finalizer
+                || s.finalizer
                     .as_ref()
                     .is_some_and(|f| f.body.iter().any(stmt_contains_import_meta))
         }
@@ -310,7 +309,9 @@ pub fn bind_file<'arena>(
     }
     walk.close(root);
 
-    let facts = FileFacts { module_ness: module_ness(program) };
+    let facts = FileFacts {
+        module_ness: module_ness(program),
+    };
 
     // Pass 2: the symbol bind (functions-first, container-threaded).
     let (diagnostics, merge) = {
@@ -353,7 +354,13 @@ struct SoaWalk {
 
 impl SoaWalk {
     /// Assign the next pre-order id to a node, recording its columns and address.
-    fn add(&mut self, kind: NodeKind, span: Span, parent: Option<NodeId>, address: usize) -> NodeId {
+    fn add(
+        &mut self,
+        kind: NodeKind,
+        span: Span,
+        parent: Option<NodeId>,
+        address: usize,
+    ) -> NodeId {
         let id = NodeId::from_index(self.kinds.len());
         self.parents.push(parent);
         self.kinds.push(kind);
@@ -373,7 +380,12 @@ impl SoaWalk {
     /// Visit a statement: assign its id, then descend into the declarations and
     /// nested statements the SoA walk tracks.
     fn visit_statement(&mut self, stmt: &Statement<'_>, parent: NodeId) {
-        let id = self.add(statement_kind(stmt), stmt.span(), Some(parent), addr_of(stmt));
+        let id = self.add(
+            statement_kind(stmt),
+            stmt.span(),
+            Some(parent),
+            addr_of(stmt),
+        );
         match stmt {
             Statement::VariableDeclaration(decl) => self.visit_declarators(decl, id),
             Statement::FunctionDeclaration(func) => {
@@ -458,7 +470,12 @@ impl SoaWalk {
     }
 
     fn visit_variable_declaration(&mut self, decl: &VariableDeclaration<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::VariableDeclaration, decl.span, Some(parent), addr_of(decl));
+        let id = self.add(
+            NodeKind::VariableDeclaration,
+            decl.span,
+            Some(parent),
+            addr_of(decl),
+        );
         self.visit_declarators(decl, id);
         self.close(id);
     }
@@ -489,7 +506,12 @@ impl SoaWalk {
     }
 
     fn visit_identifier(&mut self, ident: &tsv_ts::ast::Identifier<'_>, parent: NodeId) {
-        let id = self.add(NodeKind::Identifier, ident.span, Some(parent), addr_of(ident));
+        let id = self.add(
+            NodeKind::Identifier,
+            ident.span,
+            Some(parent),
+            addr_of(ident),
+        );
         self.close(id);
     }
 }
@@ -618,16 +640,25 @@ mod tests {
     fn cascade_functions_first_picks_2300_over_2451() {
         // The function hoists first, so the table symbol is the function (not
         // block-scoped) -> TS2300 for the whole `x` run.
-        assert_eq!(diag_codes("let x; var x; function x() {}"), vec![2300, 2300, 2300]);
+        assert_eq!(
+            diag_codes("let x; var x; function x() {}"),
+            vec![2300, 2300, 2300]
+        );
         // No same-scope function: `let` is first -> TS2451.
-        assert_eq!(diag_codes("function f() { let y; { var y; } }"), vec![2451, 2451]);
+        assert_eq!(
+            diag_codes("function f() { let y; { var y; } }"),
+            vec![2451, 2451]
+        );
     }
 
     #[test]
     fn cascade_class_and_method_conflicts_are_2300() {
         assert_eq!(diag_codes("class C {} class C {}"), vec![2300, 2300]);
         // A method vs a same-named property conflicts (Method in PropertyExcludes).
-        assert_eq!(diag_codes("class C { m() {} m: number; }"), vec![2300, 2300]);
+        assert_eq!(
+            diag_codes("class C { m() {} m: number; }"),
+            vec![2300, 2300]
+        );
         // Duplicate parameters conflict via ParameterExcludes.
         assert_eq!(diag_codes("function f(a, a) {}"), vec![2300, 2300]);
     }
@@ -642,7 +673,10 @@ mod tests {
 
     #[test]
     fn cascade_multiple_default_exports_is_2528() {
-        assert_eq!(diag_codes("export default 0; export default 1;"), vec![2528, 2528]);
+        assert_eq!(
+            diag_codes("export default 0; export default 1;"),
+            vec![2528, 2528]
+        );
     }
 
     #[test]
@@ -652,7 +686,10 @@ mod tests {
         assert!(diag_codes("namespace N { interface I {} } declare var N: any;").is_empty());
         // A value-content namespace is a ValueModule and conflicts with a `let`
         // (TS2300 — the namespace, first in the table, is not block-scoped).
-        assert_eq!(diag_codes("namespace M { const v = 1; } let M;"), vec![2300, 2300]);
+        assert_eq!(
+            diag_codes("namespace M { const v = 1; } let M;"),
+            vec![2300, 2300]
+        );
     }
 
     #[test]
@@ -663,10 +700,16 @@ mod tests {
         // private *fields* would be property-vs-property — a check-time TS2300.)
         let src = "class C { #x() {} #x = 1; }";
         let bound = bind(src);
-        let mut diags: Vec<(u32, u32)> =
-            bound.diagnostics.iter().map(|d| (d.code, d.span.start)).collect();
+        let mut diags: Vec<(u32, u32)> = bound
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.span.start))
+            .collect();
         diags.sort_unstable();
-        assert_eq!(diags.iter().map(|d| d.0).collect::<Vec<_>>(), vec![2300, 2300]);
+        assert_eq!(
+            diags.iter().map(|d| d.0).collect::<Vec<_>>(),
+            vec![2300, 2300]
+        );
         for (_, start) in &diags {
             assert_eq!(&src[*start as usize..=*start as usize], "#");
         }
@@ -677,20 +720,40 @@ mod tests {
         // `export default <identifier>` binds as an inert alias, so a following
         // default declaration does not conflict (matches tsgo; the redeclare is a
         // check-time TS2323, not a bind-time TS2528).
-        assert!(diag_codes("const foo = 1; export default foo; export default class Foo {}").is_empty());
+        assert!(
+            diag_codes("const foo = 1; export default foo; export default class Foo {}").is_empty()
+        );
     }
 
     #[test]
     fn module_ness_detects_indicators() {
-        assert_eq!(bind("export const x = 1;").facts.module_ness, ModuleNess::Module);
-        assert_eq!(bind("import x from 'y';").facts.module_ness, ModuleNess::Module);
+        assert_eq!(
+            bind("export const x = 1;").facts.module_ness,
+            ModuleNess::Module
+        );
+        assert_eq!(
+            bind("import x from 'y';").facts.module_ness,
+            ModuleNess::Module
+        );
         assert_eq!(bind("const x = 1;").facts.module_ness, ModuleNess::Script);
         // `import x = require('y')` counts; `import x = A.B` and `export as
         // namespace N` do not.
-        assert_eq!(bind("import x = require('y');").facts.module_ness, ModuleNess::Module);
-        assert_eq!(bind("import x = A.B;").facts.module_ness, ModuleNess::Script);
-        assert_eq!(bind("export as namespace N;").facts.module_ness, ModuleNess::Script);
+        assert_eq!(
+            bind("import x = require('y');").facts.module_ness,
+            ModuleNess::Module
+        );
+        assert_eq!(
+            bind("import x = A.B;").facts.module_ness,
+            ModuleNess::Script
+        );
+        assert_eq!(
+            bind("export as namespace N;").facts.module_ness,
+            ModuleNess::Script
+        );
         // `import.meta` anywhere counts.
-        assert_eq!(bind("const u = import.meta.url;").facts.module_ness, ModuleNess::Module);
+        assert_eq!(
+            bind("const u = import.meta.url;").facts.module_ness,
+            ModuleNess::Module
+        );
     }
 }

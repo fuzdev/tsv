@@ -19,15 +19,15 @@
 //! failure (it means the ported option universe is incomplete).
 
 use crate::tsc_conformance::corpus::{
-    basename_collisions, discover_corpus, read_corpus_file, BasenameCollision, CorpusTest,
+    BasenameCollision, CorpusTest, basename_collisions, discover_corpus, read_corpus_file,
 };
 use crate::tsc_conformance::directives::{
     classify_units, extract_settings, harness_current_directory, section_display_name, split_units,
 };
-use crate::tsc_conformance::discovery::{discover_baselines, Baseline};
+use crate::tsc_conformance::discovery::{Baseline, discover_baselines};
 use crate::tsc_conformance::options_meta::{
-    is_known_directive, strict_members, variant_is_unsupported, DEFAULT_USE_CASE_SENSITIVE_FILE_NAMES,
-    HARNESS_FORCED_DEFAULTS, SKIPPED_TESTS,
+    DEFAULT_USE_CASE_SENSITIVE_FILE_NAMES, HARNESS_FORCED_DEFAULTS, SKIPPED_TESTS,
+    is_known_directive, strict_members, variant_is_unsupported,
 };
 use crate::tsc_conformance::roundtrip::is_pretty;
 use crate::tsc_conformance::variants::{config_name, expand};
@@ -159,7 +159,8 @@ fn split_baseline_key(relative_path: &str) -> Option<(&str, &str)> {
 /// Run the corpus-input index over a typescript-go checkout.
 pub fn run_index(checkout: &Path) -> Result<IndexReport, String> {
     let corpus = discover_corpus(checkout)?;
-    let baselines = discover_baselines(&crate::tsc_conformance::discovery::baselines_dir(checkout))?;
+    let baselines =
+        discover_baselines(&crate::tsc_conformance::discovery::baselines_dir(checkout))?;
     let collisions = basename_collisions(&corpus);
 
     let mut report = IndexReport {
@@ -217,7 +218,9 @@ pub fn run_index(checkout: &Path) -> Result<IndexReport, String> {
 
         for key in settings.keys() {
             if !is_known_directive(key) {
-                unknown.entry(key.clone()).or_insert_with(|| test.relative_path.clone());
+                unknown
+                    .entry(key.clone())
+                    .or_insert_with(|| test.relative_path.clone());
             }
         }
 
@@ -305,7 +308,9 @@ pub fn run_index(checkout: &Path) -> Result<IndexReport, String> {
             Some(entries) => {
                 let nonskip: Vec<&Derived> = entries.iter().filter(|d| !d.skipped).collect();
                 if nonskip.is_empty() {
-                    report.join_skipped_with_baseline.push(baseline.relative_path.clone());
+                    report
+                        .join_skipped_with_baseline
+                        .push(baseline.relative_path.clone());
                 } else if nonskip.len() > 1 {
                     report.join_ambiguous.push(baseline.relative_path.clone());
                 } else {
@@ -376,7 +381,8 @@ fn check_unit_roundtrip(baseline: &Baseline, record: &TestRecord, report: &mut I
     let reason = if record.tsconfig_unresolved {
         // Body multiset only (FileNames ordering deferred).
         let mut unit_lines: Vec<&Vec<String>> = record.units.iter().map(|(_, body)| body).collect();
-        let mut section_lines: Vec<&Vec<String>> = parsed.sections.iter().map(|s| &s.src_lines).collect();
+        let mut section_lines: Vec<&Vec<String>> =
+            parsed.sections.iter().map(|s| &s.src_lines).collect();
         unit_lines.sort();
         section_lines.sort();
         (unit_lines != section_lines).then(|| {
@@ -507,11 +513,23 @@ impl IndexReport {
         println!("  ambiguous:                {}", self.join_ambiguous.len());
         println!();
         println!("Gate 2 — unit-text round-trip");
-        println!("  checked (non-pretty):     {}", self.unit_roundtrip_checked);
-        println!("  pretty skipped:           {}", self.unit_roundtrip_pretty_skipped);
-        println!("  mismatches:               {}", self.unit_roundtrip_mismatches.len());
+        println!(
+            "  checked (non-pretty):     {}",
+            self.unit_roundtrip_checked
+        );
+        println!(
+            "  pretty skipped:           {}",
+            self.unit_roundtrip_pretty_skipped
+        );
+        println!(
+            "  mismatches:               {}",
+            self.unit_roundtrip_mismatches.len()
+        );
         println!();
-        println!("Unknown directives:         {}", self.unknown_directives.len());
+        println!(
+            "Unknown directives:         {}",
+            self.unknown_directives.len()
+        );
         println!();
         println!(
             "Substrate: {} harness-forced defaults, {} strict-family members, case-sensitive={}",

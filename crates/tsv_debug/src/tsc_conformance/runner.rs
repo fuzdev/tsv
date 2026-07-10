@@ -33,23 +33,21 @@
 // tsgo: internal/testrunner/compiler_runner.go (the in-scope selection)
 
 use crate::tsc_conformance::baseline::{parse_baseline, parse_summary_block};
-use crate::tsc_conformance::corpus::{discover_corpus, read_corpus_file, CorpusTest};
-use crate::tsc_conformance::directives::{extract_settings, split_units, Unit};
-use crate::tsc_conformance::discovery::{baselines_dir, discover_baselines, Baseline};
+use crate::tsc_conformance::corpus::{CorpusTest, discover_corpus, read_corpus_file};
+use crate::tsc_conformance::directives::{Unit, extract_settings, split_units};
+use crate::tsc_conformance::discovery::{Baseline, baselines_dir, discover_baselines};
 use crate::tsc_conformance::index::{is_js_flavored, is_jsx_scoped};
 use crate::tsc_conformance::libs::LibResolver;
 use crate::tsc_conformance::options_meta::{
-    is_config_file_name, variant_is_unsupported, SKIPPED_TESTS,
+    SKIPPED_TESTS, is_config_file_name, variant_is_unsupported,
 };
-use crate::tsc_conformance::variants::{config_name, expand, Variant};
+use crate::tsc_conformance::variants::{Variant, config_name, expand};
 use bumpalo::Bump;
 use std::collections::{BTreeMap, HashMap};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::time::Instant;
-use tsv_check::{
-    bind_program, check_bound, check_program, Diagnostic, ParseReport, SourceUnit,
-};
+use tsv_check::{Diagnostic, ParseReport, SourceUnit, bind_program, check_bound, check_program};
 use tsv_lang::{LocationMapper, LocationTracker};
 
 /// The bind-time duplicate/conflict family this slice grades: TS2300 (duplicate
@@ -65,8 +63,9 @@ const MERGE_CODES: [u32; 4] = [2397, 2649, 2664, 2671];
 /// The TS1xxx codes the binder itself emits (strict-mode + private-identifier
 /// checks) — they prove nothing about parse state, so a baseline carrying only
 /// these does not trigger the recovery-AST carve-out (predicate v1, rule a).
-const BIND_EMITTED_TS1XXX: [u32; 12] =
-    [1100, 1101, 1102, 1210, 1212, 1213, 1214, 1215, 1262, 1344, 1359, 18012];
+const BIND_EMITTED_TS1XXX: [u32; 12] = [
+    1100, 1101, 1102, 1210, 1212, 1213, 1214, 1215, 1262, 1344, 1359, 18012,
+];
 
 /// The P1-family baselines whose family diagnostics come from a standard-library
 /// conflict (S5). These now **match** via the lib base; the classifier is kept as a
@@ -110,12 +109,18 @@ const CRASH_EXCLUSIONS: &[(&str, CrashKind)] = &[
     // `parse_string_literal` (parser/mod.rs). Dev-profile only (debug_assert is
     // compiled out in release), so `cargo run` — the gate's profile — panics.
     // A future tsv_ts fix should reject the form gracefully; then drop this entry.
-    ("exportDeclarationInInternalModule.ts", CrashKind::CatchablePanic),
+    (
+        "exportDeclarationInInternalModule.ts",
+        CrashKind::CatchablePanic,
+    ),
 ];
 
 /// The [`CrashKind`] of a crash-excluded test, or `None` if not excluded.
 fn crash_exclusion_kind(basename: &str) -> Option<CrashKind> {
-    CRASH_EXCLUSIONS.iter().find(|(n, _)| *n == basename).map(|(_, k)| *k)
+    CRASH_EXCLUSIONS
+        .iter()
+        .find(|(n, _)| *n == basename)
+        .map(|(_, k)| *k)
 }
 
 /// One expect-clean variant that graded non-clean (should never happen while the
@@ -342,7 +347,9 @@ pub fn run_skeleton(checkout: &Path, options: &RunOptions) -> Result<SkeletonRep
         .name("tsc-skeleton".to_string())
         .spawn(move || run_skeleton_inner(&checkout, &options))
         .map_err(|e| format!("spawn skeleton worker: {e}"))?;
-    handle.join().map_err(|_| "skeleton worker panicked".to_string())?
+    handle
+        .join()
+        .map_err(|_| "skeleton worker panicked".to_string())?
 }
 
 fn run_skeleton_inner(checkout: &Path, options: &RunOptions) -> Result<SkeletonReport, String> {
@@ -398,21 +405,35 @@ fn run_skeleton_inner(checkout: &Path, options: &RunOptions) -> Result<SkeletonR
         if expansion.cap_exceeded {
             continue;
         }
-        let in_scope: Vec<&Variant> =
-            expansion.variants.iter().filter(|v| !variant_is_unsupported(&v.config)).collect();
+        let in_scope: Vec<&Variant> = expansion
+            .variants
+            .iter()
+            .filter(|v| !variant_is_unsupported(&v.config))
+            .collect();
         if in_scope.is_empty() {
             continue;
         }
 
         report.in_scope_tests += 1;
-        grade_test(test, &units[0], &in_scope, &ondisk, &mut resolver, options, &mut report);
+        grade_test(
+            test,
+            &units[0],
+            &in_scope,
+            &ondisk,
+            &mut resolver,
+            options,
+            &mut report,
+        );
     }
 
     // Fold in the resolver's lib-base census (parse-once/fold-once counts + gates).
     report.lib_files_bound = resolver.files_bound();
     report.lib_sets_built = resolver.sets_built();
-    report.lib_parse_errors =
-        resolver.parse_errors().iter().map(|(f, e)| format!("{f}: {e}")).collect();
+    report.lib_parse_errors = resolver
+        .parse_errors()
+        .iter()
+        .map(|(f, e)| format!("{f}: {e}"))
+        .collect();
     report.lib_missing_files = resolver.missing_files().to_vec();
     report.lib_unknown_names = {
         let mut names: Vec<String> = resolver.unknown_libs().to_vec();
@@ -435,8 +456,10 @@ fn probe_crash_exclusion(test: &CorpusTest) -> bool {
     };
     let units = split_units(&content, &test.basename);
     let arena = Bump::new();
-    let source_units: Vec<SourceUnit<'_>> =
-        units.iter().map(|u| SourceUnit::new(&u.name, &u.content)).collect();
+    let source_units: Vec<SourceUnit<'_>> = units
+        .iter()
+        .map(|u| SourceUnit::new(&u.name, &u.content))
+        .collect();
     // Silence the default panic hook for the deliberate probe (we expect it to
     // panic; the message would otherwise leak to stderr and read as a failure).
     let prev = std::panic::take_hook();
@@ -493,7 +516,9 @@ fn grade_test(
 
     // The single unit's parse outcome (parse_reports is never empty for one input).
     let reports = bound.parse_reports();
-    let Some(&(_, parse)) = reports.first() else { return };
+    let Some(&(_, parse)) = reports.first() else {
+        return;
+    };
     let parsed = matches!(parse, ParseReport::Parsed(_));
 
     // The unit's line map — reused across the test's variants for the parsed case.
@@ -558,7 +583,15 @@ fn grade_test(
                             reason: "panic",
                             diff: format!("# {}/{name}  (lib-resolution panic)\n", test.suite),
                         });
-                        record_manifest(report, options, test, &name, baseline.is_some(), true, "panic");
+                        record_manifest(
+                            report,
+                            options,
+                            test,
+                            &name,
+                            baseline.is_some(),
+                            true,
+                            "panic",
+                        );
                         continue;
                     }
                 };
@@ -590,7 +623,12 @@ fn grade_test(
                         let ours_family = match line_map.as_ref() {
                             Some((tracker, map)) => {
                                 let mapper = LocationMapper { tracker, map };
-                                build_ours_family(&result.diagnostics, &unit.name, &mapper, lib_files)
+                                build_ours_family(
+                                    &result.diagnostics,
+                                    &unit.name,
+                                    &mapper,
+                                    lib_files,
+                                )
                             }
                             None => Vec::new(),
                         };
@@ -600,7 +638,15 @@ fn grade_test(
             }
         };
 
-        record_manifest(report, options, test, &name, baseline.is_some(), parsed, verdict);
+        record_manifest(
+            report,
+            options,
+            test,
+            &name,
+            baseline.is_some(),
+            parsed,
+            verdict,
+        );
     }
 
     // Node total: counted once per test (all variants share the parse+bind).
@@ -650,11 +696,19 @@ fn render_family_diff(
     let mut s = format!("# {}/{name}  ({reason})\n", test.suite);
     let _ = writeln!(s, "## ours family ({})", ours.len());
     for e in ours {
-        let _ = writeln!(s, "  {}({},{}): TS{}", e.key.file, e.key.line, e.key.col, e.key.code);
+        let _ = writeln!(
+            s,
+            "  {}({},{}): TS{}",
+            e.key.file, e.key.line, e.key.col, e.key.code
+        );
     }
     let _ = writeln!(s, "## baseline family ({})", base.len());
     for e in base {
-        let _ = writeln!(s, "  {}({},{}): TS{}", e.key.file, e.key.line, e.key.col, e.key.code);
+        let _ = writeln!(
+            s,
+            "  {}({},{}): TS{}",
+            e.key.file, e.key.line, e.key.col, e.key.code
+        );
     }
     s
 }
@@ -741,7 +795,11 @@ fn resolve_related(
                 loc: None,
             }
         }
-        None => RelatedKey { code: r.code, file: unit_name.to_string(), loc: None },
+        None => RelatedKey {
+            code: r.code,
+            file: unit_name.to_string(),
+            loc: None,
+        },
     }
 }
 
@@ -802,7 +860,12 @@ fn grade_family(
                 return None;
             }
             Some(FamilyEntry {
-                key: FamilyDiag { file: d.file.clone()?, line: d.line?, col: d.col?, code },
+                key: FamilyDiag {
+                    file: d.file.clone()?,
+                    line: d.line?,
+                    col: d.col?,
+                    code,
+                },
                 related: d.related.clone(),
             })
         })
@@ -832,18 +895,25 @@ fn grade_family(
         *report.family_match_by_code.entry(*code).or_default() += *count;
     }
     if buckets.extra > 0 && report.extra_samples.len() < 20 {
-        report.extra_samples.push(format!("{}/{name} (+{})", test.suite, buckets.extra));
+        report
+            .extra_samples
+            .push(format!("{}/{name} (+{})", test.suite, buckets.extra));
     }
     if buckets.span_mismatch > 0 && report.span_mismatch_samples.len() < 20 {
-        report
-            .span_mismatch_samples
-            .push(format!("{}/{name} (~{})", test.suite, buckets.span_mismatch));
+        report.span_mismatch_samples.push(format!(
+            "{}/{name} (~{})",
+            test.suite, buckets.span_mismatch
+        ));
     }
     // An unexplained hard-fail bucket (extra / span mismatch) gets a rendered
     // ours-vs-baseline diff artifact; the pinned check-time `missing` is expected,
     // so it does not.
     if buckets.extra > 0 || buckets.span_mismatch > 0 {
-        let reason = if buckets.extra > 0 { "family_extra" } else { "span_mismatch" };
+        let reason = if buckets.extra > 0 {
+            "family_extra"
+        } else {
+            "span_mismatch"
+        };
         report.failing_variants.push(FailingVariant {
             suite: test.suite.to_string(),
             config: name.to_string(),
@@ -877,10 +947,14 @@ fn grade_family(
     report.related_extra += rel.extra;
     report.related_missing += rel.missing;
     if rel.extra > 0 && report.related_extra_samples.len() < 20 {
-        report.related_extra_samples.push(format!("{}/{name} (+{})", test.suite, rel.extra));
+        report
+            .related_extra_samples
+            .push(format!("{}/{name} (+{})", test.suite, rel.extra));
     }
     if rel.missing > 0 && report.related_missing_samples.len() < 20 {
-        report.related_missing_samples.push(format!("{}/{name} (-{})", test.suite, rel.missing));
+        report
+            .related_missing_samples
+            .push(format!("{}/{name} (-{})", test.suite, rel.missing));
     }
 
     // The per-variant verdict (extra dominates — it is the hard gate).
@@ -922,8 +996,18 @@ fn parse_base_diags(content: &str) -> Vec<BaseDiag> {
                     Some(Loc::Numbered { line, col }) => (Some(line), Some(col)),
                     _ => (None, None),
                 };
-                let related = d.related.iter().filter_map(|s| parse_related_line(s)).collect();
-                BaseDiag { file: d.file.clone(), line, col, code: d.code, related }
+                let related = d
+                    .related
+                    .iter()
+                    .filter_map(|s| parse_related_line(s))
+                    .collect();
+                BaseDiag {
+                    file: d.file.clone(),
+                    line,
+                    col,
+                    code: d.code,
+                    related,
+                }
             })
             .collect(),
         Err(_) => parse_summary_block(content)
@@ -958,7 +1042,11 @@ fn parse_related_line(line: &str) -> Option<RelatedKey> {
     } else {
         Some((line_s.parse().ok()?, col.parse().ok()?))
     };
-    Some(RelatedKey { code, file: file.to_string(), loc })
+    Some(RelatedKey {
+        code,
+        file: file.to_string(),
+        loc,
+    })
 }
 
 /// The related-info buckets across a variant's matched primaries.
@@ -987,7 +1075,9 @@ fn grade_related(ours: &[FamilyEntry], base: &[FamilyEntry]) -> RelatedBuckets {
 
     let mut out = RelatedBuckets::default();
     for (key, ours_sets) in &ours_by {
-        let Some(base_sets) = base_by.get(key) else { continue };
+        let Some(base_sets) = base_by.get(key) else {
+            continue;
+        };
         let paired = ours_sets.len().min(base_sets.len());
         for i in 0..paired {
             related_diff(ours_sets[i], base_sets[i], &mut out);
@@ -1024,7 +1114,11 @@ fn related_diff(ours: &[RelatedKey], base: &[RelatedKey], out: &mut RelatedBucke
         let oc = ours_counts.get(*r).copied().unwrap_or(0);
         let m = oc.min(bc);
         if bc > m {
-            let bucket = if r.loc.is_none() { &mut left_base_masked } else { &mut left_base_located };
+            let bucket = if r.loc.is_none() {
+                &mut left_base_masked
+            } else {
+                &mut left_base_located
+            };
             *bucket.entry((r.code, r.file.as_str())).or_default() += bc - m;
         }
     }
@@ -1125,7 +1219,13 @@ fn family_buckets(ours: &[FamilyDiag], base: &[FamilyDiag]) -> FamilyBuckets {
         }
     }
 
-    FamilyBuckets { matched, extra, span_mismatch, matched_by_code, missing_by_code }
+    FamilyBuckets {
+        matched,
+        extra,
+        span_mismatch,
+        matched_by_code,
+        missing_by_code,
+    }
 }
 
 /// Classify a parse-rejected variant's baseline shape for the census.
@@ -1156,8 +1256,14 @@ impl SkeletonReport {
         println!("    graded NON-clean:      {}", self.clean_fail.len());
         println!("  parsed, baselined:       {}", self.baselined_parsed);
         println!("  parse-rejected:          {}", self.parse_rejected_total);
-        println!("    no baseline:           {}", self.parse_rejected_no_baseline);
-        println!("    TS1xxx-only baseline:  {}", self.parse_rejected_ts1xxx_only);
+        println!(
+            "    no baseline:           {}",
+            self.parse_rejected_no_baseline
+        );
+        println!(
+            "    TS1xxx-only baseline:  {}",
+            self.parse_rejected_ts1xxx_only
+        );
         println!("    other baseline:        {}", self.parse_rejected_other);
         println!("Script-goal retries:       {}", self.script_retry);
         println!("Bound nodes (total):       {}", self.total_nodes);
@@ -1165,12 +1271,18 @@ impl SkeletonReport {
         println!("Family grading (2300/2451/2567/2528 + merge 2397/2649/2664/2671)");
         println!("---------------------------------------------------------------");
         println!("Graded variants:           {}", self.family_graded_variants);
-        println!("  ...family-positive:      {}", self.family_positive_variants);
+        println!(
+            "  ...family-positive:      {}",
+            self.family_positive_variants
+        );
         println!("  match:                   {}", self.family_match);
         println!("  missing:                 {}", self.family_missing);
         println!("    merge-path (S4):       {}", self.missing_merge);
         println!("    lib-conflict (S5):     {}", self.missing_lib);
-        println!("    check-time (S3+):      {} (checker-emitted TS2300/2451: duplicate members, type params, computed/private names)", self.missing_other);
+        println!(
+            "    check-time (S3+):      {} (checker-emitted TS2300/2451: duplicate members, type params, computed/private names)",
+            self.missing_other
+        );
         println!("  extra (GATE=0):          {}", self.family_extra);
         println!("  span_mismatch:           {}", self.family_span_mismatch);
         println!("Related-info (matched primaries; own channel, non-gating)");
@@ -1185,8 +1297,14 @@ impl SkeletonReport {
             println!("  REL-EXTRA {s}");
         }
         println!("Carve-out rule (a):        {}", self.carve_out_rule_a);
-        println!("  ...family-positive:      {}", self.carve_out_rule_a_family);
-        println!("moduleDetection variants:  {} (watch; inert for family)", self.module_detection_variants);
+        println!(
+            "  ...family-positive:      {}",
+            self.carve_out_rule_a_family
+        );
+        println!(
+            "moduleDetection variants:  {} (watch; inert for family)",
+            self.module_detection_variants
+        );
         for s in &self.extra_samples {
             println!("  EXTRA {s}");
         }
@@ -1200,9 +1318,18 @@ impl SkeletonReport {
         println!("Lib base (S5)");
         println!("  lib files bound:         {}", self.lib_files_bound);
         println!("  lib sets folded:         {}", self.lib_sets_built);
-        println!("  lib parse errors:        {} (GATE=0)", self.lib_parse_errors.len());
-        println!("  lib missing files:       {} (GATE=0)", self.lib_missing_files.len());
-        println!("  lib unknown names:       {} (GATE=0)", self.lib_unknown_names.len());
+        println!(
+            "  lib parse errors:        {} (GATE=0)",
+            self.lib_parse_errors.len()
+        );
+        println!(
+            "  lib missing files:       {} (GATE=0)",
+            self.lib_missing_files.len()
+        );
+        println!(
+            "  lib unknown names:       {} (GATE=0)",
+            self.lib_unknown_names.len()
+        );
         for e in &self.lib_parse_errors {
             println!("  LIB-PARSE-ERR {e}");
         }
@@ -1216,7 +1343,10 @@ impl SkeletonReport {
         println!("Panics (caught):           {}", self.panics.len());
         println!("Crash-excluded (tracked):  {}", self.excluded_crashes);
         if !self.stale_exclusions.is_empty() {
-            println!("Stale crash-exclusions:    {} (drop them)", self.stale_exclusions.len());
+            println!(
+                "Stale crash-exclusions:    {} (drop them)",
+                self.stale_exclusions.len()
+            );
         }
         println!("Wall-clock:                {} ms", self.wall_ms);
         if !self.clean_fail.is_empty() {
@@ -1299,8 +1429,10 @@ pub fn check_one(
         [] => return Err(format!("no corpus test matches {name:?}")),
         [one] => *one,
         many => {
-            let paths: Vec<String> =
-                many.iter().map(|t| format!("{}/{}", t.suite, t.relative_path)).collect();
+            let paths: Vec<String> = many
+                .iter()
+                .map(|t| format!("{}/{}", t.suite, t.relative_path))
+                .collect();
             return Err(format!("{name:?} is ambiguous: {}", paths.join(", ")));
         }
     };
@@ -1325,8 +1457,10 @@ pub fn check_one(
 
     // Parse + bind every unit, then merge against the selected variant's lib base.
     let arena = Bump::new();
-    let source_units: Vec<SourceUnit<'_>> =
-        units.iter().map(|u| SourceUnit::new(&u.name, &u.content)).collect();
+    let source_units: Vec<SourceUnit<'_>> = units
+        .iter()
+        .map(|u| SourceUnit::new(&u.name, &u.content))
+        .collect();
     let bound = bind_program(&source_units, &arena);
     let mut resolver = LibResolver::new(checkout);
     let base = resolver.base_for(&variant.config);
@@ -1341,8 +1475,11 @@ pub fn check_one(
             Some(f) if f.index() < units_len => {
                 let (line, col) = units.get(f.index()).map_or((None, None), |u| {
                     let (t, m) = LocationTracker::new_ecmascript_with_map(&u.content);
-                    let (_, pos) =
-                        LocationMapper { tracker: &t, map: &m }.pos_and_position(d.span.start);
+                    let (_, pos) = LocationMapper {
+                        tracker: &t,
+                        map: &m,
+                    }
+                    .pos_and_position(d.span.start);
                     (Some(pos.line as u32), Some(pos.column as u32 + 1))
                 });
                 DiagLine {
@@ -1360,7 +1497,13 @@ pub fn check_one(
                 code: d.code,
                 related: Vec::new(),
             },
-            None => DiagLine { file: None, line: None, col: None, code: d.code, related: Vec::new() },
+            None => DiagLine {
+                file: None,
+                line: None,
+                col: None,
+                code: d.code,
+                related: Vec::new(),
+            },
         }
     };
     let ours: Vec<DiagLine> = result
@@ -1419,7 +1562,9 @@ fn select_variant<'a>(
     filter: Option<&(String, String)>,
 ) -> Result<&'a Variant, String> {
     match filter {
-        None => variants.first().ok_or_else(|| "test has no variants".to_string()),
+        None => variants
+            .first()
+            .ok_or_else(|| "test has no variants".to_string()),
         Some((key, value)) => {
             let key = key.to_lowercase();
             variants
@@ -1436,7 +1581,10 @@ fn select_variant<'a>(
                             }
                         })
                         .collect();
-                    format!("no variant with {key}={value}; available: {}", available.join(", "))
+                    format!(
+                        "no variant with {key}={value}; available: {}",
+                        available.join(", ")
+                    )
                 })
         }
     }
@@ -1445,7 +1593,10 @@ fn select_variant<'a>(
 impl CheckTestReport {
     /// Print the human diff (ours vs the baseline summary).
     pub fn print(&self) {
-        println!("check-test: {}/{}  variant={}", self.suite, self.test, self.variant);
+        println!(
+            "check-test: {}/{}  variant={}",
+            self.suite, self.test, self.variant
+        );
         if self.parse_rejected {
             println!(
                 "  tsv PARSE-REJECTED: {}",

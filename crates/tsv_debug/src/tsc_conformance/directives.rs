@@ -533,7 +533,10 @@ mod tests {
         let mut settings = BTreeMap::new();
         settings.insert("currentdirectory".to_string(), "/".to_string());
         let cwd = harness_current_directory(&settings);
-        assert_eq!(section_display_name("/deps/dep/dep.d.ts", &cwd), "/deps/dep/dep.d.ts");
+        assert_eq!(
+            section_display_name("/deps/dep/dep.d.ts", &cwd),
+            "/deps/dep/dep.d.ts"
+        );
         assert_eq!(section_display_name("/app.ts", &cwd), "/app.ts");
     }
 

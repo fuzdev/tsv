@@ -13,7 +13,7 @@
 // tsgo: internal/testutil/harnessutil/harnessutil.go getFileBasedTestConfigurationDescription
 // tsgo: internal/testrunner/compiler_runner.go newCompilerTest (configuredName)
 
-use crate::tsc_conformance::options_meta::{all_values, is_vary_by, normalize_value, NormValue};
+use crate::tsc_conformance::options_meta::{NormValue, all_values, is_vary_by, normalize_value};
 use std::collections::BTreeMap;
 
 /// The variant cap: a product above this is a hard harness failure.
@@ -201,7 +201,10 @@ pub fn expand(settings: &BTreeMap<String, String>) -> Expansion {
                 for (k, v) in &non_varying {
                     config.entry(k.clone()).or_insert_with(|| v.clone());
                 }
-                Variant { description, config }
+                Variant {
+                    description,
+                    config,
+                }
             })
             .collect()
     };
@@ -293,7 +296,10 @@ mod tests {
     #[test]
     fn split_dedup_aliases() {
         // es6 and es2015 alias; first (es6) wins, so one value.
-        assert_eq!(split_option_values("es6, es2015", "target").values, vec!["es6"]);
+        assert_eq!(
+            split_option_values("es6, es2015", "target").values,
+            vec!["es6"]
+        );
     }
 
     #[test]
@@ -315,7 +321,10 @@ mod tests {
 
     #[test]
     fn expand_product_sorted_description() {
-        let e = expand(&settings(&[("strict", "true, false"), ("module", "commonjs, esnext")]));
+        let e = expand(&settings(&[
+            ("strict", "true, false"),
+            ("module", "commonjs, esnext"),
+        ]));
         assert_eq!(e.variants.len(), 4);
         // Keys are sorted in the description.
         assert!(e
@@ -330,8 +339,14 @@ mod tests {
         let e = expand(&settings(&[("target", "es2015"), ("jsxfactory", "h")]));
         assert_eq!(e.variants.len(), 1);
         assert_eq!(e.variants[0].description, "");
-        assert_eq!(e.variants[0].config.get("target").map(String::as_str), Some("es2015"));
-        assert_eq!(e.variants[0].config.get("jsxfactory").map(String::as_str), Some("h"));
+        assert_eq!(
+            e.variants[0].config.get("target").map(String::as_str),
+            Some("es2015")
+        );
+        assert_eq!(
+            e.variants[0].config.get("jsxfactory").map(String::as_str),
+            Some("h")
+        );
     }
 
     #[test]
@@ -368,9 +383,18 @@ mod tests {
     #[test]
     fn config_name_synthesis() {
         assert_eq!(config_name("foo.ts", ""), "foo.errors.txt");
-        assert_eq!(config_name("foo.ts", "target=es2015"), "foo(target=es2015).errors.txt");
-        assert_eq!(config_name("foo.tsx", "jsx=react"), "foo(jsx=react).errors.txt");
-        assert_eq!(config_name("foo.d.ts", "target=es5"), "foo.d(target=es5).errors.txt");
+        assert_eq!(
+            config_name("foo.ts", "target=es2015"),
+            "foo(target=es2015).errors.txt"
+        );
+        assert_eq!(
+            config_name("foo.tsx", "jsx=react"),
+            "foo(jsx=react).errors.txt"
+        );
+        assert_eq!(
+            config_name("foo.d.ts", "target=es5"),
+            "foo.d(target=es5).errors.txt"
+        );
         // A .js basename keeps its extension (never joins an .errors.txt).
         assert_eq!(config_name("foo.js", ""), "foo.js");
     }

@@ -50,15 +50,13 @@ pub mod diag;
 pub mod ids;
 pub mod merge;
 
-pub use binder::{
-    bind_file, module_ness, BoundFile, FileFacts, ModuleNess, NodeKind,
-};
+pub use binder::{BoundFile, FileFacts, ModuleNess, NodeKind, bind_file, module_ness};
 pub use diag::{Category, Diagnostic};
 pub use ids::{FileId, NodeId};
 pub use merge::{LibBase, LibFile};
 pub use program::{
-    bind_lib, bind_program, check_bound, check_program, check_program_with_lib, BoundProgram,
-    CheckResult, FileReport, ParseReport, ParsedFacts, SourceUnit,
+    BoundProgram, CheckResult, FileReport, ParseReport, ParsedFacts, SourceUnit, bind_lib,
+    bind_program, check_bound, check_program, check_program_with_lib,
 };
 
 // Re-exported so consumers can name the parse goal a `ParsedFacts` reports

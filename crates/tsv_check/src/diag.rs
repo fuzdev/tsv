@@ -172,9 +172,9 @@ pub fn equal_no_related_info(a: &Diagnostic, b: &Diagnostic, paths: &[String]) -
 /// **not** path or loc.
 fn equal_chain(a: &[Diagnostic], b: &[Diagnostic]) -> bool {
     a.len() == b.len()
-        && a.iter().zip(b).all(|(x, y)| {
-            x.code == y.code && x.args == y.args && equal_chain(&x.chain, &y.chain)
-        })
+        && a.iter()
+            .zip(b)
+            .all(|(x, y)| x.code == y.code && x.args == y.args && equal_chain(&x.chain, &y.chain))
 }
 
 /// Full diagnostic equality (tsgo `EqualDiagnostics`): equal-no-related-info and
@@ -183,7 +183,10 @@ fn equal_chain(a: &[Diagnostic], b: &[Diagnostic]) -> bool {
 pub fn equal_diagnostics(a: &Diagnostic, b: &Diagnostic, paths: &[String]) -> bool {
     equal_no_related_info(a, b, paths)
         && a.related.len() == b.related.len()
-        && a.related.iter().zip(&b.related).all(|(x, y)| equal_diagnostics(x, y, paths))
+        && a.related
+            .iter()
+            .zip(&b.related)
+            .all(|(x, y)| equal_diagnostics(x, y, paths))
 }
 
 /// Sort `diags` into canonical order and merge duplicates, faithful to tsgo's
@@ -328,8 +331,14 @@ mod tests {
     #[test]
     fn chain_content_leg() {
         let p = paths();
-        let a = with_chain(diag(Some(0), 0, 0, 1), vec![with_args(diag(Some(0), 0, 0, 2), &["a"])]);
-        let b = with_chain(diag(Some(0), 0, 0, 1), vec![with_args(diag(Some(0), 0, 0, 2), &["b"])]);
+        let a = with_chain(
+            diag(Some(0), 0, 0, 1),
+            vec![with_args(diag(Some(0), 0, 0, 2), &["a"])],
+        );
+        let b = with_chain(
+            diag(Some(0), 0, 0, 1),
+            vec![with_args(diag(Some(0), 0, 0, 2), &["b"])],
+        );
         // same size, chain content (args) breaks the tie
         assert_eq!(compare_diagnostics(&a, &b, &p), Ordering::Less);
     }
@@ -363,7 +372,11 @@ mod tests {
     #[test]
     fn dedup_collapses_identical() {
         let p = paths();
-        let mut v = vec![diag(Some(0), 0, 0, 1), diag(Some(0), 0, 0, 1), diag(Some(0), 1, 1, 2)];
+        let mut v = vec![
+            diag(Some(0), 0, 0, 1),
+            diag(Some(0), 0, 0, 1),
+            diag(Some(0), 1, 1, 2),
+        ];
         sort_and_deduplicate(&mut v, &p);
         assert_eq!(v.len(), 2);
         assert_eq!(v[0].code, 1);
@@ -408,13 +421,19 @@ mod tests {
         // Two-level chains: outer -> mid -> leaf. Equal chains compare Equal;
         // a differing leaf arg two levels down orders by that arg.
         let p = paths();
-        let mid = with_chain(diag(Some(0), 0, 0, 2), vec![with_args(diag(Some(0), 0, 0, 3), &["x"])]);
+        let mid = with_chain(
+            diag(Some(0), 0, 0, 2),
+            vec![with_args(diag(Some(0), 0, 0, 3), &["x"])],
+        );
         let a = with_chain(diag(Some(0), 0, 0, 1), vec![mid.clone()]);
         let b = with_chain(diag(Some(0), 0, 0, 1), vec![mid]);
         assert!(equal_no_related_info(&a, &b, &p));
         assert_eq!(compare_diagnostics(&a, &b, &p), Ordering::Equal);
 
-        let mid_y = with_chain(diag(Some(0), 0, 0, 2), vec![with_args(diag(Some(0), 0, 0, 3), &["y"])]);
+        let mid_y = with_chain(
+            diag(Some(0), 0, 0, 2),
+            vec![with_args(diag(Some(0), 0, 0, 3), &["y"])],
+        );
         let c = with_chain(diag(Some(0), 0, 0, 1), vec![mid_y]);
         assert!(!equal_no_related_info(&a, &c, &p));
         // Same chain sizes; the depth-2 content ("x" < "y") breaks the tie.

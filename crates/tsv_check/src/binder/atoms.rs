@@ -44,7 +44,11 @@ impl Atoms {
         let mut interner = StringInterner::<StringBackend<SymbolU32>>::new();
         let default = Atom(interner.get_or_intern("default").to_usize() as u32);
         let export_equals = Atom(interner.get_or_intern("export=").to_usize() as u32);
-        Atoms { interner, default, export_equals }
+        Atoms {
+            interner,
+            default,
+            export_equals,
+        }
     }
 
     /// Intern a name to its [`Atom`].

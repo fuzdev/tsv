@@ -127,9 +127,8 @@ impl SymbolFlags {
     pub const PROPERTY_EXCLUDES: SymbolFlags =
         SymbolFlags(Self::VALUE.0 & !(Self::PROPERTY.0 | Self::ACCESSOR.0));
     pub const ENUM_MEMBER_EXCLUDES: SymbolFlags = SymbolFlags(Self::VALUE.0 | Self::TYPE.0);
-    pub const FUNCTION_EXCLUDES: SymbolFlags = SymbolFlags(
-        Self::VALUE.0 & !(Self::FUNCTION.0 | Self::VALUE_MODULE.0 | Self::CLASS.0),
-    );
+    pub const FUNCTION_EXCLUDES: SymbolFlags =
+        SymbolFlags(Self::VALUE.0 & !(Self::FUNCTION.0 | Self::VALUE_MODULE.0 | Self::CLASS.0));
     pub const CLASS_EXCLUDES: SymbolFlags = SymbolFlags(
         (Self::VALUE.0 | Self::TYPE.0)
             & !(Self::VALUE_MODULE.0 | Self::INTERFACE.0 | Self::FUNCTION.0),

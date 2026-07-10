@@ -133,7 +133,10 @@ impl LibBase {
         // `var globalThis` hits the NamespaceModule guard rather than a stray merge.
         globals.insert(
             NAME_GLOBAL_THIS.to_string(),
-            LibEntry { flags: MODULE_FLAGS, decls: Vec::new() },
+            LibEntry {
+                flags: MODULE_FLAGS,
+                decls: Vec::new(),
+            },
         );
         for (index, lib) in libs.iter().enumerate() {
             let lib_file = index as u32;
@@ -149,7 +152,10 @@ impl LibBase {
                 }
             }
         }
-        LibBase { lib_files: libs.iter().map(|l| l.name.clone()).collect(), globals }
+        LibBase {
+            lib_files: libs.iter().map(|l| l.name.clone()).collect(),
+            globals,
+        }
     }
 
     /// Look up a global by name.
@@ -167,9 +173,10 @@ impl LibBase {
 /// Fold one lib symbol into the base globals (accumulate flags + priority-ordered
 /// declarations).
 fn fold_lib_symbol(globals: &mut FxHashMap<String, LibEntry>, sym: &MergeSymbol, lib_file: u32) {
-    let entry = globals
-        .entry(sym.name.clone())
-        .or_insert_with(|| LibEntry { flags: SymbolFlags::NONE, decls: Vec::new() });
+    let entry = globals.entry(sym.name.clone()).or_insert_with(|| LibEntry {
+        flags: SymbolFlags::NONE,
+        decls: Vec::new(),
+    });
     entry.flags.insert(sym.flags);
     for decl in &sym.decls {
         entry.decls.push(LibDecl {
@@ -300,7 +307,11 @@ pub fn merge_program(
             continue;
         }
         // The globalThis check runs over the file's own locals, before merging.
-        if let Some(sym) = file.source_locals.iter().find(|s| s.name == NAME_GLOBAL_THIS) {
+        if let Some(sym) = file
+            .source_locals
+            .iter()
+            .find(|s| s.name == NAME_GLOBAL_THIS)
+        {
             for decl in &sym.decls {
                 out.push(conflict_2397(decl, NAME_GLOBAL_THIS));
             }
@@ -486,7 +497,12 @@ fn merge_symbol(target: &mut GlobalEntry, source: &MergeSymbol, out: &mut MergeO
         if target.name != NAME_GLOBAL_THIS
             && let Some(decl) = source.decls.first()
         {
-            out.push(augment_error(decl.file, decl.error_span, 2649, &target.name));
+            out.push(augment_error(
+                decl.file,
+                decl.error_span,
+                2649,
+                &target.name,
+            ));
         }
     } else {
         report_merge_symbol_error(target, source, out);
@@ -546,7 +562,11 @@ fn add_duplicate_declaration_error(
     out: &mut MergeOut,
 ) {
     let needs_name = code != 2567;
-    let args = if needs_name { vec![symbol_name.to_string()] } else { Vec::new() };
+    let args = if needs_name {
+        vec![symbol_name.to_string()]
+    } else {
+        Vec::new()
+    };
     let mut primary = Diagnostic {
         file: Some(decl.file),
         span: decl.error_span,
@@ -641,25 +661,77 @@ fn excluded_symbol_flags(flags: SymbolFlags) -> SymbolFlags {
             *result = result.union(mask);
         }
     };
-    add(&mut result, SymbolFlags::BLOCK_SCOPED_VARIABLE, SymbolFlags::BLOCK_SCOPED_VARIABLE_EXCLUDES);
+    add(
+        &mut result,
+        SymbolFlags::BLOCK_SCOPED_VARIABLE,
+        SymbolFlags::BLOCK_SCOPED_VARIABLE_EXCLUDES,
+    );
     add(
         &mut result,
         SymbolFlags::FUNCTION_SCOPED_VARIABLE,
         SymbolFlags::FUNCTION_SCOPED_VARIABLE_EXCLUDES,
     );
-    add(&mut result, SymbolFlags::PROPERTY, SymbolFlags::PROPERTY_EXCLUDES);
-    add(&mut result, SymbolFlags::ENUM_MEMBER, SymbolFlags::ENUM_MEMBER_EXCLUDES);
-    add(&mut result, SymbolFlags::FUNCTION, SymbolFlags::FUNCTION_EXCLUDES);
+    add(
+        &mut result,
+        SymbolFlags::PROPERTY,
+        SymbolFlags::PROPERTY_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::ENUM_MEMBER,
+        SymbolFlags::ENUM_MEMBER_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::FUNCTION,
+        SymbolFlags::FUNCTION_EXCLUDES,
+    );
     add(&mut result, SymbolFlags::CLASS, SymbolFlags::CLASS_EXCLUDES);
-    add(&mut result, SymbolFlags::INTERFACE, SymbolFlags::INTERFACE_EXCLUDES);
-    add(&mut result, SymbolFlags::REGULAR_ENUM, SymbolFlags::REGULAR_ENUM_EXCLUDES);
-    add(&mut result, SymbolFlags::CONST_ENUM, SymbolFlags::CONST_ENUM_EXCLUDES);
-    add(&mut result, SymbolFlags::VALUE_MODULE, SymbolFlags::VALUE_MODULE_EXCLUDES);
-    add(&mut result, SymbolFlags::METHOD, SymbolFlags::METHOD_EXCLUDES);
-    add(&mut result, SymbolFlags::GET_ACCESSOR, SymbolFlags::GET_ACCESSOR_EXCLUDES);
-    add(&mut result, SymbolFlags::SET_ACCESSOR, SymbolFlags::SET_ACCESSOR_EXCLUDES);
-    add(&mut result, SymbolFlags::TYPE_PARAMETER, SymbolFlags::TYPE_PARAMETER_EXCLUDES);
-    add(&mut result, SymbolFlags::TYPE_ALIAS, SymbolFlags::TYPE_ALIAS_EXCLUDES);
+    add(
+        &mut result,
+        SymbolFlags::INTERFACE,
+        SymbolFlags::INTERFACE_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::REGULAR_ENUM,
+        SymbolFlags::REGULAR_ENUM_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::CONST_ENUM,
+        SymbolFlags::CONST_ENUM_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::VALUE_MODULE,
+        SymbolFlags::VALUE_MODULE_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::METHOD,
+        SymbolFlags::METHOD_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::GET_ACCESSOR,
+        SymbolFlags::GET_ACCESSOR_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::SET_ACCESSOR,
+        SymbolFlags::SET_ACCESSOR_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::TYPE_PARAMETER,
+        SymbolFlags::TYPE_PARAMETER_EXCLUDES,
+    );
+    add(
+        &mut result,
+        SymbolFlags::TYPE_ALIAS,
+        SymbolFlags::TYPE_ALIAS_EXCLUDES,
+    );
     add(&mut result, SymbolFlags::ALIAS, SymbolFlags::ALIAS_EXCLUDES);
     // NamespaceModule contributes no excludes (it merges with anything).
     if flags.intersects(SymbolFlags::REPLACEABLE_BY_METHOD) {
@@ -676,16 +748,21 @@ fn message_for(code: u32, name: Option<&str>) -> String {
             "Declaration name conflicts with built-in global identifier '{}'.",
             name.unwrap_or("")
         ),
-        2451 => format!("Cannot redeclare block-scoped variable '{}'.", name.unwrap_or("")),
-        2567 => {
-            "Enum declarations can only merge with namespace or other enum declarations.".to_string()
-        }
+        2451 => format!(
+            "Cannot redeclare block-scoped variable '{}'.",
+            name.unwrap_or("")
+        ),
+        2567 => "Enum declarations can only merge with namespace or other enum declarations."
+            .to_string(),
         2649 => format!(
             "Cannot augment module '{}' with value exports because it resolves to a non-module entity.",
             name.unwrap_or("")
         ),
         2664 => {
-            format!("Invalid module name in augmentation, module '{}' cannot be found.", name.unwrap_or(""))
+            format!(
+                "Invalid module name in augmentation, module '{}' cannot be found.",
+                name.unwrap_or("")
+            )
         }
         2671 => format!(
             "Cannot augment module '{}' because it resolves to a non-module entity.",
@@ -745,7 +822,11 @@ mod tests {
         let codes: Vec<u32> = diags.iter().map(|d| d.code).collect();
         // One TS2451 on each declaration; each carries a TS6203 related info.
         assert_eq!(codes, vec![2451, 2451]);
-        assert!(diags.iter().all(|d| d.related.len() == 1 && d.related[0].code == 6203));
+        assert!(
+            diags
+                .iter()
+                .all(|d| d.related.len() == 1 && d.related[0].code == 6203)
+        );
         // Emitted on both files (raw order is source-then-target — the canonical
         // sort in `check_program` reorders to path order).
         let mut files: Vec<u32> = diags.iter().filter_map(|d| d.file.map(|f| f.0)).collect();
@@ -767,7 +848,10 @@ mod tests {
             )
         };
         let diags = merge_program(&[mk(0), mk(1)], None, 0);
-        assert_eq!(diags.iter().map(|d| d.code).collect::<Vec<_>>(), vec![2300, 2300]);
+        assert_eq!(
+            diags.iter().map(|d| d.code).collect::<Vec<_>>(),
+            vec![2300, 2300]
+        );
     }
 
     /// A regular enum and a const enum in separate files can't merge (TS2567).
@@ -790,7 +874,10 @@ mod tests {
             }],
         );
         let diags = merge_program(&[a, b], None, 0);
-        assert_eq!(diags.iter().map(|d| d.code).collect::<Vec<_>>(), vec![2567, 2567]);
+        assert_eq!(
+            diags.iter().map(|d| d.code).collect::<Vec<_>>(),
+            vec![2567, 2567]
+        );
         // 2567 carries no `{0}` argument.
         assert!(diags.iter().all(|d| d.args.is_empty()));
     }
@@ -856,7 +943,10 @@ mod tests {
         // All primaries are TS2300; a.ts (the recurring target) carries two related
         // entries, both TS6203 (the union of two fresh single-related primaries).
         assert!(diags.iter().all(|d| d.code == 2300));
-        let a = diags.iter().find(|d| d.file == Some(FileId(0))).expect("a.ts primary");
+        let a = diags
+            .iter()
+            .find(|d| d.file == Some(FileId(0)))
+            .expect("a.ts primary");
         assert_eq!(a.related.len(), 2);
         assert!(a.related.iter().all(|r| r.code == 6203));
     }
@@ -896,8 +986,10 @@ mod tests {
         let diags = merge_program(&files, None, 0);
         // The const-enum primary (file 6) carries the capped chain (asserted on the
         // raw pool, before any cross-merge union, to isolate the within-primary cap).
-        let source_primary =
-            diags.iter().find(|d| d.file == Some(FileId(6))).expect("a const-enum primary at file 6");
+        let source_primary = diags
+            .iter()
+            .find(|d| d.file == Some(FileId(6)))
+            .expect("a const-enum primary at file 6");
         assert_eq!(source_primary.code, 2567);
         let codes: Vec<u32> = source_primary.related.iter().map(|r| r.code).collect();
         // Leading TS6203 + four TS6204 = five related; the sixth conflicting decl is dropped.
@@ -931,7 +1023,7 @@ mod tests {
                 name: "undefined".to_string(),
                 flags: SymbolFlags::CLASS.union(SymbolFlags::VALUE_MODULE),
                 decls: vec![
-                    decl(0, 6, "undefined", true),  // class
+                    decl(0, 6, "undefined", true),   // class
                     decl(0, 40, "undefined", false), // namespace
                 ],
             }],
@@ -952,8 +1044,16 @@ mod tests {
             source_locals: Vec::new(),
             global_augmentations: Vec::new(),
             module_augmentations: vec![
-                ModuleAug { file: FileId(0), name: "M".to_string(), name_span: Span::new(22, 25) },
-                ModuleAug { file: FileId(0), name: "M".to_string(), name_span: Span::new(50, 53) },
+                ModuleAug {
+                    file: FileId(0),
+                    name: "M".to_string(),
+                    name_span: Span::new(22, 25),
+                },
+                ModuleAug {
+                    file: FileId(0),
+                    name: "M".to_string(),
+                    name_span: Span::new(50, 53),
+                },
             ],
         };
         let diags = merge_program(&[f], None, 0);
@@ -1013,10 +1113,18 @@ mod tests {
     fn lib_conflict_emits_priority_ordered_related_chain() {
         // Symbol declared across three lib files (priority order es5, es2015.symbol,
         // es2015.symbol.wellknown): interface, var, interface -> flags Interface|Fsv.
-        let es5 = lib("lib.es5.d.ts", vec![lib_symbol("Symbol", SymbolFlags::INTERFACE, 10, true)]);
+        let es5 = lib(
+            "lib.es5.d.ts",
+            vec![lib_symbol("Symbol", SymbolFlags::INTERFACE, 10, true)],
+        );
         let sym = lib(
             "lib.es2015.symbol.d.ts",
-            vec![lib_symbol("Symbol", SymbolFlags::FUNCTION_SCOPED_VARIABLE, 20, false)],
+            vec![lib_symbol(
+                "Symbol",
+                SymbolFlags::FUNCTION_SCOPED_VARIABLE,
+                20,
+                false,
+            )],
         );
         let wk = lib(
             "lib.es2015.symbol.wellknown.d.ts",
@@ -1052,16 +1160,26 @@ mod tests {
         let codes: Vec<u32> = test_primary.related.iter().map(|r| r.code).collect();
         assert_eq!(codes, vec![6203, 6204, 6204]);
         let files: Vec<Option<FileId>> = test_primary.related.iter().map(|r| r.file).collect();
-        assert_eq!(files, vec![Some(FileId(1)), Some(FileId(2)), Some(FileId(3))]);
+        assert_eq!(
+            files,
+            vec![Some(FileId(1)), Some(FileId(2)), Some(FileId(3))]
+        );
         // The lib-side primaries land on the (masked) lib files.
-        assert!(diags.iter().any(|d| d.file == Some(FileId(1)) && d.code == 2300));
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.file == Some(FileId(1)) && d.code == 2300)
+        );
     }
 
     /// A clean augmentation of a lib global (a test `interface` merging into a lib
     /// interface) emits nothing.
     #[test]
     fn lib_clean_interface_merge_is_silent() {
-        let array = lib("lib.es5.d.ts", vec![lib_symbol("Array", SymbolFlags::INTERFACE, 10, true)]);
+        let array = lib(
+            "lib.es5.d.ts",
+            vec![lib_symbol("Array", SymbolFlags::INTERFACE, 10, true)],
+        );
         let base = LibBase::build(&[&array]);
         let test = script(
             0,
@@ -1098,7 +1216,12 @@ mod tests {
     fn lib_declare_global_interface_vs_type_alias_is_2300() {
         let dom = lib(
             "lib.dom.d.ts",
-            vec![lib_symbol("ElementTagNameMap", SymbolFlags::TYPE_ALIAS, 10, true)],
+            vec![lib_symbol(
+                "ElementTagNameMap",
+                SymbolFlags::TYPE_ALIAS,
+                10,
+                true,
+            )],
         );
         let base = LibBase::build(&[&dom]);
         // An external module carrying a `declare global { interface ElementTagNameMap }`.
@@ -1114,7 +1237,10 @@ mod tests {
             module_augmentations: Vec::new(),
         };
         let diags = merge_program(&[test], Some(&base), 1);
-        let test_primary = diags.iter().find(|d| d.file == Some(FileId(0))).expect("primary");
+        let test_primary = diags
+            .iter()
+            .find(|d| d.file == Some(FileId(0)))
+            .expect("primary");
         assert_eq!(test_primary.code, 2300);
         assert_eq!(test_primary.span.start, 40);
         assert_eq!(test_primary.related.len(), 1);
