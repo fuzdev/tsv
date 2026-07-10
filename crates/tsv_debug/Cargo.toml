@@ -18,6 +18,7 @@ swallow_check = ["tsv_lang/swallow_check"]
 
 [dependencies]
 tsv_cli = { path = "../tsv_cli" }
+tsv_check = { workspace = true }
 tsv_lang = { workspace = true }
 tsv_svelte = { workspace = true, features = ["convert"] }
 tsv_ts = { workspace = true, features = ["convert", "debug_lex"] }

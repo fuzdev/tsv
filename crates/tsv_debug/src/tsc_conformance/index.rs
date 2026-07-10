@@ -451,8 +451,9 @@ fn split_content_lines(content: &str) -> Vec<String> {
 }
 
 /// Whether a test is JSX-scoped: a `.tsx` file, an `@jsx` directive, or a path
-/// under a `jsx/` directory.
-fn is_jsx_scoped(test: &CorpusTest, settings: &BTreeMap<String, String>) -> bool {
+/// under a `jsx/` directory. Shared with the skeleton runner's in-scope predicate.
+#[must_use]
+pub fn is_jsx_scoped(test: &CorpusTest, settings: &BTreeMap<String, String>) -> bool {
     test.extension == "tsx"
         || settings.contains_key("jsx")
         || test.relative_path.contains("/jsx/")
@@ -460,7 +461,9 @@ fn is_jsx_scoped(test: &CorpusTest, settings: &BTreeMap<String, String>) -> bool
 }
 
 /// Whether a test is JS-flavored: `@checkJs` / `@allowJs`, or a `.js` file.
-fn is_js_flavored(test: &CorpusTest, settings: &BTreeMap<String, String>) -> bool {
+/// Shared with the skeleton runner's in-scope predicate.
+#[must_use]
+pub fn is_js_flavored(test: &CorpusTest, settings: &BTreeMap<String, String>) -> bool {
     settings.contains_key("checkjs") || settings.contains_key("allowjs") || test.extension == "js"
 }
 

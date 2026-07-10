@@ -487,6 +487,7 @@ tsv/
 │   ├── tsv_ts/      # TypeScript: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_css/     # CSS: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast_json_bytes()
+│   ├── tsv_check/   # TypeScript binder + checker (tsgo-conformance target; consumed only by tsv_debug — no shipped artifact links it)
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
@@ -817,6 +818,22 @@ cargo run -p tsv_debug tsc_conformance roundtrip compiler/async  # filter by pat
 # enforces three exact pins — total baselines, byte-identical count, and the
 # pretty-path count — plus a 100% invariant, failing on any drift; a re-pin is
 # deliberate (a code change or a tsgo pull).
+
+# run - the walking-skeleton gate over tsv_check: sweeps every in-scope variant
+# (single-file, non-JSX, non-JS-flavored, non-skipped), drives parse → lower+bind
+# → no-op check → sort/dedup via the tsv_check crate, grades expect-clean variants
+# (must be zero-diagnostic), and publishes the parse-divergence census (tsv
+# parse-rejections bucketed by baseline shape + Script-goal retries). Each test
+# runs catch_unwind-wrapped on a generous-stack worker; tracked parser crashes
+# live in a pinned CRASH_EXCLUSIONS ledger. Exact two-sided RUN_* pins on full
+# runs. Not yet a deno-task/conformance leg (joins when the first code family
+# gates).
+cargo run -p tsv_debug --quiet tsc_conformance run
+
+# check-test - the inner dev loop: one corpus test (optionally one variant),
+# our diagnostics vs the baseline's summary block as a readable diff.
+cargo run -p tsv_debug --quiet tsc_conformance check-test duplicateVar --variant target=es2015
+# Options: --json; works for expect-clean tests (prints the expectation).
 
 # index - the corpus-INPUT side: indexes tests/cases/{compiler,conformance},
 # parses directives, splits @filename units, expands each test's varyBy variants

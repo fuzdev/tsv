@@ -6,9 +6,10 @@
 
 use crate::cli::CliError;
 use crate::tsc_conformance::index::IndexReport;
+use crate::tsc_conformance::runner::SkeletonReport;
 use crate::tsc_conformance::{
-    baselines_dir, corpus_materialized, denominators, discover_baselines, histogram, run_index,
-    run_roundtrip, tests_by_code,
+    baselines_dir, check_one, corpus_materialized, denominators, discover_baselines, histogram,
+    run_index, run_roundtrip, run_skeleton, tests_by_code,
 };
 use argh::FromArgs;
 use std::path::PathBuf;
@@ -67,6 +68,27 @@ const INDEX_JOIN_MATCHED_PIN: usize = 7033;
 const INDEX_UNIT_ROUNDTRIP_PIN: usize = 7019;
 const INDEX_UNIT_ROUNDTRIP_PRETTY_PIN: usize = 14;
 
+/// REGRESSION PINS (exact, two-sided) for the walking-skeleton sweep (`run`).
+/// Measured 2026-07-10, ../typescript-go at 168e7015 (`_submodules/TypeScript`
+/// corpus materialized). The checker emits nothing yet, so the meaningful gate
+/// is `clean_pass == expect_clean_graded` with zero panics; the counts below pin
+/// the in-scope denominators + parse-divergence census so any drift (a
+/// harness-port change, a tsv parser change, or a typescript-go pull) forces a
+/// deliberate re-pin.
+const RUN_IN_SCOPE_TESTS_PIN: usize = 9388;
+const RUN_IN_SCOPE_VARIANTS_PIN: usize = 9887;
+const RUN_EXPECT_CLEAN_PIN: usize = 4435;
+const RUN_BASELINED_PARSED_PIN: usize = 4446;
+const RUN_PARSE_REJECTED_PIN: usize = 1006;
+const RUN_PARSE_REJECTED_NO_BASELINE_PIN: usize = 45;
+const RUN_PARSE_REJECTED_TS1XXX_PIN: usize = 451;
+const RUN_PARSE_REJECTED_OTHER_PIN: usize = 510;
+const RUN_SCRIPT_RETRY_PIN: usize = 25;
+/// Tracked parser crashes carved out of the sweep (the `CRASH_EXCLUSIONS`
+/// ledger). Pinned so the ledger can't grow or shrink silently — a move means a
+/// tsv parser robustness change (a fix removes an entry; a regression adds one).
+const RUN_CRASH_EXCLUDED_PIN: usize = 1;
+
 /// Query the tsgo TypeScript conformance baselines.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "tsc_conformance")]
@@ -81,6 +103,8 @@ enum TscConformanceSub {
     Query(QueryCommand),
     Roundtrip(RoundtripCommand),
     Index(IndexCommand),
+    Run(RunCommand),
+    CheckTest(CheckTestCommand),
 }
 
 /// Answer an ad-hoc question over the baselines.
@@ -152,14 +176,186 @@ pub struct IndexCommand {
     verbose: bool,
 }
 
+/// Walking-skeleton sweep (the S2 gate): drive `tsv_check` over every in-scope
+/// variant (single-file, non-JSX, non-JS-flavored, not skipped, not an
+/// unsupported-option variant) and grade the checker plumbing end-to-end. The
+/// checker emits nothing yet, so the gate is: every expect-clean in-scope
+/// variant grades clean (zero diagnostics), zero panics, and the pinned
+/// denominators + parse-divergence census hold. Runs on a generous-stack worker
+/// thread; each test's check is `catch_unwind`-contained. Exit 0 only when the
+/// invariants hold and (on a full run) the pins match.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "run")]
+pub struct RunCommand {
+    /// path to the typescript-go checkout (default: ../typescript-go)
+    #[argh(option, default = "PathBuf::from(\"../typescript-go\")")]
+    path: PathBuf,
+
+    /// emit a JSON report instead of the human summary
+    #[argh(switch)]
+    json: bool,
+}
+
+/// Inner dev loop: run one corpus test (optionally one variant) through
+/// `tsv_check` and print our diagnostics vs the baseline summary.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "check-test")]
+pub struct CheckTestCommand {
+    /// path to the typescript-go checkout (default: ../typescript-go)
+    #[argh(option, default = "PathBuf::from(\"../typescript-go\")")]
+    path: PathBuf,
+
+    /// select one variant, `key=value` (e.g. `target=es2015`)
+    #[argh(option)]
+    variant: Option<String>,
+
+    /// emit a JSON report instead of the human diff
+    #[argh(switch)]
+    json: bool,
+
+    /// the test to run (exact relative path or basename)
+    #[argh(positional)]
+    name: String,
+}
+
 impl TscConformanceCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         match self.nested {
             TscConformanceSub::Query(query) => query.run(),
             TscConformanceSub::Roundtrip(rt) => rt.run(),
             TscConformanceSub::Index(index) => index.run(),
+            TscConformanceSub::Run(run) => run.run(),
+            TscConformanceSub::CheckTest(check) => check.run(),
         }
     }
+}
+
+impl RunCommand {
+    fn run(self) -> Result<(), CliError> {
+        require_corpus(&self.path)?;
+        let report = run_skeleton(&self.path).map_err(|e| {
+            eprintln!("Error running skeleton sweep: {e}");
+            CliError::Failed
+        })?;
+        if self.json {
+            print_json(&report)?;
+        } else {
+            report.print();
+        }
+        enforce_run_gates(&report)
+    }
+}
+
+/// Enforce the skeleton gates: the clean-grade invariant, zero panics, and (a
+/// full run's) exact denominator + census pins.
+fn enforce_run_gates(report: &SkeletonReport) -> Result<(), CliError> {
+    let mut errs: Vec<String> = Vec::new();
+
+    // Invariant gates (always).
+    if report.clean_pass != report.expect_clean_graded {
+        errs.push(format!(
+            "clean pass {} != expect-clean graded {} ({} non-clean)",
+            report.clean_pass,
+            report.expect_clean_graded,
+            report.clean_fail.len()
+        ));
+    }
+    if !report.panics.is_empty() {
+        errs.push(format!(
+            "{} test(s) panicked, e.g. {}",
+            report.panics.len(),
+            report.panics.first().map_or("", |p| p.test.as_str())
+        ));
+    }
+
+    // Exact two-sided pins.
+    let pin = |errs: &mut Vec<String>, label: &str, got: usize, want: usize| {
+        if got != want {
+            errs.push(format!("{label} {got} != pinned {want}"));
+        }
+    };
+    pin(&mut errs, "in-scope tests", report.in_scope_tests, RUN_IN_SCOPE_TESTS_PIN);
+    pin(&mut errs, "in-scope variants", report.in_scope_variants, RUN_IN_SCOPE_VARIANTS_PIN);
+    pin(&mut errs, "expect-clean graded", report.expect_clean_graded, RUN_EXPECT_CLEAN_PIN);
+    pin(&mut errs, "clean pass", report.clean_pass, RUN_EXPECT_CLEAN_PIN);
+    pin(&mut errs, "baselined parsed", report.baselined_parsed, RUN_BASELINED_PARSED_PIN);
+    pin(&mut errs, "parse-rejected", report.parse_rejected_total, RUN_PARSE_REJECTED_PIN);
+    pin(
+        &mut errs,
+        "parse-rejected (no baseline)",
+        report.parse_rejected_no_baseline,
+        RUN_PARSE_REJECTED_NO_BASELINE_PIN,
+    );
+    pin(
+        &mut errs,
+        "parse-rejected (TS1xxx-only)",
+        report.parse_rejected_ts1xxx_only,
+        RUN_PARSE_REJECTED_TS1XXX_PIN,
+    );
+    pin(
+        &mut errs,
+        "parse-rejected (other)",
+        report.parse_rejected_other,
+        RUN_PARSE_REJECTED_OTHER_PIN,
+    );
+    pin(&mut errs, "script retries", report.script_retry, RUN_SCRIPT_RETRY_PIN);
+    pin(&mut errs, "crash-excluded", report.excluded_crashes, RUN_CRASH_EXCLUDED_PIN);
+
+    if errs.is_empty() {
+        Ok(())
+    } else {
+        eprintln!(
+            "\nError: {}. If deliberate (a harness-port change, a tsv parser change, or a \
+             typescript-go pull), re-pin the RUN_* constants.",
+            errs.join("; ")
+        );
+        Err(CliError::Failed)
+    }
+}
+
+impl CheckTestCommand {
+    fn run(self) -> Result<(), CliError> {
+        require_corpus(&self.path)?;
+        let variant = match self.variant.as_deref().map(parse_variant_filter) {
+            Some(Ok(v)) => Some(v),
+            Some(Err(e)) => {
+                eprintln!("{e}");
+                return Err(CliError::Failed);
+            }
+            None => None,
+        };
+        let report = check_one(&self.path, &self.name, variant).map_err(|e| {
+            eprintln!("Error: {e}");
+            CliError::Failed
+        })?;
+        if self.json {
+            print_json(&report)
+        } else {
+            report.print();
+            Ok(())
+        }
+    }
+}
+
+/// Parse a `key=value` variant filter.
+fn parse_variant_filter(arg: &str) -> Result<(String, String), String> {
+    arg.split_once('=')
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .ok_or_else(|| format!("Error: --variant expects key=value, got {arg:?}"))
+}
+
+/// Fail (with the submodule hint) when the corpus inputs are not materialized —
+/// both `run` and `check-test` need them, unlike the baseline-only tools.
+fn require_corpus(path: &std::path::Path) -> Result<(), CliError> {
+    if corpus_materialized(path) {
+        return Ok(());
+    }
+    eprintln!(
+        "Error: the tsc corpus inputs are not materialized under {}.",
+        path.display()
+    );
+    eprintln!("Run `git submodule update --init` in ../typescript-go to materialize them.");
+    Err(CliError::Failed)
 }
 
 impl IndexCommand {

@@ -29,9 +29,11 @@ pub mod pretty;
 pub mod query;
 pub mod render;
 pub mod roundtrip;
+pub mod runner;
 pub mod variants;
 
 pub use discovery::{baselines_dir, corpus_materialized, discover_baselines};
 pub use index::run_index;
 pub use query::{denominators, histogram, tests_by_code};
 pub use roundtrip::run_roundtrip;
+pub use runner::{check_one, run_skeleton};

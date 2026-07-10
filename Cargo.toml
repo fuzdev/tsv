@@ -9,6 +9,7 @@ members = [
     "crates/tsv_ts",
     "crates/tsv_css",
     "crates/tsv_svelte",
+    "crates/tsv_check",
     "crates/tsv_cli",
     "crates/tsv_debug",
     "crates/tsv_wasm",
@@ -44,6 +45,11 @@ tsv_discover = { path = "crates/tsv_discover" }
 tsv_ts = { path = "crates/tsv_ts", default-features = false }
 tsv_css = { path = "crates/tsv_css", default-features = false }
 tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
+
+# Experimental TypeScript type-checking. A consumer crate of tsv_ts's concrete
+# types; referenced only by the tsv_debug harness so it never touches the
+# shipped format/parse artifacts (a crate-boundary zero-cost exclusion).
+tsv_check = { path = "crates/tsv_check" }
 
 # External dependencies
 argh = "0.1"

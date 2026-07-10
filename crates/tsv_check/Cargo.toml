@@ -1,0 +1,18 @@
+[package]
+name = "tsv_check"
+version.workspace = true
+edition.workspace = true
+description = "Experimental TypeScript type-checking for tsv (the tsv_check checker crate)"
+
+[dependencies]
+# Foundation (spans, comments, diagnostics substrate) + the TypeScript parser
+# whose internal AST the checker binds and checks. No convert feature — the
+# checker consumes the internal AST directly, never the wire JSON.
+tsv_lang = { workspace = true }
+tsv_ts = { workspace = true }
+# The per-file parse arena the caller owns (caller-owns-arena, the tsv_ts
+# contract). Already a workspace dependency.
+bumpalo = { workspace = true }
+
+[lints]
+workspace = true

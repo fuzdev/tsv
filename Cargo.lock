@@ -667,6 +667,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tsv_check"
+version = "0.1.0"
+dependencies = [
+ "bumpalo",
+ "tsv_lang",
+ "tsv_ts",
+]
+
+[[package]]
 name = "tsv_cli"
 version = "0.1.0"
 dependencies = [
@@ -705,6 +714,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tsv_check",
  "tsv_cli",
  "tsv_css",
  "tsv_html",
