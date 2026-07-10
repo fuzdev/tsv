@@ -123,9 +123,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // Computed property: { [expr]: value }
                 TokenKind::BracketOpen => {
                     self.advance()?; // consume '['
-                    let key_expr = self.parse_expression()?;
-                    self.expect(&TokenKind::BracketClose)?; // consume ']'
-                    (key_expr, true, false)
+                    (self.parse_computed_member_key()?, true, false)
                 }
                 // Both identifiers and keywords can be property keys: { foo: 1, object: 2, in: 3 }
                 TokenKind::Identifier => {

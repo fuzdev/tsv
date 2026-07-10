@@ -205,9 +205,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Property key: identifier, keyword, string literal, number literal, or computed [expr]
         // Keywords are valid property names in type literals: { class: string }
         let (computed, key) = if self.eat(TokenKind::BracketOpen) {
-            let expr = self.parse_expression()?;
-            self.expect(&TokenKind::BracketClose)?;
-            (true, expr)
+            (true, self.parse_computed_member_key()?)
         } else if self.current_is_identifier_or_keyword() {
             let (key_start, key_end) = self.current_pos();
             // Member keys decode `\u` escapes (span-identity otherwise) — acorn parity.
