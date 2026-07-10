@@ -93,33 +93,46 @@ const RUN_CRASH_EXCLUDED_PIN: usize = 1;
 /// gate). Measured 2026-07-10 vs pin 168e7015. `family_extra` is gated to 0
 /// (hard); the rest pin the buckets so any move (a cascade change, a merge
 /// change, a tsv parser change, a typescript-go pull) forces a deliberate re-pin.
-/// The missing bucket is classified: `merge` (merge-phase family — **now 0**, S4
+/// The missing bucket is classified: `merge` (merge-phase family — **0**, S4
 /// closed the single-file merge path: TS2397 globalThis/undefined + TS2664
-/// augmentation-not-found), `lib` (absent-lib conflicts, S5), and `check-time`
-/// (checker-emitted TS2300/2451 the bind+merge slice can't produce — duplicate
-/// members, type parameters, computed/private names). A drop in `check-time`
-/// (matches gained) or `lib` is a real improvement that re-pins; a rise anywhere
-/// is a regression to explain.
+/// augmentation-not-found), `lib` (absent-lib conflicts — **now 0**, S5 closed the
+/// four classified lib-conflict misses: TS2300 eval/Symbol/Promise/ElementTagNameMap
+/// against the standard-library globals), and `check-time` (checker-emitted
+/// TS2300/2451 the bind+merge slice can't produce — duplicate members, type
+/// parameters, computed/private names). A drop in `check-time` (matches gained) is a
+/// real improvement that re-pins; a rise anywhere is a regression to explain.
 const RUN_FAMILY_GRADED_PIN: usize = 4066;
 const RUN_FAMILY_POSITIVE_PIN: usize = 125;
-const RUN_FAMILY_MATCH_PIN: usize = 421;
-const RUN_FAMILY_MISSING_PIN: usize = 129;
+const RUN_FAMILY_MATCH_PIN: usize = 425;
+const RUN_FAMILY_MISSING_PIN: usize = 125;
 const RUN_MISSING_MERGE_PIN: usize = 0;
-const RUN_MISSING_LIB_PIN: usize = 4;
+const RUN_MISSING_LIB_PIN: usize = 0;
 const RUN_MISSING_CHECKTIME_PIN: usize = 125;
 const RUN_FAMILY_SPAN_MISMATCH_PIN: usize = 0;
 const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
 const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 9;
 const RUN_MODULE_DETECTION_PIN: usize = 1;
 
+/// REGRESSION PINS (exact, two-sided) for the lib base (S5). Measured 2026-07-10 vs
+/// pin 168e7015 (`_submodules/TypeScript` corpus materialized): the distinct lib
+/// `.d.ts` files parsed+bound and the distinct resolved lib sets folded across the
+/// in-scope variants. A move is a deliberate re-pin (a harness-port change, a lib
+/// set change, or a typescript-go pull). The three error channels are gated to
+/// empty (a lib parse-reject, a missing referenced lib, or an unrecognized
+/// `@lib`/reference name — all expected never on the pinned checkout).
+const RUN_LIB_FILES_BOUND_PIN: usize = 107;
+const RUN_LIB_SETS_PIN: usize = 50;
+
 /// REGRESSION PINS (exact, two-sided) for the related-info channel — graded on the
 /// matched family primaries only (the primary code gates the per-variant verdict;
 /// related info is its own pinned channel). Measured 2026-07-10 vs pin 168e7015:
-/// the 42 matches are the multiple-default-export chains (TS2752/2753/2528's
-/// TS6204). `missing`/`extra`/`span_mismatch` are 0 (the merge-path family the
-/// merge emits carries no related info, and the sole TS1369-hint baseline is a
-/// tsv parse-rejection). A rise in `missing`/`extra` is a regression to explain.
-const RUN_RELATED_MATCH_PIN: usize = 42;
+/// the 42 multiple-default-export chains (TS2752/2753/2528's TS6204) plus the 9
+/// lib-conflict related infos S5 added (TS6203/6204 pointing at the masked lib
+/// files: eval 1, Symbol 3, Promise 4, ElementTagNameMap 1). `missing`/`extra`/
+/// `span_mismatch` are 0 (the lib relateds match the baseline's masked
+/// `lib.x.d.ts:--:--` entries by (code, file), loc-agnostic). A rise in
+/// `missing`/`extra` is a regression to explain.
+const RUN_RELATED_MATCH_PIN: usize = 51;
 const RUN_RELATED_MISSING_PIN: usize = 0;
 const RUN_RELATED_EXTRA_PIN: usize = 0;
 const RUN_RELATED_SPAN_MISMATCH_PIN: usize = 0;
@@ -351,6 +364,31 @@ fn enforce_run_gates(report: &SkeletonReport) -> Result<(), CliError> {
     );
     pin(&mut errs, "script retries", report.script_retry, RUN_SCRIPT_RETRY_PIN);
     pin(&mut errs, "crash-excluded", report.excluded_crashes, RUN_CRASH_EXCLUDED_PIN);
+
+    // Lib-base (S5) sizing pins + the empty-error-channel invariants.
+    pin(&mut errs, "lib files bound", report.lib_files_bound, RUN_LIB_FILES_BOUND_PIN);
+    pin(&mut errs, "lib sets folded", report.lib_sets_built, RUN_LIB_SETS_PIN);
+    if !report.lib_parse_errors.is_empty() {
+        errs.push(format!(
+            "{} lib file(s) failed to parse, e.g. {}",
+            report.lib_parse_errors.len(),
+            report.lib_parse_errors.first().map_or("", String::as_str)
+        ));
+    }
+    if !report.lib_missing_files.is_empty() {
+        errs.push(format!(
+            "{} referenced lib file(s) missing, e.g. {}",
+            report.lib_missing_files.len(),
+            report.lib_missing_files.first().map_or("", String::as_str)
+        ));
+    }
+    if !report.lib_unknown_names.is_empty() {
+        errs.push(format!(
+            "{} unrecognized @lib/reference name(s), e.g. {}",
+            report.lib_unknown_names.len(),
+            report.lib_unknown_names.first().map_or("", String::as_str)
+        ));
+    }
 
     // Family grading pins.
     pin(&mut errs, "family graded", report.family_graded_variants, RUN_FAMILY_GRADED_PIN);

@@ -24,6 +24,7 @@ pub mod corpus;
 pub mod directives;
 pub mod discovery;
 pub mod index;
+pub mod libs;
 pub mod options_meta;
 pub mod pretty;
 pub mod query;

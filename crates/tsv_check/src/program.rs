@@ -36,7 +36,7 @@
 use crate::binder::{bind_file, module_ness, ModuleNess};
 use crate::diag::{sort_and_deduplicate, Diagnostic};
 use crate::ids::FileId;
-use crate::merge::{merge_program, FileMerge};
+use crate::merge::{merge_program, FileMerge, LibBase, LibFile};
 use bumpalo::Bump;
 use tsv_ts::ast::Program;
 use tsv_ts::{parse_with_goal, Goal};
@@ -81,6 +81,7 @@ pub struct FileReport {
 }
 
 /// A unit's parse outcome.
+#[derive(Clone)]
 pub enum ParseReport {
     /// The unit parsed (possibly via the `Goal::Script` retry).
     Parsed(ParsedFacts),
@@ -92,6 +93,7 @@ pub enum ParseReport {
 }
 
 /// Facts recorded for a parsed unit.
+#[derive(Clone)]
 pub struct ParsedFacts {
     /// The goal the unit parsed under.
     pub goal: Goal,
@@ -103,73 +105,159 @@ pub struct ParsedFacts {
     pub node_count: u32,
 }
 
-/// Check a program: parse every unit via the goal rule, and — unless any unit
-/// parse-rejects — bind and check each, concatenating diagnostics and returning
-/// them in canonical sorted order.
+/// A parsed + bound program — variant-independent and fully owned
+/// (arena-independent), so the caller may drop the parse arena the moment this
+/// returns and merge it against any number of lib bases ([`check_bound`]). This is
+/// the split that keeps parse+bind out of the per-variant loop: parse+bind once,
+/// merge per resolved lib set.
+pub struct BoundProgram {
+    /// Whether any unit parse-rejected (a reported fact; it does **not** suppress
+    /// the other units' diagnostics — the CompileFilesEx parity).
+    pub parse_rejected: bool,
+    units: Vec<BoundUnit>,
+    total_nodes: u64,
+}
+
+/// One unit's owned bind product inside a [`BoundProgram`].
+struct BoundUnit {
+    file: FileId,
+    name: String,
+    parse: ParseReport,
+    /// The bind (+ check) diagnostics — variant-independent, cloned into each
+    /// [`check_bound`] result.
+    bind_diagnostics: Vec<Diagnostic>,
+    /// The merge product, `None` when the unit parse-rejected.
+    merge: Option<FileMerge>,
+}
+
+impl BoundProgram {
+    /// Total bound nodes across parsed units (informational).
+    #[must_use]
+    pub fn total_node_count(&self) -> u64 {
+        self.total_nodes
+    }
+
+    /// The per-unit parse reports, in input order (a read-only view for the caller
+    /// that need not run [`check_bound`] to learn parse facts).
+    #[must_use]
+    pub fn parse_reports(&self) -> Vec<(&str, &ParseReport)> {
+        self.units.iter().map(|u| (u.name.as_str(), &u.parse)).collect()
+    }
+}
+
+/// Parse every unit via the goal rule and bind each, returning the owned
+/// [`BoundProgram`]. The merge is deferred to [`check_bound`] (it depends on the
+/// resolved lib set), so this is variant-independent.
 #[must_use]
-pub fn check_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> CheckResult {
-    let mut attempts: Vec<Attempt<'a>> = Vec::with_capacity(units.len());
+pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgram {
+    let mut bound_units: Vec<BoundUnit> = Vec::with_capacity(units.len());
     let mut parse_rejected = false;
+    let mut total_nodes = 0u64;
 
     for (i, unit) in units.iter().enumerate() {
         let file = FileId(i as u32);
         match parse_unit(unit.source, arena) {
-            Ok((program, goal, used_script_retry)) => attempts.push(Attempt {
-                file,
-                name: unit.name,
-                goal,
-                used_script_retry,
-                module_ness: module_ness(&program),
-                program: Some(program),
-                message: None,
-                node_count: 0,
-            }),
+            Ok((program, goal, used_script_retry)) => {
+                let module_ness = module_ness(&program);
+                let bound = bind_file(&program, unit.source, file);
+                total_nodes += u64::from(bound.node_count);
+                // Per file: bind diagnostics then check diagnostics (check is a
+                // no-op this slice) — the getBindAndCheckDiagnostics concat.
+                let check_diags = check_file(&bound);
+                let mut bind_diagnostics = bound.diagnostics;
+                bind_diagnostics.extend(check_diags);
+                bound_units.push(BoundUnit {
+                    file,
+                    name: unit.name.to_string(),
+                    parse: ParseReport::Parsed(ParsedFacts {
+                        goal,
+                        used_script_retry,
+                        module_ness,
+                        node_count: bound.node_count,
+                    }),
+                    bind_diagnostics,
+                    merge: Some(bound.merge),
+                });
+            }
             Err(message) => {
                 parse_rejected = true;
-                attempts.push(Attempt {
+                bound_units.push(BoundUnit {
                     file,
-                    name: unit.name,
-                    goal: Goal::Module,
-                    used_script_retry: false,
-                    module_ness: ModuleNess::Script,
-                    program: None,
-                    message: Some(message),
-                    node_count: 0,
+                    name: unit.name.to_string(),
+                    parse: ParseReport::Rejected { message },
+                    bind_diagnostics: Vec::new(),
+                    merge: None,
                 });
             }
         }
     }
 
-    // Unconditional concat (the CompileFilesEx parity path): every unit that
-    // parsed contributes its bind/check diagnostics, independent of a sibling's
-    // rejection. A rejected unit has no AST, so it contributes none.
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-    let mut merges: Vec<FileMerge> = Vec::new();
-    for attempt in &mut attempts {
-        if let Some(program) = &attempt.program {
-            let source = units[attempt.file.index()].source;
-            let bound = bind_file(program, source, attempt.file);
-            attempt.node_count = bound.node_count;
-            // Per file: bind diagnostics then check diagnostics (check is a no-op
-            // this slice) — the getBindAndCheckDiagnostics concat.
-            let check_diags = check_file(&bound);
-            diagnostics.extend(bound.diagnostics);
-            diagnostics.extend(check_diags);
-            merges.push(bound.merge);
-        }
-    }
-    // The single-threaded global merge (checker-init phase) over every parsed
-    // file's bind product — cross-declaration-space conflicts, the
-    // globalThis/undefined checks, and module augmentations. Its diagnostics join
-    // the pool before the canonical sort (order-independent).
-    diagnostics.extend(merge_program(&merges));
+    BoundProgram { parse_rejected, units: bound_units, total_nodes }
+}
 
-    // Final caller-side sort + dedup over the whole program's diagnostics.
-    let paths: Vec<String> = units.iter().map(|u| u.name.to_string()).collect();
+/// Merge a [`BoundProgram`] against an optional [`LibBase`] and return the final
+/// [`CheckResult`] (canonically sorted + deduped). The bind diagnostics are the
+/// variant-independent concat (the CompileFilesEx parity path); the merge phase
+/// consults the lib base, so the lib file names append after the program units in
+/// the diagnostic path space.
+#[must_use]
+pub fn check_bound(bound: &BoundProgram, lib: Option<&LibBase>) -> CheckResult {
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    for unit in &bound.units {
+        diagnostics.extend(unit.bind_diagnostics.iter().cloned());
+    }
+    // Only test-unit merges are cloned here (lib globals live in the base, not in
+    // `files`), so this stays cheap even run per-variant.
+    let merges: Vec<FileMerge> = bound.units.iter().filter_map(|u| u.merge.clone()).collect();
+    let lib_file_offset = bound.units.len() as u32;
+    diagnostics.extend(merge_program(&merges, lib, lib_file_offset));
+
+    // Path space: program units first, then the lib files (their FileIds are
+    // `lib_file_offset + lib-local index`).
+    let mut paths: Vec<String> = bound.units.iter().map(|u| u.name.clone()).collect();
+    if let Some(base) = lib {
+        paths.extend(base.lib_files.iter().cloned());
+    }
     sort_and_deduplicate(&mut diagnostics, &paths);
 
-    let files = attempts.into_iter().map(Attempt::into_report).collect();
-    CheckResult { diagnostics, files, parse_rejected }
+    let files = bound
+        .units
+        .iter()
+        .map(|u| FileReport { file: u.file, name: u.name.clone(), parse: u.parse.clone() })
+        .collect();
+    CheckResult { diagnostics, files, parse_rejected: bound.parse_rejected }
+}
+
+/// Check a program with no lib base — parse every unit via the goal rule, bind,
+/// merge, and return canonically sorted diagnostics.
+#[must_use]
+pub fn check_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> CheckResult {
+    check_bound(&bind_program(units, arena), None)
+}
+
+/// Check a program against an optional lib base (the lib-aware entry point).
+#[must_use]
+pub fn check_program_with_lib<'a>(
+    units: &[SourceUnit<'a>],
+    lib: Option<&LibBase>,
+    arena: &'a Bump,
+) -> CheckResult {
+    check_bound(&bind_program(units, arena), lib)
+}
+
+/// Parse + bind one lib `.d.ts` file, returning its owned global-eligible product
+/// for folding into a [`LibBase`]. A lib is an ambient script; its globals are its
+/// source-file locals (bound under FileId 0 — the fold re-keys by priority index).
+///
+/// # Errors
+///
+/// Returns the parse error message when the lib file does not parse under either
+/// goal (expected never for the bundled libs; the caller counts it as a carve-out).
+pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
+    let arena = Bump::new();
+    let (program, _goal, _retry) = parse_unit(source, &arena)?;
+    let bound = bind_file(&program, source, FileId::ROOT);
+    Ok(LibFile { name: name.to_string(), merge: bound.merge })
 }
 
 /// Check one bound file — a no-op skeleton (no semantic diagnostics yet).
@@ -194,33 +282,6 @@ fn parse_unit<'a>(
             // Both goals failed: report the primary (Module) goal's error.
             Err(_script_err) => Err(module_err.to_string()),
         },
-    }
-}
-
-/// The mutable per-unit state carried from parse through bind into the report.
-struct Attempt<'a> {
-    file: FileId,
-    name: &'a str,
-    goal: Goal,
-    used_script_retry: bool,
-    module_ness: ModuleNess,
-    program: Option<Program<'a>>,
-    message: Option<String>,
-    node_count: u32,
-}
-
-impl Attempt<'_> {
-    fn into_report(self) -> FileReport {
-        let parse = match self.message {
-            Some(message) => ParseReport::Rejected { message },
-            None => ParseReport::Parsed(ParsedFacts {
-                goal: self.goal,
-                used_script_retry: self.used_script_retry,
-                module_ness: self.module_ness,
-                node_count: self.node_count,
-            }),
-        };
-        FileReport { file: self.file, name: self.name.to_string(), parse }
     }
 }
 

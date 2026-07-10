@@ -17,23 +17,31 @@
 //! Iteration is **deterministic** (file order, then declaration order) — never a
 //! hash-map's iteration order (the grimoire-recorded tsgo determinism landmine).
 //!
-//! **Single-file P1 scope.** With no lib bound (S5) the globals table starts
-//! empty, so `mergeGlobalSymbol` on a single file's locals never finds a prior
-//! symbol to conflict with — the cross-space TS2300/2451/2567 path
-//! ([`report_merge_symbol_error`]) is exercised only by a **multi-file** program
-//! (two scripts sharing global scope, or two `declare global` blocks). It is a
-//! genuine, unit-tested port here so it is correct the moment a second file (or a
-//! lib) lands. Module resolution is likewise trivial single-file: an augmentation
-//! resolves iff an ambient module of that name exists in the same file, which for
-//! an external-module file is never (every string-literal module in one is itself
-//! an augmentation) — so a single-file augmentation is **always** "not found"
-//! (TS2664). The resolves-to-a-non-module errors (TS2649 / TS2671) need a
+//! **Two-level globals (overlay + lib base).** A resolved lib set folds into an
+//! immutable [`LibBase`] (built once per distinct set, shared across variants);
+//! the merge maintains a per-program **overlay** it consults *before* the base
+//! ([`merge_global_symbol`]). A script's `var eval` / `class Symbol` /
+//! `class Promise`, or a `declare global` `interface ElementTagNameMap`, conflicts
+//! with the lib global of that name via the same `*Excludes` masks — issuing the
+//! observable test-file primary whose related info is the priority-ordered lib
+//! declarations (leading TS6203). Test symbols never mutate the base; on a conflict
+//! a base declaration's lib-local file id translates into program FileId space
+//! (`lib_file_offset + index`), so the lib file appends after the test units in the
+//! diagnostic path space and its masked primaries carry the lib file name. With no
+//! base (`lib = None`) the globals table starts empty, so the cross-space path
+//! ([`report_merge_symbol_error`]) is exercised only by a **multi-file** program.
+//!
+//! Module resolution is trivial single-file: an augmentation resolves iff an
+//! ambient module of that name exists in the same file, which for an
+//! external-module file is never — so a single-file augmentation is **always** "not
+//! found" (TS2664). The resolves-to-a-non-module errors (TS2649 / TS2671) need a
 //! multi-file resolution target and are structurally unreachable at single-file
-//! P1; their machinery is noted at the site, not emitted.
+//! scope; their machinery is noted at the site, not emitted.
 //!
 //! `mergeSymbol`'s member/export **recursion** (merging a `declare global`
-//! interface into a lib interface of the same name) is deferred with lib (S5) —
-//! P1's globals hold no members to merge into.
+//! interface *into* a lib interface's member table) is not modelled: the family
+//! keys on the top-level symbol conflict, and a legal interface↔interface merge is
+//! silent (no member table to reconcile for the duplicate-identifier verdict).
 //
 // tsgo: internal/checker/checker.go initializeChecker (:1296, the phase order),
 //       mergeGlobalSymbol (:1386), mergeModuleAugmentation (:1397),
@@ -62,9 +70,120 @@ fn is_ambient_module_symbol_name(name: &str) -> bool {
     name.starts_with('"') && name.ends_with('"')
 }
 
+/// One bound lib (`.d.ts`) file's global-eligible product — its owned
+/// [`FileMerge`] plus the display name a cross-file conflict points a masked
+/// diagnostic at. Arena-independent (owned strings), so the caller may drop the
+/// parse arena the moment the bind returns and reuse this across every variant.
+pub struct LibFile {
+    /// The lib file's display name (e.g. `lib.es5.d.ts`).
+    pub name: String,
+    /// The bound merge product (a lib is an ambient script — its globals live in
+    /// `source_locals`).
+    pub merge: FileMerge,
+}
+
+/// The immutable folded global scope of one resolved lib set — built once per
+/// distinct sorted lib list and shared across every variant that resolves to it
+/// (a test's globals consult it, never mutate it).
+///
+/// tsgo binds the lib files in **priority order** (`fileloader.go sortLibs`) before
+/// the test file, so each global symbol's declaration list is priority-ordered —
+/// which fixes the TS6203/6204 related-info attribution (highest-priority lib leads
+/// with TS6203). This mirror folds the same way and seeds `globalThis`
+/// (`VALUE_MODULE|NAMESPACE_MODULE`), matching `initializeChecker`'s pre-merge
+/// seed.
+pub struct LibBase {
+    /// The lib file names in priority order — the index is a **lib-local file id**;
+    /// a cross-file conflict translates it into program FileId space
+    /// (`lib_file_offset + index`).
+    pub lib_files: Vec<String>,
+    /// The folded globals: symbol name -> its accumulated flags + priority-ordered
+    /// declarations.
+    globals: FxHashMap<String, LibEntry>,
+}
+
+/// One folded lib global symbol.
+struct LibEntry {
+    flags: SymbolFlags,
+    /// Declarations in priority-then-source order (drives the TS6203/6204 order).
+    decls: Vec<LibDecl>,
+}
+
+/// One declaration of a [`LibEntry`], keyed by its lib-local file id.
+struct LibDecl {
+    /// Index into [`LibBase::lib_files`] — the lib file this declaration lives in.
+    lib_file: u32,
+    error_span: Span,
+    is_type_decl: bool,
+}
+
+impl LibBase {
+    /// Build a lib base by folding the lib files' globals in the given order
+    /// (which **must** be priority order, so the related-info attribution matches
+    /// tsgo). Lib globals of the same name accumulate (flags union, declarations
+    /// appended) — well-formed libs merge cleanly, so no conflict is detected here.
+    ///
+    /// # Panics
+    ///
+    /// Never — the fold only inserts into an owned table.
+    #[must_use]
+    pub fn build(libs: &[&LibFile]) -> LibBase {
+        let mut globals: FxHashMap<String, LibEntry> = FxHashMap::default();
+        // Seed `globalThis` (tsgo's `initializeChecker` seed) so a test's
+        // `var globalThis` hits the NamespaceModule guard rather than a stray merge.
+        globals.insert(
+            NAME_GLOBAL_THIS.to_string(),
+            LibEntry { flags: MODULE_FLAGS, decls: Vec::new() },
+        );
+        for (index, lib) in libs.iter().enumerate() {
+            let lib_file = index as u32;
+            // A lib is an ambient script: its globals are its source-file locals.
+            for sym in &lib.merge.source_locals {
+                fold_lib_symbol(&mut globals, sym, lib_file);
+            }
+            // A lib could theoretically carry a `declare global {}` block; fold its
+            // exports too (empty for the bundled libs, cheap to be safe).
+            for aug in &lib.merge.global_augmentations {
+                for sym in aug {
+                    fold_lib_symbol(&mut globals, sym, lib_file);
+                }
+            }
+        }
+        LibBase { lib_files: libs.iter().map(|l| l.name.clone()).collect(), globals }
+    }
+
+    /// Look up a global by name.
+    fn get(&self, name: &str) -> Option<&LibEntry> {
+        self.globals.get(name)
+    }
+
+    /// The number of distinct global names — informational (base sizing).
+    #[must_use]
+    pub fn global_count(&self) -> usize {
+        self.globals.len()
+    }
+}
+
+/// Fold one lib symbol into the base globals (accumulate flags + priority-ordered
+/// declarations).
+fn fold_lib_symbol(globals: &mut FxHashMap<String, LibEntry>, sym: &MergeSymbol, lib_file: u32) {
+    let entry = globals
+        .entry(sym.name.clone())
+        .or_insert_with(|| LibEntry { flags: SymbolFlags::NONE, decls: Vec::new() });
+    entry.flags.insert(sym.flags);
+    for decl in &sym.decls {
+        entry.decls.push(LibDecl {
+            lib_file,
+            error_span: decl.error_span,
+            is_type_decl: decl.is_type_decl,
+        });
+    }
+}
+
 /// The merge-relevant product of binding one file — program-independent (a C15
 /// requirement), fully resolved to owned strings so cross-file names reconcile by
 /// value with no shared interner.
+#[derive(Clone)]
 pub struct FileMerge {
     /// The file these declarations belong to.
     pub file: FileId,
@@ -84,6 +203,7 @@ pub struct FileMerge {
 
 /// One symbol exposed to the merge: its accumulated flags, resolved name, and its
 /// declarations (each pointing a diagnostic at a name span).
+#[derive(Clone)]
 pub struct MergeSymbol {
     /// The resolved symbol-table key (identifier text).
     pub name: String,
@@ -108,6 +228,7 @@ pub struct MergeDecl {
 
 /// A non-global `declare module "X"` augmentation: the unquoted module name (the
 /// `{0}` argument) and the string-literal span a TS2664 points at.
+#[derive(Clone)]
 pub struct ModuleAug {
     /// The file the augmentation lives in.
     pub file: FileId,
@@ -148,10 +269,23 @@ impl MergeOut {
     }
 }
 
-/// Run the global merge across a program's per-file bind products, returning the
-/// merge diagnostics (unsorted — the caller concatenates and canonically sorts).
+/// Run the global merge across a program's per-file bind products, consulting an
+/// optional [`LibBase`], returning the merge diagnostics (unsorted — the caller
+/// concatenates and canonically sorts).
+///
+/// The **overlay** (a program's own globals) is consulted before the immutable
+/// **base** (the lib globals): a test symbol merges into a prior test symbol of the
+/// same name, else conflicts-or-merges against the base, else is inserted fresh.
+/// Test symbols never mutate the base, so the base is shared across variants. On a
+/// base conflict, a base declaration's lib-local file id is translated into program
+/// FileId space via `lib_file_offset` (= the number of program units), so the lib
+/// file appends after the test units in the diagnostic path space.
 #[must_use]
-pub fn merge_program(files: &[FileMerge]) -> Vec<Diagnostic> {
+pub fn merge_program(
+    files: &[FileMerge],
+    lib: Option<&LibBase>,
+    lib_file_offset: u32,
+) -> Vec<Diagnostic> {
     let mut out = MergeOut::new();
     let mut globals: FxHashMap<String, GlobalEntry> = FxHashMap::default();
 
@@ -175,7 +309,7 @@ pub fn merge_program(files: &[FileMerge]) -> Vec<Diagnostic> {
             if sym.flags.intersects(MODULE_FLAGS) && is_ambient_module_symbol_name(&sym.name) {
                 deferred_ambient.push(sym);
             } else {
-                merge_global_symbol(&mut globals, sym, &mut out);
+                merge_global_symbol(&mut globals, lib, lib_file_offset, sym, &mut out);
             }
         }
     }
@@ -184,7 +318,7 @@ pub fn merge_program(files: &[FileMerge]) -> Vec<Diagnostic> {
     for file in files {
         for aug in &file.global_augmentations {
             for sym in aug {
-                merge_global_symbol(&mut globals, sym, &mut out);
+                merge_global_symbol(&mut globals, lib, lib_file_offset, sym, &mut out);
             }
         }
     }
@@ -207,7 +341,7 @@ pub fn merge_program(files: &[FileMerge]) -> Vec<Diagnostic> {
     // globals symbol of the same quoted name (multi-file or lib), so at single-file
     // scope it merges into empty globals with no diagnostic.
     for sym in deferred_ambient {
-        merge_global_symbol(&mut globals, sym, &mut out);
+        merge_global_symbol(&mut globals, lib, lib_file_offset, sym, &mut out);
     }
 
     // --- Phase 5: non-global module augmentations (`declare module "X"`) ---
@@ -228,25 +362,103 @@ pub fn merge_program(files: &[FileMerge]) -> Vec<Diagnostic> {
 }
 
 /// tsgo `mergeGlobalSymbol` — merge one symbol into the globals table, reporting a
-/// cross-declaration-space conflict when the flags exclude each other.
+/// cross-declaration-space conflict when the flags exclude each other. The overlay
+/// (a program's own accumulated globals) is consulted first, then the immutable
+/// lib base.
 fn merge_global_symbol(
     globals: &mut FxHashMap<String, GlobalEntry>,
+    lib: Option<&LibBase>,
+    lib_file_offset: u32,
     source: &MergeSymbol,
     out: &mut MergeOut,
 ) {
-    match globals.get_mut(&source.name) {
-        Some(target) => merge_symbol(target, source, out),
-        None => {
-            globals.insert(
-                source.name.clone(),
-                GlobalEntry {
-                    name: source.name.clone(),
-                    flags: source.flags,
-                    decls: source.decls.clone(),
-                },
-            );
-        }
+    if let Some(target) = globals.get_mut(&source.name) {
+        merge_symbol(target, source, out);
+        return;
     }
+    if let Some(base) = lib.and_then(|l| l.get(&source.name)) {
+        // Conflict-or-merge against the base without mutating it. A clean merge
+        // emits nothing; the in-file cascade already collapsed same-name test
+        // symbols to one, so (at the single-file scope this grades) not cloning the
+        // base into the overlay is sound — a later same-name symbol cannot arise.
+        merge_symbol_against_base(base, &source.name, lib_file_offset, source, out);
+        return;
+    }
+    globals.insert(
+        source.name.clone(),
+        GlobalEntry {
+            name: source.name.clone(),
+            flags: source.flags,
+            decls: source.decls.clone(),
+        },
+    );
+}
+
+/// tsgo `mergeSymbol` with the target an immutable [`LibBase`] entry — the
+/// conflict decision when a test symbol merges into a lib global. On a clean merge
+/// nothing is emitted (and the base is not mutated); on a conflict the base
+/// declarations are translated into program FileId space.
+fn merge_symbol_against_base(
+    base: &LibEntry,
+    name: &str,
+    lib_file_offset: u32,
+    source: &MergeSymbol,
+    out: &mut MergeOut,
+) {
+    if !base.flags.intersects(excluded_symbol_flags(source.flags)) {
+        // No conflict: the test symbol legally augments/merges the lib global.
+        return;
+    }
+    if base.flags.intersects(SymbolFlags::NAMESPACE_MODULE) {
+        // A value merging into a non-instantiated namespace (TS2649) — but never
+        // when the base is the built-in `globalThis` (the phase-1 TS2397 already
+        // reports that, and a second TS2649 would not make sense; the Part A guard).
+        if name != NAME_GLOBAL_THIS
+            && let Some(decl) = source.decls.first()
+        {
+            out.push(augment_error(decl.file, decl.error_span, 2649, name));
+        }
+        return;
+    }
+    report_merge_symbol_error_with_base(base, name, lib_file_offset, source, out);
+}
+
+/// tsgo `reportMergeSymbolError` with the target a [`LibBase`] entry: the same
+/// three-way message selection and both-direction emission as
+/// [`report_merge_symbol_error`], the base declarations translated into program
+/// FileId space. The test-side primaries (their related info the priority-ordered
+/// lib declarations) are the observable ones; the lib-side primaries land on the
+/// masked lib file the baseline hides.
+fn report_merge_symbol_error_with_base(
+    base: &LibEntry,
+    name: &str,
+    lib_file_offset: u32,
+    source: &MergeSymbol,
+    out: &mut MergeOut,
+) {
+    let base_decls: Vec<MergeDecl> = base
+        .decls
+        .iter()
+        .map(|d| MergeDecl {
+            file: FileId(lib_file_offset + d.lib_file),
+            error_span: d.error_span,
+            is_type_decl: d.is_type_decl,
+        })
+        .collect();
+    let is_either_enum =
+        base.flags.intersects(SymbolFlags::ENUM) || source.flags.intersects(SymbolFlags::ENUM);
+    let is_either_block = base.flags.intersects(SymbolFlags::BLOCK_SCOPED_VARIABLE)
+        || source.flags.intersects(SymbolFlags::BLOCK_SCOPED_VARIABLE);
+    let code = if is_either_enum {
+        2567
+    } else if is_either_block {
+        2451
+    } else {
+        2300
+    };
+    let symbol_name = name.to_string();
+    add_dup_errors(&source.decls, code, &symbol_name, &base_decls, out);
+    add_dup_errors(&base_decls, code, &symbol_name, &source.decls, out);
 }
 
 /// tsgo `mergeSymbol` (the merge/conflict decision). No member/export recursion at
@@ -520,7 +732,7 @@ mod tests {
                 decls: vec![decl(1, 4, "x", false)],
             }],
         );
-        let diags = merge_program(&[a, b]);
+        let diags = merge_program(&[a, b], None, 0);
         let codes: Vec<u32> = diags.iter().map(|d| d.code).collect();
         // One TS2451 on each declaration; each carries a TS6203 related info.
         assert_eq!(codes, vec![2451, 2451]);
@@ -545,7 +757,7 @@ mod tests {
                 }],
             )
         };
-        let diags = merge_program(&[mk(0), mk(1)]);
+        let diags = merge_program(&[mk(0), mk(1)], None, 0);
         assert_eq!(diags.iter().map(|d| d.code).collect::<Vec<_>>(), vec![2300, 2300]);
     }
 
@@ -568,7 +780,7 @@ mod tests {
                 decls: vec![decl(1, 11, "E", true)],
             }],
         );
-        let diags = merge_program(&[a, b]);
+        let diags = merge_program(&[a, b], None, 0);
         assert_eq!(diags.iter().map(|d| d.code).collect::<Vec<_>>(), vec![2567, 2567]);
         // 2567 carries no `{0}` argument.
         assert!(diags.iter().all(|d| d.args.is_empty()));
@@ -597,7 +809,7 @@ mod tests {
                 )
             })
             .collect();
-        let mut diags = merge_program(&files);
+        let mut diags = merge_program(&files, None, 0);
         // Raw pool: every conflicting merge pushes a fresh primary (six merges,
         // each emitting a source-side and a target-side primary = twelve).
         assert_eq!(diags.len(), 12);
@@ -629,7 +841,7 @@ mod tests {
                 }],
             )
         };
-        let mut diags = merge_program(&[mk(0), mk(1), mk(2)]);
+        let mut diags = merge_program(&[mk(0), mk(1), mk(2)], None, 0);
         sort_and_deduplicate(&mut diags, &paths);
         assert_eq!(diags.len(), 3);
         // All primaries are TS2300; a.ts (the recurring target) carries two related
@@ -651,7 +863,7 @@ mod tests {
                 decls: vec![decl(0, 4, "globalThis", false)],
             }],
         );
-        let diags = merge_program(&[f]);
+        let diags = merge_program(&[f], None, 0);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, 2397);
         assert_eq!(diags[0].args, vec!["globalThis".to_string()]);
@@ -672,7 +884,7 @@ mod tests {
                 ],
             }],
         );
-        let diags = merge_program(&[f]);
+        let diags = merge_program(&[f], None, 0);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, 2397);
         assert_eq!(diags[0].span.start, 40);
@@ -692,7 +904,7 @@ mod tests {
                 ModuleAug { file: FileId(0), name: "M".to_string(), name_span: Span::new(50, 53) },
             ],
         };
-        let diags = merge_program(&[f]);
+        let diags = merge_program(&[f], None, 0);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, 2664);
         assert_eq!(diags[0].span.start, 22);
@@ -714,6 +926,147 @@ mod tests {
             global_augmentations: Vec::new(),
             module_augmentations: Vec::new(),
         };
-        assert!(merge_program(&[f]).is_empty());
+        assert!(merge_program(&[f], None, 0).is_empty());
+    }
+
+    // --- lib base ---------------------------------------------------------
+
+    /// A tiny lib file with two globals, in priority order.
+    fn lib(name: &str, symbols: Vec<MergeSymbol>) -> LibFile {
+        LibFile {
+            name: name.to_string(),
+            merge: FileMerge {
+                file: FileId(0),
+                is_external: false,
+                source_locals: symbols,
+                global_augmentations: Vec::new(),
+                module_augmentations: Vec::new(),
+            },
+        }
+    }
+
+    fn lib_symbol(name: &str, flags: SymbolFlags, span: u32, is_type: bool) -> MergeSymbol {
+        MergeSymbol {
+            name: name.to_string(),
+            flags,
+            decls: vec![decl(0, span, name, is_type)],
+        }
+    }
+
+    /// A test `class` conflicting with a lib global spanning three files reproduces
+    /// the priority-ordered TS6203/6204 related chain (leading TS6203 on the
+    /// highest-priority lib file), and the lib declarations translate into program
+    /// FileId space (offset = the number of program units).
+    #[test]
+    fn lib_conflict_emits_priority_ordered_related_chain() {
+        // Symbol declared across three lib files (priority order es5, es2015.symbol,
+        // es2015.symbol.wellknown): interface, var, interface -> flags Interface|Fsv.
+        let es5 = lib("lib.es5.d.ts", vec![lib_symbol("Symbol", SymbolFlags::INTERFACE, 10, true)]);
+        let sym = lib(
+            "lib.es2015.symbol.d.ts",
+            vec![lib_symbol("Symbol", SymbolFlags::FUNCTION_SCOPED_VARIABLE, 20, false)],
+        );
+        let wk = lib(
+            "lib.es2015.symbol.wellknown.d.ts",
+            vec![lib_symbol("Symbol", SymbolFlags::INTERFACE, 30, true)],
+        );
+        let base = LibBase::build(&[&es5, &sym, &wk]);
+        // The single test unit is FileId 0, so lib files map to FileIds 1..=3.
+        let test = script(
+            0,
+            vec![MergeSymbol {
+                name: "Symbol".to_string(),
+                flags: SymbolFlags::CLASS,
+                decls: vec![decl(0, 6, "Symbol", true)],
+            }],
+        );
+        let mut diags = merge_program(&[test], Some(&base), 1);
+        let paths = vec![
+            "test.ts".to_string(),
+            "lib.es5.d.ts".to_string(),
+            "lib.es2015.symbol.d.ts".to_string(),
+            "lib.es2015.symbol.wellknown.d.ts".to_string(),
+        ];
+        sort_and_deduplicate(&mut diags, &paths);
+        // The observable primary is on the test file's `class Symbol`.
+        let test_primary = diags
+            .iter()
+            .find(|d| d.file == Some(FileId(0)))
+            .expect("a test-file primary");
+        assert_eq!(test_primary.code, 2300);
+        assert_eq!(test_primary.span.start, 6);
+        // Its related chain is priority-ordered: TS6203 on es5, TS6204 on the rest,
+        // each pointing at the (translated) lib FileId.
+        let codes: Vec<u32> = test_primary.related.iter().map(|r| r.code).collect();
+        assert_eq!(codes, vec![6203, 6204, 6204]);
+        let files: Vec<Option<FileId>> = test_primary.related.iter().map(|r| r.file).collect();
+        assert_eq!(files, vec![Some(FileId(1)), Some(FileId(2)), Some(FileId(3))]);
+        // The lib-side primaries land on the (masked) lib files.
+        assert!(diags.iter().any(|d| d.file == Some(FileId(1)) && d.code == 2300));
+    }
+
+    /// A clean augmentation of a lib global (a test `interface` merging into a lib
+    /// interface) emits nothing.
+    #[test]
+    fn lib_clean_interface_merge_is_silent() {
+        let array = lib("lib.es5.d.ts", vec![lib_symbol("Array", SymbolFlags::INTERFACE, 10, true)]);
+        let base = LibBase::build(&[&array]);
+        let test = script(
+            0,
+            vec![MergeSymbol {
+                name: "Array".to_string(),
+                flags: SymbolFlags::INTERFACE,
+                decls: vec![decl(0, 10, "Array", true)],
+            }],
+        );
+        assert!(merge_program(&[test], Some(&base), 1).is_empty());
+    }
+
+    /// A test `var globalThis` hits the seeded-globalThis NamespaceModule guard (no
+    /// TS2649), leaving only the phase-1 TS2397.
+    #[test]
+    fn lib_var_globalthis_only_2397() {
+        let base = LibBase::build(&[]); // still seeds globalThis
+        let test = script(
+            0,
+            vec![MergeSymbol {
+                name: "globalThis".to_string(),
+                flags: SymbolFlags::FUNCTION_SCOPED_VARIABLE,
+                decls: vec![decl(0, 4, "globalThis", false)],
+            }],
+        );
+        let diags = merge_program(&[test], Some(&base), 1);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].code, 2397);
+    }
+
+    /// A `declare global` augmentation (an interface) conflicting with a lib type
+    /// alias of the same name is TS2300 (the ElementTagNameMap shape).
+    #[test]
+    fn lib_declare_global_interface_vs_type_alias_is_2300() {
+        let dom = lib(
+            "lib.dom.d.ts",
+            vec![lib_symbol("ElementTagNameMap", SymbolFlags::TYPE_ALIAS, 10, true)],
+        );
+        let base = LibBase::build(&[&dom]);
+        // An external module carrying a `declare global { interface ElementTagNameMap }`.
+        let test = FileMerge {
+            file: FileId(0),
+            is_external: true,
+            source_locals: Vec::new(),
+            global_augmentations: vec![vec![MergeSymbol {
+                name: "ElementTagNameMap".to_string(),
+                flags: SymbolFlags::INTERFACE,
+                decls: vec![decl(0, 40, "ElementTagNameMap", true)],
+            }]],
+            module_augmentations: Vec::new(),
+        };
+        let diags = merge_program(&[test], Some(&base), 1);
+        let test_primary = diags.iter().find(|d| d.file == Some(FileId(0))).expect("primary");
+        assert_eq!(test_primary.code, 2300);
+        assert_eq!(test_primary.span.start, 40);
+        assert_eq!(test_primary.related.len(), 1);
+        assert_eq!(test_primary.related[0].code, 6203);
+        assert_eq!(test_primary.related[0].file, Some(FileId(1)));
     }
 }

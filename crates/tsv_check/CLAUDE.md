@@ -44,7 +44,12 @@
   dedup. Operates on scripts' file locals and `declare global` /
   ambient-module augmentation exports — never an external module's locals.
   Per-file `FileMerge` inputs are program-independent (owned strings,
-  declaration-order iteration — never map order).
+  declaration-order iteration — never map order). Also owns the lib layer:
+  `LibFile` (a lib's bound product), `LibBase::build` (fold a resolved lib
+  set in priority order into an immutable global base, `globalThis`
+  seeded), and the base-aware merge (`merge_symbol_against_base` — programs
+  consult overlay-then-base; test symbols never mutate the base; base decls
+  translate into program FileId space only on a conflict).
 - `binder/` — the fused lower+bind pre-order walk: assigns dense 1-based
   `NodeId`s, fills SoA side columns (`parents`/`kinds`/`spans`/
   `subtree_end` — the latter makes descendant tests O(1) interval checks),
@@ -78,7 +83,10 @@ let result: CheckResult = check_program(&units, &arena);
 ```
 
 The caller owns the arena (the same contract as `tsv_ts::parse`); the
-result is fully owned — nothing borrows out.
+result is fully owned — nothing borrows out. For lib-aware checking:
+`bind_program` (parse+bind once, variant-independent, fully owned) →
+`check_bound(&bound, Some(&lib_base))`; `bind_lib` produces a cacheable
+`LibFile`; `check_program_with_lib` is the one-shot form.
 
 ## Which tool answers which question
 

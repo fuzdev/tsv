@@ -37,6 +37,7 @@ use crate::tsc_conformance::corpus::{discover_corpus, read_corpus_file, CorpusTe
 use crate::tsc_conformance::directives::{extract_settings, split_units, Unit};
 use crate::tsc_conformance::discovery::{baselines_dir, discover_baselines, Baseline};
 use crate::tsc_conformance::index::{is_js_flavored, is_jsx_scoped};
+use crate::tsc_conformance::libs::LibResolver;
 use crate::tsc_conformance::options_meta::{
     is_config_file_name, variant_is_unsupported, SKIPPED_TESTS,
 };
@@ -46,7 +47,9 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::time::Instant;
-use tsv_check::{check_program, ParseReport, SourceUnit};
+use tsv_check::{
+    bind_program, check_bound, check_program, Diagnostic, ParseReport, SourceUnit,
+};
 use tsv_lang::{LocationMapper, LocationTracker};
 
 /// The bind-time duplicate/conflict family this slice grades: TS2300 (duplicate
@@ -65,8 +68,10 @@ const MERGE_CODES: [u32; 4] = [2397, 2649, 2664, 2671];
 const BIND_EMITTED_TS1XXX: [u32; 12] =
     [1100, 1101, 1102, 1210, 1212, 1213, 1214, 1215, 1262, 1344, 1359, 18012];
 
-/// The five P1-family baselines whose family diagnostics need lib binding (S5).
-/// A *missing* in one of these is attributed to the absent lib, not a cascade bug.
+/// The P1-family baselines whose family diagnostics come from a standard-library
+/// conflict (S5). These now **match** via the lib base; the classifier is kept as a
+/// regression guard — a *missing* in one of these buckets to `missing_lib` (pinned
+/// 0) rather than `missing_other`, so a lib-detection regression fails loudly.
 const LIB_CONFLICT_BASELINES: [&str; 5] = [
     "intersectionsOfLargeUnions2.ts",
     "jsExportMemberMergedWithModuleAugmentation2.ts",
@@ -216,6 +221,18 @@ pub struct SkeletonReport {
     pub panics: Vec<PanicRecord>,
     /// Tests skipped by the crash-exclusion ledger (tracked parser aborts/panics).
     pub excluded_crashes: usize,
+
+    // --- lib base (S5) ---
+    /// Distinct lib `.d.ts` files parsed + bound this run (informational).
+    pub lib_files_bound: usize,
+    /// Distinct resolved lib sets folded into a base this run (informational).
+    pub lib_sets_built: usize,
+    /// Lib files that failed to parse (`file: error`). **Gate: must be empty.**
+    pub lib_parse_errors: Vec<String>,
+    /// Referenced lib files not found on disk. **Gate: must be empty.**
+    pub lib_missing_files: Vec<String>,
+    /// Unrecognized `@lib` / `/// <reference lib>` names. **Gate: must be empty.**
+    pub lib_unknown_names: Vec<String>,
     /// Catchable-panic exclusions that no longer panic (a fix landed) — the entry
     /// is stale and must be dropped. **Gate: must be empty.**
     pub stale_exclusions: Vec<String>,
@@ -262,6 +279,7 @@ fn run_skeleton_inner(checkout: &Path) -> Result<SkeletonReport, String> {
     }
 
     let mut report = SkeletonReport::default();
+    let mut resolver = LibResolver::new(checkout);
 
     for test in &corpus {
         if SKIPPED_TESTS.contains(&test.basename.as_str()) {
@@ -301,8 +319,21 @@ fn run_skeleton_inner(checkout: &Path) -> Result<SkeletonReport, String> {
         }
 
         report.in_scope_tests += 1;
-        grade_test(test, &units[0], &in_scope, &ondisk, &mut report);
+        grade_test(test, &units[0], &in_scope, &ondisk, &mut resolver, &mut report);
     }
+
+    // Fold in the resolver's lib-base census (parse-once/fold-once counts + gates).
+    report.lib_files_bound = resolver.files_bound();
+    report.lib_sets_built = resolver.sets_built();
+    report.lib_parse_errors =
+        resolver.parse_errors().iter().map(|(f, e)| format!("{f}: {e}")).collect();
+    report.lib_missing_files = resolver.missing_files().to_vec();
+    report.lib_unknown_names = {
+        let mut names: Vec<String> = resolver.unknown_libs().to_vec();
+        names.sort_unstable();
+        names.dedup();
+        names
+    };
 
     report.wall_ms = start.elapsed().as_millis();
     Ok(report)
@@ -344,22 +375,26 @@ fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
     }
 }
 
-/// Parse+check one single-file test once and attribute the outcome to each of
-/// its in-scope variants.
+/// Parse+bind one single-file test once, then — per in-scope variant — merge it
+/// against that variant's resolved lib base and grade the result. Parse+bind is
+/// variant-independent; only the merge (and thus the lib-conflict family) varies by
+/// the resolved lib set, so a variant with a Promise/Symbol/… global conflicts at
+/// one target and is clean at another.
 fn grade_test(
     test: &CorpusTest,
     unit: &Unit,
     in_scope: &[&Variant],
     ondisk: &HashMap<(&str, String), &Baseline>,
+    resolver: &mut LibResolver,
     report: &mut SkeletonReport,
 ) {
-    // Parse + check on a fresh arena, contained against panics.
+    // Parse + bind on a fresh arena, contained against panics (the tsv parser is the
+    // panic source; the merge over owned data that follows is deterministic).
     let arena = Bump::new();
-    let checked = catch_unwind(AssertUnwindSafe(|| {
-        check_program(&[SourceUnit::new(&unit.name, &unit.content)], &arena)
-    }));
-    let result = match checked {
-        Ok(result) => result,
+    let bound = match catch_unwind(AssertUnwindSafe(|| {
+        bind_program(&[SourceUnit::new(&unit.name, &unit.content)], &arena)
+    })) {
+        Ok(bound) => bound,
         Err(payload) => {
             report.panics.push(PanicRecord {
                 test: test.relative_path.clone(),
@@ -369,45 +404,13 @@ fn grade_test(
         }
     };
 
-    // The single unit's parse outcome (files is never empty for one input).
-    let Some(file) = result.files.first() else { return };
+    // The single unit's parse outcome (parse_reports is never empty for one input).
+    let reports = bound.parse_reports();
+    let Some(&(_, parse)) = reports.first() else { return };
+    let parsed = matches!(parse, ParseReport::Parsed(_));
 
-    // Our family diagnostics are variant-independent (the checker consults no
-    // directives, and module-ness is inert for the cascade), so build the
-    // (file, line, col, code) multiset — plus each diagnostic's related info —
-    // once per test via the unit's line map.
-    let ours_family: Vec<FamilyEntry> = if matches!(file.parse, ParseReport::Parsed(_)) {
-        let (tracker, map) = LocationTracker::new_ecmascript_with_map(&unit.content);
-        let mapper = LocationMapper { tracker: &tracker, map: &map };
-        let family = |code: u32, span: tsv_lang::Span, file_name: &str| {
-            let (_, pos) = mapper.pos_and_position(span.start);
-            (pos.line as u32, pos.column as u32 + 1, code, file_name.to_string())
-        };
-        result
-            .diagnostics
-            .iter()
-            .filter(|d| FAMILY_CODES.contains(&d.code))
-            .map(|d| {
-                let (line, col, code, file_name) = family(d.code, d.span, &unit.name);
-                // Single-file: every related node lives in the one unit.
-                let related = d
-                    .related
-                    .iter()
-                    .map(|r| {
-                        let (_, pos) = mapper.pos_and_position(r.span.start);
-                        RelatedKey {
-                            code: r.code,
-                            file: unit.name.clone(),
-                            loc: Some((pos.line as u32, pos.column as u32 + 1)),
-                        }
-                    })
-                    .collect();
-                FamilyEntry { key: FamilyDiag { file: file_name, line, col, code }, related }
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+    // The unit's line map — reused across the test's variants for the parsed case.
+    let line_map = parsed.then(|| LocationTracker::new_ecmascript_with_map(&unit.content));
 
     for variant in in_scope {
         report.in_scope_variants += 1;
@@ -417,7 +420,7 @@ fn grade_test(
         let name = config_name(&test.basename, &variant.description);
         let baseline = ondisk.get(&(test.suite, name.clone())).copied();
 
-        match &file.parse {
+        match parse {
             ParseReport::Rejected { .. } => {
                 report.parse_rejected_total += 1;
                 match baseline_shape(baseline) {
@@ -430,6 +433,12 @@ fn grade_test(
                 if facts.used_script_retry {
                     report.script_retry += 1;
                 }
+                // Resolve this variant's lib set (cached) and merge the bound program
+                // against it — the merge diagnostics are the lib-conflict family.
+                let base = resolver.base_for(&variant.config);
+                let result = check_bound(&bound, base.as_deref());
+                let lib_files = base.as_ref().map_or(&[][..], |b| b.lib_files.as_slice());
+
                 match baseline {
                     None => {
                         report.expect_clean_graded += 1;
@@ -444,6 +453,14 @@ fn grade_test(
                     }
                     Some(b) => {
                         report.baselined_parsed += 1;
+                        // `parsed` => `line_map` is `Some`; the `None` arm is dead.
+                        let ours_family = match line_map.as_ref() {
+                            Some((tracker, map)) => {
+                                let mapper = LocationMapper { tracker, map };
+                                build_ours_family(&result.diagnostics, &unit.name, &mapper, lib_files)
+                            }
+                            None => Vec::new(),
+                        };
                         grade_family(test, &name, b, &ours_family, report);
                     }
                 }
@@ -451,9 +468,78 @@ fn grade_test(
         }
     }
 
-    // Node total: counted once per test (all variants share the parse).
-    if let ParseReport::Parsed(facts) = &file.parse {
-        report.total_nodes += u64::from(facts.node_count);
+    // Node total: counted once per test (all variants share the parse+bind).
+    report.total_nodes += bound.total_node_count();
+}
+
+/// The number of program units in the single-file sweep (a lib FileId is
+/// `>= UNITS_LEN`, translating to `lib_files[FileId - UNITS_LEN]`).
+const UNITS_LEN: u32 = 1;
+
+/// Build our family multiset for one variant's diagnostics, resolving each FileId to
+/// a display name. A **lib-file primary** (FileId beyond the program units) is
+/// dropped — the baseline masks it (`lib.x.d.ts(--,--)`) — and a lib-sourced related
+/// carries the lib file name with a masked location so it matches the baseline's
+/// `lib.x.d.ts:--:--` related by `(code, file)`.
+fn build_ours_family(
+    diagnostics: &[Diagnostic],
+    unit_name: &str,
+    mapper: &LocationMapper<'_>,
+    lib_files: &[String],
+) -> Vec<FamilyEntry> {
+    diagnostics
+        .iter()
+        .filter(|d| FAMILY_CODES.contains(&d.code))
+        .filter_map(|d| {
+            let file = d.file?;
+            // A lib-file primary is masked in the baseline — exclude it.
+            if file.index() >= UNITS_LEN as usize {
+                return None;
+            }
+            let (_, pos) = mapper.pos_and_position(d.span.start);
+            let key = FamilyDiag {
+                file: unit_name.to_string(),
+                line: pos.line as u32,
+                col: pos.column as u32 + 1,
+                code: d.code,
+            };
+            let related = d
+                .related
+                .iter()
+                .map(|r| resolve_related(r, unit_name, mapper, lib_files))
+                .collect();
+            Some(FamilyEntry { key, related })
+        })
+        .collect()
+}
+
+/// Resolve one related-info entry's FileId to a [`RelatedKey`]: an in-unit related
+/// carries its computed location; a lib-sourced related carries the lib file name
+/// and a masked (`None`) location.
+fn resolve_related(
+    r: &Diagnostic,
+    unit_name: &str,
+    mapper: &LocationMapper<'_>,
+    lib_files: &[String],
+) -> RelatedKey {
+    match r.file {
+        Some(f) if f.index() < UNITS_LEN as usize => {
+            let (_, pos) = mapper.pos_and_position(r.span.start);
+            RelatedKey {
+                code: r.code,
+                file: unit_name.to_string(),
+                loc: Some((pos.line as u32, pos.column as u32 + 1)),
+            }
+        }
+        Some(f) => {
+            let idx = f.index() - UNITS_LEN as usize;
+            RelatedKey {
+                code: r.code,
+                file: lib_files.get(idx).cloned().unwrap_or_default(),
+                loc: None,
+            }
+        }
+        None => RelatedKey { code: r.code, file: unit_name.to_string(), loc: None },
     }
 }
 
@@ -871,6 +957,22 @@ impl SkeletonReport {
             println!("  SPAN {s}");
         }
         println!();
+        println!("Lib base (S5)");
+        println!("  lib files bound:         {}", self.lib_files_bound);
+        println!("  lib sets folded:         {}", self.lib_sets_built);
+        println!("  lib parse errors:        {} (GATE=0)", self.lib_parse_errors.len());
+        println!("  lib missing files:       {} (GATE=0)", self.lib_missing_files.len());
+        println!("  lib unknown names:       {} (GATE=0)", self.lib_unknown_names.len());
+        for e in &self.lib_parse_errors {
+            println!("  LIB-PARSE-ERR {e}");
+        }
+        for f in &self.lib_missing_files {
+            println!("  LIB-MISSING {f}");
+        }
+        for n in &self.lib_unknown_names {
+            println!("  LIB-UNKNOWN {n}");
+        }
+        println!();
         println!("Panics (caught):           {}", self.panics.len());
         println!("Crash-excluded (tracked):  {}", self.excluded_crashes);
         if !self.stale_exclusions.is_empty() {
@@ -894,16 +996,20 @@ impl SkeletonReport {
 // ===========================================================================
 
 /// One diagnostic line (ours or the baseline's) for the check-test diff.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct DiagLine {
-    /// The file the diagnostic points at (or `null` for a global one).
+    /// The file the diagnostic points at (or `null` for a global one). A lib file
+    /// (`lib.es5.d.ts`) with `null` line/col is a masked lib-sourced entry.
     pub file: Option<String>,
-    /// 1-based line (`null` for a global diagnostic).
+    /// 1-based line (`null` for a global or masked-lib diagnostic).
     pub line: Option<u32>,
-    /// 1-based column (`null` for a global diagnostic).
+    /// 1-based column (`null` for a global or masked-lib diagnostic).
     pub col: Option<u32>,
     /// The `TS<code>` number.
     pub code: u32,
+    /// The diagnostic's related-info entries (empty for a baseline summary line).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub related: Vec<DiagLine>,
 }
 
 /// The `check-test` report for one test/variant.
@@ -977,28 +1083,53 @@ pub fn check_one(
     }
     let baseline = ondisk.get(&(test.suite, baseline_name.clone())).copied();
 
-    // Parse + check every unit (single- or multi-file).
+    // Parse + bind every unit, then merge against the selected variant's lib base.
     let arena = Bump::new();
     let source_units: Vec<SourceUnit<'_>> =
         units.iter().map(|u| SourceUnit::new(&u.name, &u.content)).collect();
-    let result = check_program(&source_units, &arena);
+    let bound = bind_program(&source_units, &arena);
+    let mut resolver = LibResolver::new(checkout);
+    let base = resolver.base_for(&variant.config);
+    let lib_files = base.as_ref().map_or(&[][..], |b| b.lib_files.as_slice());
+    let result = check_bound(&bound, base.as_deref());
 
-    // Byte-span -> (1-based line, 1-based UTF-16 col) per the owning unit.
+    // Resolve each diagnostic's FileId to a display line: a program unit carries its
+    // (line, col); a lib file carries the lib name with a masked location.
+    let resolve_line = |d: &Diagnostic| -> DiagLine {
+        let units_len = units.len();
+        match d.file {
+            Some(f) if f.index() < units_len => {
+                let (line, col) = units.get(f.index()).map_or((None, None), |u| {
+                    let (t, m) = LocationTracker::new_ecmascript_with_map(&u.content);
+                    let (_, pos) =
+                        LocationMapper { tracker: &t, map: &m }.pos_and_position(d.span.start);
+                    (Some(pos.line as u32), Some(pos.column as u32 + 1))
+                });
+                DiagLine {
+                    file: units.get(f.index()).map(|u| u.name.clone()),
+                    line,
+                    col,
+                    code: d.code,
+                    related: Vec::new(),
+                }
+            }
+            Some(f) => DiagLine {
+                file: lib_files.get(f.index() - units_len).cloned(),
+                line: None,
+                col: None,
+                code: d.code,
+                related: Vec::new(),
+            },
+            None => DiagLine { file: None, line: None, col: None, code: d.code, related: Vec::new() },
+        }
+    };
     let ours: Vec<DiagLine> = result
         .diagnostics
         .iter()
         .map(|d| {
-            let (line, col) = d.file.and_then(|f| units.get(f.index())).map_or((None, None), |u| {
-                let (t, m) = LocationTracker::new_ecmascript_with_map(&u.content);
-                let (_, pos) = LocationMapper { tracker: &t, map: &m }.pos_and_position(d.span.start);
-                (Some(pos.line as u32), Some(pos.column as u32 + 1))
-            });
-            DiagLine {
-                file: d.file.and_then(|f| source_units.get(f.index()).map(|u| u.name.to_string())),
-                line,
-                col,
-                code: d.code,
-            }
+            let mut line = resolve_line(d);
+            line.related = d.related.iter().map(&resolve_line).collect();
+            line
         })
         .collect();
     let parse_error = result.files.iter().find_map(|f| match &f.parse {
@@ -1011,7 +1142,13 @@ pub fn check_one(
             .map(|c| {
                 parse_summary_block(&c)
                     .into_iter()
-                    .map(|d| DiagLine { file: d.file, line: d.line, col: d.col, code: d.code })
+                    .map(|d| DiagLine {
+                        file: d.file,
+                        line: d.line,
+                        col: d.col,
+                        code: d.code,
+                        related: Vec::new(),
+                    })
                     .collect()
             })
             .unwrap_or_default(),
@@ -1084,6 +1221,9 @@ impl CheckTestReport {
         println!("  ours ({}):", self.ours.len());
         for d in &self.ours {
             println!("    {}", fmt_diag(d));
+            for r in &d.related {
+                println!("      related {}", fmt_diag(r));
+            }
         }
         if self.ours.is_empty() {
             println!("    (none)");
@@ -1102,6 +1242,8 @@ impl CheckTestReport {
 fn fmt_diag(d: &DiagLine) -> String {
     match (&d.file, d.line, d.col) {
         (Some(file), Some(line), Some(col)) => format!("{file}({line},{col}): TS{}", d.code),
+        // A masked lib entry (file, no location) or a global one.
+        (Some(file), _, _) => format!("{file}(--,--): TS{}", d.code),
         _ => format!("error TS{} (global)", d.code),
     }
 }
