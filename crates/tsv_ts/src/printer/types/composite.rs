@@ -245,29 +245,25 @@ impl<'a> Printer<'a> {
         on_new_line: bool,
     ) -> DocId {
         let d = self.d();
+        // Union and intersection branches share one hang: the inner doc sits one
+        // level past the operator (`indent`) — on a fresh line after an
+        // operator-line comment (`on_new_line`, first union member then taking its
+        // leading `| `), or glued after the operator's space.
+        let hang = |inner: DocId| {
+            if on_new_line {
+                d.indent(d.concat(&[d.hardline(), inner]))
+            } else {
+                d.concat(&[d.text(" "), d.indent(inner)])
+            }
+        };
         match self.unwrap_redundant_parens(branch_type) {
             TSType::Union(u) if !should_hug_union_type(u) => {
                 // `build_union_type_doc` already returns `group(members)` (the bare
                 // `printed`); the branch supplies only one `indent`, so the member
                 // group breaks its continuations one level past the operator.
-                let union_doc = self.build_union_type_doc(u);
-                if on_new_line {
-                    // A comment ended the operator's line; the union starts on a
-                    // fresh line one level in, its first member taking the `| `.
-                    d.indent(d.concat(&[d.hardline(), union_doc]))
-                } else {
-                    // First member glues after the operator's space.
-                    d.concat(&[d.text(" "), d.indent(union_doc)])
-                }
+                hang(self.build_union_type_doc(u))
             }
-            TSType::Intersection(i) => {
-                let hanging = self.intersection_hanging_with_indent(i);
-                if on_new_line {
-                    d.indent(d.concat(&[d.hardline(), hanging]))
-                } else {
-                    d.concat(&[d.text(" "), d.indent(hanging)])
-                }
-            }
+            TSType::Intersection(i) => hang(self.intersection_hanging_with_indent(i)),
             _ => {
                 if on_new_line {
                     // Literal tab text (not d.indent) shifts only the first line

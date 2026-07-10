@@ -172,6 +172,17 @@ impl<'a> Printer<'a> {
         let value_type = self.unwrap_redundant_parens(return_type.type_annotation);
         if let TSType::Union(u) = value_type {
             let type_doc = self.build_union_type_doc(u);
+            // A brace-hugging union return (`{ … } | null` / `| void`) hugs `=>`
+            // block-style: the object owns its own expansion and the void member
+            // trails the `}`, the same layout the type-alias RHS / `as` cast use
+            // (`build_union_type_doc`'s hug path). See `union_return_hugs` for the
+            // scope: a `Promise<…> | null` `TSTypeReference` member is deliberately
+            // NOT hugged (the sanctioned `return_type_generic_union` print-width
+            // family), and a member/gap comment disqualifies the hug — those fall
+            // through to the break-after-operator layout that matches prettier there.
+            if self.union_return_hugs(value_type, u, arrow_end, type_start) {
+                return d.concat(&[d.text(arrow_sp), comments_doc, type_doc]);
+            }
             return d.concat(&[
                 d.text(arrow),
                 hang_after_operator(d, d.concat(&[comments_doc, type_doc])),

@@ -206,14 +206,29 @@ impl<'a> Printer<'a> {
             let comments_doc =
                 self.build_comments_between(colon_end, value_type_start, CommentSpacing::Trailing);
 
+            // A brace-hugging union return (`{ … } | null` / `| void`) hugs `:`
+            // block-style, like the type-alias RHS — the object owns its own expansion
+            // and the void member trails the `}`. Prettier never breaks after `:` here
+            // (it hugs even behind a very long method name), so there is no
+            // break-after-colon fallback. `union_return_hugs` scopes it: a
+            // `Promise<…> | null` `TSTypeReference` member is excluded (the sanctioned
+            // `return_type_generic_union` print-width family, handled by the
+            // `should_hug_union_type` branch below), and a member/gap comment
+            // disqualifies the hug.
+            if self.union_return_hugs(value_type, u, colon_end, value_type_start) {
+                return d.concat(&[d.text(": "), comments_doc, type_doc]);
+            }
+
             if should_hug_union_type(u) {
-                // Hugged unions (e.g., `null | { ... }`) use conditional_group to bypass
-                // the renderer's will_break check. The object type inside the union has
-                // hardlines for multiline members, but those shouldn't force the type
-                // annotation to break after `:`. The conditional_group calls fits()
+                // A should-hug union that didn't take the brace-hug above: a
+                // `TSTypeReference` object-like member with only void siblings
+                // (`Promise<…> | null`), or a brace union whose member/gap comment
+                // disqualified the hug. Uses conditional_group to bypass the renderer's
+                // will_break check: an inner group may break, but that shouldn't force
+                // the annotation to break after `:`. The conditional_group calls fits()
                 // directly, which correctly handles nested hardlines (returns true).
-                // State 0: `: null | { ... }` (inline, no break after colon)
-                // State 1: `:\n  null | { ... }` (break after colon, for very long names)
+                // State 0: `: Promise<…> | null` (inline, no break after colon)
+                // State 1: `:\n  Promise<…> | null` (break after colon, for long names)
                 let flat_state = d.concat(&[d.text(": "), comments_doc, type_doc]);
                 let break_state = d.concat(&[
                     d.text(":"),

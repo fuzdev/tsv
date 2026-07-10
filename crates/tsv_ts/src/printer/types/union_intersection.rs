@@ -8,7 +8,7 @@
 use super::super::comments_in_range;
 use super::helpers::{
     find_separator_position, intersection_has_expanding_first_type,
-    intersection_has_huggable_last_type, should_hug_union_type,
+    intersection_has_huggable_last_type, is_hugging_union_type_arg, should_hug_union_type,
     type_needs_parens_in_union_or_intersection, type_never_needs_parens, unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
@@ -530,7 +530,33 @@ impl<'a> Printer<'a> {
     /// Matches prettier's `hasComment(node)` for the detached comment model:
     /// comments between member spans correspond to attached trailing/leading
     /// comments in prettier's AST.
-    fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
+    /// True when a return-type union hugs its brace member block-style
+    /// (`{ … } | null` / `| void`) instead of breaking before it — the object owns
+    /// its own expansion, the same layout the type-alias RHS / `as` cast use. The
+    /// single source of truth shared by the function-type `=>` return
+    /// (`build_function_type_return_doc`) and the `: Type` annotation return
+    /// (`build_type_annotation_doc_with_wrapping`), so the two arms can't drift (the
+    /// drift is exactly what let the hug miss those contexts before).
+    ///
+    /// Requires a brace member with only void siblings (`is_hugging_union_type_arg` —
+    /// a `TypeLiteral`/`Mapped`; excludes the `Promise<…> | null` `TSTypeReference`
+    /// print-width family). A comment prettier's `shouldHugUnionType` would bail on —
+    /// between two members, or in the operator→union gap `[gap_start, gap_end]` —
+    /// disqualifies the hug; an *inside-object* comment (`{ /* c */ … }`) does not.
+    /// `gap_start`/`gap_end` bound the source between the `=>`/`:` and the union.
+    pub(crate) fn union_return_hugs(
+        &self,
+        value_type: &TSType<'_>,
+        union: &TSUnionType<'_>,
+        gap_start: u32,
+        gap_end: u32,
+    ) -> bool {
+        is_hugging_union_type_arg(value_type)
+            && !self.union_has_comments_between_members(union)
+            && !self.has_comments_between(gap_start, gap_end)
+    }
+
+    pub(crate) fn union_has_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
         // Zero-comment window gate: one binary search over the whole union span before
         // the N-1 pairwise between-member searches. Each pairwise range lies within
         // `[union.span.start, union.span.end]`, so with no comment inside the union
@@ -550,6 +576,13 @@ impl<'a> Printer<'a> {
     /// Used by callers (e.g., mapped types) to decide whether the union needs
     /// extra indentation wrapping, and internally to force multiline formatting.
     pub(crate) fn union_has_line_comments_between_members(&self, union: &TSUnionType<'_>) -> bool {
+        // Zero-comment window gate (as in `union_has_comments_between_members`): every
+        // pairwise range lies within the union span, so no comment inside the union
+        // means every pairwise scan below is provably false — skip them on the common
+        // comment-free `A | B | C`.
+        if !self.has_comments_between(union.span.start, union.span.end) {
+            return false;
+        }
         union
             .types
             .windows(2)
