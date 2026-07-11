@@ -1,4 +1,4 @@
-//! Lib (`.d.ts`) resolution + a per-run [`tsv_check::LibBase`] cache — the S5 seam
+//! Lib (`.d.ts`) resolution + a per-run [`tsv_check::LibBase`] cache — the layer
 //! that lets the checker leg conflict a test's globals against the standard library.
 //!
 //! Ported from tsgo's file loader: a variant's resolved lib set is its default lib

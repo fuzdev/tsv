@@ -1,20 +1,23 @@
-//! The walking-skeleton runner: drive `tsv_check` over the in-scope corpus and
-//! grade the checker plumbing end-to-end.
+//! The conformance runner: drive `tsv_check` over the in-scope corpus and
+//! grade it against tsgo's committed `.errors.txt` baselines.
 //!
-//! This is tool #4 of the harness (the runner) in its first form. It reuses the
-//! S1 substrate — corpus index, directive parser, variant expansion, the
-//! unsupported-option skip classes — and adds the checker leg: for every
-//! **in-scope** variant (single-file, non-JSX, non-JS-flavored, not skipped,
-//! not an unsupported-option variant) it parses the unit via `tsv_check`'s goal
-//! rule, runs `check_program`, and grades the result. The checker emits nothing
-//! yet, so the meaningful gate is that every **expect-clean** in-scope variant
-//! (one with no on-disk baseline) grades clean (zero diagnostics) with zero
-//! panics — proving the harness<->checker plumbing before any family gate.
+//! The runner layers the checker leg on the corpus substrate — corpus index,
+//! directive parser, variant expansion, the unsupported-option skip classes:
+//! for every **in-scope** variant (single-file, non-JSX, non-JS-flavored, not
+//! skipped, not an unsupported-option variant) it parses the unit via
+//! `tsv_check`'s goal rule, binds, merges against the variant's lib base, and
+//! grades the result on three channels. Every **expect-clean** in-scope
+//! variant (one with no on-disk baseline) must grade clean (zero diagnostics);
+//! the bind/merge duplicate-conflict **family** ([`FAMILY_CODES`]) is compared
+//! as codes+spans multisets — extra = 0 is the hard gate, missing is
+//! classified by deferred cause; and **related-info** on matched family
+//! primaries is graded as its own channel. Zero panics, always.
 //!
 //! A single-file test's variants all parse identically (the goal rule is
-//! directive-independent), so the parse+check runs **once per test** and its
-//! outcome is attributed to each in-scope variant — correct while `check` is a
-//! no-op and cheap regardless.
+//! directive-independent), so parse+bind runs **once per test**
+//! (`bind_program`) and merge+check runs once per distinct lib set among its
+//! variants (`check_bound`), with the outcome attributed to each in-scope
+//! variant.
 //!
 //! The **parse-divergence census** (informational, not gated) counts in-scope
 //! variants tsv parse-rejects, split by baseline shape (none / TS1xxx-only /
@@ -50,14 +53,14 @@ use std::time::Instant;
 use tsv_check::{Diagnostic, ParseReport, SourceUnit, bind_program, check_bound, check_program};
 use tsv_lang::{LocationMapper, LocationTracker};
 
-/// The bind-time duplicate/conflict family this slice grades: TS2300 (duplicate
+/// The bind/merge duplicate/conflict family the gate grades: TS2300 (duplicate
 /// identifier), TS2451 (block-scoped redeclare), TS2567 (enum-merge), TS2528
 /// (multiple default exports), plus the merge-path codes TS2397/2649/2664/2671
-/// (emitted only from the merge phase, out of this slice — they land as *misses*).
+/// (emitted from the globals-merge phase rather than the same-table cascade).
 const FAMILY_CODES: [u32; 8] = [2300, 2451, 2567, 2528, 2397, 2649, 2664, 2671];
 
-/// The merge-path family codes — a *missing* of one of these is a merge-phase gap
-/// (S4), not a same-table cascade bug.
+/// The merge-path family codes — a *missing* of one of these is classified as a
+/// merge-phase gap, not a same-table cascade bug.
 const MERGE_CODES: [u32; 4] = [2397, 2649, 2664, 2671];
 
 /// The TS1xxx codes the binder itself emits (strict-mode + private-identifier
@@ -67,10 +70,11 @@ const BIND_EMITTED_TS1XXX: [u32; 12] = [
     1100, 1101, 1102, 1210, 1212, 1213, 1214, 1215, 1262, 1344, 1359, 18012,
 ];
 
-/// The P1-family baselines whose family diagnostics come from a standard-library
-/// conflict (S5). These now **match** via the lib base; the classifier is kept as a
-/// regression guard — a *missing* in one of these buckets to `missing_lib` (pinned
-/// 0) rather than `missing_other`, so a lib-detection regression fails loudly.
+/// The family baselines whose family diagnostics come from a standard-library
+/// conflict. These **match** via the lib base; the classifier is kept as a
+/// regression guard — a *missing* in one of these is bucketed to `missing_lib`
+/// (pinned 0) rather than `missing_other`, so a lib-detection regression fails
+/// loudly.
 const LIB_CONFLICT_BASELINES: [&str; 5] = [
     "intersectionsOfLargeUnions2.ts",
     "jsExportMemberMergedWithModuleAugmentation2.ts",
@@ -247,7 +251,7 @@ pub struct SkeletonReport {
     /// In-scope variants that parsed and DO have a baseline.
     pub baselined_parsed: usize,
 
-    // --- family grading (the S3 gate) ---
+    // --- family grading ---
     /// Parsed-with-baseline variants family-graded (not carved by predicate v1).
     pub family_graded_variants: usize,
     /// ...of those, whose baseline carries at least one family code.
@@ -314,7 +318,7 @@ pub struct SkeletonReport {
     /// Tests skipped by the crash-exclusion ledger (tracked parser aborts/panics).
     pub excluded_crashes: usize,
 
-    // --- lib base (S5) ---
+    // --- lib base ---
     /// Distinct lib `.d.ts` files parsed + bound this run (informational).
     pub lib_files_bound: usize,
     /// Distinct resolved lib sets folded into a base this run (informational).
@@ -1280,8 +1284,8 @@ fn baseline_shape(baseline: Option<&Baseline>) -> BaselineShape {
 impl SkeletonReport {
     /// Print the human summary.
     pub fn print(&self) {
-        println!("tsc_conformance — walking skeleton");
-        println!("==================================");
+        println!("tsc_conformance run");
+        println!("===================");
         println!("In-scope tests:            {}", self.in_scope_tests);
         println!("In-scope variants:         {}", self.in_scope_variants);
         println!("  parsed, expect-clean:    {}", self.expect_clean_graded);
@@ -1310,10 +1314,10 @@ impl SkeletonReport {
         );
         println!("  match:                   {}", self.family_match);
         println!("  missing:                 {}", self.family_missing);
-        println!("    merge-path (S4):       {}", self.missing_merge);
-        println!("    lib-conflict (S5):     {}", self.missing_lib);
+        println!("    merge-path:            {}", self.missing_merge);
+        println!("    lib-conflict:          {}", self.missing_lib);
         println!(
-            "    check-time (S3+):      {} (checker-emitted TS2300/2451: duplicate members, type params, computed/private names)",
+            "    check-time:            {} (deferred family misses — duplicate members, type params, computed/private names)",
             self.missing_other
         );
         println!("  extra (GATE=0):          {}", self.family_extra);
@@ -1348,7 +1352,7 @@ impl SkeletonReport {
             println!("  SPAN {s}");
         }
         println!();
-        println!("Lib base (S5)");
+        println!("Lib base");
         println!("  lib files bound:         {}", self.lib_files_bound);
         println!("  lib sets folded:         {}", self.lib_sets_built);
         println!(

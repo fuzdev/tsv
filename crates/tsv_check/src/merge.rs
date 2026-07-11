@@ -336,7 +336,7 @@ pub fn merge_program(
 
     // --- Phase 3: the `undefined` redeclaration check ---
     // tsgo seeds `c.globals["undefined"]` with the builtin `undefinedSymbol`; with
-    // no lib (S5) globals["undefined"] is present iff a file declared it, so a
+    // no lib base, `globals["undefined"]` is present iff a file declared it, so a
     // present entry is exactly the redeclaration case.
     if let Some(entry) = globals.get(NAME_UNDEFINED) {
         for decl in &entry.decls {

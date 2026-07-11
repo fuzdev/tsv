@@ -68,13 +68,12 @@ const INDEX_JOIN_MATCHED_PIN: usize = 7033;
 const INDEX_UNIT_ROUNDTRIP_PIN: usize = 7019;
 const INDEX_UNIT_ROUNDTRIP_PRETTY_PIN: usize = 14;
 
-/// REGRESSION PINS (exact, two-sided) for the walking-skeleton sweep (`run`).
+/// REGRESSION PINS (exact, two-sided) for the conformance sweep (`run`).
 /// Measured 2026-07-10, ../typescript-go at 168e7015 (`_submodules/TypeScript`
-/// corpus materialized). The checker emits nothing yet, so the meaningful gate
-/// is `clean_pass == expect_clean_graded` with zero panics; the counts below pin
-/// the in-scope denominators + parse-divergence census so any drift (a
-/// harness-port change, a tsv parser change, or a typescript-go pull) forces a
-/// deliberate re-pin.
+/// corpus materialized). `clean_pass == expect_clean_graded` and zero panics
+/// are invariant gates; the counts below pin the in-scope denominators +
+/// parse-divergence census so any drift (a harness-port change, a tsv parser
+/// change, or a typescript-go pull) forces a deliberate re-pin.
 const RUN_IN_SCOPE_TESTS_PIN: usize = 9388;
 const RUN_IN_SCOPE_VARIANTS_PIN: usize = 9887;
 const RUN_EXPECT_CLEAN_PIN: usize = 4435;
@@ -93,14 +92,15 @@ const RUN_CRASH_EXCLUDED_PIN: usize = 1;
 /// gate). Measured 2026-07-10 vs pin 168e7015. `family_extra` is gated to 0
 /// (hard); the rest pin the buckets so any move (a cascade change, a merge
 /// change, a tsv parser change, a typescript-go pull) forces a deliberate re-pin.
-/// The missing bucket is classified: `merge` (merge-phase family — **0**, S4
-/// closed the single-file merge path: TS2397 globalThis/undefined + TS2664
-/// augmentation-not-found), `lib` (absent-lib conflicts — **now 0**, S5 closed the
-/// four classified lib-conflict misses: TS2300 eval/Symbol/Promise/ElementTagNameMap
-/// against the standard-library globals), and `check-time` (checker-emitted
-/// TS2300/2451 the bind+merge slice can't produce — duplicate members, type
-/// parameters, computed/private names). A drop in `check-time` (matches gained) is a
-/// real improvement that re-pins; a rise anywhere is a regression to explain.
+/// The missing bucket is classified: `merge` (merge-phase family — **0**: the
+/// single-file merge path matches, TS2397 globalThis/undefined + TS2664
+/// augmentation-not-found), `lib` (absent-lib conflicts — **0**: the classified
+/// lib-conflict baselines, TS2300 eval/Symbol/Promise/ElementTagNameMap, match
+/// against the standard-library globals), and `check-time` (the deferred
+/// remainder — duplicate members, type parameters, computed/private names —
+/// family instances the current bind+merge implementation does not yet emit).
+/// A drop in `check-time` (matches gained) is a real improvement that re-pins;
+/// a rise anywhere is a regression to explain.
 const RUN_FAMILY_GRADED_PIN: usize = 4066;
 const RUN_FAMILY_POSITIVE_PIN: usize = 125;
 const RUN_FAMILY_MATCH_PIN: usize = 425;
@@ -113,13 +113,14 @@ const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
 const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 9;
 const RUN_MODULE_DETECTION_PIN: usize = 1;
 
-/// REGRESSION PINS (exact, two-sided) for the lib base (S5). Measured 2026-07-10 vs
+/// REGRESSION PINS (exact, two-sided) for the lib base. Measured 2026-07-10 vs
 /// pin 168e7015 (`_submodules/TypeScript` corpus materialized): the distinct lib
 /// `.d.ts` files parsed+bound and the distinct resolved lib sets folded across the
 /// in-scope variants. A move is a deliberate re-pin (a harness-port change, a lib
-/// set change, or a typescript-go pull). The three error channels are gated to
-/// empty (a lib parse-reject, a missing referenced lib, or an unrecognized
-/// `@lib`/reference name — all expected never on the pinned checkout).
+/// set change, or a typescript-go pull). The four error channels are gated to
+/// empty (a lib parse-reject, a missing referenced lib, an unrecognized
+/// `@lib`/reference name, or a lib binding external with no `declare global`
+/// block — all expected never on the pinned checkout).
 const RUN_LIB_FILES_BOUND_PIN: usize = 107;
 const RUN_LIB_SETS_PIN: usize = 50;
 
@@ -202,7 +203,7 @@ pub struct RoundtripCommand {
     filters: Vec<String>,
 }
 
-/// Corpus-input self-check (the S1 gates): index the tsc corpus, expand every
+/// Corpus-input self-check (the index gates): index the tsc corpus, expand every
 /// test's varyBy variants, and prove three invariants against the on-disk
 /// baselines — the join (every baseline maps to one non-skipped variant), the
 /// unit-text round-trip (units reproduce the `====` section bodies), and the
@@ -224,14 +225,16 @@ pub struct IndexCommand {
     verbose: bool,
 }
 
-/// Walking-skeleton sweep (the S2 gate): drive `tsv_check` over every in-scope
-/// variant (single-file, non-JSX, non-JS-flavored, not skipped, not an
-/// unsupported-option variant) and grade the checker plumbing end-to-end. The
-/// checker emits nothing yet, so the gate is: every expect-clean in-scope
-/// variant grades clean (zero diagnostics), zero panics, and the pinned
-/// denominators + parse-divergence census hold. Runs on a generous-stack worker
-/// thread; each test's check is `catch_unwind`-contained. Exit 0 only when the
-/// invariants hold and (on a full run) the pins match.
+/// Conformance sweep: drive `tsv_check` over every in-scope variant
+/// (single-file, non-JSX, non-JS-flavored, not skipped, not an
+/// unsupported-option variant) and grade it against tsgo's baselines. The
+/// gates: every expect-clean in-scope variant grades clean (zero diagnostics);
+/// the bind/merge duplicate-conflict family matches as codes+spans multisets
+/// (extra = 0 hard, missing classified by deferred cause); the related-info
+/// and lib-base channels stay clean; zero panics; and (on a full run) the
+/// pinned denominators + parse-divergence census hold. Runs on a
+/// generous-stack worker thread; each test's check is `catch_unwind`-contained.
+/// Exit 0 only when the invariants hold and (on a full run) the pins match.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "run")]
 pub struct RunCommand {
@@ -411,7 +414,8 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
         ));
     }
     // The lib error channels must stay empty (a lib parse-reject, a missing referenced
-    // lib, or an unrecognized `@lib`/reference name).
+    // lib, an unrecognized `@lib`/reference name, or a lib binding external with no
+    // `declare global` block).
     if !report.lib_parse_errors.is_empty() {
         errs.push(format!(
             "{} lib file(s) failed to parse, e.g. {}",
@@ -520,7 +524,7 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
             RUN_CRASH_EXCLUDED_PIN,
         );
 
-        // Lib-base (S5) sizing pins.
+        // Lib-base sizing pins.
         pin(
             &mut errs,
             "lib files bound",
