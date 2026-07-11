@@ -82,7 +82,6 @@ const DEFERRED_BUG: &str = "delimiter-deferred-bug";
 ///   (url/color paren finds — not candidates).
 /// - `at-rule-range` — connector keyword in a normalized CSS at-rule range prelude.
 /// - `attr-name` — Svelte attribute-name `:` split (directive prefix).
-/// - `template-marker` — `${` of a template-literal type.
 /// - `jsdoc-tag` — scans a value/comment string for `@type`/`@satisfies` cast tags.
 ///
 /// Tracked delimiter-over-source scans (the real "Comment-Aware Delimiter Scans"
@@ -203,16 +202,6 @@ const ALLOW: &[Allow] = &[
         "tsv_ts/src/printer/mod.rs",
         "let line_start = self.source[..pos].rfind('\\n').map_or(0, |i| i + 1);",
         "newline",
-    ),
-    (
-        "tsv_ts/src/printer/statements/control_flow/try_jump.rs",
-        ".rfind(\"finally\")",
-        "delimiter-latent",
-    ),
-    (
-        "tsv_ts/src/printer/types/literal_types.rs",
-        ".rfind(\"${\")",
-        "template-marker",
     ),
 ];
 

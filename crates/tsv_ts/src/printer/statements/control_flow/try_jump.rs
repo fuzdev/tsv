@@ -111,14 +111,14 @@ impl<'a> Printer<'a> {
                 .handler
                 .as_ref()
                 .map_or(stmt.block.span.end, |h| h.body.span.end);
-            // The finalizer span starts at the "finally" keyword
-            // Note: finalizer is a BlockStatement, we need to find the keyword position
-            // Search for "finally" in source (but avoid matching inside comments)
-            // For safety, search backwards from finalizer start for "finally"
-            let search_range = &self.source[prev_end as usize..finalizer.span.start as usize];
-            let finally_keyword_pos = search_range
-                .rfind("finally")
-                .map_or(finalizer.span.start, |p| prev_end + p as u32);
+            // The finalizer span starts at the "finally" block `{`; the keyword sits
+            // in the gap after the previous block. It's the only real keyword there,
+            // so the first whole-word match wins — trivia-aware so a `/* finally */`
+            // comment before or after the keyword can't be mistaken for it (a raw
+            // `rfind` matched the one inside such a comment and dropped it).
+            let finally_keyword_pos = self
+                .find_keyword_in_range(prev_end, finalizer.span.start, "finally")
+                .unwrap_or(finalizer.span.start);
             if self.has_comments_between(prev_end, finally_keyword_pos) {
                 let has_line_comment =
                     self.has_line_comments_between(prev_end, finally_keyword_pos);
