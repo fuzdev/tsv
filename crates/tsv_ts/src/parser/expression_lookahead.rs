@@ -23,12 +23,18 @@ fn is_arrow_close(bytes: &[u8], pos: usize) -> bool {
     pos > 0 && bytes[pos - 1] == b'='
 }
 
-/// `>` at `pos` is `>=` comparison operator, but NOT `>=>` (close-angle + arrow)
+/// `>` at `pos` is a `>=` comparison operator, but NOT `>=>` (close-angle +
+/// arrow) nor `>==` / `>===` (close-angle + `==`/`===`). The trailing-`=` and
+/// trailing-`>` carve-outs keep the `>` available as a type-argument close: a
+/// `>=` right after a would-be `<…>` close whose next byte is `=` or `>` can
+/// only be `>` + `==`/`===`/`=>` (never a real `>=` operand — `x >= = y` /
+/// `x >= > y` are nonsense), so acorn re-scans just the `>` and `f<T>==c` reads
+/// as `(f<T>) == c`.
 #[inline]
 fn is_greater_equal_op(bytes: &[u8], pos: usize) -> bool {
     pos + 1 < bytes.len()
         && bytes[pos + 1] == b'='
-        && !(pos + 2 < bytes.len() && bytes[pos + 2] == b'>')
+        && !(pos + 2 < bytes.len() && matches!(bytes[pos + 2], b'>' | b'='))
 }
 
 /// Scan through parentheses and check if followed by `=>`
@@ -337,26 +343,40 @@ pub(super) fn is_function_type_start(bytes: &[u8], pos: usize) -> bool {
 /// or `<T, (x: number) => void>` is actually type arguments (finds matching `>`).
 ///
 /// Returns `true` if a matching `>` is found before hitting an unbalanced
-/// `)`, `]`, `}`, or `;` at depth 0, and the close isn't followed by an
-/// expression-starting token (which would make the `>` a comparison instead).
+/// `)`, `]`, `}`, or `;` at depth 0, and the close isn't followed by a token
+/// that makes the `>` a comparison instead: a `>`/`>>`/`>>>` (relational or
+/// shift) run, or an expression-starting token on the same line.
 pub(super) fn scan_for_closing_angle_bracket(bytes: &[u8], pos: usize) -> bool {
     match matching_angle_close(bytes, pos) {
         None => false,
         Some(close) => {
-            // After closing `>` in type args, the next token is `(`
-            // (a call), a template literal (a tagged template), or a
-            // non-expression token (`;`, `,`, `)`, an operator…).
-            // Any other expression-starting token — identifier,
-            // number, string, `[`, `{`, or a prefix operator — means
-            // this `>` is a comparison operator instead — but only
-            // on the same line: across a line break the token starts
-            // a new statement via ASI and the `<…>` is an
-            // instantiation (acorn bails to relational on
-            // `tokenCanStartExpression && !hasPrecedingLineBreak`).
             let after = skip_whitespace_and_comments(bytes, close + 1);
-            !(after < bytes.len()
-                && starts_expression_after_type_args(bytes, after)
-                && !has_line_terminator_between(bytes, close + 1, after))
+            if after >= bytes.len() {
+                return true;
+            }
+            // A `>`-led follow token means the `>` we matched as the close was
+            // really the first `>` of a longer relational/shift run: acorn re-reads
+            // `a<b>>c` as `a < (b >> c)` and `a<b>>>c` as `a < (b >>> c)` (its
+            // `tsMatchRightRelational` / bitShift bail), never `(a<b>) > c`. So a
+            // `>` here disqualifies the type-argument reading — except when the run
+            // is immediately closed by `=` (`>=` / `>>=`), which acorn keeps as an
+            // instantiation follow (`f<T> >= c` is `(f<T>) >= c`).
+            if bytes[after] == b'>' {
+                let mut run = after;
+                while run < bytes.len() && bytes[run] == b'>' {
+                    run += 1;
+                }
+                return bytes.get(run) == Some(&b'=');
+            }
+            // Otherwise: a token that can start an expression (with no intervening
+            // line break) makes this `>` a comparison operator (acorn's
+            // `tokenCanStartExpression && !hasPrecedingLineBreak` bail). `(` (call),
+            // a template (tagged template), and other non-expression tokens (`;`,
+            // `,`, `)`, `.`, an operator…) continue the instantiation — and across a
+            // line break an expression-starting token begins a new statement via ASI,
+            // leaving the `<…>` an instantiation.
+            !starts_expression_after_type_args(bytes, after)
+                || has_line_terminator_between(bytes, close + 1, after)
         }
     }
 }
@@ -555,9 +575,26 @@ fn matching_paren_close(bytes: &[u8], mut pos: usize) -> Option<usize> {
 /// because acorn also rejects `x < y > /a/`.
 fn starts_expression_after_type_args(bytes: &[u8], pos: usize) -> bool {
     let b = bytes[pos];
-    is_identifier_start(b)
-        || b.is_ascii_digit()
-        || matches!(b, b'\'' | b'"' | b'[' | b'{' | b'!' | b'~' | b'+' | b'-')
+    if is_identifier_start(b) {
+        // `in` and `instanceof` are binary keyword operators — acorn's `tt._in` /
+        // `tt._instanceof` have `startsExpr = false`, so a would-be `<…>` close
+        // followed by one continues the instantiation (`f<T> in x` is `(f<T>) in x`)
+        // rather than becoming a comparison. Every other identifier/keyword
+        // (`as`/`satisfies` included — acorn lexes those as plain names) starts an
+        // expression and disqualifies the type-argument reading.
+        return !matches!(
+            &bytes[pos..skip_identifier(bytes, pos)],
+            b"in" | b"instanceof"
+        );
+    }
+    // `!` starts an expression only as prefix negation (`!x`); `!=` / `!==` are
+    // equality operators (acorn's tokens aren't `startsExpr`), so a would-be close
+    // followed by one continues the instantiation (`f<T> != c` is `(f<T>) != c`).
+    if b == b'!' {
+        return bytes.get(pos + 1) != Some(&b'=');
+    }
+    b.is_ascii_digit()
+        || matches!(b, b'\'' | b'"' | b'[' | b'{' | b'~' | b'+' | b'-')
         || (b == b'.' && pos + 1 < bytes.len() && bytes[pos + 1].is_ascii_digit())
 }
 
