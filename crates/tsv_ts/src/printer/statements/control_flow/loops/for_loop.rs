@@ -1458,11 +1458,7 @@ impl<'a> Printer<'a> {
             // bare `for (async of x)` is a syntax error).
             internal::ForInOfLeft::Pattern(expr) => {
                 let doc = self.build_expression_doc(expr);
-                if wrap_async_paren {
-                    d.parens(doc)
-                } else {
-                    doc
-                }
+                if wrap_async_paren { d.parens(doc) } else { doc }
             }
         }
     }

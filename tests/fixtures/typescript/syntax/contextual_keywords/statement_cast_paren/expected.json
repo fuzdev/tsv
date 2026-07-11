@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 101,
+	"end": 86,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -13,19 +13,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 100,
+		"end": 85,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 91,
+			"end": 76,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 6,
+					"line": 5,
 					"column": 9
 				}
 			},
@@ -171,7 +171,7 @@
 				{
 					"type": "ExpressionStatement",
 					"start": 56,
-					"end": 69,
+					"end": 75,
 					"loc": {
 						"start": {
 							"line": 4,
@@ -179,111 +179,34 @@
 						},
 						"end": {
 							"line": 4,
-							"column": 14
-						}
-					},
-					"expression": {
-						"type": "TSAsExpression",
-						"start": 56,
-						"end": 68,
-						"loc": {
-							"start": {
-								"line": 4,
-								"column": 1
-							},
-							"end": {
-								"line": 4,
-								"column": 13
-							}
-						},
-						"expression": {
-							"type": "Identifier",
-							"start": 57,
-							"end": 62,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 2
-								},
-								"end": {
-									"line": 4,
-									"column": 7
-								}
-							},
-							"name": "using"
-						},
-						"typeAnnotation": {
-							"type": "TSTypeReference",
-							"start": 67,
-							"end": 68,
-							"loc": {
-								"start": {
-									"line": 4,
-									"column": 12
-								},
-								"end": {
-									"line": 4,
-									"column": 13
-								}
-							},
-							"typeName": {
-								"type": "Identifier",
-								"start": 67,
-								"end": 68,
-								"loc": {
-									"start": {
-										"line": 4,
-										"column": 12
-									},
-									"end": {
-										"line": 4,
-										"column": 13
-									}
-								},
-								"name": "X"
-							}
-						}
-					}
-				},
-				{
-					"type": "ExpressionStatement",
-					"start": 71,
-					"end": 90,
-					"loc": {
-						"start": {
-							"line": 5,
-							"column": 1
-						},
-						"end": {
-							"line": 5,
 							"column": 20
 						}
 					},
 					"expression": {
 						"type": "TSSatisfiesExpression",
-						"start": 71,
-						"end": 89,
+						"start": 56,
+						"end": 74,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 4,
 								"column": 1
 							},
 							"end": {
-								"line": 5,
+								"line": 4,
 								"column": 19
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 72,
-							"end": 76,
+							"start": 57,
+							"end": 61,
 							"loc": {
 								"start": {
-									"line": 5,
+									"line": 4,
 									"column": 2
 								},
 								"end": {
-									"line": 5,
+									"line": 4,
 									"column": 6
 								}
 							},
@@ -291,29 +214,29 @@
 						},
 						"typeAnnotation": {
 							"type": "TSTypeReference",
-							"start": 88,
-							"end": 89,
+							"start": 73,
+							"end": 74,
 							"loc": {
 								"start": {
-									"line": 5,
+									"line": 4,
 									"column": 18
 								},
 								"end": {
-									"line": 5,
+									"line": 4,
 									"column": 19
 								}
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 88,
-								"end": 89,
+								"start": 73,
+								"end": 74,
 								"loc": {
 									"start": {
-										"line": 5,
+										"line": 4,
 										"column": 18
 									},
 									"end": {
-										"line": 5,
+										"line": 4,
 										"column": 19
 									}
 								},

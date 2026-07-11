@@ -610,6 +610,61 @@ pub(crate) fn leftmost_no_lookahead<'a>(expr: &'a Expression<'a>) -> &'a Express
     }
 }
 
+/// Whether `export default <expr>;` must wrap the expression in parens — true iff
+/// its first *printed* token would be a bare `function`/`class` keyword, which the
+/// grammar reads as a (hoisted) declaration, leaving the rest of the expression
+/// (`.m()`, `= 1`, `as T`) dangling and unreparseable. Mirrors prettier's
+/// `startsWithNoLookaheadToken(expr, isFunctionOrClass)` (parentheses/needs-parentheses.js).
+///
+/// Unlike the shared `leftmost_no_lookahead`, the callee/tag/object descent is
+/// **paren-aware**: it stops when that child is itself parenthesized (a binary
+/// tag `(f(){}+x)`, a lower-precedence callee, …), because the printed form then
+/// starts with `(` and needs no outer paren. That avoids the double-wrap the raw
+/// walk hits — prettier's own util docstring flags it as "overzealous if there
+/// already are necessary grouping parentheses". The other descents (binary left,
+/// conditional test, cast operand, …) print the keyword bare, so they recurse
+/// unconditionally like `leftmost_no_lookahead`.
+pub(crate) fn export_default_needs_parens(expr: &Expression<'_>) -> bool {
+    matches!(
+        export_default_leftmost(expr),
+        Expression::FunctionExpression(_) | Expression::ClassExpression(_)
+    )
+}
+
+fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
+    match expr {
+        Expression::BinaryExpression(b) => export_default_leftmost(b.left),
+        Expression::AssignmentExpression(a) => export_default_leftmost(a.left),
+        Expression::ConditionalExpression(c) => export_default_leftmost(c.test),
+        Expression::SequenceExpression(s) => {
+            s.expressions.first().map_or(expr, export_default_leftmost)
+        }
+        Expression::UpdateExpression(u) if !u.prefix => export_default_leftmost(u.argument),
+        Expression::TSAsExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSSatisfiesExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSNonNullExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSInstantiationExpression(e) => export_default_leftmost(e.expression),
+        // Descents that cross a would-be-parenthesized child: stop there, since its
+        // leading `(` already guards any inner keyword.
+        Expression::MemberExpression(m)
+            if !needs_parens(m.object, ParenContext::ChainBase, false) =>
+        {
+            export_default_leftmost(m.object)
+        }
+        Expression::CallExpression(call)
+            if !needs_parens(call.callee, ParenContext::Callee, false) =>
+        {
+            export_default_leftmost(call.callee)
+        }
+        Expression::TaggedTemplateExpression(t)
+            if !needs_parens(t.tag, ParenContext::TaggedTemplateTag, false) =>
+        {
+            export_default_leftmost(t.tag)
+        }
+        _ => expr,
+    }
+}
+
 /// Binary operand: `<expr> op y` or `x op <expr>`
 fn needs_parens_binary_operand(
     expr: &Expression<'_>,

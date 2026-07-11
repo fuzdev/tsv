@@ -17,7 +17,7 @@ mod specifier_list;
 pub(super) use super::{Printer, build_entity_name_doc};
 
 use crate::ast::internal;
-use crate::printer::needs_parens::leftmost_no_lookahead;
+use crate::printer::needs_parens::export_default_needs_parens;
 use smallvec::SmallVec;
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
@@ -335,11 +335,7 @@ impl<'a> Printer<'a> {
                 // (parentheses/needs-parentheses.js). Decorated class expressions are
                 // handled above; the FunctionDeclaration/ClassDeclaration arms cover
                 // bare `export default function/class …`.
-                if matches!(
-                    leftmost_no_lookahead(expr),
-                    internal::Expression::FunctionExpression(_)
-                        | internal::Expression::ClassExpression(_)
-                ) {
+                if export_default_needs_parens(expr) {
                     expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
                 }
                 let argument_end = expr.span().end;

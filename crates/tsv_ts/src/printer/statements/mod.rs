@@ -49,24 +49,20 @@ fn strip_statement_casts<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<
     stripped.then_some(cur)
 }
 
-/// Contextual-keyword identifier names that need parens when they head an
-/// `as`/`satisfies` cast at statement position (bare `type as T` reparses as a
-/// `type` alias declaration). Prettier's list (parentheses/identifier.js); of
-/// these only `type`/`module`/`using` are reachable in tsv (the rest are reserved
-/// words the parser rejects before formatting), but the full set matches prettier.
+/// Contextual-keyword identifier names whose **bare** `<kw> as T` / `<kw> satisfies T`
+/// at statement position tsv's parser *rejects* — it commits to a declaration reading
+/// (`type <name> = …` alias, `module <name> { … }` namespace) and errors when no
+/// `=`/`{` follows. Dropping the source parens on `(type) as T` would make the output
+/// unreparseable, so the parens are kept.
+///
+/// This is deliberately tsv's reject-set, NOT prettier's full identifier list
+/// (parentheses/identifier.js also lists `await`/`interface`/`yield`/`let`/`component`/
+/// `hook`, which tsv's parser rejects even bare-as-an-expression, so they never reach
+/// the formatter). `using` is excluded on purpose: tsv **accepts** bare `using as T`
+/// (a cast, per its acorn oracle) and keeps it bare — a deliberate divergence pinned by
+/// `typescript_specific/using/cast_prettier_divergence`. Wrapping it would break that.
 fn is_statement_ambiguous_keyword(name: &str) -> bool {
-    matches!(
-        name,
-        "await"
-            | "interface"
-            | "module"
-            | "using"
-            | "yield"
-            | "let"
-            | "component"
-            | "hook"
-            | "type"
-    )
+    matches!(name, "type" | "module")
 }
 
 impl<'a> Printer<'a> {
