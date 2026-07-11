@@ -56,7 +56,9 @@ pub mod diag;
 pub mod ids;
 pub mod merge;
 
-pub use binder::{BoundFile, FileFacts, ModuleNess, NodeKind, bind_file, module_ness};
+pub use binder::{
+    BoundFile, FileFacts, ModuleNess, NODE_FLAGS_UNREACHABLE, NodeKind, bind_file, module_ness,
+};
 pub use check::check_file_members;
 pub use diag::{Category, Diagnostic};
 pub use ids::{FileId, NodeId};
