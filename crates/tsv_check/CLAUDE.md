@@ -85,10 +85,11 @@
     Consumers resolve NodeIds through the SoA walk's **strict**
     `require_node_id` (a miss aborts). The flow product rides `BoundUnit`,
     consumed by `check/unreachable.rs` (TS7027/7028) and, later, the CFA type
-    engine. **Known pre-P3 fix**: `require_node_id` cannot distinguish a
-    `MethodDefinition` from its offset-0 inline `value: FunctionExpression`
-    (same address) — key the map on `(address, NodeKind)` before P3 (pinned by
-    `method_address_collides_with_value`).
+    engine. The address map keys on `(address, NodeKind)`, so the one offset-0
+    collision pair — a `MethodDefinition` and its inline
+    `value: FunctionExpression` (same address) — stays distinctly resolvable
+    (pinned by `method_and_value_resolve_distinctly`); the kind disambiguates,
+    and no same-kind collisions exist.
 
   **Borrow-only discipline**: visitors take
   `&'arena` references and never clone AST nodes — the AST derives `Clone`,

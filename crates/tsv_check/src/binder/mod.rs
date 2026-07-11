@@ -87,7 +87,11 @@ use tsv_ts::ast::internal::{
 /// and a negative-number literal type; `TSIndexSignature` both the class-member and
 /// type-element index-signature forms; `FunctionExpression` a value function and a
 /// method's `value`. The set is not graded or serialized, so its ordering is free.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+///
+/// `Hash` is derived so a `(usize, NodeKind)` pair can key the address map — the
+/// compound key that disambiguates the one offset-0 collision pair
+/// (`MethodDefinition` / its inline `value: FunctionExpression`).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(u16)]
 pub enum NodeKind {
     /// The source file root.
@@ -271,8 +275,11 @@ pub struct BoundFile {
     /// Per-node flag byte (see [`NODE_FLAGS_UNREACHABLE`]), one per [`NodeId`],
     /// zero-initialized. F0 sets nothing; the flow pass (F1) writes it.
     pub node_flags: Vec<u8>,
-    /// Node arena address -> id (the random-access escape hatch).
-    pub address_map: FxHashMap<usize, NodeId>,
+    /// Node `(arena address, kind)` -> id (the random-access escape hatch). The
+    /// kind is part of the key so the one offset-0 collision pair
+    /// (`MethodDefinition` and its inline `value: FunctionExpression`) stays
+    /// distinctly resolvable (see [`BoundFile::require_node_id`]).
+    pub address_map: FxHashMap<(usize, NodeKind), NodeId>,
     /// Bind diagnostics — the duplicate/conflict family, in emission order (the
     /// caller sorts + dedups across the whole program).
     pub diagnostics: Vec<Diagnostic>,
@@ -297,32 +304,32 @@ impl BoundFile {
         self.node_flags[id.index()]
     }
 
-    /// Strict address -> [`NodeId`] resolution for flow consumers. Unlike the
-    /// symbol bind's lenient `node_id_of` (whose `Decl.node` result is dead), a
-    /// flow graph attaches to the node at `address`, so a **miss is a bug** — the
-    /// SoA walk failed to cover a node the flow pass reached, and a silent
-    /// `NodeId::FIRST` fallback would splice the graph onto the wrong node. So this
-    /// hard-fails rather than returning a sentinel.
+    /// Strict `(address, kind)` -> [`NodeId`] resolution for flow consumers.
+    /// Unlike the symbol bind's lenient `node_id_of` (whose `Decl.node` result is
+    /// dead), a flow graph attaches to the node at `address`, so a **miss is a
+    /// bug** — the SoA walk failed to cover a node the flow pass reached, and a
+    /// silent `NodeId::FIRST` fallback would splice the graph onto the wrong node.
+    /// So this hard-fails rather than returning a sentinel.
     ///
     /// `address` is `std::ptr::from_ref(node) as usize` for the same arena node
-    /// reference the walk keyed on.
+    /// reference the walk keyed on, and `kind` is the [`NodeKind`] the walk
+    /// assigned it.
     ///
-    /// **Known collision (pre-P3 fix pending).** Pointer-identity keying cannot
-    /// distinguish a node from an offset-0 inline struct-typed child at the same
-    /// address. The AST has exactly one such pair: `MethodDefinition` and its
-    /// inline `value: FunctionExpression` (value at struct offset 0), so
-    /// `require_node_id(addr_of(&method))` returns the *value's* id, not the
-    /// method's — a silent wrong node, worse than a miss. Inert today (the flow
-    /// walk deliberately anchors methods on `value`; nothing else resolves a method
-    /// by address), pinned by `method_address_collides_with_value` below. The fix —
-    /// keying the map on `(address, NodeKind)` (no same-kind collisions exist) — is
-    /// deferred to a pre-P3 slice (P3's method flow-write + typeof narrowing need
-    /// the method node's own id).
+    /// **The offset-0 collision, resolved by compound keying.** Pointer-identity
+    /// alone cannot distinguish a node from an offset-0 inline struct-typed child
+    /// at the same address. The AST has exactly one such pair: `MethodDefinition`
+    /// and its inline `value: FunctionExpression` (value at struct offset 0). The
+    /// kind component of the key disambiguates them — no same-kind collisions
+    /// exist (verified via `-Zprint-type-sizes`), so `(address, kind)` is a total
+    /// key. `require_node_id(addr_of(&method), NodeKind::MethodDefinition)` and
+    /// `require_node_id(addr_of(&method.value), NodeKind::FunctionExpression)` now
+    /// resolve to their respective distinct ids (pinned by
+    /// `method_and_value_resolve_distinctly` below).
     #[must_use]
-    pub fn require_node_id(&self, address: usize) -> NodeId {
-        match self.address_map.get(&address) {
+    pub fn require_node_id(&self, address: usize, kind: NodeKind) -> NodeId {
+        match self.address_map.get(&(address, kind)) {
             Some(&id) => id,
-            None => node_id_miss(address),
+            None => node_id_miss(address, kind),
         }
     }
 }
@@ -335,9 +342,9 @@ impl BoundFile {
 #[cold]
 #[inline(never)]
 #[allow(clippy::panic)]
-fn node_id_miss(address: usize) -> ! {
+fn node_id_miss(address: usize, kind: NodeKind) -> ! {
     panic!(
-        "require_node_id: address {address:#x} not covered by the SoA walk — a flow \
+        "require_node_id: ({address:#x}, {kind:?}) not covered by the SoA walk — a flow \
          consumer reached a node the lowering pass did not id (would corrupt the flow graph)"
     );
 }
@@ -549,7 +556,7 @@ struct SoaWalk {
     spans: Vec<Span>,
     subtree_end: Vec<NodeId>,
     node_flags: Vec<u8>,
-    address_map: FxHashMap<usize, NodeId>,
+    address_map: FxHashMap<(usize, NodeKind), NodeId>,
 }
 
 impl SoaWalk {
@@ -567,7 +574,7 @@ impl SoaWalk {
         self.spans.push(span);
         self.subtree_end.push(id); // provisional (a leaf owns only itself)
         self.node_flags.push(0); // F0 mints the column zeroed; F1 sets it
-        self.address_map.insert(address, id);
+        self.address_map.insert((address, kind), id);
         id
     }
 
@@ -1911,8 +1918,10 @@ impl SoaWalk {
     }
 }
 
-/// The [`NodeKind`] for a statement variant.
-fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
+/// The [`NodeKind`] for a statement variant. Shared with the flow walk and the
+/// unreachable-code shim, which resolve statements through the compound-keyed
+/// address map (`require_node_id` / a lenient `address_map` lookup).
+pub(crate) fn statement_kind(stmt: &Statement<'_>) -> NodeKind {
     match stmt {
         Statement::ExpressionStatement(_) => NodeKind::ExpressionStatement,
         Statement::VariableDeclaration(_) => NodeKind::VariableDeclaration,
@@ -1999,7 +2008,11 @@ mod tests {
         let bound = bind_file(&program, "let a = 1; let b = 2;", FileId::ROOT);
         let second = &program.body[1];
         let addr = std::ptr::from_ref(second) as usize;
-        let id = bound.address_map.get(&addr).copied().expect("mapped");
+        let id = bound
+            .address_map
+            .get(&(addr, NodeKind::VariableDeclaration))
+            .copied()
+            .expect("mapped");
         assert_eq!(bound.kinds[id.index()], NodeKind::VariableDeclaration);
     }
 
@@ -2042,7 +2055,7 @@ mod tests {
         let program = tsv_ts::parse("let a = 1;", &arena).expect("parse");
         let bound = bind_file(&program, "let a = 1;", FileId::ROOT);
         let addr = std::ptr::from_ref(&program.body[0]) as usize;
-        let id = bound.require_node_id(addr);
+        let id = bound.require_node_id(addr, NodeKind::VariableDeclaration);
         assert_eq!(bound.kinds[id.index()], NodeKind::VariableDeclaration);
     }
 
@@ -2052,17 +2065,16 @@ mod tests {
         // Address 0 is never a real arena node — the strict resolver must abort
         // rather than return a corrupting `NodeId::FIRST` sentinel.
         let bound = bind("const x = 1;");
-        let _ = bound.require_node_id(0);
+        let _ = bound.require_node_id(0, NodeKind::Program);
     }
 
     #[test]
-    fn method_address_collides_with_value() {
-        // KNOWN F0 collision (pre-P3 fix pending; see `require_node_id`'s doc). A
-        // `MethodDefinition` and its inline offset-0 `value: FunctionExpression`
-        // share an address, so the walk's second insert wins and
-        // `require_node_id(addr_of(&method))` returns the FunctionExpression, not
-        // the MethodDefinition. Pinned so the `(address, NodeKind)` fix is a
-        // visible ratchet (this assertion flips to `MethodDefinition` when it lands).
+    fn method_and_value_resolve_distinctly() {
+        // The compound key disambiguates the one offset-0 pair: a
+        // `MethodDefinition` and its inline `value: FunctionExpression` share an
+        // address (value at struct offset 0), yet each resolves to its own id
+        // through the `(address, NodeKind)` key. Both look-ups hit the same
+        // address; only the kind tells them apart.
         use tsv_ts::ast::internal::ClassMember;
         let arena = Bump::new();
         let src = "class C { m() {} }";
@@ -2074,8 +2086,17 @@ mod tests {
         let ClassMember::MethodDefinition(method) = &class.body.body[0] else {
             panic!("expected a method definition");
         };
-        let id = bound.require_node_id(std::ptr::from_ref(method) as usize);
-        assert_eq!(bound.kinds[id.index()], NodeKind::FunctionExpression);
+        // The two share one address (the collision the compound key resolves).
+        let method_addr = std::ptr::from_ref(method) as usize;
+        let value_addr = std::ptr::from_ref(&method.value) as usize;
+        assert_eq!(method_addr, value_addr);
+        // The method resolves to its own id …
+        let method_id = bound.require_node_id(method_addr, NodeKind::MethodDefinition);
+        assert_eq!(bound.kinds[method_id.index()], NodeKind::MethodDefinition);
+        // … and the value resolves to a distinct id.
+        let value_id = bound.require_node_id(value_addr, NodeKind::FunctionExpression);
+        assert_eq!(bound.kinds[value_id.index()], NodeKind::FunctionExpression);
+        assert_ne!(method_id, value_id);
     }
 
     #[test]

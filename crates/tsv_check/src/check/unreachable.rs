@@ -40,7 +40,7 @@
 //       (2294-2428), IsPotentiallyExecutableNode (4210).
 
 use crate::binder::flow::FlowProduct;
-use crate::binder::{BoundFile, NODE_FLAGS_UNREACHABLE, NodeKind, addr_of};
+use crate::binder::{BoundFile, NODE_FLAGS_UNREACHABLE, NodeKind, addr_of, statement_kind};
 use crate::diag::Diagnostic;
 use crate::ids::{FileId, NodeId};
 use crate::options::{CheckOptions, Tristate};
@@ -385,7 +385,11 @@ impl CandidateWalk<'_> {
     /// lookup — a miss (never expected) simply treats the statement as
     /// non-candidate.
     fn candidate_id(&self, stmt: &Statement<'_>) -> Option<NodeId> {
-        let id = self.bound.address_map.get(&addr_of(stmt)).copied()?;
+        let id = self
+            .bound
+            .address_map
+            .get(&(addr_of(stmt), statement_kind(stmt)))
+            .copied()?;
         (self.flow.node_flags[id.index()] & NODE_FLAGS_UNREACHABLE != 0).then_some(id)
     }
 

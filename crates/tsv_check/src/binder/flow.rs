@@ -93,7 +93,7 @@
 //       (+ the newFlowNode* / createFlow* / finishFlowLabel / addAntecedent
 //        constructor family and the per-statement flow shapers)
 
-use crate::binder::{BoundFile, NodeKind, addr_of};
+use crate::binder::{BoundFile, NodeKind, addr_of, statement_kind};
 use crate::ids::{FlowNodeId, NodeId};
 use smallvec::SmallVec;
 use tsv_lang::Span;
@@ -840,8 +840,8 @@ impl<'a> FlowBuilder<'a> {
     // --- helpers ----------------------------------------------------------
 
     #[inline]
-    fn require(&self, address: usize) -> NodeId {
-        self.bound.require_node_id(address)
+    fn require(&self, address: usize, kind: NodeKind) -> NodeId {
+        self.bound.require_node_id(address, kind)
     }
 
     #[inline]
@@ -954,7 +954,7 @@ impl<'a> FlowBuilder<'a> {
     fn run(&mut self, program: &Program<'_>) {
         // The SourceFile is a control-flow container: fresh Start (id 2), no
         // return target (not an IIFE/constructor), no Start subject.
-        let root = self.require(addr_of(program));
+        let root = self.require(addr_of(program), NodeKind::Program);
         let start = self.new_flow_node(FlowFlags::START);
         self.current_flow = start;
         self.current_return_target = None;
@@ -987,7 +987,7 @@ impl<'a> FlowBuilder<'a> {
     // --- statements -------------------------------------------------------
 
     fn visit_statement(&mut self, stmt: &Statement<'_>) {
-        let id = self.require(addr_of(stmt));
+        let id = self.require(addr_of(stmt), statement_kind(stmt));
         if self.current_unreachable() {
             // bindChildren dead path (binder.go:1651): the non-leaf statement's
             // flow attachment is nil (already `None`); mark potentially-
@@ -1075,7 +1075,7 @@ impl<'a> FlowBuilder<'a> {
                 }
             }
             Statement::FunctionDeclaration(f) => {
-                let id = self.require(addr_of(stmt));
+                let id = self.require(addr_of(stmt), statement_kind(stmt));
                 self.visit_function_declaration(f, id);
             }
             Statement::ClassDeclaration(c) => self.visit_class_decl(c),
@@ -1219,7 +1219,7 @@ impl<'a> FlowBuilder<'a> {
             && !matches!(c.callee, Expression::Super(_))
             && is_dotted_name(c.callee)
         {
-            let call_id = self.require(addr_of(c));
+            let call_id = self.require(addr_of(c), NodeKind::CallExpression);
             self.current_flow = self.create_flow_call(self.current_flow, call_id);
         }
     }
@@ -1237,7 +1237,7 @@ impl<'a> FlowBuilder<'a> {
             self.visit_expression(init);
         }
         if decl.init.is_some() {
-            let decl_id = self.require(addr_of(decl));
+            let decl_id = self.require(addr_of(decl), NodeKind::VariableDeclarator);
             self.current_flow =
                 self.create_flow_mutation(FlowFlags::ASSIGNMENT, self.current_flow, decl_id);
         }
@@ -1359,7 +1359,7 @@ impl<'a> FlowBuilder<'a> {
                     if let Some(init) = &decl.init {
                         self.visit_expression(init);
                     }
-                    let decl_id = self.require(addr_of(decl));
+                    let decl_id = self.require(addr_of(decl), NodeKind::VariableDeclarator);
                     self.current_flow = self.create_flow_mutation(
                         FlowFlags::ASSIGNMENT,
                         self.current_flow,
@@ -1538,7 +1538,7 @@ impl<'a> FlowBuilder<'a> {
             self.bind_case_or_default_clause(&clauses[i]);
             fallthrough_flow = self.current_flow;
             if !self.current_unreachable() && i != last {
-                let clause_id = self.require(addr_of(&clauses[i]));
+                let clause_id = self.require(addr_of(&clauses[i]), NodeKind::SwitchCase);
                 self.fallthrough_flow.push((clause_id, self.current_flow));
             }
             i += 1;
@@ -1668,7 +1668,7 @@ impl<'a> FlowBuilder<'a> {
     /// body's exit.
     fn bind_labeled_statement(&mut self, s: &LabeledStatement<'_>) {
         let post = self.create_branch_label();
-        let label_id = self.require(addr_of(&s.label));
+        let label_id = self.require(addr_of(&s.label), NodeKind::Identifier);
         self.active_label_list.push(ActiveLabelEntry {
             break_target: post,
             continue_target: None,
@@ -1698,7 +1698,7 @@ impl<'a> FlowBuilder<'a> {
 
     /// The source text of a label identifier (the break/continue label name).
     fn label_text(&self, ident: &Identifier<'_>) -> &'a str {
-        let id = self.require(addr_of(ident));
+        let id = self.require(addr_of(ident), NodeKind::Identifier);
         self.bound.spans[id.index()].extract(self.source)
     }
 
@@ -1910,53 +1910,55 @@ impl<'a> FlowBuilder<'a> {
         }
     }
 
-    /// The F0 [`NodeId`] of an expression node — its variant payload's address in
-    /// the address map (the key F0's lowering walk used). Condition / mutation
-    /// subjects are always value expressions F0 lowered, so this never misses.
+    /// The F0 [`NodeId`] of an expression node — its variant payload's
+    /// `(address, kind)` in the address map (the compound key F0's lowering walk
+    /// used). Each arm's [`NodeKind`] mirrors the one `visit_expression` assigns to
+    /// that variant in `binder/mod.rs`. Condition / mutation subjects are always
+    /// value expressions F0 lowered, so this never misses.
     fn expr_id(&self, e: &Expression<'_>) -> NodeId {
         use Expression as E;
-        let addr = match e {
+        let (addr, kind) = match e {
             E::JsdocCast(c) => return self.expr_id(c.inner),
-            E::Literal(x) => addr_of(x),
-            E::Identifier(x) => addr_of(x),
-            E::PrivateIdentifier(x) => addr_of(x),
-            E::ObjectExpression(x) => addr_of(x),
-            E::ArrayExpression(x) => addr_of(x),
-            E::UnaryExpression(x) => addr_of(x),
-            E::UpdateExpression(x) => addr_of(x),
-            E::BinaryExpression(x) => addr_of(x),
-            E::CallExpression(x) => addr_of(x),
-            E::NewExpression(x) => addr_of(x),
-            E::MemberExpression(x) => addr_of(x),
-            E::ConditionalExpression(x) => addr_of(x),
-            E::ArrowFunctionExpression(x) => addr_of(x),
-            E::FunctionExpression(x) => addr_of(x),
-            E::ClassExpression(x) => addr_of(x),
-            E::SpreadElement(x) => addr_of(x),
-            E::TemplateLiteral(x) => addr_of(x),
-            E::TaggedTemplateExpression(x) => addr_of(x),
-            E::AwaitExpression(x) => addr_of(x),
-            E::YieldExpression(x) => addr_of(x),
-            E::SequenceExpression(x) => addr_of(x),
-            E::RegexLiteral(x) => addr_of(x),
-            E::ThisExpression(x) => addr_of(x),
-            E::Super(x) => addr_of(x),
-            E::AssignmentExpression(x) => addr_of(x),
-            E::ObjectPattern(x) => addr_of(x),
-            E::ArrayPattern(x) => addr_of(x),
-            E::AssignmentPattern(x) => addr_of(x),
-            E::RestElement(x) => addr_of(x),
-            E::TSTypeAssertion(x) => addr_of(x),
-            E::TSAsExpression(x) => addr_of(x),
-            E::TSSatisfiesExpression(x) => addr_of(x),
-            E::TSInstantiationExpression(x) => addr_of(x),
-            E::TSNonNullExpression(x) => addr_of(x),
-            E::TSParameterProperty(x) => addr_of(x),
-            E::ImportExpression(x) => addr_of(x),
-            E::MetaProperty(x) => addr_of(x),
-            E::ParenthesizedExpression(x) => addr_of(x),
+            E::Literal(x) => (addr_of(x), NodeKind::Literal),
+            E::Identifier(x) => (addr_of(x), NodeKind::Identifier),
+            E::PrivateIdentifier(x) => (addr_of(x), NodeKind::PrivateIdentifier),
+            E::ObjectExpression(x) => (addr_of(x), NodeKind::ObjectExpression),
+            E::ArrayExpression(x) => (addr_of(x), NodeKind::ArrayExpression),
+            E::UnaryExpression(x) => (addr_of(x), NodeKind::UnaryExpression),
+            E::UpdateExpression(x) => (addr_of(x), NodeKind::UpdateExpression),
+            E::BinaryExpression(x) => (addr_of(x), NodeKind::BinaryExpression),
+            E::CallExpression(x) => (addr_of(x), NodeKind::CallExpression),
+            E::NewExpression(x) => (addr_of(x), NodeKind::NewExpression),
+            E::MemberExpression(x) => (addr_of(x), NodeKind::MemberExpression),
+            E::ConditionalExpression(x) => (addr_of(x), NodeKind::ConditionalExpression),
+            E::ArrowFunctionExpression(x) => (addr_of(x), NodeKind::ArrowFunctionExpression),
+            E::FunctionExpression(x) => (addr_of(x), NodeKind::FunctionExpression),
+            E::ClassExpression(x) => (addr_of(x), NodeKind::ClassExpression),
+            E::SpreadElement(x) => (addr_of(x), NodeKind::SpreadElement),
+            E::TemplateLiteral(x) => (addr_of(x), NodeKind::TemplateLiteral),
+            E::TaggedTemplateExpression(x) => (addr_of(x), NodeKind::TaggedTemplateExpression),
+            E::AwaitExpression(x) => (addr_of(x), NodeKind::AwaitExpression),
+            E::YieldExpression(x) => (addr_of(x), NodeKind::YieldExpression),
+            E::SequenceExpression(x) => (addr_of(x), NodeKind::SequenceExpression),
+            E::RegexLiteral(x) => (addr_of(x), NodeKind::RegexLiteral),
+            E::ThisExpression(x) => (addr_of(x), NodeKind::ThisExpression),
+            E::Super(x) => (addr_of(x), NodeKind::Super),
+            E::AssignmentExpression(x) => (addr_of(x), NodeKind::AssignmentExpression),
+            E::ObjectPattern(x) => (addr_of(x), NodeKind::ObjectPattern),
+            E::ArrayPattern(x) => (addr_of(x), NodeKind::ArrayPattern),
+            E::AssignmentPattern(x) => (addr_of(x), NodeKind::AssignmentPattern),
+            E::RestElement(x) => (addr_of(x), NodeKind::RestElement),
+            E::TSTypeAssertion(x) => (addr_of(x), NodeKind::TSTypeAssertion),
+            E::TSAsExpression(x) => (addr_of(x), NodeKind::TSAsExpression),
+            E::TSSatisfiesExpression(x) => (addr_of(x), NodeKind::TSSatisfiesExpression),
+            E::TSInstantiationExpression(x) => (addr_of(x), NodeKind::TSInstantiationExpression),
+            E::TSNonNullExpression(x) => (addr_of(x), NodeKind::TSNonNullExpression),
+            E::TSParameterProperty(x) => (addr_of(x), NodeKind::TSParameterProperty),
+            E::ImportExpression(x) => (addr_of(x), NodeKind::ImportExpression),
+            E::MetaProperty(x) => (addr_of(x), NodeKind::MetaProperty),
+            E::ParenthesizedExpression(x) => (addr_of(x), NodeKind::ParenthesizedExpression),
         };
-        self.require(addr)
+        self.require(addr, kind)
     }
 
     // --- containers -------------------------------------------------------
@@ -2109,7 +2111,7 @@ impl<'a> FlowBuilder<'a> {
                 if let Some(value) = &p.value {
                     // A property-with-initializer is a control-flow container
                     // (binder.go:2584): fresh Start around the initializer.
-                    let p_id = self.require(addr_of(p));
+                    let p_id = self.require(addr_of(p), NodeKind::PropertyDefinition);
                     let saved = self.enter_container(None, false, false);
                     self.visit_expression(value);
                     self.exit_container(saved, false, false, false, p_id, false);
@@ -2118,7 +2120,7 @@ impl<'a> FlowBuilder<'a> {
             ClassMember::StaticBlock(s) => {
                 // A class static block is flow-transparent (binder.go:1525-1528)
                 // with its own return target; `return_flow` anchors on it.
-                let s_id = self.require(addr_of(s));
+                let s_id = self.require(addr_of(s), NodeKind::StaticBlock);
                 let saved = self.enter_container(None, true, true);
                 self.visit_statement_list(s.body);
                 self.exit_container(saved, true, true, true, s_id, true);
@@ -2133,16 +2135,16 @@ impl<'a> FlowBuilder<'a> {
         let is_ctor = m.kind == MethodKind::Constructor;
         self.visit_expression(&m.key);
         // The method body lives in `value` (a FunctionExpression); the method is
-        // a control-flow container anchored on that FunctionExpression. tsv wraps
-        // a method body in a FunctionExpression (tsc's method node holds the body
-        // directly), and — F0 hazard — the address map collides the
-        // MethodDefinition with its inline `value` (a repr reorder puts `value`
-        // at offset 0, so F0's later insert overwrites the map slot). So the
-        // value FunctionExpression is the reliably-addressable body-bearing node;
-        // anchor there. The obj-literal/class-expression method flow-write +
-        // Start.Node subject (binder.go:982, 1534) is a P3 narrowing hint,
-        // deferred to F1b.
-        let anchor = self.require(addr_of(&m.value));
+        // a control-flow container anchored on that FunctionExpression — the
+        // body-bearing node (tsv wraps a method body in a FunctionExpression,
+        // where tsc's method node holds the body directly). The `MethodDefinition`
+        // and its inline `value` share an address (a repr reorder puts `value` at
+        // offset 0), so the address map keys on `(address, NodeKind)`; anchoring
+        // here resolves the FunctionExpression id via its kind (the method itself
+        // is now separately resolvable by `NodeKind::MethodDefinition`). The
+        // obj-literal/class-expression method flow-write + Start.Node subject
+        // (binder.go:982, 1534) is a P3 narrowing hint, deferred to F1b.
+        let anchor = self.require(addr_of(&m.value), NodeKind::FunctionExpression);
         let saved = self.enter_container(None, false, is_ctor);
         self.bind_params(m.value.params);
         self.visit_statement_list(m.value.body.body);
@@ -2158,7 +2160,7 @@ impl<'a> FlowBuilder<'a> {
             Some(TSModuleDeclarationBody::TSModuleBlock(block)) => {
                 // A ModuleBlock is a control-flow container (binder.go:2582) —
                 // fresh Start, no return target, not function-like.
-                let block_id = self.require(addr_of(block));
+                let block_id = self.require(addr_of(block), NodeKind::TSModuleBlock);
                 let saved = self.enter_container(None, false, false);
                 self.visit_statement_list(block.body);
                 self.exit_container(saved, false, false, false, block_id, false);
@@ -2175,7 +2177,7 @@ impl<'a> FlowBuilder<'a> {
         match &e.declaration {
             V::Expression(expr) => self.visit_expression(expr),
             V::FunctionDeclaration(f) => {
-                let id = self.require(addr_of(f));
+                let id = self.require(addr_of(f), NodeKind::FunctionDeclaration);
                 self.visit_function_declaration(f, id);
             }
             V::ClassDeclaration(c) => self.visit_class_decl(c),
@@ -2208,25 +2210,25 @@ impl<'a> FlowBuilder<'a> {
         match expr {
             E::Identifier(idn) => self.visit_identifier(idn),
             E::ThisExpression(t) => {
-                let id = self.require(addr_of(t));
+                let id = self.require(addr_of(t), NodeKind::ThisExpression);
                 self.set_flow_leaf(id);
             }
             E::Super(s) => {
-                let id = self.require(addr_of(s));
+                let id = self.require(addr_of(s), NodeKind::Super);
                 self.set_flow_leaf(id);
             }
             E::MetaProperty(m) => {
                 // Non-leaf write (nil'd in dead code). tsv models `import`/`new`
                 // and `meta`/`target` as identifiers; they are keyword-ish, not
                 // references, so only the MetaProperty node is stamped.
-                let id = self.require(addr_of(m));
+                let id = self.require(addr_of(m), NodeKind::MetaProperty);
                 self.set_flow_nonleaf(id);
             }
             E::MemberExpression(m) => {
                 // The access flow write (binder.go:618): non-leaf, reachable-
                 // only, gated on `isNarrowableReference`.
                 if is_narrowable_reference(expr) {
-                    let id = self.require(addr_of(m));
+                    let id = self.require(addr_of(m), NodeKind::MemberExpression);
                     self.set_flow_nonleaf(id);
                 }
                 self.visit_expression(m.object);
@@ -2287,14 +2289,14 @@ impl<'a> FlowBuilder<'a> {
                         for arg in c.arguments {
                             self.visit_expression(arg);
                         }
-                        let id = self.require(addr_of(a));
+                        let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
                         self.visit_arrow(a, id, true);
                     }
                     E::FunctionExpression(f) if !f.r#async && !f.generator => {
                         for arg in c.arguments {
                             self.visit_expression(arg);
                         }
-                        let id = self.require(addr_of(f));
+                        let id = self.require(addr_of(f), NodeKind::FunctionExpression);
                         self.visit_function_expression(f, id, true);
                     }
                     _ => {
@@ -2313,11 +2315,11 @@ impl<'a> FlowBuilder<'a> {
             }
             E::ConditionalExpression(c) => self.bind_conditional_expression_flow(c),
             E::ArrowFunctionExpression(a) => {
-                let id = self.require(addr_of(a));
+                let id = self.require(addr_of(a), NodeKind::ArrowFunctionExpression);
                 self.visit_arrow(a, id, false);
             }
             E::FunctionExpression(f) => {
-                let id = self.require(addr_of(f));
+                let id = self.require(addr_of(f), NodeKind::FunctionExpression);
                 self.visit_function_expression(f, id, false);
             }
             E::ClassExpression(c) => self.visit_class_expr(c),
@@ -2408,7 +2410,7 @@ impl<'a> FlowBuilder<'a> {
         // dead identifier keeps `Some(unreachable)`. Its decorators (parameter
         // decorators) are value expressions; its type annotation is a type
         // position (skipped).
-        let id = self.require(addr_of(ident));
+        let id = self.require(addr_of(ident), NodeKind::Identifier);
         self.set_flow_leaf(id);
         self.visit_decorators(ident.decorators());
     }
@@ -2439,7 +2441,7 @@ impl<'a> FlowBuilder<'a> {
             // collision workaround). The obj-literal method flow-write
             // (binder.go:982) is a P3 narrowing hint, deferred.
             self.visit_expression(&pr.key);
-            let anchor = self.require(addr_of(f));
+            let anchor = self.require(addr_of(f), NodeKind::FunctionExpression);
             let saved = self.enter_container(None, false, false);
             self.bind_params(f.params);
             self.visit_statement_list(f.body.body);
@@ -3129,8 +3131,10 @@ mod tests {
                 panic!("expression statement");
             };
             let id = match &s.expression {
-                Expression::Literal(l) => bound.require_node_id(addr_of(l)),
-                Expression::Identifier(idn) => bound.require_node_id(addr_of(idn)),
+                Expression::Literal(l) => bound.require_node_id(addr_of(l), NodeKind::Literal),
+                Expression::Identifier(idn) => {
+                    bound.require_node_id(addr_of(idn), NodeKind::Identifier)
+                }
                 _ => panic!("unexpected expression"),
             };
             (&s.expression, id)

@@ -61,7 +61,7 @@
 
 use super::atoms::{Atom, Atoms};
 use super::symbols::{Decl, Symbol, SymbolFlags, SymbolId, TableId};
-use super::{FileFacts, addr_of};
+use super::{FileFacts, NodeKind, addr_of};
 use crate::diag::{Category, Diagnostic};
 use crate::hash::FxHashMap;
 use crate::ids::{FileId, NodeId};
@@ -140,7 +140,7 @@ struct DeclInput {
 pub(super) struct SymbolBinder<'a> {
     source: &'a str,
     interner: &'a DefaultStringInterner,
-    address_map: &'a FxHashMap<usize, NodeId>,
+    address_map: &'a FxHashMap<(usize, NodeKind), NodeId>,
     file: FileId,
     is_external: bool,
 
@@ -165,7 +165,7 @@ impl<'a> SymbolBinder<'a> {
     pub(super) fn new(
         source: &'a str,
         interner: &'a DefaultStringInterner,
-        address_map: &'a FxHashMap<usize, NodeId>,
+        address_map: &'a FxHashMap<(usize, NodeKind), NodeId>,
         file: FileId,
         facts: FileFacts,
     ) -> SymbolBinder<'a> {
@@ -319,9 +319,13 @@ impl<'a> SymbolBinder<'a> {
         t
     }
 
-    fn node_id_of<T>(&self, node: &T) -> NodeId {
+    /// The [`NodeId`] of `node` (of kind `kind`), or [`NodeId::FIRST`] on a miss.
+    /// Lenient by design — the result feeds `Decl.node`, which is dead in the
+    /// single-file pipeline (statement-level inner structs the SoA walk keys on
+    /// the enclosing `&Statement` address fall back to the root id here).
+    fn node_id_of<T>(&self, node: &T, kind: NodeKind) -> NodeId {
         self.address_map
-            .get(&addr_of(node))
+            .get(&(addr_of(node), kind))
             .copied()
             .unwrap_or(NodeId::FIRST)
     }
@@ -921,7 +925,7 @@ impl<'a> SymbolBinder<'a> {
                         is_default_export: false,
                         is_export_assignment_default: false,
                         exported: true,
-                        node: self.node_id_of(ea),
+                        node: self.node_id_of(ea, NodeKind::TSExportAssignment),
                     };
                     let table = self.exports_of(sym);
                     self.declare_symbol(
@@ -1010,7 +1014,7 @@ impl<'a> SymbolBinder<'a> {
                         is_default_export: false,
                         is_export_assignment_default: true,
                         exported: false,
-                        node: self.node_id_of(e),
+                        node: self.node_id_of(e, NodeKind::ExportDefaultDeclaration),
                     };
                     let table = self.exports_of(sym);
                     self.declare_symbol(table, Some(sym), d, flags, SymbolFlags::ALL);
@@ -1255,7 +1259,7 @@ impl<'a> SymbolBinder<'a> {
             is_default_export: mods.default,
             is_export_assignment_default: false,
             exported: mods.exported,
-            node: self.node_id_of(id),
+            node: self.node_id_of(id, NodeKind::Identifier),
         }
     }
 
@@ -1688,7 +1692,7 @@ impl<'a> SymbolBinder<'a> {
             is_default_export: mods.default,
             is_export_assignment_default: false,
             exported: mods.exported,
-            node: self.node_id_of(m),
+            node: self.node_id_of(m, NodeKind::TSModuleDeclaration),
         };
         // Instantiation state (tsgo `GetModuleInstanceState`): a namespace of only
         // types binds as the inert `NamespaceModule`, so it never conflicts with a
