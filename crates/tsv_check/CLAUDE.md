@@ -78,10 +78,12 @@
 - `check/` — the post-bind **syntactic** check pass (`check_file_members`), a
   standalone `CheckWalk` over `&Program` that never consults the binder's
   symbol tables (walking the shared interface member table would break
-  declaration-merging). It descends every syntactic position — class /
-  interface / type-literal bodies and every type-annotation / assertion /
-  predicate / function-type site (a general `TSType` recursion) — and runs the
-  per-node check-time checks: `duplicate_members.rs` ports
+  declaration-merging). It descends every syntactic position a type literal or
+  type-parameter list can hide — class / interface / type-literal bodies, every
+  type-annotation / assertion / predicate / function-type site (a general
+  `TSType` recursion), class/interface heritage type arguments, decorators
+  (class / member / parameter), and template-literal-type interpolations — and
+  runs the per-node check-time checks: `duplicate_members.rs` ports
   `checkObjectTypeForDuplicateDeclarations` (the two-map property/accessor
   state machine → TS2300, disjoint from the bind cascade by construction) and
   `checkTypeParameters` (per-declaration duplicate type-param identity). Its
