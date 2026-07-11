@@ -1544,6 +1544,14 @@ impl<'a> SymbolBinder<'a> {
                     SymbolFlags::PROPERTY,
                     SymbolFlags::PROPERTY_EXCLUDES,
                 );
+                // Descend the member's own type — a nested type literal's members bind
+                // (its method-vs-property conflict is bind-time, so it is missed unless
+                // this recurses). tsgo binds nested type-literal members; a
+                // property/property nested dup is caught separately by the check pass at
+                // any depth, so this closes only the bind-time family gap.
+                if let Some(ann) = &p.type_annotation {
+                    self.bind_type_annotation(ann);
+                }
             }
             TSTypeElement::MethodSignature(m) => {
                 self.declare_type_member(
@@ -1558,6 +1566,12 @@ impl<'a> SymbolBinder<'a> {
                 // signature conflict (TS2300) independently of the enclosing member
                 // table.
                 self.with_function_scope(m.type_parameters.as_ref(), |b| b.bind_params(m.params));
+                // The return type descends for the same nested-type-literal reason as a
+                // property signature (param type literals already descend via
+                // `bind_binding`).
+                if let Some(ann) = &m.return_type {
+                    self.bind_type_annotation(ann);
+                }
             }
             // Call/construct signatures are anonymous in the member table: tsgo binds
             // them `SymbolFlagsSignature` with no excludes, so they never conflict —
@@ -1567,9 +1581,15 @@ impl<'a> SymbolBinder<'a> {
             // tsgo: internal/binder/binder.go GetContainerFlags (Kind{Call,Construct}Signature)
             TSTypeElement::CallSignature(c) => {
                 self.with_function_scope(c.type_parameters.as_ref(), |b| b.bind_params(c.params));
+                if let Some(ann) = &c.return_type {
+                    self.bind_type_annotation(ann);
+                }
             }
             TSTypeElement::ConstructSignature(c) => {
                 self.with_function_scope(c.type_parameters.as_ref(), |b| b.bind_params(c.params));
+                if let Some(ann) = &c.return_type {
+                    self.bind_type_annotation(ann);
+                }
             }
             TSTypeElement::IndexSignature(_) => {}
         }
@@ -2007,11 +2027,21 @@ impl<'a> SymbolBinder<'a> {
                 Expression::Literal(lit)
                     if matches!(lit.value, LiteralValue::String(_) | LiteralValue::Number(_)) =>
                 {
-                    let a = self.string_atom(lit);
+                    // The grouping key stays the decoded/canonical value (so `[0]` and
+                    // `['0']` collide). The diagnostic points at the whole `[ … ]` name
+                    // node — bracket-inclusive, matching tsgo (`getNameOfDeclaration` ->
+                    // the ComputedPropertyName) and the check-pass span, so a key that
+                    // conflicts at both phases collapses in the sort/dedup. The display
+                    // is that raw bracket-inclusive source (tsgo's `symbolToString`).
+                    let key_atom = self.string_atom(lit);
+                    let source = self.source;
+                    let start = crate::span_scan::bracket_start(source, lit.span.start);
+                    let end = crate::span_scan::bracket_end(source, lit.span.end);
+                    let display = self.atoms.intern(&source[start as usize..end as usize]);
                     Some(KeyInfo {
-                        key: a,
-                        display: a,
-                        span: lit.span,
+                        key: key_atom,
+                        display,
+                        span: Span::new(start, end),
                     })
                 }
                 _ => None,

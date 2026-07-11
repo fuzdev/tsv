@@ -6,10 +6,12 @@
 //! (walking the shared interface member table would break declaration-merging).
 //! It descends every syntactic position — class / interface / type-literal bodies,
 //! every type-annotation site (variable / parameter / return-type / predicate /
-//! function-type / union / intersection / assertion target / …), and every
-//! type-parameter declaration — and runs a set of per-node checks. Those are the
-//! duplicate-member check and the type-parameter-identity check (both in
-//! [`duplicate_members`]), sharing the one descent.
+//! function-type / union / intersection / assertion target / …), class and
+//! interface heritage type arguments, decorators (class / member / parameter),
+//! template-literal-type interpolations, and every type-parameter declaration — and
+//! runs a set of per-node checks. Those are the duplicate-member check and the
+//! type-parameter-identity check (both in [`duplicate_members`]), sharing the one
+//! descent.
 //!
 //! The output folds into each file's diagnostics in [`crate::program`], alongside
 //! the bind product, then the whole program is canonically sorted + deduped — so a
@@ -27,10 +29,10 @@ use duplicate_members::MemberCtx;
 use string_interner::DefaultStringInterner;
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, ClassBody, ClassMember, ExportDefaultValue, Expression, ForInOfLeft,
-    ForInit, ObjectPatternProperty, ObjectProperty, Statement, TSModuleDeclaration,
-    TSModuleDeclarationBody, TSType, TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration,
-    TSTypeParameterInstantiation, VariableDeclaration,
+    ArrowFunctionBody, ClassBody, ClassMember, Decorator, ExportDefaultValue, Expression,
+    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, TSInterfaceHeritage,
+    TSLiteralType, TSModuleDeclaration, TSModuleDeclarationBody, TSType, TSTypeAnnotation,
+    TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
 };
 
 /// Run the syntactic check pass over one parsed file, returning its check-time
@@ -91,10 +93,17 @@ impl<'a> CheckWalk<'a> {
             }
             Statement::ClassDeclaration(c) => {
                 self.visit_type_params(c.type_parameters.as_ref());
+                self.visit_class_heritage(
+                    c.decorators,
+                    c.super_class,
+                    c.super_type_parameters.as_ref(),
+                    c.implements,
+                );
                 self.visit_class_body(&c.body);
             }
             Statement::TSInterfaceDeclaration(i) => {
                 self.visit_type_params(i.type_parameters.as_ref());
+                self.visit_heritage_type_args(i.extends);
                 self.visit_type_elements(i.body.body);
             }
             Statement::TSTypeAliasDeclaration(t) => {
@@ -258,10 +267,17 @@ impl<'a> CheckWalk<'a> {
             }
             ExportDefaultValue::ClassDeclaration(c) => {
                 self.visit_type_params(c.type_parameters.as_ref());
+                self.visit_class_heritage(
+                    c.decorators,
+                    c.super_class,
+                    c.super_type_parameters.as_ref(),
+                    c.implements,
+                );
                 self.visit_class_body(&c.body);
             }
             ExportDefaultValue::TSInterfaceDeclaration(i) => {
                 self.visit_type_params(i.type_parameters.as_ref());
+                self.visit_heritage_type_args(i.extends);
                 self.visit_type_elements(i.body.body);
             }
         }
@@ -295,6 +311,12 @@ impl<'a> CheckWalk<'a> {
             }
             E::ClassExpression(c) => {
                 self.visit_type_params(c.type_parameters.as_ref());
+                self.visit_class_heritage(
+                    c.decorators,
+                    c.super_class,
+                    c.super_type_parameters.as_ref(),
+                    c.implements,
+                );
                 self.visit_class_body(&c.body);
             }
             E::TSAsExpression(t) => {
@@ -404,12 +426,54 @@ impl<'a> CheckWalk<'a> {
 
     // --- classes / interfaces / type literals --------------------------------
 
+    /// Descend a decorator list — each decorator's expression can host a type
+    /// literal (`@dec({} as {x; x})`). tsgo's `checkSourceElement` checks decorators.
+    fn visit_decorators(&mut self, decorators: Option<&[Decorator<'_>]>) {
+        if let Some(decs) = decorators {
+            for d in decs {
+                self.visit_expression(&d.expression);
+            }
+        }
+    }
+
+    /// Descend a class's decorators + heritage: the `extends` expression and its
+    /// type arguments, and each `implements` clause's type arguments — every site a
+    /// type literal can hide (`extends Base<{x; x}>`). tsgo's `checkSourceElement`
+    /// descends the heritage type arguments and decorators.
+    fn visit_class_heritage(
+        &mut self,
+        decorators: Option<&[Decorator<'_>]>,
+        super_class: Option<&Expression<'_>>,
+        super_type_parameters: Option<&TSTypeParameterInstantiation<'_>>,
+        implements: &[TSInterfaceHeritage<'_>],
+    ) {
+        self.visit_decorators(decorators);
+        if let Some(sc) = super_class {
+            self.visit_expression(sc);
+        }
+        if let Some(tp) = super_type_parameters {
+            self.visit_type_args(tp);
+        }
+        self.visit_heritage_type_args(implements);
+    }
+
+    /// Descend each heritage clause's type arguments (shared by a class's
+    /// `implements` and an interface's `extends` — both are `TSInterfaceHeritage`).
+    fn visit_heritage_type_args(&mut self, heritages: &[TSInterfaceHeritage<'_>]) {
+        for h in heritages {
+            if let Some(ta) = &h.type_arguments {
+                self.visit_type_args(ta);
+            }
+        }
+    }
+
     fn visit_class_body(&mut self, body: &ClassBody<'_>) {
         let ctx = self.member_ctx();
         duplicate_members::check_class_members(&ctx, body.body, &mut self.diagnostics);
         for member in body.body {
             match member {
                 ClassMember::MethodDefinition(m) => {
+                    self.visit_decorators(m.decorators);
                     self.visit_type_params(m.value.type_parameters.as_ref());
                     self.visit_params(m.value.params);
                     self.visit_type_annotation_opt(m.value.return_type.as_ref());
@@ -418,6 +482,7 @@ impl<'a> CheckWalk<'a> {
                     }
                 }
                 ClassMember::PropertyDefinition(p) => {
+                    self.visit_decorators(p.decorators);
                     self.visit_type_annotation_opt(p.type_annotation.as_ref());
                     if let Some(v) = &p.value {
                         self.visit_expression(v);
@@ -476,11 +541,13 @@ impl<'a> CheckWalk<'a> {
     fn visit_param(&mut self, param: &Expression<'_>) {
         match param {
             Expression::Identifier(id) => {
+                self.visit_decorators(id.decorators());
                 if let Some(ann) = id.type_annotation() {
                     self.visit_type_annotation(ann);
                 }
             }
             Expression::ObjectPattern(op) => {
+                self.visit_decorators(op.decorators);
                 if let Some(ann) = &op.type_annotation {
                     self.visit_type_annotation(ann);
                 }
@@ -492,6 +559,7 @@ impl<'a> CheckWalk<'a> {
                 }
             }
             Expression::ArrayPattern(ap) => {
+                self.visit_decorators(ap.decorators);
                 if let Some(ann) = &ap.type_annotation {
                     self.visit_type_annotation(ann);
                 }
@@ -500,6 +568,7 @@ impl<'a> CheckWalk<'a> {
                 }
             }
             Expression::AssignmentPattern(a) => {
+                self.visit_decorators(a.decorators);
                 self.visit_param(a.left);
                 self.visit_expression(a.right);
             }
@@ -631,7 +700,17 @@ impl<'a> CheckWalk<'a> {
                     self.visit_type_args(args);
                 }
             }
-            TSType::Keyword(_) | TSType::Literal(_) | TSType::ThisType(_) => {}
+            TSType::Literal(lit) => {
+                // A template-literal type's interpolations are types, which can be
+                // type literals (`` `p-${ {x; x} }` ``); every other literal type is a
+                // leaf.
+                if let TSLiteralType::TemplateLiteral(t) = lit {
+                    for ty in t.types {
+                        self.visit_type(ty);
+                    }
+                }
+            }
+            TSType::Keyword(_) | TSType::ThisType(_) => {}
         }
     }
 }
@@ -700,6 +779,58 @@ mod tests {
             check_codes("class C { static x = 1; static x = 2; }"),
             vec![2300, 2300]
         );
+    }
+
+    #[test]
+    fn heritage_and_decorator_and_template_type_literals_are_checked() {
+        // The walk descends class/interface heritage type arguments, decorators, and
+        // template-literal-type interpolations — every syntactic position a type
+        // literal can hide — so a duplicate member there is caught (two raw TS2300).
+        assert_eq!(
+            check_codes("class C extends Base<{x:number;x:string}> {}"),
+            vec![2300, 2300]
+        );
+        assert_eq!(
+            check_codes("interface I extends Base<{x;x}> {}"),
+            vec![2300, 2300]
+        );
+        assert_eq!(
+            check_codes("class C implements Base<{x;x}> {}"),
+            vec![2300, 2300]
+        );
+        assert_eq!(
+            check_codes("@dec({} as {x;x}) class C {}"),
+            vec![2300, 2300]
+        );
+        assert_eq!(
+            check_codes("class C { @dec({} as {x;x}) m() {} }"),
+            vec![2300, 2300]
+        );
+        assert_eq!(
+            check_codes("class C { @dec({} as {x;x}) p = 1; }"),
+            vec![2300, 2300]
+        );
+        // A constructor parameter's own decorator.
+        assert_eq!(
+            check_codes("class C { m(@dec({} as {x;x}) p) {} }"),
+            vec![2300, 2300]
+        );
+        assert_eq!(check_codes("type T = `p-${ {x;x} }`;"), vec![2300, 2300]);
+    }
+
+    #[test]
+    fn computed_literal_key_display_is_raw_bracket_source() {
+        // A computed key's message arg is the raw `[ … ]` source (tsgo's
+        // `symbolToString`), not the decoded value — while its grouping key stays the
+        // decoded value. Interface computed keys fire property/property in the check
+        // pass, so this exercises the check-side display in isolation.
+        let arena = Bump::new();
+        let src = "interface I { ['a']: number; ['a']: string; }";
+        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let diags = check_file_members(&program, src, FileId::ROOT);
+        assert_eq!(diags.len(), 2);
+        assert!(diags.iter().all(|d| d.code == 2300));
+        assert!(diags.iter().all(|d| d.args == vec!["['a']".to_string()]));
     }
 
     #[test]

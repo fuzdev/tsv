@@ -381,4 +381,48 @@ mod tests {
             ParseReport::Rejected { .. }
         ));
     }
+
+    #[test]
+    fn computed_literal_key_bind_and_check_spans_collapse() {
+        // A computed-literal key that conflicts at BOTH bind (method vs property) and
+        // check (property vs property) once produced two differently-spanned
+        // diagnostics per declaration — the bind side spanned the bare literal, the
+        // check side the whole `[ … ]` node — so the sort/dedup couldn't collapse
+        // them (six TS2300 for three declarations). Both phases now span the
+        // bracket-inclusive name node with the raw `[0]` message arg, so identical
+        // diagnostics collapse: three declarations -> three TS2300.
+        let result = check("class C { [0]() {} [0] = 1; [0] = 2; }");
+        let ts2300: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == 2300)
+            .collect();
+        assert_eq!(ts2300.len(), 3);
+        assert!(ts2300.iter().all(|d| d.args == vec!["[0]".to_string()]));
+        assert_eq!(
+            ts2300
+                .iter()
+                .map(|d| (d.span.start, d.span.end))
+                .collect::<Vec<_>>(),
+            vec![(10, 13), (19, 22), (28, 31)]
+        );
+    }
+
+    #[test]
+    fn nested_type_literal_method_property_conflict_binds() {
+        // A nested type literal's method-vs-property conflict is bind-time; it was
+        // missed at depth >= 1 because a property signature's own type annotation
+        // never descended. The property/property nested dup was always caught (the
+        // check pass recurses at any depth) — this closes only the bind-time family
+        // gap. Depth-0 control and the nested case both fire two TS2300.
+        let ts2300 = |source: &str| {
+            check(source)
+                .diagnostics
+                .iter()
+                .filter(|d| d.code == 2300)
+                .count()
+        };
+        assert_eq!(ts2300("var a: { m(): void; m: number };"), 2);
+        assert_eq!(ts2300("var a: { outer: { m(): void; m: number } };"), 2);
+    }
 }

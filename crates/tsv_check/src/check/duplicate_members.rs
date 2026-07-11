@@ -33,6 +33,7 @@
 use crate::diag::{Category, Diagnostic};
 use crate::hash::FxHashMap;
 use crate::ids::FileId;
+use crate::span_scan::{bracket_end, bracket_start};
 use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
@@ -55,12 +56,16 @@ enum MemberKind {
     Accessor,
 }
 
-/// A body member reduced to what the check needs: its canonical key string, the
-/// span its diagnostic points at (the name node), its static-ness, whether it
-/// feeds the state machine (`classify`), and whether it is a constructor parameter
-/// property (batched irrespective of the bucket's static-ness, per tsgo).
+/// A body member reduced to what the check needs: its canonical grouping key, the
+/// display string its diagnostic message prints (`key` for a plain name, the raw
+/// bracket-inclusive `[ … ]` source for a computed key — matching tsgo's
+/// `symbolToString`), the span its diagnostic points at (the name node), its
+/// static-ness, whether it feeds the state machine (`classify`), and whether it is
+/// a constructor parameter property (batched irrespective of the bucket's
+/// static-ness, per tsgo).
 struct Entry {
     key: String,
+    display: String,
     span: Span,
     is_static: bool,
     classify: Option<MemberKind>,
@@ -111,6 +116,7 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
                             && let Some((key, span)) = param_property_key(ctx, pp.parameter)
                         {
                             entries.push(Entry {
+                                display: key.clone(),
                                 key,
                                 span,
                                 is_static: false,
@@ -121,9 +127,10 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
                     }
                 }
                 MethodKind::Method => {
-                    if let Some((key, span)) = member_key(ctx, &m.key, m.computed) {
+                    if let Some((key, display, span)) = member_key(ctx, &m.key, m.computed) {
                         entries.push(Entry {
                             key,
+                            display,
                             span,
                             is_static: m.is_static,
                             classify: None,
@@ -132,9 +139,10 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
                     }
                 }
                 MethodKind::Get | MethodKind::Set => {
-                    if let Some((key, span)) = member_key(ctx, &m.key, m.computed) {
+                    if let Some((key, display, span)) = member_key(ctx, &m.key, m.computed) {
                         entries.push(Entry {
                             key,
+                            display,
                             span,
                             is_static: m.is_static,
                             classify: Some(MemberKind::Accessor),
@@ -144,7 +152,7 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
                 }
             },
             ClassMember::PropertyDefinition(p) => {
-                if let Some((key, span)) = member_key(ctx, &p.key, p.computed) {
+                if let Some((key, display, span)) = member_key(ctx, &p.key, p.computed) {
                     let classify = if p.accessor {
                         MemberKind::Accessor
                     } else {
@@ -152,6 +160,7 @@ fn class_entries(ctx: &MemberCtx<'_>, members: &[ClassMember<'_>]) -> Vec<Entry>
                     };
                     entries.push(Entry {
                         key,
+                        display,
                         span,
                         is_static: p.is_static,
                         classify: Some(classify),
@@ -172,9 +181,10 @@ fn type_element_entries(ctx: &MemberCtx<'_>, members: &[TSTypeElement<'_>]) -> V
     for member in members {
         match member {
             TSTypeElement::PropertySignature(p) => {
-                if let Some((key, span)) = member_key(ctx, &p.key, p.computed) {
+                if let Some((key, display, span)) = member_key(ctx, &p.key, p.computed) {
                     entries.push(Entry {
                         key,
+                        display,
                         span,
                         is_static: false,
                         classify: Some(MemberKind::Property),
@@ -183,7 +193,7 @@ fn type_element_entries(ctx: &MemberCtx<'_>, members: &[TSTypeElement<'_>]) -> V
                 }
             }
             TSTypeElement::MethodSignature(m) => {
-                if let Some((key, span)) = member_key(ctx, &m.key, m.computed) {
+                if let Some((key, display, span)) = member_key(ctx, &m.key, m.computed) {
                     let classify = match m.kind {
                         MethodKind::Get | MethodKind::Set => Some(MemberKind::Accessor),
                         // A plain method signature is unclassified but still batched.
@@ -191,6 +201,7 @@ fn type_element_entries(ctx: &MemberCtx<'_>, members: &[TSTypeElement<'_>]) -> V
                     };
                     entries.push(Entry {
                         key,
+                        display,
                         span,
                         is_static: false,
                         classify,
@@ -260,7 +271,7 @@ fn fire_batch(
             entry.key == key && entry.is_static == is_static
         };
         if matches {
-            out.push(make_2300(ctx.file, entry.span, &entry.key));
+            out.push(make_2300(ctx.file, entry.span, &entry.display));
         }
     }
 }
@@ -309,14 +320,23 @@ pub(super) fn check_type_parameters(
     }
 }
 
-/// Derive a member's canonical key string and the span its diagnostic points at
-/// (the `member.Name()` node). Returns `None` for a member with no stable key — a
-/// dynamic (non-literal) computed name, or a non-name key.
-fn member_key(ctx: &MemberCtx<'_>, key: &Expression<'_>, computed: bool) -> Option<(String, Span)> {
+/// Derive a member's `(grouping key, message display, name-node span)`. Returns
+/// `None` for a member with no stable key — a dynamic (non-literal) computed name,
+/// or a non-name key.
+///
+/// The **grouping key** is the canonical/decoded value (so `[0]` and `['0']`
+/// collide); the **display** is what tsgo's `symbolToString` prints — equal to the
+/// key for a plain name, but the raw bracket-inclusive `[ … ]` source for a
+/// computed key (`'["a"]'`, not `'a'`).
+fn member_key(
+    ctx: &MemberCtx<'_>,
+    key: &Expression<'_>,
+    computed: bool,
+) -> Option<(String, String, Span)> {
     if computed {
         // A computed name is a stable key only for a string/number literal; the
         // diagnostic points at the whole `[ … ]` name node, so the span runs from
-        // the `[` to just past the `]`.
+        // the `[` to just past the `]` and the display is that raw source.
         return match key {
             Expression::Literal(lit)
                 if matches!(lit.value, LiteralValue::String(_) | LiteralValue::Number(_)) =>
@@ -324,23 +344,25 @@ fn member_key(ctx: &MemberCtx<'_>, key: &Expression<'_>, computed: bool) -> Opti
                 let k = literal_key(ctx, lit)?;
                 let start = bracket_start(ctx.source, lit.span.start);
                 let end = bracket_end(ctx.source, lit.span.end);
-                Some((k, Span::new(start, end)))
+                let span = Span::new(start, end);
+                Some((k, span.extract(ctx.source).to_string(), span))
             }
             // A dynamic computed name is late-bound (bucket G, deferred) — skip.
             _ => None,
         };
     }
     match key {
-        Expression::Identifier(id) => Some((
-            id.name(ctx.source, ctx.interner).to_string(),
-            id.name_span(),
-        )),
-        Expression::Literal(lit) => literal_key(ctx, lit).map(|k| (k, lit.span)),
+        Expression::Identifier(id) => {
+            let name = id.name(ctx.source, ctx.interner).to_string();
+            Some((name.clone(), name, id.name_span()))
+        }
+        Expression::Literal(lit) => literal_key(ctx, lit).map(|k| (k.clone(), k, lit.span)),
         Expression::PrivateIdentifier(pid) => {
             // A `#name` — key it with the `#` so it never collides with the public
             // `name`; the diagnostic covers the whole `#name` node.
             let name = pid.name(ctx.source, ctx.interner);
-            Some((format!("#{name}"), pid.span))
+            let keyed = format!("#{name}");
+            Some((keyed.clone(), keyed, pid.span))
         }
         _ => None,
     }
@@ -380,38 +402,6 @@ fn literal_key(ctx: &MemberCtx<'_>, lit: &Literal<'_>) -> Option<String> {
         LiteralValue::BigInt => Some(lit.span.extract(ctx.source).to_string()),
         LiteralValue::Boolean(_) | LiteralValue::Null => None,
     }
-}
-
-/// The byte offset of the `[` opening a computed key, scanning back from the key
-/// expression's start (a plain byte loop — `[` is ASCII). Falls back to the
-/// expression start if no `[` precedes it (never for a well-formed computed name).
-fn bracket_start(source: &str, expr_start: u32) -> u32 {
-    let bytes = source.as_bytes();
-    let mut i = expr_start as usize;
-    while i > 0 {
-        i -= 1;
-        if bytes[i] == b'[' {
-            return i as u32;
-        }
-    }
-    expr_start
-}
-
-/// The byte offset just past the `]` closing a computed key, scanning forward from
-/// the key expression's end (a plain byte loop — `]` is ASCII). Mirrors
-/// [`bracket_start`] so the diagnostic spans the whole `[ … ]` name node (as tsgo
-/// does). Falls back to the expression end if no `]` follows (never for a
-/// well-formed computed name).
-fn bracket_end(source: &str, expr_end: u32) -> u32 {
-    let bytes = source.as_bytes();
-    let mut i = expr_end as usize;
-    while i < bytes.len() {
-        if bytes[i] == b']' {
-            return i as u32 + 1;
-        }
-        i += 1;
-    }
-    expr_end
 }
 
 /// ECMA-262 `Number::toString` for a finite property-name value — the string tsgo
