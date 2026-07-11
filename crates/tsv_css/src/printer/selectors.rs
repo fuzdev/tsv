@@ -116,12 +116,24 @@ impl<'a> Printer<'a> {
     /// parentheses — `@scope (root) to (limit)`. The caller writes the `(`/`)`; this
     /// renders the inner list, breaking each selector onto its own indented line
     /// when it exceeds the print width (never the always-break top-level rule).
-    pub(super) fn print_selector_list_nested(&mut self, list: &internal::SelectorList<'_>) {
+    ///
+    /// `paren_span` is the clause's full `(…)` span (end one past `)`, the pseudo-arg
+    /// convention). Comments leading or trailing the selector list but inside the parens
+    /// (`@scope (/* c */ .a)`) sit outside `list.span`, so they interleave here via
+    /// `wrap_args_gap_comments` — the same wrapping `:is()`'s argument gaps use.
+    pub(super) fn print_selector_list_nested(
+        &mut self,
+        list: &internal::SelectorList<'_>,
+        paren_span: Option<Span>,
+    ) {
         if list.selectors.is_empty() {
             return;
         }
         let d = self.d();
-        let inner = self.build_nested_selector_list_doc(list);
+        let mut inner = self.build_nested_selector_list_doc(list);
+        if let Some(paren_span) = paren_span {
+            inner = self.wrap_args_gap_comments(inner, paren_span, list.span);
+        }
         // The caller already wrote `(`; emit `softline inner` indented, then a
         // trailing softline so the closing `)` (written by the caller) lands at the
         // base level when broken. Reserve `) {`-ish via a 3-col suffix.
