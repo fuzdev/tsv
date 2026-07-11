@@ -49,6 +49,7 @@
 mod binder;
 mod check;
 mod hash;
+mod options;
 mod program;
 mod span_scan;
 
@@ -61,9 +62,11 @@ pub use binder::{
     BoundFile, FileFacts, ModuleNess, NODE_FLAGS_UNREACHABLE, NodeKind, bind_file, module_ness,
 };
 pub use check::check_file_members;
+pub use check::unreachable::ModuleInstanceState;
 pub use diag::{Category, Diagnostic};
 pub use ids::{FileId, FlowNodeId, NodeId};
 pub use merge::{LibBase, LibFile};
+pub use options::{CheckOptions, Tristate};
 pub use program::{
     BoundProgram, CheckResult, FileReport, ParseReport, ParsedFacts, SourceUnit, bind_lib,
     bind_program, check_bound, check_program, check_program_with_lib,

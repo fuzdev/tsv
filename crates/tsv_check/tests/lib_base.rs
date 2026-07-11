@@ -7,7 +7,7 @@
 //! the same bind path the harness uses.
 
 use bumpalo::Bump;
-use tsv_check::{FileId, LibBase, SourceUnit, bind_lib, check_program_with_lib};
+use tsv_check::{CheckOptions, FileId, LibBase, SourceUnit, bind_lib, check_program_with_lib};
 
 /// `var eval;` conflicts with the lib's `declare function eval` — the
 /// `variableDeclarationInStrictMode1` shape, end to end.
@@ -19,7 +19,7 @@ fn var_eval_conflicts_with_lib_function_eval() {
 
     let arena = Bump::new();
     let units = [SourceUnit::new("t.ts", "\"use strict\";\nvar eval;")];
-    let result = check_program_with_lib(&units, Some(&base), &arena);
+    let result = check_program_with_lib(&units, Some(&base), &arena, &CheckOptions::default());
 
     // The observable primary is on the test file (FileId 0); the lib-file primary
     // (FileId 1 = lib.es5.d.ts) is present too but is what the baseline masks.
@@ -61,7 +61,7 @@ fn class_promise_conflicts_across_lib_files() {
         "promiseDefinitionTest.ts",
         "class Promise<T> {}",
     )];
-    let result = check_program_with_lib(&units, Some(&base), &arena);
+    let result = check_program_with_lib(&units, Some(&base), &arena, &CheckOptions::default());
 
     let primary = result
         .diagnostics
@@ -94,7 +94,7 @@ fn interface_augmentation_of_lib_is_silent() {
         "t.ts",
         "interface Array<T> { extra(): void; }",
     )];
-    let result = check_program_with_lib(&units, Some(&base), &arena);
+    let result = check_program_with_lib(&units, Some(&base), &arena, &CheckOptions::default());
     assert!(
         result.diagnostics.is_empty(),
         "a legal interface merge must be silent"
@@ -107,6 +107,6 @@ fn interface_augmentation_of_lib_is_silent() {
 fn no_lib_base_no_conflict() {
     let arena = Bump::new();
     let units = [SourceUnit::new("t.ts", "var eval;")];
-    let result = check_program_with_lib(&units, None, &arena);
+    let result = check_program_with_lib(&units, None, &arena, &CheckOptions::default());
     assert!(result.diagnostics.is_empty());
 }

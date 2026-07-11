@@ -35,9 +35,11 @@
 
 use crate::binder::flow::{FlowProduct, build_flow};
 use crate::binder::{ModuleNess, bind_file, module_ness};
+use crate::check::unreachable::{UnreachableCandidates, build_candidates};
 use crate::diag::{Diagnostic, sort_and_deduplicate};
 use crate::ids::FileId;
 use crate::merge::{FileMerge, LibBase, LibFile, merge_program};
+use crate::options::CheckOptions;
 use bumpalo::Bump;
 use tsv_ts::ast::Program;
 use tsv_ts::{Goal, parse_with_goal};
@@ -58,12 +60,17 @@ impl<'a> SourceUnit<'a> {
     }
 }
 
-/// The result of checking a program: its (sorted, deduped) diagnostics, a
-/// per-unit report, and whether any unit parse-rejected.
+/// The result of checking a program: its (sorted, deduped) diagnostics, its
+/// suggestion-category diagnostics (a separate sink), a per-unit report, and
+/// whether any unit parse-rejected.
 pub struct CheckResult {
     /// Diagnostics in canonical sorted order — the unconditional concat of every
     /// unit that parsed (a rejected unit contributes none, having no AST).
     pub diagnostics: Vec<Diagnostic>,
+    /// Suggestion-category diagnostics (the default-`Unknown` reachability
+    /// shims), kept **out of** [`CheckResult::diagnostics`] so the conformance
+    /// gate's error/expect-clean channel never sees them.
+    pub suggestions: Vec<Diagnostic>,
     /// Per-unit parse/bind report, in input order.
     pub files: Vec<FileReport>,
     /// Whether any unit parse-rejected (a reported fact; it does **not** suppress
@@ -129,10 +136,14 @@ struct BoundUnit {
     bind_diagnostics: Vec<Diagnostic>,
     /// The merge product, `None` when the unit parse-rejected.
     merge: Option<FileMerge>,
-    /// The per-file flow product, carried **dark** — nothing consumes it until
-    /// F3; F1a builds it and `--dump-flow` renders it. `None` when the unit
-    /// parse-rejected (no AST to walk).
+    /// The per-file flow product, carried **dark** — `--dump-flow` renders it and
+    /// F3's candidate table is built from it. `None` when the unit parse-rejected
+    /// (no AST to walk).
     flow: Option<FlowProduct>,
+    /// The variant-independent unreachable-code / unused-label candidate table
+    /// (F3), built once at bind time and filtered per variant in [`check_bound`].
+    /// `None` when the unit parse-rejected.
+    candidates: Option<UnreachableCandidates>,
 }
 
 impl BoundProgram {
@@ -181,6 +192,11 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
                 // and F0's node identity. Borrows `&bound`, so it runs before the
                 // bind product's fields move out below. Carried dark in the unit.
                 let flow = build_flow(&program, unit.source, &bound);
+                // F3: the unreachable-code / unused-label candidate table, built
+                // once here (the flag bit, run grouping, and const-enum/module
+                // classification are all syntactic). Filtered per variant in
+                // `check_bound`, keeping `BoundProgram` variant-independent.
+                let candidates = build_candidates(&program, unit.source, &bound, &flow);
                 // Per file: bind diagnostics then check diagnostics — the
                 // getBindAndCheckDiagnostics concat. The check pass is a standalone
                 // syntactic walk over the program (it needs no `BoundFile`); its
@@ -201,6 +217,7 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
                     bind_diagnostics,
                     merge: Some(bound.merge),
                     flow: Some(flow),
+                    candidates: Some(candidates),
                 });
             }
             Err(message) => {
@@ -212,6 +229,7 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
                     bind_diagnostics: Vec::new(),
                     merge: None,
                     flow: None,
+                    candidates: None,
                 });
             }
         }
@@ -224,16 +242,31 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
     }
 }
 
-/// Merge a [`BoundProgram`] against an optional [`LibBase`] and return the final
-/// [`CheckResult`] (canonically sorted + deduped). The bind diagnostics are the
-/// variant-independent concat (the CompileFilesEx parity path); the merge phase
-/// consults the lib base, so the lib file names append after the program units in
-/// the diagnostic path space.
+/// Merge a [`BoundProgram`] against an optional [`LibBase`] under `options` and
+/// return the final [`CheckResult`] (canonically sorted + deduped). The bind
+/// diagnostics are the variant-independent concat (the CompileFilesEx parity
+/// path); the merge phase consults the lib base, so the lib file names append
+/// after the program units in the diagnostic path space. `options` drives the
+/// per-variant reachability shims (TS7027/7028) — the only option-dependent
+/// output, routed to `diagnostics` (error) or the separate `suggestions` sink.
+// `options` is threaded by reference (uniform with `lib: Option<&LibBase>` and
+// future-proof if `CheckOptions` grows) though it is currently `Copy`-small.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 #[must_use]
-pub fn check_bound(bound: &BoundProgram, lib: Option<&LibBase>) -> CheckResult {
+pub fn check_bound(
+    bound: &BoundProgram,
+    lib: Option<&LibBase>,
+    options: &CheckOptions,
+) -> CheckResult {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut suggestions: Vec<Diagnostic> = Vec::new();
     for unit in &bound.units {
         diagnostics.extend(unit.bind_diagnostics.iter().cloned());
+        // F3: filter the unit's variant-independent candidate table under
+        // `options` — errors into `diagnostics`, suggestions into their own sink.
+        if let Some(candidates) = &unit.candidates {
+            candidates.emit(unit.file, options, &mut diagnostics, &mut suggestions);
+        }
     }
     // Only test-unit merges are cloned here (lib globals live in the base, not in
     // `files`), so this stays cheap even run per-variant.
@@ -248,6 +281,7 @@ pub fn check_bound(bound: &BoundProgram, lib: Option<&LibBase>) -> CheckResult {
         paths.extend(base.lib_files.iter().cloned());
     }
     sort_and_deduplicate(&mut diagnostics, &paths);
+    sort_and_deduplicate(&mut suggestions, &paths);
 
     let files = bound
         .units
@@ -260,6 +294,7 @@ pub fn check_bound(bound: &BoundProgram, lib: Option<&LibBase>) -> CheckResult {
         .collect();
     CheckResult {
         diagnostics,
+        suggestions,
         files,
         parse_rejected: bound.parse_rejected,
     }
@@ -267,19 +302,26 @@ pub fn check_bound(bound: &BoundProgram, lib: Option<&LibBase>) -> CheckResult {
 
 /// Check a program with no lib base — parse every unit via the goal rule, bind,
 /// merge, and return canonically sorted diagnostics.
+#[allow(clippy::trivially_copy_pass_by_ref)] // `&CheckOptions` — see `check_bound`
 #[must_use]
-pub fn check_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> CheckResult {
-    check_bound(&bind_program(units, arena), None)
+pub fn check_program<'a>(
+    units: &[SourceUnit<'a>],
+    arena: &'a Bump,
+    options: &CheckOptions,
+) -> CheckResult {
+    check_bound(&bind_program(units, arena), None, options)
 }
 
 /// Check a program against an optional lib base (the lib-aware entry point).
+#[allow(clippy::trivially_copy_pass_by_ref)] // `&CheckOptions` — see `check_bound`
 #[must_use]
 pub fn check_program_with_lib<'a>(
     units: &[SourceUnit<'a>],
     lib: Option<&LibBase>,
     arena: &'a Bump,
+    options: &CheckOptions,
 ) -> CheckResult {
-    check_bound(&bind_program(units, arena), lib)
+    check_bound(&bind_program(units, arena), lib, options)
 }
 
 /// Parse + bind one lib `.d.ts` file, returning its owned global-eligible product
@@ -332,7 +374,11 @@ mod tests {
 
     fn check(source: &str) -> CheckResult {
         let arena = Bump::new();
-        check_program(&[SourceUnit::new("test.ts", source)], &arena)
+        check_program(
+            &[SourceUnit::new("test.ts", source)],
+            &arena,
+            &CheckOptions::default(),
+        )
     }
 
     #[test]
@@ -389,6 +435,7 @@ mod tests {
                 SourceUnit::new("b.ts", "const = ;"),
             ],
             &arena,
+            &CheckOptions::default(),
         );
         assert!(result.parse_rejected);
         // a.ts's two TS2451 survive despite b.ts rejecting.

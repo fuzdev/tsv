@@ -22,6 +22,7 @@
 //       checks this walk ports piecemeal)
 
 mod duplicate_members;
+pub(crate) mod unreachable;
 
 use crate::diag::Diagnostic;
 use crate::ids::FileId;

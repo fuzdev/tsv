@@ -2119,6 +2119,7 @@ mod tests {
         let result = crate::program::check_program(
             &[crate::program::SourceUnit::new("t.ts", source)],
             &arena,
+            &crate::options::CheckOptions::default(),
         );
         result.diagnostics.iter().map(|d| d.code).collect()
     }

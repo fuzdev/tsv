@@ -51,8 +51,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::time::Instant;
 use tsv_check::{
-    Diagnostic, FileId, ParseReport, SourceUnit, bind_file, bind_program, build_flow, check_bound,
-    check_program, render_flow_dot,
+    CheckOptions, Diagnostic, FileId, ParseReport, SourceUnit, bind_file, bind_program, build_flow,
+    check_bound, check_program, render_flow_dot,
 };
 use tsv_lang::{LocationMapper, LocationTracker};
 
@@ -523,7 +523,7 @@ fn probe_crash_exclusion(test: &CorpusTest) -> bool {
     let prev = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let panicked = catch_unwind(AssertUnwindSafe(|| {
-        let _ = check_program(&source_units, &arena);
+        let _ = check_program(&source_units, &arena, &CheckOptions::default());
     }))
     .is_err();
     std::panic::set_hook(prev);
@@ -547,6 +547,24 @@ fn panic_payload_message(payload: &(dyn std::any::Any + Send)) -> String {
 /// variant-independent; only the merge (and thus the lib-conflict family) varies by
 /// the resolved lib set, so a variant with a Promise/Symbol/… global conflicts at
 /// one target and is clean at another.
+/// Build `tsv_check`'s options from a variant's resolved directive config, mapping
+/// the harness tri-state to the checker's. `preserveConstEnums` feeds
+/// `ShouldPreserveConstEnums` (the `isolatedModules` contribution is not modeled —
+/// a rare-in-dead-code residual that can only under-report).
+fn check_options_for(config: &BTreeMap<String, String>) -> CheckOptions {
+    use crate::tsc_conformance::options_meta::{Tristate as OptTri, resolve_bool};
+    let map = |t: OptTri| match t {
+        OptTri::Unset => tsv_check::Tristate::Unknown,
+        OptTri::False => tsv_check::Tristate::False,
+        OptTri::True => tsv_check::Tristate::True,
+    };
+    CheckOptions {
+        allow_unreachable_code: map(resolve_bool(config, "allowunreachablecode")),
+        allow_unused_labels: map(resolve_bool(config, "allowunusedlabels")),
+        preserve_const_enums: resolve_bool(config, "preserveconstenums") == OptTri::True,
+    }
+}
+
 fn grade_test(
     test: &CorpusTest,
     unit: &Unit,
@@ -622,9 +640,10 @@ fn grade_test(
                 // lib resolution (parse+bind of each `.d.ts`) is the only remaining
                 // panic source past the initial bind, so contain it per variant: a
                 // future lib parse panic is recorded, not sweep-fatal.
+                let check_opts = check_options_for(&variant.config);
                 let checked = catch_unwind(AssertUnwindSafe(|| {
                     let base = resolver.base_for(&variant.config);
-                    let result = check_bound(&bound, base.as_deref());
+                    let result = check_bound(&bound, base.as_deref(), &check_opts);
                     (base, result)
                 }));
                 let (base, result) = match checked {
@@ -1536,7 +1555,7 @@ pub fn check_one(
     let mut resolver = LibResolver::new(checkout);
     let base = resolver.base_for(&variant.config);
     let lib_files = base.as_ref().map_or(&[][..], |b| b.lib_files.as_slice());
-    let result = check_bound(&bound, base.as_deref());
+    let result = check_bound(&bound, base.as_deref(), &check_options_for(&variant.config));
 
     // Resolve each diagnostic's FileId to a display line: a program unit carries its
     // (line, col); a lib file carries the lib name with a masked location.

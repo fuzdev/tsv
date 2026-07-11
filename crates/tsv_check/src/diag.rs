@@ -83,6 +83,29 @@ impl Diagnostic {
             related: Vec::new(),
         }
     }
+
+    /// Build a bare suggestion diagnostic — the same shape as [`Diagnostic::error`]
+    /// but [`Category::Suggestion`]. Suggestions are routed to a separate sink the
+    /// conformance gate's error channel never inspects (the default reachability
+    /// diagnostic when its option is unset).
+    #[must_use]
+    pub fn suggestion(
+        file: FileId,
+        span: Span,
+        code: u32,
+        message: impl Into<String>,
+    ) -> Diagnostic {
+        Diagnostic {
+            file: Some(file),
+            span,
+            code,
+            category: Category::Suggestion,
+            message: message.into(),
+            args: Vec::new(),
+            chain: Vec::new(),
+            related: Vec::new(),
+        }
+    }
 }
 
 /// The diagnostic's sort path: the file's name, or `""` for a global one.
