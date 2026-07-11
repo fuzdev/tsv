@@ -174,6 +174,7 @@ Foundation for all parsing.
 - `await expr` (in async)
 - `yield expr` (in generators)
 - `yield* expr` (delegation)
+- Operand parenthesization preserved where dropping parens would merge tokens — a same-sign `+`/`-` operand stays wrapped (`+(+x)` not `++x`, `-(--x)` not `---x`, `+(++x)` not `+++x`)
 
 ### Update Expressions
 
@@ -181,6 +182,7 @@ Foundation for all parsing.
 - Prefix decrement (`--x`)
 - Postfix increment (`x++`)
 - Postfix decrement (`x--`)
+- Operand parenthesization preserved for a type-assertion operand — `(a as T)++` not `a as T++`
 
 ### Binary Operators
 
