@@ -574,13 +574,17 @@ impl SoaWalk {
         self.spans.push(span);
         self.subtree_end.push(id); // provisional (a leaf owns only itself)
         self.node_flags.push(0); // F0 mints the column zeroed; F1 sets it
-        // Each node is added exactly once by the pre-order walk, so a prior entry
-        // for this `(address, kind)` key is a genuine same-kind offset-0 collision
-        // (the "no same-kind collisions exist" claim in `require_node_id`, made a
-        // corpus-checked invariant — `tsc_conformance run` is a debug build).
-        // Compiles out of release.
+        // The insert must run in ALL profiles — the flow walk's strict
+        // `require_node_id` reads this map at runtime. Each node is added exactly
+        // once by the pre-order walk, so a prior entry for this `(address, kind)`
+        // key is a genuine same-kind offset-0 collision (the "no same-kind
+        // collisions exist" claim in `require_node_id`, made a corpus-checked
+        // invariant — `tsc_conformance run` is a debug build). Only that
+        // collision *assertion* compiles out of release; the insert side effect
+        // is hoisted out of the assert condition so it always happens.
+        let prev = self.address_map.insert((address, kind), id);
         debug_assert!(
-            self.address_map.insert((address, kind), id).is_none(),
+            prev.is_none(),
             "same-kind address collision at {address:#x} / {kind:?}"
         );
         id
