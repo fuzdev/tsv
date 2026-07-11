@@ -812,7 +812,7 @@ impl<'a> SymbolBinder<'a> {
             Statement::ExportDefaultDeclaration(e) => self.bind_export_default(e, skip_symbol),
             // Control flow: descend for nested bindings + block scopes.
             Statement::BlockStatement(b) => {
-                self.with_block_scope(|bd| bd.bind_statement_list(b.body, true))
+                self.with_block_scope(|bd| bd.bind_statement_list(b.body, true));
             }
             Statement::IfStatement(s) => {
                 self.visit_expression(&s.test);
@@ -1756,7 +1756,7 @@ impl<'a> SymbolBinder<'a> {
                     b.bind_params(a.params);
                     match &a.body {
                         tsv_ts::ast::internal::ArrowFunctionBody::Expression(e) => {
-                            b.visit_expression(e)
+                            b.visit_expression(e);
                         }
                         tsv_ts::ast::internal::ArrowFunctionBody::BlockStatement(block) => {
                             b.bind_statement_list(block.body, true);
