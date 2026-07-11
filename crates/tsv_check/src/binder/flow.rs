@@ -12,12 +12,25 @@
 //! `bindCondition` machinery — `&&`/`||`/`??`/`?:`/`!`/parenthesized + the
 //! `hasFlowEffects` save/restore family), **`if`/`else`**, the five loops
 //! (**`while`**, **`do…while`**, **`for`**, **`for-in`**, **`for-of`**), and
-//! **unlabeled `break`/`continue`**. A `switch` gets a local post-switch break
-//! target (so a contained `break` resolves locally) but its clause topology,
-//! fallthrough and exhaustiveness stay linear placeholders. Still **F2**: switch
-//! clause topology, try/finally exception edges, labeled-statement resolution,
-//! IIFE inlining, and parameter-default forks (all marked `// F2:`). Flow stays
-//! **dark** — nothing consumes it until F3, so this slice emits no diagnostics.
+//! **unlabeled `break`/`continue`**.
+//!
+//! **F2a scope: switch-statement flow topology.** On top of F1b's local
+//! post-switch break target this slice builds the real clause topology
+//! (`bindSwitchStatement` / `bindCaseBlock` / `bindCaseOrDefaultClause`): every
+//! clause's `preCase` label is fed **from the switch head unconditionally**
+//! (`preSwitchCaseFlow`) in addition to the prior clause's fallthrough edge, so a
+//! clause reached only after a prior `break`/`return` stays reachable — F1b's
+//! linear stub wrongly marked it `Unreachable`. A narrowing switch
+//! (`switch (true)` or a narrowing discriminant) additionally mints a
+//! `SwitchClause` flow node per clause carrying the matched half-open
+//! `[start, end)` clause range, and a switch with no `default` clause adds a
+//! `(0, 0)` "no clause matched" `SwitchClause` exhaustiveness sentinel to the
+//! post-switch label. Post-exhaustive-switch reachability (code after an
+//! exhaustive no-`default` switch) is type-dependent
+//! (`isExhaustiveSwitchStatement`) and stays deferred. Still **F2b**: try/finally
+//! exception edges, labeled-statement resolution, IIFE inlining, and
+//! parameter-default forks (all marked `// F2:`). Flow stays **dark** — nothing
+//! consumes it until F3, so this slice emits no diagnostics.
 //!
 //! **`isTopLevelLogicalExpression` without parent pointers.** tsgo's
 //! `bindBinaryExpressionFlow` walks the parent chain to decide whether a logical
@@ -79,15 +92,17 @@ use tsv_ts::ast::internal::{
     Decorator, DoWhileStatement, Expression, ForInOfLeft, ForInit, ForStatement,
     FunctionDeclaration, FunctionExpression, Identifier, IfStatement, LiteralValue,
     MethodDefinition, MethodKind, ObjectPatternProperty, ObjectProperty, Property, Statement,
-    SwitchStatement, TSModuleDeclarationBody, UnaryOperator, VariableDeclarator, WhileStatement,
+    SwitchCase, SwitchStatement, TSModuleDeclarationBody, UnaryOperator, VariableDeclarator,
+    WhileStatement,
 };
 
 // --- FlowFlags -------------------------------------------------------------
 
 /// The flow-node flag bits — a `u16` newtype over tsgo's 13 `FlowFlags`
 /// (flow.go:5-23; the max bit is `Shared`, `1 << 12`, so a `u16` fits). All 13
-/// bits are defined for shape; the F2-only bits (`SwitchClause`,
-/// `ArrayMutation`, `ReduceLabel`) are never *set* in F1a.
+/// bits are defined for shape; `SwitchClause` is set by the switch flow builder
+/// (F2a), while the remaining F2 bits (`ArrayMutation`, `ReduceLabel`) are never
+/// *set* yet.
 ///
 /// # tsgo
 /// `internal/ast/flow.go` `FlowFlags`.
@@ -109,7 +124,7 @@ impl FlowFlags {
     pub const TRUE_CONDITION: FlowFlags = FlowFlags(1 << 5);
     /// Condition known to be false.
     pub const FALSE_CONDITION: FlowFlags = FlowFlags(1 << 6);
-    /// Switch-statement clause (F2 — never set in F1a).
+    /// Switch-statement clause (set by the switch flow builder, F2a).
     pub const SWITCH_CLAUSE: FlowFlags = FlowFlags(1 << 7);
     /// Potential array mutation (F2 — never set in F1a).
     pub const ARRAY_MUTATION: FlowFlags = FlowFlags(1 << 8);
@@ -163,10 +178,11 @@ impl FlowFlags {
 
 // --- F2 payload shapes (defined for the SoA shape; not populated in F1a) ----
 
-/// A switch-clause payload (F2). Defined for the settled [`FlowGraph`] shape;
-/// populated by the switch flow builder in a later slice.
+/// A switch-clause payload: the switch it belongs to and the half-open
+/// `[clause_start, clause_end)` clause range it matched. Written by the switch
+/// flow builder (binder.go:2087-2108) and read back through
+/// [`FlowGraph::switch_clause_data`].
 #[derive(Clone, Copy, Debug)]
-#[allow(dead_code)] // F2: written by the switch flow builder (binder.go:2087-2108)
 pub struct FlowSwitchClause {
     /// The switch statement node.
     pub switch: NodeId,
@@ -209,8 +225,8 @@ pub struct FlowGraph {
     antecedent: Vec<u32>,
     /// Length-prefixed antecedent runs for labels (`[len, e0, e1, …]`).
     pool: Vec<u32>,
-    /// F2 — switch-clause payloads (empty in F1a; kept for shape).
-    #[allow(dead_code)] // F2: switch flow
+    /// Switch-clause payloads, addressed by a `SwitchClause` node's 1-based
+    /// `subject` slot (read via [`FlowGraph::switch_clause_data`]).
     switch_payloads: Vec<FlowSwitchClause>,
     /// F2 — reduce-label payloads (empty in F1a; kept for shape).
     #[allow(dead_code)] // F2: try/finally flow
@@ -233,10 +249,28 @@ impl FlowGraph {
     }
 
     /// The subject `NodeId` of a flow node, if any (labels have none).
+    ///
+    /// **Not** valid on a `SwitchClause` node: there the `subject` slot holds a
+    /// 1-based payload index, not a raw `NodeId` — use
+    /// [`FlowGraph::switch_clause_data`] instead.
     #[inline]
     #[must_use]
     pub fn subject(&self, id: FlowNodeId) -> Option<NodeId> {
         NodeId::from_raw_opt(self.subject[id.index()])
+    }
+
+    /// The switch-clause payload of a `SwitchClause` flow node.
+    ///
+    /// A `SwitchClause` node's `subject` slot stores a **1-based index** into
+    /// `switch_payloads` (the same convention the label pool uses), not a
+    /// [`NodeId`], so [`FlowGraph::subject`] must not be called on it — it would
+    /// mis-decode the index as a node id. This is the only correct reader;
+    /// callers gate on `flags(id).contains(SWITCH_CLAUSE)`.
+    #[must_use]
+    pub fn switch_clause_data(&self, id: FlowNodeId) -> &FlowSwitchClause {
+        debug_assert!(self.flags(id).contains(FlowFlags::SWITCH_CLAUSE));
+        let index = self.subject[id.index()] as usize; // 1-based
+        &self.switch_payloads[index - 1]
     }
 
     /// The antecedents of a flow node, in append order.
@@ -296,7 +330,9 @@ pub struct FlowProduct {
     /// (binder.go:1575), sorted by `NodeId`. Every other tsgo `ReturnFlowNode`
     /// write/read is dead plumbing and is not ported.
     pub return_flow: Vec<(NodeId, FlowNodeId)>,
-    /// F2 — case-clause fallthrough anchors (empty in F1a; kept for shape).
+    /// Case-clause fallthrough anchors: the reachable exit flow of each non-last
+    /// clause (tsgo's `clause.AsCaseOrDefaultClause().FallthroughFlowNode`,
+    /// binder.go:2121), sorted by `NodeId`.
     pub fallthrough_flow: Vec<(NodeId, FlowNodeId)>,
     /// Construction counters.
     pub stats: FlowStats,
@@ -319,6 +355,16 @@ impl FlowProduct {
             .binary_search_by_key(&node, |&(n, _)| n)
             .ok()
             .map(|i| self.return_flow[i].1)
+    }
+
+    /// The `fallthrough_flow` anchor for a case clause, if any (the reachable
+    /// exit flow of a non-last clause).
+    #[must_use]
+    pub fn fallthrough_flow_of(&self, node: NodeId) -> Option<FlowNodeId> {
+        self.fallthrough_flow
+            .binary_search_by_key(&node, |&(n, _)| n)
+            .ok()
+            .map(|i| self.fallthrough_flow[i].1)
     }
 }
 
@@ -372,6 +418,12 @@ struct FlowBuilder<'a> {
     node_flags: Vec<u8>,
     end_flow: Vec<(NodeId, FlowNodeId)>,
     return_flow: Vec<(NodeId, FlowNodeId)>,
+    /// Case-clause fallthrough anchors (`FallthroughFlowNode`, binder.go:2121),
+    /// sorted by `NodeId` in `finish()` like `end_flow`/`return_flow`.
+    fallthrough_flow: Vec<(NodeId, FlowNodeId)>,
+    /// Switch-clause payloads (`createFlowSwitchClause`); a `SwitchClause` node's
+    /// `subject` slot is a 1-based index into this.
+    switch_payloads: Vec<FlowSwitchClause>,
 
     // construction state (the F1b subset of the container-boundary set)
     current_flow: FlowNodeId,
@@ -384,6 +436,11 @@ struct FlowBuilder<'a> {
     /// loop/switch binders, `None` outside a loop/switch, reset at a container.
     current_break_target: Option<FlowNodeId>,
     current_continue_target: Option<FlowNodeId>,
+    /// `preSwitchCaseFlow` (binder.go:67) — the switch-head flow every clause
+    /// forks from. Set by `bind_switch_statement` after the discriminant is
+    /// bound, saved/restored there (not in the container set — it is only live
+    /// while binding a switch's case block), `None` otherwise.
+    pre_switch_case_flow: Option<FlowNodeId>,
     /// The condition-branch targets (binder.go:1790-1793). Set only inside
     /// `do_with_conditional_branches` and swapped by the `!`-prefix; their
     /// `Some`-ness is the pointer-free `isTopLevelLogicalExpression` signal (see
@@ -421,12 +478,15 @@ impl<'a> FlowBuilder<'a> {
             node_flags: bound.node_flags.clone(),
             end_flow: Vec::new(),
             return_flow: Vec::new(),
+            fallthrough_flow: Vec::new(),
+            switch_payloads: Vec::new(),
             current_flow: FlowNodeId::UNREACHABLE,
             unreachable_flow: FlowNodeId::UNREACHABLE,
             current_return_target: None,
             current_exception_target: None,
             current_break_target: None,
             current_continue_target: None,
+            pre_switch_case_flow: None,
             current_true_target: None,
             current_false_target: None,
             has_explicit_return: false,
@@ -468,22 +528,24 @@ impl<'a> FlowBuilder<'a> {
         }
         let mut end_flow = self.end_flow;
         let mut return_flow = self.return_flow;
+        let mut fallthrough_flow = self.fallthrough_flow;
         end_flow.sort_unstable_by_key(|&(n, _)| n);
         return_flow.sort_unstable_by_key(|&(n, _)| n);
+        fallthrough_flow.sort_unstable_by_key(|&(n, _)| n);
         FlowProduct {
             graph: FlowGraph {
                 flags: self.flags,
                 subject: self.subject,
                 antecedent: self.antecedent,
                 pool: self.pool,
-                switch_payloads: Vec::new(),
+                switch_payloads: self.switch_payloads,
                 reduce_payloads: Vec::new(),
             },
             flow_of_node: self.flow_of_node,
             node_flags: self.node_flags,
             end_flow,
             return_flow,
-            fallthrough_flow: Vec::new(),
+            fallthrough_flow,
             stats: FlowStats {
                 branch_labels: self.branch_labels,
                 dead_labels: self.dead_labels,
@@ -552,6 +614,33 @@ impl<'a> FlowBuilder<'a> {
         self.set_flow_node_referenced(antecedent);
         self.has_flow_effects = true;
         self.new_flow_node_ex(FlowFlags::CALL, Some(node), antecedent)
+    }
+
+    /// `createFlowSwitchClause` (binder.go:509) — a `SwitchClause` flow node
+    /// carrying the switch node + the matched half-open `[clause_start,
+    /// clause_end)` clause range as a `FlowSwitchClause` payload. The `subject`
+    /// slot holds a **1-based index** into `switch_payloads` (not a `NodeId`) —
+    /// read via [`FlowGraph::switch_clause_data`], never [`FlowGraph::subject`].
+    /// Unlike the mutation/call constructors this does **not** set
+    /// `hasFlowEffects` (a switch clause is a junction, not an effect).
+    fn create_flow_switch_clause(
+        &mut self,
+        antecedent: FlowNodeId,
+        switch: NodeId,
+        clause_start: u32,
+        clause_end: u32,
+    ) -> FlowNodeId {
+        self.set_flow_node_referenced(antecedent);
+        self.switch_payloads.push(FlowSwitchClause {
+            switch,
+            clause_start,
+            clause_end,
+        });
+        let payload_index = self.switch_payloads.len() as u32; // 1-based
+        let id = self.new_flow_node(FlowFlags::SWITCH_CLAUSE);
+        self.subject[id.index()] = payload_index;
+        self.antecedent[id.index()] = antecedent.get();
+        id
     }
 
     /// `createFlowCondition` (binder.go:479) — the condition-binding constructor.
@@ -846,7 +935,7 @@ impl<'a> FlowBuilder<'a> {
             }
             Statement::BreakStatement(s) => self.bind_break_statement(s),
             Statement::ContinueStatement(s) => self.bind_continue_statement(s),
-            Statement::SwitchStatement(s) => self.bind_switch_statement(s),
+            Statement::SwitchStatement(s) => self.bind_switch_statement(id, s),
             // Everything else (declarations, blocks, and the F2 sequential
             // placeholders — labeled / try / exports / modules) threads flow
             // linearly through its children.
@@ -1222,25 +1311,92 @@ impl<'a> FlowBuilder<'a> {
         }
     }
 
-    /// A `switch` with a **local** post-switch break target, so a contained
-    /// `break` resolves here rather than at an enclosing loop. F2: the real
-    /// clause topology (per-clause `SwitchClause` flow, fallthrough,
-    /// exhaustiveness) — F1b threads the discriminant + clauses linearly through
-    /// `current_flow`.
-    fn bind_switch_statement(&mut self, s: &SwitchStatement<'_>) {
-        let save_break = self.current_break_target;
+    /// `bindSwitchStatement` (binder.go:2074) — a `switch` with a **local**
+    /// post-switch break target (so a contained `break` resolves here, not at an
+    /// enclosing loop) and the real clause topology (`bind_case_block`). When no
+    /// clause is a `default`, an **unconditional** `(0, 0)` `SwitchClause`
+    /// exhaustiveness sentinel — "no clause matched" — feeds the post-switch
+    /// label alongside the case-block exit. `preSwitchCaseFlow` is captured
+    /// **after** the discriminant is bound (the flow every clause forks from) and
+    /// saved/restored here, as in tsgo (it is not in the container save set).
+    fn bind_switch_statement(&mut self, switch_id: NodeId, s: &SwitchStatement<'_>) {
         let post_switch = self.create_branch_label();
-        self.current_break_target = Some(post_switch);
         self.visit_expression(&s.discriminant);
-        for case in s.cases {
-            if let Some(t) = &case.test {
-                self.visit_expression(t);
-            }
-            self.visit_statement_list(case.consequent);
-        }
+        let save_break = self.current_break_target;
+        let save_pre_switch = self.pre_switch_case_flow;
+        self.current_break_target = Some(post_switch);
+        self.pre_switch_case_flow = Some(self.current_flow);
+        self.bind_case_block(switch_id, s);
         self.add_antecedent(post_switch, self.current_flow);
+        let has_default = s.cases.iter().any(|c| c.test.is_none());
+        if !has_default {
+            // The "no clause matched" fall-off: reachable from the switch head
+            // regardless of narrowing (an empty `(0, 0)` range is the sentinel).
+            let pre_switch = self.pre_switch_case_flow.unwrap_or(self.unreachable_flow);
+            let sentinel = self.create_flow_switch_clause(pre_switch, switch_id, 0, 0);
+            self.add_antecedent(post_switch, sentinel);
+        }
         self.current_break_target = save_break;
+        self.pre_switch_case_flow = save_pre_switch;
         self.current_flow = self.finish_flow_label(post_switch);
+    }
+
+    /// `bindCaseBlock` (binder.go:2095) — thread the clauses. Each clause's
+    /// `preCase` label is fed **from the switch head** (`preSwitchCaseFlow`,
+    /// unconditionally — a narrowing switch wraps it in a per-clause
+    /// `SwitchClause` node) plus the prior clause's fallthrough edge, so a clause
+    /// reached only after a prior `break`/`return` stays reachable (the F2a
+    /// reachability fix). An empty-clause run (`case a: case b:` with no
+    /// statements) re-points to the head only when nothing live falls into it.
+    fn bind_case_block(&mut self, switch_id: NodeId, s: &SwitchStatement<'_>) {
+        let clauses = s.cases;
+        let is_narrowing_switch =
+            is_true_keyword(&s.discriminant) || is_narrowing_expression(&s.discriminant);
+        let last = clauses.len().wrapping_sub(1);
+        let mut fallthrough_flow = self.unreachable_flow;
+        let mut i = 0;
+        while i < clauses.len() {
+            let clause_start = i as u32;
+            // Empty-clause run: advance past clauses with no statements (bar the
+            // last), re-pointing to the head only when nothing live falls in.
+            while clauses[i].consequent.is_empty() && i + 1 < clauses.len() {
+                if fallthrough_flow == self.unreachable_flow {
+                    self.current_flow = self.pre_switch_case_flow.unwrap_or(self.unreachable_flow);
+                }
+                self.bind_case_or_default_clause(&clauses[i]);
+                i += 1;
+            }
+            let pre_case = self.create_branch_label();
+            let pre_switch = self.pre_switch_case_flow.unwrap_or(self.unreachable_flow);
+            let pre_case_flow = if is_narrowing_switch {
+                self.create_flow_switch_clause(pre_switch, switch_id, clause_start, i as u32 + 1)
+            } else {
+                pre_switch
+            };
+            self.add_antecedent(pre_case, pre_case_flow); // head edge (reachability fix)
+            self.add_antecedent(pre_case, fallthrough_flow); // fallthrough (unreachable = no-op)
+            self.current_flow = self.finish_flow_label(pre_case);
+            self.bind_case_or_default_clause(&clauses[i]);
+            fallthrough_flow = self.current_flow;
+            if !self.current_unreachable() && i != last {
+                let clause_id = self.require(addr_of(&clauses[i]));
+                self.fallthrough_flow.push((clause_id, self.current_flow));
+            }
+            i += 1;
+        }
+    }
+
+    /// `bindCaseOrDefaultClause` (binder.go:2126) — the clause's test expression
+    /// binds under the switch head (`preSwitchCaseFlow`, saved/restored), its
+    /// statements under the current (post-`preCase`) flow.
+    fn bind_case_or_default_clause(&mut self, case: &SwitchCase<'_>) {
+        if let Some(test) = &case.test {
+            let saved = self.current_flow;
+            self.current_flow = self.pre_switch_case_flow.unwrap_or(self.unreachable_flow);
+            self.visit_expression(test);
+            self.current_flow = saved;
+        }
+        self.visit_statement_list(case.consequent);
     }
 
     // --- condition binding (the bindCondition machinery) ------------------
@@ -2275,6 +2431,26 @@ pub fn render_flow_dot(product: &FlowProduct, node_spans: &[Span], source: &str)
 fn flow_node_label(g: &FlowGraph, id: FlowNodeId, node_spans: &[Span], source: &str) -> String {
     let flags = g.flags(id);
     let header = flow_flag_header(flags);
+    if flags.contains(FlowFlags::SWITCH_CLAUSE) {
+        // A SwitchClause node's `subject` slot is a payload index, not a NodeId —
+        // read the switch text + clause range through the payload, never subject().
+        let data = g.switch_clause_data(id);
+        let span = node_spans[data.switch.index()];
+        let text = span.extract(source);
+        let text = text.split('\n').next().unwrap_or(text);
+        let text = match text.char_indices().nth(24) {
+            Some((idx, _)) => &text[..idx],
+            None => text,
+        };
+        return format!(
+            "#{} {}[{},{}): {}",
+            id.get(),
+            header,
+            data.clause_start,
+            data.clause_end,
+            text
+        );
+    }
     if let Some(node) = g.subject(id) {
         let span = node_spans[node.index()];
         let text = span.extract(source);
@@ -2307,6 +2483,8 @@ fn flow_flag_header(flags: FlowFlags) -> &'static str {
         "true"
     } else if flags.contains(FlowFlags::FALSE_CONDITION) {
         "false"
+    } else if flags.contains(FlowFlags::SWITCH_CLAUSE) {
+        "switch"
     } else if flags.contains(FlowFlags::CALL) {
         "call"
     } else {
@@ -2866,5 +3044,174 @@ mod tests {
             }
         }
         assert!(saw_shared, "the fn Start is shared by both condition nodes");
+    }
+
+    // --- F2a switch topology (hand-traced graphs) -------------------------
+
+    /// Every `SwitchClause` flow node, in id order.
+    fn switch_clauses(product: &FlowProduct) -> Vec<FlowNodeId> {
+        (1..=product.graph.node_count())
+            .filter_map(FlowNodeId::from_raw)
+            .filter(|&id| product.graph.flags(id).contains(FlowFlags::SWITCH_CLAUSE))
+            .collect()
+    }
+
+    #[test]
+    fn switch_no_default_has_exhaustive_sentinel() {
+        // `switch (x) { case 1: a; }` — no default clause, so postSwitch gets the
+        // clause-1 exit AND a `(0, 0)` "no clause matched" SwitchClause sentinel.
+        let src = "function f() { switch (x) { case 1: a; } }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        // The clause body is reachable (fed from the switch head).
+        assert_ne!(flow_of_node(&product, a), FlowNodeId::UNREACHABLE);
+
+        // The `(0, 0)` sentinel exists and feeds postSwitch (the function exit).
+        let sentinel = switch_clauses(&product)
+            .into_iter()
+            .find(|&id| {
+                let d = product.graph.switch_clause_data(id);
+                d.clause_start == 0 && d.clause_end == 0
+            })
+            .expect("no-default (0,0) sentinel");
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let exit = product.end_flow_of(f).expect("f end_flow");
+        assert!(
+            product.graph.antecedents(exit).contains(&sentinel),
+            "the (0,0) sentinel feeds postSwitch"
+        );
+    }
+
+    #[test]
+    fn switch_break_then_clause_stays_reachable() {
+        // THE F2a PROOF. `switch (x) { case 1: break; case 2: a; }` — case 1
+        // breaks, so nothing falls through into case 2; but case 2 is reachable
+        // FROM THE SWITCH HEAD, so `a` must be reachable. F1b's linear stub
+        // threaded current_flow (= unreachable after the break) into case 2 and
+        // wrongly marked it Unreachable — this test fails on that stub.
+        let src = "function f() { switch (x) { case 1: break; case 2: a; } }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let a_flow = flow_of_node(&product, a);
+        assert_ne!(
+            a_flow,
+            FlowNodeId::UNREACHABLE,
+            "case 2 is reachable from the switch head despite case 1's break"
+        );
+        // `a`'s entry is the clause's SwitchClause node covering range [1, 2).
+        assert!(
+            product
+                .graph
+                .flags(a_flow)
+                .contains(FlowFlags::SWITCH_CLAUSE)
+        );
+        assert_eq!(
+            {
+                let d = product.graph.switch_clause_data(a_flow);
+                (d.clause_start, d.clause_end)
+            },
+            (1, 2)
+        );
+        // The `a;` statement is reachable: Some entry flow, no Unreachable flag.
+        let a_stmt = nodes_of_kind(&bound, NodeKind::ExpressionStatement)[0];
+        assert!(product.flow_of_node[a_stmt.index()].is_some());
+        assert_eq!(
+            product.node_flags[a_stmt.index()] & crate::binder::NODE_FLAGS_UNREACHABLE,
+            0
+        );
+    }
+
+    #[test]
+    fn switch_fallthrough_feeds_next_clause() {
+        // `switch (x) { case 1: a; case 2: b; }` — case 1 falls through to case 2,
+        // so case 2's preCase merges its switch-head edge (a SwitchClause[1,2)) and
+        // case 1's fallthrough edge; case 1 records a fallthrough anchor.
+        let src = "function f() { switch (x) { case 1: a; case 2: b; } }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let b = ident(&bound, src, "b");
+        let a_flow = flow_of_node(&product, a);
+        let b_flow = flow_of_node(&product, b);
+
+        // case 2 binds at a materialized 2-antecedent branch label.
+        assert!(
+            product
+                .graph
+                .flags(b_flow)
+                .contains(FlowFlags::BRANCH_LABEL)
+        );
+        let antes = product.graph.antecedents(b_flow);
+        assert_eq!(antes.len(), 2);
+        // One antecedent is case 1's exit (the fallthrough).
+        assert!(antes.contains(&a_flow), "fallthrough edge from case 1");
+        // The other is case 2's switch-head SwitchClause with range [1, 2).
+        let head = antes
+            .iter()
+            .copied()
+            .find(|&x| x != a_flow)
+            .expect("head edge");
+        assert!(product.graph.flags(head).contains(FlowFlags::SWITCH_CLAUSE));
+        assert_eq!(
+            {
+                let d = product.graph.switch_clause_data(head);
+                (d.clause_start, d.clause_end)
+            },
+            (1, 2)
+        );
+        // case 1 (the first SwitchCase node) recorded its reachable exit anchor.
+        let case1 = nodes_of_kind(&bound, NodeKind::SwitchCase)[0];
+        assert_eq!(product.fallthrough_flow_of(case1), Some(a_flow));
+    }
+
+    #[test]
+    fn switch_empty_clause_run_reachable() {
+        // `switch (x) { case 1: case 2: a; }` — the empty `case 1` shares the run
+        // with `case 2`; `a` is reachable, fed from the head via one SwitchClause
+        // whose range spans the merged run [0, 2).
+        let src = "function f() { switch (x) { case 1: case 2: a; } }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let a_flow = flow_of_node(&product, a);
+        assert_ne!(a_flow, FlowNodeId::UNREACHABLE);
+        assert!(
+            product
+                .graph
+                .flags(a_flow)
+                .contains(FlowFlags::SWITCH_CLAUSE)
+        );
+        assert_eq!(
+            {
+                let d = product.graph.switch_clause_data(a_flow);
+                (d.clause_start, d.clause_end)
+            },
+            (0, 2)
+        );
+    }
+
+    #[test]
+    fn switch_true_narrows_with_real_range() {
+        // `switch (true) { case y: a; }` — a narrowing switch, so the clause gets
+        // a real SwitchClause node carrying its [0, 1) range, fed from the head.
+        let src = "function f() { switch (true) { case y: a; } }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let a_flow = flow_of_node(&product, a);
+        assert!(
+            product
+                .graph
+                .flags(a_flow)
+                .contains(FlowFlags::SWITCH_CLAUSE)
+        );
+        assert_eq!(
+            {
+                let d = product.graph.switch_clause_data(a_flow);
+                (d.clause_start, d.clause_end)
+            },
+            (0, 1)
+        );
+        // The SwitchClause node's single antecedent is the switch head (fn Start).
+        let head = product.graph.antecedents(a_flow);
+        assert_eq!(head.len(), 1);
+        assert!(product.graph.flags(head[0]).contains(FlowFlags::START));
     }
 }
