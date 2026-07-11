@@ -142,6 +142,16 @@ impl<'a> ValueCursor<'a> {
                 (c, c.len_utf8())
             };
 
+            // An escaped paren (`\(` / `\)`) is a content code point (css-syntax §4.3.7), not a
+            // nesting delimiter, so it must not change `paren_depth` — otherwise an escaped `)`
+            // inside `url()` mis-drops the depth and exposes a false top-level separator. Skip
+            // both (parens are ASCII, one byte each). Kept identical in the twin
+            // `fast_scan` / `classify_separators` trackers.
+            if ch == '\\' && matches!(bytes.get(i + 1), Some(b'(' | b')')) {
+                i += 2;
+                continue;
+            }
+
             // Check delimiter BEFORE updating state (use current nesting level)
             if self.paren_depth == 0 && !self.in_quote && is_delimiter(ch) {
                 return (start, i);

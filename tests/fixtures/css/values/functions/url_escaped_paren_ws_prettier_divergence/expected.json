@@ -1,0 +1,73 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 166,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 157,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 132,
+							"end": 153,
+							"property": "background",
+							"value": "url(a\\(b)"
+						}
+					]
+				},
+				"start": 9,
+				"end": 157
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 158,
+			"styles": "\n\ta {\n\t\t/* tsv trims the url-token's outer whitespace (§4.3.6); prettier keeps it when the content has an escaped paren */\n\t\tbackground: url(a\\(b);\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 167,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
