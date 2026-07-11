@@ -75,6 +75,19 @@
   and one accidental `.clone()` silently mints differently-addressed copies
   that break the address map; nothing type-level enforces this, so it is a
   reviewed convention.
+- `check/` — the post-bind **syntactic** check pass (`check_file_members`), a
+  standalone `CheckWalk` over `&Program` that never consults the binder's
+  symbol tables (walking the shared interface member table would break
+  declaration-merging). It descends every syntactic position — class /
+  interface / type-literal bodies and every type-annotation / assertion /
+  predicate / function-type site (a general `TSType` recursion) — and runs the
+  per-node check-time checks: `duplicate_members.rs` ports
+  `checkObjectTypeForDuplicateDeclarations` (the two-map property/accessor
+  state machine → TS2300, disjoint from the bind cascade by construction) and
+  `checkTypeParameters` (per-declaration duplicate type-param identity). Its
+  output folds into each file's diagnostics in `program.rs` before the
+  program-wide sort/dedup. The traversal's `visit_type_params` is the seam
+  future per-node checks hook into.
 - `diag.rs` — `Diagnostic` (code, file, span, category, message + args,
   nested chain + related-info) and the canonical ordering kernels, ported
   from tsgo `internal/ast/diagnostic.go`: `compare_diagnostics`
@@ -108,11 +121,15 @@ result is fully owned — nothing borrows out. For lib-aware checking:
 
 - `tsv_debug tsc_conformance run` — the standing gate: sweeps the in-scope
   corpus (single-file, non-JSX, non-JS-flavored, non-skipped), grades
-  expect-clean variants AND the bind/merge duplicate-conflict family
+  expect-clean variants AND the duplicate-conflict family
   (TS2300/2451/2567/2528 + merge-path TS2397/2649/2664/2671) as codes+spans
-  multisets (extra = 0 is a hard gate; missing is classified by deferred
-  cause), grades related-info on matched primaries as its own pinned
-  channel, and publishes the parse-divergence census; exact `RUN_*` pins.
+  multisets — bind + merge + lib **and** the check-time TS2300 subset
+  (duplicate members / type parameters, from the `check` pass). extra = 0 is a
+  hard gate; a missing is classified `merge` / `lib` / `deferred_late_bound`
+  (an exact pin — the type-engine-dependent `lateBindMember` residual) /
+  `other` (a HARD-zero invariant — any unclassified family miss fails the run).
+  It also grades related-info on matched primaries as its own pinned channel
+  and publishes the parse-divergence census; exact `RUN_*` pins.
   Triage filters (`--test`/`--code`/`--variant`) skip the pins;
   `--emit-manifest` and `--report` (the committed
   `benches/js/results/report.tsc-conformance.{json,md}`) serve tooling. A
