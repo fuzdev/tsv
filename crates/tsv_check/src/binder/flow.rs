@@ -126,11 +126,12 @@ impl FlowFlags {
     pub const FALSE_CONDITION: FlowFlags = FlowFlags(1 << 6);
     /// Switch-statement clause (set by the switch flow builder, F2a).
     pub const SWITCH_CLAUSE: FlowFlags = FlowFlags(1 << 7);
-    /// Potential array mutation (F2 — never set in F1a).
+    /// Potential array mutation — never set (its two ordinary mutation sites are
+    /// deliberately skipped per the F2 census; a narrowing-only hint).
     pub const ARRAY_MUTATION: FlowFlags = FlowFlags(1 << 8);
     /// Potential assertion call.
     pub const CALL: FlowFlags = FlowFlags(1 << 9);
-    /// Temporarily reduce antecedents of a label (F2 — never set in F1a).
+    /// Temporarily reduce antecedents of a label (set by try/finally, F2b).
     pub const REDUCE_LABEL: FlowFlags = FlowFlags(1 << 10);
     /// Referenced as an antecedent once.
     pub const REFERENCED: FlowFlags = FlowFlags(1 << 11);
@@ -3213,5 +3214,62 @@ mod tests {
         let head = product.graph.antecedents(a_flow);
         assert_eq!(head.len(), 1);
         assert!(product.graph.flags(head[0]).contains(FlowFlags::START));
+    }
+
+    #[test]
+    fn switch_non_narrowing_clauses_have_no_payload() {
+        // `switch (f()) { case 1: a; case 2: b; }` — a call discriminant is NOT
+        // narrowing, so each clause is fed from the bare switch head (no per-clause
+        // `SwitchClause` payload node). Clauses stay reachable; the only SwitchClause
+        // in the graph is the no-default `(0,0)` sentinel. (Guards the `is_narrowing_switch`
+        // false branch — a regression that always minted SwitchClause nodes would
+        // pass every narrowing test.)
+        let src = "function f() { switch (f()) { case 1: a; case 2: b; } }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let b = ident(&bound, src, "b");
+        assert_ne!(flow_of_node(&product, a), FlowNodeId::UNREACHABLE);
+        assert_ne!(flow_of_node(&product, b), FlowNodeId::UNREACHABLE);
+        // Neither clause body's entry flow is a SwitchClause node.
+        assert!(
+            !product
+                .graph
+                .flags(flow_of_node(&product, a))
+                .contains(FlowFlags::SWITCH_CLAUSE)
+        );
+        assert!(
+            !product
+                .graph
+                .flags(flow_of_node(&product, b))
+                .contains(FlowFlags::SWITCH_CLAUSE)
+        );
+        // The only SwitchClause node is the `(0,0)` sentinel (no default clause).
+        let clauses = switch_clauses(&product);
+        assert_eq!(clauses.len(), 1);
+        let d = product.graph.switch_clause_data(clauses[0]);
+        assert_eq!((d.clause_start, d.clause_end), (0, 0));
+    }
+
+    #[test]
+    fn switch_with_default_has_no_sentinel() {
+        // `switch (x) { case 1: a; default: b; }` — a `default` clause makes the
+        // switch exhaustive, so NO `(0,0)` sentinel is emitted. (Narrowing, so the
+        // clauses still get real SwitchClause payloads.) Guards the `has_default`
+        // path — a regression that always emitted the sentinel would pass every
+        // no-default test.
+        let src = "function f() { switch (x) { case 1: a; default: b; } }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let b = ident(&bound, src, "b");
+        assert_ne!(flow_of_node(&product, a), FlowNodeId::UNREACHABLE);
+        assert_ne!(flow_of_node(&product, b), FlowNodeId::UNREACHABLE);
+        // No SwitchClause node carries the `(0,0)` sentinel range.
+        assert!(
+            switch_clauses(&product).into_iter().all(|id| {
+                let d = product.graph.switch_clause_data(id);
+                (d.clause_start, d.clause_end) != (0, 0)
+            }),
+            "a default-present switch emits no (0,0) exhaustiveness sentinel"
+        );
     }
 }
