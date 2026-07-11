@@ -306,6 +306,18 @@ impl BoundFile {
     ///
     /// `address` is `std::ptr::from_ref(node) as usize` for the same arena node
     /// reference the walk keyed on.
+    ///
+    /// **Known collision (pre-P3 fix pending).** Pointer-identity keying cannot
+    /// distinguish a node from an offset-0 inline struct-typed child at the same
+    /// address. The AST has exactly one such pair: `MethodDefinition` and its
+    /// inline `value: FunctionExpression` (value at struct offset 0), so
+    /// `require_node_id(addr_of(&method))` returns the *value's* id, not the
+    /// method's — a silent wrong node, worse than a miss. Inert today (the flow
+    /// walk deliberately anchors methods on `value`; nothing else resolves a method
+    /// by address), pinned by `method_address_collides_with_value` below. The fix —
+    /// keying the map on `(address, NodeKind)` (no same-kind collisions exist) — is
+    /// deferred to a pre-P3 slice (P3's method flow-write + typeof narrowing need
+    /// the method node's own id).
     #[must_use]
     pub fn require_node_id(&self, address: usize) -> NodeId {
         match self.address_map.get(&address) {
@@ -2041,6 +2053,29 @@ mod tests {
         // rather than return a corrupting `NodeId::FIRST` sentinel.
         let bound = bind("const x = 1;");
         let _ = bound.require_node_id(0);
+    }
+
+    #[test]
+    fn method_address_collides_with_value() {
+        // KNOWN F0 collision (pre-P3 fix pending; see `require_node_id`'s doc). A
+        // `MethodDefinition` and its inline offset-0 `value: FunctionExpression`
+        // share an address, so the walk's second insert wins and
+        // `require_node_id(addr_of(&method))` returns the FunctionExpression, not
+        // the MethodDefinition. Pinned so the `(address, NodeKind)` fix is a
+        // visible ratchet (this assertion flips to `MethodDefinition` when it lands).
+        use tsv_ts::ast::internal::ClassMember;
+        let arena = Bump::new();
+        let src = "class C { m() {} }";
+        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let bound = bind_file(&program, src, FileId::ROOT);
+        let Statement::ClassDeclaration(class) = &program.body[0] else {
+            panic!("expected a class declaration");
+        };
+        let ClassMember::MethodDefinition(method) = &class.body.body[0] else {
+            panic!("expected a method definition");
+        };
+        let id = bound.require_node_id(std::ptr::from_ref(method) as usize);
+        assert_eq!(bound.kinds[id.index()], NodeKind::FunctionExpression);
     }
 
     #[test]

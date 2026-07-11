@@ -23,12 +23,15 @@
 //!   type nodes (annotations, type arguments, type-parameter constraints,
 //!   heritage type args, interface/type-alias bodies, enum bodies) are skipped.
 //!   tsgo stamps `currentFlow` on every identifier *including* type positions
-//!   (binder.go:602), but the checker performs **no** control-flow analysis in
-//!   type positions, so those stamps are inert — the same soundness that lets
-//!   lib files skip flow construction entirely. Consequences: the
-//!   `QualifiedName`-inside-`typeof` stamp (binder.go:611) and type-position
-//!   identifier stamps are omitted. F1b/P3 can add a type descent if a consumer
-//!   ever needs it (none does today).
+//!   (binder.go:602). For **pure** type positions those stamps are inert (the
+//!   checker runs no CFA there — the same soundness that lets lib files skip
+//!   flow). The **exception is `typeof` queries**: `typeof x` / `typeof x.y` in a
+//!   type position *is* flow-narrowed by the checker, which is exactly why tsgo
+//!   gates the `QualifiedName` stamp on `IsPartOfTypeQuery` (binder.go:611). So
+//!   the omitted type-position identifier stamp (for `typeof x`) and the
+//!   `QualifiedName`-inside-`typeof` stamp are **not** dead weight — they are a
+//!   **P3 prerequisite** for typeof-query narrowing (ledgered as such), not
+//!   inert. Nothing before P3 reads them, so deferring is safe now.
 //! - **No `Start` region for the bodiless signature/type function-likes**
 //!   (`TSFunctionType` / `TSConstructorType` / method-/call-/construct-signature)
 //!   — a corollary of not descending types.
@@ -448,6 +451,10 @@ impl<'a> FlowBuilder<'a> {
 
     /// `createFlowMutation` (binder.go:499). The `currentExceptionTarget` hook
     /// is a no-op in F1 (that field is always `None`; try/finally sets it, F2).
+    // F1b: tsgo also sets `hasFlowEffects = true` here (binder.go:501) — F1b's
+    // condition/logical/for binding reads it to decide whether a post-expression
+    // label materializes, so F1b must reintroduce it (omitting it over-produces
+    // flow nodes: a sound superset, but diverges from tsgo's shape).
     fn create_flow_mutation(
         &mut self,
         flags: FlowFlags,
@@ -462,7 +469,8 @@ impl<'a> FlowBuilder<'a> {
         result
     }
 
-    /// `createFlowCall` (binder.go:514).
+    /// `createFlowCall` (binder.go:514). F1b: also sets `hasFlowEffects = true`
+    /// (binder.go:516) — see `create_flow_mutation`.
     fn create_flow_call(&mut self, antecedent: FlowNodeId, node: NodeId) -> FlowNodeId {
         self.set_flow_node_referenced(antecedent);
         self.new_flow_node_ex(FlowFlags::CALL, Some(node), antecedent)
@@ -1229,10 +1237,11 @@ impl<'a> FlowBuilder<'a> {
             pr.method || pr.kind != tsv_ts::ast::internal::PropertyKind::Init;
         if let (true, Expression::FunctionExpression(f)) = (is_method_or_accessor, &pr.value) {
             // An object-literal method/accessor is a control-flow container
-            // anchored on its value FunctionExpression (the same MethodDefinition-
-            // -vs-value address collision applies to `Property` — anchor on the
-            // reliably-addressable FunctionExpression). The obj-literal method
-            // flow-write (binder.go:982) is a P3 narrowing hint, deferred.
+            // anchored on its value FunctionExpression — the body-bearing node
+            // (unlike `MethodDefinition`, a `Property` does NOT share its value's
+            // address, so this is a consistency choice with `visit_method`, not a
+            // collision workaround). The obj-literal method flow-write
+            // (binder.go:982) is a P3 narrowing hint, deferred.
             self.visit_expression(&pr.key);
             let anchor = self.require(addr_of(f));
             let saved = self.enter_container(None, false, false);
@@ -1471,7 +1480,12 @@ fn flow_node_label(g: &FlowGraph, id: FlowNodeId, node_spans: &[Span], source: &
         let span = node_spans[node.index()];
         let text = span.extract(source);
         let text = text.split('\n').next().unwrap_or(text);
-        let text = if text.len() > 32 { &text[..32] } else { text };
+        // Truncate on a char boundary (byte-slicing `&text[..32]` panics when a
+        // multibyte char straddles byte 32).
+        let text = match text.char_indices().nth(32) {
+            Some((idx, _)) => &text[..idx],
+            None => text,
+        };
         format!("#{} {}: {}", id.get(), header, text)
     } else {
         format!("#{} {}", id.get(), header)
