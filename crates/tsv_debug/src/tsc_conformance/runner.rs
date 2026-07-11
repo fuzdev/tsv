@@ -960,8 +960,8 @@ fn grade_family(
         ));
     }
     // An unexplained hard-fail bucket (extra / span mismatch) gets a rendered
-    // ours-vs-baseline diff artifact; the pinned check-time `missing` is expected,
-    // so it does not.
+    // ours-vs-baseline diff artifact; the pinned deferred-late-bound `missing` is
+    // expected, so it does not.
     if buckets.extra > 0 || buckets.span_mismatch > 0 {
         let reason = if buckets.extra > 0 {
             "family_extra"

@@ -835,9 +835,11 @@ mod tests {
 
     #[test]
     fn check_pass_non_decimal_numeric_keys_stay_distinct() {
-        // `0x0` / `0xff` decode to NaN upstream; keyed on their verbatim source they
-        // stay distinct, so no false TS2300 (a `NaN`-keyed collision would flag them).
+        // `0x0` / `0xff` (and octal / binary / numeric-separator forms) decode to
+        // NaN upstream; keyed on their verbatim source they stay distinct, so no
+        // false TS2300 (a `NaN`-keyed collision would flag them all).
         assert!(diag_codes("type T = { 0x0: number; 0xff: string };").is_empty());
+        assert!(diag_codes("type T = { 0o7: number; 1_0: string };").is_empty());
         // The identical form still collides (both key `"0x1"`).
         assert_eq!(
             diag_codes("type T = { 0x1: number; 0x1: string };"),
