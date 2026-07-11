@@ -112,9 +112,9 @@ use tsv_ts::ast::internal::{
 
 /// The flow-node flag bits — a `u16` newtype over tsgo's 13 `FlowFlags`
 /// (flow.go:5-23; the max bit is `Shared`, `1 << 12`, so a `u16` fits). All 13
-/// bits are defined for shape; `SwitchClause` is set by the switch flow builder
-/// (F2a), while the remaining F2 bits (`ArrayMutation`, `ReduceLabel`) are never
-/// *set* yet.
+/// bits are defined for shape; `SwitchClause` (F2a) and `ReduceLabel` (F2b) are
+/// set by the flow builder, while `ArrayMutation` is never *set* (its two ordinary
+/// mutation sites are deliberately skipped per the F2 census — a narrowing hint).
 ///
 /// # tsgo
 /// `internal/ast/flow.go` `FlowFlags`.
@@ -1599,7 +1599,11 @@ impl<'a> FlowBuilder<'a> {
             self.add_antecedent(exception_label, self.current_flow);
             self.current_exception_target = Some(exception_label);
             if let Some(param) = &handler.param {
-                self.visit_expression(param);
+                // The catch variable is a binding position (tsgo reaches it via
+                // bindBindingElementFlow → bindInitializer), so a flow-changing
+                // destructuring default forks — bind_binding_target, not the plain
+                // value walk. Equivalent for a non-defaulted param.
+                self.bind_binding_target(param);
             }
             self.visit_statement_list(handler.body.body);
             self.add_antecedent(normal_exit, self.current_flow);
@@ -3811,6 +3815,39 @@ mod tests {
                 .contains(FlowFlags::ASSIGNMENT),
             "h binds at the const-x assignment, not the isolated g() call"
         );
+    }
+
+    #[test]
+    fn async_iife_stays_isolated() {
+        // Guards the `!async` gate: an async IIFE is NOT inlined, so `h` binds
+        // under the outer function's own flow (Start), not continued from the
+        // async body's g() call. A regression dropping the async check would make
+        // `h`'s flow the inlined CALL (as in the sync-IIFE proof).
+        let src = "function f() { (async function(){ g(); })(); h(); }";
+        let (product, bound) = build_with_bound(src);
+        let h = ident(&bound, src, "h");
+        let h_flow = flow_of_node(&product, h);
+        assert!(
+            product.graph.flags(h_flow).contains(FlowFlags::START),
+            "h binds under the outer Start — the async IIFE body is flow-isolated"
+        );
+        assert!(!product.graph.flags(h_flow).contains(FlowFlags::CALL));
+    }
+
+    #[test]
+    fn try_return_finally_leaves_post_try_unreachable_in_plain_function() {
+        // Guards the normal-list-empty → unreachable branch: in a PLAIN function
+        // (no return target), `try { return; } finally {}` leaves the code after
+        // the try unreachable — the try's only exit was via `return` (to the
+        // return label), so the finally's normal-exit list is empty. The existing
+        // return-reduce test uses an IIFE (non-None return target), so this
+        // plain-function branch was uncovered.
+        let src = "function f() { try { return; } finally {} g(); }";
+        let (product, bound) = build_with_bound(src);
+        let g = ident(&bound, src, "g");
+        // `g` (a leaf in dead code) keeps `Some(unreachable)`; the `g();` statement
+        // is unreachable.
+        assert_eq!(flow_of_node(&product, g), FlowNodeId::UNREACHABLE);
     }
 
     #[test]
