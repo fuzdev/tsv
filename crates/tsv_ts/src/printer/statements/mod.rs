@@ -19,6 +19,7 @@ mod variable;
 pub(super) use super::{Printer, build_entity_name_doc, should_hug_union_type};
 
 use super::ParenContext;
+use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
@@ -28,6 +29,42 @@ use tsv_lang::comments_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
+
+/// Strip only `as`/`satisfies` casts from the head of a statement expression,
+/// returning the innermost operand — but only if at least one cast was peeled.
+/// Mirrors prettier's `ancestorNeitherAsNorSatisfies` walk
+/// (parentheses/identifier.js): unlike `leftmost_no_lookahead` it does NOT descend
+/// through member/call heads (`type.foo` is unambiguous), so it fires only for a
+/// bare-identifier operand of a cast chain.
+fn strip_statement_casts<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<'a>> {
+    let mut cur = expr;
+    let mut stripped = false;
+    loop {
+        cur = match cur {
+            Expression::TSAsExpression(e) => e.expression,
+            Expression::TSSatisfiesExpression(e) => e.expression,
+            _ => break,
+        };
+        stripped = true;
+    }
+    stripped.then_some(cur)
+}
+
+/// Contextual-keyword identifier names whose **bare** `<kw> as T` / `<kw> satisfies T`
+/// at statement position tsv's parser *rejects* — it commits to a declaration reading
+/// (`type <name> = …` alias, `module <name> { … }` namespace) and errors when no
+/// `=`/`{` follows. Dropping the source parens on `(type) as T` would make the output
+/// unreparseable, so the parens are kept.
+///
+/// This is deliberately tsv's reject-set, NOT prettier's full identifier list
+/// (parentheses/identifier.js also lists `await`/`interface`/`yield`/`let`/`component`/
+/// `hook`, which tsv's parser rejects even bare-as-an-expression, so they never reach
+/// the formatter). `using` is excluded on purpose: tsv **accepts** bare `using as T`
+/// (a cast, per its acorn oracle) and keeps it bare — a deliberate divergence pinned by
+/// `typescript_specific/using/cast_prettier_divergence`. Wrapping it would break that.
+fn is_statement_ambiguous_keyword(name: &str) -> bool {
+    matches!(name, "type" | "module")
+}
 
 impl<'a> Printer<'a> {
     /// Build a Doc for a statement
@@ -132,6 +169,15 @@ impl<'a> Printer<'a> {
                         | Expression::ClassExpression(_)
                 ) {
                     self.expr_stmt_paren_target.set(Some(leftmost.span()));
+                } else if let Some(Expression::Identifier(id)) =
+                    strip_statement_casts(&stmt.expression)
+                    && self.with_ident_name(id, is_statement_ambiguous_keyword)
+                {
+                    // `(type) as T;` / `(module) satisfies U;` — a contextual keyword
+                    // heading an `as`/`satisfies` cast at statement level reparses as a
+                    // `type`/`module`/… declaration without the parens. The identifier's
+                    // doc builder consumes this span-matched target and wraps itself.
+                    self.expr_stmt_paren_target.set(Some(id.span));
                 }
             }
 
@@ -154,7 +200,7 @@ impl<'a> Printer<'a> {
             let decorated_class_expr = needs_parens
                 && matches!(
                     &stmt.expression,
-                    Expression::ClassExpression(c) if c.decorators.is_some_and(|dec| !dec.is_empty())
+                    Expression::ClassExpression(c) if class_expr_has_decorators(c)
                 );
 
             if paren_open_own_line_comment {

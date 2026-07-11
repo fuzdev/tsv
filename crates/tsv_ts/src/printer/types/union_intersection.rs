@@ -198,6 +198,26 @@ impl<'a> Printer<'a> {
             return self.build_union_type_doc_with_line_comments(union);
         }
 
+        // A single-member union has no `|` of its own: prettier drops single-element
+        // `TSUnionType` nodes in postprocess, so the lone member prints in the union's
+        // position with NO leading pipe and NO per-member offset. Rendering it
+        // transparently collapses a nested `| (| (| A | B))` to the innermost
+        // multi-member union (`| A | B`) instead of stacking a leading `|` per level —
+        // the flat form already collapses, but the loop below emits each level's
+        // `if_break("| ")` + offset once a nested comment forces the union multiline.
+        // Placed after the hug/line-comment paths so a leading line comment (which the
+        // block-only comment helper can't carry) still routes there. A block comment
+        // between the dropped `|` and the member is preserved. `member_parens` here is
+        // `type_never_needs_parens`, so any required parens come from the parent one
+        // level up.
+        if union.types.len() == 1 {
+            let member = &union.types[0];
+            let leading =
+                self.build_member_leading_block_comments(union.span.start, member.span().start);
+            let member_doc = self.build_type_doc_maybe_parens(member, member_parens);
+            return d.concat(&[leading, member_doc]);
+        }
+
         // Build parts: each type prefixed conditionally with `| ` or nothing
         // Flat: T1 | T2 | T3
         // Break: | T1

@@ -19,6 +19,7 @@
 use crate::ast::internal::{
     BinaryOperator, Expression, LiteralValue, UnaryOperator, UpdateOperator,
 };
+use crate::printer::class_expr_has_decorators;
 
 /// Context for parenthesization decisions
 ///
@@ -236,8 +237,16 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
 
         // Non-null: `(a + b)!`, `(!x)!`, `(a ? b : c)!`, `(yield x)!`, `(++x)!`, etc.
         // UpdateExpression needs parens too: `(++x)!` is `NonNull(++x)`, but `++x!`
-        // parses as `++(x!)` (`Update(NonNull)`) — a different AST.
-        ParenContext::NonNull => is_lower_precedence(expr) || is_unary_or_update(expr),
+        // parses as `++(x!)` (`Update(NonNull)`) — a different AST. An arrow function
+        // needs parens as well (`((a) => a)!` — bare `(a) => a!` is `(a) => (a!)`, and
+        // a block-body `(a) => {}!` can't postfix the arrow at all → unreparseable).
+        // Function/class expressions don't: their brace-delimited bodies make the
+        // parens redundant, and prettier strips them.
+        ParenContext::NonNull => {
+            is_lower_precedence(expr)
+                || is_unary_or_update(expr)
+                || matches!(expr, Expression::ArrowFunctionExpression(_))
+        }
 
         // Type assertion (as/satisfies): `(a + b) as T`, `(await x) as T`, `(<U>x) as T`
         // Arrow functions need parens because `(...args) => x as T` parses as `(...args) => (x as T)`
@@ -291,6 +300,9 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Await argument: `await (a + b)`, `await (x as T)`, `await (<T>x)`, `await (a ? b : c)`
         // Parens needed for precedence/semantics - await has higher precedence than ?:
         // Assignment: `await (x ??= y)` — without parens, parses as `(await x) ??= y` (syntax error)
+        // `await` takes a UnaryExpression operand, so the lower-precedence yield and
+        // arrow forms need parens too: `await (yield x)` (bare `await yield x` is a
+        // syntax error), `await (() => {})` (bare `await () => {}` is invalid).
         ParenContext::AwaitArgument => {
             is_type_assertion(expr)
                 || matches!(
@@ -298,6 +310,8 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                     Expression::BinaryExpression(_)
                         | Expression::ConditionalExpression(_)
                         | Expression::AssignmentExpression(_)
+                        | Expression::YieldExpression(_)
+                        | Expression::ArrowFunctionExpression(_)
                 )
         }
 
@@ -360,6 +374,15 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                         | Expression::NewExpression(_)
                         | Expression::TaggedTemplateExpression(_)
                         | Expression::ObjectExpression(_)
+                )
+                // A *decorated* class expression must be parenthesized —
+                // `extends @deco class {}` reads the `@deco` as decorating the
+                // enclosing class and the inner `class {}` as the heritage body,
+                // producing unreparseable output. A bare (undecorated) class
+                // expression stays unwrapped (prettier keeps `extends class {}`).
+                || matches!(
+                    stripped,
+                    Expression::ClassExpression(c) if class_expr_has_decorators(c)
                 )
         }
 
@@ -583,6 +606,61 @@ pub(crate) fn leftmost_no_lookahead<'a>(expr: &'a Expression<'a>) -> &'a Express
         Expression::TSSatisfiesExpression(e) => leftmost_no_lookahead(e.expression),
         Expression::TSNonNullExpression(e) => leftmost_no_lookahead(e.expression),
         Expression::TSInstantiationExpression(e) => leftmost_no_lookahead(e.expression),
+        _ => expr,
+    }
+}
+
+/// Whether `export default <expr>;` must wrap the expression in parens — true iff
+/// its first *printed* token would be a bare `function`/`class` keyword, which the
+/// grammar reads as a (hoisted) declaration, leaving the rest of the expression
+/// (`.m()`, `= 1`, `as T`) dangling and unreparseable. Mirrors prettier's
+/// `startsWithNoLookaheadToken(expr, isFunctionOrClass)` (parentheses/needs-parentheses.js).
+///
+/// Unlike the shared `leftmost_no_lookahead`, the callee/tag/object descent is
+/// **paren-aware**: it stops when that child is itself parenthesized (a binary
+/// tag `(f(){}+x)`, a lower-precedence callee, …), because the printed form then
+/// starts with `(` and needs no outer paren. That avoids the double-wrap the raw
+/// walk hits — prettier's own util docstring flags it as "overzealous if there
+/// already are necessary grouping parentheses". The other descents (binary left,
+/// conditional test, cast operand, …) print the keyword bare, so they recurse
+/// unconditionally like `leftmost_no_lookahead`.
+pub(crate) fn export_default_needs_parens(expr: &Expression<'_>) -> bool {
+    matches!(
+        export_default_leftmost(expr),
+        Expression::FunctionExpression(_) | Expression::ClassExpression(_)
+    )
+}
+
+fn export_default_leftmost<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
+    match expr {
+        Expression::BinaryExpression(b) => export_default_leftmost(b.left),
+        Expression::AssignmentExpression(a) => export_default_leftmost(a.left),
+        Expression::ConditionalExpression(c) => export_default_leftmost(c.test),
+        Expression::SequenceExpression(s) => {
+            s.expressions.first().map_or(expr, export_default_leftmost)
+        }
+        Expression::UpdateExpression(u) if !u.prefix => export_default_leftmost(u.argument),
+        Expression::TSAsExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSSatisfiesExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSNonNullExpression(e) => export_default_leftmost(e.expression),
+        Expression::TSInstantiationExpression(e) => export_default_leftmost(e.expression),
+        // Descents that cross a would-be-parenthesized child: stop there, since its
+        // leading `(` already guards any inner keyword.
+        Expression::MemberExpression(m)
+            if !needs_parens(m.object, ParenContext::ChainBase, false) =>
+        {
+            export_default_leftmost(m.object)
+        }
+        Expression::CallExpression(call)
+            if !needs_parens(call.callee, ParenContext::Callee, false) =>
+        {
+            export_default_leftmost(call.callee)
+        }
+        Expression::TaggedTemplateExpression(t)
+            if !needs_parens(t.tag, ParenContext::TaggedTemplateTag, false) =>
+        {
+            export_default_leftmost(t.tag)
+        }
         _ => expr,
     }
 }

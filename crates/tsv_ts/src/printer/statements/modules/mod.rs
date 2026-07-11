@@ -17,6 +17,7 @@ mod specifier_list;
 pub(super) use super::{Printer, build_entity_name_doc};
 
 use crate::ast::internal;
+use crate::printer::needs_parens::export_default_needs_parens;
 use smallvec::SmallVec;
 use smallvec::smallvec;
 use tsv_lang::comments_in_range;
@@ -325,7 +326,18 @@ impl<'a> Printer<'a> {
 
         let value_doc = match &decl.declaration {
             internal::ExportDefaultValue::Expression(expr) => {
-                let expr_doc = self.build_expression_doc(expr);
+                let mut expr_doc = self.build_expression_doc(expr);
+                // Prettier wraps the exported expression when its leftmost
+                // (first-printed) token is a function/class keyword — else
+                // `export default function () {}.m()` reparses the function as a
+                // *declaration* and the trailing `.m()` / `= …` / `as T` dangles.
+                // Mirrors prettier's `startsWithNoLookaheadToken(expr, isFunctionOrClass)`
+                // (parentheses/needs-parentheses.js). Decorated class expressions are
+                // handled above; the FunctionDeclaration/ClassDeclaration arms cover
+                // bare `export default function/class …`.
+                if export_default_needs_parens(expr) {
+                    expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
+                }
                 let argument_end = expr.span().end;
                 let has_trailing_comments = self.has_comments_between(argument_end, decl.span.end);
                 if has_trailing_comments {

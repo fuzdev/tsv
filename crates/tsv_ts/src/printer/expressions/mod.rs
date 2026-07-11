@@ -30,7 +30,7 @@ mod template_literal;
 use self::operators::OperatorBuf;
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
-use crate::printer::{ParenContext, PatternContext, Printer, chain};
+use crate::printer::{ParenContext, PatternContext, Printer, chain, class_expr_has_decorators};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
@@ -88,7 +88,14 @@ impl<'a> Printer<'a> {
 
         match expr {
             Expression::Literal(lit) => self.build_literal_doc(lit),
-            Expression::Identifier(id) => self.build_identifier_doc(id),
+            Expression::Identifier(id) => {
+                // A contextual keyword heading an `as`/`satisfies` cast at statement
+                // level wraps itself (`(type) as T;`) — see
+                // `build_expression_statement_doc`. A no-op for every other identifier
+                // (the target is None or a different span).
+                let doc = self.build_identifier_doc(id);
+                self.maybe_wrap_expr_stmt_paren(id.span, doc)
+            }
             Expression::PrivateIdentifier(pid) => self.build_private_identifier_doc(pid),
             Expression::ObjectExpression(obj) => {
                 // Wrap in parens when this is the leftmost object of an arrow body
@@ -132,7 +139,7 @@ impl<'a> Printer<'a> {
                 // open + indents, like the bare-statement form; an undecorated
                 // `(class {}).foo` keeps the flat wrap.
                 if self.expr_stmt_paren_target.get() == Some(class_expr.span)
-                    && class_expr.decorators.is_some_and(|dec| !dec.is_empty())
+                    && class_expr_has_decorators(class_expr)
                 {
                     self.build_break_open_parens(doc)
                 } else {
