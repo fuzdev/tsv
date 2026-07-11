@@ -27,10 +27,24 @@
 //! `(0, 0)` "no clause matched" `SwitchClause` exhaustiveness sentinel to the
 //! post-switch label. Post-exhaustive-switch reachability (code after an
 //! exhaustive no-`default` switch) is type-dependent
-//! (`isExhaustiveSwitchStatement`) and stays deferred. Still **F2b**: try/finally
-//! exception edges, labeled-statement resolution, IIFE inlining, and
-//! parameter-default forks (all marked `// F2:`). Flow stays **dark** — nothing
-//! consumes it until F3, so this slice emits no diagnostics.
+//! (`isExhaustiveSwitchStatement`) and stays deferred.
+//!
+//! **F2b scope: the four remaining flow landmines.** On top of F2a this slice
+//! builds **try/catch/finally** topology (`bindTryStatement` — the
+//! exception/return/normal-exit labels, the catch-as-second-try re-point, and
+//! the `ReduceLabel` finally-completion routing back through the return /
+//! outer-exception / normal antecedent subsets), **IIFE inlining**
+//! (`GetImmediatelyInvokedFunctionExpression` + the `bindContainer`
+//! `!isImmediatelyInvoked` gate — a non-async, non-generator function/arrow
+//! callee of a call is bound *transparently* into the containing flow, with its
+//! own return target merged at exit but no fresh `Start` and no `current_flow`
+//! restore), **initializer forks** (`bindInitializer` — a parameter /
+//! binding-element default that actually changes `current_flow` forks around
+//! it), and **labeled statements** (`bindLabeledStatement` + the
+//! `activeLabelList` — labeled `break`/`continue` resolution, per-label
+//! continue-target propagation, and the unreferenced-label `Unreachable` stamp).
+//! Flow stays **dark** — nothing consumes it until F3, so this slice emits no
+//! diagnostics.
 //!
 //! **`isTopLevelLogicalExpression` without parent pointers.** tsgo's
 //! `bindBinaryExpressionFlow` walks the parent chain to decide whether a logical
@@ -71,17 +85,15 @@
 //!   are pattern-shaped `Expression`s), so a destructuring `let {a} = e` emits a
 //!   single `Assignment` per *declarator* (subject = the declarator) rather than
 //!   one per element (binder.go:2329). Exact for the identifier case; the
-//!   contained identifiers still get their leaf stamps.
-//! - **IIFE inlining dropped** (binder.go:1525-1528). `is_flow_transparent` is
-//!   narrowed to `ClassStaticBlockDeclaration` only; ordinary
-//!   function-expression IIFEs stay flow-isolated (a safe F1 approximation;
-//!   true inlining is F2).
+//!   contained identifiers still get their leaf stamps. Binding-element and
+//!   parameter **defaults** fork per `bindInitializer` (F2b) when the default
+//!   changes the flow.
 //
 // tsgo: internal/binder/binder.go bind / bindContainer / bindChildren
 //       (+ the newFlowNode* / createFlow* / finishFlowLabel / addAntecedent
 //        constructor family and the per-statement flow shapers)
 
-use crate::binder::{BoundFile, addr_of};
+use crate::binder::{BoundFile, NodeKind, addr_of};
 use crate::ids::{FlowNodeId, NodeId};
 use smallvec::SmallVec;
 use tsv_lang::Span;
@@ -90,10 +102,10 @@ use tsv_ts::ast::internal::{
     ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, BreakStatement,
     ClassDeclaration, ClassExpression, ClassMember, ConditionalExpression, ContinueStatement,
     Decorator, DoWhileStatement, Expression, ForInOfLeft, ForInit, ForStatement,
-    FunctionDeclaration, FunctionExpression, Identifier, IfStatement, LiteralValue,
-    MethodDefinition, MethodKind, ObjectPatternProperty, ObjectProperty, Property, Statement,
-    SwitchCase, SwitchStatement, TSModuleDeclarationBody, UnaryOperator, VariableDeclarator,
-    WhileStatement,
+    FunctionDeclaration, FunctionExpression, Identifier, IfStatement, LabeledStatement,
+    LiteralValue, MethodDefinition, MethodKind, ObjectPatternProperty, ObjectProperty, Property,
+    Statement, SwitchCase, SwitchStatement, TSModuleDeclarationBody, TryStatement, UnaryOperator,
+    VariableDeclarator, WhileStatement,
 };
 
 // --- FlowFlags -------------------------------------------------------------
@@ -193,14 +205,16 @@ pub struct FlowSwitchClause {
     pub clause_end: u32,
 }
 
-/// A reduce-label payload (F2). Defined for the settled [`FlowGraph`] shape;
-/// populated by the try/finally flow builder in a later slice.
+/// A reduce-label payload — the try/finally "temporarily reduce a label's
+/// antecedents" node (`createReduceLabel`, binder.go:475/2042-2045). Written by
+/// the try/finally flow builder and read back through
+/// [`FlowGraph::reduce_label_data`].
 #[derive(Clone, Copy, Debug)]
-#[allow(dead_code)] // F2: written by the try/finally flow builder (binder.go:2042-2045)
 pub struct FlowReduceLabel {
-    /// The target label.
+    /// The label whose antecedent set is temporarily reduced.
     pub target: FlowNodeId,
-    /// Pool-run index of the temporary antecedent list.
+    /// **1-based** pool-run index of the reduced antecedent list (the same
+    /// length-prefixed pool convention the label pool uses).
     pub antecedents: u32,
 }
 
@@ -229,8 +243,8 @@ pub struct FlowGraph {
     /// Switch-clause payloads, addressed by a `SwitchClause` node's 1-based
     /// `subject` slot (read via [`FlowGraph::switch_clause_data`]).
     switch_payloads: Vec<FlowSwitchClause>,
-    /// F2 — reduce-label payloads (empty in F1a; kept for shape).
-    #[allow(dead_code)] // F2: try/finally flow
+    /// Reduce-label payloads (try/finally), addressed by a `ReduceLabel` node's
+    /// 1-based `subject` slot (read via [`FlowGraph::reduce_label_data`]).
     reduce_payloads: Vec<FlowReduceLabel>,
 }
 
@@ -272,6 +286,34 @@ impl FlowGraph {
         debug_assert!(self.flags(id).contains(FlowFlags::SWITCH_CLAUSE));
         let index = self.subject[id.index()] as usize; // 1-based
         &self.switch_payloads[index - 1]
+    }
+
+    /// The reduce-label payload of a `ReduceLabel` flow node.
+    ///
+    /// Like a `SwitchClause` node, a `ReduceLabel` node's `subject` slot stores a
+    /// **1-based index** into `reduce_payloads`, not a [`NodeId`], so
+    /// [`FlowGraph::subject`] must not be called on it. Callers gate on
+    /// `flags(id).contains(REDUCE_LABEL)`. The payload's `antecedents` field is a
+    /// 1-based pool-run index of the reduced antecedent list.
+    #[must_use]
+    pub fn reduce_label_data(&self, id: FlowNodeId) -> &FlowReduceLabel {
+        debug_assert!(self.flags(id).contains(FlowFlags::REDUCE_LABEL));
+        let index = self.subject[id.index()] as usize; // 1-based
+        &self.reduce_payloads[index - 1]
+    }
+
+    /// The reduced antecedent list of a `ReduceLabel` node, in append order (the
+    /// temporary antecedent subset the checker substitutes for `target` while it
+    /// passes this node).
+    #[must_use]
+    pub fn reduce_label_antecedents(&self, id: FlowNodeId) -> Vec<FlowNodeId> {
+        let data = self.reduce_label_data(id);
+        let off = (data.antecedents - 1) as usize; // 1-based pool-run index
+        let len = self.pool[off] as usize;
+        self.pool[off + 1..off + 1 + len]
+            .iter()
+            .filter_map(|&raw| FlowNodeId::from_raw(raw))
+            .collect()
     }
 
     /// The antecedents of a flow node, in append order.
@@ -374,8 +416,8 @@ impl FlowProduct {
 /// per-unit loop for parsed non-lib units (lib files skip flow construction —
 /// no consumer reads lib flow and ambient files have no executable code).
 #[must_use]
-pub fn build_flow(program: &Program<'_>, _source: &str, bound: &BoundFile) -> FlowProduct {
-    let mut b = FlowBuilder::new(bound);
+pub fn build_flow<'a>(program: &Program<'_>, source: &'a str, bound: &'a BoundFile) -> FlowProduct {
+    let mut b = FlowBuilder::new(bound, source);
     b.run(program);
     b.finish()
 }
@@ -397,11 +439,35 @@ struct SavedFlow {
     current_true_target: Option<FlowNodeId>,
     current_false_target: Option<FlowNodeId>,
     has_explicit_return: bool,
+    /// `saveActiveLabelList` (binder.go:1522) — the active labeled statements,
+    /// cleared at every control-flow container (a label can't be jumped to from a
+    /// nested function, even a flow-transparent IIFE) and restored on exit.
+    active_label_list: Vec<ActiveLabelEntry>,
+}
+
+/// An entry in the active-label stack (`ActiveLabel`, binder.go:85-94), used LIFO
+/// (innermost last). The name is recovered on demand from the label identifier's
+/// span (`spans[label_node_id]`) rather than stored owned.
+struct ActiveLabelEntry {
+    /// The label's post-statement break target (`postStatementLabel`).
+    break_target: FlowNodeId,
+    /// The continue target, set by `set_continue_target` when the label directly
+    /// encloses a loop (`None` for a label on a non-loop statement).
+    continue_target: Option<FlowNodeId>,
+    /// Whether a labeled `break`/`continue` resolved to this label — an
+    /// unreferenced label's identifier gets the `Unreachable` stamp (the TS7028
+    /// signal, binder.go:2167).
+    referenced: bool,
+    /// The label identifier's `NodeId` (the `Unreachable`-stamp target + the
+    /// name-lookup key).
+    label_node_id: NodeId,
 }
 
 /// The flow-graph construction walk.
 struct FlowBuilder<'a> {
     bound: &'a BoundFile,
+    /// The host document — the label-name lookup extracts `spans[id]` slices.
+    source: &'a str,
 
     // graph columns
     flags: Vec<FlowFlags>,
@@ -425,6 +491,12 @@ struct FlowBuilder<'a> {
     /// Switch-clause payloads (`createFlowSwitchClause`); a `SwitchClause` node's
     /// `subject` slot is a 1-based index into this.
     switch_payloads: Vec<FlowSwitchClause>,
+    /// Reduce-label payloads (`createReduceLabel`, try/finally); a `ReduceLabel`
+    /// node's `subject` slot is a 1-based index into this.
+    reduce_payloads: Vec<FlowReduceLabel>,
+    /// The active labeled-statement stack (`activeLabelList`), used LIFO —
+    /// innermost is the last element. Saved/cleared/restored at every container.
+    active_label_list: Vec<ActiveLabelEntry>,
 
     // construction state (the F1b subset of the container-boundary set)
     current_flow: FlowNodeId,
@@ -466,10 +538,11 @@ struct FlowBuilder<'a> {
 }
 
 impl<'a> FlowBuilder<'a> {
-    fn new(bound: &'a BoundFile) -> FlowBuilder<'a> {
+    fn new(bound: &'a BoundFile, source: &'a str) -> FlowBuilder<'a> {
         let n = bound.node_count as usize;
         let mut b = FlowBuilder {
             bound,
+            source,
             flags: Vec::new(),
             subject: Vec::new(),
             antecedent: Vec::new(),
@@ -481,6 +554,8 @@ impl<'a> FlowBuilder<'a> {
             return_flow: Vec::new(),
             fallthrough_flow: Vec::new(),
             switch_payloads: Vec::new(),
+            reduce_payloads: Vec::new(),
+            active_label_list: Vec::new(),
             current_flow: FlowNodeId::UNREACHABLE,
             unreachable_flow: FlowNodeId::UNREACHABLE,
             current_return_target: None,
@@ -540,7 +615,7 @@ impl<'a> FlowBuilder<'a> {
                 antecedent: self.antecedent,
                 pool: self.pool,
                 switch_payloads: self.switch_payloads,
-                reduce_payloads: Vec::new(),
+                reduce_payloads: self.reduce_payloads,
             },
             flow_of_node: self.flow_of_node,
             node_flags: self.node_flags,
@@ -639,6 +714,35 @@ impl<'a> FlowBuilder<'a> {
         });
         let payload_index = self.switch_payloads.len() as u32; // 1-based
         let id = self.new_flow_node(FlowFlags::SWITCH_CLAUSE);
+        self.subject[id.index()] = payload_index;
+        self.antecedent[id.index()] = antecedent.get();
+        id
+    }
+
+    /// `createReduceLabel` (binder.go:475) — a `ReduceLabel` node carrying a
+    /// `target` label + a snapshot of a **reduced** antecedent list (flushed to
+    /// the pool as a length-prefixed run, like a label). Unlike every other flow
+    /// constructor this does **not** `setFlowNodeReferenced` its antecedent (tsgo
+    /// `newFlowNodeEx` without the reference bump). The `subject` slot holds a
+    /// **1-based index** into `reduce_payloads` (not a `NodeId`) — read via
+    /// [`FlowGraph::reduce_label_data`], never [`FlowGraph::subject`].
+    fn create_reduce_label(
+        &mut self,
+        target: FlowNodeId,
+        antecedents_snapshot: &[FlowNodeId],
+        antecedent: FlowNodeId,
+    ) -> FlowNodeId {
+        // Flush the reduced antecedent snapshot as a length-prefixed pool run.
+        let off = self.pool.len() as u32;
+        self.pool.push(antecedents_snapshot.len() as u32);
+        self.pool
+            .extend(antecedents_snapshot.iter().map(|e| e.get()));
+        self.reduce_payloads.push(FlowReduceLabel {
+            target,
+            antecedents: off + 1, // 1-based pool-run index
+        });
+        let payload_index = self.reduce_payloads.len() as u32; // 1-based
+        let id = self.new_flow_node(FlowFlags::REDUCE_LABEL);
         self.subject[id.index()] = payload_index;
         self.antecedent[id.index()] = antecedent.get();
         id
@@ -782,6 +886,9 @@ impl<'a> FlowBuilder<'a> {
             current_true_target: self.current_true_target,
             current_false_target: self.current_false_target,
             has_explicit_return: self.has_explicit_return,
+            // Cleared even for a flow-transparent IIFE: a label outside the
+            // callee can't be `break`/`continue`-targeted from inside it.
+            active_label_list: std::mem::take(&mut self.active_label_list),
         };
         if !transparent {
             let start = self.new_flow_node(FlowFlags::START);
@@ -839,6 +946,7 @@ impl<'a> FlowBuilder<'a> {
         self.current_true_target = saved.current_true_target;
         self.current_false_target = saved.current_false_target;
         self.has_explicit_return = saved.has_explicit_return;
+        self.active_label_list = saved.active_label_list;
     }
 
     // --- entry (SourceFile container) -------------------------------------
@@ -937,9 +1045,10 @@ impl<'a> FlowBuilder<'a> {
             Statement::BreakStatement(s) => self.bind_break_statement(s),
             Statement::ContinueStatement(s) => self.bind_continue_statement(s),
             Statement::SwitchStatement(s) => self.bind_switch_statement(id, s),
-            // Everything else (declarations, blocks, and the F2 sequential
-            // placeholders — labeled / try / exports / modules) threads flow
-            // linearly through its children.
+            Statement::TryStatement(s) => self.bind_try_statement(s),
+            Statement::LabeledStatement(s) => self.bind_labeled_statement(s),
+            // Everything else (declarations, blocks, exports, modules) threads
+            // flow linearly through its children.
             _ => self.descend_children_generic(stmt),
         }
     }
@@ -1047,7 +1156,9 @@ impl<'a> FlowBuilder<'a> {
                 }
             }
             Statement::LabeledStatement(s) => {
-                self.visit_identifier(&s.label); // F2: real labeled-statement topology
+                // Dead-path fallback; the reachable topology lives in
+                // `bind_labeled_statement`.
+                self.visit_identifier(&s.label);
                 self.visit_statement(s.body);
             }
             Statement::BreakStatement(s) => {
@@ -1115,11 +1226,13 @@ impl<'a> FlowBuilder<'a> {
 
     /// `bindVariableDeclarationFlow` + `bindInitializedVariableFlow`
     /// (binder.go:2314) — a `var/let/const x = e` with an initializer emits one
-    /// unconditional `Assignment` (no default-value fork; that is F2). A
-    /// destructuring pattern emits one `Assignment` per declarator (tsv has no
-    /// binding-element node — see the module scope note).
+    /// unconditional `Assignment`. The name binds as a **binding target**
+    /// (`bind_binding_target`), so a destructuring default (`let {a = e} = …`)
+    /// forks per `bindInitializer`. A destructuring pattern emits one
+    /// `Assignment` per declarator (tsv has no binding-element node — see the
+    /// module scope note).
     fn bind_variable_declaration_flow(&mut self, decl: &VariableDeclarator<'_>) {
-        self.visit_expression(&decl.id);
+        self.bind_binding_target(&decl.id);
         if let Some(init) = &decl.init {
             self.visit_expression(init);
         }
@@ -1154,7 +1267,8 @@ impl<'a> FlowBuilder<'a> {
     /// loop label **before** it becomes `current_flow`; the back edge **after**
     /// the body.
     fn bind_while_statement(&mut self, stmt_id: NodeId, s: &WhileStatement<'_>) {
-        let pre_while = set_continue_target(stmt_id, self.create_loop_label());
+        let loop_label = self.create_loop_label();
+        let pre_while = self.set_continue_target(stmt_id, loop_label);
         let pre_body = self.create_branch_label();
         let post_while = self.create_branch_label();
         self.add_antecedent(pre_while, self.current_flow); // entry edge (first)
@@ -1171,7 +1285,8 @@ impl<'a> FlowBuilder<'a> {
     /// loop label), and the condition loops back to the loop label.
     fn bind_do_statement(&mut self, stmt_id: NodeId, s: &DoWhileStatement<'_>) {
         let pre_do = self.create_loop_label();
-        let pre_condition = set_continue_target(stmt_id, self.create_branch_label());
+        let condition_label = self.create_branch_label();
+        let pre_condition = self.set_continue_target(stmt_id, condition_label);
         let post_do = self.create_branch_label();
         self.add_antecedent(pre_do, self.current_flow);
         self.current_flow = pre_do;
@@ -1185,7 +1300,8 @@ impl<'a> FlowBuilder<'a> {
     /// `bindForStatement` (binder.go:1885) — init → loop label → condition →
     /// body (continue = the increment label) → incrementor → back edge.
     fn bind_for_statement(&mut self, stmt_id: NodeId, s: &ForStatement<'_>) {
-        let pre_loop = set_continue_target(stmt_id, self.create_loop_label());
+        let loop_label = self.create_loop_label();
+        let pre_loop = self.set_continue_target(stmt_id, loop_label);
         let pre_body = self.create_branch_label();
         let pre_increment = self.create_branch_label();
         let post_loop = self.create_branch_label();
@@ -1225,7 +1341,8 @@ impl<'a> FlowBuilder<'a> {
         right: &Expression<'_>,
         body: &Statement<'_>,
     ) {
-        let pre_loop = set_continue_target(stmt_id, self.create_loop_label());
+        let loop_label = self.create_loop_label();
+        let pre_loop = self.set_continue_target(stmt_id, loop_label);
         let post_loop = self.create_branch_label();
         self.visit_expression(right);
         self.add_antecedent(pre_loop, self.current_flow);
@@ -1238,7 +1355,7 @@ impl<'a> FlowBuilder<'a> {
         match left {
             ForInOfLeft::VariableDeclaration(d) => {
                 for decl in d.declarations {
-                    self.visit_expression(&decl.id);
+                    self.bind_binding_target(&decl.id);
                     if let Some(init) = &decl.init {
                         self.visit_expression(init);
                     }
@@ -1260,6 +1377,28 @@ impl<'a> FlowBuilder<'a> {
         self.current_flow = self.finish_flow_label(post_loop);
     }
 
+    /// `setContinueTarget` (binder.go:1779) — walk the parent chain up from a
+    /// loop while each parent is a `LabeledStatement`, assigning that label's
+    /// continue target (so `continue L` on a labeled loop lands on the loop's
+    /// continue point), in lockstep with the active-label stack from its top. No
+    /// enclosing labeled statements → a no-op returning `target` unchanged.
+    fn set_continue_target(&mut self, loop_node: NodeId, target: FlowNodeId) -> FlowNodeId {
+        let mut node = loop_node;
+        let mut i = self.active_label_list.len();
+        loop {
+            let Some(parent) = self.bound.parents[node.index()] else {
+                break;
+            };
+            if self.bound.kinds[parent.index()] != NodeKind::LabeledStatement || i == 0 {
+                break;
+            }
+            i -= 1;
+            self.active_label_list[i].continue_target = Some(target);
+            node = parent;
+        }
+        target
+    }
+
     /// `bindIterativeStatement` (binder.go:1807) — bind a loop body with its
     /// break/continue targets installed, restored on exit.
     fn bind_iterative_statement(
@@ -1277,27 +1416,46 @@ impl<'a> FlowBuilder<'a> {
         self.current_continue_target = save_continue;
     }
 
-    /// `bindBreakStatement` (binder.go:1955), unlabeled path only.
+    /// `bindBreakStatement` (binder.go:1955) — a labeled `break L` resolves to
+    /// `L`'s **break** target (`findActiveLabel`, marking it referenced); an
+    /// unlabeled `break` uses `current_break_target`. An unresolved label is a
+    /// no-op (deferred diagnostic).
     fn bind_break_statement(&mut self, s: &BreakStatement<'_>) {
         match &s.label {
             None => {
                 let target = self.current_break_target;
                 self.bind_break_or_continue_flow(target);
             }
-            // F2: labeled break resolution (findActiveLabel + the label's target).
-            Some(label) => self.visit_identifier(label),
+            Some(label) => {
+                self.visit_identifier(label);
+                let name = self.label_text(label);
+                if let Some(i) = self.find_active_label(name) {
+                    self.active_label_list[i].referenced = true;
+                    let target = Some(self.active_label_list[i].break_target);
+                    self.bind_break_or_continue_flow(target);
+                }
+            }
         }
     }
 
-    /// `bindContinueStatement` (binder.go:1959), unlabeled path only.
+    /// `bindContinueStatement` (binder.go:1959) — a labeled `continue L` resolves
+    /// to `L`'s **continue** target; an unlabeled `continue` uses
+    /// `current_continue_target`. A missing/`None` target is a no-op.
     fn bind_continue_statement(&mut self, s: &ContinueStatement<'_>) {
         match &s.label {
             None => {
                 let target = self.current_continue_target;
                 self.bind_break_or_continue_flow(target);
             }
-            // F2: labeled continue resolution.
-            Some(label) => self.visit_identifier(label),
+            Some(label) => {
+                self.visit_identifier(label);
+                let name = self.label_text(label);
+                if let Some(i) = self.find_active_label(name) {
+                    self.active_label_list[i].referenced = true;
+                    let target = self.active_label_list[i].continue_target;
+                    self.bind_break_or_continue_flow(target);
+                }
+            }
         }
     }
 
@@ -1398,6 +1556,146 @@ impl<'a> FlowBuilder<'a> {
             self.current_flow = saved;
         }
         self.visit_statement_list(case.consequent);
+    }
+
+    // --- try / catch / finally --------------------------------------------
+
+    /// A snapshot of a label's pending antecedent list (`label.Antecedents`) —
+    /// the try/finally combine reads three of these directly (the pointer-free
+    /// `combineFlowLists` analog).
+    fn scratch_snapshot(&self, label: FlowNodeId) -> SmallVec<[FlowNodeId; 4]> {
+        self.label_scratch.get(&label).cloned().unwrap_or_default()
+    }
+
+    /// `bindTryStatement` (binder.go:1993). Three fresh labels — `normalExit`,
+    /// `returnLabel`, `exceptionLabel` — thread the "any instruction can throw"
+    /// edge (`exceptionLabel` seeded from `current_flow` **before** the try
+    /// block, `current_exception_target` repointed so `create_flow_mutation`'s
+    /// fan-out comes alive). A catch is bound as a **second try** (a fresh
+    /// `exceptionLabel` seeded from the first one's finish). With a finally, the
+    /// finally label's antecedents = `normal ++ exception ++ return`
+    /// (`combineFlowLists`), it becomes `current_flow`, and up to three
+    /// `ReduceLabel`s route the finally's completion back through the return /
+    /// outer-exception / normal-exit subsets (binder.go:2052-2067).
+    fn bind_try_statement(&mut self, s: &TryStatement<'_>) {
+        let save_return_target = self.current_return_target;
+        let save_exception_target = self.current_exception_target;
+        let normal_exit = self.create_branch_label();
+        let return_label = self.create_branch_label();
+        let mut exception_label = self.create_branch_label();
+        if s.finalizer.is_some() {
+            self.current_return_target = Some(return_label);
+        }
+        // The exception edge for exceptions before any mutation.
+        self.add_antecedent(exception_label, self.current_flow);
+        self.current_exception_target = Some(exception_label);
+        self.visit_statement_list(s.block.body);
+        self.add_antecedent(normal_exit, self.current_flow);
+        if let Some(handler) = &s.handler {
+            // The catch is the target of exceptions from the try block; its own
+            // exceptions flow to a fresh label (catch = a second try).
+            self.current_flow = self.finish_flow_label(exception_label);
+            exception_label = self.create_branch_label();
+            self.add_antecedent(exception_label, self.current_flow);
+            self.current_exception_target = Some(exception_label);
+            if let Some(param) = &handler.param {
+                self.visit_expression(param);
+            }
+            self.visit_statement_list(handler.body.body);
+            self.add_antecedent(normal_exit, self.current_flow);
+        }
+        // Restore BEFORE the finally — the finally isn't inside its own try.
+        self.current_return_target = save_return_target;
+        self.current_exception_target = save_exception_target;
+        if let Some(finalizer) = &s.finalizer {
+            let normal_list = self.scratch_snapshot(normal_exit);
+            let exception_list = self.scratch_snapshot(exception_label);
+            let return_list = self.scratch_snapshot(return_label);
+            let finally_label = self.create_branch_label();
+            // finallyLabel.Antecedents = normal ++ exception ++ return
+            // (combineFlowLists, no dedup — faithful to binder.go:2043).
+            let mut combined: SmallVec<[FlowNodeId; 4]> = SmallVec::new();
+            combined.extend(normal_list.iter().copied());
+            combined.extend(exception_list.iter().copied());
+            combined.extend(return_list.iter().copied());
+            self.label_scratch.insert(finally_label, combined);
+            self.current_flow = finally_label;
+            self.visit_statement_list(finalizer.body);
+            if self.current_unreachable() {
+                // An unreachable end-of-finally makes the whole try unreachable.
+                self.current_flow = self.unreachable_flow;
+            } else {
+                // Route the finally's completion back through the return-only
+                // subset (IIFE/constructor return target), then the outer
+                // exception-only subset, then continue via the normal subset.
+                if let Some(rt) = self.current_return_target
+                    && !return_list.is_empty()
+                {
+                    let rl =
+                        self.create_reduce_label(finally_label, &return_list, self.current_flow);
+                    self.add_antecedent(rt, rl);
+                }
+                if let Some(et) = self.current_exception_target
+                    && !exception_list.is_empty()
+                {
+                    let el =
+                        self.create_reduce_label(finally_label, &exception_list, self.current_flow);
+                    self.add_antecedent(et, el);
+                }
+                if normal_list.is_empty() {
+                    self.current_flow = self.unreachable_flow;
+                } else {
+                    self.current_flow =
+                        self.create_reduce_label(finally_label, &normal_list, self.current_flow);
+                }
+            }
+        } else {
+            self.current_flow = self.finish_flow_label(normal_exit);
+        }
+    }
+
+    // --- labeled statements -----------------------------------------------
+
+    /// `bindLabeledStatement` (binder.go:2153). Push an active-label entry
+    /// (break target = `postStatementLabel`, continue target set later by a
+    /// directly-enclosed loop's `set_continue_target`), bind the label + body,
+    /// then pop; an **unreferenced** label gets the `Unreachable` stamp on its
+    /// identifier (the TS7028 signal, binder.go:2167). The post label merges the
+    /// body's exit.
+    fn bind_labeled_statement(&mut self, s: &LabeledStatement<'_>) {
+        let post = self.create_branch_label();
+        let label_id = self.require(addr_of(&s.label));
+        self.active_label_list.push(ActiveLabelEntry {
+            break_target: post,
+            continue_target: None,
+            referenced: false,
+            label_node_id: label_id,
+        });
+        self.visit_identifier(&s.label);
+        self.visit_statement(s.body);
+        // Balanced with the push above (pop is always `Some`). An unreferenced
+        // label's identifier gets the `Unreachable` stamp (the TS7028 signal).
+        if let Some(entry) = self.active_label_list.pop()
+            && !entry.referenced
+        {
+            self.node_flags[entry.label_node_id.index()] |= crate::binder::NODE_FLAGS_UNREACHABLE;
+        }
+        self.add_antecedent(post, self.current_flow);
+        self.current_flow = self.finish_flow_label(post);
+    }
+
+    /// `findActiveLabel` (binder.go:1976) — innermost-first (the stack top is the
+    /// last element, so scan from the end). Returns the stack index.
+    fn find_active_label(&self, name: &str) -> Option<usize> {
+        self.active_label_list
+            .iter()
+            .rposition(|e| self.bound.spans[e.label_node_id.index()].extract(self.source) == name)
+    }
+
+    /// The source text of a label identifier (the break/continue label name).
+    fn label_text(&self, ident: &Identifier<'_>) -> &'a str {
+        let id = self.require(addr_of(ident));
+        self.bound.spans[id.index()].extract(self.source)
     }
 
     // --- condition binding (the bindCondition machinery) ------------------
@@ -1666,35 +1964,107 @@ impl<'a> FlowBuilder<'a> {
         self.exit_container(saved, false, true, true, anchor, false);
     }
 
-    fn visit_function_expression(&mut self, f: &FunctionExpression<'_>, node_id: NodeId) {
+    /// A function expression. `is_iife` marks a call callee (an IIFE): the
+    /// container is entered **transparently** (no fresh `Start`, `current_flow`
+    /// not restored on exit) with its own return target, so the body joins the
+    /// containing control flow (binder.go:1525-1544). The return-flow anchor
+    /// stays off (`is_ctor_or_static = false`) — tsgo writes it only for
+    /// constructors / static blocks, never a plain IIFE.
+    fn visit_function_expression(
+        &mut self,
+        f: &FunctionExpression<'_>,
+        node_id: NodeId,
+        is_iife: bool,
+    ) {
         // The function-expression flow write is captured at the OUTER flow,
         // before the body's Start (binder.go:915). Unconditional: the container
         // path does not nil it in dead code.
         self.set_flow_leaf(node_id);
-        let saved = self.enter_container(Some(node_id), false, false);
+        let saved = self.enter_container(Some(node_id), is_iife, is_iife);
         self.bind_params(f.params);
         self.visit_statement_list(f.body.body);
-        self.exit_container(saved, false, true, true, node_id, false);
+        self.exit_container(saved, is_iife, true, true, node_id, false);
     }
 
     fn visit_arrow(
         &mut self,
         a: &tsv_ts::ast::internal::ArrowFunctionExpression<'_>,
         node_id: NodeId,
+        is_iife: bool,
     ) {
         self.set_flow_leaf(node_id); // binder.go:915 (arrows dispatch here too)
-        let saved = self.enter_container(Some(node_id), false, false);
+        let saved = self.enter_container(Some(node_id), is_iife, is_iife);
         self.bind_params(a.params);
         match &a.body {
             ArrowFunctionBody::Expression(e) => self.visit_expression(e),
             ArrowFunctionBody::BlockStatement(block) => self.visit_statement_list(block.body),
         }
-        self.exit_container(saved, false, true, true, node_id, false);
+        self.exit_container(saved, is_iife, true, true, node_id, false);
     }
 
     fn bind_params(&mut self, params: &[Expression<'_>]) {
         for param in params {
-            self.visit_expression(param);
+            self.bind_binding_target(param);
+        }
+    }
+
+    /// `bindInitializer` (binder.go:2474) — bind a parameter / binding-element
+    /// **default** and fork `current_flow` around it, but **only** when binding
+    /// the default actually changed the flow (a `BindingElement`/`Parameter` has
+    /// no side effects when its initializer isn't evaluated — GH#49759). The
+    /// entry/exit pointer-equality guard is exact: a literal default (`= 1`)
+    /// leaves `current_flow` untouched and mints no label.
+    fn bind_initializer(&mut self, initializer: &Expression<'_>) {
+        let entry = self.current_flow;
+        self.visit_expression(initializer);
+        if entry == self.unreachable_flow || entry == self.current_flow {
+            return;
+        }
+        let exit = self.create_branch_label();
+        self.add_antecedent(exit, entry);
+        self.add_antecedent(exit, self.current_flow);
+        self.current_flow = self.finish_flow_label(exit);
+    }
+
+    /// Bind a **binding target** (declaration / parameter position):
+    /// `bindParameterFlow` / `bindBindingElementFlow` (binder.go:2463/2450). A
+    /// defaulted element's initializer is bound **before** the name (TC39 order,
+    /// via `bind_initializer`, which forks only when the default changed the
+    /// flow). Distinct from the value traversal (`visit_expression`) so the
+    /// assignment-target destructuring recursion — a separate deferred item —
+    /// stays untouched; for a non-defaulted target the two are equivalent.
+    fn bind_binding_target(&mut self, node: &Expression<'_>) {
+        use Expression as E;
+        match node {
+            E::AssignmentPattern(a) => {
+                self.visit_decorators(a.decorators);
+                self.bind_initializer(a.right);
+                self.bind_binding_target(a.left);
+            }
+            E::ObjectPattern(op) => {
+                self.visit_decorators(op.decorators);
+                for prop in op.properties {
+                    match prop {
+                        ObjectPatternProperty::Property(pr) => {
+                            self.visit_expression(&pr.key);
+                            self.bind_binding_target(&pr.value);
+                        }
+                        ObjectPatternProperty::RestElement(r) => {
+                            self.bind_binding_target(r.argument);
+                        }
+                    }
+                }
+            }
+            E::ArrayPattern(ap) => {
+                self.visit_decorators(ap.decorators);
+                for el in ap.elements.iter().flatten() {
+                    self.bind_binding_target(el);
+                }
+            }
+            E::RestElement(r) => self.bind_binding_target(r.argument),
+            E::TSParameterProperty(pp) => self.bind_binding_target(pp.parameter),
+            // A plain identifier / other leaf binding: the ordinary traversal.
+            _ => self.visit_expression(node),
         }
     }
 
@@ -1898,9 +2268,37 @@ impl<'a> FlowBuilder<'a> {
                 self.visit_expression(b.right);
             }
             E::CallExpression(c) => {
-                self.visit_expression(c.callee);
-                for a in c.arguments {
-                    self.visit_expression(a);
+                // IIFE detection (`GetImmediatelyInvokedFunctionExpression`,
+                // utilities.go:1834; `bindCallExpressionFlow`, binder.go:2419):
+                // a non-async (non-generator) function/arrow callee — through any
+                // grouping parens — is inlined into the containing flow. Its
+                // arguments bind FIRST so the callee's flow write captures the
+                // post-argument flow.
+                let mut unwrapped = c.callee;
+                while let E::ParenthesizedExpression(p) = unwrapped {
+                    unwrapped = p.expression;
+                }
+                match unwrapped {
+                    E::ArrowFunctionExpression(a) if !a.r#async => {
+                        for arg in c.arguments {
+                            self.visit_expression(arg);
+                        }
+                        let id = self.require(addr_of(a));
+                        self.visit_arrow(a, id, true);
+                    }
+                    E::FunctionExpression(f) if !f.r#async && !f.generator => {
+                        for arg in c.arguments {
+                            self.visit_expression(arg);
+                        }
+                        let id = self.require(addr_of(f));
+                        self.visit_function_expression(f, id, true);
+                    }
+                    _ => {
+                        self.visit_expression(c.callee);
+                        for arg in c.arguments {
+                            self.visit_expression(arg);
+                        }
+                    }
                 }
             }
             E::NewExpression(n) => {
@@ -1912,11 +2310,11 @@ impl<'a> FlowBuilder<'a> {
             E::ConditionalExpression(c) => self.bind_conditional_expression_flow(c),
             E::ArrowFunctionExpression(a) => {
                 let id = self.require(addr_of(a));
-                self.visit_arrow(a, id);
+                self.visit_arrow(a, id, false);
             }
             E::FunctionExpression(f) => {
                 let id = self.require(addr_of(f));
-                self.visit_function_expression(f, id);
+                self.visit_function_expression(f, id, false);
             }
             E::ClassExpression(c) => self.visit_class_expr(c),
             E::SpreadElement(s) => self.visit_expression(s.argument),
@@ -2205,13 +2603,6 @@ fn is_false_keyword(expr: &Expression<'_>) -> bool {
     matches!(expr, Expression::Literal(l) if matches!(l.value, LiteralValue::Boolean(false)))
 }
 
-/// `setContinueTarget` (binder.go:1779). F2 walks the active-label list (labeled
-/// loops) assigning each label's continue target; F1b has no active labels, so
-/// this is the identity on `target`. The `_loop` node keeps the call-site shape.
-fn set_continue_target(_loop: NodeId, target: FlowNodeId) -> FlowNodeId {
-    target
-}
-
 /// Whether a condition node is a logical `&&`/`||`/`??` or a logical
 /// compound-assignment `&&=`/`||=`/`??=` — the `bindCondition` non-atomic test
 /// (binder.go:1801, combining `IsLogicalExpression` + `isLogicalAssignment`).
@@ -2432,6 +2823,12 @@ pub fn render_flow_dot(product: &FlowProduct, node_spans: &[Span], source: &str)
 fn flow_node_label(g: &FlowGraph, id: FlowNodeId, node_spans: &[Span], source: &str) -> String {
     let flags = g.flags(id);
     let header = flow_flag_header(flags);
+    if flags.contains(FlowFlags::REDUCE_LABEL) {
+        // The `subject` slot is a payload index, not a NodeId — read the target
+        // through the payload, never subject().
+        let data = g.reduce_label_data(id);
+        return format!("#{} {}→N{}", id.get(), header, data.target.get());
+    }
     if flags.contains(FlowFlags::SWITCH_CLAUSE) {
         // A SwitchClause node's `subject` slot is a payload index, not a NodeId —
         // read the switch text + clause range through the payload, never subject().
@@ -2486,6 +2883,8 @@ fn flow_flag_header(flags: FlowFlags) -> &'static str {
         "false"
     } else if flags.contains(FlowFlags::SWITCH_CLAUSE) {
         "switch"
+    } else if flags.contains(FlowFlags::REDUCE_LABEL) {
+        "reduce"
     } else if flags.contains(FlowFlags::CALL) {
         "call"
     } else {
@@ -2696,7 +3095,7 @@ mod tests {
         let arena = Bump::new();
         let program = tsv_ts::parse(src, &arena).expect("parse");
         let bound = bind_file(&program, src, FileId::ROOT);
-        let mut b = FlowBuilder::new(&bound);
+        let mut b = FlowBuilder::new(&bound, src);
         let a1 = b.new_flow_node(FlowFlags::START);
         let a2 = b.new_flow_node(FlowFlags::ASSIGNMENT);
         let label = b.create_branch_label();
@@ -2736,7 +3135,7 @@ mod tests {
         let false_lit = expr_at(1);
         let y = expr_at(2);
 
-        let mut b = FlowBuilder::new(&bound);
+        let mut b = FlowBuilder::new(&bound, src);
         let ante = b.new_flow_node(FlowFlags::START);
 
         // nil-expr True → passthrough; nil-expr False → unreachable.
@@ -3270,6 +3669,256 @@ mod tests {
                 (d.clause_start, d.clause_end) != (0, 0)
             }),
             "a default-present switch emits no (0,0) exhaustiveness sentinel"
+        );
+    }
+
+    // --- F2b: the four remaining flow landmines (hand-traced graphs) -------
+
+    /// Every `ReduceLabel` flow node, in id order.
+    fn reduce_labels(product: &FlowProduct) -> Vec<FlowNodeId> {
+        (1..=product.graph.node_count())
+            .filter_map(FlowNodeId::from_raw)
+            .filter(|&id| product.graph.flags(id).contains(FlowFlags::REDUCE_LABEL))
+            .collect()
+    }
+
+    #[test]
+    fn try_finally_reduce_label_and_merge() {
+        // `try { a; } finally { b; }` — b binds at the finally label (a branch
+        // label merging the try-normal and exception antecedents); the try exits
+        // through a REDUCE_LABEL (the finally's normal-completion routing) whose
+        // target is that finally label.
+        let src = "function f() { try { a; } finally { b; } }";
+        let (product, bound) = build_with_bound(src);
+        let b = ident(&bound, src, "b");
+        let b_flow = flow_of_node(&product, b);
+        assert!(
+            product
+                .graph
+                .flags(b_flow)
+                .contains(FlowFlags::BRANCH_LABEL)
+        );
+
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let exit = product.end_flow_of(f).expect("f end_flow");
+        assert!(product.graph.flags(exit).contains(FlowFlags::REDUCE_LABEL));
+        assert_eq!(product.graph.reduce_label_data(exit).target, b_flow);
+        // The reduced antecedent list is the try block's normal exit (f's Start).
+        let reduced = product.graph.reduce_label_antecedents(exit);
+        assert_eq!(reduced.len(), 1);
+        assert!(product.graph.flags(reduced[0]).contains(FlowFlags::START));
+    }
+
+    #[test]
+    fn try_catch_finally_exception_edges() {
+        // Catch = a second try. `try { x = 1; } catch { b; } finally { c; }` —
+        // the catch binds at the try's exception label, fed by BOTH the
+        // "any instruction can throw" edge (the entry Start) AND the mutation's
+        // exception fan-out (createFlowMutation → currentExceptionTarget).
+        let src = "function f() { try { x = 1; } catch { b; } finally { c; } }";
+        let (product, bound) = build_with_bound(src);
+        let b = ident(&bound, src, "b");
+        let b_flow = flow_of_node(&product, b);
+        assert!(
+            product
+                .graph
+                .flags(b_flow)
+                .contains(FlowFlags::BRANCH_LABEL)
+        );
+        let antes = product.graph.antecedents(b_flow);
+        assert!(
+            antes
+                .iter()
+                .any(|&a| product.graph.flags(a).contains(FlowFlags::START)),
+            "the pre-mutation throw edge"
+        );
+        assert!(
+            antes
+                .iter()
+                .any(|&a| product.graph.flags(a).contains(FlowFlags::ASSIGNMENT)),
+            "the mutation's exception fan-out"
+        );
+        // The finally still routes normal completion through a REDUCE_LABEL.
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let exit = product.end_flow_of(f).expect("f end_flow");
+        assert!(product.graph.flags(exit).contains(FlowFlags::REDUCE_LABEL));
+    }
+
+    #[test]
+    fn try_finally_return_routes_through_reduce_label() {
+        // An IIFE gives the try a real (non-None) return target, so a `return`
+        // inside a try-with-finally materializes a return-only ReduceLabel that
+        // feeds that target (and collapses onto it as the function exit).
+        let src = "function f() { (function() { try { return 1; } finally { g(); } })(); }";
+        let (product, bound) = build_with_bound(src);
+        let reduces = reduce_labels(&product);
+        assert_eq!(
+            reduces.len(),
+            1,
+            "one ReduceLabel: the return-only finally routing"
+        );
+        let rl = reduces[0];
+        let reduced = product.graph.reduce_label_antecedents(rl);
+        assert_eq!(reduced.len(), 1, "the single return path");
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        assert_eq!(product.end_flow_of(f), Some(rl));
+    }
+
+    #[test]
+    fn iife_body_is_inlined_into_containing_flow() {
+        // THE IIFE PROOF. `(function(){ g(); })(); h();` — the IIFE body is NOT
+        // flow-isolated: `h` continues from the IIFE body's exit (the g() call),
+        // and `g` binds under the ambient flow (no fresh Start).
+        let src = "function f() { (function(){ g(); })(); h(); }";
+        let (product, bound) = build_with_bound(src);
+        let g = ident(&bound, src, "g");
+        let h = ident(&bound, src, "h");
+        assert!(
+            product
+                .graph
+                .flags(flow_of_node(&product, g))
+                .contains(FlowFlags::START),
+            "g binds under the ambient (transparent) flow"
+        );
+        assert!(
+            product
+                .graph
+                .flags(flow_of_node(&product, h))
+                .contains(FlowFlags::CALL),
+            "h continues from the IIFE body's g() call, not a restored/fresh flow"
+        );
+    }
+
+    #[test]
+    fn non_invoked_function_expression_is_flow_isolated() {
+        // Contrast: a non-invoked function expression IS isolated — `h` is
+        // unaffected (binds at the `const x = …` mutation), and `g` binds under
+        // the function's own fresh Start.
+        let src = "function f() { const x = function(){ g(); }; h(); }";
+        let (product, bound) = build_with_bound(src);
+        let g = ident(&bound, src, "g");
+        let h = ident(&bound, src, "h");
+        assert!(
+            product
+                .graph
+                .flags(flow_of_node(&product, g))
+                .contains(FlowFlags::START)
+        );
+        assert!(
+            product
+                .graph
+                .flags(flow_of_node(&product, h))
+                .contains(FlowFlags::ASSIGNMENT),
+            "h binds at the const-x assignment, not the isolated g() call"
+        );
+    }
+
+    #[test]
+    fn parameter_default_that_changes_flow_forks() {
+        // A parameter default containing a flow-changing expression (an
+        // assignment mutation) forks current_flow around the initializer
+        // (bindInitializer). The only branch label is the fork's exit.
+        let src = "function f(a = (b = c)) {}";
+        let (product, bound) = build_with_bound(src);
+        assert_eq!(product.stats.branch_labels, 1);
+        let a = ident(&bound, src, "a");
+        let a_flow = flow_of_node(&product, a);
+        assert!(
+            product
+                .graph
+                .flags(a_flow)
+                .contains(FlowFlags::BRANCH_LABEL)
+        );
+        assert_eq!(
+            product.graph.antecedents(a_flow).len(),
+            2,
+            "the no-default entry + the post-initializer flow merge"
+        );
+    }
+
+    #[test]
+    fn parameter_default_without_flow_change_does_not_fork() {
+        // A literal default doesn't change current_flow → no fork, no label.
+        let src = "function f(a = 1) {}";
+        let product = build(src);
+        assert_eq!(product.stats.branch_labels, 0);
+    }
+
+    #[test]
+    fn labeled_continue_resolves_to_loop_continue_target() {
+        // `outer: while (x) { continue outer; }` — continue outer routes to the
+        // while's continue target (the loop label), and `outer` is referenced so
+        // its label identifier carries NO Unreachable bit.
+        let src = "function f() { outer: while (x) { continue outer; } }";
+        let (product, bound) = build_with_bound(src);
+        let x = ident(&bound, src, "x");
+        let l1 = flow_of_node(&product, x);
+        assert!(product.graph.flags(l1).contains(FlowFlags::LOOP_LABEL));
+        let c1 = condition_of(&product, x, true);
+        let antes = product.graph.antecedents(l1);
+        assert!(
+            antes.contains(&c1),
+            "continue outer lands on the loop label (like an unlabeled continue)"
+        );
+        assert_eq!(antes.len(), 2); // [entry, continue-outer back edge]
+
+        let outer = ident(&bound, src, "outer");
+        assert_eq!(
+            product.node_flags[outer.index()] & crate::binder::NODE_FLAGS_UNREACHABLE,
+            0,
+            "outer is referenced → no Unreachable stamp"
+        );
+    }
+
+    #[test]
+    fn unreferenced_label_gets_unreachable_stamp() {
+        // `unused: a;` — the label is never targeted, so its identifier gets the
+        // Unreachable bit (the TS7028 signal).
+        let src = "function f() { unused: a; }";
+        let (product, bound) = build_with_bound(src);
+        let unused = ident(&bound, src, "unused");
+        assert_ne!(
+            product.node_flags[unused.index()] & crate::binder::NODE_FLAGS_UNREACHABLE,
+            0,
+            "an unreferenced label identifier carries the Unreachable bit"
+        );
+    }
+
+    #[test]
+    fn labeled_break_targets_outer_post_label() {
+        // `outer: inner: while (x) { break outer; }` — break outer targets
+        // outer's post-statement label (the function exit, merging the break edge
+        // and the loop's normal false-condition exit). `outer` is referenced,
+        // `inner` is not.
+        let src = "function f() { outer: inner: while (x) { break outer; } }";
+        let (product, bound) = build_with_bound(src);
+        let outer = ident(&bound, src, "outer");
+        let inner = ident(&bound, src, "inner");
+        assert_eq!(
+            product.node_flags[outer.index()] & crate::binder::NODE_FLAGS_UNREACHABLE,
+            0,
+            "outer is referenced by break outer"
+        );
+        assert_ne!(
+            product.node_flags[inner.index()] & crate::binder::NODE_FLAGS_UNREACHABLE,
+            0,
+            "inner is unused"
+        );
+
+        let x = ident(&bound, src, "x");
+        let c1 = condition_of(&product, x, true);
+        let c2 = condition_of(&product, x, false);
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let exit = product.end_flow_of(f).expect("f end_flow");
+        assert!(product.graph.flags(exit).contains(FlowFlags::BRANCH_LABEL));
+        let antes = product.graph.antecedents(exit);
+        assert!(
+            antes.contains(&c1),
+            "the break-outer edge (from inside the loop body)"
+        );
+        assert!(
+            antes.contains(&c2),
+            "the loop's normal false-condition exit"
         );
     }
 }
