@@ -19,6 +19,7 @@ mod variable;
 pub(super) use super::{Printer, build_entity_name_doc, should_hug_union_type};
 
 use super::ParenContext;
+use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, LiteralValue, Statement};
@@ -199,7 +200,7 @@ impl<'a> Printer<'a> {
             let decorated_class_expr = needs_parens
                 && matches!(
                     &stmt.expression,
-                    Expression::ClassExpression(c) if c.decorators.is_some_and(|dec| !dec.is_empty())
+                    Expression::ClassExpression(c) if class_expr_has_decorators(c)
                 );
 
             if paren_open_own_line_comment {

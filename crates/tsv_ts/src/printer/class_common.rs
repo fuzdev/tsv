@@ -13,6 +13,7 @@ use crate::ast::internal;
 use crate::printer::CommentSpacing;
 use crate::printer::HeritageKeyword;
 use crate::printer::Printer;
+use crate::printer::class_expr_has_decorators;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -197,8 +198,7 @@ impl<'a> Printer<'a> {
             // stays inline in flat parens.
             if matches!(
                 super_class,
-                internal::Expression::ClassExpression(c)
-                    if c.decorators.is_some_and(|dec| !dec.is_empty())
+                internal::Expression::ClassExpression(c) if class_expr_has_decorators(c)
             ) {
                 self.build_break_open_parens(doc)
             } else {

@@ -30,7 +30,7 @@ mod template_literal;
 use self::operators::OperatorBuf;
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
-use crate::printer::{ParenContext, PatternContext, Printer, chain};
+use crate::printer::{ParenContext, PatternContext, Printer, chain, class_expr_has_decorators};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_in_range;
@@ -139,7 +139,7 @@ impl<'a> Printer<'a> {
                 // open + indents, like the bare-statement form; an undecorated
                 // `(class {}).foo` keeps the flat wrap.
                 if self.expr_stmt_paren_target.get() == Some(class_expr.span)
-                    && class_expr.decorators.is_some_and(|dec| !dec.is_empty())
+                    && class_expr_has_decorators(class_expr)
                 {
                     self.build_break_open_parens(doc)
                 } else {

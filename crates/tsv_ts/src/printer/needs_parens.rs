@@ -19,6 +19,7 @@
 use crate::ast::internal::{
     BinaryOperator, Expression, LiteralValue, UnaryOperator, UpdateOperator,
 };
+use crate::printer::class_expr_has_decorators;
 
 /// Context for parenthesization decisions
 ///
@@ -381,8 +382,7 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                 // expression stays unwrapped (prettier keeps `extends class {}`).
                 || matches!(
                     stripped,
-                    Expression::ClassExpression(c)
-                        if c.decorators.is_some_and(|dec| !dec.is_empty())
+                    Expression::ClassExpression(c) if class_expr_has_decorators(c)
                 )
         }
 
