@@ -154,8 +154,10 @@ impl BoundProgram {
     }
 
     /// A unit's dark-carried flow product (`None` for a rejected unit or an
-    /// out-of-range index). Nothing in the check pipeline reads it (F3 will);
-    /// `--dump-flow` reaches it through this accessor.
+    /// out-of-range index) — the natural accessor for a bound program's flow
+    /// product, which the CFA type engine (P3) will consume.
+    // TODO: no consumer wires this yet — P3's CFA reads a bound program's flow
+    // here (`--dump-flow` renders via `bind_file` + `build_flow` directly, not this).
     #[must_use]
     pub fn unit_flow(&self, index: usize) -> Option<&FlowProduct> {
         self.units.get(index).and_then(|u| u.flow.as_ref())

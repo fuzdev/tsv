@@ -31,9 +31,10 @@ use string_interner::DefaultStringInterner;
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
     ArrowFunctionBody, ClassBody, ClassMember, Decorator, ExportDefaultValue, Expression,
-    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, TSInterfaceHeritage,
-    TSLiteralType, TSModuleDeclaration, TSModuleDeclarationBody, TSType, TSTypeAnnotation,
-    TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation, VariableDeclaration,
+    ForInOfLeft, ForInit, ObjectPatternProperty, ObjectProperty, Statement, TSInterfaceDeclaration,
+    TSInterfaceHeritage, TSLiteralType, TSModuleDeclaration, TSModuleDeclarationBody, TSType,
+    TSTypeAnnotation, TSTypeElement, TSTypeParameterDeclaration, TSTypeParameterInstantiation,
+    VariableDeclaration,
 };
 
 /// Run the syntactic check pass over one parsed file, returning its check-time
@@ -79,34 +80,26 @@ impl<'a> CheckWalk<'a> {
         match stmt {
             Statement::ExpressionStatement(s) => self.visit_expression(&s.expression),
             Statement::VariableDeclaration(d) => self.visit_variable_declaration(d),
-            Statement::FunctionDeclaration(f) => {
-                self.visit_type_params(f.type_parameters.as_ref());
-                self.visit_params(f.params);
-                self.visit_type_annotation_opt(f.return_type.as_ref());
-                for s in f.body.body {
-                    self.visit_statement(s);
-                }
-            }
+            Statement::FunctionDeclaration(f) => self.check_function_common(
+                f.type_parameters.as_ref(),
+                f.params,
+                f.return_type.as_ref(),
+                f.body.body,
+            ),
             Statement::TSDeclareFunction(f) => {
                 self.visit_type_params(f.type_parameters.as_ref());
                 self.visit_params(f.params);
                 self.visit_type_annotation_opt(f.return_type.as_ref());
             }
-            Statement::ClassDeclaration(c) => {
-                self.visit_type_params(c.type_parameters.as_ref());
-                self.visit_class_heritage(
-                    c.decorators,
-                    c.super_class,
-                    c.super_type_parameters.as_ref(),
-                    c.implements,
-                );
-                self.visit_class_body(&c.body);
-            }
-            Statement::TSInterfaceDeclaration(i) => {
-                self.visit_type_params(i.type_parameters.as_ref());
-                self.visit_heritage_type_args(i.extends);
-                self.visit_type_elements(i.body.body);
-            }
+            Statement::ClassDeclaration(c) => self.check_class_common(
+                c.type_parameters.as_ref(),
+                c.decorators,
+                c.super_class,
+                c.super_type_parameters.as_ref(),
+                c.implements,
+                &c.body,
+            ),
+            Statement::TSInterfaceDeclaration(i) => self.check_interface_common(i),
             Statement::TSTypeAliasDeclaration(t) => {
                 self.visit_type_params(t.type_parameters.as_ref());
                 self.visit_type(&t.type_annotation);
@@ -253,34 +246,72 @@ impl<'a> CheckWalk<'a> {
     fn visit_export_default(&mut self, value: &ExportDefaultValue<'_>) {
         match value {
             ExportDefaultValue::Expression(e) => self.visit_expression(e),
-            ExportDefaultValue::FunctionDeclaration(f) => {
-                self.visit_type_params(f.type_parameters.as_ref());
-                self.visit_params(f.params);
-                self.visit_type_annotation_opt(f.return_type.as_ref());
-                for s in f.body.body {
-                    self.visit_statement(s);
-                }
-            }
+            ExportDefaultValue::FunctionDeclaration(f) => self.check_function_common(
+                f.type_parameters.as_ref(),
+                f.params,
+                f.return_type.as_ref(),
+                f.body.body,
+            ),
             ExportDefaultValue::TSDeclareFunction(f) => {
                 self.visit_type_params(f.type_parameters.as_ref());
                 self.visit_params(f.params);
                 self.visit_type_annotation_opt(f.return_type.as_ref());
             }
-            ExportDefaultValue::ClassDeclaration(c) => {
-                self.visit_type_params(c.type_parameters.as_ref());
-                self.visit_class_heritage(
-                    c.decorators,
-                    c.super_class,
-                    c.super_type_parameters.as_ref(),
-                    c.implements,
-                );
-                self.visit_class_body(&c.body);
-            }
-            ExportDefaultValue::TSInterfaceDeclaration(i) => {
-                self.visit_type_params(i.type_parameters.as_ref());
-                self.visit_heritage_type_args(i.extends);
-                self.visit_type_elements(i.body.body);
-            }
+            ExportDefaultValue::ClassDeclaration(c) => self.check_class_common(
+                c.type_parameters.as_ref(),
+                c.decorators,
+                c.super_class,
+                c.super_type_parameters.as_ref(),
+                c.implements,
+                &c.body,
+            ),
+            ExportDefaultValue::TSInterfaceDeclaration(i) => self.check_interface_common(i),
+        }
+    }
+
+    // --- shared declaration descents -----------------------------------------
+
+    /// The class descent shared by the declaration, export-default, and expression
+    /// forms: type parameters, heritage (decorators / `extends` / `implements`), and
+    /// the member body. The three sites are byte-identical across `ClassDeclaration`
+    /// and `ClassExpression` (distinct types with the same field shape).
+    fn check_class_common(
+        &mut self,
+        type_parameters: Option<&TSTypeParameterDeclaration<'_>>,
+        decorators: Option<&[Decorator<'_>]>,
+        super_class: Option<&Expression<'_>>,
+        super_type_parameters: Option<&TSTypeParameterInstantiation<'_>>,
+        implements: &[TSInterfaceHeritage<'_>],
+        body: &ClassBody<'_>,
+    ) {
+        self.visit_type_params(type_parameters);
+        self.visit_class_heritage(decorators, super_class, super_type_parameters, implements);
+        self.visit_class_body(body);
+    }
+
+    /// The interface descent shared by the declaration and export-default forms.
+    fn check_interface_common(&mut self, interface: &TSInterfaceDeclaration<'_>) {
+        self.visit_type_params(interface.type_parameters.as_ref());
+        self.visit_heritage_type_args(interface.extends);
+        self.visit_type_elements(interface.body.body);
+    }
+
+    /// The body-bearing function descent shared by the declaration, export-default,
+    /// and expression forms: type parameters, parameters, return type, then the body
+    /// statements. (The bodyless `TSDeclareFunction` arms share only the header, so
+    /// they stay inline.)
+    fn check_function_common(
+        &mut self,
+        type_parameters: Option<&TSTypeParameterDeclaration<'_>>,
+        params: &[Expression<'_>],
+        return_type: Option<&TSTypeAnnotation<'_>>,
+        body: &[Statement<'_>],
+    ) {
+        self.visit_type_params(type_parameters);
+        self.visit_params(params);
+        self.visit_type_annotation_opt(return_type);
+        for s in body {
+            self.visit_statement(s);
         }
     }
 
@@ -289,14 +320,12 @@ impl<'a> CheckWalk<'a> {
     fn visit_expression(&mut self, expr: &Expression<'_>) {
         use Expression as E;
         match expr {
-            E::FunctionExpression(f) => {
-                self.visit_type_params(f.type_parameters.as_ref());
-                self.visit_params(f.params);
-                self.visit_type_annotation_opt(f.return_type.as_ref());
-                for s in f.body.body {
-                    self.visit_statement(s);
-                }
-            }
+            E::FunctionExpression(f) => self.check_function_common(
+                f.type_parameters.as_ref(),
+                f.params,
+                f.return_type.as_ref(),
+                f.body.body,
+            ),
             E::ArrowFunctionExpression(a) => {
                 self.visit_type_params(a.type_parameters.as_ref());
                 self.visit_params(a.params);
@@ -310,16 +339,14 @@ impl<'a> CheckWalk<'a> {
                     }
                 }
             }
-            E::ClassExpression(c) => {
-                self.visit_type_params(c.type_parameters.as_ref());
-                self.visit_class_heritage(
-                    c.decorators,
-                    c.super_class,
-                    c.super_type_parameters.as_ref(),
-                    c.implements,
-                );
-                self.visit_class_body(&c.body);
-            }
+            E::ClassExpression(c) => self.check_class_common(
+                c.type_parameters.as_ref(),
+                c.decorators,
+                c.super_class,
+                c.super_type_parameters.as_ref(),
+                c.implements,
+                &c.body,
+            ),
             E::TSAsExpression(t) => {
                 self.visit_expression(t.expression);
                 self.visit_type(t.type_annotation);

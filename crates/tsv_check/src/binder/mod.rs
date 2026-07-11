@@ -574,7 +574,15 @@ impl SoaWalk {
         self.spans.push(span);
         self.subtree_end.push(id); // provisional (a leaf owns only itself)
         self.node_flags.push(0); // F0 mints the column zeroed; F1 sets it
-        self.address_map.insert((address, kind), id);
+        // Each node is added exactly once by the pre-order walk, so a prior entry
+        // for this `(address, kind)` key is a genuine same-kind offset-0 collision
+        // (the "no same-kind collisions exist" claim in `require_node_id`, made a
+        // corpus-checked invariant — `tsc_conformance run` is a debug build).
+        // Compiles out of release.
+        debug_assert!(
+            self.address_map.insert((address, kind), id).is_none(),
+            "same-kind address collision at {address:#x} / {kind:?}"
+        );
         id
     }
 
@@ -761,13 +769,37 @@ impl SoaWalk {
     // --- declaration descents (shared between statement + export-default) -----
 
     fn descend_function(&mut self, f: &FunctionDeclaration<'_>, id: NodeId) {
-        if let Some(name) = &f.id {
+        self.descend_function_common(
+            id,
+            f.id.as_ref(),
+            f.type_parameters.as_ref(),
+            f.params,
+            f.return_type.as_ref(),
+            f.body.body,
+        );
+    }
+
+    /// The body-bearing function descent shared by the declaration form
+    /// ([`Self::descend_function`]) and the method-value / function-expression form
+    /// ([`Self::visit_function_expression`]), keyed on the already-minted `id`. Kept
+    /// as one helper so `FunctionDeclaration` and `FunctionExpression` — distinct
+    /// types with the same field shape — never drift in what the walk descends.
+    fn descend_function_common(
+        &mut self,
+        id: NodeId,
+        name: Option<&Identifier<'_>>,
+        type_parameters: Option<&TSTypeParameterDeclaration<'_>>,
+        params: &[Expression<'_>],
+        return_type: Option<&TSTypeAnnotation<'_>>,
+        body: &[Statement<'_>],
+    ) {
+        if let Some(name) = name {
             self.visit_identifier(name, id);
         }
-        self.visit_type_params(f.type_parameters.as_ref(), id);
-        self.visit_params(f.params, id);
-        self.visit_type_annotation_opt(f.return_type.as_ref(), id);
-        self.visit_statements(f.body.body, id);
+        self.visit_type_params(type_parameters, id);
+        self.visit_params(params, id);
+        self.visit_type_annotation_opt(return_type, id);
+        self.visit_statements(body, id);
     }
 
     fn descend_declare_function(&mut self, f: &TSDeclareFunction<'_>, id: NodeId) {
@@ -1369,13 +1401,14 @@ impl SoaWalk {
             Some(parent),
             addr_of(f),
         );
-        if let Some(name) = &f.id {
-            self.visit_identifier(name, id);
-        }
-        self.visit_type_params(f.type_parameters.as_ref(), id);
-        self.visit_params(f.params, id);
-        self.visit_type_annotation_opt(f.return_type.as_ref(), id);
-        self.visit_statements(f.body.body, id);
+        self.descend_function_common(
+            id,
+            f.id.as_ref(),
+            f.type_parameters.as_ref(),
+            f.params,
+            f.return_type.as_ref(),
+            f.body.body,
+        );
         self.close(id);
     }
 

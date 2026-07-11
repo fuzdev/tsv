@@ -133,6 +133,12 @@ impl UnreachableCandidates {
         diagnostics: &mut Vec<Diagnostic>,
         suggestions: &mut Vec<Diagnostic>,
     ) {
+        // TODO: tsgo's `getDiagnosticsWithPrecedingDirectives` filters ALL bind+check
+        // diagnostics; tsv suppresses only this flow family (TS7027/7028), so a
+        // `@ts-ignore`'d dup-family diagnostic still emits as a family extra. Widening
+        // is deferred — the clean form is a final per-file pass over the concatenated
+        // bind+check(+merge) diagnostics, which entangles with multi-file merge
+        // cross-file attribution (a P3/multi-file concern).
         // TS7027 — unreachable code. Skip the probe entirely at `True`.
         if options.allow_unreachable_code != Tristate::True {
             let is_error = options.allow_unreachable_code == Tristate::False;

@@ -207,8 +207,9 @@ pub struct Decl {
 /// A bound symbol: accumulated flags, its table key, its declarations, and the
 /// child tables a container owns.
 #[derive(Clone, Debug)]
-// `name` and `parent` mirror tsgo's `Symbol` shape and are set by the bind; the
-// family cascade reads `flags`/`decls`/`members`/`exports` only.
+// `parent` mirrors tsgo's `Symbol` shape and is set by the bind but read by nothing
+// yet (hence the allow); the cascade + merge resolution read
+// `flags`/`name`/`decls`/`members`/`exports`.
 #[allow(dead_code)]
 pub struct Symbol {
     /// The accumulated classification flags.

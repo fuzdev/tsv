@@ -180,13 +180,6 @@ impl FlowFlags {
     pub const fn is_label(self) -> bool {
         self.intersects(FlowFlags::LABEL)
     }
-
-    /// The raw bits (for the DOT renderer's header labels).
-    #[inline]
-    #[must_use]
-    pub const fn bits(self) -> u16 {
-        self.0
-    }
 }
 
 // --- F2 payload shapes (defined for the SoA shape; not populated in F1a) ----
@@ -2075,28 +2068,32 @@ impl<'a> FlowBuilder<'a> {
     }
 
     fn visit_class_decl(&mut self, c: &ClassDeclaration<'_>) {
-        if let Some(name) = &c.id {
-            self.visit_identifier(name);
-        }
-        self.visit_decorators(c.decorators);
-        if let Some(sc) = c.super_class {
-            self.visit_expression(sc);
-        }
-        // type params / super type args / implements are type positions (skip).
-        for member in c.body.body {
-            self.visit_class_member(member);
-        }
+        self.visit_class_common(c.id.as_ref(), c.decorators, c.super_class, c.body.body);
     }
 
     fn visit_class_expr(&mut self, c: &ClassExpression<'_>) {
-        if let Some(name) = &c.id {
+        self.visit_class_common(c.id.as_ref(), c.decorators, c.super_class, c.body.body);
+    }
+
+    /// The value-flow class descent shared by the declaration and expression forms
+    /// (distinct types with the same field shape): the name binding, decorators, and
+    /// the `extends` expression, then each member. Type positions (type params /
+    /// super type args / `implements`) are skipped.
+    fn visit_class_common(
+        &mut self,
+        name: Option<&Identifier<'_>>,
+        decorators: Option<&[Decorator<'_>]>,
+        super_class: Option<&Expression<'_>>,
+        members: &[ClassMember<'_>],
+    ) {
+        if let Some(name) = name {
             self.visit_identifier(name);
         }
-        self.visit_decorators(c.decorators);
-        if let Some(sc) = c.super_class {
+        self.visit_decorators(decorators);
+        if let Some(sc) = super_class {
             self.visit_expression(sc);
         }
-        for member in c.body.body {
+        for member in members {
             self.visit_class_member(member);
         }
     }
@@ -3091,6 +3088,8 @@ mod tests {
             bound.kinds[anchor_node.index()],
             NodeKind::FunctionExpression
         );
+        // The symmetric accessor resolves the anchor to the same return flow.
+        assert_eq!(product.return_flow_of(anchor_node), Some(rf));
         assert!(product.stats.branch_labels >= 1);
         assert!(product.stats.dead_labels >= 1);
     }

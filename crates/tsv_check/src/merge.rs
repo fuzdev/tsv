@@ -162,12 +162,6 @@ impl LibBase {
     fn get(&self, name: &str) -> Option<&LibEntry> {
         self.globals.get(name)
     }
-
-    /// The number of distinct global names — informational (base sizing).
-    #[must_use]
-    pub fn global_count(&self) -> usize {
-        self.globals.len()
-    }
 }
 
 /// Fold one lib symbol into the base globals (accumulate flags + priority-ordered
