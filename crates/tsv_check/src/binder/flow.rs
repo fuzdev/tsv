@@ -23,16 +23,19 @@
 //! `bindBinaryExpressionFlow` walks the parent chain to decide whether a logical
 //! expression is evaluated for its value (top-level → `hasFlowEffects` post-label
 //! wrap) or as a condition (nested → wired to the enclosing true/false targets).
-//! tsv's `Expression` has no parent pointer, so the walk is replaced by the
-//! invariant that the true/false targets are `Some` **exactly** inside a
-//! condition bind (they are set only by `do_with_conditional_branches` and the
-//! `!`-swap): a logical expression is top-level iff `current_true_target` is
-//! `None`. To keep that invariant sound across a nested function/initializer
-//! container (which can be entered mid-condition, e.g.
-//! `if (arr.some(x => x && y))`), the true/false targets are **saved + reset to
-//! `None` at every flow container** and restored on exit — a deliberate
-//! departure from tsgo (which never saves them, relying on the parent walk)
-//! required by the pointer-free heuristic.
+//! tsv's `Expression` has no parent pointer, so the walk is replaced by keeping
+//! the true/false targets `Some` **only** while binding an actual sub-condition —
+//! they are set by `do_with_conditional_branches` / the `!`-swap, and reset to
+//! `None` at two boundaries so they never leak into a non-condition: (1) at every
+//! **value sub-position** — `visit_expression` resets them for every non-threading
+//! expression, so a logical nested in a call argument / `?:` arm / array element
+//! (`if (f(x && y))`) is classified top-level (a value), not a sub-condition; and
+//! (2) at every **flow container** — one can be entered mid-condition
+//! (`if (arr.some(x => x && y))`), which would otherwise leak the outer targets
+//! into the callback body. With both resets a logical expression is top-level iff
+//! `current_true_target` is `None`. Both are deliberate departures from tsgo
+//! (which never saves the targets, relying on the parent walk) required by the
+//! pointer-free heuristic.
 //!
 //! **Deliberate scoping deviations (F1a; documented for F1b):**
 //! - **Types are not descended.** The walk visits value positions only; pure
@@ -440,13 +443,17 @@ impl<'a> FlowBuilder<'a> {
     }
 
     fn finish(mut self) -> FlowProduct {
-        // Flush any label whose antecedents still live in scratch — the **loop
-        // labels** (`preWhile`/`preDo`/`preLoop`). A loop label is referenced (its
-        // condition flows from it, and it is a back/continue edge target) but the
-        // loop binders never call `finish_flow_label` on it (a back edge can be
-        // added after it is already used), so its entry + back edges never reach
-        // the pool via the collapse path. Deterministic order (sort by id) so the
-        // pool layout is reproducible; the per-label edge order is push-order.
+        // Flush any label whose antecedents still live in scratch: the **loop
+        // labels** (`preWhile`/`preDo`/`preLoop` — referenced via their condition
+        // flow and a back/continue edge, but the loop binders never call
+        // `finish_flow_label` on them since a back edge can be added after the label
+        // is already used, so their entry + back edges never reach the pool via the
+        // collapse path), AND the **un-finished value-context post labels** — a
+        // top-level logical / conditional whose subtree had no flow effects keeps
+        // `current_flow` at the saved pre-expression flow and never finishes its
+        // `post` label, leaving a dead, unreferenced row (matching tsgo's
+        // un-finished label object). Deterministic order (sort by id) so the pool
+        // layout is reproducible; the per-label edge order is push-order.
         let mut pending: Vec<FlowNodeId> = self.label_scratch.keys().copied().collect();
         pending.sort_unstable();
         for label in pending {
@@ -1650,6 +1657,23 @@ impl<'a> FlowBuilder<'a> {
 
     fn visit_expression(&mut self, expr: &Expression<'_>) {
         use Expression as E;
+        // A **value** sub-position resets the condition targets, so a logical
+        // expression nested inside one (`if (f(x && y))`, `if (c ? x && y : z)`,
+        // `if (g([x && y]))`) is classified top-level — a value with its own
+        // post-label — not a sub-condition of the enclosing `bind_condition`. This
+        // is the pointer-free `isTopLevelLogicalExpression` (binder.go:2782): only
+        // the *threading* variants (`!`, `&&`/`||`/`??`, logical-assignment, parens)
+        // propagate the targets into their operands; every other expression is a
+        // value boundary. Without the reset, `current_true_target.is_none()` stays
+        // false through the whole condition subtree and mis-wires nested logicals.
+        let restore = if is_condition_threading(expr) {
+            None
+        } else {
+            Some((
+                self.current_true_target.take(),
+                self.current_false_target.take(),
+            ))
+        };
         match expr {
             E::Identifier(idn) => self.visit_identifier(idn),
             E::ThisExpression(t) => {
@@ -1813,6 +1837,10 @@ impl<'a> FlowBuilder<'a> {
             }
             E::JsdocCast(c) => self.visit_expression(c.inner),
             E::ParenthesizedExpression(p) => self.visit_expression(p.expression),
+        }
+        if let Some((t, f)) = restore {
+            self.current_true_target = t;
+            self.current_false_target = f;
         }
     }
 
@@ -2037,6 +2065,20 @@ fn is_logical_condition(e: &Expression<'_>) -> bool {
         Expression::BinaryExpression(b) => b.operator.is_logical(),
         Expression::AssignmentExpression(a) => is_logical_assign_op(a.operator),
         _ => false,
+    }
+}
+
+/// Whether an expression **threads** the enclosing condition targets into its
+/// operands (vs being a value boundary that resets them). Mirrors the four
+/// threading arms of `visit_expression`: `!`, `&&`/`||`/`??`, logical-assignment,
+/// and parentheses — the same set tsgo's `isTopLevelLogicalExpression`
+/// (binder.go:2782) ascends through. Every other expression is a value
+/// sub-position (see the reset in `visit_expression`).
+fn is_condition_threading(e: &Expression<'_>) -> bool {
+    match e {
+        Expression::UnaryExpression(u) => u.operator == UnaryOperator::Bang,
+        Expression::ParenthesizedExpression(_) => true,
+        _ => is_logical_condition(e),
     }
 }
 
@@ -2643,6 +2685,36 @@ mod tests {
                 .contains(FlowFlags::BRANCH_LABEL)
         );
         assert_eq!(product.graph.antecedents(b_flow), vec![c1, c2]);
+    }
+
+    #[test]
+    fn logical_in_condition_value_subposition_is_top_level() {
+        // `if (f(x && y)) a; else b;` — the `x && y` sits in a VALUE sub-position
+        // (a call argument) of the if condition, so it is top-level (a value with
+        // its own post-label), NOT a sub-condition of the if. tsgo classifies this
+        // via a parent walk (`isTopLevelLogicalExpression`); tsv resets the
+        // condition targets at the value boundary in `visit_expression`. The if's
+        // actual condition `f(x && y)` is non-narrowing with no flow effects, so
+        // BOTH arms enter from the function Start — the distinguishing property:
+        // the bug wired x/y's conditions into the if's then/else, making
+        // a.flow != b.flow. (`if (c ? x && y : z)` and `if (g([x && y]))` are the
+        // same class — value sub-positions.)
+        let src = "function w() { if (f(x && y)) a; else b; }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let b = ident(&bound, src, "b");
+        let a_flow = flow_of_node(&product, a);
+        let b_flow = flow_of_node(&product, b);
+        assert_eq!(
+            a_flow, b_flow,
+            "a non-narrowing if-condition merges both arms; x && y must not wire into them"
+        );
+        assert!(product.graph.flags(a_flow).contains(FlowFlags::START));
+        // `x && y` is still narrowed as a value — its own condition nodes exist,
+        // but they feed x && y's post-label, not the if arms.
+        let x = ident(&bound, src, "x");
+        let xc = condition_of(&product, x, true);
+        assert_ne!(a_flow, xc);
     }
 
     #[test]
