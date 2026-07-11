@@ -505,6 +505,52 @@ const self_closing_nonvoid: DivergencePattern = {
 	},
 };
 
+const attr_value_single_quote: DivergencePattern = {
+	id: 'attr_value_single_quote',
+	description: 'Attribute / style: / this= value with a literal " kept single-quoted',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Attributes'],
+	fixtures: [
+		'svelte/attributes/value_double_quote_prettier_divergence',
+		'svelte/directives/style/value_double_quote_prettier_divergence',
+		'svelte/special_elements/svelte_element_this_double_quote_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		// tsv emits a quoted attribute / `style:` / `this=` value with SINGLE-quote
+		// delimiters exactly when the value contains a literal `"` (double quotes
+		// cannot hold it — HTML §13.1.2.3); prettier-plugin-svelte re-quotes with `"`
+		// and corrupts. The unique fingerprint on OURS is a single-quoted value
+		// carrying a `"` — every other value is double-quoted, so this shape appears
+		// only for this divergence. Pair it with prettier's double-quoted form of the
+		// same attribute name to stay airtight (a JS string in `<script>` never
+		// produces the paired prettier form, since prettier also single-quotes it).
+		const ours_single_dq = /(?:^|\s)([\w:@.-]+)='[^']*"[^']*'/;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			for (const line of hunk.added_lines) {
+				const m = ours_single_dq.exec(line);
+				if (!m) continue;
+				const name = m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+				const prettier_dq = new RegExp(`${name}="[^"]*"`);
+				if (hunk.removed_lines.some((l) => prettier_dq.test(l))) return true;
+			}
+			return false;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'attr_value_single_quote',
+				confidence: 'certain',
+				hunk_indices,
+				reason: 'Value with a literal " kept single-quoted (prettier corrupts to double quotes)',
+			};
+		}
+		return null;
+	},
+};
+
 const empty_statement_removal: DivergencePattern = {
 	id: 'empty_statement_removal',
 	description: 'Standalone empty statement (;) removed',
@@ -2348,6 +2394,7 @@ export const PATTERNS: DivergencePattern[] = [
 	// 1. Language-specific narrow patterns (certain or rare)
 	bom_strip,
 	self_closing_nonvoid,
+	attr_value_single_quote,
 	empty_statement_removal,
 	css_value_ratio,
 
