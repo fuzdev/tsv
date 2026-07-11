@@ -9,8 +9,10 @@
 //!   (heritage clauses, type parameters, member signatures, decorators, import/
 //!   export specifiers, …). It fills the parent/kind/span/`subtree_end` side
 //!   columns, the zero-initialized `node_flags` column, and the address→id map.
-//!   Source order, so the `subtree_end` interval test (`is X a descendant of Y`)
-//!   stays valid. The one deliberate carve-out is the pure list-wrapper nodes
+//!   Pre-order — each parent precedes its contiguous subtree, so the
+//!   `subtree_end` interval test (`is X a descendant of Y`) stays valid. Sibling
+//!   order follows the traversal, not always source order (an annotated binding
+//!   descends its `: T` before the binding), which the interval test does not rely on. The one deliberate carve-out is the pure list-wrapper nodes
 //!   (`ClassBody` / `TSInterfaceBody` / a function/try/catch/finally/static body
 //!   `BlockStatement` / the `Program.body` slice / the transparent
 //!   `TSTypeAnnotation` `: T` wrapper): their members/inner stay flat children of
@@ -759,6 +761,9 @@ impl SoaWalk {
         if let Some(name) = &c.id {
             self.visit_identifier(name, id);
         }
+        // The class's own `<T>` — kept in sync with the `ClassExpression` arm in
+        // `visit_expression` (guarded by the `require_node_id` coverage test).
+        self.visit_type_params(c.type_parameters.as_ref(), id);
         self.visit_class_heritage(
             c.decorators,
             c.super_class,
@@ -1149,6 +1154,8 @@ impl SoaWalk {
                 if let Some(name) = &c.id {
                     self.visit_identifier(name, id);
                 }
+                // Kept in sync with `descend_class` (see the coverage test).
+                self.visit_type_params(c.type_parameters.as_ref(), id);
                 self.visit_class_heritage(
                     c.decorators,
                     c.super_class,
@@ -2033,6 +2040,39 @@ mod tests {
         // rather than return a corrupting `NodeId::FIRST` sentinel.
         let bound = bind("const x = 1;");
         let _ = bound.require_node_id(0);
+    }
+
+    #[test]
+    fn class_type_parameters_are_descended() {
+        // Regression guard (F0 review): a class's own `<T>` was dropped — no
+        // NodeId — so F1's strict `require_node_id` would panic on a class type
+        // parameter. `class C<T> {}` mints Program, ClassDeclaration, Identifier(C),
+        // TSTypeParameterDeclaration, TSTypeParameter, Identifier(T) = 6 nodes, and
+        // `require_node_id` resolves the type-parameter node.
+        let arena = Bump::new();
+        let program = tsv_ts::parse("class C<T> {}", &arena).expect("parse");
+        let bound = bind_file(&program, "class C<T> {}", FileId::ROOT);
+        assert_eq!(bound.node_count, 6);
+        let tp = bound
+            .kinds
+            .iter()
+            .position(|k| *k == NodeKind::TSTypeParameter)
+            .map(NodeId::from_index)
+            .expect("class type parameter is idd");
+        // The `<T>` decl is the type-param's parent; the class owns both.
+        assert!(bound.is_descendant_of(tp, NodeId::from_index(1)));
+        // The class-expression path mirrors the declaration path (kept in sync).
+        assert!(
+            bind("const C = class<T> {};")
+                .kinds
+                .contains(&NodeKind::TSTypeParameter)
+        );
+        // A class type param's constraint + default are reached (both `TSTypeReference`s).
+        assert!(
+            bind("class C<T extends U = V> {}")
+                .kinds
+                .contains(&NodeKind::TSTypeReference)
+        );
     }
 
     /// The sorted family diagnostic codes a source produces — via the full
