@@ -103,11 +103,11 @@ const RUN_CRASH_EXCLUDED_PIN: usize = 1;
 /// a rise anywhere is a regression to explain.
 const RUN_FAMILY_GRADED_PIN: usize = 4066;
 const RUN_FAMILY_POSITIVE_PIN: usize = 125;
-const RUN_FAMILY_MATCH_PIN: usize = 425;
-const RUN_FAMILY_MISSING_PIN: usize = 125;
+const RUN_FAMILY_MATCH_PIN: usize = 445;
+const RUN_FAMILY_MISSING_PIN: usize = 105;
 const RUN_MISSING_MERGE_PIN: usize = 0;
 const RUN_MISSING_LIB_PIN: usize = 0;
-const RUN_MISSING_CHECKTIME_PIN: usize = 125;
+const RUN_MISSING_CHECKTIME_PIN: usize = 105;
 const RUN_FAMILY_SPAN_MISMATCH_PIN: usize = 0;
 const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
 const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 9;

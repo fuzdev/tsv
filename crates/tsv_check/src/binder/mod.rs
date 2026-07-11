@@ -693,6 +693,61 @@ mod tests {
     }
 
     #[test]
+    fn signature_duplicate_params_conflict() {
+        // A method / call / construct signature is its own function scope, so its
+        // duplicate params conflict (TS2300) — the anonymous signature declaration
+        // itself never conflicts.
+        assert_eq!(diag_codes("interface I { foo(x, x); }"), vec![2300, 2300]);
+        assert_eq!(diag_codes("interface I { (x, x); }"), vec![2300, 2300]);
+        assert_eq!(diag_codes("interface I { new (x, x); }"), vec![2300, 2300]);
+        // A generic method signature still conflicts on the params (the type param
+        // binds in the same scope without colliding).
+        assert_eq!(
+            diag_codes("interface I { foo<T>(x: T, x: T); }"),
+            vec![2300, 2300]
+        );
+        // Distinct param names in one signature and a lone param never conflict.
+        assert!(diag_codes("interface I { foo(x, y); bar(z); }").is_empty());
+    }
+
+    #[test]
+    fn type_annotation_type_literal_members_bind() {
+        // A typed binding descends its annotation: a type-literal method signature's
+        // duplicate params conflict.
+        assert_eq!(diag_codes("var a: { foo(x, x); };"), vec![2300, 2300]);
+        // Duplicate *members* of a type literal silent-merge at bind (they are a
+        // check-time TS2300, out of the bind/merge family).
+        assert!(diag_codes("var a: { x: number; x: string; };").is_empty());
+    }
+
+    #[test]
+    fn object_literal_duplicate_methods_conflict() {
+        // Two same-named object-literal methods conflict (the method exclude is the
+        // whole Value mask for an object-literal method).
+        assert_eq!(diag_codes("var b = { foo() {}, foo() {} };"), vec![2300, 2300]);
+        // Duplicate plain properties silent-merge (Property is not in PropertyExcludes).
+        assert!(diag_codes("var b = { x: 1, x: 2 };").is_empty());
+        // A getter/setter pair of the same name merges without a diagnostic.
+        assert!(diag_codes("var b = { get x() { return 1; }, set x(v) {} };").is_empty());
+    }
+
+    #[test]
+    fn dotted_namespace_merges_with_explicit_nested() {
+        // The dotted form's intermediate segments route to the enclosing namespace's
+        // exports, so they merge with the explicit-nested form — and their conflicting
+        // members surface (two classes named `P` in the merged inner namespace).
+        assert_eq!(
+            diag_codes(
+                "namespace M.X { export class P {} } \
+                 namespace M { export namespace X { export class P {} } }"
+            ),
+            vec![2300, 2300]
+        );
+        // A lone dotted namespace introduces no spurious conflict.
+        assert!(diag_codes("namespace A.B.C { export const x = 1; }").is_empty());
+    }
+
+    #[test]
     fn private_name_mangling_collides_at_hash() {
         // A private method vs a same-named private field is a bind-time conflict
         // (Method in PropertyExcludes); the mangling (class symbol id + name) makes

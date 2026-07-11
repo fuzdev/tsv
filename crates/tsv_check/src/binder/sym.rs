@@ -72,8 +72,9 @@ use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
     ClassBody, ClassMember, ExportDefaultValue, ExportSpecifier, Expression, ForInOfLeft, ForInit,
     Identifier, ImportSpecifier, Literal, LiteralValue, MethodKind, ModuleExportName,
-    ObjectPatternProperty, Statement, TSEnumMemberId, TSInterfaceBody, TSModuleDeclarationBody,
-    TSModuleName, TSTypeElement, TSTypeParameterDeclaration,
+    ObjectExpression, ObjectPatternProperty, ObjectProperty, PropertyKind, Statement,
+    TSEnumMemberId, TSInterfaceBody, TSModuleDeclarationBody, TSModuleName, TSType, TSTypeAnnotation,
+    TSTypeElement, TSTypeLiteral, TSTypeParameterDeclaration,
 };
 
 /// The container kinds that route member declarations (a subset of tsgo's node
@@ -1189,6 +1190,14 @@ impl<'a> SymbolBinder<'a> {
                 } else {
                     self.declare_in_container(d, includes, excludes);
                 }
+                // The binder's one type-annotation entry point: a typed binding
+                // (`var a: { … }`) descends into its annotation so a type literal's
+                // members bind (its method-signature params conflict, its duplicate
+                // members silent-merge). Narrow by design — an incomplete traversal
+                // only leaves family instances missing, never fabricates a conflict.
+                if let Some(ann) = id.type_annotation() {
+                    self.bind_type_annotation(ann);
+                }
             }
             Expression::ObjectPattern(p) => {
                 for prop in p.properties {
@@ -1483,27 +1492,98 @@ impl<'a> SymbolBinder<'a> {
         // `export default interface` with no container symbol: nothing to bind.
     }
 
-    fn bind_type_element(&mut self, element: &TSTypeElement<'a>) {
-        let (key_expr, computed, span, inc, exc) = match element {
-            TSTypeElement::PropertySignature(p) => (
-                &p.key,
-                p.computed,
-                p.span,
-                SymbolFlags::PROPERTY,
-                SymbolFlags::PROPERTY_EXCLUDES,
-            ),
-            TSTypeElement::MethodSignature(m) => (
-                &m.key,
-                m.computed,
-                m.span,
-                SymbolFlags::METHOD,
-                SymbolFlags::METHOD_EXCLUDES,
-            ),
-            // Call/construct/index signatures are anonymous (Signature, no conflict).
-            TSTypeElement::CallSignature(_)
-            | TSTypeElement::ConstructSignature(_)
-            | TSTypeElement::IndexSignature(_) => return,
+    // --- type annotations ----------------------------------------------------
+
+    /// Descend a binding's type annotation.
+    fn bind_type_annotation(&mut self, ann: &TSTypeAnnotation<'a>) {
+        self.bind_type(ann.type_annotation);
+    }
+
+    /// Bind the only type shape whose members reach the family cascade — a type
+    /// literal. Every other variant is a deliberate no-op: a narrower-than-tsgo
+    /// traversal can only leave things missing, never fabricate an extra.
+    fn bind_type(&mut self, ty: &TSType<'a>) {
+        if let TSType::TypeLiteral(tl) = ty {
+            self.bind_type_literal_body(tl);
+        }
+    }
+
+    /// Bind a type literal's members under an anonymous `TypeLiteral` symbol —
+    /// mirrors [`Self::bind_interface_body`]'s member scope, so a method
+    /// signature's duplicate params conflict and its duplicate members
+    /// silent-merge (the property/member family is check-time, out of this bind).
+    ///
+    /// tsgo: internal/binder/binder.go bindAnonymousDeclaration
+    ///       (SymbolFlagsTypeLiteral, InternalSymbolNameType)
+    fn bind_type_literal_body(&mut self, tl: &TSTypeLiteral<'a>) {
+        let name = self.atoms.intern("__type");
+        let sym = self.new_symbol(SymbolFlags::TYPE_LITERAL, name);
+        let saved = (self.container, self.block_scope);
+        let scope = Scope {
+            kind: ContainerKind::Interface,
+            symbol: Some(sym),
+            locals: None,
+            is_external_module: false,
+            is_export_context: false,
         };
+        self.container = scope;
+        self.block_scope = scope;
+        for member in tl.members {
+            self.bind_type_element(member);
+        }
+        self.container = saved.0;
+        self.block_scope = saved.1;
+    }
+
+    fn bind_type_element(&mut self, element: &TSTypeElement<'a>) {
+        match element {
+            TSTypeElement::PropertySignature(p) => {
+                self.declare_type_member(
+                    &p.key,
+                    p.computed,
+                    SymbolFlags::PROPERTY,
+                    SymbolFlags::PROPERTY_EXCLUDES,
+                );
+            }
+            TSTypeElement::MethodSignature(m) => {
+                self.declare_type_member(
+                    &m.key,
+                    m.computed,
+                    SymbolFlags::METHOD,
+                    SymbolFlags::METHOD_EXCLUDES,
+                );
+                // A method signature is itself a `HasLocals` function-like container
+                // (tsgo `GetContainerFlags` KindMethodSignature), so its parameters
+                // bind into a fresh function scope — duplicate params within one
+                // signature conflict (TS2300) independently of the enclosing member
+                // table.
+                self.with_function_scope(m.type_parameters.as_ref(), |b| b.bind_params(m.params));
+            }
+            // Call/construct signatures are anonymous in the member table: tsgo binds
+            // them `SymbolFlagsSignature` with no excludes, so they never conflict —
+            // tsv skips that inert declaration and binds only their parameters, into
+            // their own function scope. Index signatures have a single parameter that
+            // cannot self-conflict, so nothing binds.
+            // tsgo: internal/binder/binder.go GetContainerFlags (Kind{Call,Construct}Signature)
+            TSTypeElement::CallSignature(c) => {
+                self.with_function_scope(c.type_parameters.as_ref(), |b| b.bind_params(c.params));
+            }
+            TSTypeElement::ConstructSignature(c) => {
+                self.with_function_scope(c.type_parameters.as_ref(), |b| b.bind_params(c.params));
+            }
+            TSTypeElement::IndexSignature(_) => {}
+        }
+    }
+
+    /// Declare a type-literal / interface member (property or method signature)
+    /// keyed by its name into the current member container.
+    fn declare_type_member(
+        &mut self,
+        key_expr: &Expression<'a>,
+        computed: bool,
+        inc: SymbolFlags,
+        exc: SymbolFlags,
+    ) {
         if let Some(key) = self.resolve_member_key(key_expr, computed, None) {
             let d = DeclInput {
                 name: key.key,
@@ -1514,7 +1594,6 @@ impl<'a> SymbolBinder<'a> {
                 exported: false,
                 node: NodeId::FIRST,
             };
-            let _ = span;
             self.declare_in_container(d, inc, exc);
         }
     }
@@ -1632,7 +1711,24 @@ impl<'a> SymbolBinder<'a> {
                 self.bind_statement_list(block.body, true);
             }
             Some(TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
-                self.bind_module(nested, DeclMods::default());
+                // A dotted-namespace continuation: `namespace X.Y.Z {}` parses to a
+                // nested `TSModuleDeclaration` chain, and this body variant is
+                // constructed only by that dot path. tsgo's parser synthesizes an
+                // implicit `export` modifier (`NodeFlagsReparsed`) on every
+                // dot-continuation segment, so the intermediate segments land in the
+                // enclosing namespace's persistent *exports* table — the same table an
+                // explicit `export namespace Y {}` routes to — letting the dotted and
+                // explicit-nested forms merge (and their members conflict) instead of
+                // splitting into fresh per-instance locals that never meet.
+                //
+                // tsgo: internal/parser/parser.go parseModuleOrNamespaceDeclaration
+                self.bind_module(
+                    nested,
+                    DeclMods {
+                        exported: true,
+                        default: false,
+                    },
+                );
             }
             None => {}
         }
@@ -1824,13 +1920,7 @@ impl<'a> SymbolBinder<'a> {
                     self.visit_expression(e);
                 }
             }
-            E::ObjectExpression(o) => {
-                for p in o.properties {
-                    if let tsv_ts::ast::internal::ObjectProperty::Property(pr) = p {
-                        self.visit_expression(&pr.value);
-                    }
-                }
-            }
+            E::ObjectExpression(o) => self.bind_object_expression(o),
             E::TemplateLiteral(t) => {
                 for e in t.expressions {
                     self.visit_expression(e);
@@ -1843,6 +1933,61 @@ impl<'a> SymbolBinder<'a> {
                 }
             }
             _ => {}
+        }
+    }
+
+    // --- object literals -----------------------------------------------------
+
+    /// Bind an object literal's members into a fresh member table so duplicate
+    /// members conflict. tsgo binds the literal an anonymous `ObjectLiteral`
+    /// container; tsv builds the member table locally and swaps no scope — an
+    /// object literal is not a `HasLocals` container, and nothing consumes the
+    /// literal's symbol, so nested function/arrow *values* still open their own
+    /// scope through the per-value [`Self::visit_expression`] recursion.
+    ///
+    /// The load-bearing choice is the object-literal-method exclude: it is the
+    /// whole `Value` mask (tsgo `IsObjectLiteralMethod ? SymbolFlagsValue :
+    /// SymbolFlagsMethodExcludes`), and `Value ⊇ Method`, so two same-named
+    /// object-literal methods conflict — while class/interface methods
+    /// (`METHOD_EXCLUDES`) keep their silent-merge untouched.
+    ///
+    /// tsgo: internal/binder/binder.go bindPropertyOrMethodOrAccessor
+    ///       (KindObjectLiteralExpression member cases)
+    fn bind_object_expression(&mut self, obj: &ObjectExpression<'a>) {
+        let table = self.new_table();
+        for prop in obj.properties {
+            match prop {
+                ObjectProperty::Property(pr) => {
+                    if let Some(key) = self.resolve_member_key(&pr.key, pr.computed, None) {
+                        let (inc, exc) = match pr.kind {
+                            PropertyKind::Get => (
+                                SymbolFlags::GET_ACCESSOR,
+                                SymbolFlags::GET_ACCESSOR_EXCLUDES,
+                            ),
+                            PropertyKind::Set => (
+                                SymbolFlags::SET_ACCESSOR,
+                                SymbolFlags::SET_ACCESSOR_EXCLUDES,
+                            ),
+                            PropertyKind::Init if pr.method => (SymbolFlags::METHOD, SymbolFlags::VALUE),
+                            PropertyKind::Init => {
+                                (SymbolFlags::PROPERTY, SymbolFlags::PROPERTY_EXCLUDES)
+                            }
+                        };
+                        let d = DeclInput {
+                            name: key.key,
+                            display: key.display,
+                            error_span: key.span,
+                            is_default_export: false,
+                            is_export_assignment_default: false,
+                            exported: false,
+                            node: NodeId::FIRST,
+                        };
+                        self.declare_symbol(table, None, d, inc, exc);
+                    }
+                    self.visit_expression(&pr.value);
+                }
+                ObjectProperty::SpreadElement(s) => self.visit_expression(s.argument),
+            }
         }
     }
 
