@@ -1,5 +1,5 @@
 {
-  "oracle": "tsgo committed .errors.txt baselines (bind + merge family)",
+  "oracle": "tsgo committed .errors.txt baselines (bind + merge + flow family)",
   "denominators": {
     "in_scope_tests": 9388,
     "in_scope_variants": 9887,
@@ -7,15 +7,20 @@
     "clean_pass": 4435,
     "baselined_parsed": 4446,
     "family_graded_variants": 4066,
-    "family_positive_variants": 125
+    "family_positive_variants": 140
   },
   "family": {
-    "match": 539,
+    "match": 573,
+    "dup_match": 539,
+    "flow_match": 34,
     "missing": {
-      "total": 11,
+      "total": 37,
+      "dup": 11,
+      "flow": 26,
       "merge_path": 0,
       "lib_conflict": 0,
       "late_bound": 11,
+      "cfa": 26,
       "other": 0
     },
     "extra": 0,
@@ -28,10 +33,13 @@
       "2451": 56,
       "2528": 35,
       "2567": 26,
-      "2664": 3
+      "2664": 3,
+      "7027": 31,
+      "7028": 3
     },
     "missing": {
-      "2300": 11
+      "2300": 11,
+      "7027": 26
     }
   },
   "related": {
@@ -42,7 +50,7 @@
   },
   "carve_outs": {
     "recovery_ast_rule_a": 380,
-    "recovery_ast_rule_a_family": 9,
+    "recovery_ast_rule_a_family": 11,
     "module_detection_variants": 1
   },
   "census": {
@@ -64,12 +72,17 @@
     "baselined_parsed": 4446,
     "parse_rejected": 1006,
     "family_graded": 4066,
-    "family_positive": 125,
-    "family_match": 539,
-    "family_missing": 11,
+    "family_positive": 140,
+    "family_match": 573,
+    "family_missing": 37,
+    "dup_match": 539,
+    "dup_missing": 11,
+    "flow_match": 34,
+    "flow_missing": 26,
     "missing_merge": 0,
     "missing_lib": 0,
     "missing_deferred_late_bound": 11,
+    "missing_deferred_cfa": 26,
     "missing_other": 0,
     "family_extra": 0,
     "family_span_mismatch": 0,
@@ -78,7 +91,7 @@
     "related_extra": 0,
     "related_span_mismatch": 0,
     "carve_out_rule_a": 380,
-    "carve_out_rule_a_family": 9,
+    "carve_out_rule_a_family": 11,
     "module_detection": 1,
     "script_retry": 25,
     "crash_excluded": 1,

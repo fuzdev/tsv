@@ -89,7 +89,18 @@
   `checkTypeParameters` (per-declaration duplicate type-param identity). Its
   output folds into each file's diagnostics in `program.rs` before the
   program-wide sort/dedup. The traversal's `visit_type_params` is the seam
-  future per-node checks hook into.
+  future per-node checks hook into. `check/` also holds `unreachable.rs` — the
+  TS7027 (unreachable-code) + TS7028 (unused-label) **flow shim**, a separate
+  consumer of the binder's flow product (`binder/flow.rs`): it reads the
+  fast-path `NODE_FLAGS_UNREACHABLE` bit (tsgo's binder-set-bit branch of
+  `checkSourceElementUnreachable`), building a bind-time, variant-independent
+  candidate table (so `BoundProgram` stays owned/relocatable) that per-variant
+  emit filters by the `allowUnreachableCode` / `allowUnusedLabels` /
+  `preserveConstEnums` options — routing explicit-`False` runs to `diagnostics`
+  and the default (suggestion) runs to a separate `suggestions` sink. The
+  type-dependent `isReachableFlowNode` fallback (never-returning signatures,
+  assertion predicates, exhaustive switches) is out of scope — deferred to the
+  CFA type engine.
 - `diag.rs` — `Diagnostic` (code, file, span, category, message + args,
   nested chain + related-info) and the canonical ordering kernels, ported
   from tsgo `internal/ast/diagnostic.go`: `compare_diagnostics`
@@ -123,12 +134,17 @@ result is fully owned — nothing borrows out. For lib-aware checking:
 
 - `tsv_debug tsc_conformance run` — the standing gate: sweeps the in-scope
   corpus (single-file, non-JSX, non-JS-flavored, non-skipped), grades
-  expect-clean variants AND the duplicate-conflict family
-  (TS2300/2451/2567/2528 + merge-path TS2397/2649/2664/2671) as codes+spans
-  multisets — bind + merge + lib **and** the check-time TS2300 subset
-  (duplicate members / type parameters, from the `check` pass). extra = 0 is a
-  hard gate; a missing is classified `merge` / `lib` / `deferred_late_bound`
-  (an exact pin — the type-engine-dependent `lateBindMember` residual) /
+  expect-clean variants AND two graded families as codes+spans multisets — the
+  **duplicate-conflict** family (`dup`: TS2300/2451/2567/2528 + merge-path
+  TS2397/2649/2664/2671) from bind + merge + lib **and** the check-time TS2300
+  subset (duplicate members / type parameters, from the `check` pass), plus the
+  **flow** family (`flow`: TS7027 unreachable code + TS7028 unused label) from
+  the `check/unreachable` shim. `--family {dup,flow,all}` isolates a sub-family
+  for triage. extra = 0 is a hard gate; a missing is classified `merge` / `lib` /
+  `deferred_late_bound` (an exact pin — the type-engine-dependent `lateBindMember`
+  residual) / `deferred_cfa` (an exact pin — the type-engine-dependent
+  `isReachableFlowNode` residual: never-returning signatures / assertion
+  predicates / switch exhaustiveness / structural reachability fallback) /
   `other` (a HARD-zero invariant — any unclassified family miss fails the run).
   It also grades related-info on matched primaries as its own pinned channel
   and publishes the parse-divergence census; exact `RUN_*` pins.

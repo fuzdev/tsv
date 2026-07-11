@@ -8,9 +8,9 @@ use crate::cli::CliError;
 use crate::tsc_conformance::index::IndexReport;
 use crate::tsc_conformance::runner::SkeletonReport;
 use crate::tsc_conformance::{
-    RunFilter, RunOptions, baselines_dir, check_one, corpus_materialized, denominators,
-    discover_baselines, dump_flow_dot, histogram, run_index, run_roundtrip, run_skeleton,
-    tests_by_code,
+    FamilyFilter, RunFilter, RunOptions, baselines_dir, check_one, corpus_materialized,
+    denominators, discover_baselines, dump_flow_dot, histogram, run_index, run_roundtrip,
+    run_skeleton, tests_by_code,
 };
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
@@ -90,36 +90,48 @@ const RUN_SCRIPT_RETRY_PIN: usize = 25;
 const RUN_CRASH_EXCLUDED_PIN: usize = 1;
 
 /// REGRESSION PINS (exact, two-sided) for the family grading (the bind + merge +
-/// check gate). Measured vs pin 168e7015. `family_extra` is gated to 0 (hard); the
-/// rest pin the buckets so any move (a cascade change, a merge change, a check-pass
-/// change, a tsv parser change, a typescript-go pull) forces a deliberate re-pin.
-/// The syntactic check pass emits the duplicate-member family (TS2300 over class /
-/// interface / type-literal properties and accessors) **and** the type-parameter
-/// identity check (TS2300 over a declaration's own duplicate type parameters), so
-/// those match rather than sitting in the missing bucket. The missing bucket is
-/// classified four ways: `merge` (merge-phase family — **0**: the single-file merge
-/// path matches, TS2397 globalThis/undefined plus TS2664 augmentation-not-found),
-/// `lib` (absent-lib conflicts — **0**: the classified lib-conflict baselines, TS2300
-/// eval/Symbol/Promise/ElementTagNameMap, match against the standard-library
-/// globals), `late-bound` (**11**: the `LATE_BOUND_BASELINES` tests, genuinely
-/// deferred to the type engine — literal-type / `unique symbol` computed member
-/// names), and `other` (**0**, a HARD gate — any unclassified miss is a same-table
-/// cascade bug). A drop in `late-bound` (matches gained) is a real improvement that
-/// re-pins; a rise in `other` fails the run.
+/// check + flow gate). Measured vs pin 168e7015. `family_extra` is gated to 0
+/// (hard); the rest pin the buckets so any move (a cascade change, a merge change, a
+/// check-pass change, a flow-shim change, a tsv parser change, a typescript-go pull)
+/// forces a deliberate re-pin. The graded family is now two sub-families: the
+/// duplicate-conflict codes ([`DUP_CODES`], dup match/missing **539 / 11**) and the
+/// flow-construction codes ([`FLOW_CODES`], TS7027/TS7028, flow match/missing
+/// **34 / 26**). The syntactic check pass emits the duplicate-member family (TS2300
+/// over class / interface / type-literal properties and accessors) **and** the
+/// type-parameter identity check (TS2300 over a declaration's own duplicate type
+/// parameters); the flow shim emits TS7027 (unreachable code, construction-only
+/// fast path) + TS7028 (unused label). The missing bucket is classified five ways:
+/// `merge` (merge-phase family — **0**), `lib` (absent-lib conflicts — **0**),
+/// `late-bound` (**11**: the `LATE_BOUND_BASELINES` tests, deferred to the type
+/// engine — literal-type / `unique symbol` computed member names), `cfa` (**26**:
+/// the `DEFERRED_CFA_BASELINES` tests, deferred to the CFA type engine —
+/// never-returning signatures / assertion predicates / switch exhaustiveness /
+/// structural reachability fallback), and `other` (**0**, a HARD gate — any
+/// unclassified miss is a cascade/construction bug). A drop in `late-bound` / `cfa`
+/// (matches gained) is a real improvement that re-pins; a rise in `other` fails the
+/// run. `family_match` / `family_missing` are the aggregate totals (573 / 37);
+/// `dup_*` / `flow_*` pin the sub-family partitions.
 const RUN_FAMILY_GRADED_PIN: usize = 4066;
-const RUN_FAMILY_POSITIVE_PIN: usize = 125;
-const RUN_FAMILY_MATCH_PIN: usize = 539;
-const RUN_FAMILY_MISSING_PIN: usize = 11;
+const RUN_FAMILY_POSITIVE_PIN: usize = 140;
+const RUN_FAMILY_MATCH_PIN: usize = 573;
+const RUN_FAMILY_MISSING_PIN: usize = 37;
+const RUN_DUP_MATCH_PIN: usize = 539;
+const RUN_DUP_MISSING_PIN: usize = 11;
+const RUN_FLOW_MATCH_PIN: usize = 34;
+const RUN_FLOW_MISSING_PIN: usize = 26;
 const RUN_MISSING_MERGE_PIN: usize = 0;
 const RUN_MISSING_LIB_PIN: usize = 0;
-/// Genuinely-deferred family misses (need the type engine); exact-pinned.
+/// Genuinely-deferred dup-family misses (need the type engine); exact-pinned.
 const RUN_MISSING_DEFERRED_LATE_BOUND_PIN: usize = 11;
+/// Genuinely-deferred flow-family misses (need the CFA type engine); exact-pinned.
+const RUN_MISSING_DEFERRED_CFA_PIN: usize = 26;
 /// Unclassified family misses — a HARD-zero invariant gate (not just a full-run pin),
-/// so a same-table cascade regression fails even a filtered triage run.
+/// so a same-table cascade / flow-construction regression fails even a filtered
+/// triage run.
 const RUN_MISSING_OTHER_PIN: usize = 0;
 const RUN_FAMILY_SPAN_MISMATCH_PIN: usize = 0;
 const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
-const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 9;
+const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 11;
 const RUN_MODULE_DETECTION_PIN: usize = 1;
 
 /// REGRESSION PINS (exact, two-sided) for the lib base. Measured 2026-07-10 vs
@@ -270,6 +282,11 @@ pub struct RunCommand {
     #[argh(option)]
     variant: Option<String>,
 
+    /// triage filter: keep only variants whose baseline carries a code in this
+    /// sub-family — `dup`, `flow`, or `all` (SKIPS the pins)
+    #[argh(option)]
+    family: Option<String>,
+
     /// write a JSON manifest of every graded variant (per-variant verdict + buckets
     /// + census + pins) to this path — the tsc analog of `test262 --emit-manifest`
     #[argh(option)]
@@ -381,11 +398,32 @@ impl RunCommand {
             }
             None => None,
         };
+        let family = match self.family.as_deref().map(parse_family_filter) {
+            Some(Ok(f)) => Some(f),
+            Some(Err(e)) => {
+                eprintln!("{e}");
+                return Err(CliError::Failed);
+            }
+            None => None,
+        };
         Ok(RunFilter {
             test: self.test.clone(),
             code: self.code,
             variant,
+            family,
         })
+    }
+}
+
+/// Parse a `--family` value into a [`FamilyFilter`] (`dup` / `flow` / `all`).
+fn parse_family_filter(arg: &str) -> Result<FamilyFilter, String> {
+    match arg.to_lowercase().as_str() {
+        "dup" => Ok(FamilyFilter::Dup),
+        "flow" => Ok(FamilyFilter::Flow),
+        "all" => Ok(FamilyFilter::All),
+        other => Err(format!(
+            "Error: --family expects dup, flow, or all, got {other:?}"
+        )),
     }
 }
 
@@ -587,6 +625,31 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
             report.family_missing,
             RUN_FAMILY_MISSING_PIN,
         );
+        // Sub-family partitions (dup = bind/merge/check; flow = TS7027/TS7028).
+        pin(
+            &mut errs,
+            "dup match",
+            report.dup_match(),
+            RUN_DUP_MATCH_PIN,
+        );
+        pin(
+            &mut errs,
+            "dup missing",
+            report.dup_missing(),
+            RUN_DUP_MISSING_PIN,
+        );
+        pin(
+            &mut errs,
+            "flow match",
+            report.flow_match(),
+            RUN_FLOW_MATCH_PIN,
+        );
+        pin(
+            &mut errs,
+            "flow missing",
+            report.flow_missing(),
+            RUN_FLOW_MISSING_PIN,
+        );
         pin(
             &mut errs,
             "missing merge",
@@ -604,6 +667,12 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
             "missing late-bound",
             report.missing_deferred_late_bound,
             RUN_MISSING_DEFERRED_LATE_BOUND_PIN,
+        );
+        pin(
+            &mut errs,
+            "missing cfa",
+            report.missing_deferred_cfa,
+            RUN_MISSING_DEFERRED_CFA_PIN,
         );
         pin(
             &mut errs,
@@ -683,9 +752,14 @@ struct RunPins {
     family_positive: usize,
     family_match: usize,
     family_missing: usize,
+    dup_match: usize,
+    dup_missing: usize,
+    flow_match: usize,
+    flow_missing: usize,
     missing_merge: usize,
     missing_lib: usize,
     missing_deferred_late_bound: usize,
+    missing_deferred_cfa: usize,
     missing_other: usize,
     family_extra: usize,
     family_span_mismatch: usize,
@@ -715,9 +789,14 @@ fn run_pins() -> RunPins {
         family_positive: RUN_FAMILY_POSITIVE_PIN,
         family_match: RUN_FAMILY_MATCH_PIN,
         family_missing: RUN_FAMILY_MISSING_PIN,
+        dup_match: RUN_DUP_MATCH_PIN,
+        dup_missing: RUN_DUP_MISSING_PIN,
+        flow_match: RUN_FLOW_MATCH_PIN,
+        flow_missing: RUN_FLOW_MISSING_PIN,
         missing_merge: RUN_MISSING_MERGE_PIN,
         missing_lib: RUN_MISSING_LIB_PIN,
         missing_deferred_late_bound: RUN_MISSING_DEFERRED_LATE_BOUND_PIN,
+        missing_deferred_cfa: RUN_MISSING_DEFERRED_CFA_PIN,
         missing_other: RUN_MISSING_OTHER_PIN,
         family_extra: 0,
         family_span_mismatch: RUN_FAMILY_SPAN_MISMATCH_PIN,
@@ -806,7 +885,7 @@ fn write_manifest(
 /// per-code maps, wall-clock excluded) so re-runs are diff-clean.
 fn build_report_value(report: &SkeletonReport) -> serde_json::Value {
     serde_json::json!({
-        "oracle": "tsgo committed .errors.txt baselines (bind + merge family)",
+        "oracle": "tsgo committed .errors.txt baselines (bind + merge + flow family)",
         "denominators": {
             "in_scope_tests": report.in_scope_tests,
             "in_scope_variants": report.in_scope_variants,
@@ -818,11 +897,16 @@ fn build_report_value(report: &SkeletonReport) -> serde_json::Value {
         },
         "family": {
             "match": report.family_match,
+            "dup_match": report.dup_match(),
+            "flow_match": report.flow_match(),
             "missing": {
                 "total": report.family_missing,
+                "dup": report.dup_missing(),
+                "flow": report.flow_missing(),
                 "merge_path": report.missing_merge,
                 "lib_conflict": report.missing_lib,
                 "late_bound": report.missing_deferred_late_bound,
+                "cfa": report.missing_deferred_cfa,
                 "other": report.missing_other,
             },
             "extra": report.family_extra,
@@ -867,7 +951,7 @@ fn render_report_md(report: &SkeletonReport) -> String {
     let mut s = String::new();
     s.push_str("# tsc_conformance run — committed report\n\n");
     s.push_str(
-        "Oracle: tsgo committed `.errors.txt` baselines (bind + merge family). \
+        "Oracle: tsgo committed `.errors.txt` baselines (bind + merge + flow family). \
          Deterministic — wall-clock excluded.\n\n",
     );
 
@@ -886,15 +970,31 @@ fn render_report_md(report: &SkeletonReport) -> String {
         report.family_graded_variants, report.family_positive_variants
     );
 
-    s.push_str("## Family (2300 / 2451 / 2567 / 2528 + merge 2397 / 2649 / 2664 / 2671)\n\n");
-    let _ = writeln!(s, "- match: {}", report.family_match);
+    s.push_str(
+        "## Family (dup 2300 / 2451 / 2567 / 2528 + merge 2397 / 2649 / 2664 / 2671; \
+         flow 7027 / 7028)\n\n",
+    );
     let _ = writeln!(
         s,
-        "- missing: {} (merge-path {}, lib-conflict {}, late-bound {}, other {})",
+        "- match: {} (dup {}, flow {})",
+        report.family_match,
+        report.dup_match(),
+        report.flow_match()
+    );
+    let _ = writeln!(
+        s,
+        "- missing: {} (dup {}, flow {})",
         report.family_missing,
+        report.dup_missing(),
+        report.flow_missing()
+    );
+    let _ = writeln!(
+        s,
+        "  - by cause: merge-path {}, lib-conflict {}, late-bound {}, cfa {}, other {}",
         report.missing_merge,
         report.missing_lib,
         report.missing_deferred_late_bound,
+        report.missing_deferred_cfa,
         report.missing_other
     );
     let _ = writeln!(s, "- extra (GATE=0): {}", report.family_extra);
@@ -1628,6 +1728,7 @@ mod tests {
             test: None,
             code: Some(2300),
             variant: Some(("target".to_string(), "es2015".to_string())),
+            family: None,
         };
         let filtered = serde_json::to_value(run_manifest(&r, &filter)).unwrap();
         assert_eq!(filtered["filtered"], serde_json::json!(true));

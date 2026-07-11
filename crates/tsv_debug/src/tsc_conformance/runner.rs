@@ -8,10 +8,12 @@
 //! `tsv_check`'s goal rule, binds, merges against the variant's lib base, and
 //! grades the result on three channels. Every **expect-clean** in-scope
 //! variant (one with no on-disk baseline) must grade clean (zero diagnostics);
-//! the bind/merge duplicate-conflict **family** ([`FAMILY_CODES`]) is compared
-//! as codes+spans multisets — extra = 0 is the hard gate, missing is
-//! classified by deferred cause; and **related-info** on matched family
-//! primaries is graded as its own channel. Zero panics, always.
+//! the graded **family** ([`FAMILY_CODES`] — the bind/merge duplicate-conflict
+//! sub-family [`DUP_CODES`] plus the flow-construction sub-family [`FLOW_CODES`],
+//! TS7027/TS7028) is compared as codes+spans multisets — extra = 0 is the hard
+//! gate, missing is classified by deferred cause (merge / lib / late-bound / cfa,
+//! else the hard-zero `other`); and **related-info** on matched family primaries
+//! is graded as its own channel. Zero panics, always.
 //!
 //! A single-file test's variants all parse identically (the goal rule is
 //! directive-independent), so parse+bind runs **once per test**
@@ -56,11 +58,24 @@ use tsv_check::{
 };
 use tsv_lang::{LocationMapper, LocationTracker};
 
-/// The bind/merge duplicate/conflict family the gate grades: TS2300 (duplicate
-/// identifier), TS2451 (block-scoped redeclare), TS2567 (enum-merge), TS2528
-/// (multiple default exports), plus the merge-path codes TS2397/2649/2664/2671
-/// (emitted from the globals-merge phase rather than the same-table cascade).
-const FAMILY_CODES: [u32; 8] = [2300, 2451, 2567, 2528, 2397, 2649, 2664, 2671];
+/// The full set of codes the gate grades — the bind/merge duplicate-conflict
+/// family ([`DUP_CODES`]) plus the flow-construction family ([`FLOW_CODES`]).
+/// Duplicate-conflict: TS2300 (duplicate identifier), TS2451 (block-scoped
+/// redeclare), TS2567 (enum-merge), TS2528 (multiple default exports), plus the
+/// merge-path codes TS2397/2649/2664/2671 (emitted from the globals-merge phase
+/// rather than the same-table cascade). Flow: TS7027 (unreachable code), TS7028
+/// (unused label), emitted from the post-bind flow-construction shim.
+const FAMILY_CODES: [u32; 10] = [2300, 2451, 2567, 2528, 2397, 2649, 2664, 2671, 7027, 7028];
+
+/// The duplicate/conflict sub-family (bind + merge + the check-time TS2300
+/// members/type-parameters pass) — the partition used for the `--family dup`
+/// filter and the sub-family report lines.
+const DUP_CODES: [u32; 8] = [2300, 2451, 2567, 2528, 2397, 2649, 2664, 2671];
+
+/// The flow-construction sub-family (TS7027 unreachable code / TS7028 unused
+/// label) — the partition used for the `--family flow` filter and the sub-family
+/// report lines.
+const FLOW_CODES: [u32; 2] = [7027, 7028];
 
 /// The merge-path family codes — a *missing* of one of these is classified as a
 /// merge-phase gap, not a same-table cascade bug.
@@ -98,6 +113,36 @@ const LATE_BOUND_BASELINES: [&str; 4] = [
     "symbolDeclarationEmit12.ts",
     "symbolProperty37.ts",
     "symbolProperty44.ts",
+];
+
+/// The flow-family baselines whose remaining missing TS7027 diagnostics are
+/// genuinely deferred to the CFA type engine: the construction-only fast-path
+/// shim (a strict subset of what tsgo reports) can't resolve them because they
+/// come from tsgo's `isReachableFlowNode` fallback — never-returning call
+/// signatures, `asserts` type predicates, switch exhaustiveness, and the
+/// structural reachability fallback. A *missing* in one of these is bucketed to
+/// `missing_deferred_cfa` (exact-pinned) rather than the hard-zero `missing_other`,
+/// so the honest CFA residual stays visible without gating a release on a
+/// type-engine gap. Basenames, mirroring `LATE_BOUND_BASELINES`.
+///
+/// `assertionTypePredicates1.ts` never reaches the cfa bucket — its entry is a
+/// defensive no-op kept for completeness. tsv currently **parse-rejects** it (an
+/// over-rejection of the setter assertion-predicate form `set p(x: this is T)`,
+/// counted in the parse-divergence census), so it is graded not at all; and were
+/// the parser fixed, its baseline's non-bind TS1xxx (TS1228) would carve it out by
+/// predicate v1 rule (a) instead — either way its 5 flow instances never land in
+/// `missing_deferred_cfa`. The live cfa residual is **26**: neverReturningFunctions1
+/// 22, exhaustiveSwitchStatements1 1, unreachableSwitchTypeofAny 1,
+/// unreachableSwitchTypeofUnknown 1 (**25** across the four non-carved named
+/// baselines), plus reachabilityChecks8 1 (the structural `isReachableFlowNode`
+/// fallback tsv's faithful for-construction correctly doesn't emit).
+const DEFERRED_CFA_BASELINES: [&str; 6] = [
+    "neverReturningFunctions1.ts",
+    "assertionTypePredicates1.ts",
+    "exhaustiveSwitchStatements1.ts",
+    "unreachableSwitchTypeofAny.ts",
+    "unreachableSwitchTypeofUnknown.ts",
+    "reachabilityChecks8.ts",
 ];
 
 /// Worker-thread stack for the sweep: the corpus has deeply-nested tests and
@@ -163,6 +208,27 @@ pub struct PanicRecord {
     pub payload: String,
 }
 
+/// Which graded sub-family the `--family` filter isolates.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum FamilyFilter {
+    /// The duplicate/conflict sub-family ([`DUP_CODES`]).
+    Dup,
+    /// The flow-construction sub-family ([`FLOW_CODES`]).
+    Flow,
+    /// The whole graded family ([`FAMILY_CODES`]) — isolates the family-graded slice.
+    All,
+}
+
+/// The code set a [`FamilyFilter`] keeps a variant for (its baseline must carry at
+/// least one).
+fn family_filter_codes(f: FamilyFilter) -> &'static [u32] {
+    match f {
+        FamilyFilter::Dup => &DUP_CODES,
+        FamilyFilter::Flow => &FLOW_CODES,
+        FamilyFilter::All => &FAMILY_CODES,
+    }
+}
+
 /// Filters for a scoped `run` sweep. Any active filter SKIPS the exact pins (the
 /// `roundtrip`/`query` convention), so a filtered run is a triage view — the
 /// invariant gates (clean grading, no panics, `family_extra == 0`) still hold.
@@ -174,13 +240,19 @@ pub struct RunFilter {
     pub code: Option<u32>,
     /// Keep only variants whose config has this `key=value` (key lowercased).
     pub variant: Option<(String, String)>,
+    /// Keep only variants whose baseline carries a code in this sub-family
+    /// (`dup` / `flow` / `all`).
+    pub family: Option<FamilyFilter>,
 }
 
 impl RunFilter {
     /// Whether any filter is active (drives pin skipping).
     #[must_use]
     pub fn is_active(&self) -> bool {
-        self.test.is_some() || self.code.is_some() || self.variant.is_some()
+        self.test.is_some()
+            || self.code.is_some()
+            || self.variant.is_some()
+            || self.family.is_some()
     }
 
     /// Whether a test passes the `--test` substring filter (absent filter ⇒ keep).
@@ -204,6 +276,18 @@ impl RunFilter {
     /// on its behalf. Absent filter ⇒ keep.
     fn keeps_code(&self, baseline_carries: impl FnOnce(u32) -> bool) -> bool {
         self.code.is_none_or(baseline_carries)
+    }
+
+    /// Whether a variant passes the `--family` filter: its baseline must carry at
+    /// least one code in the selected sub-family (an expect-clean variant carries
+    /// none, so it is filtered out). `baseline_carries` is consulted only when the
+    /// filter is active. Absent filter ⇒ keep.
+    fn keeps_family(&self, baseline_carries: impl Fn(u32) -> bool) -> bool {
+        self.family.is_none_or(|f| {
+            family_filter_codes(f)
+                .iter()
+                .any(|&code| baseline_carries(code))
+        })
     }
 }
 
@@ -305,8 +389,14 @@ pub struct SkeletonReport {
     /// ...missing genuinely deferred to the type engine (a `LATE_BOUND_BASELINES`
     /// test — literal-type / `unique symbol` computed member names). Exact-pinned.
     pub missing_deferred_late_bound: usize,
-    /// ...missing not attributable to merge/lib/late-bound — a same-table cascade
-    /// bug or an unclassified gap. **Gate: must be 0** (any such miss is a regression).
+    /// ...flow missing genuinely deferred to the CFA type engine (a
+    /// `DEFERRED_CFA_BASELINES` test — never-returning signatures / assertion
+    /// predicates / switch exhaustiveness / structural reachability fallback).
+    /// Exact-pinned.
+    pub missing_deferred_cfa: usize,
+    /// ...missing not attributable to merge/lib/late-bound/cfa — a same-table
+    /// cascade bug or an unclassified gap. **Gate: must be 0** (any such miss is a
+    /// regression).
     pub missing_other: usize,
     /// Variants carved out by predicate v1 rule (a): tsv parses clean but the
     /// baseline carries a non-bind TS1xxx code (recovery-AST incomparability).
@@ -615,6 +705,12 @@ fn grade_test(
         {
             continue;
         }
+        if !options
+            .filter
+            .keeps_family(|code| baseline.is_some_and(|b| baseline_carries_code(b, code)))
+        {
+            continue;
+        }
 
         report.in_scope_variants += 1;
         if variant.config.contains_key("moduledetection") {
@@ -752,12 +848,16 @@ fn record_manifest(
     }
 }
 
-/// Whether a baseline's summary block carries a given TS code (the `--code` filter).
+/// Whether a baseline carries a given TS code (the `--code` / `--family` filters).
+/// Uses the category-generic [`parse_base_diags`] (not the error-only
+/// `parse_summary_block`), so a `--code 7027` / `--family flow` triage matches
+/// suggestion- and message-category flow lines too, not just error-category ones.
 fn baseline_carries_code(baseline: &Baseline, code: u32) -> bool {
     let Ok(content) = std::fs::read_to_string(&baseline.path) else {
         return false;
     };
-    parse_summary_block(&content).iter().any(|d| d.code == code)
+    let want = i32::try_from(code).unwrap_or(-1);
+    parse_base_diags(&content).iter().any(|d| d.code == want)
 }
 
 /// Render one failing family variant's ours-vs-baseline diff for a `.diff` artifact.
@@ -999,6 +1099,7 @@ fn grade_family(
     }
     let is_lib = LIB_CONFLICT_BASELINES.contains(&test.basename.as_str());
     let is_late_bound = LATE_BOUND_BASELINES.contains(&test.basename.as_str());
+    let is_deferred_cfa = DEFERRED_CFA_BASELINES.contains(&test.basename.as_str());
     for (code, count) in &buckets.missing_by_code {
         report.family_missing += *count;
         *report.family_missing_by_code.entry(*code).or_default() += *count;
@@ -1008,6 +1109,8 @@ fn grade_family(
             report.missing_lib += *count;
         } else if is_late_bound {
             report.missing_deferred_late_bound += *count;
+        } else if is_deferred_cfa {
+            report.missing_deferred_cfa += *count;
         } else {
             report.missing_other += *count;
             if report.missing_other_samples.len() < 20 {
@@ -1323,7 +1426,41 @@ fn baseline_shape(baseline: Option<&Baseline>) -> BaselineShape {
     }
 }
 
+/// Sum a per-code map's entries whose code is in `codes` (the sub-family partition
+/// behind `dup_*` / `flow_*`).
+fn sub_family_sum(by_code: &BTreeMap<u32, usize>, codes: &[u32]) -> usize {
+    by_code
+        .iter()
+        .filter(|(code, _)| codes.contains(code))
+        .map(|(_, count)| *count)
+        .sum()
+}
+
 impl SkeletonReport {
+    /// The duplicate/conflict sub-family matches (partition of `family_match_by_code`).
+    #[must_use]
+    pub fn dup_match(&self) -> usize {
+        sub_family_sum(&self.family_match_by_code, &DUP_CODES)
+    }
+
+    /// The flow sub-family matches (partition of `family_match_by_code`).
+    #[must_use]
+    pub fn flow_match(&self) -> usize {
+        sub_family_sum(&self.family_match_by_code, &FLOW_CODES)
+    }
+
+    /// The duplicate/conflict sub-family misses (partition of `family_missing_by_code`).
+    #[must_use]
+    pub fn dup_missing(&self) -> usize {
+        sub_family_sum(&self.family_missing_by_code, &DUP_CODES)
+    }
+
+    /// The flow sub-family misses (partition of `family_missing_by_code`).
+    #[must_use]
+    pub fn flow_missing(&self) -> usize {
+        sub_family_sum(&self.family_missing_by_code, &FLOW_CODES)
+    }
+
     /// Print the human summary.
     pub fn print(&self) {
         println!("tsc_conformance run");
@@ -1347,20 +1484,36 @@ impl SkeletonReport {
         println!("Script-goal retries:       {}", self.script_retry);
         println!("Bound nodes (total):       {}", self.total_nodes);
         println!();
-        println!("Family grading (2300/2451/2567/2528 + merge 2397/2649/2664/2671)");
+        println!(
+            "Family grading (dup 2300/2451/2567/2528 + merge 2397/2649/2664/2671; flow 7027/7028)"
+        );
         println!("---------------------------------------------------------------");
         println!("Graded variants:           {}", self.family_graded_variants);
         println!(
             "  ...family-positive:      {}",
             self.family_positive_variants
         );
-        println!("  match:                   {}", self.family_match);
-        println!("  missing:                 {}", self.family_missing);
+        println!(
+            "  match:                   {} (dup {}, flow {})",
+            self.family_match,
+            self.dup_match(),
+            self.flow_match()
+        );
+        println!(
+            "  missing:                 {} (dup {}, flow {})",
+            self.family_missing,
+            self.dup_missing(),
+            self.flow_missing()
+        );
         println!("    merge-path:            {}", self.missing_merge);
         println!("    lib-conflict:          {}", self.missing_lib);
         println!(
             "    late-bound (deferred): {} (needs the type engine — literal-type / unique-symbol computed member names)",
             self.missing_deferred_late_bound
+        );
+        println!(
+            "    cfa (deferred):        {} (needs the CFA type engine — never-returning sigs / assertion predicates / switch exhaustiveness / structural reachability)",
+            self.missing_deferred_cfa
         );
         println!(
             "    other (GATE=0):        {} (unclassified family miss — a same-table cascade bug)",
@@ -1836,6 +1989,40 @@ mod tests {
     }
 
     #[test]
+    fn keeps_family_selects_sub_family() {
+        // No `--family` filter keeps without consulting the baseline resolver.
+        let none = RunFilter::default();
+        assert!(none.keeps_family(|_| panic!("resolver consulted with no --family filter")));
+
+        // `flow` keeps iff the baseline carries a FLOW_CODES member; a dup-only
+        // baseline is excluded, a flow baseline is kept.
+        let flow = RunFilter {
+            family: Some(FamilyFilter::Flow),
+            ..RunFilter::default()
+        };
+        assert!(flow.keeps_family(|c| c == 7027));
+        assert!(!flow.keeps_family(|c| c == 2300));
+
+        // `dup` is the complementary partition.
+        let dup = RunFilter {
+            family: Some(FamilyFilter::Dup),
+            ..RunFilter::default()
+        };
+        assert!(dup.keeps_family(|c| c == 2300));
+        assert!(!dup.keeps_family(|c| c == 7027));
+
+        // `all` keeps any family code (either partition).
+        let all = RunFilter {
+            family: Some(FamilyFilter::All),
+            ..RunFilter::default()
+        };
+        assert!(all.keeps_family(|c| c == 7028));
+        assert!(all.keeps_family(|c| c == 2451));
+        // A non-family code (or no baseline) is excluded.
+        assert!(!all.keeps_family(|c| c == 9999));
+    }
+
+    #[test]
     fn filters_compose_as_and() {
         // The call site ANDs the three predicates; all must keep for a variant to be
         // graded, and any one failing excludes it.
@@ -1843,6 +2030,7 @@ mod tests {
             test: Some("dup".to_string()),
             code: Some(2300),
             variant: Some(("target".to_string(), "es5".to_string())),
+            family: None,
         };
         let cfg = config(&[("target", "es5")]);
         let carried = [2300u32];

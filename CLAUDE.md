@@ -246,7 +246,7 @@ Package shape: built from the wasm-pack `web` target, then `scripts/patch_npm_pa
 
 `scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → conformance → build (npm packages + deno bundles, so artifact validation never sees stale bundles) → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (the bump is required in **both** places and they must agree; on stamp the marker is dropped and a fresh empty `## Unreleased` reset to `bump: patch` is seeded for the next cycle). The user keeps it updated as work lands — agents don't touch `CHANGELOG.md` (see [Committing](#committing)). A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
 
-**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`) and the tsc corpus (`conformance:ts-repo`), the `tsc_conformance` roundtrip self-check vs tsgo's `.errors.txt` baselines (`conformance:tsc-roundtrip`), the tsv_check binder-family conformance gate vs those baselines (`conformance:tsc-check` — the duplicate/conflict code family, exact pins + the committed `report.tsc-conformance.{json,md}`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../typescript-go` checkouts — for the tsc-check leg also the materialized `_submodules/TypeScript` corpus + `internal/bundled/libs` — + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format is re-run and must reproduce byte-identically), so treat it as real; the historical FFI heisenbug now surfaces as a loud `native format nondeterminism` per-file error instead (see ./benches/js/CLAUDE.md §Known Issues).
+**Conformance gates (Step 3b).** The release-cadence correctness gates that run against **external oracles** — so they can't live in `deno task check` — run here via `deno task conformance`: the Svelte parser vs `svelte/compiler` (`conformance:svelte-fixtures`), the TS parser vs acorn-typescript's own suite (`conformance:ts-fixtures`) and the tsc corpus (`conformance:ts-repo`), the `tsc_conformance` roundtrip self-check vs tsgo's `.errors.txt` baselines (`conformance:tsc-roundtrip`), the tsv_check binder-family conformance gate vs those baselines (`conformance:tsc-check` — the duplicate/conflict code family + the flow family TS7027/7028, exact pins + the committed `report.tsc-conformance.{json,md}`), plus all three languages' AST + formatter vs the canonical parsers / prettier (`corpus:compare:parse` + `:format`, `--all`). Skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../typescript-go` checkouts — for the tsc-check leg also the materialized `_submodules/TypeScript` corpus + `internal/bundled/libs` — + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. `test262` (needs `../test262`) and the CSS-WPT harvest stay manual, out of the automated step. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format is re-run and must reproduce byte-identically), so treat it as real; the historical FFI heisenbug now surfaces as a loud `native format nondeterminism` per-file error instead (see ./benches/js/CLAUDE.md §Known Issues).
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation
@@ -828,14 +828,19 @@ cargo run -p tsv_debug tsc_conformance roundtrip compiler/async  # filter by pat
 # run - the conformance gate over tsv_check: sweeps every in-scope variant
 # (single-file, non-JSX, non-JS-flavored, non-skipped), drives parse → lower+bind
 # → check → sort/dedup via the tsv_check crate, grades expect-clean variants
-# (must be zero-diagnostic) AND the bind/merge duplicate-conflict family
-# (TS2300/2451/2567/2528 + merge-path codes) as codes+spans multisets — extra=0
-# is a hard gate, missing is classified by deferred cause (check-time family /
-# merge / lib) — and publishes the parse-divergence census (tsv
-# parse-rejections bucketed by baseline shape + Script-goal retries). Each test
+# (must be zero-diagnostic) AND two graded families as codes+spans multisets —
+# the bind/merge duplicate-conflict family (TS2300/2451/2567/2528 + merge-path
+# codes) and the flow family (TS7027 unreachable code + TS7028 unused label, from
+# the check/unreachable shim over the binder flow product). extra=0 is a hard
+# gate; missing is classified by deferred cause — merge / lib / deferred_late_bound
+# (lateBindMember residual) / deferred_cfa (isReachableFlowNode residual:
+# never-returning sigs / assertion predicates / switch exhaustiveness / structural
+# reachability) / other (HARD-zero). It also publishes the parse-divergence census
+# (tsv parse-rejections bucketed by baseline shape + Script-goal retries). Each test
 # runs catch_unwind-wrapped on a generous-stack worker; tracked parser crashes
 # live in a pinned CRASH_EXCLUSIONS ledger. Exact two-sided RUN_* pins on full
-# runs. Triage filters --test <substr> / --code <n> / --variant k=v skip the
+# runs. Triage filters --test <substr> / --code <n> / --variant k=v /
+# --family {dup,flow,all} skip the
 # pins (invariant gates still hold); --emit-manifest <path> writes per-variant
 # verdicts + buckets + census (pins verified before writing); --report <path>
 # writes the deterministic committed report (full-run only). On gate failure,
