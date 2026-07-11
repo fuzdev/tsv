@@ -73,8 +73,8 @@ use tsv_ts::ast::internal::{
     ClassBody, ClassMember, ExportDefaultValue, ExportSpecifier, Expression, ForInOfLeft, ForInit,
     Identifier, ImportSpecifier, Literal, LiteralValue, MethodKind, ModuleExportName,
     ObjectExpression, ObjectPatternProperty, ObjectProperty, PropertyKind, Statement,
-    TSEnumMemberId, TSInterfaceBody, TSModuleDeclarationBody, TSModuleName, TSType, TSTypeAnnotation,
-    TSTypeElement, TSTypeLiteral, TSTypeParameterDeclaration,
+    TSEnumMemberId, TSInterfaceBody, TSModuleDeclarationBody, TSModuleName, TSType,
+    TSTypeAnnotation, TSTypeElement, TSTypeLiteral, TSTypeParameterDeclaration,
 };
 
 /// The container kinds that route member declarations (a subset of tsgo's node
@@ -1968,7 +1968,9 @@ impl<'a> SymbolBinder<'a> {
                                 SymbolFlags::SET_ACCESSOR,
                                 SymbolFlags::SET_ACCESSOR_EXCLUDES,
                             ),
-                            PropertyKind::Init if pr.method => (SymbolFlags::METHOD, SymbolFlags::VALUE),
+                            PropertyKind::Init if pr.method => {
+                                (SymbolFlags::METHOD, SymbolFlags::VALUE)
+                            }
                             PropertyKind::Init => {
                                 (SymbolFlags::PROPERTY, SymbolFlags::PROPERTY_EXCLUDES)
                             }

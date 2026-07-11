@@ -715,16 +715,22 @@ mod tests {
         // A typed binding descends its annotation: a type-literal method signature's
         // duplicate params conflict.
         assert_eq!(diag_codes("var a: { foo(x, x); };"), vec![2300, 2300]);
-        // Duplicate *members* of a type literal silent-merge at bind (they are a
-        // check-time TS2300, out of the bind/merge family).
-        assert!(diag_codes("var a: { x: number; x: string; };").is_empty());
+        // Duplicate *members* of a type literal silent-merge at bind, but the
+        // check pass emits them (a check-time TS2300 per declaration).
+        assert_eq!(
+            diag_codes("var a: { x: number; x: string; };"),
+            vec![2300, 2300]
+        );
     }
 
     #[test]
     fn object_literal_duplicate_methods_conflict() {
         // Two same-named object-literal methods conflict (the method exclude is the
         // whole Value mask for an object-literal method).
-        assert_eq!(diag_codes("var b = { foo() {}, foo() {} };"), vec![2300, 2300]);
+        assert_eq!(
+            diag_codes("var b = { foo() {}, foo() {} };"),
+            vec![2300, 2300]
+        );
         // Duplicate plain properties silent-merge (Property is not in PropertyExcludes).
         assert!(diag_codes("var b = { x: 1, x: 2 };").is_empty());
         // A getter/setter pair of the same name merges without a diagnostic.
@@ -768,6 +774,51 @@ mod tests {
         for (_, start) in &diags {
             assert_eq!(&src[*start as usize..=*start as usize], "#");
         }
+    }
+
+    #[test]
+    fn param_position_type_literal_method_params_conflict() {
+        // A method signature inside a parameter's type annotation is its own
+        // function scope, so its duplicate params conflict (the param-position
+        // type-annotation hook reaches the type literal).
+        assert_eq!(
+            diag_codes("function f(p: { foo(x, x); }) {}"),
+            vec![2300, 2300]
+        );
+    }
+
+    #[test]
+    fn object_literal_getter_getter_conflicts() {
+        // Two same-named object-literal getters conflict (GET_ACCESSOR_EXCLUDES);
+        // the accessor bump keeps the run reporting.
+        assert_eq!(
+            diag_codes("var b = { get x() {}, get x() {} };"),
+            vec![2300, 2300]
+        );
+    }
+
+    #[test]
+    fn object_literal_computed_key_method_conflicts() {
+        // A computed string-literal key names an object-literal method, so two
+        // `['foo']()` methods conflict (the object-literal method exclude is Value).
+        assert_eq!(
+            diag_codes("var b = { ['foo']() {}, ['foo']() {} };"),
+            vec![2300, 2300]
+        );
+    }
+
+    #[test]
+    fn dotted_namespace_three_deep_merges_with_explicit_nested() {
+        // A 3-deep dotted namespace's intermediate segments route to their
+        // enclosing namespace's exports, so `M.X.Y` merges with the explicit 3-deep
+        // nested form and the inner `P` conflict surfaces.
+        assert_eq!(
+            diag_codes(
+                "namespace M.X.Y { export class P {} } \
+                 namespace M { export namespace X { export namespace Y { export class P {} } } }"
+            ),
+            vec![2300, 2300]
+        );
     }
 
     #[test]

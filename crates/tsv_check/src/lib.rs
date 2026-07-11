@@ -17,7 +17,7 @@
 //!   -> parse (goal rule: Module first, Script retry)   [program]
 //!   -> lower + bind (one fused pre-order walk per file) [binder]
 //!   -> merge (single-threaded global-scope fold)        [merge]
-//!   -> check (no-op skeleton)                           [program]
+//!   -> check (syntactic per-node checks)                [check]
 //!   -> sort + dedup (tsgo's comparer)                   [diag]
 //!   -> owned diagnostics
 //! ```
@@ -32,6 +32,8 @@
 //! - [`diag`] — the `Diagnostic` shape and the canonical sort/dedup kernel.
 //! - `hash` (private) — the crate's Fx-style hasher and `FxHashMap`/`FxHashSet`.
 //! - `binder` (private) — the fused lower+bind pre-order walk.
+//! - `check` (private) — the syntactic per-node check pass ([`check_file_members`]:
+//!   duplicate member declarations today; a general walk for future per-node checks).
 //! - [`merge`] — the single-threaded global-scope fold (cross-declaration-space
 //!   conflicts, `globalThis`/`undefined`, module augmentations).
 //! - `program` (private) — pipeline assembly and the parse-error short-circuit.
@@ -43,6 +45,7 @@
 //! to the checker), so the port stays diffable against the oracle.
 
 mod binder;
+mod check;
 mod hash;
 mod program;
 
@@ -51,6 +54,7 @@ pub mod ids;
 pub mod merge;
 
 pub use binder::{BoundFile, FileFacts, ModuleNess, NodeKind, bind_file, module_ness};
+pub use check::check_file_members;
 pub use diag::{Category, Diagnostic};
 pub use ids::{FileId, NodeId};
 pub use merge::{LibBase, LibFile};

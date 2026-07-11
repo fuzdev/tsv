@@ -88,26 +88,28 @@ const RUN_SCRIPT_RETRY_PIN: usize = 25;
 /// tsv parser robustness change (a fix removes an entry; a regression adds one).
 const RUN_CRASH_EXCLUDED_PIN: usize = 1;
 
-/// REGRESSION PINS (exact, two-sided) for the family grading (the bind + merge
-/// gate). Measured 2026-07-10 vs pin 168e7015. `family_extra` is gated to 0
+/// REGRESSION PINS (exact, two-sided) for the family grading (the bind + merge +
+/// check gate). Measured 2026-07-10 vs pin 168e7015. `family_extra` is gated to 0
 /// (hard); the rest pin the buckets so any move (a cascade change, a merge
-/// change, a tsv parser change, a typescript-go pull) forces a deliberate re-pin.
-/// The missing bucket is classified: `merge` (merge-phase family — **0**: the
-/// single-file merge path matches, TS2397 globalThis/undefined + TS2664
-/// augmentation-not-found), `lib` (absent-lib conflicts — **0**: the classified
-/// lib-conflict baselines, TS2300 eval/Symbol/Promise/ElementTagNameMap, match
-/// against the standard-library globals), and `check-time` (the deferred
-/// remainder — duplicate members, type parameters, computed/private names —
-/// family instances the current bind+merge implementation does not yet emit).
-/// A drop in `check-time` (matches gained) is a real improvement that re-pins;
-/// a rise anywhere is a regression to explain.
+/// change, a check-pass change, a tsv parser change, a typescript-go pull) forces
+/// a deliberate re-pin. The missing bucket is classified: `merge` (merge-phase
+/// family — **0**: the single-file merge path matches, TS2397 globalThis/undefined
+/// plus TS2664 augmentation-not-found), `lib` (absent-lib conflicts — **0**: the
+/// classified lib-conflict baselines, TS2300 eval/Symbol/Promise/ElementTagNameMap,
+/// match against the standard-library globals), and `check-time` (the deferred
+/// remainder — type parameters, and type-dependent / late-bound computed & symbol
+/// names — family instances the current bind+check implementation does not yet
+/// emit). The syntactic check pass now emits the duplicate-member family (TS2300
+/// over class / interface / type-literal properties and accessors), so those no
+/// longer sit in `check-time`. A drop in `check-time` (matches gained) is a real
+/// improvement that re-pins; a rise anywhere is a regression to explain.
 const RUN_FAMILY_GRADED_PIN: usize = 4066;
 const RUN_FAMILY_POSITIVE_PIN: usize = 125;
-const RUN_FAMILY_MATCH_PIN: usize = 445;
-const RUN_FAMILY_MISSING_PIN: usize = 105;
+const RUN_FAMILY_MATCH_PIN: usize = 518;
+const RUN_FAMILY_MISSING_PIN: usize = 32;
 const RUN_MISSING_MERGE_PIN: usize = 0;
 const RUN_MISSING_LIB_PIN: usize = 0;
-const RUN_MISSING_CHECKTIME_PIN: usize = 105;
+const RUN_MISSING_CHECKTIME_PIN: usize = 32;
 const RUN_FAMILY_SPAN_MISMATCH_PIN: usize = 0;
 const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
 const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 9;

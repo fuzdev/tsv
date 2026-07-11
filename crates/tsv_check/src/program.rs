@@ -164,9 +164,12 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
                 let module_ness = module_ness(&program);
                 let bound = bind_file(&program, unit.source, file);
                 total_nodes += u64::from(bound.node_count);
-                // Per file: bind diagnostics then check diagnostics (check is a
-                // no-op this slice) — the getBindAndCheckDiagnostics concat.
-                let check_diags = check_file(&bound);
+                // Per file: bind diagnostics then check diagnostics — the
+                // getBindAndCheckDiagnostics concat. The check pass is a standalone
+                // syntactic walk over the program (it needs no `BoundFile`); its
+                // output folds in here, and the program-wide sort/dedup collapses any
+                // diagnostic the bind and check both emit.
+                let check_diags = crate::check::check_file_members(&program, unit.source, file);
                 let mut bind_diagnostics = bound.diagnostics;
                 bind_diagnostics.extend(check_diags);
                 bound_units.push(BoundUnit {
@@ -288,14 +291,6 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
         name: name.to_string(),
         merge: bound.merge,
     })
-}
-
-/// Check one bound file — a no-op skeleton (no semantic diagnostics yet).
-fn check_file(bound: &crate::binder::BoundFile) -> Vec<Diagnostic> {
-    // The checker is not built yet; the seam exists so the pipeline is proven
-    // end-to-end. The bound columns are available here for the future checker.
-    let _ = bound;
-    Vec::new()
 }
 
 /// Parse a unit via the goal rule: `Module` first, `Script` on failure. Returns

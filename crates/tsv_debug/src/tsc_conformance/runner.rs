@@ -1317,7 +1317,7 @@ impl SkeletonReport {
         println!("    merge-path:            {}", self.missing_merge);
         println!("    lib-conflict:          {}", self.missing_lib);
         println!(
-            "    check-time:            {} (deferred family misses — duplicate members, type params, computed/private names)",
+            "    check-time:            {} (deferred family misses — type params, type-dependent / late-bound computed & symbol names)",
             self.missing_other
         );
         println!("  extra (GATE=0):          {}", self.family_extra);
