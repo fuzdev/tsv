@@ -53,7 +53,8 @@
 - `binder/` — **two cooperating walks per file** (deliberately NOT one
   fused walk — functions-first symbol binding reorders symbol creation
   within a statement list, which would break strict pre-order id
-  intervals; see `binder/mod.rs`'s header):
+  intervals; see `binder/mod.rs`'s header), plus a **third flow walk**
+  (`flow.rs`) invoked separately from `program.rs`:
   - `mod.rs` — the SoA lowering walk: dense 1-based `NodeId`s, side columns
     (`parents`/`kinds`/`spans`/`subtree_end` — the latter makes descendant
     tests O(1) interval checks), the address→NodeId map, per-file facts
@@ -69,6 +70,25 @@
   - `atoms.rs` — the checker's own program-scoped name interner (a fresh
     `string-interner` instance — never the parser's per-document
     `SharedInterner`), reserved internal-name atoms.
+  - `flow.rs` — the **third walk**: the per-file control-flow graph
+    (`build_flow`), a faithful port of tsgo's binder flow construction
+    (`bind`/`bindContainer`/`bindChildren` + the per-statement flow shapers).
+    A `FlowGraph` in SoA form (`u16` `FlowFlags`, kind-discriminated
+    `subject`/`antecedent`, length-prefixed pool runs, switch/reduce payload
+    side tables; the `unreachableFlow` singleton is `FlowNodeId` 1) plus
+    `flow_of_node`, the `node_flags` `Unreachable` bit, and the
+    `end`/`return`/`fallthrough` anchors. Covers conditions/if/loops/switch
+    (clauses reachable from the head)/try-finally (ReduceLabels)/IIFE
+    inlining/initializer forks/labeled statements, and renders DOT for
+    `check-test --dump-flow`. Invoked from `program.rs`'s per-unit loop (NOT
+    `bind_file`) so **lib files skip flow construction** (recorded deviation).
+    Consumers resolve NodeIds through the SoA walk's **strict**
+    `require_node_id` (a miss aborts). The flow product rides `BoundUnit`,
+    consumed by `check/unreachable.rs` (TS7027/7028) and, later, the CFA type
+    engine. **Known pre-P3 fix**: `require_node_id` cannot distinguish a
+    `MethodDefinition` from its offset-0 inline `value: FunctionExpression`
+    (same address) — key the map on `(address, NodeKind)` before P3 (pinned by
+    `method_address_collides_with_value`).
 
   **Borrow-only discipline**: visitors take
   `&'arena` references and never clone AST nodes — the AST derives `Clone`,
@@ -108,8 +128,13 @@
   related-info), `equal_no_related_info` (full-chain equality, related-info
   excluded), `sort_and_deduplicate` (+ related-info merge). Pure kernels,
   unit-tested per comparator leg.
-- `ids.rs` — `NodeId` (`NonZeroU32`, 1-based pre-order; `Option<NodeId>`
+- `ids.rs` — `NodeId` / `FlowNodeId` (`NonZeroU32`, 1-based; `Option`
   niche-packs to 4 bytes) and `FileId` newtypes.
+- `options.rs` — the checker's option surface (tsv_check's first): `Tristate`
+  (`Unknown`/`False`/`True`, mirroring `core.Tristate`, default `Unknown`) and
+  `CheckOptions { allow_unreachable_code, allow_unused_labels,
+  preserve_const_enums }`, threaded into `check_bound`. Default everywhere
+  outside the conformance harness.
 - `hash.rs` — crate-private Fx-style multiply-xor hasher +
   `FxHashMap`/`FxHashSet` aliases (no external hashing dependency).
 
@@ -118,17 +143,21 @@
 ```rust
 let arena = bumpalo::Bump::new();
 let units = [SourceUnit::new("a.ts", source)];
-let result: CheckResult = check_program(&units, &arena);
-// result.diagnostics — canonically sorted + deduplicated
+let result: CheckResult = check_program(&units, &arena, &CheckOptions::default());
+// result.diagnostics — canonically sorted + deduplicated (error category)
+// result.suggestions — suggestion-category diagnostics (default-option TS7027/8),
+//                      a SEPARATE sink the parity/expect-clean grading never reads
 // result.files[i].parse — ParseReport::Parsed(ParsedFacts) | Rejected
 // result.parse_rejected — the short-circuit fired
 ```
 
 The caller owns the arena (the same contract as `tsv_ts::parse`); the
 result is fully owned — nothing borrows out. For lib-aware checking:
-`bind_program` (parse+bind once, variant-independent, fully owned) →
-`check_bound(&bound, Some(&lib_base))`; `bind_lib` produces a cacheable
-`LibFile`; `check_program_with_lib` is the one-shot form.
+`bind_program` (parse+bind+flow once, variant-independent, fully owned) →
+`check_bound(&bound, Some(&lib_base), &options)`; `bind_lib` produces a cacheable
+`LibFile`; `check_program_with_lib` is the one-shot form. `CheckOptions` (the two
+unreachable/unused-label tri-states + `preserve_const_enums`) is `default()` for
+every non-conformance caller.
 
 ## Which tool answers which question
 

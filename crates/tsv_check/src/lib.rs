@@ -14,12 +14,14 @@
 //!
 //! ```text
 //! source units (+ arena)
-//!   -> parse (goal rule: Module first, Script retry)   [program]
-//!   -> lower + bind (one fused pre-order walk per file) [binder]
-//!   -> merge (single-threaded global-scope fold)        [merge]
-//!   -> check (syntactic per-node checks)                [check]
-//!   -> sort + dedup (tsgo's comparer)                   [diag]
-//!   -> owned diagnostics
+//!   -> parse (goal rule: Module first, Script retry)       [program]
+//!   -> lower+bind: SoA node-identity walk + symbol bind     [binder/mod,sym]
+//!   -> flow: per-file control-flow graph (third walk)       [binder/flow]
+//!   -> merge (single-threaded global-scope fold)            [merge]
+//!   -> check: syntactic per-node checks + the TS7027/7028
+//!            unreachable/unused-label flow shim             [check]
+//!   -> sort + dedup (tsgo's comparer)                       [diag]
+//!   -> owned diagnostics (+ a separate suggestion sink)
 //! ```
 //!
 //! [`check_program`] is the single entry point. The caller owns the parse arena
