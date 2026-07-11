@@ -454,12 +454,20 @@ fn run_skeleton_inner(checkout: &Path, options: &RunOptions) -> Result<SkeletonR
     // Fold in the resolver's lib-base census (parse-once/fold-once counts + gates).
     report.lib_files_bound = resolver.files_bound();
     report.lib_sets_built = resolver.sets_built();
-    report.lib_parse_errors = resolver
-        .parse_errors()
-        .iter()
-        .map(|(f, e)| format!("{f}: {e}"))
-        .collect();
-    report.lib_missing_files = resolver.missing_files().to_vec();
+    report.lib_parse_errors = {
+        let mut errors: Vec<String> = resolver
+            .parse_errors()
+            .iter()
+            .map(|(f, e)| format!("{f}: {e}"))
+            .collect();
+        errors.sort_unstable();
+        errors
+    };
+    report.lib_missing_files = {
+        let mut files: Vec<String> = resolver.missing_files().to_vec();
+        files.sort_unstable();
+        files
+    };
     report.lib_unknown_names = {
         let mut names: Vec<String> = resolver.unknown_libs().to_vec();
         names.sort_unstable();
