@@ -466,7 +466,7 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
         ));
     }
     // The honest-residual gate: every missing must be explained by merge / lib /
-    // late-bound. An `other` miss is a same-table cascade bug — a HARD zero (an
+    // late-bound / cfa. An `other` miss is a same-table cascade bug — a HARD zero (an
     // invariant, so a filtered triage run catches it too), not just a full-run pin.
     if report.missing_other != RUN_MISSING_OTHER_PIN {
         errs.push(format!(
