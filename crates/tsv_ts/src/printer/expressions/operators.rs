@@ -57,6 +57,13 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let argument_doc = self.build_expression_doc(update.argument);
+        // A type-assertion operand keeps its parens: `(a as T)++` (bare
+        // `a as T++` binds `++` to `T`).
+        let argument_doc = if self.needs_parens(update.argument, ParenContext::UpdateArgument) {
+            d.parens(argument_doc)
+        } else {
+            argument_doc
+        };
         let operator_doc = d.text(update.operator.as_str());
 
         if update.prefix {
@@ -114,8 +121,12 @@ impl<'a> Printer<'a> {
             // needs_parens layer is redundant for a binary/logical operand — prettier
             // strips it (`!(x + y /* c */)`). Assignment/ternary operands keep their
             // parens for clarity in both formatters, so leave those untouched.
-            let needs_paren_wrap = self.needs_parens(unary.argument, ParenContext::UnaryArgument)
-                && !matches!(unary.argument, Expression::BinaryExpression(_));
+            let needs_paren_wrap = self.needs_parens(
+                unary.argument,
+                ParenContext::UnaryArgument {
+                    parent_op: unary.operator,
+                },
+            ) && !matches!(unary.argument, Expression::BinaryExpression(_));
             let inner = if needs_paren_wrap {
                 d.parens(inner)
             } else {
@@ -168,7 +179,12 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(")"));
                 d.concat(&parts)
             }
-        } else if self.needs_parens(unary.argument, ParenContext::UnaryArgument) {
+        } else if self.needs_parens(
+            unary.argument,
+            ParenContext::UnaryArgument {
+                parent_op: unary.operator,
+            },
+        ) {
             // Binary expressions need parens - grouping lets the parens expand when the arg is long
             if let Expression::BinaryExpression(binary) = unary.argument {
                 // Wrap any binaryish arg (logical or not) in a single paren group.

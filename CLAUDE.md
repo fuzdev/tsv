@@ -928,6 +928,32 @@ cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
 cargo run -p tsv_debug authoring_audit ~/dev/zzz/src --prettier --dump-dir /tmp/audit
 ```
 
+**Format→Reparse Round-Trip Audit (delimiter/structure-corruption gate):**
+
+```bash
+# roundtrip_audit - corpus-scale "does format(src) reparse to the SAME document?".
+# Catches the class the other gates can't see: output that mis-delimits but loses
+# no characters (a re-quoted attr='a"b' → attr="a"b", `+(+x)` → `++x`, `(a as T)++`
+# → `a as T++`). corpus:compare:format's SAFETY is char-frequency — BLIND to
+# delimiter/structure corruption; this fills that gap. Two phases (tsv-self
+# pre-filter → canonical confirm): parse input and formatted output, reduce each to
+# a STRUCTURAL SKELETON (node-tree shape + `type`, erasing reformattable leaf
+# scalars + acorn `extra`), and compare — so legit reformatting (CSS value spacing,
+# `<style>` raw blob, quote/trailing-comma normalization) doesn't read as
+# corruption. Buckets: {tsv,canonical}_unreparseable (the prize — output the parser
+# rejects), {tsv,canonical}_divergent (structural change). Pure-Rust tsv-self runs
+# over every file; canonical (Svelte/acorn/parseCss via sidecar) confirms suspects,
+# or every file with --canonical-all. Zero false positives on real formatted code;
+# point it at the delimiter-dense prettier suites for the work-list.
+cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
+cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../zzz/src
+# Also: --canonical-all (thorough — closes tsv-self's blind spot), --no-render,
+# --verbose (AST diff per finding), --limit N, --json. A diagnostic (not yet a
+# `deno task check` gate — the divergent bucket over tests/fixtures is still
+# Svelte-reflow-noisy vs render_normalize's simpler whitespace model).
+cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
+```
+
 ## Architectural Notes
 
 ### Closed Scope, Open Convention
