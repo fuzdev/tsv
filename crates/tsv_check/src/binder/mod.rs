@@ -55,6 +55,7 @@
 //       a recorded deviation with identical results)
 
 mod atoms;
+pub mod flow;
 mod sym;
 pub mod symbols;
 

@@ -33,6 +33,7 @@
 //       The product-mode short-circuit lives at GetDiagnosticsOfAnyProgram
 //       (program.go:1755, :1770) and is deliberately NOT ported here.
 
+use crate::binder::flow::{FlowProduct, build_flow};
 use crate::binder::{ModuleNess, bind_file, module_ness};
 use crate::diag::{Diagnostic, sort_and_deduplicate};
 use crate::ids::FileId;
@@ -128,6 +129,10 @@ struct BoundUnit {
     bind_diagnostics: Vec<Diagnostic>,
     /// The merge product, `None` when the unit parse-rejected.
     merge: Option<FileMerge>,
+    /// The per-file flow product, carried **dark** — nothing consumes it until
+    /// F3; F1a builds it and `--dump-flow` renders it. `None` when the unit
+    /// parse-rejected (no AST to walk).
+    flow: Option<FlowProduct>,
 }
 
 impl BoundProgram {
@@ -135,6 +140,14 @@ impl BoundProgram {
     #[must_use]
     pub fn total_node_count(&self) -> u64 {
         self.total_nodes
+    }
+
+    /// A unit's dark-carried flow product (`None` for a rejected unit or an
+    /// out-of-range index). Nothing in the check pipeline reads it (F3 will);
+    /// `--dump-flow` reaches it through this accessor.
+    #[must_use]
+    pub fn unit_flow(&self, index: usize) -> Option<&FlowProduct> {
+        self.units.get(index).and_then(|u| u.flow.as_ref())
     }
 
     /// The per-unit parse reports, in input order (a read-only view for the caller
@@ -164,6 +177,10 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
                 let module_ness = module_ness(&program);
                 let bound = bind_file(&program, unit.source, file);
                 total_nodes += u64::from(bound.node_count);
+                // The third walk: the flow graph, built from the parsed program
+                // and F0's node identity. Borrows `&bound`, so it runs before the
+                // bind product's fields move out below. Carried dark in the unit.
+                let flow = build_flow(&program, unit.source, &bound);
                 // Per file: bind diagnostics then check diagnostics — the
                 // getBindAndCheckDiagnostics concat. The check pass is a standalone
                 // syntactic walk over the program (it needs no `BoundFile`); its
@@ -183,6 +200,7 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
                     }),
                     bind_diagnostics,
                     merge: Some(bound.merge),
+                    flow: Some(flow),
                 });
             }
             Err(message) => {
@@ -193,6 +211,7 @@ pub fn bind_program<'a>(units: &[SourceUnit<'a>], arena: &'a Bump) -> BoundProgr
                     parse: ParseReport::Rejected { message },
                     bind_diagnostics: Vec::new(),
                     merge: None,
+                    flow: None,
                 });
             }
         }

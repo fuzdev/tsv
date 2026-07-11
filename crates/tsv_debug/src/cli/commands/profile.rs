@@ -252,7 +252,10 @@ fn profile_bind_once(source: &str, arena: &bumpalo::Bump) -> Result<(Duration, D
     let parse_dur = t0.elapsed();
 
     let t1 = Instant::now();
-    let _ = tsv_check::bind_file(&ast, source, tsv_check::FileId::ROOT);
+    // Parse -> lower+bind (F0) -> flow graph (F1). The flow walk is the third
+    // pass, so it belongs in the bind column the checker's perf anchor tracks.
+    let bound = tsv_check::bind_file(&ast, source, tsv_check::FileId::ROOT);
+    let _ = tsv_check::build_flow(&ast, source, &bound);
     let bind_dur = t1.elapsed();
 
     Ok((parse_dur, bind_dur))

@@ -57,6 +57,71 @@ impl NodeId {
     pub const fn get(self) -> u32 {
         self.0.get()
     }
+
+    /// A `NodeId` from a raw 1-based value, or `None` for 0 (the "no node"
+    /// sentinel the flow graph's `subject` column uses).
+    #[inline]
+    #[must_use]
+    pub fn from_raw_opt(raw: u32) -> Option<NodeId> {
+        NonZeroU32::new(raw).map(NodeId)
+    }
+}
+
+/// A dense, per-file flow-node identity assigned by the flow-graph walk
+/// ([`crate::binder`]'s third walk).
+///
+/// Ids start at 1 (`Option<FlowNodeId>` niche-packs into 4 bytes — the same
+/// idiom as [`NodeId`], the sentinel without a magic `u32::MAX`). The per-file
+/// `unreachableFlow` singleton is minted first, so it is **id 1 by
+/// construction** — tsgo's pointer-identity unreachable test becomes id
+/// equality against [`FlowNodeId::UNREACHABLE`].
+//
+// tsgo: internal/ast/ids.go / internal/binder/binder.go (flowNodeArena — a
+//       per-file bump arena; ours is a per-file dense id space)
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct FlowNodeId(NonZeroU32);
+
+impl FlowNodeId {
+    /// The per-file `unreachableFlow` singleton — minted first, so id 1
+    /// (binder.go:126). Pointer identity in tsgo becomes id equality here.
+    pub const UNREACHABLE: FlowNodeId = FlowNodeId(NonZeroU32::MIN);
+
+    /// Build a `FlowNodeId` from a 0-based dense index (`index + 1`).
+    ///
+    /// Total by construction (a wrap clamps to [`FlowNodeId::UNREACHABLE`]
+    /// rather than panicking — the crate's `panic`/`unwrap_used` lints are
+    /// warn-level, so this stays panic-free without an `#[allow]`).
+    #[inline]
+    #[must_use]
+    pub fn from_index(index: usize) -> FlowNodeId {
+        let raw = (index as u32).wrapping_add(1);
+        match NonZeroU32::new(raw) {
+            Some(n) => FlowNodeId(n),
+            None => FlowNodeId::UNREACHABLE,
+        }
+    }
+
+    /// Build a `FlowNodeId` from a raw 1-based value, or `None` for 0 (the
+    /// "no antecedent" / "no subject" sentinel in the SoA columns).
+    #[inline]
+    #[must_use]
+    pub fn from_raw(raw: u32) -> Option<FlowNodeId> {
+        NonZeroU32::new(raw).map(FlowNodeId)
+    }
+
+    /// The 0-based column index this id addresses (`id - 1`).
+    #[inline]
+    #[must_use]
+    pub const fn index(self) -> usize {
+        (self.0.get() - 1) as usize
+    }
+
+    /// The raw 1-based id value.
+    #[inline]
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0.get()
+    }
 }
 
 /// A dense per-program file identity (0-based). Single-file callers use

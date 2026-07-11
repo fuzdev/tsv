@@ -50,7 +50,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::time::Instant;
-use tsv_check::{Diagnostic, ParseReport, SourceUnit, bind_program, check_bound, check_program};
+use tsv_check::{
+    Diagnostic, FileId, ParseReport, SourceUnit, bind_file, bind_program, build_flow, check_bound,
+    check_program, render_flow_dot,
+};
 use tsv_lang::{LocationMapper, LocationTracker};
 
 /// The bind/merge duplicate/conflict family the gate grades: TS2300 (duplicate
@@ -1621,6 +1624,48 @@ pub fn check_one(
         ours,
         baseline_summary,
     })
+}
+
+/// Build the flow graph of a corpus test's **first** unit and render it to DOT
+/// (the `check-test --dump-flow` product). Parses under the goal rule (Module,
+/// then a Script retry), binds (F0), builds the flow product (F1), and renders
+/// through `tsv_check`'s source-aware DOT renderer. Keeps the `BoundFile` alive
+/// so the renderer can slice subject-node source text from its span column.
+pub fn dump_flow_dot(checkout: &Path, name: &str) -> Result<String, String> {
+    let corpus = discover_corpus(checkout)?;
+    let matches: Vec<&CorpusTest> = corpus
+        .iter()
+        .filter(|t| t.relative_path == name || t.basename == name)
+        .collect();
+    let test = match matches.as_slice() {
+        [] => return Err(format!("no corpus test matches {name:?}")),
+        [one] => *one,
+        many => {
+            let paths: Vec<String> = many
+                .iter()
+                .map(|t| format!("{}/{}", t.suite, t.relative_path))
+                .collect();
+            return Err(format!("{name:?} is ambiguous: {}", paths.join(", ")));
+        }
+    };
+
+    let content = read_corpus_file(&test.path)?;
+    let units = split_units(&content, &test.basename);
+    let unit = units
+        .first()
+        .ok_or_else(|| "test has no units".to_string())?;
+
+    let arena = Bump::new();
+    // The goal rule (Module first, Script retry) — the same rule bind_program
+    // uses, inlined here because --dump-flow keeps the BoundFile for rendering.
+    let program = match tsv_ts::parse_with_goal(&unit.content, tsv_ts::Goal::Module, &arena) {
+        Ok(p) => p,
+        Err(module_err) => tsv_ts::parse_with_goal(&unit.content, tsv_ts::Goal::Script, &arena)
+            .map_err(|_| format!("parse error: {module_err}"))?,
+    };
+    let bound = bind_file(&program, &unit.content, FileId::ROOT);
+    let flow = build_flow(&program, &unit.content, &bound);
+    Ok(render_flow_dot(&flow, &bound.spans, &unit.content))
 }
 
 /// Select a variant by an optional `k=v` filter (config match, lowercased key);

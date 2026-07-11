@@ -9,7 +9,8 @@ use crate::tsc_conformance::index::IndexReport;
 use crate::tsc_conformance::runner::SkeletonReport;
 use crate::tsc_conformance::{
     RunFilter, RunOptions, baselines_dir, check_one, corpus_materialized, denominators,
-    discover_baselines, histogram, run_index, run_roundtrip, run_skeleton, tests_by_code,
+    discover_baselines, dump_flow_dot, histogram, run_index, run_roundtrip, run_skeleton,
+    tests_by_code,
 };
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
@@ -296,6 +297,11 @@ pub struct CheckTestCommand {
     /// emit a JSON report instead of the human diff
     #[argh(switch)]
     json: bool,
+
+    /// dump the first unit's control-flow graph as Graphviz DOT (F1) to stdout,
+    /// instead of the diagnostic diff
+    #[argh(switch)]
+    dump_flow: bool,
 
     /// the test to run (exact relative path or basename)
     #[argh(positional)]
@@ -1040,6 +1046,14 @@ fn sanitize_artifact_name(name: &str) -> String {
 impl CheckTestCommand {
     fn run(self) -> Result<(), CliError> {
         require_corpus(&self.path)?;
+        if self.dump_flow {
+            let dot = dump_flow_dot(&self.path, &self.name).map_err(|e| {
+                eprintln!("Error: {e}");
+                CliError::Failed
+            })?;
+            print!("{dot}");
+            return Ok(());
+        }
         let variant = match self.variant.as_deref().map(parse_variant_filter) {
             Some(Ok(v)) => Some(v),
             Some(Err(e)) => {
