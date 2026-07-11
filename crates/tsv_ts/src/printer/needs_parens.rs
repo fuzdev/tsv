@@ -16,7 +16,9 @@
 // - prettier/src/language-js/needs-parens.js
 // - prettier/src/language-js/print/index.js (application layer)
 
-use crate::ast::internal::{BinaryOperator, Expression, LiteralValue};
+use crate::ast::internal::{
+    BinaryOperator, Expression, LiteralValue, UnaryOperator, UpdateOperator,
+};
 
 /// Context for parenthesization decisions
 ///
@@ -66,8 +68,15 @@ pub enum ParenContext {
     /// Expression in TSInstantiationExpression: `<expr><T>`
     InstantiationExpression,
 
-    /// Argument of unary operator: `!<expr>`, `typeof <expr>`
-    UnaryArgument,
+    /// Argument of a unary operator: `!<expr>`, `typeof <expr>`, `-<expr>`.
+    /// Carries the parent operator so a `+`/`-` operand that would re-tokenize
+    /// (`+(+x)` → `++x`, `-(--x)` → `---x`) gets parenthesized.
+    UnaryArgument { parent_op: UnaryOperator },
+
+    /// Argument of an update operator: `<expr>++`, `++<expr>`.
+    /// A type-assertion operand keeps its parens — bare `a as T++` binds `++`
+    /// to `T`.
+    UpdateArgument,
 
     /// Argument of await: `await <expr>`
     AwaitArgument,
@@ -247,19 +256,22 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         }
 
         // Angle-bracket assertion: `<T>(a + b)`, `<T>(<U>x)`, `<T>(x as U)`, `<T>(a ? b : c)`
-        // Unary argument: `!(a + b)`, `!(await x)`, `!(<T>x)`, `typeof (a ? b : c)`
         // Both need parens for: await/yield, all type assertions, binary, conditional, assignment, arrow
-        ParenContext::AngleBracketAssertion | ParenContext::UnaryArgument => {
-            is_await_or_yield(expr)
-                || is_type_assertion(expr)
-                || matches!(
-                    expr,
-                    Expression::BinaryExpression(_)
-                        | Expression::ConditionalExpression(_)
-                        | Expression::AssignmentExpression(_)
-                        | Expression::ArrowFunctionExpression(_)
-                )
+        ParenContext::AngleBracketAssertion => needs_parens_unary_arg_common(expr),
+
+        // Unary argument: `!(a + b)`, `!(await x)`, `!(<T>x)`, `typeof (a ? b : c)`.
+        // The shared rule, plus the `+`/`-` same-sign guard so an operand that
+        // would re-tokenize with the parent (`+(+x)`, `-(--x)`, `+(++x)`) is
+        // parenthesized (prettier's UnaryExpression/UpdateExpression cases).
+        ParenContext::UnaryArgument { parent_op } => {
+            needs_parens_unary_arg_common(expr) || needs_parens_unary_same_sign(expr, parent_op)
         }
+
+        // Update argument: a type-assertion operand keeps its parens
+        // (`(a as T)++` — bare `a as T++` binds `++` to `T`). Other operands are
+        // either plain references (redundant parens stripped) or not valid update
+        // targets, so no further wrapping applies.
+        ParenContext::UpdateArgument => is_type_assertion(expr),
 
         // Instantiation: `(<T>() => {})<U>`, `(x as A)<T>`, `(<T>x)<U>`, `(await x)<T>`, `(a = b)<T>`
         // Ternary/binary/assignment need parens to preserve semantics:
@@ -414,6 +426,42 @@ fn is_type_assertion(expr: &Expression<'_>) -> bool {
             | Expression::TSSatisfiesExpression(_)
             | Expression::TSTypeAssertion(_)
     )
+}
+
+/// The rule shared by a unary operator's argument and an angle-bracket
+/// assertion's operand: await/yield, any type assertion, and the
+/// lower-precedence binary / conditional / assignment / arrow forms all need
+/// parens.
+fn needs_parens_unary_arg_common(expr: &Expression<'_>) -> bool {
+    is_await_or_yield(expr)
+        || is_type_assertion(expr)
+        || matches!(
+            expr,
+            Expression::BinaryExpression(_)
+                | Expression::ConditionalExpression(_)
+                | Expression::AssignmentExpression(_)
+                | Expression::ArrowFunctionExpression(_)
+        )
+}
+
+/// Prettier's UnaryExpression/UpdateExpression-under-UnaryExpression rule: a
+/// `+`/`-` operand that would re-tokenize with the parent operator needs parens
+/// — a same-operator unary (`+(+x)`, `-(-x)`) or a matching-sign *prefix* update
+/// (`+(++x)`, `-(--x)`). Otherwise `+ +` / `- -` / `+ ++` / `- --` glue into
+/// `++` / `--` / `+++` / `---`. Postfix updates (`+(x++)` → `+x++`) bind tightly
+/// and never merge, so they're excluded; `!`/`~`/`typeof`/`void`/`delete` never
+/// form a longer token, so only `+`/`-` parents apply.
+fn needs_parens_unary_same_sign(expr: &Expression<'_>, parent_op: UnaryOperator) -> bool {
+    let (unary_sign, update_sign) = match parent_op {
+        UnaryOperator::Plus => (UnaryOperator::Plus, UpdateOperator::Increment),
+        UnaryOperator::Minus => (UnaryOperator::Minus, UpdateOperator::Decrement),
+        _ => return false,
+    };
+    match expr {
+        Expression::UnaryExpression(u) => u.operator == unary_sign,
+        Expression::UpdateExpression(u) => u.prefix && u.operator == update_sign,
+        _ => false,
+    }
 }
 
 /// Arrow function or function expression
