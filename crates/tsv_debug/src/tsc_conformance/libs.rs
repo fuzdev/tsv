@@ -234,6 +234,17 @@ fn is_no_lib(config: &BTreeMap<String, String>) -> bool {
         .is_some_and(|v| v.eq_ignore_ascii_case("true"))
 }
 
+/// Whether a bound lib contributed its globals through **nothing**: it bound as an
+/// external module (so its top-level members reach module exports, not global scope,
+/// leaving `source_locals` empty) yet carries no `declare global {}` block to route
+/// globals back in. Such a lib silently folds to zero globals — a no-op the resolver's
+/// other census counters (files bound / sets folded) can't see. `bind_lib` guards the
+/// same invariant with a `debug_assert!` for fast dev feedback; this predicate backs
+/// the harness gate that holds on every build.
+fn binds_external_without_globals(lib: &LibFile) -> bool {
+    lib.merge.is_external && lib.merge.global_augmentations.is_empty()
+}
+
 /// Per-run lib resolver + cache: parses + binds each lib file once, and folds each
 /// distinct resolved set into a [`LibBase`] once, sharing both across variants.
 pub struct LibResolver {
@@ -392,6 +403,22 @@ impl LibResolver {
         &self.unknown_libs
     }
 
+    /// Lib files that bound as an external module with no `declare global {}` block —
+    /// their globals silently fold to nothing (see [`binds_external_without_globals`]).
+    /// Expected empty; sorted for a deterministic gate.
+    #[must_use]
+    pub fn external_no_globals(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .file_cache
+            .values()
+            .filter_map(|slot| slot.as_deref())
+            .filter(|lib| binds_external_without_globals(lib))
+            .map(|lib| lib.name.clone())
+            .collect();
+        names.sort_unstable();
+        names
+    }
+
     /// Distinct lib files parsed + bound this run.
     #[must_use]
     pub fn files_bound(&self) -> usize {
@@ -471,5 +498,66 @@ mod tests {
         // A bare resolver needs no libs_dir for the noLib short-circuit.
         let mut r = LibResolver::new(Path::new("/nonexistent"));
         assert!(r.resolve_set(&cfg(&[("nolib", "true")])).is_empty());
+    }
+
+    /// A hand-built [`LibFile`] with a chosen module-ness and `declare global`
+    /// presence — enough to exercise [`binds_external_without_globals`] without
+    /// touching the filesystem or the binder.
+    fn lib_file(name: &str, is_external: bool, has_global_block: bool) -> LibFile {
+        use tsv_check::FileId;
+        use tsv_check::merge::FileMerge;
+        LibFile {
+            name: name.to_string(),
+            merge: FileMerge {
+                file: FileId::ROOT,
+                is_external,
+                source_locals: Vec::new(),
+                // A present-but-empty `declare global {}` block still counts (the
+                // guard is presence, matching `bind_lib`'s `debug_assert!`).
+                global_augmentations: if has_global_block {
+                    vec![Vec::new()]
+                } else {
+                    Vec::new()
+                },
+                module_augmentations: Vec::new(),
+            },
+        }
+    }
+
+    #[test]
+    fn external_without_globals_is_flagged() {
+        // External module, no `declare global` block: globals fold to nothing — flagged.
+        assert!(binds_external_without_globals(&lib_file(
+            "lib.bad.d.ts",
+            true,
+            false
+        )));
+    }
+
+    #[test]
+    fn external_with_global_block_is_clean() {
+        // External module WITH a `declare global {}` block (the lib.es2025.iterator
+        // shape) routes globals back in — not flagged.
+        assert!(!binds_external_without_globals(&lib_file(
+            "lib.es2025.iterator.d.ts",
+            true,
+            true
+        )));
+    }
+
+    #[test]
+    fn ambient_script_lib_is_clean() {
+        // A plain ambient script (globals in source_locals, not external) — not flagged,
+        // whether or not it also carries a `declare global` block.
+        assert!(!binds_external_without_globals(&lib_file(
+            "lib.es5.d.ts",
+            false,
+            false
+        )));
+        assert!(!binds_external_without_globals(&lib_file(
+            "lib.es5.d.ts",
+            false,
+            true
+        )));
     }
 }

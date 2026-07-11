@@ -433,6 +433,18 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
             report.lib_unknown_names.first().map_or("", String::as_str)
         ));
     }
+    // A lib that binds external with no `declare global` block folds its globals to
+    // nothing — the census can't otherwise see the no-op, so gate it to zero.
+    if !report.lib_external_no_globals.is_empty() {
+        errs.push(format!(
+            "{} lib file(s) bound external with no `declare global` block, e.g. {}",
+            report.lib_external_no_globals.len(),
+            report
+                .lib_external_no_globals
+                .first()
+                .map_or("", String::as_str)
+        ));
+    }
 
     // --- Exact two-sided pins (full run only; filters skip them) ---
     if enforce_pins {

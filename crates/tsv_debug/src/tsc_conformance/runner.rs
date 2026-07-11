@@ -324,6 +324,9 @@ pub struct SkeletonReport {
     pub lib_missing_files: Vec<String>,
     /// Unrecognized `@lib` / `/// <reference lib>` names. **Gate: must be empty.**
     pub lib_unknown_names: Vec<String>,
+    /// Lib files that bound as an external module with no `declare global {}` block —
+    /// their globals would silently fold to nothing. **Gate: must be empty.**
+    pub lib_external_no_globals: Vec<String>,
     /// Catchable-panic exclusions that no longer panic (a fix landed) — the entry
     /// is stale and must be dropped. **Gate: must be empty.**
     pub stale_exclusions: Vec<String>,
@@ -462,6 +465,7 @@ fn run_skeleton_inner(checkout: &Path, options: &RunOptions) -> Result<SkeletonR
         names.dedup();
         names
     };
+    report.lib_external_no_globals = resolver.external_no_globals();
 
     report.wall_ms = start.elapsed().as_millis();
     Ok(report)
@@ -1350,6 +1354,10 @@ impl SkeletonReport {
             "  lib unknown names:       {} (GATE=0)",
             self.lib_unknown_names.len()
         );
+        println!(
+            "  lib external no-globals: {} (GATE=0)",
+            self.lib_external_no_globals.len()
+        );
         for e in &self.lib_parse_errors {
             println!("  LIB-PARSE-ERR {e}");
         }
@@ -1358,6 +1366,9 @@ impl SkeletonReport {
         }
         for n in &self.lib_unknown_names {
             println!("  LIB-UNKNOWN {n}");
+        }
+        for f in &self.lib_external_no_globals {
+            println!("  LIB-EXT-NO-GLOBALS {f}");
         }
         println!();
         println!("Panics (caught):           {}", self.panics.len());

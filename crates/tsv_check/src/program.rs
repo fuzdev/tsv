@@ -276,8 +276,10 @@ pub fn bind_lib(name: &str, source: &str) -> Result<LibFile, String> {
     // (globals in `source_locals`) or, when the lib file is itself a module — e.g.
     // `lib.es2025.iterator.d.ts`, which carries a top-level `export {}` and so binds
     // external — through a `declare global {}` block (`global_augmentations`). A lib
-    // that bound external with NEITHER would silently fold to nothing; guard the
-    // no-op the census can't see.
+    // that bound external with NEITHER would silently fold to nothing. This
+    // `debug_assert!` is the fast local guard (dev builds only); the conformance
+    // harness's lib channel counts any such lib and fails its run on a nonzero count,
+    // so release/corpus builds catch the same no-op this compiles out of.
     debug_assert!(
         !bound.merge.is_external || !bound.merge.global_augmentations.is_empty(),
         "lib {name} bound as an external module with no `declare global` block — its globals would be silently dropped",
