@@ -206,9 +206,7 @@ impl<'a> Printer<'a> {
                 self.write_scope_gap_comments(atrule.span.start, first_start);
 
                 if let Some(root) = root {
-                    self.write(" (");
-                    self.print_selector_list_nested(&root.list, Some(root.paren));
-                    self.write(")");
+                    self.write_scope_clause(root);
                 }
                 if let Some(limit) = limit {
                     // Between-clause gap: root `)` → `to` (only when a root precedes it).
@@ -218,9 +216,7 @@ impl<'a> Printer<'a> {
                     self.write(" to");
                     // After-`to` gap: `to` → limit `(`.
                     self.write_scope_gap_comments(limit.to_span.end, limit.clause.paren.start);
-                    self.write(" (");
-                    self.print_selector_list_nested(&limit.clause.list, Some(limit.clause.paren));
-                    self.write(")");
+                    self.write_scope_clause(&limit.clause);
                 }
                 // Pre-`{` gap: after the last clause's `)` (only when a clause exists — a
                 // bare `@scope /* c */ {` comment is the leading gap above).
@@ -618,6 +614,15 @@ impl<'a> Printer<'a> {
             self.write(" ");
             self.write(&text);
         }
+    }
+
+    /// Emit one `@scope` clause — ` (<selector-list>)` — interleaving any comment inside
+    /// the parens (leading/trailing the list) via the clause's `paren` span, the same
+    /// wrapping the `:is()` args use. The printer twin of the parser's `parse_scope_clause`.
+    fn write_scope_clause(&mut self, clause: &internal::ScopeClause<'_>) {
+        self.write(" (");
+        self.print_selector_list_nested(&clause.list, Some(clause.paren));
+        self.write(")");
     }
 
     /// Format an `@import` media query (doc-first).

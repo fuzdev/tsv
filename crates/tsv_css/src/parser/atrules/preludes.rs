@@ -329,33 +329,6 @@ pub(super) fn parse_container_prelude<'arena>(
     Ok((container_name, condition, span))
 }
 
-/// Parse @scope prelude into structured selector lists.
-///
-/// CSS Syntax (css-cascade-6): `@scope [(<scope-start>)]? [to (<scope-end>)]?` —
-/// **both clauses are independently optional**, so all four combinations are valid
-/// (parseCss accepts each): a bare `@scope { … }`, root-only, limit-only, and both.
-///
-/// Examples:
-/// - `` (empty) - bare `@scope { … }`, scopes to the enclosing context
-/// - `(.card)` - scope root only
-/// - `(.card) to (.footer)` - scope root and limit
-/// - `to (.footer)` - scope limit only
-/// - `(article > header)` - with combinator
-///
-/// The span covers the authored prelude (first clause start to last `)`); when both
-/// clauses are absent it is a zero-width span at the cursor, so the public AST's
-/// `prelude` string extracts to `""` (matching parseCss).
-///
-/// The parsed `@scope` prelude: the optional root/limit clauses (each a
-/// `ScopeClause`/`ScopeLimit` that bundles its selector list with the printer-only
-/// spans, so the "span is `Some` iff the list is" invariant is structural) plus the
-/// overall prelude span.
-pub(super) struct ScopePrelude<'arena> {
-    pub root: Option<ScopeClause<'arena>>,
-    pub limit: Option<ScopeLimit<'arena>>,
-    pub span: Span,
-}
-
 /// Parse one `@scope` clause — `(<forgiving-selector-list>)` — with the in-paren
 /// leading/trailing gap comments registered (the printer re-emits them from the AST via
 /// `comments_in_range`, the same wrapping `:is()` args use). Assumes the current token
@@ -387,9 +360,25 @@ fn parse_scope_clause<'arena>(
     })
 }
 
+/// Parse an @scope prelude into a `PreludeValue::Selectors`.
+///
+/// CSS Syntax (css-cascade-6): `@scope [(<scope-start>)]? [to (<scope-end>)]?` —
+/// **both clauses are independently optional**, so all four combinations are valid
+/// (parseCss accepts each): a bare `@scope { … }`, root-only, limit-only, and both.
+///
+/// Examples:
+/// - `` (empty) - bare `@scope { … }`, scopes to the enclosing context
+/// - `(.card)` - scope root only
+/// - `(.card) to (.footer)` - scope root and limit
+/// - `to (.footer)` - scope limit only
+/// - `(article > header)` - with combinator
+///
+/// The span covers the authored prelude (first clause start to last `)`); when both
+/// clauses are absent it is a zero-width span at the cursor, so the public AST's
+/// `prelude` string extracts to `""` (matching parseCss).
 pub(super) fn parse_scope_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<ScopePrelude<'arena>, ParseError> {
+) -> Result<PreludeValue<'arena>, ParseError> {
     // Leading gap comments (`@scope /* c */ …`) register here: the shared at-rule
     // name skip in `parse_atrule` is a plain skip that stops at a comment, so a leading
     // comment is the current token on entry. Capturing `start` *after* this keeps it out
@@ -434,7 +423,7 @@ pub(super) fn parse_scope_prelude<'arena>(
         None
     };
 
-    Ok(ScopePrelude {
+    Ok(PreludeValue::Selectors {
         root,
         limit,
         span: Span { start, end },

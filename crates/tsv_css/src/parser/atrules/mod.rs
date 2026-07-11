@@ -102,13 +102,8 @@ pub(crate) fn parse_atrule<'arena>(
         // rationale as the `@supports`/`@container` fallback below).
         parse_import_prelude(parser)?
     } else if name_lc == "scope" {
-        // Parse @scope prelude as structured selector lists
-        let scope = parse_scope_prelude(parser)?;
-        PreludeValue::Selectors {
-            root: scope.root,
-            limit: scope.limit,
-            span: scope.span,
-        }
+        // Parse @scope prelude as structured selector lists (`PreludeValue::Selectors`).
+        parse_scope_prelude(parser)?
     } else if name_lc == "supports" {
         // Parse @supports prelude as structured conditions (for line-width wrapping)
         let (condition, span) = parse_condition_query(parser)?;
