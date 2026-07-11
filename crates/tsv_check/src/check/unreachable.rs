@@ -155,8 +155,10 @@ impl UnreachableCandidates {
                         j += 1;
                     }
                     // A directive (`@ts-ignore` / `@ts-expect-error`) preceding the
-                    // sub-run's start line drops it entirely (neither sink).
-                    if !self.is_suppressed(start) {
+                    // sub-run's start line drops an ERROR-category diagnostic; tsgo's
+                    // suggestion collection bypasses directive filtering
+                    // (`getSuggestionDiagnosticsWithChecker`), so a suggestion is kept.
+                    if !(is_error && self.is_suppressed(start)) {
                         push(
                             diagnostics,
                             suggestions,
@@ -176,7 +178,8 @@ impl UnreachableCandidates {
         if options.allow_unused_labels != Tristate::True {
             let is_error = options.allow_unused_labels == Tristate::False;
             for &span in &self.unused_labels {
-                if self.is_suppressed(span.start) {
+                // Error-category only; a suggestion bypasses directive suppression.
+                if is_error && self.is_suppressed(span.start) {
                     continue;
                 }
                 push(
@@ -264,20 +267,24 @@ pub fn build_candidates(
 /// blank/comment lines up to and including the first code line it protects. Empty
 /// (the fast path) when the file has no directive comments.
 fn compute_suppressed_ranges(source: &str, comments: &[Comment]) -> Vec<(u32, u32)> {
-    let mut directive_starts: Vec<u32> = comments
+    // Key each directive off its comment's END offset: tsc attributes a directive
+    // to its comment's LAST line (`lastLineStart`), so a multi-line
+    // `/* … @ts-ignore */` protects the line after the `*/`, not after the `/*`. A
+    // `//` directive can't span lines, so `end` == `start`'s line for those.
+    let mut directive_ends: Vec<u32> = comments
         .iter()
         .filter(|c| is_directive_comment(c.content(source)))
-        .map(|c| c.span.start)
+        .map(|c| c.span.end)
         .collect();
-    if directive_starts.is_empty() {
+    if directive_ends.is_empty() {
         return Vec::new();
     }
-    directive_starts.sort_unstable();
+    directive_ends.sort_unstable();
     let bytes = source.as_bytes();
     let line_starts = compute_line_starts(source);
     let mut ranges: Vec<(u32, u32)> = Vec::new();
-    for &start in &directive_starts {
-        let mut l = line_of(&line_starts, start) + 1;
+    for &directive_end in &directive_ends {
+        let mut l = line_of(&line_starts, directive_end) + 1;
         while l < line_starts.len() {
             let line_start = line_starts[l];
             let line_end = line_starts
@@ -837,11 +844,15 @@ fn statement_instance_state(stmt: &Statement<'_>) -> ModuleInstanceState {
             // `export interface` / `export const enum` / `export const` — classify
             // the wrapped declaration.
             Some(inner) => statement_instance_state(inner),
-            // Bare `export { … }` alias targets: a faithful resolution walks the
-            // enclosing scope per name; tsv takes tsgo's "couldn't locate, assume a
-            // value" fallback. The residual is a dead namespace whose only member is
-            // a type-only re-export.
-            None => ModuleInstanceState::Instantiated,
+            // Bare `export { … }` alias targets: a faithful resolution
+            // (`getModuleInstanceStateForAliasTarget`) walks the enclosing scope per
+            // name — a type-only re-export folds to NonInstantiated. tsv does not
+            // resolve, so it takes the **NonInstantiated** default: under-reporting a
+            // value re-export is safe (a missing), whereas assuming Instantiated
+            // would over-report a type-only re-export as a false TS7027 extra (the
+            // dangerous direction). The residual is a dead namespace whose only
+            // member is a value re-export.
+            None => ModuleInstanceState::NonInstantiated,
         },
         _ => ModuleInstanceState::Instantiated,
     }
@@ -933,6 +944,42 @@ mod tests {
         assert_eq!(
             emit_codes(src2, Tristate::False, Tristate::Unknown, false).len(),
             1
+        );
+    }
+
+    #[test]
+    fn midrun_const_enum_splits_run_into_two() {
+        // `[plain, const enum, plain]` after a return: at preserve=false the const
+        // enum fails the filter and SPLITS the run into two separate TS7027 (the
+        // mid-run re-split path — a filtered gap in the middle of a run);
+        // preserve=true merges all three into one.
+        let src = "function f() { return; a; const enum B { Y } c; }";
+        let split = emit_codes(src, Tristate::False, Tristate::Unknown, false);
+        assert_eq!(
+            split.len(),
+            2,
+            "the const enum splits the run into two TS7027"
+        );
+        assert!(split.iter().all(|d| d.0 == 7027));
+        let merged = emit_codes(src, Tristate::False, Tristate::Unknown, true);
+        assert_eq!(merged.len(), 1, "preserve merges all three into one run");
+    }
+
+    #[test]
+    fn bare_export_alias_target_is_non_instantiated() {
+        // Regression (F3 review): a dead namespace whose only members are a type
+        // and a bare `export { … }` re-export must NOT over-report. tsv can't
+        // resolve the alias, so it defaults to NonInstantiated — assuming
+        // Instantiated would over-report a type-only re-export as a false TS7027
+        // extra (the dangerous direction).
+        let src = "function f() { return; namespace N { interface I {} export { I }; } }";
+        assert_eq!(
+            emit_codes(src, Tristate::False, Tristate::Unknown, false).len(),
+            0
+        );
+        assert_eq!(
+            emit_codes(src, Tristate::False, Tristate::Unknown, true).len(),
+            0
         );
     }
 
