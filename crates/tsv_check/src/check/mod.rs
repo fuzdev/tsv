@@ -5,11 +5,11 @@
 //! It is deliberately **not** the binder: it never consults the symbol tables
 //! (walking the shared interface member table would break declaration-merging).
 //! It descends every syntactic position — class / interface / type-literal bodies,
-//! and every type-annotation site (variable / parameter / return-type / predicate /
-//! function-type / union / intersection / assertion target / …) — and runs a set
-//! of per-node checks. Today that is the duplicate-member check
-//! ([`duplicate_members`]); the traversal is general so a second per-node check
-//! (type-parameter identity) hooks into the same walk without a second descent.
+//! every type-annotation site (variable / parameter / return-type / predicate /
+//! function-type / union / intersection / assertion target / …), and every
+//! type-parameter declaration — and runs a set of per-node checks. Those are the
+//! duplicate-member check and the type-parameter-identity check (both in
+//! [`duplicate_members`]), sharing the one descent.
 //!
 //! The output folds into each file's diagnostics in [`crate::program`], alongside
 //! the bind product, then the whole program is canonically sorted + deduped — so a
@@ -532,10 +532,13 @@ impl<'a> CheckWalk<'a> {
         }
     }
 
-    /// The per-type-parameter-declaration hook (constraints + defaults are types).
-    /// Slice 3's type-parameter-identity check attaches here alongside the descent.
+    /// The per-type-parameter-declaration hook: the duplicate-name identity check
+    /// (`check_type_parameters`) plus the descent into each parameter's constraint
+    /// and default (both are types).
     fn visit_type_params(&mut self, params: Option<&TSTypeParameterDeclaration<'_>>) {
         if let Some(decl) = params {
+            let ctx = self.member_ctx();
+            duplicate_members::check_type_parameters(&ctx, decl, &mut self.diagnostics);
             for p in decl.params {
                 if let Some(c) = p.constraint {
                     self.visit_type(c);
@@ -630,5 +633,83 @@ impl<'a> CheckWalk<'a> {
             }
             TSType::Keyword(_) | TSType::Literal(_) | TSType::ThisType(_) => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bumpalo::Bump;
+
+    /// Run the check pass in isolation over `source`, returning the raw (unsorted,
+    /// un-deduped) diagnostic codes — the check pass alone, no binder, no
+    /// program-wide sort/dedup.
+    fn check_codes(source: &str) -> Vec<u32> {
+        let arena = Bump::new();
+        let program = tsv_ts::parse(source, &arena).expect("parse");
+        check_file_members(&program, source, FileId::ROOT)
+            .iter()
+            .map(|d| d.code)
+            .collect()
+    }
+
+    #[test]
+    fn type_parameters_duplicate_fires_at_later_param() {
+        // The identity check emits one TS2300 (at the second occurrence); no binder.
+        assert_eq!(check_codes("function f<T, T>() {}"), vec![2300]);
+        assert_eq!(check_codes("class C<T, U, T> {}"), vec![2300]);
+        assert_eq!(check_codes("interface I<A, A> {}"), vec![2300]);
+        // Distinct names never fire.
+        assert!(check_codes("function g<T, U>() {}").is_empty());
+    }
+
+    #[test]
+    fn type_parameters_three_way_pushes_raw_before_dedup() {
+        // The raw per-(i, j) push: T₂ fires once (j=0), T₃ fires twice (j=0, j=1) —
+        // three diagnostics at two distinct spans. The program-wide sort/dedup (see
+        // the binder-side `diag_codes` test) later collapses the T₃ pair to one.
+        let arena = Bump::new();
+        let src = "function f<T, T, T>() {}";
+        let program = tsv_ts::parse(src, &arena).expect("parse");
+        let diags = check_file_members(&program, src, FileId::ROOT);
+        assert_eq!(
+            diags.iter().map(|d| d.code).collect::<Vec<_>>(),
+            vec![2300, 2300, 2300]
+        );
+        let distinct: std::collections::BTreeSet<u32> =
+            diags.iter().map(|d| d.span.start).collect();
+        assert_eq!(distinct.len(), 2, "two distinct spans (T2 once, T3 twice)");
+    }
+
+    #[test]
+    fn accessor_accessor_is_check_pass_noop() {
+        // The state machine leaves a same-named accessor/accessor pair to the binder
+        // (the coarse kind can't tell get from set), so the check pass emits nothing.
+        assert!(check_codes("class C { get x() {} get x() {} }").is_empty());
+        assert!(check_codes("class C { get x() {} set x(v) {} }").is_empty());
+    }
+
+    #[test]
+    fn static_and_instance_members_are_separate_buckets() {
+        // `static x` and instance `x` live in different (key, is_static) buckets, so
+        // the check pass never merges them into a duplicate.
+        assert!(check_codes("class C { static x = 1; x = 2; }").is_empty());
+        // A same-static-ness duplicate DOES fire — the separation is by
+        // (key, is_static), not by ignoring static.
+        assert_eq!(
+            check_codes("class C { static x = 1; static x = 2; }"),
+            vec![2300, 2300]
+        );
+    }
+
+    #[test]
+    fn constructor_parameter_property_participates_in_batch() {
+        // A constructor parameter property (`public x`) is an instance property that
+        // matches the batch on key alone; paired with a field `x` the check pass
+        // fires at both (2 raw diagnostics — property/property silent-merges at bind).
+        assert_eq!(
+            check_codes("class C { constructor(public x: number) {} x = 1; }"),
+            vec![2300, 2300]
+        );
     }
 }

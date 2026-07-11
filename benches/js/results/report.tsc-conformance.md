@@ -12,8 +12,8 @@ Oracle: tsgo committed `.errors.txt` baselines (bind + merge family). Determinis
 
 ## Family (2300 / 2451 / 2567 / 2528 + merge 2397 / 2649 / 2664 / 2671)
 
-- match: 518
-- missing: 32 (merge-path 0, lib-conflict 0, check-time 32)
+- match: 539
+- missing: 11 (merge-path 0, lib-conflict 0, late-bound 11, other 0)
 - extra (GATE=0): 0
 - span mismatch: 0
 
@@ -21,7 +21,7 @@ Oracle: tsgo committed `.errors.txt` baselines (bind + merge family). Determinis
 
 | code | match | missing |
 | --- | --- | --- |
-| TS2300 | 394 | 32 |
+| TS2300 | 415 | 11 |
 | TS2397 | 4 | 0 |
 | TS2451 | 56 | 0 |
 | TS2528 | 35 | 0 |

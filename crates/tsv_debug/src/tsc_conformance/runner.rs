@@ -83,6 +83,20 @@ const LIB_CONFLICT_BASELINES: [&str; 5] = [
     "variableDeclarationInStrictMode1.ts",
 ];
 
+/// The family baselines whose remaining missing family diagnostics are genuinely
+/// deferred: they need the type engine (a literal-type or `unique symbol` computed
+/// member name, resolved via tsgo's `lateBindMember`) that this bind+check
+/// implementation has no counterpart for. A *missing* in one of these is bucketed to
+/// `missing_deferred_late_bound` (exact-pinned) rather than the hard-zero
+/// `missing_other`, so the honest residual stays visible without gating a release on
+/// a type-engine gap. Basenames, mirroring `LIB_CONFLICT_BASELINES`.
+const LATE_BOUND_BASELINES: [&str; 4] = [
+    "dynamicNamesErrors.ts",
+    "symbolDeclarationEmit12.ts",
+    "symbolProperty37.ts",
+    "symbolProperty44.ts",
+];
+
 /// Worker-thread stack for the sweep: the corpus has deeply-nested tests and
 /// tsv's recursive-descent parser has no depth guard, so the default 8 MiB
 /// overflows. 512 MiB is virtual-only reserve on Linux.
@@ -285,8 +299,11 @@ pub struct SkeletonReport {
     pub missing_merge: usize,
     /// ...missing attributed to absent lib binding (a `LIB_CONFLICT_BASELINES` test).
     pub missing_lib: usize,
-    /// ...missing not attributable to merge/lib — investigate (a same-table miss
-    /// is a cascade bug).
+    /// ...missing genuinely deferred to the type engine (a `LATE_BOUND_BASELINES`
+    /// test — literal-type / `unique symbol` computed member names). Exact-pinned.
+    pub missing_deferred_late_bound: usize,
+    /// ...missing not attributable to merge/lib/late-bound — a same-table cascade
+    /// bug or an unclassified gap. **Gate: must be 0** (any such miss is a regression).
     pub missing_other: usize,
     /// Variants carved out by predicate v1 rule (a): tsv parses clean but the
     /// baseline carries a non-bind TS1xxx code (recovery-AST incomparability).
@@ -959,6 +976,7 @@ fn grade_family(
         });
     }
     let is_lib = LIB_CONFLICT_BASELINES.contains(&test.basename.as_str());
+    let is_late_bound = LATE_BOUND_BASELINES.contains(&test.basename.as_str());
     for (code, count) in &buckets.missing_by_code {
         report.family_missing += *count;
         *report.family_missing_by_code.entry(*code).or_default() += *count;
@@ -966,6 +984,8 @@ fn grade_family(
             report.missing_merge += *count;
         } else if is_lib {
             report.missing_lib += *count;
+        } else if is_late_bound {
+            report.missing_deferred_late_bound += *count;
         } else {
             report.missing_other += *count;
             if report.missing_other_samples.len() < 20 {
@@ -1317,7 +1337,11 @@ impl SkeletonReport {
         println!("    merge-path:            {}", self.missing_merge);
         println!("    lib-conflict:          {}", self.missing_lib);
         println!(
-            "    check-time:            {} (deferred family misses — type params, type-dependent / late-bound computed & symbol names)",
+            "    late-bound (deferred): {} (needs the type engine — literal-type / unique-symbol computed member names)",
+            self.missing_deferred_late_bound
+        );
+        println!(
+            "    other (GATE=0):        {} (unclassified family miss — a same-table cascade bug)",
             self.missing_other
         );
         println!("  extra (GATE=0):          {}", self.family_extra);

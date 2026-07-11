@@ -37,6 +37,7 @@ use string_interner::DefaultStringInterner;
 use tsv_lang::Span;
 use tsv_ts::ast::internal::{
     ClassMember, Expression, Literal, LiteralValue, MethodKind, TSTypeElement,
+    TSTypeParameterDeclaration,
 };
 
 /// The per-body derivation context (source + interner for names, file for spans).
@@ -278,21 +279,52 @@ fn make_2300(file: FileId, span: Span, display: &str) -> Diagnostic {
     }
 }
 
+/// Check one type-parameter declaration's own parameters for duplicate names,
+/// appending a TS2300 at each later duplicate's name identifier.
+///
+/// A faithful port of tsgo's `checkTypeParameters` identity loop: for each param
+/// `i`, for each prior `j < i`, if they share a symbol — equivalently a name, since
+/// the binder silent-merges same-name type params (`TypeParameterExcludes` excludes
+/// `Type` but not `TypeParameter`, so no bind diagnostic fires) — emit `Duplicate
+/// identifier` at param `i`'s name. Scoped strictly to ONE declaration's own params:
+/// declaration-merged interfaces never cross-compare (that is the separate TS2428
+/// check, deliberately not ported here). The raw per-`(i, j)` push is intentional —
+/// the program-wide sort/dedup collapses the repeats a longer run produces
+/// (`<T, T, T>` fires 1 at T₂ + 2 at T₃, deduping to 2).
+// tsgo: internal/checker/checker.go checkTypeParameters (:6979)
+// tsgo: internal/binder/binder.go bindTypeParameter (:1259) — TypeParameterExcludes
+//       merges same-name type params silently (no bind diagnostic)
+pub(super) fn check_type_parameters(
+    ctx: &MemberCtx<'_>,
+    decl: &TSTypeParameterDeclaration<'_>,
+    out: &mut Vec<Diagnostic>,
+) {
+    for (i, param) in decl.params.iter().enumerate() {
+        let name = param.name.name(ctx.source, ctx.interner);
+        for prior in &decl.params[..i] {
+            if prior.name.name(ctx.source, ctx.interner) == name {
+                out.push(make_2300(ctx.file, param.name.name_span(), name));
+            }
+        }
+    }
+}
+
 /// Derive a member's canonical key string and the span its diagnostic points at
 /// (the `member.Name()` node). Returns `None` for a member with no stable key — a
 /// dynamic (non-literal) computed name, or a non-name key.
 fn member_key(ctx: &MemberCtx<'_>, key: &Expression<'_>, computed: bool) -> Option<(String, Span)> {
     if computed {
         // A computed name is a stable key only for a string/number literal; the
-        // diagnostic points at the whole `[ … ]` name node, so the span starts at
-        // the `[`.
+        // diagnostic points at the whole `[ … ]` name node, so the span runs from
+        // the `[` to just past the `]`.
         return match key {
             Expression::Literal(lit)
                 if matches!(lit.value, LiteralValue::String(_) | LiteralValue::Number(_)) =>
             {
                 let k = literal_key(ctx, lit)?;
-                let bracket = bracket_start(ctx.source, lit.span.start);
-                Some((k, Span::new(bracket, lit.span.end)))
+                let start = bracket_start(ctx.source, lit.span.start);
+                let end = bracket_end(ctx.source, lit.span.end);
+                Some((k, Span::new(start, end)))
             }
             // A dynamic computed name is late-bound (bucket G, deferred) — skip.
             _ => None,
@@ -332,12 +364,18 @@ fn param_property_key(ctx: &MemberCtx<'_>, parameter: &Expression<'_>) -> Option
 }
 
 /// The canonical key string of a literal property name: a string's decoded value,
-/// a number's ECMA-262 `Number::toString` form (so `0`, `0.0`, `0x0` all key `0`
-/// and collide with the string `'0'`), a bigint's verbatim source (conservative —
-/// never over-collides).
+/// a decimal number's ECMA-262 `Number::toString` form (so `0`, `0.0`, `0e0` all key
+/// `0` and collide with the string `'0'`), a bigint's verbatim source (conservative —
+/// never over-collides). A non-decimal numeric literal (`0x0`, `0o7`, `1_0`) the
+/// parser currently decodes to `NaN` falls back to its verbatim source too, so those
+/// forms stay distinct rather than all keying `"NaN"`.
 fn literal_key(ctx: &MemberCtx<'_>, lit: &Literal<'_>) -> Option<String> {
     match &lit.value {
         LiteralValue::String(cooked) => Some(cooked.resolve(lit.span, ctx.source).to_string()),
+        // A non-decimal numeric literal decodes to NaN upstream; key it on its
+        // verbatim source (like the bigint arm) so distinct forms stay distinct —
+        // `ecma_number_to_string(NaN)` would collapse them all to `"NaN"` and collide.
+        LiteralValue::Number(n) if n.is_nan() => Some(lit.span.extract(ctx.source).to_string()),
         LiteralValue::Number(n) => Some(ecma_number_to_string(*n)),
         LiteralValue::BigInt => Some(lit.span.extract(ctx.source).to_string()),
         LiteralValue::Boolean(_) | LiteralValue::Null => None,
@@ -357,6 +395,23 @@ fn bracket_start(source: &str, expr_start: u32) -> u32 {
         }
     }
     expr_start
+}
+
+/// The byte offset just past the `]` closing a computed key, scanning forward from
+/// the key expression's end (a plain byte loop — `]` is ASCII). Mirrors
+/// [`bracket_start`] so the diagnostic spans the whole `[ … ]` name node (as tsgo
+/// does). Falls back to the expression end if no `]` follows (never for a
+/// well-formed computed name).
+fn bracket_end(source: &str, expr_end: u32) -> u32 {
+    let bytes = source.as_bytes();
+    let mut i = expr_end as usize;
+    while i < bytes.len() {
+        if bytes[i] == b']' {
+            return i as u32 + 1;
+        }
+        i += 1;
+    }
+    expr_end
 }
 
 /// ECMA-262 `Number::toString` for a finite property-name value — the string tsgo
@@ -446,10 +501,12 @@ mod tests {
     fn ecma_number_to_string_integers_and_decimals() {
         assert_eq!(ecma_number_to_string(0.0), "0");
         assert_eq!(ecma_number_to_string(-0.0), "0");
-        // `0` and `0.0` and `0x0` all parse to the same f64 → same key (they collide).
+        // `0` and `0.0` and `0e0` all parse to the same f64 → same key (they collide).
+        // (A non-decimal `0x0` decodes to NaN upstream and is keyed on verbatim
+        // source instead — see `literal_key` — so it does NOT reach this helper.)
         assert_eq!(ecma_number_to_string(1.0), "1");
         assert_eq!(ecma_number_to_string(100.0), "100");
-        assert_eq!(ecma_number_to_string(255.0), "255"); // 0xff
+        assert_eq!(ecma_number_to_string(255.0), "255");
         assert_eq!(ecma_number_to_string(0.5), "0.5");
         assert_eq!(ecma_number_to_string(2.5), "2.5");
         assert_eq!(ecma_number_to_string(1.25), "1.25");

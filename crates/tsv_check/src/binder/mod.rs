@@ -808,6 +808,44 @@ mod tests {
     }
 
     #[test]
+    fn check_pass_duplicate_type_parameters() {
+        // The check pass emits TS2300 for a duplicate type parameter (the binder
+        // silent-merges same-name type params, so this is check-only). One duplicate
+        // → one diagnostic after sort/dedup.
+        assert_eq!(diag_codes("function f<T, T>() {}"), vec![2300]);
+        assert_eq!(diag_codes("class C<T, U, T> {}"), vec![2300]);
+        assert_eq!(diag_codes("interface I<A, A> {}"), vec![2300]);
+        // Distinct names never fire.
+        assert!(diag_codes("function g<T, U>() {}").is_empty());
+        // Declaration-merged interfaces are scoped per-declaration — only the second
+        // (its own `C, C`) fires; the two decls never cross-compare (that would be
+        // TS2428, deliberately not ported).
+        assert_eq!(
+            diag_codes("interface J<B> {} interface J<C, C> {}"),
+            vec![2300]
+        );
+    }
+
+    #[test]
+    fn check_pass_type_parameters_three_way_dedup() {
+        // `<T, T, T>` fires 1 at T₂ + 2 at T₃ raw; the program-wide sort/dedup
+        // collapses the T₃ pair → 2 final diagnostics.
+        assert_eq!(diag_codes("function f<T, T, T>() {}"), vec![2300, 2300]);
+    }
+
+    #[test]
+    fn check_pass_non_decimal_numeric_keys_stay_distinct() {
+        // `0x0` / `0xff` decode to NaN upstream; keyed on their verbatim source they
+        // stay distinct, so no false TS2300 (a `NaN`-keyed collision would flag them).
+        assert!(diag_codes("type T = { 0x0: number; 0xff: string };").is_empty());
+        // The identical form still collides (both key `"0x1"`).
+        assert_eq!(
+            diag_codes("type T = { 0x1: number; 0x1: string };"),
+            vec![2300, 2300]
+        );
+    }
+
+    #[test]
     fn dotted_namespace_three_deep_merges_with_explicit_nested() {
         // A 3-deep dotted namespace's intermediate segments route to their
         // enclosing namespace's exports, so `M.X.Y` merges with the explicit 3-deep

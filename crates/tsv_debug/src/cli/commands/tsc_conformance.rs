@@ -89,27 +89,33 @@ const RUN_SCRIPT_RETRY_PIN: usize = 25;
 const RUN_CRASH_EXCLUDED_PIN: usize = 1;
 
 /// REGRESSION PINS (exact, two-sided) for the family grading (the bind + merge +
-/// check gate). Measured 2026-07-10 vs pin 168e7015. `family_extra` is gated to 0
-/// (hard); the rest pin the buckets so any move (a cascade change, a merge
-/// change, a check-pass change, a tsv parser change, a typescript-go pull) forces
-/// a deliberate re-pin. The missing bucket is classified: `merge` (merge-phase
-/// family — **0**: the single-file merge path matches, TS2397 globalThis/undefined
-/// plus TS2664 augmentation-not-found), `lib` (absent-lib conflicts — **0**: the
-/// classified lib-conflict baselines, TS2300 eval/Symbol/Promise/ElementTagNameMap,
-/// match against the standard-library globals), and `check-time` (the deferred
-/// remainder — type parameters, and type-dependent / late-bound computed & symbol
-/// names — family instances the current bind+check implementation does not yet
-/// emit). The syntactic check pass now emits the duplicate-member family (TS2300
-/// over class / interface / type-literal properties and accessors), so those no
-/// longer sit in `check-time`. A drop in `check-time` (matches gained) is a real
-/// improvement that re-pins; a rise anywhere is a regression to explain.
+/// check gate). Measured vs pin 168e7015. `family_extra` is gated to 0 (hard); the
+/// rest pin the buckets so any move (a cascade change, a merge change, a check-pass
+/// change, a tsv parser change, a typescript-go pull) forces a deliberate re-pin.
+/// The syntactic check pass emits the duplicate-member family (TS2300 over class /
+/// interface / type-literal properties and accessors) **and** the type-parameter
+/// identity check (TS2300 over a declaration's own duplicate type parameters), so
+/// those match rather than sitting in the missing bucket. The missing bucket is
+/// classified four ways: `merge` (merge-phase family — **0**: the single-file merge
+/// path matches, TS2397 globalThis/undefined plus TS2664 augmentation-not-found),
+/// `lib` (absent-lib conflicts — **0**: the classified lib-conflict baselines, TS2300
+/// eval/Symbol/Promise/ElementTagNameMap, match against the standard-library
+/// globals), `late-bound` (**11**: the `LATE_BOUND_BASELINES` tests, genuinely
+/// deferred to the type engine — literal-type / `unique symbol` computed member
+/// names), and `other` (**0**, a HARD gate — any unclassified miss is a same-table
+/// cascade bug). A drop in `late-bound` (matches gained) is a real improvement that
+/// re-pins; a rise in `other` fails the run.
 const RUN_FAMILY_GRADED_PIN: usize = 4066;
 const RUN_FAMILY_POSITIVE_PIN: usize = 125;
-const RUN_FAMILY_MATCH_PIN: usize = 518;
-const RUN_FAMILY_MISSING_PIN: usize = 32;
+const RUN_FAMILY_MATCH_PIN: usize = 539;
+const RUN_FAMILY_MISSING_PIN: usize = 11;
 const RUN_MISSING_MERGE_PIN: usize = 0;
 const RUN_MISSING_LIB_PIN: usize = 0;
-const RUN_MISSING_CHECKTIME_PIN: usize = 32;
+/// Genuinely-deferred family misses (need the type engine); exact-pinned.
+const RUN_MISSING_DEFERRED_LATE_BOUND_PIN: usize = 11;
+/// Unclassified family misses — a HARD-zero invariant gate (not just a full-run pin),
+/// so a same-table cascade regression fails even a filtered triage run.
+const RUN_MISSING_OTHER_PIN: usize = 0;
 const RUN_FAMILY_SPAN_MISMATCH_PIN: usize = 0;
 const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
 const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 9;
@@ -415,6 +421,16 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
             report.extra_samples.first().map_or("", String::as_str)
         ));
     }
+    // The honest-residual gate: every missing must be explained by merge / lib /
+    // late-bound. An `other` miss is a same-table cascade bug — a HARD zero (an
+    // invariant, so a filtered triage run catches it too), not just a full-run pin.
+    if report.missing_other != RUN_MISSING_OTHER_PIN {
+        errs.push(format!(
+            "missing OTHER {} != 0 (an unclassified family miss — a same-table cascade bug), e.g. {}",
+            report.missing_other,
+            report.missing_other_samples.first().map_or("", String::as_str)
+        ));
+    }
     // The lib error channels must stay empty (a lib parse-reject, a missing referenced
     // lib, an unrecognized `@lib`/reference name, or a lib binding external with no
     // `declare global` block).
@@ -579,9 +595,9 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
         );
         pin(
             &mut errs,
-            "missing check-time",
-            report.missing_other,
-            RUN_MISSING_CHECKTIME_PIN,
+            "missing late-bound",
+            report.missing_deferred_late_bound,
+            RUN_MISSING_DEFERRED_LATE_BOUND_PIN,
         );
         pin(
             &mut errs,
@@ -663,7 +679,8 @@ struct RunPins {
     family_missing: usize,
     missing_merge: usize,
     missing_lib: usize,
-    missing_check_time: usize,
+    missing_deferred_late_bound: usize,
+    missing_other: usize,
     family_extra: usize,
     family_span_mismatch: usize,
     related_match: usize,
@@ -694,7 +711,8 @@ fn run_pins() -> RunPins {
         family_missing: RUN_FAMILY_MISSING_PIN,
         missing_merge: RUN_MISSING_MERGE_PIN,
         missing_lib: RUN_MISSING_LIB_PIN,
-        missing_check_time: RUN_MISSING_CHECKTIME_PIN,
+        missing_deferred_late_bound: RUN_MISSING_DEFERRED_LATE_BOUND_PIN,
+        missing_other: RUN_MISSING_OTHER_PIN,
         family_extra: 0,
         family_span_mismatch: RUN_FAMILY_SPAN_MISMATCH_PIN,
         related_match: RUN_RELATED_MATCH_PIN,
@@ -798,7 +816,8 @@ fn build_report_value(report: &SkeletonReport) -> serde_json::Value {
                 "total": report.family_missing,
                 "merge_path": report.missing_merge,
                 "lib_conflict": report.missing_lib,
-                "check_time": report.missing_other,
+                "late_bound": report.missing_deferred_late_bound,
+                "other": report.missing_other,
             },
             "extra": report.family_extra,
             "span_mismatch": report.family_span_mismatch,
@@ -865,8 +884,12 @@ fn render_report_md(report: &SkeletonReport) -> String {
     let _ = writeln!(s, "- match: {}", report.family_match);
     let _ = writeln!(
         s,
-        "- missing: {} (merge-path {}, lib-conflict {}, check-time {})",
-        report.family_missing, report.missing_merge, report.missing_lib, report.missing_other
+        "- missing: {} (merge-path {}, lib-conflict {}, late-bound {}, other {})",
+        report.family_missing,
+        report.missing_merge,
+        report.missing_lib,
+        report.missing_deferred_late_bound,
+        report.missing_other
     );
     let _ = writeln!(s, "- extra (GATE=0): {}", report.family_extra);
     let _ = writeln!(s, "- span mismatch: {}\n", report.family_span_mismatch);

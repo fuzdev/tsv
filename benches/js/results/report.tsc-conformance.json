@@ -10,19 +10,20 @@
     "family_positive_variants": 125
   },
   "family": {
-    "match": 518,
+    "match": 539,
     "missing": {
-      "total": 32,
+      "total": 11,
       "merge_path": 0,
       "lib_conflict": 0,
-      "check_time": 32
+      "late_bound": 11,
+      "other": 0
     },
     "extra": 0,
     "span_mismatch": 0
   },
   "per_code": {
     "match": {
-      "2300": 394,
+      "2300": 415,
       "2397": 4,
       "2451": 56,
       "2528": 35,
@@ -30,7 +31,7 @@
       "2664": 3
     },
     "missing": {
-      "2300": 32
+      "2300": 11
     }
   },
   "related": {
@@ -64,11 +65,12 @@
     "parse_rejected": 1006,
     "family_graded": 4066,
     "family_positive": 125,
-    "family_match": 518,
-    "family_missing": 32,
+    "family_match": 539,
+    "family_missing": 11,
     "missing_merge": 0,
     "missing_lib": 0,
-    "missing_check_time": 32,
+    "missing_deferred_late_bound": 11,
+    "missing_other": 0,
     "family_extra": 0,
     "family_span_mismatch": 0,
     "related_match": 51,
