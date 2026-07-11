@@ -7,16 +7,32 @@
 //! **strict** [`BoundFile::require_node_id`] (a miss aborts — a flow graph must
 //! never silently splice onto the wrong node).
 //!
-//! **F1a scope: the LINEAR + unreachable core.** Real branching topology
-//! (if / loops / conditions / switch / try / labeled / break / continue) is
-//! **F1b** — those constructs are handled here by a linear placeholder that
-//! threads `current_flow` through their children (marked `// F1b: real
-//! topology`), so every contained node still gets a flow attachment and the
-//! walk never panics. What *is* real here: the flow substrate + constructors,
-//! container save/restore (fresh `Start`, constructor/static-block return
-//! targets), linear statement threading, the assertion-`Call` and
-//! variable-`Assignment` mutations, and `return`/`throw` unreachable
-//! propagation.
+//! **F1b scope: the branching control-flow constructs.** On top of F1a's linear
+//! substrate this slice builds faithful topology for **conditions** (the
+//! `bindCondition` machinery — `&&`/`||`/`??`/`?:`/`!`/parenthesized + the
+//! `hasFlowEffects` save/restore family), **`if`/`else`**, the five loops
+//! (**`while`**, **`do…while`**, **`for`**, **`for-in`**, **`for-of`**), and
+//! **unlabeled `break`/`continue`**. A `switch` gets a local post-switch break
+//! target (so a contained `break` resolves locally) but its clause topology,
+//! fallthrough and exhaustiveness stay linear placeholders. Still **F2**: switch
+//! clause topology, try/finally exception edges, labeled-statement resolution,
+//! IIFE inlining, and parameter-default forks (all marked `// F2:`). Flow stays
+//! **dark** — nothing consumes it until F3, so this slice emits no diagnostics.
+//!
+//! **`isTopLevelLogicalExpression` without parent pointers.** tsgo's
+//! `bindBinaryExpressionFlow` walks the parent chain to decide whether a logical
+//! expression is evaluated for its value (top-level → `hasFlowEffects` post-label
+//! wrap) or as a condition (nested → wired to the enclosing true/false targets).
+//! tsv's `Expression` has no parent pointer, so the walk is replaced by the
+//! invariant that the true/false targets are `Some` **exactly** inside a
+//! condition bind (they are set only by `do_with_conditional_branches` and the
+//! `!`-swap): a logical expression is top-level iff `current_true_target` is
+//! `None`. To keep that invariant sound across a nested function/initializer
+//! container (which can be entered mid-condition, e.g.
+//! `if (arr.some(x => x && y))`), the true/false targets are **saved + reset to
+//! `None` at every flow container** and restored on exit — a deliberate
+//! departure from tsgo (which never saves them, relying on the parent walk)
+//! required by the pointer-free heuristic.
 //!
 //! **Deliberate scoping deviations (F1a; documented for F1b):**
 //! - **Types are not descended.** The walk visits value positions only; pure
@@ -55,10 +71,12 @@ use smallvec::SmallVec;
 use tsv_lang::Span;
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
-    ArrowFunctionBody, BinaryOperator, ClassDeclaration, ClassExpression, ClassMember, Decorator,
-    Expression, ForInit, FunctionDeclaration, FunctionExpression, Identifier, LiteralValue,
+    ArrowFunctionBody, AssignmentOperator, BinaryExpression, BinaryOperator, BreakStatement,
+    ClassDeclaration, ClassExpression, ClassMember, ConditionalExpression, ContinueStatement,
+    Decorator, DoWhileStatement, Expression, ForInOfLeft, ForInit, ForStatement,
+    FunctionDeclaration, FunctionExpression, Identifier, IfStatement, LiteralValue,
     MethodDefinition, MethodKind, ObjectPatternProperty, ObjectProperty, Property, Statement,
-    TSModuleDeclarationBody, VariableDeclarator,
+    SwitchStatement, TSModuleDeclarationBody, UnaryOperator, VariableDeclarator, WhileStatement,
 };
 
 // --- FlowFlags -------------------------------------------------------------
@@ -315,12 +333,20 @@ pub fn build_flow(program: &Program<'_>, _source: &str, bound: &BoundFile) -> Fl
 // --- FlowBuilder -----------------------------------------------------------
 
 /// Saved control-flow state restored at a flow-container boundary
-/// (binder.go:1517-1524, the F1 subset — the deferred break/continue/label
-/// targets are always `None` in F1a and land with F1b's branching).
+/// (binder.go:1517-1524, the F1b subset — `activeLabelList` / `seenThisKeyword`
+/// stay F2/unported). The true/false targets are **not** in tsgo's container
+/// save set; F1b adds them (see the module header — the pointer-free
+/// `isTopLevelLogicalExpression` heuristic needs a container to reset the
+/// condition context).
 struct SavedFlow {
     current_flow: FlowNodeId,
     current_return_target: Option<FlowNodeId>,
     current_exception_target: Option<FlowNodeId>,
+    current_break_target: Option<FlowNodeId>,
+    current_continue_target: Option<FlowNodeId>,
+    current_true_target: Option<FlowNodeId>,
+    current_false_target: Option<FlowNodeId>,
+    has_explicit_return: bool,
 }
 
 /// The flow-graph construction walk.
@@ -344,13 +370,34 @@ struct FlowBuilder<'a> {
     end_flow: Vec<(NodeId, FlowNodeId)>,
     return_flow: Vec<(NodeId, FlowNodeId)>,
 
-    // construction state (the F1 subset of the container-boundary set)
+    // construction state (the F1b subset of the container-boundary set)
     current_flow: FlowNodeId,
     unreachable_flow: FlowNodeId,
     current_return_target: Option<FlowNodeId>,
-    /// Always `None` in F1 (`createFlowMutation` reads it; only try/finally sets
+    /// Always `None` in F1b (`createFlowMutation` reads it; only try/finally sets
     /// it, which is F2), but ported so the exception hook is faithful.
     current_exception_target: Option<FlowNodeId>,
+    /// Unlabeled-`break` / `continue` targets (binder.go:1546-1547) — set by the
+    /// loop/switch binders, `None` outside a loop/switch, reset at a container.
+    current_break_target: Option<FlowNodeId>,
+    current_continue_target: Option<FlowNodeId>,
+    /// The condition-branch targets (binder.go:1790-1793). Set only inside
+    /// `do_with_conditional_branches` and swapped by the `!`-prefix; their
+    /// `Some`-ness is the pointer-free `isTopLevelLogicalExpression` signal (see
+    /// the module header). Reset at a container so a nested function body binds
+    /// its own logicals as top-level.
+    current_true_target: Option<FlowNodeId>,
+    current_false_target: Option<FlowNodeId>,
+    /// `hasExplicitReturn` (binder.go:1549) — set by `return`, saved+reset at a
+    /// container. Dark plumbing in F1b (the `HasExplicitReturn` node-flag write is
+    /// F3-consumed reachability), ported for the faithful container-boundary set.
+    has_explicit_return: bool,
+    /// `hasFlowEffects` (binder.go:501/516) — set by `createFlowMutation` /
+    /// `createFlowCall` / `return` / `throw` / `break` / `continue`; read by the
+    /// logical/conditional post-label save/restore family to decide whether a
+    /// post-expression label materializes. Not saved at a container (the family
+    /// wrappers always reset-then-`OR`, isolating each subtree).
+    has_flow_effects: bool,
 
     // stats
     branch_labels: u32,
@@ -375,6 +422,12 @@ impl<'a> FlowBuilder<'a> {
             unreachable_flow: FlowNodeId::UNREACHABLE,
             current_return_target: None,
             current_exception_target: None,
+            current_break_target: None,
+            current_continue_target: None,
+            current_true_target: None,
+            current_false_target: None,
+            has_explicit_return: false,
+            has_flow_effects: false,
             branch_labels: 0,
             dead_labels: 0,
         };
@@ -386,7 +439,26 @@ impl<'a> FlowBuilder<'a> {
         b
     }
 
-    fn finish(self) -> FlowProduct {
+    fn finish(mut self) -> FlowProduct {
+        // Flush any label whose antecedents still live in scratch — the **loop
+        // labels** (`preWhile`/`preDo`/`preLoop`). A loop label is referenced (its
+        // condition flows from it, and it is a back/continue edge target) but the
+        // loop binders never call `finish_flow_label` on it (a back edge can be
+        // added after it is already used), so its entry + back edges never reach
+        // the pool via the collapse path. Deterministic order (sort by id) so the
+        // pool layout is reproducible; the per-label edge order is push-order.
+        let mut pending: Vec<FlowNodeId> = self.label_scratch.keys().copied().collect();
+        pending.sort_unstable();
+        for label in pending {
+            let list = self.label_scratch.remove(&label).unwrap_or_default();
+            if list.is_empty() {
+                continue;
+            }
+            let off = self.pool.len() as u32;
+            self.pool.push(list.len() as u32);
+            self.pool.extend(list.iter().map(|e| e.get()));
+            self.antecedent[label.index()] = off + 1; // 1-based pool-run index
+        }
         let mut end_flow = self.end_flow;
         let mut return_flow = self.return_flow;
         end_flow.sort_unstable_by_key(|&(n, _)| n);
@@ -443,18 +515,15 @@ impl<'a> FlowBuilder<'a> {
         self.new_flow_node(FlowFlags::BRANCH_LABEL)
     }
 
-    /// `createLoopLabel` (binder.go:467). F1b (loops) exercises this.
-    #[allow(dead_code)] // F1b: loop constructs
+    /// `createLoopLabel` (binder.go:467).
     fn create_loop_label(&mut self) -> FlowNodeId {
         self.new_flow_node(FlowFlags::LOOP_LABEL)
     }
 
     /// `createFlowMutation` (binder.go:499). The `currentExceptionTarget` hook
-    /// is a no-op in F1 (that field is always `None`; try/finally sets it, F2).
-    // F1b: tsgo also sets `hasFlowEffects = true` here (binder.go:501) — F1b's
-    // condition/logical/for binding reads it to decide whether a post-expression
-    // label materializes, so F1b must reintroduce it (omitting it over-produces
-    // flow nodes: a sound superset, but diverges from tsgo's shape).
+    /// is a no-op in F1b (that field is always `None`; try/finally sets it, F2).
+    /// Sets `hasFlowEffects` (binder.go:501) — the condition/logical post-label
+    /// family reads it to decide whether a post-expression label materializes.
     fn create_flow_mutation(
         &mut self,
         flags: FlowFlags,
@@ -462,6 +531,7 @@ impl<'a> FlowBuilder<'a> {
         node: NodeId,
     ) -> FlowNodeId {
         self.set_flow_node_referenced(antecedent);
+        self.has_flow_effects = true;
         let result = self.new_flow_node_ex(flags, Some(node), antecedent);
         if let Some(target) = self.current_exception_target {
             self.add_antecedent(target, result);
@@ -469,20 +539,19 @@ impl<'a> FlowBuilder<'a> {
         result
     }
 
-    /// `createFlowCall` (binder.go:514). F1b: also sets `hasFlowEffects = true`
+    /// `createFlowCall` (binder.go:514). Sets `hasFlowEffects = true`
     /// (binder.go:516) — see `create_flow_mutation`.
     fn create_flow_call(&mut self, antecedent: FlowNodeId, node: NodeId) -> FlowNodeId {
         self.set_flow_node_referenced(antecedent);
+        self.has_flow_effects = true;
         self.new_flow_node_ex(FlowFlags::CALL, Some(node), antecedent)
     }
 
-    /// `createFlowCondition` (binder.go:479) — ported for F1b's condition
-    /// binding. The `expression.Parent` guards (optional-chain root / nullish
-    /// coalesce) are supplied by the caller, which has the parent context tsv's
-    /// AST does not carry on an `Expression`; `is_narrowing` is the caller's
-    /// `is_narrowing_expression` verdict (F1b). Unexercised by F1a's linear
-    /// walk (conditions are F1b).
-    #[allow(dead_code)] // F1b: condition binding (bindCondition)
+    /// `createFlowCondition` (binder.go:479) — the condition-binding constructor.
+    /// The `expression.Parent` guards (optional-chain root / nullish coalesce) are
+    /// supplied by the caller, which has the parent context tsv's AST does not
+    /// carry on an `Expression`; `is_narrowing` is the caller's
+    /// `is_narrowing_expression` verdict.
     fn create_flow_condition(
         &mut self,
         flags: FlowFlags,
@@ -611,6 +680,11 @@ impl<'a> FlowBuilder<'a> {
             current_flow: self.current_flow,
             current_return_target: self.current_return_target,
             current_exception_target: self.current_exception_target,
+            current_break_target: self.current_break_target,
+            current_continue_target: self.current_continue_target,
+            current_true_target: self.current_true_target,
+            current_false_target: self.current_false_target,
+            has_explicit_return: self.has_explicit_return,
         };
         if !transparent {
             let start = self.new_flow_node(FlowFlags::START);
@@ -625,6 +699,14 @@ impl<'a> FlowBuilder<'a> {
             None
         };
         self.current_exception_target = None;
+        self.current_break_target = None;
+        self.current_continue_target = None;
+        // Reset the condition context so a nested body binds its own logicals as
+        // top-level (see the module header — the pointer-free
+        // `isTopLevelLogicalExpression` heuristic). tsgo leaves these untouched.
+        self.current_true_target = None;
+        self.current_false_target = None;
+        self.has_explicit_return = false;
         saved
     }
 
@@ -655,6 +737,11 @@ impl<'a> FlowBuilder<'a> {
         }
         self.current_return_target = saved.current_return_target;
         self.current_exception_target = saved.current_exception_target;
+        self.current_break_target = saved.current_break_target;
+        self.current_continue_target = saved.current_continue_target;
+        self.current_true_target = saved.current_true_target;
+        self.current_false_target = saved.current_false_target;
+        self.has_explicit_return = saved.has_explicit_return;
     }
 
     // --- entry (SourceFile container) -------------------------------------
@@ -667,6 +754,11 @@ impl<'a> FlowBuilder<'a> {
         self.current_flow = start;
         self.current_return_target = None;
         self.current_exception_target = None;
+        self.current_break_target = None;
+        self.current_continue_target = None;
+        self.current_true_target = None;
+        self.current_false_target = None;
+        self.has_explicit_return = false;
         self.visit_statement_list(program.body);
         // SourceFile end_flow is unconditional (binder.go:1567-1569).
         self.end_flow.push((root, self.current_flow));
@@ -717,6 +809,7 @@ impl<'a> FlowBuilder<'a> {
                 }
             }
             Statement::ReturnStatement(s) => {
+                // `bindReturnStatement` (binder.go:1939).
                 if let Some(a) = &s.argument {
                     self.visit_expression(a);
                 }
@@ -724,21 +817,45 @@ impl<'a> FlowBuilder<'a> {
                     self.add_antecedent(rt, self.current_flow);
                 }
                 self.current_flow = self.unreachable_flow;
+                self.has_explicit_return = true;
+                self.has_flow_effects = true;
             }
             Statement::ThrowStatement(s) => {
+                // `bindThrowStatement` (binder.go:1949).
                 self.visit_expression(&s.argument);
                 self.current_flow = self.unreachable_flow;
+                self.has_flow_effects = true;
             }
-            // Everything else (declarations, blocks, and the F1b branching
-            // placeholders) threads flow linearly through its children.
+            // --- F1b: branching control-flow topology ---------------------
+            Statement::IfStatement(s) => self.bind_if_statement(s),
+            Statement::WhileStatement(s) => self.bind_while_statement(id, s),
+            Statement::DoWhileStatement(s) => self.bind_do_statement(id, s),
+            Statement::ForStatement(s) => self.bind_for_statement(id, s),
+            Statement::ForInStatement(s) => {
+                self.bind_for_in_or_of(id, &s.left, &s.right, s.body);
+            }
+            Statement::ForOfStatement(s) => {
+                self.bind_for_in_or_of(id, &s.left, &s.right, s.body);
+            }
+            Statement::BreakStatement(s) => self.bind_break_statement(s),
+            Statement::ContinueStatement(s) => self.bind_continue_statement(s),
+            Statement::SwitchStatement(s) => self.bind_switch_statement(s),
+            // Everything else (declarations, blocks, and the F2 sequential
+            // placeholders — labeled / try / exports / modules) threads flow
+            // linearly through its children.
             _ => self.descend_children_generic(stmt),
         }
     }
 
     /// Descend a statement's value children threading `current_flow` linearly,
-    /// with **no** flow shaping — the `bindEachChild` analog. Shared by the
-    /// dead-code path and the F1b branching placeholders (which build no real
-    /// topology yet). Containers nested here still open their own `Start`
+    /// with **no** flow shaping — the `bindEachChild` analog. Used by the
+    /// **dead-code path** (where linear descent is correct — nothing is
+    /// reachable) for every statement kind, and by the reachable `_` arm for the
+    /// kinds without their own shaper (declarations, blocks, and the F2
+    /// sequential placeholders — labeled / try / exports / modules). The
+    /// branching arms below (`if` / the loops / `switch` / `break` / `continue`)
+    /// are therefore reached **only in dead code**; the reachable topology lives
+    /// in `visit_statement`. Containers nested here still open their own `Start`
     /// regions, so a function body stays reachable even in dead code.
     fn descend_children_generic(&mut self, stmt: &Statement<'_>) {
         match stmt {
@@ -763,7 +880,8 @@ impl<'a> FlowBuilder<'a> {
             }
             Statement::ThrowStatement(s) => self.visit_expression(&s.argument),
             Statement::BlockStatement(b) => self.visit_statement_list(b.body),
-            // --- F1b: real topology (branching) — linear placeholder descent -
+            // --- dead-path linear descent for the branching kinds (their real
+            //     topology lives in `visit_statement`; reached only when dead) ---
             Statement::IfStatement(s) => {
                 self.visit_expression(&s.test);
                 self.visit_statement(s.consequent);
@@ -790,24 +908,24 @@ impl<'a> FlowBuilder<'a> {
                 if let Some(u) = &s.update {
                     self.visit_expression(u);
                 }
-                self.visit_statement(s.body); // F1b: real topology
+                self.visit_statement(s.body);
             }
             Statement::ForInStatement(s) => {
                 self.visit_for_left(&s.left);
                 self.visit_expression(&s.right);
-                self.visit_statement(s.body); // F1b: real topology
+                self.visit_statement(s.body);
             }
             Statement::ForOfStatement(s) => {
                 self.visit_for_left(&s.left);
                 self.visit_expression(&s.right);
-                self.visit_statement(s.body); // F1b: real topology
+                self.visit_statement(s.body);
             }
             Statement::WhileStatement(s) => {
                 self.visit_expression(&s.test);
-                self.visit_statement(s.body); // F1b: real topology
+                self.visit_statement(s.body);
             }
             Statement::DoWhileStatement(s) => {
-                self.visit_statement(s.body); // F1b: real topology
+                self.visit_statement(s.body);
                 self.visit_expression(&s.test);
             }
             Statement::SwitchStatement(s) => {
@@ -816,7 +934,7 @@ impl<'a> FlowBuilder<'a> {
                     if let Some(t) = &case.test {
                         self.visit_expression(t);
                     }
-                    self.visit_statement_list(case.consequent); // F1b: real topology
+                    self.visit_statement_list(case.consequent);
                 }
             }
             Statement::TryStatement(s) => {
@@ -832,17 +950,17 @@ impl<'a> FlowBuilder<'a> {
                 }
             }
             Statement::LabeledStatement(s) => {
-                self.visit_identifier(&s.label); // F1b: real label topology
+                self.visit_identifier(&s.label); // F2: real labeled-statement topology
                 self.visit_statement(s.body);
             }
             Statement::BreakStatement(s) => {
                 if let Some(label) = &s.label {
-                    self.visit_identifier(label); // F1b: real break/continue topology
+                    self.visit_identifier(label);
                 }
             }
             Statement::ContinueStatement(s) => {
                 if let Some(label) = &s.label {
-                    self.visit_identifier(label); // F1b: real break/continue topology
+                    self.visit_identifier(label);
                 }
             }
             Statement::ExportNamedDeclaration(e) => {
@@ -869,8 +987,8 @@ impl<'a> FlowBuilder<'a> {
         }
     }
 
-    fn visit_for_left(&mut self, left: &tsv_ts::ast::internal::ForInOfLeft<'_>) {
-        use tsv_ts::ast::internal::ForInOfLeft as L;
+    fn visit_for_left(&mut self, left: &ForInOfLeft<'_>) {
+        use ForInOfLeft as L;
         match left {
             L::VariableDeclaration(d) => {
                 for decl in d.declarations {
@@ -913,6 +1031,466 @@ impl<'a> FlowBuilder<'a> {
             self.current_flow =
                 self.create_flow_mutation(FlowFlags::ASSIGNMENT, self.current_flow, decl_id);
         }
+    }
+
+    // --- branching statement flow shapers ---------------------------------
+
+    /// `bindIfStatement` (binder.go:1924) — then/else branch labels merge at
+    /// `postIf`; each branch binds against the condition-split flow.
+    fn bind_if_statement(&mut self, s: &IfStatement<'_>) {
+        let then_label = self.create_branch_label();
+        let else_label = self.create_branch_label();
+        let post_if = self.create_branch_label();
+        self.bind_condition(Some(&s.test), then_label, else_label, false);
+        self.current_flow = self.finish_flow_label(then_label);
+        self.visit_statement(s.consequent);
+        self.add_antecedent(post_if, self.current_flow);
+        self.current_flow = self.finish_flow_label(else_label);
+        if let Some(alt) = s.alternate {
+            self.visit_statement(alt);
+        }
+        self.add_antecedent(post_if, self.current_flow);
+        self.current_flow = self.finish_flow_label(post_if);
+    }
+
+    /// `bindWhileStatement` (binder.go:1857) — the entry edge is added to the
+    /// loop label **before** it becomes `current_flow`; the back edge **after**
+    /// the body.
+    fn bind_while_statement(&mut self, stmt_id: NodeId, s: &WhileStatement<'_>) {
+        let pre_while = set_continue_target(stmt_id, self.create_loop_label());
+        let pre_body = self.create_branch_label();
+        let post_while = self.create_branch_label();
+        self.add_antecedent(pre_while, self.current_flow); // entry edge (first)
+        self.current_flow = pre_while;
+        self.bind_condition(Some(&s.test), pre_body, post_while, false);
+        self.current_flow = self.finish_flow_label(pre_body);
+        self.bind_iterative_statement(s.body, post_while, pre_while);
+        self.add_antecedent(pre_while, self.current_flow); // back edge (after)
+        self.current_flow = self.finish_flow_label(post_while);
+    }
+
+    /// `bindDoStatement` (binder.go:1871) — the body runs from the loop label
+    /// first; the continue target is a **pre-condition** branch label (not the
+    /// loop label), and the condition loops back to the loop label.
+    fn bind_do_statement(&mut self, stmt_id: NodeId, s: &DoWhileStatement<'_>) {
+        let pre_do = self.create_loop_label();
+        let pre_condition = set_continue_target(stmt_id, self.create_branch_label());
+        let post_do = self.create_branch_label();
+        self.add_antecedent(pre_do, self.current_flow);
+        self.current_flow = pre_do;
+        self.bind_iterative_statement(s.body, post_do, pre_condition);
+        self.add_antecedent(pre_condition, self.current_flow);
+        self.current_flow = self.finish_flow_label(pre_condition);
+        self.bind_condition(Some(&s.test), pre_do, post_do, false);
+        self.current_flow = self.finish_flow_label(post_do);
+    }
+
+    /// `bindForStatement` (binder.go:1885) — init → loop label → condition →
+    /// body (continue = the increment label) → incrementor → back edge.
+    fn bind_for_statement(&mut self, stmt_id: NodeId, s: &ForStatement<'_>) {
+        let pre_loop = set_continue_target(stmt_id, self.create_loop_label());
+        let pre_body = self.create_branch_label();
+        let pre_increment = self.create_branch_label();
+        let post_loop = self.create_branch_label();
+        match &s.init {
+            Some(ForInit::VariableDeclaration(d)) => {
+                for decl in d.declarations {
+                    self.bind_variable_declaration_flow(decl);
+                }
+            }
+            Some(ForInit::Expression(e)) => self.visit_expression(e),
+            None => {}
+        }
+        self.add_antecedent(pre_loop, self.current_flow);
+        self.current_flow = pre_loop;
+        // A nil condition is a true passthrough / false-unreachable, handled by
+        // `create_flow_condition`'s nil-expression arm.
+        self.bind_condition(s.test.as_ref(), pre_body, post_loop, false);
+        self.current_flow = self.finish_flow_label(pre_body);
+        self.bind_iterative_statement(s.body, post_loop, pre_increment);
+        self.add_antecedent(pre_increment, self.current_flow);
+        self.current_flow = self.finish_flow_label(pre_increment);
+        if let Some(u) = &s.update {
+            self.visit_expression(u);
+        }
+        self.add_antecedent(pre_loop, self.current_flow); // back edge
+        self.current_flow = self.finish_flow_label(post_loop);
+    }
+
+    /// `bindForInOrOfStatement` (binder.go:1904). The exit edge is
+    /// **unconditional** (a for-in/of can exit after zero iterations); continue
+    /// targets the loop label. Shared by `for-in` and `for-of` (the for-of
+    /// `await` modifier is a `bool` in tsv — no node to bind, no fork).
+    fn bind_for_in_or_of(
+        &mut self,
+        stmt_id: NodeId,
+        left: &ForInOfLeft<'_>,
+        right: &Expression<'_>,
+        body: &Statement<'_>,
+    ) {
+        let pre_loop = set_continue_target(stmt_id, self.create_loop_label());
+        let post_loop = self.create_branch_label();
+        self.visit_expression(right);
+        self.add_antecedent(pre_loop, self.current_flow);
+        self.current_flow = pre_loop;
+        self.add_antecedent(post_loop, self.current_flow); // unconditional exit
+        // Bind the initializer (binder.go:1915-1918). A declaration-list variable
+        // is assigned each iteration (`bindVariableDeclarationFlow`'s for-in/of
+        // guard, binder.go:2316 — the `Assignment` mutation even with no
+        // initializer); a pattern initializer runs `bindAssignmentTargetFlow`.
+        match left {
+            ForInOfLeft::VariableDeclaration(d) => {
+                for decl in d.declarations {
+                    self.visit_expression(&decl.id);
+                    if let Some(init) = &decl.init {
+                        self.visit_expression(init);
+                    }
+                    let decl_id = self.require(addr_of(decl));
+                    self.current_flow = self.create_flow_mutation(
+                        FlowFlags::ASSIGNMENT,
+                        self.current_flow,
+                        decl_id,
+                    );
+                }
+            }
+            ForInOfLeft::Pattern(p) => {
+                self.visit_expression(p);
+                self.bind_assignment_target_flow(p);
+            }
+        }
+        self.bind_iterative_statement(body, post_loop, pre_loop);
+        self.add_antecedent(pre_loop, self.current_flow); // back edge
+        self.current_flow = self.finish_flow_label(post_loop);
+    }
+
+    /// `bindIterativeStatement` (binder.go:1807) — bind a loop body with its
+    /// break/continue targets installed, restored on exit.
+    fn bind_iterative_statement(
+        &mut self,
+        body: &Statement<'_>,
+        break_target: FlowNodeId,
+        continue_target: FlowNodeId,
+    ) {
+        let save_break = self.current_break_target;
+        let save_continue = self.current_continue_target;
+        self.current_break_target = Some(break_target);
+        self.current_continue_target = Some(continue_target);
+        self.visit_statement(body);
+        self.current_break_target = save_break;
+        self.current_continue_target = save_continue;
+    }
+
+    /// `bindBreakStatement` (binder.go:1955), unlabeled path only.
+    fn bind_break_statement(&mut self, s: &BreakStatement<'_>) {
+        match &s.label {
+            None => {
+                let target = self.current_break_target;
+                self.bind_break_or_continue_flow(target);
+            }
+            // F2: labeled break resolution (findActiveLabel + the label's target).
+            Some(label) => self.visit_identifier(label),
+        }
+    }
+
+    /// `bindContinueStatement` (binder.go:1959), unlabeled path only.
+    fn bind_continue_statement(&mut self, s: &ContinueStatement<'_>) {
+        match &s.label {
+            None => {
+                let target = self.current_continue_target;
+                self.bind_break_or_continue_flow(target);
+            }
+            // F2: labeled continue resolution.
+            Some(label) => self.visit_identifier(label),
+        }
+    }
+
+    /// `bindBreakOrContinueFlow` (binder.go:1985) — route to the target and go
+    /// unreachable; a `None` target (break/continue outside any loop/switch) is a
+    /// no-op (the parser accepts it; the illegal-jump diagnostic is F3+).
+    fn bind_break_or_continue_flow(&mut self, target: Option<FlowNodeId>) {
+        if let Some(t) = target {
+            self.add_antecedent(t, self.current_flow);
+            self.current_flow = self.unreachable_flow;
+            self.has_flow_effects = true;
+        }
+    }
+
+    /// A `switch` with a **local** post-switch break target, so a contained
+    /// `break` resolves here rather than at an enclosing loop. F2: the real
+    /// clause topology (per-clause `SwitchClause` flow, fallthrough,
+    /// exhaustiveness) — F1b threads the discriminant + clauses linearly through
+    /// `current_flow`.
+    fn bind_switch_statement(&mut self, s: &SwitchStatement<'_>) {
+        let save_break = self.current_break_target;
+        let post_switch = self.create_branch_label();
+        self.current_break_target = Some(post_switch);
+        self.visit_expression(&s.discriminant);
+        for case in s.cases {
+            if let Some(t) = &case.test {
+                self.visit_expression(t);
+            }
+            self.visit_statement_list(case.consequent);
+        }
+        self.add_antecedent(post_switch, self.current_flow);
+        self.current_break_target = save_break;
+        self.current_flow = self.finish_flow_label(post_switch);
+    }
+
+    // --- condition binding (the bindCondition machinery) ------------------
+
+    /// `doWithConditionalBranches` (binder.go:1789) — bind `value` with the given
+    /// true/false targets installed, restored on exit. A `None` value is the
+    /// nil-node no-op (`for (;;)`).
+    fn do_with_conditional_branches(
+        &mut self,
+        value: Option<&Expression<'_>>,
+        true_target: FlowNodeId,
+        false_target: FlowNodeId,
+    ) {
+        let saved_true = self.current_true_target;
+        let saved_false = self.current_false_target;
+        self.current_true_target = Some(true_target);
+        self.current_false_target = Some(false_target);
+        if let Some(v) = value {
+            self.visit_expression(v);
+        }
+        self.current_true_target = saved_true;
+        self.current_false_target = saved_false;
+    }
+
+    /// `bindCondition` (binder.go:1799) — bind the condition through the
+    /// true/false targets, then, **only for an atomic condition** (not a logical
+    /// `&&`/`||`/`??` or logical compound-assignment, whose sub-binder already
+    /// wired the targets), add the true/false condition edges. `parent_is_nullish`
+    /// is the caller-supplied `IsNullishCoalesce(parent)` guard (the operands of a
+    /// `??`); `is_optional_chain_root` is always `false` here (optional chains are
+    /// atomic — their dedicated short-circuit machinery is F2).
+    fn bind_condition(
+        &mut self,
+        node: Option<&Expression<'_>>,
+        true_target: FlowNodeId,
+        false_target: FlowNodeId,
+        parent_is_nullish: bool,
+    ) {
+        self.do_with_conditional_branches(node, true_target, false_target);
+        if node.is_none_or(|e| !is_logical_condition(e)) {
+            let with_id = node.map(|e| (e, self.expr_id(e)));
+            let is_narrowing = node.is_some_and(is_narrowing_expression);
+            let tc = self.create_flow_condition(
+                FlowFlags::TRUE_CONDITION,
+                self.current_flow,
+                with_id,
+                is_narrowing,
+                false,
+                parent_is_nullish,
+            );
+            self.add_antecedent(true_target, tc);
+            let fc = self.create_flow_condition(
+                FlowFlags::FALSE_CONDITION,
+                self.current_flow,
+                with_id,
+                is_narrowing,
+                false,
+                parent_is_nullish,
+            );
+            self.add_antecedent(false_target, fc);
+        }
+    }
+
+    /// `bindBinaryExpressionFlow`'s logical branch (binder.go:2219) — decides
+    /// value-context (top-level → a `hasFlowEffects` post-label materializes only
+    /// if the subtree had flow effects) vs condition-context (nested → the
+    /// enclosing true/false targets). The pointer-free
+    /// `isTopLevelLogicalExpression` test is `current_true_target.is_none()` (see
+    /// the module header). `assign_target` is the LHS for a logical
+    /// compound-assignment (`&&=`/`||=`/`??=`), else `None`.
+    fn bind_binary_expression_flow(
+        &mut self,
+        node: &Expression<'_>,
+        left: &Expression<'_>,
+        right: &Expression<'_>,
+        is_and: bool,
+        is_nullish: bool,
+        assign_target: Option<&Expression<'_>>,
+    ) {
+        if self.current_true_target.is_none() {
+            let post = self.create_branch_label();
+            let saved_flow = self.current_flow;
+            let saved_effects = self.has_flow_effects;
+            self.has_flow_effects = false;
+            self.bind_logical_like_expression(
+                node,
+                left,
+                right,
+                is_and,
+                is_nullish,
+                assign_target,
+                post,
+                post,
+            );
+            self.current_flow = if self.has_flow_effects {
+                self.finish_flow_label(post)
+            } else {
+                saved_flow
+            };
+            self.has_flow_effects = self.has_flow_effects || saved_effects;
+        } else {
+            let t = self.current_true_target.unwrap_or(self.unreachable_flow);
+            let f = self.current_false_target.unwrap_or(self.unreachable_flow);
+            self.bind_logical_like_expression(
+                node,
+                left,
+                right,
+                is_and,
+                is_nullish,
+                assign_target,
+                t,
+                f,
+            );
+        }
+    }
+
+    /// `bindLogicalLikeExpression` (binder.go:2261) — narrow the left operand
+    /// against a fresh `preRight` label (vs the false target for `&&`/`&&=`, vs
+    /// the true target otherwise), then the right against the original targets;
+    /// a logical compound-assignment additionally mutates its target and tests
+    /// the whole node.
+    #[allow(clippy::too_many_arguments)] // faithful port of the tsgo signature
+    fn bind_logical_like_expression(
+        &mut self,
+        node: &Expression<'_>,
+        left: &Expression<'_>,
+        right: &Expression<'_>,
+        is_and: bool,
+        is_nullish: bool,
+        assign_target: Option<&Expression<'_>>,
+        true_target: FlowNodeId,
+        false_target: FlowNodeId,
+    ) {
+        let pre_right = self.create_branch_label();
+        if is_and {
+            self.bind_condition(Some(left), pre_right, false_target, is_nullish);
+        } else {
+            self.bind_condition(Some(left), true_target, pre_right, is_nullish);
+        }
+        self.current_flow = self.finish_flow_label(pre_right);
+        if let Some(target) = assign_target {
+            // Logical compound-assignment (binder.go:2271-2275): bind the RHS in
+            // the outer condition context, mutate the target, then test `node`
+            // (never a boolean keyword → the parent-nullish guard is irrelevant).
+            self.do_with_conditional_branches(Some(right), true_target, false_target);
+            self.bind_assignment_target_flow(target);
+            let node_id = self.expr_id(node);
+            let is_narrowing = is_narrowing_expression(node);
+            let tc = self.create_flow_condition(
+                FlowFlags::TRUE_CONDITION,
+                self.current_flow,
+                Some((node, node_id)),
+                is_narrowing,
+                false,
+                false,
+            );
+            self.add_antecedent(true_target, tc);
+            let fc = self.create_flow_condition(
+                FlowFlags::FALSE_CONDITION,
+                self.current_flow,
+                Some((node, node_id)),
+                is_narrowing,
+                false,
+                false,
+            );
+            self.add_antecedent(false_target, fc);
+        } else {
+            self.bind_condition(Some(right), true_target, false_target, is_nullish);
+        }
+    }
+
+    /// `bindConditionalExpressionFlow` (binder.go:2289) — a `?:` as a value: the
+    /// condition splits to true/false labels feeding the two arms, which merge at
+    /// a `hasFlowEffects`-gated post label.
+    fn bind_conditional_expression_flow(&mut self, c: &ConditionalExpression<'_>) {
+        let true_label = self.create_branch_label();
+        let false_label = self.create_branch_label();
+        let post = self.create_branch_label();
+        let saved_flow = self.current_flow;
+        let saved_effects = self.has_flow_effects;
+        self.has_flow_effects = false;
+        self.bind_condition(Some(c.test), true_label, false_label, false);
+        self.current_flow = self.finish_flow_label(true_label);
+        self.visit_expression(c.consequent);
+        self.add_antecedent(post, self.current_flow);
+        self.current_flow = self.finish_flow_label(false_label);
+        self.visit_expression(c.alternate);
+        self.add_antecedent(post, self.current_flow);
+        self.current_flow = if self.has_flow_effects {
+            self.finish_flow_label(post)
+        } else {
+            saved_flow
+        };
+        self.has_flow_effects = self.has_flow_effects || saved_effects;
+    }
+
+    /// `bindAssignmentTargetFlow` (binder.go:1821), **default branch only**: a
+    /// narrowable-reference target gets an `Assignment` mutation. The
+    /// array/object-literal destructuring recursion (the `inAssignmentPattern`
+    /// per-element machinery) is F2, alongside parameter-default forks — a
+    /// destructuring target is not a narrowable reference, so it mints no mutation
+    /// here, and its sub-references were already visited.
+    fn bind_assignment_target_flow(&mut self, target: &Expression<'_>) {
+        if is_narrowable_reference(target) {
+            let id = self.expr_id(target);
+            self.current_flow =
+                self.create_flow_mutation(FlowFlags::ASSIGNMENT, self.current_flow, id);
+        }
+    }
+
+    /// The F0 [`NodeId`] of an expression node — its variant payload's address in
+    /// the address map (the key F0's lowering walk used). Condition / mutation
+    /// subjects are always value expressions F0 lowered, so this never misses.
+    fn expr_id(&self, e: &Expression<'_>) -> NodeId {
+        use Expression as E;
+        let addr = match e {
+            E::JsdocCast(c) => return self.expr_id(c.inner),
+            E::Literal(x) => addr_of(x),
+            E::Identifier(x) => addr_of(x),
+            E::PrivateIdentifier(x) => addr_of(x),
+            E::ObjectExpression(x) => addr_of(x),
+            E::ArrayExpression(x) => addr_of(x),
+            E::UnaryExpression(x) => addr_of(x),
+            E::UpdateExpression(x) => addr_of(x),
+            E::BinaryExpression(x) => addr_of(x),
+            E::CallExpression(x) => addr_of(x),
+            E::NewExpression(x) => addr_of(x),
+            E::MemberExpression(x) => addr_of(x),
+            E::ConditionalExpression(x) => addr_of(x),
+            E::ArrowFunctionExpression(x) => addr_of(x),
+            E::FunctionExpression(x) => addr_of(x),
+            E::ClassExpression(x) => addr_of(x),
+            E::SpreadElement(x) => addr_of(x),
+            E::TemplateLiteral(x) => addr_of(x),
+            E::TaggedTemplateExpression(x) => addr_of(x),
+            E::AwaitExpression(x) => addr_of(x),
+            E::YieldExpression(x) => addr_of(x),
+            E::SequenceExpression(x) => addr_of(x),
+            E::RegexLiteral(x) => addr_of(x),
+            E::ThisExpression(x) => addr_of(x),
+            E::Super(x) => addr_of(x),
+            E::AssignmentExpression(x) => addr_of(x),
+            E::ObjectPattern(x) => addr_of(x),
+            E::ArrayPattern(x) => addr_of(x),
+            E::AssignmentPattern(x) => addr_of(x),
+            E::RestElement(x) => addr_of(x),
+            E::TSTypeAssertion(x) => addr_of(x),
+            E::TSAsExpression(x) => addr_of(x),
+            E::TSSatisfiesExpression(x) => addr_of(x),
+            E::TSInstantiationExpression(x) => addr_of(x),
+            E::TSNonNullExpression(x) => addr_of(x),
+            E::TSParameterProperty(x) => addr_of(x),
+            E::ImportExpression(x) => addr_of(x),
+            E::MetaProperty(x) => addr_of(x),
+            E::ParenthesizedExpression(x) => addr_of(x),
+        };
+        self.require(addr)
     }
 
     // --- containers -------------------------------------------------------
@@ -1110,10 +1688,31 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_expression(el);
                 }
             }
+            E::UnaryExpression(u) if u.operator == UnaryOperator::Bang => {
+                // `bindPrefixUnaryExpressionFlow` (binder.go:2174): swap the
+                // condition targets around the operand so `!x` narrows inversely.
+                // The pre/post swaps are symmetric — any sub-binder restores the
+                // targets to their entry value (via `do_with_conditional_branches`
+                // / the `!`-swap), so the second swap is a faithful restore.
+                std::mem::swap(
+                    &mut self.current_true_target,
+                    &mut self.current_false_target,
+                );
+                self.visit_expression(u.argument);
+                std::mem::swap(
+                    &mut self.current_true_target,
+                    &mut self.current_false_target,
+                );
+            }
             E::UnaryExpression(u) => self.visit_expression(u.argument),
             E::UpdateExpression(u) => self.visit_expression(u.argument),
+            E::BinaryExpression(b) if b.operator.is_logical() => {
+                // `bindBinaryExpressionFlow` logical branch (binder.go:2219).
+                let is_and = b.operator == BinaryOperator::AmpersandAmpersand;
+                let is_nullish = b.operator == BinaryOperator::QuestionQuestion;
+                self.bind_binary_expression_flow(expr, b.left, b.right, is_and, is_nullish, None);
+            }
             E::BinaryExpression(b) => {
-                // F1b: logical short-circuit topology; F1a threads linearly.
                 self.visit_expression(b.left);
                 self.visit_expression(b.right);
             }
@@ -1129,12 +1728,7 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_expression(a);
                 }
             }
-            E::ConditionalExpression(c) => {
-                // F1b: conditional branch topology; F1a threads linearly.
-                self.visit_expression(c.test);
-                self.visit_expression(c.consequent);
-                self.visit_expression(c.alternate);
-            }
+            E::ConditionalExpression(c) => self.bind_conditional_expression_flow(c),
             E::ArrowFunctionExpression(a) => {
                 let id = self.require(addr_of(a));
                 self.visit_arrow(a, id);
@@ -1167,10 +1761,25 @@ impl<'a> FlowBuilder<'a> {
                     self.visit_expression(e);
                 }
             }
+            E::AssignmentExpression(a) if is_logical_assign_op(a.operator) => {
+                // `bindBinaryExpressionFlow` logical compound-assignment branch.
+                let is_and = a.operator == AssignmentOperator::LogicalAndAssign;
+                let is_nullish = a.operator == AssignmentOperator::NullishAssign;
+                self.bind_binary_expression_flow(
+                    expr,
+                    a.left,
+                    a.right,
+                    is_and,
+                    is_nullish,
+                    Some(a.left),
+                );
+            }
             E::AssignmentExpression(a) => {
-                // F1b: assignment createFlowMutation; F1a descends only.
+                // `bindBinaryExpressionFlow` assignment branch (binder.go:2249) —
+                // bind operands, then the target's `Assignment` mutation.
                 self.visit_expression(a.left);
                 self.visit_expression(a.right);
+                self.bind_assignment_target_flow(a.left);
             }
             E::ObjectPattern(op) => {
                 self.visit_decorators(op.decorators);
@@ -1411,15 +2020,163 @@ fn is_false_keyword(expr: &Expression<'_>) -> bool {
     matches!(expr, Expression::Literal(l) if matches!(l.value, LiteralValue::Boolean(false)))
 }
 
-/// Whether a binary expression is a nullish-coalescing (`??`) — the
-/// `IsNullishCoalesce` guard's operator test (utilities.go:387). Used by F1b's
-/// condition binding to compute the `create_flow_condition` parent guard.
-#[allow(dead_code)] // F1b: condition binding
-fn is_nullish_coalesce(expr: &Expression<'_>) -> bool {
+/// `setContinueTarget` (binder.go:1779). F2 walks the active-label list (labeled
+/// loops) assigning each label's continue target; F1b has no active labels, so
+/// this is the identity on `target`. The `_loop` node keeps the call-site shape.
+fn set_continue_target(_loop: NodeId, target: FlowNodeId) -> FlowNodeId {
+    target
+}
+
+/// Whether a condition node is a logical `&&`/`||`/`??` or a logical
+/// compound-assignment `&&=`/`||=`/`??=` — the `bindCondition` non-atomic test
+/// (binder.go:1801, combining `IsLogicalExpression` + `isLogicalAssignment`).
+/// Such a node's sub-binder already wired the true/false targets, so
+/// `bindCondition` must NOT re-add the atomic true/false conditions.
+fn is_logical_condition(e: &Expression<'_>) -> bool {
+    match e {
+        Expression::BinaryExpression(b) => b.operator.is_logical(),
+        Expression::AssignmentExpression(a) => is_logical_assign_op(a.operator),
+        _ => false,
+    }
+}
+
+/// Whether an assignment operator is a logical compound-assignment
+/// (`||=`/`&&=`/`??=`) — `IsLogicalOrCoalescingAssignmentOperator`.
+fn is_logical_assign_op(op: AssignmentOperator) -> bool {
     matches!(
-        expr,
-        Expression::BinaryExpression(b) if b.operator == BinaryOperator::QuestionQuestion
+        op,
+        AssignmentOperator::LogicalOrAssign
+            | AssignmentOperator::LogicalAndAssign
+            | AssignmentOperator::NullishAssign
     )
+}
+
+/// `isNarrowingExpression` (binder.go:2602) — the `createFlowCondition` gate.
+/// Adapted to tsv's AST: comma / assignment are their own `SequenceExpression` /
+/// `AssignmentExpression` nodes (tsc folds them into `BinaryExpression`), so their
+/// `isNarrowingBinaryExpression` cases move here.
+fn is_narrowing_expression(expr: &Expression<'_>) -> bool {
+    use Expression as E;
+    match expr {
+        E::Identifier(_) | E::ThisExpression(_) => true,
+        E::MemberExpression(_) => contains_narrowable_reference(expr),
+        E::CallExpression(c) => {
+            c.arguments.iter().any(contains_narrowable_reference)
+                || matches!(c.callee, E::MemberExpression(m)
+                    if !m.computed && contains_narrowable_reference(m.object))
+        }
+        E::ParenthesizedExpression(p) => is_narrowing_expression(p.expression),
+        E::TSNonNullExpression(t) => is_narrowing_expression(t.expression),
+        E::UnaryExpression(u)
+            if u.operator == UnaryOperator::Typeof || u.operator == UnaryOperator::Bang =>
+        {
+            is_narrowing_expression(u.argument)
+        }
+        E::BinaryExpression(b) => is_narrowing_binary_expression(b),
+        // The `isNarrowingBinaryExpression` assignment cases (`=`/`||=`/`&&=`/`??=`
+        // → containsNarrowableReference(left)); other compound assignments are not
+        // narrowing.
+        E::AssignmentExpression(a) => {
+            matches!(
+                a.operator,
+                AssignmentOperator::Assign
+                    | AssignmentOperator::LogicalOrAssign
+                    | AssignmentOperator::LogicalAndAssign
+                    | AssignmentOperator::NullishAssign
+            ) && contains_narrowable_reference(a.left)
+        }
+        // The `isNarrowingBinaryExpression` comma case (`isNarrowingExpression`
+        // of the last operand).
+        E::SequenceExpression(s) => s.expressions.last().is_some_and(is_narrowing_expression),
+        _ => false,
+    }
+}
+
+/// `containsNarrowableReference` (binder.go:2620) — a narrowable reference, or an
+/// optional-chain node whose object/callee contains one.
+fn contains_narrowable_reference(expr: &Expression<'_>) -> bool {
+    if is_narrowable_reference(expr) {
+        return true;
+    }
+    match expr {
+        Expression::MemberExpression(m) if expr.has_optional_in_chain() => {
+            contains_narrowable_reference(m.object)
+        }
+        Expression::CallExpression(c) if expr.has_optional_in_chain() => {
+            contains_narrowable_reference(c.callee)
+        }
+        Expression::TSNonNullExpression(n) if expr.has_optional_in_chain() => {
+            contains_narrowable_reference(n.expression)
+        }
+        _ => false,
+    }
+}
+
+/// `isNarrowingBinaryExpression` (binder.go:2666) for tsv's `BinaryExpression`
+/// (which never carries the comma / assignment operators — those are separate
+/// nodes, handled in `is_narrowing_expression`).
+fn is_narrowing_binary_expression(b: &BinaryExpression<'_>) -> bool {
+    use BinaryOperator as Op;
+    match b.operator {
+        Op::EqualsEquals | Op::BangEquals | Op::EqualsEqualsEquals | Op::BangEqualsEquals => {
+            let left = skip_parens(b.left);
+            let right = skip_parens(b.right);
+            is_narrowable_operand(left)
+                || is_narrowable_operand(right)
+                || is_narrowing_typeof_operands(right, left)
+                || is_narrowing_typeof_operands(left, right)
+                || (is_boolean_literal(right) && is_narrowing_expression(left))
+                || (is_boolean_literal(left) && is_narrowing_expression(right))
+        }
+        Op::Instanceof => is_narrowable_operand(b.left),
+        Op::In => is_narrowing_expression(b.right),
+        _ => false,
+    }
+}
+
+/// `isNarrowableOperand` (binder.go:2686).
+fn is_narrowable_operand(expr: &Expression<'_>) -> bool {
+    match expr {
+        Expression::ParenthesizedExpression(p) => is_narrowable_operand(p.expression),
+        Expression::AssignmentExpression(a) if a.operator == AssignmentOperator::Assign => {
+            is_narrowable_operand(a.left)
+        }
+        Expression::SequenceExpression(s) => {
+            s.expressions.last().is_some_and(is_narrowable_operand)
+        }
+        _ => contains_narrowable_reference(expr),
+    }
+}
+
+/// `isNarrowingTypeOfOperands` (binder.go:2702) — `typeof <operand> === <string>`.
+fn is_narrowing_typeof_operands(expr1: &Expression<'_>, expr2: &Expression<'_>) -> bool {
+    matches!(expr1, Expression::UnaryExpression(u)
+        if u.operator == UnaryOperator::Typeof && is_narrowable_operand(u.argument))
+        && is_string_literal_like(expr2)
+}
+
+/// `IsStringLiteralLike` — a string literal or a no-substitution template.
+fn is_string_literal_like(e: &Expression<'_>) -> bool {
+    match e {
+        Expression::Literal(l) => matches!(l.value, LiteralValue::String(_)),
+        Expression::TemplateLiteral(t) => t.expressions.is_empty(),
+        _ => false,
+    }
+}
+
+/// `IsBooleanLiteral` — a `true` / `false` keyword literal.
+fn is_boolean_literal(e: &Expression<'_>) -> bool {
+    matches!(e, Expression::Literal(l) if matches!(l.value, LiteralValue::Boolean(_)))
+}
+
+/// `SkipParentheses` — strip grouping `ParenthesizedExpression` wrappers (rare in
+/// tsv, which discards grouping parens except under `preserve_parens`).
+fn skip_parens<'a, 'arena>(e: &'a Expression<'arena>) -> &'a Expression<'arena> {
+    let mut e = e;
+    while let Expression::ParenthesizedExpression(p) = e {
+        e = p.expression;
+    }
+    e
 }
 
 // --- DOT renderer (formatControlFlowGraph reference) -----------------------
@@ -1539,6 +2296,45 @@ mod tests {
         let program = tsv_ts::parse(source, &arena).expect("parse");
         let bound = bind_file(&program, source, FileId::ROOT);
         build_flow(&program, source, &bound)
+    }
+
+    /// Build the flow product **and** keep the `BoundFile` (both owned) so a
+    /// topology test can look up node ids by kind / text.
+    fn build_with_bound(source: &str) -> (FlowProduct, BoundFile) {
+        let arena = Bump::new();
+        let program = tsv_ts::parse(source, &arena).expect("parse");
+        let bound = bind_file(&program, source, FileId::ROOT);
+        let product = build_flow(&program, source, &bound);
+        (product, bound)
+    }
+
+    /// The flow node stamped on a node (panics if unattached).
+    fn flow_of_node(product: &FlowProduct, id: NodeId) -> FlowNodeId {
+        product.flow_of_node[id.index()].expect("flow attachment")
+    }
+
+    /// The single flow node matching `pred` (panics if none / used where unique).
+    fn find_flow(
+        product: &FlowProduct,
+        pred: impl Fn(&FlowGraph, FlowNodeId) -> bool,
+    ) -> FlowNodeId {
+        (1..=product.graph.node_count())
+            .filter_map(FlowNodeId::from_raw)
+            .find(|&id| pred(&product.graph, id))
+            .expect("matching flow node")
+    }
+
+    /// The condition node (`TrueCondition`/`FalseCondition`) whose subject is
+    /// `subject`.
+    fn condition_of(product: &FlowProduct, subject: NodeId, want_true: bool) -> FlowNodeId {
+        let flag = if want_true {
+            FlowFlags::TRUE_CONDITION
+        } else {
+            FlowFlags::FALSE_CONDITION
+        };
+        find_flow(product, |g, id| {
+            g.flags(id).contains(flag) && g.subject(id) == Some(subject)
+        })
     }
 
     fn nodes_of_kind(bound: &BoundFile, kind: NodeKind) -> Vec<NodeId> {
@@ -1792,5 +2588,211 @@ mod tests {
                 );
             }
         }
+    }
+
+    // --- F1b branching topology (hand-traced graphs) ----------------------
+
+    #[test]
+    fn if_else_two_arm_merge() {
+        // `if (x) a; else b;` — C1=TrueCond(x,F0), C2=FalseCond(x,F0); a.flow=C1,
+        // b.flow=C2; both merge at a materialized BranchLabel [C1,C2]; F0 Shared.
+        let src = "function f() { if (x) a; else b; }";
+        let (product, bound) = build_with_bound(src);
+        let x = ident(&bound, src, "x");
+        let a = ident(&bound, src, "a");
+        let b = ident(&bound, src, "b");
+
+        let f0 = flow_of_node(&product, x);
+        assert!(product.graph.flags(f0).contains(FlowFlags::START));
+
+        let c1 = condition_of(&product, x, true);
+        let c2 = condition_of(&product, x, false);
+        assert_eq!(product.graph.antecedents(c1), vec![f0]);
+        assert_eq!(product.graph.antecedents(c2), vec![f0]);
+        assert_eq!(flow_of_node(&product, a), c1);
+        assert_eq!(flow_of_node(&product, b), c2);
+
+        // F0 is referenced by both conditions → Shared.
+        assert!(product.graph.flags(f0).contains(FlowFlags::SHARED));
+
+        // The if merges at postIf (a materialized 2-antecedent BranchLabel) — the
+        // function's end-of-flow.
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let exit = product.end_flow_of(f).expect("f end_flow");
+        assert!(product.graph.flags(exit).contains(FlowFlags::BRANCH_LABEL));
+        assert_eq!(product.graph.antecedents(exit), vec![c1, c2]);
+    }
+
+    #[test]
+    fn reachable_after_if_merge() {
+        // `if (x) a; b;` — with no else, `b` (the statement after the if) binds at
+        // the postIf merge label.
+        let src = "function f() { if (x) a; b; }";
+        let (product, bound) = build_with_bound(src);
+        let x = ident(&bound, src, "x");
+        let b = ident(&bound, src, "b");
+        let c1 = condition_of(&product, x, true);
+        let c2 = condition_of(&product, x, false);
+        let b_flow = flow_of_node(&product, b);
+        // b's entry flow is the postIf label carrying the then-branch (C1) and the
+        // empty-else branch (C2).
+        assert!(
+            product
+                .graph
+                .flags(b_flow)
+                .contains(FlowFlags::BRANCH_LABEL)
+        );
+        assert_eq!(product.graph.antecedents(b_flow), vec![c1, c2]);
+    }
+
+    #[test]
+    fn while_loop_topology() {
+        // `while (x) a;` — L1=LoopLabel; entry F0 added first, back edge (C1)
+        // after the body → L1.antecedents=[F0,C1]; x.flow=L1; a.flow=C1; exit=C2.
+        let src = "function f() { while (x) a; }";
+        let (product, bound) = build_with_bound(src);
+        let x = ident(&bound, src, "x");
+        let a = ident(&bound, src, "a");
+        let while_stmt = nodes_of_kind(&bound, NodeKind::WhileStatement)[0];
+        let f0 = flow_of_node(&product, while_stmt); // the while's entry flow (f's Start)
+
+        let l1 = flow_of_node(&product, x);
+        assert!(product.graph.flags(l1).contains(FlowFlags::LOOP_LABEL));
+        let c1 = condition_of(&product, x, true);
+        let c2 = condition_of(&product, x, false);
+        assert_eq!(product.graph.antecedents(l1), vec![f0, c1]);
+        assert_eq!(flow_of_node(&product, a), c1);
+
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        assert_eq!(product.end_flow_of(f), Some(c2));
+    }
+
+    #[test]
+    fn do_while_loop_topology() {
+        // `do a; while (x);` — L1=LoopLabel[F0]; a.flow=L1; x.flow=L1; the
+        // true-condition loops back → L1.antecedents=[F0,C1]; exit=C2.
+        let src = "function f() { do a; while (x); }";
+        let (product, bound) = build_with_bound(src);
+        let x = ident(&bound, src, "x");
+        let a = ident(&bound, src, "a");
+        let do_stmt = nodes_of_kind(&bound, NodeKind::DoWhileStatement)[0];
+        let f0 = flow_of_node(&product, do_stmt);
+
+        let l1 = flow_of_node(&product, a);
+        assert!(product.graph.flags(l1).contains(FlowFlags::LOOP_LABEL));
+        assert_eq!(flow_of_node(&product, x), l1); // condition binds from the loop label
+        let c1 = condition_of(&product, x, true);
+        let c2 = condition_of(&product, x, false);
+        assert_eq!(product.graph.antecedents(l1), vec![f0, c1]);
+
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        assert_eq!(product.end_flow_of(f), Some(c2));
+    }
+
+    #[test]
+    fn for_infinite_self_loop() {
+        // `for (;;) a;` — nil condition: True→L1 passthrough, False→unreachable
+        // (dropped). a.flow=L1; the back edge self-loops → L1.antecedents=[F0,L1];
+        // postLoop stays empty so the function exits unreachable (no end_flow).
+        let src = "function f() { for (;;) a; }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let for_stmt = nodes_of_kind(&bound, NodeKind::ForStatement)[0];
+        let f0 = flow_of_node(&product, for_stmt);
+
+        let l1 = flow_of_node(&product, a);
+        assert!(product.graph.flags(l1).contains(FlowFlags::LOOP_LABEL));
+        // Self-loop: L1 is its own back-edge antecedent (guarded by vec equality).
+        assert_eq!(product.graph.antecedents(l1), vec![f0, l1]);
+
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        assert_eq!(product.end_flow_of(f), None); // unreachable exit
+    }
+
+    #[test]
+    fn unlabeled_continue_targets_loop_label() {
+        // `while (x) continue;` — the continue routes back to the loop label,
+        // so L1.antecedents=[F0, C1]; the normal exit is the false condition.
+        let src = "function f() { while (x) continue; }";
+        let (product, bound) = build_with_bound(src);
+        let x = ident(&bound, src, "x");
+        let l1 = flow_of_node(&product, x);
+        let c1 = condition_of(&product, x, true);
+        let antes = product.graph.antecedents(l1);
+        assert!(
+            antes.contains(&c1),
+            "continue back-edge lands on the loop label"
+        );
+        assert_eq!(antes.len(), 2); // [entry F0, continue C1]
+
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let c2 = condition_of(&product, x, false);
+        assert_eq!(product.end_flow_of(f), Some(c2));
+    }
+
+    #[test]
+    fn unlabeled_break_targets_post_loop() {
+        // `while (x) break;` — the break routes to the post-loop label (the
+        // function exit), which also carries the false-condition edge; the break
+        // makes the back edge unreachable, so the loop label keeps only its entry.
+        let src = "function f() { while (x) break; }";
+        let (product, bound) = build_with_bound(src);
+        let x = ident(&bound, src, "x");
+        let c1 = condition_of(&product, x, true);
+        let c2 = condition_of(&product, x, false);
+
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let exit = product.end_flow_of(f).expect("f end_flow");
+        let antes = product.graph.antecedents(exit);
+        assert!(antes.contains(&c1), "break edge to the post-loop label");
+        assert!(antes.contains(&c2), "false-condition exit edge");
+
+        // The loop label kept only the entry edge (the back edge was unreachable).
+        let l1 = flow_of_node(&product, x);
+        assert_eq!(product.graph.antecedents(l1).len(), 1);
+    }
+
+    #[test]
+    fn referenced_shared_recompute_parity() {
+        // Recompute the live-graph in-degree and check it against the Referenced /
+        // Shared bits. `setFlowNodeReferenced` marks a node on EVERY antecedent
+        // add at construction (matching tsgo), including adds into a branch label
+        // that later COLLAPSES to a dead row — and tsv's SoA drops a collapsed
+        // label's edges (slot 0, no pool run). So the live in-degree is a **lower
+        // bound** on the referenced-count, and the sound, one-directional
+        // invariant is: every live antecedent edge is reflected in the bits (they
+        // never under-mark). The fn Start (shared by both condition nodes) gives a
+        // genuine live in-degree ≥ 2 → Shared.
+        let src = "function f() { if (x) a; else b; }";
+        let product = build(src);
+        let g = &product.graph;
+        let n = g.node_count();
+        let mut indeg = vec![0u32; (n + 1) as usize];
+        for id in (1..=n).filter_map(FlowNodeId::from_raw) {
+            for ante in g.antecedents(id) {
+                indeg[ante.get() as usize] += 1;
+            }
+        }
+        let mut saw_shared = false;
+        for id in (1..=n).filter_map(FlowNodeId::from_raw) {
+            let d = indeg[id.get() as usize];
+            let flags = g.flags(id);
+            if d >= 1 {
+                assert!(
+                    flags.contains(FlowFlags::REFERENCED),
+                    "in-degree ≥ 1 ⟹ Referenced at node {}",
+                    id.get()
+                );
+            }
+            if d >= 2 {
+                assert!(
+                    flags.contains(FlowFlags::SHARED),
+                    "in-degree ≥ 2 ⟹ Shared at node {}",
+                    id.get()
+                );
+                saw_shared = true;
+            }
+        }
+        assert!(saw_shared, "the fn Start is shared by both condition nodes");
     }
 }
