@@ -168,9 +168,18 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 177,
+	typescript: 173,
 	css: 22,
 };
+// typescript 177→173 (2026-07-11, ../prettier 1dcd0b0, oracle acorn-typescript 1.0.11): the
+// unary/update-argument parenthesization fix (a `+`/`-` operand that would re-tokenize — `+(+x)`,
+// `-(--x)` — and a type-assertion operand of an update — `(a as T)++` — now keep their parens;
+// needs_parens.rs UnaryArgument same-sign rule + a new UpdateArgument context) resolved four
+// prettier-suite files that previously emitted invalid, non-reparseable output (unknown→match):
+// js/unary/series.js, js/unary-expression/urnary_expression.js, typescript/as/as.ts,
+// typescript/update-expression/update-expressions.ts. A before/after --all diff on the identical
+// corpus confirmed exactly those four moved (0 new unknowns, 0 new errors, SAFETY 0). The pinned
+// svelte/css match minimums (1108<1111, 125<126) are pre-existing live-repo churn, NOT re-pinned.
 // css 23→22 (2026-07-10): `prettier/tests/format/css/url/url.css` moved unknown→partial.
 // The value-parser escaped-paren fix (an escaped `\(`/`\)` is content per css-syntax §4.3.7,
 // not a nesting delimiter — value/parser.rs fast_scan + its ValueCursor/classify_separators

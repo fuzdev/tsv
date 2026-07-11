@@ -19,6 +19,7 @@ pub mod lex_diff;
 pub mod line_width;
 pub mod metrics;
 pub mod profile;
+pub mod roundtrip_audit;
 pub mod scan_audit;
 #[cfg(feature = "swallow_check")]
 pub mod swallow_audit;

@@ -1,0 +1,553 @@
+//! Corpus-scale format→reparse round-trip audit (the escape/delimiter
+//! data-corruption gate).
+//!
+//! ## Why this exists
+//!
+//! The existing corpus gates cannot see a whole class of formatter bug:
+//! **output that mis-delimits but loses no characters.** `corpus:compare:format`
+//! guards output against prettier with a differential char-frequency SAFETY
+//! check — which is *blind* to delimiter/structure corruption (a value re-quoted
+//! `attr='a"b'` → `attr="a"b"` preserves every char `a b " =`, only the delimiter
+//! STRUCTURE is wrong, so the frequencies match). `corpus:compare:parse` diffs
+//! tsv's parse of the *input* against the canonical parsers — it never reparses
+//! tsv's *formatted output*. The single-file `ast_diff` command *does* the right
+//! round-trip (parse → format → parse → compare, optionally `--render`), but only
+//! one file at a time.
+//!
+//! This command is the missing corpus-scale runner: for every file, does
+//! `format(src)` **reparse** to the same document? A `no` is the strongest
+//! correctness signal there is — the drop-in-replacement contract broken.
+//!
+//! ## Two-phase oracle (tsv-self pre-filter → canonical confirm)
+//!
+//! 1. **tsv-self** (pure Rust, no sidecar — fast, runs over every file): parse
+//!    input and formatted output with tsv's own parser, render-normalize, compare.
+//!    - output tsv can't reparse → [`TsvVerdict::Unreparseable`] (always a bug:
+//!      the formatter emitted something its own parser rejects);
+//!    - reparses but the AST diverges → [`TsvVerdict::Divergent`] (a suspect).
+//! 2. **canonical confirm** (Svelte / acorn-typescript / parseCss via the Deno
+//!    sidecar): the drop-in contract oracle. Runs on the tsv-self suspects by
+//!    default, or on **every** input-accepted file with `--canonical-all` (the
+//!    thorough gate mode — closes tsv-self's blind spot, where tsv's own parser
+//!    happens to accept a corruption identically).
+//!    - canonical throws on tsv's output → [`CanVerdict::Unreparseable`] (invalid
+//!      per the real language — the prize);
+//!    - reparses but diverges under render-equivalence → [`CanVerdict::Divergent`].
+//!
+//! Canonical is authoritative where it runs: a canonical-Clean overrules a
+//! tsv-self `Divergent` (a tsv wire-shape quirk, not a real corruption), but never
+//! a tsv-self `Unreparseable` (that is a genuine tsv-parser-on-own-output bug).
+//!
+//! The four finding buckets (`{tsv,canonical}_unreparseable`,
+//! `{tsv,canonical}_divergent`) are the work-list; `format_error` (tsv rejects the
+//! input — a parse-gap for other gates) and `canonical_rejects_input` (an invalid /
+//! error fixture) are counted and skipped, not findings.
+
+use argh::FromArgs;
+use std::path::PathBuf;
+
+use serde_json::Value;
+
+use futures_util::{StreamExt, stream};
+
+use tsv_cli::cli::format_source::format_source;
+use tsv_cli::cli::input::ParserType;
+
+use crate::cli::CliError;
+use crate::deno;
+use crate::diff::{DiffOptions, diff_to_string};
+use crate::fixtures::remove_locations;
+use crate::render_normalize::render_normalize;
+
+use super::profile::resolve_files;
+
+/// Audit whether every file's formatted output reparses to the same document.
+///
+/// Phase 1 (pure Rust) round-trips each file through tsv's own parser; phase 2
+/// confirms the suspects (or every file, with `--canonical-all`) against the
+/// canonical parsers via the sidecar. Defaults to `tests/fixtures` when no paths
+/// are given — point it at the corpus (`../prettier/tests/format/{css,js,typescript,html}`,
+/// `../zzz/src`, `../svelte/packages/svelte/src`, …) to generate the work-list.
+#[derive(FromArgs, Debug)]
+#[argh(subcommand, name = "roundtrip_audit")]
+#[allow(clippy::struct_excessive_bools)] // independent CLI flags
+pub struct RoundtripAuditCommand {
+    /// run the canonical reparse on EVERY input-accepted file, not just the
+    /// tsv-self-flagged suspects (thorough gate mode; slower — one sidecar
+    /// round-trip per file)
+    #[argh(switch)]
+    canonical_all: bool,
+
+    /// disable Svelte-5 render-time whitespace normalization before comparing
+    /// (default: on, matching `ast_diff --render`)
+    #[argh(switch)]
+    no_render: bool,
+
+    /// print the AST diff for each divergent finding
+    #[argh(switch)]
+    verbose: bool,
+
+    /// cap the number of files audited (0 = unlimited)
+    #[argh(option, default = "0")]
+    limit: usize,
+
+    /// emit JSON
+    #[argh(switch)]
+    json: bool,
+
+    /// file paths / directories (default: tests/fixtures)
+    #[argh(positional)]
+    paths: Vec<String>,
+}
+
+/// tsv-self round-trip verdict (phase 1, pure Rust).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TsvVerdict {
+    /// Formatted output reparses to the same (render-normalized) AST.
+    Clean,
+    /// tsv could not format the input (a parse-gap; out of scope here).
+    FormatError,
+    /// tsv's own parser rejects tsv's own formatted output.
+    Unreparseable,
+    /// Output reparses but the AST diverges.
+    Divergent,
+}
+
+/// Canonical round-trip verdict (phase 2, via the sidecar).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CanVerdict {
+    /// Canonical parse of input and output are render-equivalent.
+    Clean,
+    /// The canonical parser rejects the *input* (invalid / error fixture).
+    RejectsInput,
+    /// The canonical parser throws on tsv's *output* (invalid per the real language).
+    Unreparseable,
+    /// Output reparses but the AST diverges.
+    Divergent,
+}
+
+/// The single reported bucket for a file, resolved by severity from the two
+/// phases' verdicts (canonical authoritative where present, save for a tsv-self
+/// `Unreparseable`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Bucket {
+    Clean,
+    FormatError,
+    CanonicalRejectsInput,
+    CanonicalUnreparseable,
+    TsvUnreparseable,
+    CanonicalDivergent,
+    TsvDivergent,
+}
+
+impl Bucket {
+    /// A bucket that fails the gate (a real or suspected corruption).
+    fn is_finding(self) -> bool {
+        matches!(
+            self,
+            Self::CanonicalUnreparseable
+                | Self::TsvUnreparseable
+                | Self::CanonicalDivergent
+                | Self::TsvDivergent
+        )
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Clean => "clean",
+            Self::FormatError => "format_error",
+            Self::CanonicalRejectsInput => "canonical_rejects_input",
+            Self::CanonicalUnreparseable => "canonical_unreparseable",
+            Self::TsvUnreparseable => "tsv_unreparseable",
+            Self::CanonicalDivergent => "canonical_divergent",
+            Self::TsvDivergent => "tsv_divergent",
+        }
+    }
+}
+
+/// One audited file's outcome across both phases.
+struct FileResult {
+    display: String,
+    path: PathBuf,
+    parser: ParserType,
+    tsv: TsvVerdict,
+    canonical: Option<CanVerdict>,
+    /// Captured AST diff (only with `--verbose` on a divergence).
+    diff: Option<String>,
+}
+
+impl FileResult {
+    /// Resolve the two phases' verdicts into one reported bucket, worst-first.
+    fn bucket(&self) -> Bucket {
+        // Canonical rejecting tsv's output is the headline drop-in violation.
+        if self.canonical == Some(CanVerdict::Unreparseable) {
+            return Bucket::CanonicalUnreparseable;
+        }
+        // tsv rejecting its own output is always a real bug (never masked).
+        if self.tsv == TsvVerdict::Unreparseable {
+            return Bucket::TsvUnreparseable;
+        }
+        if self.canonical == Some(CanVerdict::Divergent) {
+            return Bucket::CanonicalDivergent;
+        }
+        if self.tsv == TsvVerdict::Divergent {
+            // A canonical-Clean overrules a tsv-self divergence (a tsv wire-shape
+            // quirk, not a corruption). Otherwise the suspect stands.
+            if self.canonical == Some(CanVerdict::Clean) {
+                return Bucket::Clean;
+            }
+            return Bucket::TsvDivergent;
+        }
+        if self.canonical == Some(CanVerdict::RejectsInput) {
+            return Bucket::CanonicalRejectsInput;
+        }
+        if self.tsv == TsvVerdict::FormatError {
+            return Bucket::FormatError;
+        }
+        Bucket::Clean
+    }
+}
+
+impl RoundtripAuditCommand {
+    pub(crate) fn run(self) -> Result<(), CliError> {
+        let paths = if self.paths.is_empty() {
+            vec!["tests/fixtures".to_string()]
+        } else {
+            self.paths.clone()
+        };
+        let mut files = match resolve_files(&paths) {
+            Ok(f) => f,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                return Err(CliError::Failed);
+            }
+        };
+        // Intentionally-invalid fixture inputs aren't round-trip subjects.
+        files.retain(|p| {
+            !p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("input_invalid"))
+        });
+        if self.limit > 0 {
+            files.truncate(self.limit);
+        }
+
+        let render = !self.no_render;
+
+        // Phase 1: tsv-self round-trip (pure Rust, serial — parse+format is fast).
+        let mut results: Vec<FileResult> = files
+            .iter()
+            .map(|p| tsv_self_roundtrip(p, render, self.verbose))
+            .collect();
+
+        // Phase 2: canonical confirm over the sidecar.
+        let rt = super::create_runtime();
+        rt.block_on(canonical_phase(
+            &mut results,
+            self.canonical_all,
+            render,
+            self.verbose,
+        ));
+
+        self.report(&results)
+    }
+
+    fn report(&self, results: &[FileResult]) -> Result<(), CliError> {
+        let mut counts: std::collections::BTreeMap<&'static str, usize> =
+            std::collections::BTreeMap::new();
+        let mut findings: Vec<&FileResult> = Vec::new();
+        for r in results {
+            let b = r.bucket();
+            *counts.entry(b.label()).or_default() += 1;
+            if b.is_finding() {
+                findings.push(r);
+            }
+        }
+        // Most-severe findings first.
+        findings.sort_by_key(|r| bucket_severity(r.bucket()));
+
+        if self.json {
+            let findings_json: Vec<Value> = findings
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "path": r.display,
+                        "parser": parser_label(r.parser),
+                        "bucket": r.bucket().label(),
+                    })
+                })
+                .collect();
+            let out = serde_json::json!({
+                "scanned": results.len(),
+                "counts": counts,
+                "findings": findings_json,
+            });
+            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            return if findings.is_empty() {
+                Ok(())
+            } else {
+                Err(CliError::Failed)
+            };
+        }
+
+        println!(
+            "format→reparse round-trip audit — {} files\n",
+            results.len()
+        );
+        for (label, n) in &counts {
+            println!("  {n:>6}  {label}");
+        }
+        println!();
+
+        if findings.is_empty() {
+            println!("✓ no round-trip findings (every formatted output reparses equivalent)");
+            return Ok(());
+        }
+
+        println!("✗ {} finding(s):\n", findings.len());
+        for r in &findings {
+            println!(
+                "  [{}] {} ({})",
+                r.bucket().label(),
+                r.display,
+                parser_label(r.parser)
+            );
+            if self.verbose
+                && let Some(diff) = &r.diff
+            {
+                println!("{diff}");
+            }
+        }
+        Err(CliError::Failed)
+    }
+}
+
+/// A stable severity rank for sorting findings worst-first.
+fn bucket_severity(b: Bucket) -> u8 {
+    match b {
+        Bucket::CanonicalUnreparseable => 0,
+        Bucket::TsvUnreparseable => 1,
+        Bucket::CanonicalDivergent => 2,
+        Bucket::TsvDivergent => 3,
+        _ => 9,
+    }
+}
+
+fn parser_label(p: ParserType) -> &'static str {
+    match p {
+        ParserType::Svelte => "svelte",
+        ParserType::TypeScript => "typescript",
+        ParserType::Css => "css",
+    }
+}
+
+/// Phase 1: parse the input and the formatted output with **tsv's own** parser
+/// and compare them under render-equivalence.
+fn tsv_self_roundtrip(path: &std::path::Path, render: bool, verbose: bool) -> FileResult {
+    let display = path.to_string_lossy().into_owned();
+    let parser = ParserType::from_extension(&display);
+    let mk = |tsv: TsvVerdict, diff: Option<String>| FileResult {
+        display: display.clone(),
+        path: path.to_path_buf(),
+        parser,
+        tsv,
+        canonical: None,
+        diff,
+    };
+
+    let Ok(source) = std::fs::read_to_string(path) else {
+        return mk(TsvVerdict::FormatError, None);
+    };
+    let Ok(formatted) = format_source(&source, parser) else {
+        return mk(TsvVerdict::FormatError, None);
+    };
+    let Some(wire_in) = tsv_parse_to_value(&source, parser) else {
+        // Format parsed it, so this should not happen — treat as a parse gap.
+        return mk(TsvVerdict::FormatError, None);
+    };
+    let Some(wire_out) = tsv_parse_to_value(&formatted, parser) else {
+        return mk(TsvVerdict::Unreparseable, None);
+    };
+
+    let (equal, diff) = structurally_equivalent(wire_in, wire_out, render, verbose);
+    if equal {
+        mk(TsvVerdict::Clean, None)
+    } else {
+        mk(TsvVerdict::Divergent, diff)
+    }
+}
+
+/// Parse `source` with tsv's own parser and convert to the wire-JSON `Value`
+/// (the same shape the canonical ASTs use). `None` on a tsv parse error.
+fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Value> {
+    let arena = bumpalo::Bump::new();
+    match parser {
+        ParserType::TypeScript => {
+            let ast = tsv_ts::parse(source, &arena).ok()?;
+            Some(tsv_ts::convert_ast_json(&ast, source))
+        }
+        ParserType::Svelte => {
+            let ast = tsv_svelte::parse(source, &arena).ok()?;
+            Some(tsv_svelte::convert_ast_json(&ast, source))
+        }
+        ParserType::Css => {
+            let ast = tsv_css::parse(source, &arena).ok()?;
+            Some(tsv_css::convert_ast_json(&ast, source))
+        }
+    }
+}
+
+/// Phase 2: for the selected files, reparse input and output with the canonical
+/// parsers and record a [`CanVerdict`]. Fans out over the sidecar pool.
+async fn canonical_phase(
+    results: &mut [FileResult],
+    canonical_all: bool,
+    render: bool,
+    verbose: bool,
+) {
+    // A file is checked when it's a tsv-self suspect, or unconditionally with
+    // --canonical-all. A FormatError has no output to reparse.
+    let jobs: Vec<(usize, PathBuf, ParserType)> = results
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| {
+            r.tsv != TsvVerdict::FormatError
+                && (canonical_all
+                    || matches!(r.tsv, TsvVerdict::Unreparseable | TsvVerdict::Divergent))
+        })
+        .map(|(i, r)| (i, r.path.clone(), r.parser))
+        .collect();
+
+    if jobs.is_empty() {
+        return;
+    }
+
+    let concurrency = deno::init_bulk_pool();
+    let checked: Vec<(usize, CanVerdict, Option<String>)> = stream::iter(jobs)
+        .map(|(i, path, parser)| async move {
+            let (verdict, diff) = canonical_roundtrip(&path, parser, render, verbose).await;
+            (i, verdict, diff)
+        })
+        .buffer_unordered(concurrency)
+        .collect()
+        .await;
+
+    for (i, verdict, diff) in checked {
+        results[i].canonical = Some(verdict);
+        if results[i].diff.is_none() {
+            results[i].diff = diff;
+        }
+    }
+}
+
+/// Reparse `path`'s input and tsv-formatted output with the canonical parser.
+async fn canonical_roundtrip(
+    path: &std::path::Path,
+    parser: ParserType,
+    render: bool,
+    verbose: bool,
+) -> (CanVerdict, Option<String>) {
+    // Phase 1 already proved these succeed for non-FormatError files.
+    let Ok(source) = std::fs::read_to_string(path) else {
+        return (CanVerdict::Clean, None);
+    };
+    let Ok(formatted) = format_source(&source, parser) else {
+        return (CanVerdict::Clean, None);
+    };
+
+    let Ok(canon_in) = deno::parse_by_type(&source, parser).await else {
+        // The canonical parser rejects the input — an invalid / error fixture,
+        // not a round-trip subject.
+        return (CanVerdict::RejectsInput, None);
+    };
+    let Ok(canon_out) = deno::parse_by_type(&formatted, parser).await else {
+        return (CanVerdict::Unreparseable, None);
+    };
+
+    let (equal, diff) = structurally_equivalent(canon_in, canon_out, render, verbose);
+    if equal {
+        (CanVerdict::Clean, None)
+    } else {
+        (CanVerdict::Divergent, diff)
+    }
+}
+
+/// Compare two ASTs for **structural** equivalence — the corruption-hunt basis.
+///
+/// Both are first render-normalized (Svelte-5 template whitespace, when `render`)
+/// and location-stripped, then reduced to a [`structural_skeleton`]: the node-tree
+/// shape (object keys, array lengths, nesting) plus each node's `type`
+/// discriminator, with every other leaf scalar erased. This is immune to the
+/// source-verbatim reformatting the canonical ASTs record — CSS declaration values
+/// / at-rule preludes, the `<style>` raw blob, literal `raw` under quote
+/// normalization — while still catching the delimiter-corruption signature: an
+/// injected / dropped / re-typed node (e.g. `attr='a"b'` re-quoted to `attr="a"b"`
+/// reparses to two attributes, an array-length change). Char-dropping *value*
+/// corruption stays covered by the complementary `corpus:compare:format` SAFETY
+/// (differential char-frequency), which this deliberately does not duplicate.
+///
+/// Returns `(structurally_equal, diff)` — the diff (only with `verbose`) shows the
+/// full location-stripped values, not the skeleton, so it's readable for triage.
+fn structurally_equivalent(
+    a: Value,
+    b: Value,
+    render: bool,
+    verbose: bool,
+) -> (bool, Option<String>) {
+    let (a, b) = if render {
+        (render_normalize(a), render_normalize(b))
+    } else {
+        (a, b)
+    };
+    let a = remove_locations(a);
+    let b = remove_locations(b);
+    if structural_skeleton(&a) == structural_skeleton(&b) {
+        return (true, None);
+    }
+    let diff = if verbose {
+        match (
+            serde_json::to_string_pretty(&a),
+            serde_json::to_string_pretty(&b),
+        ) {
+            (Ok(pa), Ok(pb)) => Some(diff_to_string(&pa, &pb, &DiffOptions::ast_diff())),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    (false, diff)
+}
+
+/// Reduce an AST to its structure: preserve object keys, array lengths, nesting,
+/// and each node's `type` discriminator; erase every other leaf scalar. Two ASTs
+/// with equal skeletons differ only in reformattable leaf content, not shape.
+///
+/// The acorn/acorn-typescript **`extra`** metadata bag is dropped entirely (on
+/// both sides) rather than erased: it records source-formatting artifacts —
+/// trailing-comma presence (which tsv's `trailingComma: 'none'` removes),
+/// `parenthesized` / `parenStart`, `raw` — so its *key presence* itself flips
+/// under formatting and would otherwise read as a shape change.
+fn structural_skeleton(v: &Value) -> Value {
+    match v {
+        Value::Object(map) => {
+            let mut out = serde_json::Map::with_capacity(map.len());
+            for (k, val) in map {
+                if k == "extra" {
+                    // Parser source-metadata — omit the key on both sides.
+                    continue;
+                }
+                // `type` is the node discriminator — a change (Attribute →
+                // SpreadAttribute, …) is structural, so keep its value.
+                if k == "type" && val.is_string() {
+                    out.insert(k.clone(), val.clone());
+                } else {
+                    out.insert(k.clone(), structural_skeleton(val));
+                }
+            }
+            Value::Object(out)
+        }
+        Value::Array(arr) => Value::Array(arr.iter().map(structural_skeleton).collect()),
+        // Erase scalar leaves — reformattable source content.
+        _ => Value::Null,
+    }
+}

@@ -1,0 +1,836 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 483,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Same-sign unary operand keeps parens — bare +(+x) is required, ++x is a different expression",
+			"start": 10,
+			"end": 105,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 96
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same-sign prefix-update operand keeps parens — +++x / ---x would re-tokenize",
+			"start": 123,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Nested sign operators — each level parenthesized",
+			"start": 222,
+			"end": 273,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " In a binary right operand the inner chain still parenthesizes",
+			"start": 286,
+			"end": 350,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Different-sign operand needs no parens (no token merge)",
+			"start": 367,
+			"end": 425,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Logical-not never merges",
+			"start": 439,
+			"end": 466,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 482,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 473,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 17,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 107,
+					"end": 113,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 107,
+						"end": 112,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 6
+							}
+						},
+						"operator": "+",
+						"prefix": true,
+						"argument": {
+							"type": "UnaryExpression",
+							"start": 109,
+							"end": 111,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 3
+								},
+								"end": {
+									"line": 3,
+									"column": 5
+								}
+							},
+							"operator": "+",
+							"prefix": true,
+							"argument": {
+								"type": "Identifier",
+								"start": 110,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 4
+									},
+									"end": {
+										"line": 3,
+										"column": 5
+									}
+								},
+								"name": "x"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same-sign unary operand keeps parens — bare +(+x) is required, ++x is a different expression",
+							"start": 10,
+							"end": 105
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 115,
+					"end": 121,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 7
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 115,
+						"end": 120,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 6
+							}
+						},
+						"operator": "-",
+						"prefix": true,
+						"argument": {
+							"type": "UnaryExpression",
+							"start": 117,
+							"end": 119,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 3
+								},
+								"end": {
+									"line": 4,
+									"column": 5
+								}
+							},
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "Identifier",
+								"start": 118,
+								"end": 119,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 4
+									},
+									"end": {
+										"line": 4,
+										"column": 5
+									}
+								},
+								"name": "x"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 204,
+					"end": 211,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 204,
+						"end": 210,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 7
+							}
+						},
+						"operator": "+",
+						"prefix": true,
+						"argument": {
+							"type": "UpdateExpression",
+							"start": 206,
+							"end": 209,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 3
+								},
+								"end": {
+									"line": 6,
+									"column": 6
+								}
+							},
+							"operator": "++",
+							"prefix": true,
+							"argument": {
+								"type": "Identifier",
+								"start": 208,
+								"end": 209,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 5
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"name": "x"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same-sign prefix-update operand keeps parens — +++x / ---x would re-tokenize",
+							"start": 123,
+							"end": 202
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 213,
+					"end": 220,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 213,
+						"end": 219,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"operator": "-",
+						"prefix": true,
+						"argument": {
+							"type": "UpdateExpression",
+							"start": 215,
+							"end": 218,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 3
+								},
+								"end": {
+									"line": 7,
+									"column": 6
+								}
+							},
+							"operator": "--",
+							"prefix": true,
+							"argument": {
+								"type": "Identifier",
+								"start": 217,
+								"end": 218,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 5
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"name": "x"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 275,
+					"end": 284,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 10
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 275,
+						"end": 283,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 9
+							}
+						},
+						"operator": "+",
+						"prefix": true,
+						"argument": {
+							"type": "UnaryExpression",
+							"start": 277,
+							"end": 282,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 3
+								},
+								"end": {
+									"line": 9,
+									"column": 8
+								}
+							},
+							"operator": "+",
+							"prefix": true,
+							"argument": {
+								"type": "UnaryExpression",
+								"start": 279,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 5
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"operator": "+",
+								"prefix": true,
+								"argument": {
+									"type": "Literal",
+									"start": 280,
+									"end": 281,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 6
+										},
+										"end": {
+											"line": 9,
+											"column": 7
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Nested sign operators — each level parenthesized",
+							"start": 222,
+							"end": 273
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 352,
+					"end": 365,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 352,
+						"end": 364,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 352,
+							"end": 353,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 1
+								},
+								"end": {
+									"line": 11,
+									"column": 2
+								}
+							},
+							"name": "x"
+						},
+						"operator": "+",
+						"right": {
+							"type": "UnaryExpression",
+							"start": 356,
+							"end": 364,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 5
+								},
+								"end": {
+									"line": 11,
+									"column": 13
+								}
+							},
+							"operator": "+",
+							"prefix": true,
+							"argument": {
+								"type": "UnaryExpression",
+								"start": 358,
+								"end": 363,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 12
+									}
+								},
+								"operator": "+",
+								"prefix": true,
+								"argument": {
+									"type": "UnaryExpression",
+									"start": 360,
+									"end": 362,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 9
+										},
+										"end": {
+											"line": 11,
+											"column": 11
+										}
+									},
+									"operator": "+",
+									"prefix": true,
+									"argument": {
+										"type": "Literal",
+										"start": 361,
+										"end": 362,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 10
+											},
+											"end": {
+												"line": 11,
+												"column": 11
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " In a binary right operand the inner chain still parenthesizes",
+							"start": 286,
+							"end": 350
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 427,
+					"end": 431,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 427,
+						"end": 430,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 13,
+								"column": 4
+							}
+						},
+						"operator": "+",
+						"prefix": true,
+						"argument": {
+							"type": "UnaryExpression",
+							"start": 428,
+							"end": 430,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 4
+								}
+							},
+							"operator": "-",
+							"prefix": true,
+							"argument": {
+								"type": "Identifier",
+								"start": 429,
+								"end": 430,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 3
+									},
+									"end": {
+										"line": 13,
+										"column": 4
+									}
+								},
+								"name": "x"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Different-sign operand needs no parens (no token merge)",
+							"start": 367,
+							"end": 425
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 433,
+					"end": 437,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 433,
+						"end": 436,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 4
+							}
+						},
+						"operator": "-",
+						"prefix": true,
+						"argument": {
+							"type": "UnaryExpression",
+							"start": 434,
+							"end": 436,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 14,
+									"column": 4
+								}
+							},
+							"operator": "+",
+							"prefix": true,
+							"argument": {
+								"type": "Identifier",
+								"start": 435,
+								"end": 436,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 3
+									},
+									"end": {
+										"line": 14,
+										"column": 4
+									}
+								},
+								"name": "x"
+							}
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 468,
+					"end": 472,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 5
+						}
+					},
+					"expression": {
+						"type": "UnaryExpression",
+						"start": 468,
+						"end": 471,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 4
+							}
+						},
+						"operator": "!",
+						"prefix": true,
+						"argument": {
+							"type": "UnaryExpression",
+							"start": 469,
+							"end": 471,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 4
+								}
+							},
+							"operator": "!",
+							"prefix": true,
+							"argument": {
+								"type": "Identifier",
+								"start": 470,
+								"end": 471,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 3
+									},
+									"end": {
+										"line": 16,
+										"column": 4
+									}
+								},
+								"name": "x"
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Logical-not never merges",
+							"start": 439,
+							"end": 466
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
