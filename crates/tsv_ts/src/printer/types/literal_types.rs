@@ -83,14 +83,12 @@ impl<'a> Printer<'a> {
             pos += visual_width(quasi.raw(self.source), TAB_WIDTH);
             if i < template.types.len() {
                 let t = &template.types[i];
-                // Comments between `${` and the type
-                // Find the `${` by searching backward from the type start
-                let search_start = quasi.span.start;
-                let dollar_brace_end = self.source[search_start as usize..t.span().start as usize]
-                    .rfind("${")
-                    .map_or(quasi.span.end, |p| {
-                        search_start + p as u32 + "${".len() as u32
-                    });
+                // The `${` opening this interpolation sits immediately after the
+                // quasi's raw text (delimiters excluded), so `raw_span.end` is its
+                // start — a robust anchor that ignores both an escaped `\${` inside
+                // the quasi and a `${` buried in a trailing comment (a raw `rfind`
+                // matched the latter and dropped the comment between `${` and the type).
+                let dollar_brace_end = quasi.raw_span.end + "${".len() as u32;
                 let type_start = t.span().start;
                 // A line comment breaks so it can't swallow the interpolation type.
                 let comments_doc =

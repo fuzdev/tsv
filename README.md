@@ -25,8 +25,8 @@ tsv prioritizes, in order:
 4. extensibility (valued but deprioritized)
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
-Compared to Oxc and Biome, tsv is significantly faster, smaller, and uses less memory
-to parse and format its supported languages.
+Compared to Oxc and Biome, tsv (v0.2, not yet published) is significantly faster,
+smaller, and uses less memory to parse and format its supported languages.
 
 This is an early release, and reports and feedback are appreciated -
 see the [issues](https://github.com/fuzdev/tsv/issues)

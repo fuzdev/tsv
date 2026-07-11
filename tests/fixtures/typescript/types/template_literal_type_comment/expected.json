@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 60,
+	"end": 110,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -25,24 +25,40 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Block",
+			"value": " inner ${ delimiter ",
+			"start": 64,
+			"end": 88,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 14
+				},
+				"end": {
+					"line": 3,
+					"column": 38
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 59,
+		"end": 109,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 50,
+			"end": 100,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 3,
+					"line": 4,
 					"column": 9
 				}
 			},
@@ -168,6 +184,134 @@
 									"value": {
 										"raw": "",
 										"cooked": ""
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 51,
+					"end": 99,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 49
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 56,
+						"end": 57,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 60,
+						"end": 98,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 48
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 60,
+							"end": 98,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 48
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSStringKeyword",
+									"start": 89,
+									"end": 95,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 39
+										},
+										"end": {
+											"line": 3,
+											"column": 45
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " inner ${ delimiter ",
+											"start": 64,
+											"end": 88
+										}
+									]
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 61,
+									"end": 62,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 96,
+									"end": 97,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 46
+										},
+										"end": {
+											"line": 3,
+											"column": 47
+										}
+									},
+									"value": {
+										"raw": "c",
+										"cooked": "c"
 									},
 									"tail": true
 								}
