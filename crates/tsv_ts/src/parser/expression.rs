@@ -29,8 +29,18 @@ use super::scan::{parse_number_literal, skip_whitespace_and_comments};
 const BP_COMMA: u8 = 0;
 /// Assignment operators (=, +=, etc.) and ternary conditional
 const BP_ASSIGNMENT: u8 = 1;
-/// TypeScript `as` and `satisfies` operators
-const BP_TS_TYPE_ASSERTION: u8 = 2;
+/// TypeScript `as` / `satisfies` bind at RELATIONAL precedence — tsc's
+/// `getBinaryOperatorPrecedence` returns `OperatorPrecedence.Relational` for both
+/// (the same tier as `<` / `>` / `instanceof` / `in`), and acorn-typescript gates
+/// them on `tt._in.binop` (relational) in its `parseExprOp` override. This equals
+/// the relational `left_bp` in `infix_operator_info`, so `x === y as T` parses
+/// `x === (y as T)` (tighter than equality / logical / bitwise / `??`) while
+/// `a + b as T` stays `(a + b) as T` (looser than additive / shift /
+/// multiplicative). Left-associative — `a as T as U` is `(a as T) as U`, and
+/// `a < b as T` is `(a < b) as T` (breaks as the right operand of a same-tier
+/// relational operator) — with the right-hand side consumed as a *type* by
+/// `parse_type`, not an expression.
+const BP_AS: u8 = 19;
 /// Yield expression (same as assignment — yield takes AssignmentExpression per spec)
 const BP_YIELD: u8 = 1;
 /// Unary operators (!, -, +, ~, typeof, void, delete, await, ++, --, new)
@@ -322,6 +332,71 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.with_context_flag(|p| &mut p.allow_in, true, f)
     }
 
+    /// Fold a trailing TypeScript `as` / `satisfies` type assertion at the current
+    /// token into `left`, returning `true` if one was consumed (the infix loop should
+    /// `continue`) or `false` if the current token isn't a type assertion to take here
+    /// (the loop should stop).
+    ///
+    /// `as` / `satisfies` bind at the RELATIONAL tier (`BP_AS`), left-associative, with
+    /// a *type* (via `parse_type`) on the right — so `x === y as T` is `x === (y as T)`
+    /// while `a + b as T` stays `(a + b) as T`. Three conditions leave the keyword
+    /// unconsumed (each returns `false`) — ASI on a preceding line break, the Svelte
+    /// `#each` binding-separator gate, and relational precedence; see the guards.
+    fn try_parse_type_assertion(
+        &mut self,
+        min_bp: u8,
+        expr_start: usize,
+        left: &mut ParsedExpr<'arena>,
+    ) -> Result<bool, Box<ParseError>> {
+        let is_as = match self.current_kind() {
+            TokenKind::Keyword(KeywordKind::As) => true,
+            TokenKind::Keyword(KeywordKind::Satisfies) => false,
+            _ => return Ok(false),
+        };
+        // ASI: a preceding line terminator ends the expression, so the keyword starts a
+        // fresh statement (tsc's `parseBinaryExpressionRest` / acorn-typescript both
+        // break on `hasPrecedingLineBreak`). Unconditional — it holds inside grouping
+        // too (`(a⏎as B)` can't close), so it precedes the `#each` gate.
+        if self.had_line_terminator {
+            return Ok(false);
+        }
+        // `as` is the Svelte `#each … as pattern` binding separator when type assertions
+        // are disabled and we're outside grouping — leave it for the `#each` parser.
+        // Inside grouping (`(x as T)`) it is always a type assertion.
+        if !self.allow_ts_type_assertions && self.grouping_depth == 0 {
+            return Ok(false);
+        }
+        // Relational binding power: looser than the caller's minimum (e.g. as the right
+        // operand of a same-tier relational operator — `a < b as T` is `(a < b) as T`).
+        if BP_AS < min_bp {
+            return Ok(false);
+        }
+
+        let arena = self.arena;
+        self.advance()?; // consume `as` / `satisfies`
+        let type_annotation = arena.alloc(self.parse_type()?);
+        let span = Span::new(expr_start as u32, type_annotation.span().end);
+        let expr = if is_as {
+            Expression::TSAsExpression(TSAsExpression {
+                expression: left.expr,
+                type_annotation,
+                span,
+            })
+        } else {
+            Expression::TSSatisfiesExpression(TSSatisfiesExpression {
+                expression: left.expr,
+                type_annotation,
+                span,
+            })
+        };
+        *left = ParsedExpr {
+            expr: arena.alloc(expr),
+            actual_start: expr_start as u32,
+            actual_end: span.end,
+        };
+        Ok(true)
+    }
+
     /// Pratt parser: parse expression with minimum binding power
     ///
     /// Returns ParsedExpr with actual end position tracking for parentheses
@@ -335,122 +410,74 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse prefix expression (primary or unary)
         let mut left = self.parse_prefix_expression()?;
 
-        // Parse infix operators and TypeScript type assertions (as/satisfies)
-        // Binary operators have higher precedence than as/satisfies, so we check binary first.
-        // After parsing as/satisfies, we loop back to check for more binary operators.
-        // Example: `a + b as T` → `(a + b) as T` (binary first)
-        // Example: `a as T + b` → `(a as T) + b` (as first, then binary)
-        'infix: loop {
-            // First, try to parse binary operators (higher precedence)
-            loop {
-                let kind = self.current_kind();
+        // Parse infix binary operators and TypeScript `as` / `satisfies` type
+        // assertions in one precedence-climbing loop. `as` / `satisfies` bind at
+        // the RELATIONAL tier (`BP_AS`), left-associative, consuming a *type* on the
+        // right — so `x === y as T` is `x === (y as T)` while `a + b as T` stays
+        // `(a + b) as T`. (They were previously a second phase below every binary
+        // operator, which mis-grouped `(x === y) as T`.)
+        loop {
+            let kind = self.current_kind();
 
-                // Check if this is an infix operator
-                let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
-                    break;
-                };
-
-                // Skip `in` operator when allow_in is false (parsing for-loop headers),
-                // unless inside grouping delimiters where `in` is always a binary operator
-                if matches!(operator, BinaryOperator::In)
-                    && !self.allow_in
-                    && self.grouping_depth == 0
-                {
-                    break;
+            let Some((left_bp, right_bp, operator)) = infix_operator_info(kind) else {
+                // Not a binary operator — the only remaining infix forms are the
+                // TypeScript `as` / `satisfies` type assertions.
+                if self.try_parse_type_assertion(min_bp, expr_start, &mut left)? {
+                    continue;
                 }
+                break;
+            };
 
-                // Check if operator binds tighter than minimum
-                if left_bp < min_bp {
-                    break;
-                }
-
-                // ES2016+: Unary expression as left operand of ** without parens is a syntax error
-                // `-2 ** 3` is ambiguous - must be `(-2) ** 3` or `-(2 ** 3)`. An `await`
-                // operand is a UnaryExpression per the grammar (`await UnaryExpression`), so
-                // `await b ** 2` is the same error — must be `(await b) ** 2` or `await (b ** 2)`.
-                // Detect unparenthesized unary: actual_start equals expression span start
-                if operator == BinaryOperator::StarStar
-                    && matches!(
-                        left.expr,
-                        Expression::UnaryExpression(_) | Expression::AwaitExpression(_)
-                    )
-                    && left.actual_start == left.expr.span().start
-                {
-                    return Err(Box::new(ParseError::InvalidSyntax {
-                        message: "Unary expression cannot be the left operand of ** without parentheses. Use (-x) ** y or -(x ** y).".to_string(),
-                        position: left.expr.span().start as usize,
-                        context: None,
-                    }));
-                }
-
-                self.advance()?; // consume operator
-
-                // Parse right-hand side with right binding power
-                let right = self.parse_expression_bp(right_bp)?;
-
-                // Create binary expression
-                // Use expr_start (which includes any opening paren) instead of left.actual_start
-                // Use right.actual_end (position after parsing) to include closing parens
-                let span = Span::new(expr_start as u32, right.actual_end);
-                left = ParsedExpr {
-                    expr: arena.alloc(Expression::BinaryExpression(BinaryExpression {
-                        left: left.expr,
-                        operator,
-                        right: right.expr,
-                        span,
-                    })),
-                    actual_start: expr_start as u32,
-                    actual_end: right.actual_end,
-                };
-            }
-
-            // Then, try TypeScript `as` and `satisfies` operators (lower precedence than binary)
-            // Enabled when: explicitly allowed (normal TS context), OR inside grouping
-            // delimiters where `as` can never be the Svelte `#each` binding separator
-            if min_bp <= BP_TS_TYPE_ASSERTION
-                && (self.allow_ts_type_assertions || self.grouping_depth > 0)
+            // Skip `in` operator when allow_in is false (parsing for-loop headers),
+            // unless inside grouping delimiters where `in` is always a binary operator
+            if matches!(operator, BinaryOperator::In) && !self.allow_in && self.grouping_depth == 0
             {
-                match self.current_kind() {
-                    TokenKind::Keyword(KeywordKind::As) => {
-                        self.advance()?; // consume 'as'
-                        let type_annotation = arena.alloc(self.parse_type()?);
-                        let span = Span::new(expr_start as u32, type_annotation.span().end);
-                        left = ParsedExpr {
-                            expr: arena.alloc(Expression::TSAsExpression(TSAsExpression {
-                                expression: left.expr,
-                                type_annotation,
-                                span,
-                            })),
-                            actual_start: expr_start as u32,
-                            actual_end: span.end,
-                        };
-                        // After parsing as, loop back to check for more binary operators
-                        continue 'infix;
-                    }
-                    TokenKind::Keyword(KeywordKind::Satisfies) => {
-                        self.advance()?; // consume 'satisfies'
-                        let type_annotation = arena.alloc(self.parse_type()?);
-                        let span = Span::new(expr_start as u32, type_annotation.span().end);
-                        left = ParsedExpr {
-                            expr: arena.alloc(Expression::TSSatisfiesExpression(
-                                TSSatisfiesExpression {
-                                    expression: left.expr,
-                                    type_annotation,
-                                    span,
-                                },
-                            )),
-                            actual_start: expr_start as u32,
-                            actual_end: span.end,
-                        };
-                        // After parsing satisfies, loop back to check for more binary operators
-                        continue 'infix;
-                    }
-                    _ => {}
-                }
+                break;
             }
 
-            // No more infix operators or type assertions
-            break;
+            // Check if operator binds tighter than minimum
+            if left_bp < min_bp {
+                break;
+            }
+
+            // ES2016+: Unary expression as left operand of ** without parens is a syntax error
+            // `-2 ** 3` is ambiguous - must be `(-2) ** 3` or `-(2 ** 3)`. An `await`
+            // operand is a UnaryExpression per the grammar (`await UnaryExpression`), so
+            // `await b ** 2` is the same error — must be `(await b) ** 2` or `await (b ** 2)`.
+            // Detect unparenthesized unary: actual_start equals expression span start
+            if operator == BinaryOperator::StarStar
+                && matches!(
+                    left.expr,
+                    Expression::UnaryExpression(_) | Expression::AwaitExpression(_)
+                )
+                && left.actual_start == left.expr.span().start
+            {
+                return Err(Box::new(ParseError::InvalidSyntax {
+                    message: "Unary expression cannot be the left operand of ** without parentheses. Use (-x) ** y or -(x ** y).".to_string(),
+                    position: left.expr.span().start as usize,
+                    context: None,
+                }));
+            }
+
+            self.advance()?; // consume operator
+
+            // Parse right-hand side with right binding power
+            let right = self.parse_expression_bp(right_bp)?;
+
+            // Create binary expression
+            // Use expr_start (which includes any opening paren) instead of left.actual_start
+            // Use right.actual_end (position after parsing) to include closing parens
+            let span = Span::new(expr_start as u32, right.actual_end);
+            left = ParsedExpr {
+                expr: arena.alloc(Expression::BinaryExpression(BinaryExpression {
+                    left: left.expr,
+                    operator,
+                    right: right.expr,
+                    span,
+                })),
+                actual_start: expr_start as u32,
+                actual_end: right.actual_end,
+            };
         }
 
         // Handle assignment operator (after binary ops, before ternary)
