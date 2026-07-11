@@ -1,0 +1,110 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 245,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 88,
+				"name": "scope",
+				"prelude": "(.card)  to  (.content)",
+				"block": {
+					"type": "Block",
+					"start": 70,
+					"end": 88,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 74,
+							"end": 84,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 91,
+				"end": 141,
+				"name": "scope",
+				"prelude": "(.solo)",
+				"block": {
+					"type": "Block",
+					"start": 122,
+					"end": 141,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 126,
+							"end": 137,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 144,
+				"end": 199,
+				"name": "scope",
+				"prelude": "to (.limit)",
+				"block": {
+					"type": "Block",
+					"start": 179,
+					"end": 199,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 183,
+							"end": 195,
+							"property": "color",
+							"value": "green"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 202,
+				"end": 236,
+				"name": "scope",
+				"prelude": "",
+				"block": {
+					"type": "Block",
+					"start": 217,
+					"end": 236,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 221,
+							"end": 232,
+							"property": "color",
+							"value": "gold"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 237,
+			"styles": "\n\t@scope /* a */ (.card) /* b */ to /* c */ (.content) /* d */ {\n\t\tcolor: red;\n\t}\n\n\t@scope /* e */ (.solo) /* f */ {\n\t\tcolor: blue;\n\t}\n\n\t@scope /* g */ to (.limit) /* h */ {\n\t\tcolor: green;\n\t}\n\n\t@scope /* i */ {\n\t\tcolor: gold;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 246,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

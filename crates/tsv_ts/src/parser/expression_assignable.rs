@@ -252,7 +252,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 Ok(expr)
             }
 
-            // Invalid assignment target
+            // A non-simple target in *assignment* context (a call `foo() = …`, a
+            // literal `1 >>= …`, `this = …`, `new C() = …`, …) is not a valid
+            // `LeftHandSideExpression`, but "not a valid assignment target" is a
+            // static-semantic early-error, not a syntax error — the assignment
+            // grammar parses it and the assignability refinement is layered on top.
+            // Per the permissive stance (`crates/tsv_ts/CLAUDE.md` §Sources of truth)
+            // the parser defers it: the target is kept as-is so the formatter keeps
+            // formatting well-formed input (prettier formats all of these). Only
+            // `Assignment` defers — `Binding` (params/destructuring bindings) and
+            // `ForHead` (a no-declaration for-in/of head) still reject below, which
+            // is why `for (foo() in b)` stays a parse error (prettier rejects it too).
+            // TODO: the invalid-target early-error belongs in the diagnostics layer.
+            _ if matches!(context, AssignableContext::Assignment) => Ok(expr),
+
+            // Invalid assignment target (binding / for-head position)
             _ => Err(self.error_msg_at("Invalid assignment target", expr.span().start_usize())),
         }
     }

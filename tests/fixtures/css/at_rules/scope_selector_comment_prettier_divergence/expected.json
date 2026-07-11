@@ -1,0 +1,68 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 258,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 61,
+				"end": 127,
+				"name": "scope",
+				"prelude": "( .class1) to (.class2 )",
+				"block": {
+					"type": "Block",
+					"start": 109,
+					"end": 127,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 113,
+							"end": 123,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 182,
+				"end": 249,
+				"name": "scope",
+				"prelude": "(.class3 ) to ( .class4)",
+				"block": {
+					"type": "Block",
+					"start": 230,
+					"end": 249,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 234,
+							"end": 245,
+							"property": "color",
+							"value": "blue"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 250,
+			"styles": "\n\t/* comment leading the root, trailing the limit */\n\t@scope (/* c1 */ .class1) to (.class2 /* c2 */) {\n\t\tcolor: red;\n\t}\n\n\t/* comment trailing the root, leading the limit */\n\t@scope (.class3 /* c3 */) to (/* c4 */ .class4) {\n\t\tcolor: blue;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 259,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

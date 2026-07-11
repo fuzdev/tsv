@@ -140,8 +140,16 @@ const ALLOW: &[Allow] = &[
         "comment-marker",
     ),
     (
+        // Collecting every property→colon-gap comment: `rest` starts at a `/*`, so
+        // scanning it for the next `*/` / `/*` only ever matches comment markers
+        // (the property-name text before the parser-recorded colon holds no strings).
         "tsv_css/src/printer/value_normalization/mod.rs",
-        "if let Some(comment_end_rel) = property_part[comment_start..].find(\"*/\") {",
+        "let Some(comment_end_rel) = rest.find(\"*/\") else {",
+        "comment-marker",
+    ),
+    (
+        "tsv_css/src/printer/value_normalization/mod.rs",
+        "match rest.find(\"/*\") {",
         "comment-marker",
     ),
     (
