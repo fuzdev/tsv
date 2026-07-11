@@ -109,9 +109,9 @@ impl Diagnostic {
 }
 
 /// The diagnostic's sort path: the file's name, or `""` for a global one.
-fn diag_path<'a>(d: &Diagnostic, paths: &'a [String]) -> &'a str {
+fn diag_path<'a>(d: &Diagnostic, paths: &[&'a str]) -> &'a str {
     match d.file {
-        Some(f) => paths.get(f.index()).map_or("", String::as_str),
+        Some(f) => paths.get(f.index()).copied().unwrap_or(""),
         None => "",
     }
 }
@@ -124,7 +124,7 @@ fn diag_path<'a>(d: &Diagnostic, paths: &'a [String]) -> &'a str {
 /// `Vec<String>` ordering is exactly that.
 // tsgo: internal/ast/diagnostic.go CompareDiagnostics (:329)
 #[must_use]
-pub fn compare_diagnostics(a: &Diagnostic, b: &Diagnostic, paths: &[String]) -> Ordering {
+pub fn compare_diagnostics(a: &Diagnostic, b: &Diagnostic, paths: &[&str]) -> Ordering {
     diag_path(a, paths)
         .cmp(diag_path(b, paths))
         .then_with(|| a.span.start.cmp(&b.span.start))
@@ -168,7 +168,7 @@ fn compare_chain_content(a: &[Diagnostic], b: &[Diagnostic]) -> Ordering {
 
 /// Compare related-info lists: **more related info sorts first**, then compare
 /// each entry as a full diagnostic (tsgo `compareRelatedInfo`).
-fn compare_related_info(a: &[Diagnostic], b: &[Diagnostic], paths: &[String]) -> Ordering {
+fn compare_related_info(a: &[Diagnostic], b: &[Diagnostic], paths: &[&str]) -> Ordering {
     b.len().cmp(&a.len()).then_with(|| {
         for (ra, rb) in a.iter().zip(b) {
             let c = compare_diagnostics(ra, rb, paths);
@@ -183,7 +183,7 @@ fn compare_related_info(a: &[Diagnostic], b: &[Diagnostic], paths: &[String]) ->
 /// Equality excluding related information (tsgo `EqualDiagnosticsNoRelatedInfo`):
 /// path, loc (start+end), code, args, and the full message chain.
 #[must_use]
-pub fn equal_no_related_info(a: &Diagnostic, b: &Diagnostic, paths: &[String]) -> bool {
+pub fn equal_no_related_info(a: &Diagnostic, b: &Diagnostic, paths: &[&str]) -> bool {
     diag_path(a, paths) == diag_path(b, paths)
         && a.span == b.span
         && a.code == b.code
@@ -203,7 +203,7 @@ fn equal_chain(a: &[Diagnostic], b: &[Diagnostic]) -> bool {
 /// Full diagnostic equality (tsgo `EqualDiagnostics`): equal-no-related-info and
 /// related info equal recursively.
 #[must_use]
-pub fn equal_diagnostics(a: &Diagnostic, b: &Diagnostic, paths: &[String]) -> bool {
+pub fn equal_diagnostics(a: &Diagnostic, b: &Diagnostic, paths: &[&str]) -> bool {
     equal_no_related_info(a, b, paths)
         && a.related.len() == b.related.len()
         && a.related
@@ -217,7 +217,7 @@ pub fn equal_diagnostics(a: &Diagnostic, b: &Diagnostic, paths: &[String]) -> bo
 /// diagnostics equal except for related information collapses to the first, with
 /// their related infos concatenated, sorted, and deduped.
 // tsgo: internal/compiler/program.go SortAndDeduplicateDiagnostics (:1436)
-pub fn sort_and_deduplicate(diags: &mut Vec<Diagnostic>, paths: &[String]) {
+pub fn sort_and_deduplicate(diags: &mut Vec<Diagnostic>, paths: &[&str]) {
     diags.sort_by(|a, b| compare_diagnostics(a, b, paths));
     compact_and_merge_related_infos(diags, paths);
 }
@@ -228,7 +228,7 @@ pub fn sort_and_deduplicate(diags: &mut Vec<Diagnostic>, paths: &[String]) {
 // outer run loop (a non-equal candidate becomes the next run's head), so it must
 // outlive the inner loop.
 #[allow(clippy::while_let_on_iterator)]
-fn compact_and_merge_related_infos(diags: &mut Vec<Diagnostic>, paths: &[String]) {
+fn compact_and_merge_related_infos(diags: &mut Vec<Diagnostic>, paths: &[&str]) {
     if diags.len() < 2 {
         return;
     }
@@ -268,7 +268,7 @@ fn compact_and_merge_related_infos(diags: &mut Vec<Diagnostic>, paths: &[String]
 
 /// Remove adjacent `equal_diagnostics` duplicates, keeping the first (tsgo
 /// `slices.CompactFunc(_, EqualDiagnostics)` over the sorted related list).
-fn dedup_by_equal(diags: &mut Vec<Diagnostic>, paths: &[String]) {
+fn dedup_by_equal(diags: &mut Vec<Diagnostic>, paths: &[&str]) {
     diags.dedup_by(|a, b| equal_diagnostics(a, b, paths));
 }
 
@@ -276,8 +276,8 @@ fn dedup_by_equal(diags: &mut Vec<Diagnostic>, paths: &[String]) {
 mod tests {
     use super::*;
 
-    fn paths() -> Vec<String> {
-        vec!["a.ts".to_string(), "b.ts".to_string()]
+    fn paths() -> Vec<&'static str> {
+        vec!["a.ts", "b.ts"]
     }
 
     fn diag(file: Option<u32>, start: u32, end: u32, code: u32) -> Diagnostic {

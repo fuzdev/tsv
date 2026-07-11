@@ -289,7 +289,7 @@ impl MergeOut {
 /// file appends after the test units in the diagnostic path space.
 #[must_use]
 pub fn merge_program(
-    files: &[FileMerge],
+    files: &[&FileMerge],
     lib: Option<&LibBase>,
     lib_file_offset: u32,
 ) -> Vec<Diagnostic> {
@@ -302,7 +302,7 @@ pub fn merge_program(
     let mut deferred_ambient: Vec<&MergeSymbol> = Vec::new();
 
     // --- Phase 1: script locals + the globalThis check (file order) ---
-    for file in files {
+    for &file in files {
         if file.is_external {
             continue;
         }
@@ -326,7 +326,7 @@ pub fn merge_program(
     }
 
     // --- Phase 2: global (`declare global`) augmentations ---
-    for file in files {
+    for &file in files {
         for aug in &file.global_augmentations {
             for sym in aug {
                 merge_global_symbol(&mut globals, lib, lib_file_offset, sym, &mut out);
@@ -356,7 +356,7 @@ pub fn merge_program(
     }
 
     // --- Phase 5: non-global module augmentations (`declare module "X"`) ---
-    for file in files {
+    for &file in files {
         // Dedup by name within the file (tsgo merges only a symbol's first
         // declaration; same-name augmentations share one symbol).
         let mut seen: Vec<&str> = Vec::new();
@@ -825,7 +825,7 @@ mod tests {
                 decls: vec![decl(1, 4, "x", false)],
             }],
         );
-        let diags = merge_program(&[a, b], None, 0);
+        let diags = merge_program(&[&a, &b], None, 0);
         let codes: Vec<u32> = diags.iter().map(|d| d.code).collect();
         // One TS2451 on each declaration; each carries a TS6203 related info.
         assert_eq!(codes, vec![2451, 2451]);
@@ -854,7 +854,7 @@ mod tests {
                 }],
             )
         };
-        let diags = merge_program(&[mk(0), mk(1)], None, 0);
+        let diags = merge_program(&[&mk(0), &mk(1)], None, 0);
         assert_eq!(
             diags.iter().map(|d| d.code).collect::<Vec<_>>(),
             vec![2300, 2300]
@@ -880,7 +880,7 @@ mod tests {
                 decls: vec![decl(1, 11, "E", true)],
             }],
         );
-        let diags = merge_program(&[a, b], None, 0);
+        let diags = merge_program(&[&a, &b], None, 0);
         assert_eq!(
             diags.iter().map(|d| d.code).collect::<Vec<_>>(),
             vec![2567, 2567]
@@ -912,12 +912,14 @@ mod tests {
                 )
             })
             .collect();
-        let mut diags = merge_program(&files, None, 0);
+        let file_refs: Vec<&FileMerge> = files.iter().collect();
+        let mut diags = merge_program(&file_refs, None, 0);
         // Raw pool: every conflicting merge pushes a fresh primary (six merges,
         // each emitting a source-side and a target-side primary = twelve).
         assert_eq!(diags.len(), 12);
         // After the caller's canonical sort + related-info union.
-        sort_and_deduplicate(&mut diags, &paths);
+        let path_refs: Vec<&str> = paths.iter().map(String::as_str).collect();
+        sort_and_deduplicate(&mut diags, &path_refs);
         assert_eq!(diags.len(), 7); // one primary per file's node
         let head = &diags[0]; // f0.ts, the recurring target
         assert_eq!(head.file, Some(FileId(0)));
@@ -933,7 +935,7 @@ mod tests {
     /// TS6203 after the union (never a TS6204 on the accreting node).
     #[test]
     fn three_way_cross_file_conflict_related_codes_all_6203() {
-        let paths = vec!["a.ts".to_string(), "b.ts".to_string(), "c.ts".to_string()];
+        let paths = vec!["a.ts", "b.ts", "c.ts"];
         let mk = |f: u32| {
             script(
                 f,
@@ -944,7 +946,7 @@ mod tests {
                 }],
             )
         };
-        let mut diags = merge_program(&[mk(0), mk(1), mk(2)], None, 0);
+        let mut diags = merge_program(&[&mk(0), &mk(1), &mk(2)], None, 0);
         sort_and_deduplicate(&mut diags, &paths);
         assert_eq!(diags.len(), 3);
         // All primaries are TS2300; a.ts (the recurring target) carries two related
@@ -990,7 +992,8 @@ mod tests {
                 decls: vec![decl(6, 11, "E", true)],
             }],
         ));
-        let diags = merge_program(&files, None, 0);
+        let file_refs: Vec<&FileMerge> = files.iter().collect();
+        let diags = merge_program(&file_refs, None, 0);
         // The const-enum primary (file 6) carries the capped chain (asserted on the
         // raw pool, before any cross-merge union, to isolate the within-primary cap).
         let source_primary = diags
@@ -1014,7 +1017,7 @@ mod tests {
                 decls: vec![decl(0, 4, "globalThis", false)],
             }],
         );
-        let diags = merge_program(&[f], None, 0);
+        let diags = merge_program(&[&f], None, 0);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, 2397);
         assert_eq!(diags[0].args, vec!["globalThis".to_string()]);
@@ -1035,7 +1038,7 @@ mod tests {
                 ],
             }],
         );
-        let diags = merge_program(&[f], None, 0);
+        let diags = merge_program(&[&f], None, 0);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, 2397);
         assert_eq!(diags[0].span.start, 40);
@@ -1063,7 +1066,7 @@ mod tests {
                 },
             ],
         };
-        let diags = merge_program(&[f], None, 0);
+        let diags = merge_program(&[&f], None, 0);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, 2664);
         assert_eq!(diags[0].span.start, 22);
@@ -1085,7 +1088,7 @@ mod tests {
             global_augmentations: Vec::new(),
             module_augmentations: Vec::new(),
         };
-        assert!(merge_program(&[f], None, 0).is_empty());
+        assert!(merge_program(&[&f], None, 0).is_empty());
     }
 
     // --- lib base ---------------------------------------------------------
@@ -1147,12 +1150,12 @@ mod tests {
                 decls: vec![decl(0, 6, "Symbol", true)],
             }],
         );
-        let mut diags = merge_program(&[test], Some(&base), 1);
+        let mut diags = merge_program(&[&test], Some(&base), 1);
         let paths = vec![
-            "test.ts".to_string(),
-            "lib.es5.d.ts".to_string(),
-            "lib.es2015.symbol.d.ts".to_string(),
-            "lib.es2015.symbol.wellknown.d.ts".to_string(),
+            "test.ts",
+            "lib.es5.d.ts",
+            "lib.es2015.symbol.d.ts",
+            "lib.es2015.symbol.wellknown.d.ts",
         ];
         sort_and_deduplicate(&mut diags, &paths);
         // The observable primary is on the test file's `class Symbol`.
@@ -1196,7 +1199,7 @@ mod tests {
                 decls: vec![decl(0, 10, "Array", true)],
             }],
         );
-        assert!(merge_program(&[test], Some(&base), 1).is_empty());
+        assert!(merge_program(&[&test], Some(&base), 1).is_empty());
     }
 
     /// A test `var globalThis` hits the seeded-globalThis NamespaceModule guard (no
@@ -1212,7 +1215,7 @@ mod tests {
                 decls: vec![decl(0, 4, "globalThis", false)],
             }],
         );
-        let diags = merge_program(&[test], Some(&base), 1);
+        let diags = merge_program(&[&test], Some(&base), 1);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, 2397);
     }
@@ -1243,7 +1246,7 @@ mod tests {
         );
         // No lib base — the overlay starts empty, so `globalThis` reaches it only via
         // the user declarations (not the seed).
-        let diags = merge_program(&[ns, var], None, 0);
+        let diags = merge_program(&[&ns, &var], None, 0);
         // Only the phase-1 globalThis checks fire; the NamespaceModule guard holds for
         // the overlay entry, so no TS2649.
         assert_eq!(diags.iter().filter(|d| d.code == 2397).count(), 2);
@@ -1276,7 +1279,7 @@ mod tests {
             }]],
             module_augmentations: Vec::new(),
         };
-        let diags = merge_program(&[test], Some(&base), 1);
+        let diags = merge_program(&[&test], Some(&base), 1);
         let test_primary = diags
             .iter()
             .find(|d| d.file == Some(FileId(0)))

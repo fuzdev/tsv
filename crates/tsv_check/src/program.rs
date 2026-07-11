@@ -268,17 +268,21 @@ pub fn check_bound(
             candidates.emit(unit.file, options, &mut diagnostics, &mut suggestions);
         }
     }
-    // Only test-unit merges are cloned here (lib globals live in the base, not in
-    // `files`), so this stays cheap even run per-variant.
-    let merges: Vec<FileMerge> = bound.units.iter().filter_map(|u| u.merge.clone()).collect();
+    // Borrow each unit's merge product (lib globals live in the base, not in
+    // `files`); the merge only reads it, so no clone is needed even per-variant.
+    let merges: Vec<&FileMerge> = bound
+        .units
+        .iter()
+        .filter_map(|u| u.merge.as_ref())
+        .collect();
     let lib_file_offset = bound.units.len() as u32;
     diagnostics.extend(merge_program(&merges, lib, lib_file_offset));
 
     // Path space: program units first, then the lib files (their FileIds are
-    // `lib_file_offset + lib-local index`).
-    let mut paths: Vec<String> = bound.units.iter().map(|u| u.name.clone()).collect();
+    // `lib_file_offset + lib-local index`). Borrowed — the comparator only reads.
+    let mut paths: Vec<&str> = bound.units.iter().map(|u| u.name.as_str()).collect();
     if let Some(base) = lib {
-        paths.extend(base.lib_files.iter().cloned());
+        paths.extend(base.lib_files.iter().map(String::as_str));
     }
     sort_and_deduplicate(&mut diagnostics, &paths);
     sort_and_deduplicate(&mut suggestions, &paths);

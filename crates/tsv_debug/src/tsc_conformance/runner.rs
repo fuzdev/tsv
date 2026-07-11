@@ -1100,16 +1100,21 @@ fn grade_family(
     let is_lib = LIB_CONFLICT_BASELINES.contains(&test.basename.as_str());
     let is_late_bound = LATE_BOUND_BASELINES.contains(&test.basename.as_str());
     let is_deferred_cfa = DEFERRED_CFA_BASELINES.contains(&test.basename.as_str());
+    // Each name-keyed bucket also requires the code to be in its family (dup for
+    // lib/late-bound, flow for cfa), mirroring the merge branch — a wrong-family
+    // missing inside a named baseline falls through to the hard-zero `missing_other`
+    // instead of being silently absorbed. This keeps the classification honest on
+    // filtered/triage runs, not only on a full run where the code-keyed pins catch it.
     for (code, count) in &buckets.missing_by_code {
         report.family_missing += *count;
         *report.family_missing_by_code.entry(*code).or_default() += *count;
         if MERGE_CODES.contains(code) {
             report.missing_merge += *count;
-        } else if is_lib {
+        } else if is_lib && DUP_CODES.contains(code) {
             report.missing_lib += *count;
-        } else if is_late_bound {
+        } else if is_late_bound && DUP_CODES.contains(code) {
             report.missing_deferred_late_bound += *count;
-        } else if is_deferred_cfa {
+        } else if is_deferred_cfa && FLOW_CODES.contains(code) {
             report.missing_deferred_cfa += *count;
         } else {
             report.missing_other += *count;
