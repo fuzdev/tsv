@@ -79,12 +79,15 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, P
 fn is_type_selector_with_pseudo(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
     let remaining = &parser.source()[parser.current_end..];
     let mut temp = Lexer::new(remaining);
-    let mut paren_depth: i32 = 0;
+    // `u32` so an unbalanced close saturates at 0 (never negative) — a signed depth
+    // would floor `saturating_sub` at `i32::MIN` and disable the `== 0` terminator
+    // checks below. Matches every other depth counter in the crate.
+    let mut paren_depth: u32 = 0;
     loop {
         let tok = temp.next_token()?;
         match &tok.kind {
             TokenKind::LeftParen => paren_depth += 1,
-            TokenKind::RightParen => paren_depth = (paren_depth - 1).max(0),
+            TokenKind::RightParen => paren_depth = paren_depth.saturating_sub(1),
             TokenKind::LeftBrace if paren_depth == 0 => return Ok(true),
             TokenKind::Semicolon | TokenKind::RightBrace if paren_depth == 0 => return Ok(false),
             TokenKind::Eof => return Ok(false),
@@ -244,18 +247,25 @@ pub(crate) fn parse_declaration<'arena>(
     let mut last_ends: (usize, usize) = (0, 0);
     let mut prev_is_bang = false;
     let mut prev_ends: (usize, usize) = (0, 0);
-    let mut paren_depth: i32 = 0;
-    let mut brace_depth: i32 = 0;
-    let mut bracket_depth: i32 = 0;
+    // `u32` (not `i32`): an *unbalanced* close — e.g. the stray `)` the lexer leaves after
+    // truncating an unquoted `url()` with nested parens like `url(a(b))` at the first `)` —
+    // must saturate at depth 0 so a following `;`/`}` still terminates the value. A signed
+    // depth floors `saturating_sub` at `i32::MIN`, driving depth negative and disabling the
+    // `== 0` terminator (it then swallows the `;`, the `}`, and on to EOF). Matches the other
+    // depth counters in the crate (`is_type_selector_with_pseudo`, `atrules/raw`, `value/*`).
+    let mut paren_depth: u32 = 0;
+    let mut brace_depth: u32 = 0;
+    let mut bracket_depth: u32 = 0;
     while !parser.check(TokenKind::Eof)
         && !(paren_depth == 0
             && brace_depth == 0
             && bracket_depth == 0
             && (parser.check(TokenKind::Semicolon) || parser.check(TokenKind::RightBrace)))
     {
-        // Track balanced-group depth. An outer `}` at depth 0 would have terminated
-        // the loop above, so reaching the RightBrace arm here means we're inside a
-        // value-level block (custom-property block values).
+        // Track balanced-group depth (each close saturates at 0 — see the `u32` note at
+        // the counters' declaration). An outer `}` at depth 0 would have terminated the
+        // loop above, so reaching the RightBrace arm here means we're inside a value-level
+        // block (custom-property block values).
         match &parser.current_kind {
             TokenKind::LeftParen => paren_depth += 1,
             TokenKind::RightParen => paren_depth = paren_depth.saturating_sub(1),

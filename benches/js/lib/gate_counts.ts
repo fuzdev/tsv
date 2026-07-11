@@ -125,11 +125,20 @@ export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
  * typescript 16→9 as parser over-rejections closed. svelte 1→0: the merged
  * css-cdo-cdc / svelte-block-ws / svelte-attr-name parser fixes moved the last
  * over-rejected corpus file to both-accept.
+ *
+ * css 5→3 (2026-07-10): the nested-paren unquoted-url parse fix closed TWO files.
+ * An unquoted `url()` whose content contains a nested `(` (e.g.
+ * `url(--var(foo-bar,#dadce0))`, `url( var(x) )`) truncates to the first unescaped
+ * `)` (css-syntax §4.3.6), leaving a dangling `)` that drove the declaration-value
+ * loop's paren depth negative and over-rejected with `Expected }`. Fixing the depth
+ * clamp closed `inline-url/inline_url.css` and `loose/loose.css` (the latter's
+ * `url( var(…) )` hit the same bug — it was mislabeled a `calc (…)` error-recovery
+ * gap). Both oracles accept both files.
  */
 export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 	svelte: 0,
 	typescript: 9,
-	css: 5,
+	css: 3,
 };
 
 /**
@@ -160,8 +169,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
 	typescript: 177,
-	css: 23,
+	css: 24,
 };
+// css 23→24 (2026-07-10): the nested-paren unquoted-url parse fix made
+// `prettier/tests/format/css/loose/loose.css` parse (it was a tsv-side parse-fail,
+// excluded from the format comparison), so it now enters as `unknown`. Its sole
+// unexplained hunk is `url(var( audience-network-checkbox-image))` — tsv keeps the
+// unquoted-url content VERBATIM (opaque per css-syntax §4.3.6 <url-token>) where
+// prettier reformats inside the nested `var(…)` and drops the space. tsv is the more
+// defensible side (url content is opaque); SAFETY 0, no content loss. Pairs with the
+// `inline_url.css` partial→ move below (same url-verbatim-vs-prettier-reformat class).
 // typescript 181→177 (2026-07-09): the class-member modifier line-break fix (a contextual
 // TS modifier / `accessor` / `async` separated from its member by a line break is the member,
 // not a modifier — the `[no LineTerminator here]` guard in parser/statement/class.rs) resolved
@@ -189,8 +206,15 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 4,
 	typescript: 63,
-	css: 8,
+	css: 9,
 };
+// css 8→9 (2026-07-10): the nested-paren unquoted-url parse fix made
+// `prettier/tests/format/css/inline-url/inline_url.css` parse, so it now enters the
+// format comparison as `partial` — its `css_value_wrap` / `fill_101_boundary` hunks are
+// detected, leaving one unexplained hunk: `url(--var(foo-bar,#dadce0))` — tsv keeps the
+// unquoted-url content VERBATIM where prettier reformats inside the nested `--var(…)` and
+// adds a space after the comma. Same url-verbatim-vs-prettier-reformat class as the
+// `loose.css` unknown→ move above; tsv is the more defensible side, SAFETY 0.
 
 /**
  * bench:harvest:svelte-styles — MINIMUM extracted `<style>` block count. Live
