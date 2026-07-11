@@ -441,10 +441,19 @@ impl<'a> Printer<'a> {
             let first_byte = self.source.as_bytes().get(lit.span.start as usize).copied();
             if first_byte != Some(b'"') && first_byte != Some(b'\'') {
                 let content = cooked.resolve(lit.span, self.source);
+                // Same delimiter rule as quoted attribute values: content holding a
+                // literal `"` takes single quotes (double quotes cannot hold it —
+                // HTML §13.1.2.3), else double. Plain-string `this=` content carries at
+                // most one literal quote kind, so single quotes are lossless here too.
+                let (open, close) = if content.contains('"') {
+                    ("this='", '\'')
+                } else {
+                    ("this=\"", '"')
+                };
                 let mut w = d.pool_writer();
-                w.push_str("this=\"");
+                w.push_str(open);
                 w.push_str(content);
-                w.push('"');
+                w.push(close);
                 return w.finish_text();
             }
         }

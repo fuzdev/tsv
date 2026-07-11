@@ -1,0 +1,81 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 95,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "SvelteElement",
+				"start": 0,
+				"end": 44,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 15,
+						"character": 15
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Literal",
+					"value": "a\"b",
+					"raw": "'a\"b'",
+					"start": 22,
+					"end": 25
+				}
+			},
+			{
+				"type": "Text",
+				"start": 44,
+				"end": 45,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 45,
+				"end": 94,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 46
+					},
+					"end": {
+						"line": 2,
+						"column": 15,
+						"character": 60
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Literal",
+					"value": "say \"hi\"",
+					"raw": "'say \"hi\"'",
+					"start": 67,
+					"end": 75
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -212,13 +212,15 @@ impl<'a> Printer<'a> {
                 return if matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_)) {
                     d.concat(&[sym, d.text("="), value_doc])
                 } else {
-                    d.concat(&[sym, d.text("=\""), value_doc, d.text("\"")])
+                    let (open, close) = self.attribute_value_delims(value_parts);
+                    d.concat(&[sym, d.text(open), value_doc, d.text(close)])
                 };
             }
 
             // General path: a multi-part value is always a quoted string (a pure
             // `{expr}` value is single-part and handled by the fast path above).
-            let mut parts: DocBuf = smallvec![d.symbol(name_sym), d.text("=\"")];
+            let (open, close) = self.attribute_value_delims(value_parts);
+            let mut parts: DocBuf = smallvec![d.symbol(name_sym), d.text(open)];
             let last_idx = value_parts.len().saturating_sub(1);
             for (i, part) in value_parts.iter().enumerate() {
                 if normalize_class {
@@ -227,12 +229,40 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_attribute_value_doc(part));
                 }
             }
-            parts.push(d.text("\""));
+            parts.push(d.text(close));
 
             d.concat(&parts)
         } else {
             // Boolean attribute
             d.symbol(name_sym)
+        }
+    }
+
+    /// Choose the delimiter for a quoted attribute value from its raw text.
+    ///
+    /// Defaults to double quotes (`'value'` normalizes to `"value"`, matching
+    /// prettier-plugin-svelte), but a value whose raw text contains a literal `"`
+    /// cannot be double-quoted: HTML §13.1.2.3 requires a double-quoted value to
+    /// hold no literal `"`, and re-wrapping one in `"` corrupts the markup (the
+    /// interior `"` closes the value early). Such a value takes single-quote
+    /// delimiters instead — the only spec-conformant quoted form. In valid source a
+    /// value's raw text carries at most one literal quote kind (the delimiter quote
+    /// must appear as an entity inside), so a value with a `"` never also has a
+    /// literal `'`; single quotes are lossless and no escaping is needed. `{expr}`
+    /// parts are brace-delimited, so their interior quotes never reach the value
+    /// boundary and don't affect the choice.
+    fn attribute_value_delims(
+        &self,
+        parts: &[internal::AttributeValue<'_>],
+    ) -> (&'static str, &'static str) {
+        let has_literal_double_quote = parts.iter().any(|part| match part {
+            internal::AttributeValue::Text(text) => text.raw(self.source).contains('"'),
+            internal::AttributeValue::ExpressionTag(_) => false,
+        });
+        if has_literal_double_quote {
+            ("='", "'")
+        } else {
+            ("=\"", "\"")
         }
     }
 
@@ -442,11 +472,12 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::StyleDirectiveValue::Parts(value_parts) => {
-                parts.push(d.text("=\""));
+                let (open, close) = self.attribute_value_delims(value_parts);
+                parts.push(d.text(open));
                 for part in value_parts.iter() {
                     parts.push(self.build_attribute_value_doc(part));
                 }
-                parts.push(d.text("\""));
+                parts.push(d.text(close));
             }
         }
         d.concat(&parts)
