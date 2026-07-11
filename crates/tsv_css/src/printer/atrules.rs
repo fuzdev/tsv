@@ -173,20 +173,73 @@ impl<'a> Printer<'a> {
                 self.write(" ");
                 self.print_media_prelude(content, atrule.block.is_some());
             }
-            internal::PreludeValue::Selectors { root, limit, .. } => {
+            internal::PreludeValue::Selectors {
+                root,
+                limit,
+                root_paren,
+                limit_paren,
+                to_span,
+                ..
+            } => {
                 // @scope selector lists: `@scope [(root)]? [to (limit)]?`. Both clauses
                 // are independently optional (css-cascade-6), so a bare `@scope { … }`
                 // writes no prelude and `@scope to (limit)` writes only the limit.
                 // These are nested context, so they don't wrap (same as :is(), :where()).
+                //
+                // `*_paren` (each clause's full `(…)` span, `Some` in lockstep with its
+                // list) recovers a comment leading/trailing the list *inside* the parens —
+                // the same wrapping the `:is()` args use. The out-of-paren prelude gaps —
+                // leading (`@scope /* c */ (.a)`), between the root `)` and `to`, between
+                // `to` and the limit `(`, and after the last `)` before the block `{` —
+                // re-emit their comments here too, normalized to a single space on each
+                // side (prettier freezes the source spacing; a cataloged divergence — see
+                // conformance_prettier.md §CSS: Comments).
+                let root_paren = *root_paren;
+                let limit_paren = *limit_paren;
+                let to_span = *to_span;
+                // Right bound of the pre-`{` gap. A block-less `@scope` isn't valid CSS,
+                // but fall back to the rule's `;` end so the range stays well-formed.
+                let block_start = atrule
+                    .block
+                    .as_ref()
+                    .map_or(atrule.span.end, |b| b.span.start);
+
+                // Leading gap: the first structural token after `@scope` is the root `(`,
+                // else `to`, else the block `{`. Its left bound is the `@` — no comment can
+                // sit inside the `@scope` at-keyword token, so it never double-counts an
+                // in-paren comment.
+                let first_start = root_paren
+                    .map(|s| s.start)
+                    .or_else(|| to_span.map(|s| s.start))
+                    .unwrap_or(block_start);
+                self.write_scope_gap_comments(atrule.span.start, first_start);
+
                 if let Some(root_selectors) = root {
                     self.write(" (");
-                    self.print_selector_list_nested(root_selectors);
+                    self.print_selector_list_nested(root_selectors, root_paren);
                     self.write(")");
                 }
                 if let Some(limit_selectors) = limit {
-                    self.write(" to (");
-                    self.print_selector_list_nested(limit_selectors);
+                    // Between-clause gap: root `)` → `to` (only when a root precedes it).
+                    if let (Some(rp), Some(ts)) = (root_paren, to_span) {
+                        self.write_scope_gap_comments(rp.end, ts.start);
+                    }
+                    self.write(" to");
+                    // After-`to` gap: `to` → limit `(`.
+                    if let (Some(ts), Some(lp)) = (to_span, limit_paren) {
+                        self.write_scope_gap_comments(ts.end, lp.start);
+                    }
+                    self.write(" (");
+                    self.print_selector_list_nested(limit_selectors, limit_paren);
                     self.write(")");
+                }
+                // Pre-`{` gap: after the last clause's `)` (only when a clause exists — a
+                // bare `@scope /* c */ {` comment is the leading gap above).
+                if let Some(last_end) = limit_paren
+                    .map(|s| s.end)
+                    .or_else(|| root_paren.map(|s| s.end))
+                {
+                    self.write_scope_gap_comments(last_end, block_start);
                 }
             }
             _ => {}
@@ -559,6 +612,22 @@ impl<'a> Printer<'a> {
             self.print_css_comment(comment);
         }
         self.write(" ");
+    }
+
+    /// Emit any block comments in `[start, end]` as ` /* … */` — a single leading
+    /// space, then the comment(s) joined single-spaced (`comment_blocks_in_range`).
+    ///
+    /// The out-of-paren `@scope` prelude gaps (leading / between the clauses / after
+    /// `to` / pre-`{`) call this at each authored position; prettier preserves the
+    /// comment with the source spacing, tsv normalizes to single spaces. A gap with no
+    /// comment writes nothing — the neighboring ` (`/` to`/` {` literals already carry
+    /// the separator.
+    fn write_scope_gap_comments(&mut self, start: u32, end: u32) {
+        let text = self.comment_blocks_in_range(start, end);
+        if !text.is_empty() {
+            self.write(" ");
+            self.write(&text);
+        }
     }
 
     /// Format an `@import` media query (doc-first).

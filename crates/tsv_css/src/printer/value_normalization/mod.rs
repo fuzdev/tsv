@@ -424,6 +424,10 @@ pub(crate) fn format_string_value(content: &str, quote: char) -> String {
 /// let source = "color/* comment */:red;";
 /// assert_eq!(extract_property_name(source, 18), "color /* comment */");
 ///
+/// // Every gap comment is preserved, joined single-spaced.
+/// let source = "color/* a *//* b */:red;";
+/// assert_eq!(extract_property_name(source, 19), "color /* a */ /* b */");
+///
 /// let source = "margin: 10px;";
 /// assert_eq!(extract_property_name(source, 6), "margin");
 /// ```
@@ -442,18 +446,32 @@ pub(crate) fn extract_property_name(decl_source: &str, colon_pos: usize) -> Cow<
 
     // Check if property contains a comment
     if let Some(comment_start) = property_part.find("/*") {
-        if let Some(comment_end_rel) = property_part[comment_start..].find("*/") {
-            let comment_end = comment_start + comment_end_rel + 2; // Include */
-            // Extract parts
-            let before_comment = property_part[..comment_start].trim();
-            let comment = &property_part[comment_start..comment_end];
+        let before_comment = property_part[..comment_start].trim();
 
-            // Normalize: property + space + comment (no trailing space)
-            Cow::Owned(format!("{before_comment} {comment}"))
-        } else {
-            // Malformed comment - just trim
-            Cow::Borrowed(property_part.trim())
+        // Collect EVERY comment in the property→colon gap, not just the first: a
+        // declaration may carry two or more (`color /* a */ /* b */ :`), and this
+        // gap is the only place a CSS declaration comment survives formatting (the
+        // parser drops value comments), so emitting only the first is silent
+        // content loss.
+        let mut comments: Vec<&str> = Vec::new();
+        let mut rest = &property_part[comment_start..];
+        loop {
+            // `rest` starts at a `/*`.
+            let Some(comment_end_rel) = rest.find("*/") else {
+                // Malformed comment (no closing `*/`) - just trim the whole part.
+                return Cow::Borrowed(property_part.trim());
+            };
+            let comment_end = comment_end_rel + 2; // Include */
+            comments.push(&rest[..comment_end]);
+            rest = &rest[comment_end..];
+            match rest.find("/*") {
+                Some(next) => rest = &rest[next..],
+                None => break,
+            }
         }
+
+        // Normalize: property + space + comments joined by single spaces.
+        Cow::Owned(format!("{before_comment} {}", comments.join(" ")))
     } else {
         // No comment: trim insignificant whitespace, but a property name ending in a
         // hex escape (`\41`) consumes one following whitespace as the escape's

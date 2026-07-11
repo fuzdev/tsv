@@ -345,64 +345,111 @@ pub(super) fn parse_container_prelude<'arena>(
 /// The span covers the authored prelude (first clause start to last `)`); when both
 /// clauses are absent it is a zero-width span at the cursor, so the public AST's
 /// `prelude` string extracts to `""` (matching parseCss).
+/// The parsed `@scope` prelude: the optional root/limit selector lists, each paired
+/// with its full `(…)` span (which the printer uses to interleave leading/trailing
+/// comments sitting inside the parens but outside the list), the `to` keyword span
+/// (splitting the out-of-paren between-clause and after-`to` comment gaps), plus the
+/// overall prelude span. Both `*_paren` fields and `to_span` are `Some` in lockstep
+/// with their clause.
+pub(super) struct ScopePrelude<'arena> {
+    pub root: Option<SelectorList<'arena>>,
+    pub root_paren: Option<Span>,
+    pub limit: Option<SelectorList<'arena>>,
+    pub limit_paren: Option<Span>,
+    pub to_span: Option<Span>,
+    pub span: Span,
+}
+
 pub(super) fn parse_scope_prelude<'arena>(
     parser: &mut CssParser<'_, 'arena>,
-) -> Result<
-    (
-        Option<SelectorList<'arena>>,
-        Option<SelectorList<'arena>>,
-        Span,
-    ),
-    ParseError,
-> {
+) -> Result<ScopePrelude<'arena>, ParseError> {
+    // Leading gap comments (`@scope /* c */ …`) register here: the shared at-rule
+    // name skip in `parse_atrule` is a plain skip that stops at a comment, so a leading
+    // comment is the current token on entry. Capturing `start` *after* this keeps it out
+    // of the wire prelude (extracted from `span`), matching parseCss, which drops it.
+    parser.skip_whitespace_registering_comments()?;
     let start = parser.span_pos(parser.current_start);
     // Widens to each clause's closing `)`; stays at `start` when no clause is present.
     let mut end = start;
 
-    // Optional root clause: `(<scope-start>)`.
-    let root = if parser.check(TokenKind::LeftParen) {
+    // Optional root clause: `(<scope-start>)`. All the surrounding gaps register their
+    // comments (like the `:is()` argument gaps) so the printer can re-emit them from the
+    // AST via `comments_in_range` — a comment leading/trailing the selector list inside
+    // the parens (recovered from `root_paren`), and the between-clause gap after `)`
+    // (`@scope (.a) /* c */ to (.b)`, split by `to_span` in the printer).
+    let (root, root_paren) = if parser.check(TokenKind::LeftParen) {
+        let paren_start = parser.span_pos(parser.current_start);
         parser.advance()?; // consume '('
-        parser.skip_whitespace()?;
+        parser.skip_whitespace_registering_comments()?; // leading root comment
         let root_selectors = parse_complex_selector_list(parser)?;
-        parser.skip_whitespace()?;
+        parser.skip_whitespace_registering_comments()?; // trailing root comment
         if !parser.check(TokenKind::RightParen) {
             return Err(parser.error_expected_after("')'", "@scope root selectors"));
         }
-        end = parser.span_pos(parser.current_end);
+        let paren_end = parser.span_pos(parser.current_end);
+        end = paren_end;
         parser.advance()?; // consume ')'
-        parser.skip_whitespace()?;
-        Some(root_selectors)
+        parser.skip_whitespace_registering_comments()?; // between-clause / pre-`{` comment
+        (
+            Some(root_selectors),
+            Some(Span {
+                start: paren_start,
+                end: paren_end,
+            }),
+        )
     } else {
-        None
+        (None, None)
     };
 
     // Optional limit clause: `to (<scope-end>)` — valid with or without a root.
     // `to` is a case-insensitive grammar keyword; canonicalized to lowercase at the
-    // printer (the `" to ("` literal in `print_css_atrule`).
-    let limit = if parser.check(TokenKind::Identifier)
+    // printer (the ` to ` literal in `print_css_atrule`). Its span is kept so the printer
+    // can tell a between-clause comment (before `to`) from an after-`to` one; all the
+    // surrounding gaps register comments the same way the root clause does.
+    let mut to_span = None;
+    let (limit, limit_paren) = if parser.check(TokenKind::Identifier)
         && parser.current_identifier().eq_ignore_ascii_case("to")
     {
+        to_span = Some(Span {
+            start: parser.span_pos(parser.current_start),
+            end: parser.span_pos(parser.current_end),
+        });
         parser.advance()?; // consume "to"
-        parser.skip_whitespace()?;
+        parser.skip_whitespace_registering_comments()?; // after-`to` comment
         if !parser.check(TokenKind::LeftParen) {
             return Err(parser.error_expected_after("'('", "'to' in @scope prelude"));
         }
+        let paren_start = parser.span_pos(parser.current_start);
         parser.advance()?; // consume '('
-        parser.skip_whitespace()?;
+        parser.skip_whitespace_registering_comments()?; // leading limit comment
         let limit_selectors = parse_complex_selector_list(parser)?;
-        parser.skip_whitespace()?;
+        parser.skip_whitespace_registering_comments()?; // trailing limit comment
         if !parser.check(TokenKind::RightParen) {
             return Err(parser.error_expected_after("')'", "@scope limit selectors"));
         }
-        end = parser.span_pos(parser.current_end);
+        let paren_end = parser.span_pos(parser.current_end);
+        end = paren_end;
         parser.advance()?; // consume ')'
-        parser.skip_whitespace()?;
-        Some(limit_selectors)
+        parser.skip_whitespace_registering_comments()?; // pre-`{` comment
+        (
+            Some(limit_selectors),
+            Some(Span {
+                start: paren_start,
+                end: paren_end,
+            }),
+        )
     } else {
-        None
+        (None, None)
     };
 
-    Ok((root, limit, Span { start, end }))
+    Ok(ScopePrelude {
+        root,
+        root_paren,
+        limit,
+        limit_paren,
+        to_span,
+        span: Span { start, end },
+    })
 }
 
 /// Parse @import prelude into structured values

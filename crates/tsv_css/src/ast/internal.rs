@@ -613,6 +613,21 @@ pub enum PreludeValue<'arena> {
     Selectors {
         root: Option<SelectorList<'arena>>,
         limit: Option<SelectorList<'arena>>,
+        /// The root clause's full `(…)` span (printer-only; `Some` iff `root` is
+        /// `Some`). Bounds the gaps where a leading/trailing comment inside the parens
+        /// but outside the selector list sits (`@scope (/* c */ .a)`), which the printer
+        /// re-emits via `comments_in_range` — the same wrapping `:is()` args use. The
+        /// wire prelude ignores it (extracted from `span`, comments stripped).
+        root_paren: Option<Span>,
+        /// The limit clause's full `(…)` span (printer-only; `Some` iff `limit` is
+        /// `Some`), the `to (…)` counterpart of `root_paren`.
+        limit_paren: Option<Span>,
+        /// The `to` keyword's span (printer-only; `Some` iff `limit` is `Some`, since
+        /// `to` is what introduces the limit clause). Splits the out-of-paren prelude
+        /// gaps the printer re-emits comments in: between the root `)` and `to`
+        /// (`@scope (.a) /* c */ to (.b)`) versus between `to` and the limit `(`
+        /// (`@scope to /* c */ (.b)`). Wire-ignored, like the `*_paren` spans.
+        to_span: Option<Span>,
         span: Span,
     },
 
