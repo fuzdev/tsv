@@ -90,17 +90,6 @@ const KNOWN_GAPS: KnownGap[] = [
 		category: 'css-error-recovery',
 		reason: 'invalid attr case-flag `[type=a x]` — selectors-4 <attr-modifier> is `i`|`s` only; recovery drops the rule',
 	},
-	{
-		pattern: 'tests/format/css/loose/loose.css',
-		category: 'css-error-recovery',
-		reason: 'whitespace before `(` in `calc (…)` / split calc() — invalid function-token grammar (ident + `(` must be adjacent); parseCss+prettier lenient, recovery drops the rule',
-	},
-	// A REAL tsv CSS bug (not error recovery): valid CSS both oracles accept, tsv wrongly rejects.
-	{
-		pattern: 'tests/format/css/inline-url/inline_url.css',
-		category: 'css-url-string',
-		reason: 'quoted `url(\'…{}…\')` with special chars inside the string — VALID CSS (parseCss + prettier accept); tsv over-rejects with `Expected }` (treats the `{` inside the string as a block open)',
-	},
 	// wpt-css harvest (benches/js/.cache/wpt_css) — surfaced by the MANUAL wpt-css
 	// differential (`skip_triage.ts benches/js/.cache/wpt_css`, a publish ship-gate step,
 	// not in `deno task conformance`). All are malformed CSS the spec/parseCss recovers
