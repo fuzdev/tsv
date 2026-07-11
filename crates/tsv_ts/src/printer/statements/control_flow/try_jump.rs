@@ -28,6 +28,29 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Append ` keyword`, preserving any comments in the gap before it: a block
+    /// comment stays inline (`} /* c */ catch`), a line comment forces a hardline.
+    /// The keyword-preceding mirror of `append_keyword_to_body_comments`, shared by
+    /// the `catch` and `finally` heads (`gap_start` = previous block end,
+    /// `keyword_pos` = the comment-skipping keyword position).
+    fn append_comments_then_keyword(
+        &self,
+        parts: &mut DocBuf,
+        gap_start: u32,
+        keyword_pos: u32,
+        keyword: &'static str,
+    ) {
+        let d = self.d();
+        if self.has_comments_between(gap_start, keyword_pos) {
+            let has_line = self.has_line_comments_between(gap_start, keyword_pos);
+            parts.push(self.build_inline_comments_between_doc(gap_start, keyword_pos));
+            parts.push(if has_line { d.hardline() } else { d.text(" ") });
+        } else {
+            parts.push(d.text(" "));
+        }
+        parts.push(d.text(keyword));
+    }
+
     pub(in crate::printer::statements) fn build_try_statement_doc(
         &self,
         stmt: &internal::TryStatement<'_>,
@@ -44,22 +67,10 @@ impl<'a> Printer<'a> {
         parts.push(self.build_block_statement_expand_empty_doc(&stmt.block));
 
         if let Some(handler) = &stmt.handler {
-            // Check for comments between try block and catch keyword
+            // `handler.span.start` is the position of the "catch" keyword.
             let try_end = stmt.block.span.end;
-            // Use handler span start which is the position of "catch" keyword
             let catch_keyword_pos = handler.span.start;
-            if self.has_comments_between(try_end, catch_keyword_pos) {
-                let has_line_comment = self.has_line_comments_between(try_end, catch_keyword_pos);
-                parts.push(self.build_inline_comments_between_doc(try_end, catch_keyword_pos));
-                if has_line_comment {
-                    parts.push(d.hardline());
-                } else {
-                    parts.push(d.text(" "));
-                }
-                parts.push(d.text("catch"));
-            } else {
-                parts.push(d.text(" catch"));
-            }
+            self.append_comments_then_keyword(&mut parts, try_end, catch_keyword_pos, "catch");
             if let Some(param) = &handler.param {
                 // Find paren positions for comment handling
                 let catch_keyword_end = handler.span.start + "catch".len() as u32;
@@ -119,19 +130,7 @@ impl<'a> Printer<'a> {
             let finally_keyword_pos = self
                 .find_keyword_in_range(prev_end, finalizer.span.start, "finally")
                 .unwrap_or(finalizer.span.start);
-            if self.has_comments_between(prev_end, finally_keyword_pos) {
-                let has_line_comment =
-                    self.has_line_comments_between(prev_end, finally_keyword_pos);
-                parts.push(self.build_inline_comments_between_doc(prev_end, finally_keyword_pos));
-                if has_line_comment {
-                    parts.push(d.hardline());
-                } else {
-                    parts.push(d.text(" "));
-                }
-                parts.push(d.text("finally"));
-            } else {
-                parts.push(d.text(" finally"));
-            }
+            self.append_comments_then_keyword(&mut parts, prev_end, finally_keyword_pos, "finally");
             // Comments between finally keyword and body: `finally /* comment */ {`
             let finally_keyword_end = finally_keyword_pos + "finally".len() as u32;
             self.append_keyword_to_body_comments(
