@@ -29,6 +29,46 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
+/// Strip only `as`/`satisfies` casts from the head of a statement expression,
+/// returning the innermost operand — but only if at least one cast was peeled.
+/// Mirrors prettier's `ancestorNeitherAsNorSatisfies` walk
+/// (parentheses/identifier.js): unlike `leftmost_no_lookahead` it does NOT descend
+/// through member/call heads (`type.foo` is unambiguous), so it fires only for a
+/// bare-identifier operand of a cast chain.
+fn strip_statement_casts<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<'a>> {
+    let mut cur = expr;
+    let mut stripped = false;
+    loop {
+        cur = match cur {
+            Expression::TSAsExpression(e) => e.expression,
+            Expression::TSSatisfiesExpression(e) => e.expression,
+            _ => break,
+        };
+        stripped = true;
+    }
+    stripped.then_some(cur)
+}
+
+/// Contextual-keyword identifier names that need parens when they head an
+/// `as`/`satisfies` cast at statement position (bare `type as T` reparses as a
+/// `type` alias declaration). Prettier's list (parentheses/identifier.js); of
+/// these only `type`/`module`/`using` are reachable in tsv (the rest are reserved
+/// words the parser rejects before formatting), but the full set matches prettier.
+fn is_statement_ambiguous_keyword(name: &str) -> bool {
+    matches!(
+        name,
+        "await"
+            | "interface"
+            | "module"
+            | "using"
+            | "yield"
+            | "let"
+            | "component"
+            | "hook"
+            | "type"
+    )
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for a statement
     pub(super) fn build_statement_doc(&self, statement: &Statement<'_>) -> DocId {
@@ -132,6 +172,15 @@ impl<'a> Printer<'a> {
                         | Expression::ClassExpression(_)
                 ) {
                     self.expr_stmt_paren_target.set(Some(leftmost.span()));
+                } else if let Some(Expression::Identifier(id)) =
+                    strip_statement_casts(&stmt.expression)
+                    && self.with_ident_name(id, is_statement_ambiguous_keyword)
+                {
+                    // `(type) as T;` / `(module) satisfies U;` — a contextual keyword
+                    // heading an `as`/`satisfies` cast at statement level reparses as a
+                    // `type`/`module`/… declaration without the parens. The identifier's
+                    // doc builder consumes this span-matched target and wraps itself.
+                    self.expr_stmt_paren_target.set(Some(id.span));
                 }
             }
 

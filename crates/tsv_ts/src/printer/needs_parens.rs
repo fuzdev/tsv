@@ -236,8 +236,16 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
 
         // Non-null: `(a + b)!`, `(!x)!`, `(a ? b : c)!`, `(yield x)!`, `(++x)!`, etc.
         // UpdateExpression needs parens too: `(++x)!` is `NonNull(++x)`, but `++x!`
-        // parses as `++(x!)` (`Update(NonNull)`) — a different AST.
-        ParenContext::NonNull => is_lower_precedence(expr) || is_unary_or_update(expr),
+        // parses as `++(x!)` (`Update(NonNull)`) — a different AST. An arrow function
+        // needs parens as well (`((a) => a)!` — bare `(a) => a!` is `(a) => (a!)`, and
+        // a block-body `(a) => {}!` can't postfix the arrow at all → unreparseable).
+        // Function/class expressions don't: their brace-delimited bodies make the
+        // parens redundant, and prettier strips them.
+        ParenContext::NonNull => {
+            is_lower_precedence(expr)
+                || is_unary_or_update(expr)
+                || matches!(expr, Expression::ArrowFunctionExpression(_))
+        }
 
         // Type assertion (as/satisfies): `(a + b) as T`, `(await x) as T`, `(<U>x) as T`
         // Arrow functions need parens because `(...args) => x as T` parses as `(...args) => (x as T)`
@@ -291,6 +299,9 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
         // Await argument: `await (a + b)`, `await (x as T)`, `await (<T>x)`, `await (a ? b : c)`
         // Parens needed for precedence/semantics - await has higher precedence than ?:
         // Assignment: `await (x ??= y)` — without parens, parses as `(await x) ??= y` (syntax error)
+        // `await` takes a UnaryExpression operand, so the lower-precedence yield and
+        // arrow forms need parens too: `await (yield x)` (bare `await yield x` is a
+        // syntax error), `await (() => {})` (bare `await () => {}` is invalid).
         ParenContext::AwaitArgument => {
             is_type_assertion(expr)
                 || matches!(
@@ -298,6 +309,8 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                     Expression::BinaryExpression(_)
                         | Expression::ConditionalExpression(_)
                         | Expression::AssignmentExpression(_)
+                        | Expression::YieldExpression(_)
+                        | Expression::ArrowFunctionExpression(_)
                 )
         }
 
@@ -360,6 +373,16 @@ pub fn needs_parens(expr: &Expression<'_>, ctx: ParenContext, in_for_init: bool)
                         | Expression::NewExpression(_)
                         | Expression::TaggedTemplateExpression(_)
                         | Expression::ObjectExpression(_)
+                )
+                // A *decorated* class expression must be parenthesized —
+                // `extends @deco class {}` reads the `@deco` as decorating the
+                // enclosing class and the inner `class {}` as the heritage body,
+                // producing unreparseable output. A bare (undecorated) class
+                // expression stays unwrapped (prettier keeps `extends class {}`).
+                || matches!(
+                    stripped,
+                    Expression::ClassExpression(c)
+                        if c.decorators.is_some_and(|dec| !dec.is_empty())
                 )
         }
 

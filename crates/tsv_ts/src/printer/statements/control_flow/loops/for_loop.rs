@@ -908,6 +908,8 @@ impl<'a> Printer<'a> {
             is_await,
         );
 
+        let async_lhs_paren = self.for_lhs_needs_async_paren(left, keyword, is_await);
+
         if has_line_comments {
             return self.build_for_in_of_with_line_comments(
                 left,
@@ -917,6 +919,7 @@ impl<'a> Printer<'a> {
                 keyword_pos,
                 open_paren,
                 close_paren,
+                async_lhs_paren,
                 &mut parts,
             );
         }
@@ -931,7 +934,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(self.build_for_in_of_left_doc(left));
+        parts.push(self.build_for_in_of_left_doc(left, async_lhs_paren));
 
         // Comments after left, before the keyword
         let has_left_comment =
@@ -980,6 +983,10 @@ impl<'a> Printer<'a> {
         keyword_pos: u32,
         open_paren: Option<u32>,
         close_paren: Option<u32>,
+        // Whether the LHS is a bare `async` identifier needing parens (see
+        // `for_lhs_needs_async_paren`); precomputed by the caller, which has the
+        // `is_await` flag this method doesn't carry.
+        wrap_async_paren: bool,
         // The `for ... (` opening, prebuilt by the caller (comments preserved,
         // `await` from the AST) — shared with the inline layout. Filled in place
         // (a pooled buffer owned by the caller) rather than taken by value.
@@ -1005,7 +1012,7 @@ impl<'a> Printer<'a> {
 
         // Left side (const y)
         inner.push(d.hardline());
-        inner.push(self.build_for_in_of_left_doc(left));
+        inner.push(self.build_for_in_of_left_doc(left, wrap_async_paren));
 
         // Comments after left, before keyword — emit all (own-line comments normalize to inline)
         for comment in comments_in_range(self.comments, left_end, keyword_pos) {
@@ -1432,7 +1439,11 @@ impl<'a> Printer<'a> {
         self.build_for_of_statement_with_body_doc(stmt)
     }
 
-    fn build_for_in_of_left_doc(&self, left: &internal::ForInOfLeft<'_>) -> DocId {
+    fn build_for_in_of_left_doc(
+        &self,
+        left: &internal::ForInOfLeft<'_>,
+        wrap_async_paren: bool,
+    ) -> DocId {
         let d = self.d();
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => {
@@ -1442,8 +1453,38 @@ impl<'a> Printer<'a> {
                 }
                 d.concat(&parts)
             }
-            internal::ForInOfLeft::Pattern(expr) => self.build_expression_doc(expr),
+            // `for ((async) of x)` keeps parens around the bare `async` identifier
+            // (the caller decides via `wrap_async_paren` — a non-await for-of, where
+            // bare `for (async of x)` is a syntax error).
+            internal::ForInOfLeft::Pattern(expr) => {
+                let doc = self.build_expression_doc(expr);
+                if wrap_async_paren {
+                    d.parens(doc)
+                } else {
+                    doc
+                }
+            }
         }
+    }
+
+    /// Whether the for-in/for-of LHS is a bare `async` identifier that must be
+    /// parenthesized: only in a **non-await for-of** (bare `for (async of x)` is a
+    /// syntax error — the parser can't tell it from `for (async ... )`). Mirrors
+    /// prettier's identifier rule (parentheses/identifier.js:
+    /// `name === "async" && !parent.await && parent.type === "ForOfStatement"`).
+    fn for_lhs_needs_async_paren(
+        &self,
+        left: &internal::ForInOfLeft<'_>,
+        keyword: &str,
+        is_await: bool,
+    ) -> bool {
+        keyword == "of"
+            && !is_await
+            && matches!(
+                left,
+                internal::ForInOfLeft::Pattern(Expression::Identifier(id))
+                    if self.with_ident_name(id, |s| s == "async")
+            )
     }
 
     /// Get the end position of a ForInit

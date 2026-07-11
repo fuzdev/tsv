@@ -191,7 +191,19 @@ impl<'a> Printer<'a> {
     fn build_super_class_doc(&self, super_class: &internal::Expression<'_>) -> DocId {
         let doc = self.build_expression_doc(super_class);
         if self.needs_parens(super_class, super::ParenContext::SuperClass) {
-            self.d().parens(doc)
+            // A decorated class expression breaks its parens open and indents the
+            // content (prettier), the decorators forcing the break:
+            // `extends (⏎\t@deco⏎\tclass {}⏎)`. Every other wrapped heritage form
+            // stays inline in flat parens.
+            if matches!(
+                super_class,
+                internal::Expression::ClassExpression(c)
+                    if c.decorators.is_some_and(|dec| !dec.is_empty())
+            ) {
+                self.build_break_open_parens(doc)
+            } else {
+                self.d().parens(doc)
+            }
         } else {
             doc
         }
