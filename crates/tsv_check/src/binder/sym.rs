@@ -1502,6 +1502,14 @@ impl<'a> SymbolBinder<'a> {
     /// Bind the only type shape whose members reach the family cascade — a type
     /// literal. Every other variant is a deliberate no-op: a narrower-than-tsgo
     /// traversal can only leave things missing, never fabricate an extra.
+    //
+    // TODO: this descent is both shallow (direct `TypeLiteral` only) and reached
+    // from only a few sites — it never runs on a type-alias RHS, heritage type
+    // arguments, a nested class expression, or a union/array-wrapped nested literal,
+    // so a method-vs-property conflict in a type literal there is missed at bind
+    // (miss-only; extra=0 holds; unexercised by the corpus). The coherent fix is one
+    // general bind-side type descent mirroring the check pass's `CheckWalk::visit_type`,
+    // wired into those sites together — not patched per-position.
     fn bind_type(&mut self, ty: &TSType<'a>) {
         if let TSType::TypeLiteral(tl) = ty {
             self.bind_type_literal_body(tl);
