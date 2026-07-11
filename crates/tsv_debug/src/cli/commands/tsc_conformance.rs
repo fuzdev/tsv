@@ -310,7 +310,7 @@ impl RunCommand {
         let filter = self.build_filter()?;
         let filtered = filter.is_active();
         // The committed report is the full-run artifact; refuse to write a partial one.
-        if self.report.is_some() && filtered {
+        if !may_write_report(self.report.is_some(), filtered) {
             eprintln!(
                 "Error: --report writes the committed full report; it cannot be combined with \
                  --test/--code/--variant filters."
@@ -883,6 +883,13 @@ fn render_report_md(report: &SkeletonReport) -> String {
     s
 }
 
+/// Whether a run may write the committed `--report` artifact: it is a full-run
+/// product (the pins hold only on a full run), so a filtered (triage) run must
+/// refuse it. A run that didn't request `--report` trivially may.
+fn may_write_report(report_requested: bool, filtered: bool) -> bool {
+    !(report_requested && filtered)
+}
+
 /// Write the committed compact report to `<base>.json` + `<base>.md` (full runs only;
 /// deterministic). Called only after the gates pass.
 fn write_report(report: &SkeletonReport, base: &Path) -> Result<(), CliError> {
@@ -1399,5 +1406,118 @@ fn print_json<T: serde::Serialize>(report: &T) -> Result<(), CliError> {
             eprintln!("Error serializing JSON: {e}");
             Err(CliError::Failed)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A report with the deterministic sections populated (per-code maps out of
+    /// natural order, a few counters, and a nonzero wall-clock).
+    fn sample_report() -> SkeletonReport {
+        SkeletonReport {
+            in_scope_tests: 10,
+            in_scope_variants: 12,
+            expect_clean_graded: 4,
+            clean_pass: 4,
+            baselined_parsed: 8,
+            family_graded_variants: 7,
+            family_positive_variants: 3,
+            family_match: 5,
+            family_missing: 2,
+            missing_merge: 0,
+            missing_lib: 0,
+            missing_other: 2,
+            family_extra: 0,
+            related_match: 1,
+            // Inserted out of ascending order — the BTreeMap and the render must sort.
+            family_match_by_code: [(2528u32, 1usize), (2300, 2), (2451, 3)]
+                .into_iter()
+                .collect(),
+            family_missing_by_code: [(2664u32, 1usize), (2451, 1)].into_iter().collect(),
+            wall_ms: 123_456,
+            ..SkeletonReport::default()
+        }
+    }
+
+    #[test]
+    fn report_json_is_deterministic() {
+        // Two builds from the same report serialize byte-for-byte identically (sorted
+        // maps, no timing) — the committed artifact must be diff-clean across re-runs.
+        let r = sample_report();
+        let a = serde_json::to_string_pretty(&build_report_value(&r)).unwrap();
+        let b = serde_json::to_string_pretty(&build_report_value(&r)).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn report_md_is_deterministic() {
+        let r = sample_report();
+        assert_eq!(render_report_md(&r), render_report_md(&r));
+    }
+
+    #[test]
+    fn per_code_table_iterates_sorted() {
+        // The per-code table lists codes ascending regardless of map insertion order.
+        let md = render_report_md(&sample_report());
+        let p2300 = md.find("TS2300").expect("TS2300 row");
+        let p2451 = md.find("TS2451").expect("TS2451 row");
+        let p2528 = md.find("TS2528").expect("TS2528 row");
+        assert!(
+            p2300 < p2451 && p2451 < p2528,
+            "per-code rows not ascending"
+        );
+    }
+
+    #[test]
+    fn wall_clock_excluded_from_report() {
+        // Two reports differing ONLY in wall-clock produce identical JSON and Markdown —
+        // machine-varying timing never reaches the committed content.
+        let mut fast = sample_report();
+        fast.wall_ms = 0;
+        let mut slow = sample_report();
+        slow.wall_ms = 987_654_321;
+        assert_eq!(
+            serde_json::to_string_pretty(&build_report_value(&fast)).unwrap(),
+            serde_json::to_string_pretty(&build_report_value(&slow)).unwrap(),
+        );
+        assert_eq!(render_report_md(&fast), render_report_md(&slow));
+    }
+
+    #[test]
+    fn sanitize_replaces_path_separators() {
+        // Both slash flavors become `_` so a `suite/config` identity is one path segment.
+        assert_eq!(sanitize_artifact_name("a/b\\c"), "a_b_c");
+    }
+
+    #[test]
+    fn sanitize_replaces_whitespace() {
+        assert_eq!(sanitize_artifact_name("a b\tc"), "a_b_c");
+    }
+
+    #[test]
+    fn sanitize_preserves_baseline_identity() {
+        // A real baseline name has no path-hostile chars; parens/`=`/`.` pass through.
+        let name = "duplicateVar(target=es2015).errors.txt";
+        assert_eq!(sanitize_artifact_name(name), name);
+    }
+
+    #[test]
+    fn sanitize_is_not_injective() {
+        // The mapping has no collision handling by design: distinct inputs whose only
+        // difference is a slash-vs-space collapse to the same basename. Pins current
+        // behavior (do not add collision handling here).
+        assert_eq!(sanitize_artifact_name("a/b"), sanitize_artifact_name("a b"));
+    }
+
+    #[test]
+    fn report_write_requires_full_run() {
+        // A committed report is a full-run product: allowed unless requested on a
+        // filtered run.
+        assert!(may_write_report(false, false));
+        assert!(may_write_report(false, true));
+        assert!(may_write_report(true, false));
+        assert!(!may_write_report(true, true));
     }
 }
