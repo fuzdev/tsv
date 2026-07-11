@@ -2339,8 +2339,18 @@ impl<'a> FlowBuilder<'a> {
                 }
             }
             E::SequenceExpression(s) => {
+                // `bindBinaryExpressionFlow` comma branch: each operand's value
+                // is discarded (statement-like), so a top-level dotted-name call
+                // is a potential assertion — apply maybe-call per operand
+                // (visit-then-maybe, like `ExpressionStatement`). tsgo nests
+                // comma as left-assoc `BinaryExpression`s applying maybe-call to
+                // both `Left`/`Right` at each level; the flattened form applies
+                // it once per leaf operand (intermediate comma nodes are no-op
+                // non-calls), so the effect matches.
+                // tsgo: binder.go bindBinaryExpressionFlow (comma branch)
                 for e in s.expressions {
                     self.visit_expression(e);
+                    self.maybe_bind_expression_flow_if_call(e);
                 }
             }
             E::AssignmentExpression(a) if is_logical_assign_op(a.operator) => {
@@ -3027,6 +3037,30 @@ mod tests {
             "expected a createFlowMutation(Assignment) node"
         );
         assert!(has_call, "expected a createFlowCall node");
+    }
+
+    /// Count `CALL` flow nodes in the whole graph.
+    fn call_node_count(product: &FlowProduct) -> usize {
+        (1..=product.graph.node_count())
+            .filter_map(FlowNodeId::from_raw)
+            .filter(|&id| product.graph.flags(id).contains(FlowFlags::CALL))
+            .count()
+    }
+
+    #[test]
+    fn comma_operands_each_mint_a_call_flow_node() {
+        // `bindBinaryExpressionFlow` comma branch applies `maybeBindExpressionFlowIfCall`
+        // to every operand — each discarded (statement-like) dotted-name call is a
+        // potential assertion, so a two-operand comma mints one CALL per operand.
+        let two = build("function f() { m1(), m2(); }");
+        assert_eq!(
+            call_node_count(&two),
+            2,
+            "each comma operand's dotted-name call should mint a CALL flow node"
+        );
+        // Control: a bare expression statement mints exactly one (the established path).
+        let one = build("function f() { m1(); }");
+        assert_eq!(call_node_count(&one), 1);
     }
 
     #[test]
