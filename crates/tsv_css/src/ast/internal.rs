@@ -608,26 +608,13 @@ pub enum PreludeValue<'arena> {
     /// Selector lists (for @scope). Both clauses are independently optional per
     /// css-cascade-6 (`@scope [(<scope-start>)]? [to (<scope-end>)]?`), so a bare
     /// `@scope { … }` has `root: None, limit: None`, and `@scope to (.footer)` has
-    /// `root: None, limit: Some(…)`.
+    /// `root: None, limit: Some(…)`. Each clause's selector list is a
+    /// `<forgiving-selector-list>` (the same production `:is()`/`:where()` use), so it
+    /// may be empty or hold `Invalid` items — the printer re-emits them verbatim.
     /// Example: `@scope (.card) to (.footer)` → root: Some([.card]), limit: Some([.footer])
     Selectors {
-        root: Option<SelectorList<'arena>>,
-        limit: Option<SelectorList<'arena>>,
-        /// The root clause's full `(…)` span (printer-only; `Some` iff `root` is
-        /// `Some`). Bounds the gaps where a leading/trailing comment inside the parens
-        /// but outside the selector list sits (`@scope (/* c */ .a)`), which the printer
-        /// re-emits via `comments_in_range` — the same wrapping `:is()` args use. The
-        /// wire prelude ignores it (extracted from `span`, comments stripped).
-        root_paren: Option<Span>,
-        /// The limit clause's full `(…)` span (printer-only; `Some` iff `limit` is
-        /// `Some`), the `to (…)` counterpart of `root_paren`.
-        limit_paren: Option<Span>,
-        /// The `to` keyword's span (printer-only; `Some` iff `limit` is `Some`, since
-        /// `to` is what introduces the limit clause). Splits the out-of-paren prelude
-        /// gaps the printer re-emits comments in: between the root `)` and `to`
-        /// (`@scope (.a) /* c */ to (.b)`) versus between `to` and the limit `(`
-        /// (`@scope to /* c */ (.b)`). Wire-ignored, like the `*_paren` spans.
-        to_span: Option<Span>,
+        root: Option<ScopeClause<'arena>>,
+        limit: Option<ScopeLimit<'arena>>,
         span: Span,
     },
 
@@ -661,6 +648,31 @@ pub enum PreludeValue<'arena> {
     /// Fully structuring preludes (vs. this raw form) is a deferred design option
     /// — see docs/architecture.md § "Red-Green Trees (Deferred)".
     Media { content: &'arena str, span: Span },
+}
+
+/// One `@scope` clause: a `<forgiving-selector-list>` and its enclosing `(…)` span.
+/// Used for the root (`@scope (<scope-start>)`) and, via `ScopeLimit`, the limit.
+/// Bundling the list with its paren span makes the printer-only span **structurally**
+/// present whenever the list is (no separate `Option<Span>` to keep in lockstep): the
+/// paren bounds the gaps where a comment inside the parens but outside the list sits
+/// (`@scope (/* c */ .a)`), which the printer re-emits via `comments_in_range` — the
+/// same wrapping `:is()` args use. Wire-ignored (the prelude is extracted from the
+/// `Selectors` `span`, comments stripped).
+#[derive(Debug, Clone)]
+pub struct ScopeClause<'arena> {
+    pub list: SelectorList<'arena>,
+    /// The clause's full `(…)` span (end one past `)`, the pseudo-arg convention).
+    pub paren: Span,
+}
+
+/// The `@scope` limit clause: `to (<scope-end>)`. Carries the `to` keyword span (so the
+/// printer can tell a between-clause comment before `to` from an after-`to` one) plus
+/// the limit `ScopeClause`. Present iff the source has a `to` clause.
+#[derive(Debug, Clone)]
+pub struct ScopeLimit<'arena> {
+    /// The `to` keyword span (a case-insensitive grammar keyword, lowercased at print).
+    pub to_span: Span,
+    pub clause: ScopeClause<'arena>,
 }
 
 /// A boolean condition query — the structured prelude shared by `@supports`
@@ -716,7 +728,7 @@ impl PreludeValue<'_> {
             PreludeValue::Values { values, .. } => values.is_empty(),
             PreludeValue::Raw { content, .. } => content.is_empty(),
             PreludeValue::Selectors { root, limit, .. } => {
-                root.as_ref().is_none_or(|r| r.selectors.is_empty()) && limit.is_none()
+                root.as_ref().is_none_or(|r| r.list.selectors.is_empty()) && limit.is_none()
             }
             PreludeValue::Supports { condition, .. } => condition.parts.is_empty(),
             PreludeValue::Container {

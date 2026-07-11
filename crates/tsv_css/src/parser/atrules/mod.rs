@@ -107,9 +107,6 @@ pub(crate) fn parse_atrule<'arena>(
         PreludeValue::Selectors {
             root: scope.root,
             limit: scope.limit,
-            root_paren: scope.root_paren,
-            limit_paren: scope.limit_paren,
-            to_span: scope.to_span,
             span: scope.span,
         }
     } else if name_lc == "supports" {

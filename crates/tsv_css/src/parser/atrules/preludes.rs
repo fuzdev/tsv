@@ -1,7 +1,7 @@
 use super::{CssParser, is_boolean_operator_keyword};
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use crate::parser::selectors::parse_complex_selector_list;
+use crate::parser::selectors::parse_forgiving_selector_list;
 use tsv_lang::{ParseError, Span};
 
 /// Parse a condition query — `(prop: val)` parts connected by `and`/`or`, with
@@ -345,19 +345,46 @@ pub(super) fn parse_container_prelude<'arena>(
 /// The span covers the authored prelude (first clause start to last `)`); when both
 /// clauses are absent it is a zero-width span at the cursor, so the public AST's
 /// `prelude` string extracts to `""` (matching parseCss).
-/// The parsed `@scope` prelude: the optional root/limit selector lists, each paired
-/// with its full `(…)` span (which the printer uses to interleave leading/trailing
-/// comments sitting inside the parens but outside the list), the `to` keyword span
-/// (splitting the out-of-paren between-clause and after-`to` comment gaps), plus the
-/// overall prelude span. Both `*_paren` fields and `to_span` are `Some` in lockstep
-/// with their clause.
+///
+/// The parsed `@scope` prelude: the optional root/limit clauses (each a
+/// `ScopeClause`/`ScopeLimit` that bundles its selector list with the printer-only
+/// spans, so the "span is `Some` iff the list is" invariant is structural) plus the
+/// overall prelude span.
 pub(super) struct ScopePrelude<'arena> {
-    pub root: Option<SelectorList<'arena>>,
-    pub root_paren: Option<Span>,
-    pub limit: Option<SelectorList<'arena>>,
-    pub limit_paren: Option<Span>,
-    pub to_span: Option<Span>,
+    pub root: Option<ScopeClause<'arena>>,
+    pub limit: Option<ScopeLimit<'arena>>,
     pub span: Span,
+}
+
+/// Parse one `@scope` clause — `(<forgiving-selector-list>)` — with the in-paren
+/// leading/trailing gap comments registered (the printer re-emits them from the AST via
+/// `comments_in_range`, the same wrapping `:is()` args use). Assumes the current token
+/// is `(`. The list is **forgiving** (css-cascade-6 makes `<scope-start>`/`<scope-end>`
+/// `<forgiving-selector-list>`s, the same production `:is()`/`:where()` use), so an empty
+/// or invalid list — `@scope ()`, `@scope (.a, , .b)`, `@scope (.)` — parses (each is
+/// kept verbatim), matching parseCss (which captures the prelude raw) and prettier.
+/// `what` names the clause for the unterminated-`)` error.
+fn parse_scope_clause<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    what: &str,
+) -> Result<ScopeClause<'arena>, ParseError> {
+    let paren_start = parser.span_pos(parser.current_start);
+    parser.advance()?; // consume '('
+    parser.skip_whitespace_registering_comments()?; // leading comment
+    let list = parse_forgiving_selector_list(parser)?;
+    parser.skip_whitespace_registering_comments()?; // trailing comment
+    if !parser.check(TokenKind::RightParen) {
+        return Err(parser.error_expected_after("')'", what));
+    }
+    let paren_end = parser.span_pos(parser.current_end);
+    parser.advance()?; // consume ')'
+    Ok(ScopeClause {
+        list,
+        paren: Span {
+            start: paren_start,
+            end: paren_end,
+        },
+    })
 }
 
 pub(super) fn parse_scope_prelude<'arena>(
@@ -372,82 +399,44 @@ pub(super) fn parse_scope_prelude<'arena>(
     // Widens to each clause's closing `)`; stays at `start` when no clause is present.
     let mut end = start;
 
-    // Optional root clause: `(<scope-start>)`. All the surrounding gaps register their
-    // comments (like the `:is()` argument gaps) so the printer can re-emit them from the
-    // AST via `comments_in_range` — a comment leading/trailing the selector list inside
-    // the parens (recovered from `root_paren`), and the between-clause gap after `)`
-    // (`@scope (.a) /* c */ to (.b)`, split by `to_span` in the printer).
-    let (root, root_paren) = if parser.check(TokenKind::LeftParen) {
-        let paren_start = parser.span_pos(parser.current_start);
-        parser.advance()?; // consume '('
-        parser.skip_whitespace_registering_comments()?; // leading root comment
-        let root_selectors = parse_complex_selector_list(parser)?;
-        parser.skip_whitespace_registering_comments()?; // trailing root comment
-        if !parser.check(TokenKind::RightParen) {
-            return Err(parser.error_expected_after("')'", "@scope root selectors"));
-        }
-        let paren_end = parser.span_pos(parser.current_end);
-        end = paren_end;
-        parser.advance()?; // consume ')'
+    // Optional root clause `(<scope-start>)`. After it, the between-clause (`) /* c */ to`)
+    // and pre-`{` gaps register their comments so the printer can re-emit them.
+    let root = if parser.check(TokenKind::LeftParen) {
+        let clause = parse_scope_clause(parser, "@scope root selectors")?;
+        end = clause.paren.end;
         parser.skip_whitespace_registering_comments()?; // between-clause / pre-`{` comment
-        (
-            Some(root_selectors),
-            Some(Span {
-                start: paren_start,
-                end: paren_end,
-            }),
-        )
+        Some(clause)
     } else {
-        (None, None)
+        None
     };
 
-    // Optional limit clause: `to (<scope-end>)` — valid with or without a root.
-    // `to` is a case-insensitive grammar keyword; canonicalized to lowercase at the
-    // printer (the ` to ` literal in `print_css_atrule`). Its span is kept so the printer
-    // can tell a between-clause comment (before `to`) from an after-`to` one; all the
-    // surrounding gaps register comments the same way the root clause does.
-    let mut to_span = None;
-    let (limit, limit_paren) = if parser.check(TokenKind::Identifier)
+    // Optional limit clause `to (<scope-end>)` — valid with or without a root. `to` is a
+    // case-insensitive grammar keyword (lowercased at the printer's ` to ` literal); its
+    // span lets the printer tell a between-clause comment (before `to`) from an after-`to`
+    // one. The after-`to` and pre-`{` gaps register comments the same way.
+    let limit = if parser.check(TokenKind::Identifier)
         && parser.current_identifier().eq_ignore_ascii_case("to")
     {
-        to_span = Some(Span {
+        let to_span = Span {
             start: parser.span_pos(parser.current_start),
             end: parser.span_pos(parser.current_end),
-        });
+        };
         parser.advance()?; // consume "to"
         parser.skip_whitespace_registering_comments()?; // after-`to` comment
         if !parser.check(TokenKind::LeftParen) {
             return Err(parser.error_expected_after("'('", "'to' in @scope prelude"));
         }
-        let paren_start = parser.span_pos(parser.current_start);
-        parser.advance()?; // consume '('
-        parser.skip_whitespace_registering_comments()?; // leading limit comment
-        let limit_selectors = parse_complex_selector_list(parser)?;
-        parser.skip_whitespace_registering_comments()?; // trailing limit comment
-        if !parser.check(TokenKind::RightParen) {
-            return Err(parser.error_expected_after("')'", "@scope limit selectors"));
-        }
-        let paren_end = parser.span_pos(parser.current_end);
-        end = paren_end;
-        parser.advance()?; // consume ')'
+        let clause = parse_scope_clause(parser, "@scope limit selectors")?;
+        end = clause.paren.end;
         parser.skip_whitespace_registering_comments()?; // pre-`{` comment
-        (
-            Some(limit_selectors),
-            Some(Span {
-                start: paren_start,
-                end: paren_end,
-            }),
-        )
+        Some(ScopeLimit { to_span, clause })
     } else {
-        (None, None)
+        None
     };
 
     Ok(ScopePrelude {
         root,
-        root_paren,
         limit,
-        limit_paren,
-        to_span,
         span: Span { start, end },
     })
 }

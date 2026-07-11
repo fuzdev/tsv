@@ -207,6 +207,7 @@ columns wide. Cataloged in [Tabs-Only Alignment](#tabs-only-alignment).
 - @scope newlines — ◆stable_quirk — [scope_selector](../tests/fixtures/css/at_rules/scope_selector_prettier_divergence/)
 - @supports line wrap — ◆print_width — [supports_long](../tests/fixtures/css/at_rules/supports_long_prettier_divergence/)
 - @scope `to` keyword case — ◆design_choice — [scope_to_case](../tests/fixtures/css/at_rules/scope_to_case_prettier_divergence/)
+- @scope empty-root spacing — ◆design_choice — tsv keeps a consistent space before the clause paren (`@scope ()`), where prettier collapses it (`@scope()`) only for the empty-root-only prelude (the forgiving-list acceptance otherwise matches prettier — see [scope_forgiving_selector_list](../tests/fixtures/css/at_rules/scope_forgiving_selector_list/)) — [scope_empty_root](../tests/fixtures/css/at_rules/scope_empty_root_prettier_divergence/)
 - Media grouped feature case — ◆parser_compat — [media_grouped_feature_case](../tests/fixtures/css/at_rules/media_grouped_feature_case_prettier_divergence/)
 - SCSS directive numbers — ◆design_choice — [scss_directive_number_preserved](../tests/fixtures/css/at_rules/scss_directive_number_preserved_prettier_divergence/)
 
