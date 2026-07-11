@@ -1,0 +1,307 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 125,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 124,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 115,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 10,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 68,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 29,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 10
+							}
+						},
+						"name": "Foo"
+					},
+					"superClass": {
+						"type": "ClassExpression",
+						"start": 42,
+						"end": 62,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 14
+							}
+						},
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 42,
+								"end": 47,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 43,
+									"end": 47,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 3
+										},
+										"end": {
+											"line": 3,
+											"column": 7
+										}
+									},
+									"name": "deco"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 56,
+							"end": 59,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 8
+								},
+								"end": {
+									"line": 4,
+									"column": 11
+								}
+							},
+							"name": "Foo"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 60,
+							"end": 62,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 12
+								},
+								"end": {
+									"line": 4,
+									"column": 14
+								}
+							},
+							"body": []
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 66,
+						"end": 68,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 3
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 70,
+					"end": 114,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 5
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 76,
+						"end": 79,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 7
+							},
+							"end": {
+								"line": 6,
+								"column": 10
+							}
+						},
+						"name": "Bar"
+					},
+					"superClass": {
+						"type": "ClassExpression",
+						"start": 92,
+						"end": 108,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 2
+							},
+							"end": {
+								"line": 8,
+								"column": 10
+							}
+						},
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 92,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 93,
+									"end": 97,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 7
+										}
+									},
+									"name": "deco"
+								}
+							}
+						],
+						"id": null,
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 106,
+							"end": 108,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 8
+								},
+								"end": {
+									"line": 8,
+									"column": 10
+								}
+							},
+							"body": []
+						}
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 112,
+						"end": 114,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 3
+							},
+							"end": {
+								"line": 9,
+								"column": 5
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

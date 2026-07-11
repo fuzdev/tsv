@@ -1,0 +1,357 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 151,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " arrow-function operand of a non-null assertion keeps parens",
+			"start": 20,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 63
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 150,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 141,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 84,
+					"end": 107,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 24
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 90,
+							"end": 106,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 23
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 90,
+								"end": 92,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "r1"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 95,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 23
+									}
+								},
+								"expression": {
+									"type": "ArrowFunctionExpression",
+									"start": 96,
+									"end": 104,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 13
+										},
+										"end": {
+											"line": 3,
+											"column": 21
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 97,
+											"end": 98,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 14
+												},
+												"end": {
+													"line": 3,
+													"column": 15
+												}
+											},
+											"name": "a"
+										}
+									],
+									"body": {
+										"type": "Identifier",
+										"start": 103,
+										"end": 104,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 20
+											},
+											"end": {
+												"line": 3,
+												"column": 21
+											}
+										},
+										"name": "a"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " arrow-function operand of a non-null assertion keeps parens",
+							"start": 20,
+							"end": 82
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 109,
+					"end": 140,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 5
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 115,
+							"end": 139,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 4
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 115,
+								"end": 117,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "r2"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 120,
+								"end": 139,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "ArrowFunctionExpression",
+									"start": 121,
+									"end": 137,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 13
+										},
+										"end": {
+											"line": 6,
+											"column": 2
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 122,
+											"end": 123,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 14
+												},
+												"end": {
+													"line": 4,
+													"column": 15
+												}
+											},
+											"name": "a"
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 128,
+										"end": 137,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 20
+											},
+											"end": {
+												"line": 6,
+												"column": 2
+											}
+										},
+										"body": [
+											{
+												"type": "ExpressionStatement",
+												"start": 132,
+												"end": 134,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 2
+													},
+													"end": {
+														"line": 5,
+														"column": 4
+													}
+												},
+												"expression": {
+													"type": "Identifier",
+													"start": 132,
+													"end": 133,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 2
+														},
+														"end": {
+															"line": 5,
+															"column": 3
+														}
+													},
+													"name": "a"
+												}
+											}
+										]
+									}
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

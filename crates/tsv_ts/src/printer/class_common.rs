@@ -13,6 +13,7 @@ use crate::ast::internal;
 use crate::printer::CommentSpacing;
 use crate::printer::HeritageKeyword;
 use crate::printer::Printer;
+use crate::printer::class_expr_has_decorators;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -191,7 +192,18 @@ impl<'a> Printer<'a> {
     fn build_super_class_doc(&self, super_class: &internal::Expression<'_>) -> DocId {
         let doc = self.build_expression_doc(super_class);
         if self.needs_parens(super_class, super::ParenContext::SuperClass) {
-            self.d().parens(doc)
+            // A decorated class expression breaks its parens open and indents the
+            // content (prettier), the decorators forcing the break:
+            // `extends (⏎\t@deco⏎\tclass {}⏎)`. Every other wrapped heritage form
+            // stays inline in flat parens.
+            if matches!(
+                super_class,
+                internal::Expression::ClassExpression(c) if class_expr_has_decorators(c)
+            ) {
+                self.build_break_open_parens(doc)
+            } else {
+                self.d().parens(doc)
+            }
         } else {
             doc
         }
