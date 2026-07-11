@@ -1834,10 +1834,25 @@ impl<'a> FlowBuilder<'a> {
         }
         self.current_flow = self.finish_flow_label(pre_right);
         if let Some(target) = assign_target {
-            // Logical compound-assignment (binder.go:2271-2275): bind the RHS in
-            // the outer condition context, mutate the target, then test `node`
-            // (never a boolean keyword → the parent-nullish guard is irrelevant).
-            self.do_with_conditional_branches(Some(right), true_target, false_target);
+            // Logical compound-assignment (binder.go:2271-2275): bind the RHS, mutate
+            // the target, then test `node` (never a boolean keyword → the parent-nullish
+            // guard is irrelevant). tsgo binds the RHS with `doWithConditionalBranches`
+            // (targets = the outer true/false), but the value-vs-condition split is then
+            // taken by `isTopLevelLogicalExpression(right)` on `right`'s PARENT — which
+            // is this `&&=`/`||=`/`??=` node, not a logical operator — so `right` is
+            // classified TOP-LEVEL and its internal conditions never thread into the
+            // outer targets (only the whole-node truthiness below does). tsv emulates
+            // `isTopLevelLogicalExpression` pointer-free as `current_true_target.is_none()`,
+            // so binding the RHS with the targets SET would misclassify a logical `right`
+            // (`a &&= x && y`) as nested. The faithful adaptation is to CLEAR the targets
+            // (not set them) around the RHS bind: a logical `right` then sees itself
+            // top-level (its own discarded post-label), and a non-logical `right` is
+            // identical either way (the targets are only read by the logical branch).
+            let saved_true = self.current_true_target.take();
+            let saved_false = self.current_false_target.take();
+            self.visit_expression(right);
+            self.current_true_target = saved_true;
+            self.current_false_target = saved_false;
             self.bind_assignment_target_flow(target);
             let node_id = self.expr_id(node);
             let is_narrowing = is_narrowing_expression(node);
@@ -3334,6 +3349,87 @@ mod tests {
         let x = ident(&bound, src, "x");
         let xc = condition_of(&product, x, true);
         assert_ne!(a_flow, xc);
+    }
+
+    #[test]
+    fn logical_compound_assign_rhs_is_top_level_value() {
+        // `a &&= x && y;` as a STATEMENT — the RHS `x && y` binds as a top-level
+        // VALUE. tsgo classifies it via `isTopLevelLogicalExpression` (binder.go:2782)
+        // on `right`'s PARENT, which is the `&&=` node (not a logical operator), so
+        // the RHS is top-level: its own true/false conditions are self-contained in a
+        // throwaway post-label and discarded (effect-free identifiers), NOT threaded
+        // into the outer `&&=` post-label. tsgo wires only FALSE(a) + the whole-node
+        // truthiness — 3 antecedents. The bug (threading the RHS) leaked x/y's four
+        // conditions, giving 6: [FALSE(a), FALSE(x), TRUE(y), FALSE(y), TRUE(whole),
+        // FALSE(whole)].
+        let src = "function f() { a &&= x && y; }";
+        let (product, bound) = build_with_bound(src);
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        // The `&&=` has flow effects (the Assignment mutation), so its post-label is
+        // materialized and becomes the function's end-of-flow.
+        let post = product.end_flow_of(f).expect("f end_flow");
+        assert!(product.graph.flags(post).contains(FlowFlags::BRANCH_LABEL));
+
+        let a = ident(&bound, src, "a");
+        let whole = nodes_of_kind(&bound, NodeKind::AssignmentExpression)[0];
+        let false_a = condition_of(&product, a, false);
+        let true_whole = condition_of(&product, whole, true);
+        let false_whole = condition_of(&product, whole, false);
+        // Exact shape (and order): FALSE(a), then the whole-node TRUE/FALSE — no x/y.
+        assert_eq!(
+            product.graph.antecedents(post),
+            vec![false_a, true_whole, false_whole],
+            "the &&= post-label carries FALSE(a) + TRUE/FALSE(whole) only — x/y stay top-level"
+        );
+    }
+
+    #[test]
+    fn logical_compound_assign_still_threads_whole_node_in_condition() {
+        // `if (a &&= x && y) d;` — the `&&=` node itself is a CONDITION (its parent
+        // is the if), so its whole-node truthiness threads into then/else, while its
+        // RHS `x && y` is still top-level (self-contained, discarded). Post-fix:
+        //   - the then-branch enters from the whole-node TRUE condition ALONE
+        //     (d.flow == TRUE(whole)) — x/y's TRUE(y) does not merge in;
+        //   - the else branch carries exactly FALSE(a) + FALSE(whole) — x/y's
+        //     FALSE(x)/FALSE(y) do not leak in.
+        // The bug merged TRUE(y) into the then-branch and FALSE(x)/FALSE(y) into the
+        // else-branch.
+        let src = "function f() { if (a &&= x && y) d; }";
+        let (product, bound) = build_with_bound(src);
+        let a = ident(&bound, src, "a");
+        let d = ident(&bound, src, "d");
+        let whole = nodes_of_kind(&bound, NodeKind::AssignmentExpression)[0];
+        let false_a = condition_of(&product, a, false);
+        let true_whole = condition_of(&product, whole, true);
+        let false_whole = condition_of(&product, whole, false);
+
+        // then-branch = the whole-node TRUE condition alone (single antecedent
+        // collapses the then-label to the condition itself).
+        assert_eq!(
+            flow_of_node(&product, d),
+            true_whole,
+            "the then-branch enters from the &&= whole-node truthiness alone — TRUE(y) must not merge in"
+        );
+
+        // postIf merges the then-exit (TRUE(whole)) and the else-branch label.
+        let f = nodes_of_kind(&bound, NodeKind::FunctionDeclaration)[0];
+        let post_if = product.end_flow_of(f).expect("f end_flow");
+        let ants = product.graph.antecedents(post_if);
+        assert_eq!(
+            ants.len(),
+            2,
+            "postIf merges the then-exit and the else-branch"
+        );
+        assert_eq!(
+            ants[0], true_whole,
+            "then-exit is the whole-node TRUE condition"
+        );
+        let else_label = ants[1];
+        assert_eq!(
+            product.graph.antecedents(else_label),
+            vec![false_a, false_whole],
+            "the else branch carries only FALSE(a) + FALSE(whole) — x/y stay top-level"
+        );
     }
 
     #[test]
