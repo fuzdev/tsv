@@ -430,9 +430,11 @@ fn merge_symbol_against_base(
         return;
     }
     if base.flags.intersects(SymbolFlags::NAMESPACE_MODULE) {
-        // A value merging into a non-instantiated namespace (TS2649) — but never
-        // when the base is the built-in `globalThis` (the phase-1 TS2397 already
-        // reports that, and a second TS2649 would not make sense; the Part A guard).
+        // A value merging into a non-instantiated namespace (TS2649) — but never when
+        // the base is the seeded `globalThis` (the phase-1 TS2397 already reports that,
+        // and a second TS2649 would not make sense; tsgo's `target != globalThisSymbol`
+        // guard). `name` is the merge target's name (the base entry is looked up by it),
+        // so this name check is the observable equivalent of tsgo's identity guard.
         if name != NAME_GLOBAL_THIS
             && let Some(decl) = source.decls.first()
         {
@@ -490,10 +492,15 @@ fn merge_symbol(target: &mut GlobalEntry, source: &MergeSymbol, out: &mut MergeO
         target.decls.extend(source.decls.iter().cloned());
     } else if target.flags.intersects(SymbolFlags::NAMESPACE_MODULE) {
         // A value merging into a non-instantiated namespace: "cannot augment module
-        // with value exports" (TS2649) — but NOT when the target is the built-in
-        // `globalThis` (tsgo `mergeSymbol`'s `target != globalThisSymbol` guard):
-        // the phase-1 TS2397 already reports that conflict, and a second TS2649
-        // would not make sense.
+        // with value exports" (TS2649) — but NOT when the target is `globalThis`
+        // (tsgo `mergeSymbol`'s `target != globalThisSymbol` guard): the phase-1
+        // TS2397 already reports that conflict, and a second TS2649 would not make
+        // sense. tsgo keys on symbol identity; a **name** check is the observable
+        // equivalent here — the globals table holds exactly one entry per name and a
+        // merge only ever pairs same-named symbols, so `target.name == "globalThis"`
+        // identifies it whether the entry arrived as the lib-base seed or (with no lib)
+        // as a user-declared overlay entry from an earlier file. The base path
+        // (`merge_symbol_against_base`) makes the same name-based choice.
         if target.name != NAME_GLOBAL_THIS
             && let Some(decl) = source.decls.first()
         {
@@ -1208,6 +1215,39 @@ mod tests {
         let diags = merge_program(&[test], Some(&base), 1);
         assert_eq!(diags.len(), 1);
         assert_eq!(diags[0].code, 2397);
+    }
+
+    /// The TS2649 `globalThis` guard is name-based, so it holds even when the
+    /// `globalThis` entry arrived via the **overlay** (a user declaration) rather than
+    /// the lib-base seed. With no lib, an earlier file's instantiated
+    /// `namespace globalThis` seeds the overlay entry (NamespaceModule | ValueModule); a
+    /// later `var globalThis` conflicts and hits the NamespaceModule arm — the guard
+    /// suppresses TS2649, leaving only the two phase-1 TS2397s.
+    #[test]
+    fn overlay_globalthis_guard_suppresses_2649() {
+        let ns = script(
+            0,
+            vec![MergeSymbol {
+                name: "globalThis".to_string(),
+                flags: MODULE_FLAGS, // an instantiated `namespace globalThis {…}`
+                decls: vec![decl(0, 10, "globalThis", false)],
+            }],
+        );
+        let var = script(
+            1,
+            vec![MergeSymbol {
+                name: "globalThis".to_string(),
+                flags: SymbolFlags::FUNCTION_SCOPED_VARIABLE, // `var globalThis`
+                decls: vec![decl(1, 4, "globalThis", false)],
+            }],
+        );
+        // No lib base — the overlay starts empty, so `globalThis` reaches it only via
+        // the user declarations (not the seed).
+        let diags = merge_program(&[ns, var], None, 0);
+        // Only the phase-1 globalThis checks fire; the NamespaceModule guard holds for
+        // the overlay entry, so no TS2649.
+        assert_eq!(diags.iter().filter(|d| d.code == 2397).count(), 2);
+        assert!(diags.iter().all(|d| d.code == 2397));
     }
 
     /// A `declare global` augmentation (an interface) conflicting with a lib type

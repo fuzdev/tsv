@@ -221,7 +221,8 @@ pub struct FailingVariant {
     pub suite: String,
     /// The joined baseline name (the artifact basename).
     pub config: String,
-    /// Why it failed (`family_extra` / `span_mismatch` / `clean_fail` / `panic`).
+    /// Why it failed — the same vocabulary as the per-variant verdict
+    /// (`family_extra` / `family_span_mismatch` / `clean_fail` / `panic`).
     pub reason: &'static str,
     /// The rendered ours-vs-baseline text (file-artifact only — not in `--json`).
     #[serde(skip)]
@@ -936,7 +937,7 @@ fn grade_family(
         let reason = if buckets.extra > 0 {
             "family_extra"
         } else {
-            "span_mismatch"
+            "family_span_mismatch"
         };
         report.failing_variants.push(FailingVariant {
             suite: test.suite.to_string(),

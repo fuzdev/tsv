@@ -339,7 +339,7 @@ impl RunCommand {
         match enforce_run_gates(&report, !filtered) {
             Ok(()) => {
                 if let Some(path) = &self.emit_manifest {
-                    write_manifest(&report, path)?;
+                    write_manifest(&report, &options.filter, path)?;
                 }
                 if let Some(path) = &self.report {
                     write_report(&report, path)?;
@@ -705,20 +705,57 @@ fn run_pins() -> RunPins {
     }
 }
 
-/// The `--emit-manifest` wrapper: the full per-variant report plus the pins snapshot.
+/// The active triage filters echoed into a filtered manifest, so a consumer sees
+/// exactly which slice it was run over. Absent on a full (unfiltered) run.
+#[derive(serde::Serialize)]
+struct ManifestFilters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    test: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    variant: Option<String>,
+}
+
+/// The `--emit-manifest` wrapper: the per-variant report, the pins snapshot, and a
+/// `filtered` marker (plus the echoed filters). A triage-filtered manifest holds only
+/// a partial slice of variant rows and its pins were NOT enforced, so the marker keeps
+/// a consumer from mistaking it for a full-run one.
 #[derive(serde::Serialize)]
 struct RunManifest<'a> {
+    filtered: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filters: Option<ManifestFilters>,
     pins: RunPins,
     report: &'a SkeletonReport,
 }
 
-/// Write the `--emit-manifest` JSON (per-variant verdicts + buckets + census + pins).
-/// Called only after the gates pass, so a bad manifest never lands.
-fn write_manifest(report: &SkeletonReport, path: &Path) -> Result<(), CliError> {
-    let manifest = RunManifest {
+/// Assemble the manifest wrapper, marking whether the run was triage-filtered and
+/// echoing the active filters (`--variant key=value` re-joined for display).
+fn run_manifest<'a>(report: &'a SkeletonReport, filter: &RunFilter) -> RunManifest<'a> {
+    let filtered = filter.is_active();
+    let filters = filtered.then(|| ManifestFilters {
+        test: filter.test.clone(),
+        code: filter.code,
+        variant: filter.variant.as_ref().map(|(k, v)| format!("{k}={v}")),
+    });
+    RunManifest {
+        filtered,
+        filters,
         pins: run_pins(),
         report,
-    };
+    }
+}
+
+/// Write the `--emit-manifest` JSON (per-variant verdicts + buckets + census + pins +
+/// the `filtered` marker). Called only after the gates pass, so a bad manifest never
+/// lands.
+fn write_manifest(
+    report: &SkeletonReport,
+    filter: &RunFilter,
+    path: &Path,
+) -> Result<(), CliError> {
+    let manifest = run_manifest(report, filter);
     let file = std::fs::File::create(path).map_err(|e| {
         eprintln!("Error creating manifest {}: {e}", path.display());
         CliError::Failed
@@ -1531,5 +1568,31 @@ mod tests {
         assert!(may_write_report(false, true));
         assert!(may_write_report(true, false));
         assert!(!may_write_report(true, true));
+    }
+
+    #[test]
+    fn manifest_marks_and_echoes_filtered_runs() {
+        // A full (unfiltered) run: `filtered` is false and no `filters` object is
+        // emitted — nothing distinguishes it from a plain full-run manifest.
+        let r = sample_report();
+        let full = serde_json::to_value(run_manifest(&r, &RunFilter::default())).unwrap();
+        assert_eq!(full["filtered"], serde_json::json!(false));
+        assert!(full.get("filters").is_none());
+
+        // A triage-filtered run: `filtered` is true and the active filters are echoed
+        // (an unset filter — here `--test` — is omitted; `--variant` is re-joined).
+        let filter = RunFilter {
+            test: None,
+            code: Some(2300),
+            variant: Some(("target".to_string(), "es2015".to_string())),
+        };
+        let filtered = serde_json::to_value(run_manifest(&r, &filter)).unwrap();
+        assert_eq!(filtered["filtered"], serde_json::json!(true));
+        assert_eq!(filtered["filters"]["code"], serde_json::json!(2300));
+        assert_eq!(
+            filtered["filters"]["variant"],
+            serde_json::json!("target=es2015")
+        );
+        assert!(filtered["filters"].get("test").is_none());
     }
 }

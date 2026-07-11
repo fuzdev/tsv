@@ -327,41 +327,48 @@ impl LibResolver {
         closure
     }
 
-    /// The cached `/// <reference lib>` names of a lib file.
-    fn references_of(&mut self, file: &str) -> &[String] {
-        if !self.ref_cache.contains_key(file) {
-            let refs = match std::fs::read_to_string(self.libs_dir.join(file)) {
-                Ok(src) => extract_lib_references(&src),
-                Err(_) => {
-                    self.missing_files.push(file.to_string());
-                    Vec::new()
-                }
-            };
-            self.ref_cache.insert(file.to_string(), refs);
+    /// Read + bind a lib file exactly once, caching both its bound product and its
+    /// `/// <reference lib>` names. A single disk read feeds both the reference scan
+    /// (`references_of`, during set resolution) and the bind (`bound_file`, during the
+    /// base fold) — which target the same files — so each lib file hits the disk once
+    /// per run. A read failure records the file as missing (once) and caches an empty
+    /// reference list + a `None` product; a bind failure records the parse error and
+    /// caches `None`.
+    fn ensure_loaded(&mut self, file: &str) {
+        if self.file_cache.contains_key(file) {
+            return;
         }
+        let (bound, refs) = match std::fs::read_to_string(self.libs_dir.join(file)) {
+            Ok(src) => {
+                let refs = extract_lib_references(&src);
+                let bound = match bind_lib(file, &src) {
+                    Ok(lf) => Some(Rc::new(lf)),
+                    Err(e) => {
+                        self.parse_errors.push((file.to_string(), e));
+                        None
+                    }
+                };
+                (bound, refs)
+            }
+            Err(_) => {
+                self.missing_files.push(file.to_string());
+                (None, Vec::new())
+            }
+        };
+        self.ref_cache.insert(file.to_string(), refs);
+        self.file_cache.insert(file.to_string(), bound);
+    }
+
+    /// The cached `/// <reference lib>` names of a lib file (read + bound once).
+    fn references_of(&mut self, file: &str) -> &[String] {
+        self.ensure_loaded(file);
         &self.ref_cache[file]
     }
 
-    /// The cached bound product of a lib file (parse + bind once).
+    /// The cached bound product of a lib file (read + bound once).
     fn bound_file(&mut self, file: &str) -> Option<Rc<LibFile>> {
-        if let Some(cached) = self.file_cache.get(file) {
-            return cached.clone();
-        }
-        let result = match std::fs::read_to_string(self.libs_dir.join(file)) {
-            Ok(src) => match bind_lib(file, &src) {
-                Ok(lf) => Some(Rc::new(lf)),
-                Err(e) => {
-                    self.parse_errors.push((file.to_string(), e));
-                    None
-                }
-            },
-            Err(_) => {
-                self.missing_files.push(file.to_string());
-                None
-            }
-        };
-        self.file_cache.insert(file.to_string(), result.clone());
-        result
+        self.ensure_loaded(file);
+        self.file_cache[file].clone()
     }
 
     /// The [`LibBase`] for a variant config, built once per distinct resolved set.
