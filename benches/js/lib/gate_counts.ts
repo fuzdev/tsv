@@ -169,16 +169,25 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
 	typescript: 177,
-	css: 24,
+	css: 22,
 };
-// css 23→24 (2026-07-10): the nested-paren unquoted-url parse fix made
-// `prettier/tests/format/css/loose/loose.css` parse (it was a tsv-side parse-fail,
-// excluded from the format comparison), so it now enters as `unknown`. Its sole
-// unexplained hunk is `url(var( audience-network-checkbox-image))` — tsv keeps the
-// unquoted-url content VERBATIM (opaque per css-syntax §4.3.6 <url-token>) where
-// prettier reformats inside the nested `var(…)` and drops the space. tsv is the more
-// defensible side (url content is opaque); SAFETY 0, no content loss. Pairs with the
-// `inline_url.css` partial→ move below (same url-verbatim-vs-prettier-reformat class).
+// css 23→22 (2026-07-10): `prettier/tests/format/css/url/url.css` moved unknown→partial.
+// The value-parser escaped-paren fix (an escaped `\(`/`\)` is content per css-syntax §4.3.7,
+// not a nesting delimiter — value/parser.rs fast_scan + its ValueCursor/classify_separators
+// twins) stopped mis-counting the escaped `)` in this file's `url(  …\)\).jpg  )` tokens: they
+// now trim cleanly (§4.3.6) and its multi-`url()` `background:` list wraps with consistent tabs
+// instead of the prior mixed-indent garble. The wrap is now a plain fill_101_boundary divergence
+// (→ partial); the residual unexplained hunks are the escaped-paren url outer-whitespace
+// divergence (tsv trims, prettier keeps — url_escaped_paren_ws_prettier_divergence), which is
+// variant-only so it has no corpus detector. SAFETY 0. See the partial-pin note below.
+// css 24→23 (2026-07-10): `prettier/tests/format/css/loose/loose.css` moved
+// unknown→known. The new `css_url_opaque` divergence detector
+// (lib/divergence/patterns.ts) now explains its sole hunk —
+// `url(var( x ))` → prettier `url(var(x))`: tsv keeps unquoted-url content
+// VERBATIM (opaque <url-token>, css-syntax §4.3.6) where prettier reformats
+// inside the nested parens (conformance_prettier.md §CSS: Values, fixture
+// url_nested_reformat_prettier_divergence). SAFETY 0. Pairs with the
+// `inline_url.css` partial→known move below.
 // typescript 181→177 (2026-07-09): the class-member modifier line-break fix (a contextual
 // TS modifier / `accessor` / `async` separated from its member by a line break is the member,
 // not a modifier — the `[no LineTerminator here]` guard in parser/statement/class.rs) resolved
@@ -208,13 +217,16 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	typescript: 63,
 	css: 9,
 };
-// css 8→9 (2026-07-10): the nested-paren unquoted-url parse fix made
-// `prettier/tests/format/css/inline-url/inline_url.css` parse, so it now enters the
-// format comparison as `partial` — its `css_value_wrap` / `fill_101_boundary` hunks are
-// detected, leaving one unexplained hunk: `url(--var(foo-bar,#dadce0))` — tsv keeps the
-// unquoted-url content VERBATIM where prettier reformats inside the nested `--var(…)` and
-// adds a space after the comma. Same url-verbatim-vs-prettier-reformat class as the
-// `loose.css` unknown→ move above; tsv is the more defensible side, SAFETY 0.
+// css 8→9 (2026-07-10): `prettier/tests/format/css/url/url.css` moved unknown→partial after the
+// value-parser escaped-paren fix (see the css 23→22 unknown-pin note above) — its `background:`
+// url list now formats cleanly and reads as fill_101_boundary, with the escaped-paren
+// outer-whitespace hunks (url_escaped_paren_ws) unexplained. SAFETY 0. (Net for the day: 9→8→9 —
+// inline_url.css left partial for known, url.css joined.)
+// css 9→8 (2026-07-10): `prettier/tests/format/css/inline-url/inline_url.css` moved
+// partial→known. The new `css_url_opaque` detector now explains its remaining hunk —
+// `url(--var(foo-bar,#dadce0))` → prettier `url(--var(foo-bar, #dadce0))` (same
+// opaque-url class as the `loose.css` unknown→known move above; its css_value_wrap /
+// fill_101_boundary hunks were already detected). SAFETY 0.
 
 /**
  * bench:harvest:svelte-styles — MINIMUM extracted `<style>` block count. Live

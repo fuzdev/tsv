@@ -76,6 +76,15 @@ pub fn classify_separators(s: &str) -> ValueSeparator {
             continue;
         }
 
+        // An escaped paren (`\(` / `\)`) is a content code point (css-syntax §4.3.7), not a
+        // nesting delimiter, so it must not change `in_parens` — otherwise an escaped `)`
+        // inside `url()` mis-drops the depth and exposes a false top-level separator. Skip
+        // both bytes. Kept identical in the twin `fast_scan` / `ValueCursor` trackers.
+        if b == b'\\' && matches!(bytes.get(i + 1), Some(b'(' | b')')) {
+            i += 2;
+            continue;
+        }
+
         match b {
             b'\'' | b'"' if !in_quote => {
                 in_quote = true;

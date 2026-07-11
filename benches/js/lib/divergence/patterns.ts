@@ -1679,6 +1679,62 @@ const inline_content_block_style: DivergencePattern = {
 
 // ─── Broad patterns (run last) ──────────────────────────────────────────────
 
+const css_url_opaque: DivergencePattern = {
+	id: 'css_url_opaque',
+	description: 'Unquoted url() content kept verbatim; prettier reformats inside nested parens',
+	languages: ['css', 'svelte'],
+	conformance_sections: ['CSS: Values'],
+	fixtures: [
+		'css/values/functions/url_nested_reformat_prettier_divergence',
+	],
+	detect(ctx) {
+		// A nested `(...)` inside an unquoted `url(...)` — the only place url content
+		// (opaque per css-syntax §4.3.6, never re-parsed) and prettier's value
+		// reformatter interact. `[^)'"]*` excludes quotes so a quoted `url("…")` — a
+		// string, not opaque url content — never matches.
+		const nested_url = /\burl\(\s*[^)'"]*\([^)]*\)/i;
+		// Collapse whitespace immediately inside a `url(` open and before a `)` close —
+		// the padding the url-token tokenizer trims (§4.3.6). A pair that becomes EQUAL
+		// after this differs only in that outer padding (tsv trims it, prettier keeps
+		// it — a *distinct* divergence, e.g. prettier's `url/url.css`), so it is NOT the
+		// interior reformat this pattern documents; only a pair that still differs after
+		// the strip (a comma/space change *inside* the nested group) is claimed.
+		const strip_outer = (l: string) => l.replace(/\burl\(\s+/gi, 'url(').replace(/\s+\)/g, ')');
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			if (!is_in_css_context(hunk, ctx)) return false;
+			const { removed_lines: removed, added_lines: added } = hunk;
+			// Interior reformatting is a line-for-line rewrite: the line count never
+			// changes (only whitespace *inside* the url token moves). Requiring equal
+			// counts + a per-line whitespace-only match excludes value-list re-wraps
+			// (a line-count change — those are css_value_wrap / fill_101_boundary),
+			// so this never claims a hunk whose real divergence is the wrap.
+			if (removed.length === 0 || removed.length !== added.length) return false;
+			let saw_interior_reformat = false;
+			for (let i = 0; i < removed.length; i++) {
+				// content-preservation gate: a single non-whitespace difference on any
+				// line disables the detector, so it can never mask a real content change.
+				if (strip_all_ws(removed[i]) !== strip_all_ws(added[i])) return false;
+				if (
+					nested_url.test(removed[i]) && nested_url.test(added[i]) &&
+					strip_outer(removed[i]) !== strip_outer(added[i])
+				) {
+					saw_interior_reformat = true;
+				}
+			}
+			return saw_interior_reformat;
+		});
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'css_url_opaque',
+				confidence: 'likely',
+				hunk_indices,
+				reason: 'unquoted url() content kept verbatim; prettier reformats inside the nested parens',
+			};
+		}
+		return null;
+	},
+};
+
 const css_value_wrap: DivergencePattern = {
 	id: 'css_value_wrap',
 	description: 'CSS property value wraps at print width',
@@ -2296,6 +2352,7 @@ export const PATTERNS: DivergencePattern[] = [
 	css_value_ratio,
 
 	// 2. CSS-specific patterns
+	css_url_opaque,
 	css_unit_serialize_case,
 	css_atrule_spec_spacing,
 	css_atrule_long_wrap,
