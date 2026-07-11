@@ -192,8 +192,12 @@ fn contains_type_or_satisfies_tag(value: &str) -> bool {
 /// Uses standard JS operator precedence.
 fn infix_operator_info(kind: &TokenKind) -> Option<(u8, u8, BinaryOperator)> {
     match kind {
-        // Nullish coalescing: lowest binary precedence
-        TokenKind::QuestionQuestion => Some((5, 6, BinaryOperator::QuestionQuestion)),
+        // Nullish coalescing: same precedence as `||` (tsc's `Coalesce = LogicalOR`),
+        // left-associative — so the (ungrammatical) `a ?? b || c` mix groups as
+        // `(a ?? b) || c` like tsc/prettier, not `a ?? (b || c)`. Valid code never
+        // mixes `??` with `||`/`&&` unparenthesized (the grammar forbids it), so this
+        // shared level only decides error-recovery grouping.
+        TokenKind::QuestionQuestion => Some((7, 8, BinaryOperator::QuestionQuestion)),
         // Logical OR
         TokenKind::PipePipe => Some((7, 8, BinaryOperator::PipePipe)),
         // Logical AND
@@ -361,10 +365,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 }
 
                 // ES2016+: Unary expression as left operand of ** without parens is a syntax error
-                // `-2 ** 3` is ambiguous - must be `(-2) ** 3` or `-(2 ** 3)`
+                // `-2 ** 3` is ambiguous - must be `(-2) ** 3` or `-(2 ** 3)`. An `await`
+                // operand is a UnaryExpression per the grammar (`await UnaryExpression`), so
+                // `await b ** 2` is the same error — must be `(await b) ** 2` or `await (b ** 2)`.
                 // Detect unparenthesized unary: actual_start equals expression span start
                 if operator == BinaryOperator::StarStar
-                    && matches!(left.expr, Expression::UnaryExpression(_))
+                    && matches!(
+                        left.expr,
+                        Expression::UnaryExpression(_) | Expression::AwaitExpression(_)
+                    )
                     && left.actual_start == left.expr.span().start
                 {
                     return Err(Box::new(ParseError::InvalidSyntax {

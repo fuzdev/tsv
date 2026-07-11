@@ -29,6 +29,15 @@ pub type PrecedenceLevel = u8;
 /// 12: ** (exponentiation) - right-associative!
 pub fn get_precedence(op: BinaryOperator) -> PrecedenceLevel {
     match op {
+        // The relative order of the three logical operators here is NOT the
+        // grouping authority. `??` and `||` are actually the same precedence
+        // (tsc's `Coalesce = LogicalOR`), and where two *different* logical
+        // operators meet, `needs_parens`'s `is_logical` mixing rule
+        // force-parenthesizes them before this precedence is ever consulted — so
+        // these three values only need to sit below the non-logical operators.
+        // Operator *grouping* lives in the parser's binding-power table
+        // (`infix_operator_info` in `parser/expression.rs`), where `??` shares
+        // `||`'s level.
         BinaryOperator::QuestionQuestion => 1,
         BinaryOperator::PipePipe => 2,
         BinaryOperator::AmpersandAmpersand => 3,

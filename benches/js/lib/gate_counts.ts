@@ -98,8 +98,16 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 207, both_accept: 186 };
  * matches, moving it accept-parity → gap-beyond-acorn (case ii: tsv+acorn correctly reject at parse
  * what tsc flags later as a semantic error). over-acceptance unchanged (the corpus has no tsc-TS1xxx
  * form of these rules).
+ * accept_parity 423→429 (2026-07-11, branch bug77): recording the over-rejection fixes landed since
+ * bug3 (the triage-batch non-simple-assignment target + keyword-as-type accepts, the #406 type-args
+ * follow-token disambiguation) — the only parser-accept-widening changes in that window — which moved
+ * 6 tsc-valid files gap-beyond-acorn → accept-parity. Checkout UNCHANGED at 637d5746b (still the
+ * 2026-07-06 measurement point), so a rise on a pinned corpus is pure parity gain, not a suite
+ * refresh; gap_unexpected/gap_known both 0. gap-beyond-acorn now 7, all correctly rejected (the 3
+ * param-property-in-signature cases above + the for-in-LHS `for(foo() in b)` / numeric-enum-member
+ * quartet, which prettier ALSO rejects — so tsv siding with acorn is right there too).
  */
-export const TS_REPO_PINS = { scanned: 768, accept_parity: 423 };
+export const TS_REPO_PINS = { scanned: 768, accept_parity: 429 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
