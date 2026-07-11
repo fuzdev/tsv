@@ -33,6 +33,8 @@
 
 use serde_json::Value;
 
+use crate::fixtures::remove_locations;
+
 /// Return `value` with Svelte 5 render-time whitespace normalization applied to
 /// every template `Fragment`. Pairs with [`crate::fixtures::remove_locations`]
 /// for a render-equivalence AST comparison.
@@ -40,6 +42,66 @@ use serde_json::Value;
 pub fn render_normalize(mut value: Value) -> Value {
     normalize_node(&mut value, false);
     value
+}
+
+/// Apply the shared AST-comparison prep to a pair: Svelte-5 render-time
+/// whitespace normalization (when `render`) followed by location stripping.
+///
+/// Both `ast_diff` (exact-equality compare) and `roundtrip_audit`
+/// (structural-skeleton compare) build on this same normalized pair — only the
+/// final equality test differs.
+#[must_use]
+pub fn normalize_pair(a: Value, b: Value, render: bool) -> (Value, Value) {
+    let (a, b) = if render {
+        (render_normalize(a), render_normalize(b))
+    } else {
+        (a, b)
+    };
+    (remove_locations(a), remove_locations(b))
+}
+
+/// Reduce an AST to its structure: preserve object keys, array lengths, nesting,
+/// and each node's `type` discriminator; erase every other leaf scalar. Two ASTs
+/// with equal skeletons differ only in reformattable leaf content, not shape.
+///
+/// The acorn/acorn-typescript **`extra`** metadata bag is dropped entirely (on
+/// both sides) rather than erased: it records source-formatting artifacts —
+/// trailing-comma presence (which tsv's `trailingComma: 'none'` removes),
+/// `parenthesized` / `parenStart`, `raw` — so its *key presence* itself flips
+/// under formatting and would otherwise read as a shape change.
+///
+/// Used by `roundtrip_audit`'s corruption hunt (a re-quoted `attr='a"b'` →
+/// `attr="a"b"` reparses to two attributes, an array-length change the skeleton
+/// catches while ignoring the legitimate leaf-content reformatting around it).
+///
+/// `pub` (not `pub(crate)`) because `render_normalize.rs` is compiled into both
+/// the lib and bin targets while `cli` — the only consumer — lives in the bin
+/// alone, so a crate-private item reads as dead code in the lib target; its
+/// siblings `render_normalize` / `normalize_pair` are `pub` for the same reason.
+#[must_use]
+pub fn structural_skeleton(v: &Value) -> Value {
+    match v {
+        Value::Object(map) => {
+            let mut out = serde_json::Map::with_capacity(map.len());
+            for (k, val) in map {
+                if k == "extra" {
+                    // Parser source-metadata — omit the key on both sides.
+                    continue;
+                }
+                // `type` is the node discriminator — a change (Attribute →
+                // SpreadAttribute, …) is structural, so keep its value.
+                if k == "type" && val.is_string() {
+                    out.insert(k.clone(), val.clone());
+                } else {
+                    out.insert(k.clone(), structural_skeleton(val));
+                }
+            }
+            Value::Object(out)
+        }
+        Value::Array(arr) => Value::Array(arr.iter().map(structural_skeleton).collect()),
+        // Erase scalar leaves — reformattable source content.
+        _ => Value::Null,
+    }
 }
 
 /// `preserve` = whether we are inside a whitespace-preserving element
