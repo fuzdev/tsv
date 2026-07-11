@@ -2078,14 +2078,26 @@ impl<'a> SymbolBinder<'a> {
             }
             Expression::PrivateIdentifier(pid) => {
                 let raw = pid.name(self.source, self.interner);
-                let display = self.atoms.intern(raw);
+                // The display carries the leading `#`, matching the `#name` span and
+                // the check-side form (`duplicate_members.rs`'s `member_key`) — a
+                // duplicate reported by BOTH the bind cascade and the check pass shares
+                // a code+span but must share this message arg too, or sort/dedup can't
+                // collapse the pair (a latent span-multiset extra). tsgo prints
+                // `Duplicate identifier '#foo'.` — the `#` is included.
+                // TODO: member-key display-string derivation is duplicated across the
+                // bind (`sym.rs`) and check (`duplicate_members.rs`) sides with no
+                // shared helper (span derivation is centralized in `span_scan.rs`;
+                // display is not) — a shared display helper would prevent this class of
+                // mismatch.
+                let display = self.atoms.intern(&format!("#{raw}"));
                 // Mangle with the class symbol id so same-name privates in one
-                // class collide (tsgo GetSymbolNameForPrivateIdentifier).
+                // class collide (tsgo GetSymbolNameForPrivateIdentifier). The mangled
+                // key keeps the bare `raw` — only `display` gains the `#`.
                 let mangled = format!("\u{FE}#{}@{}", class_symbol.map_or(0, |s| s.0), raw);
                 let key = self.atoms.intern(&mangled);
                 // The diagnostic points at the whole `#name` node (tsgo's
                 // `getNameOfDeclaration` -> the PrivateIdentifier), so the squiggle
-                // covers the `#`.
+                // covers the `#` — and `display` now matches that span.
                 Some(KeyInfo {
                     key,
                     display,

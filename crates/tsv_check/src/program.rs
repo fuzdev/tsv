@@ -475,6 +475,46 @@ mod tests {
     }
 
     #[test]
+    fn private_name_bind_and_check_display_collapse() {
+        // A duplicate private member (`#x`) is reported by BOTH the bind cascade and
+        // the check pass. Both point at the same `#name` span with code 2300, but the
+        // bind side once built its message arg WITHOUT the leading `#` (bare `x`) while
+        // the check side built it WITH (`#x`), so the differing args blocked sort/dedup
+        // — a latent extra (six TS2300 for three declarations). Both phases now carry
+        // the `#x` form (matching tsgo's `Duplicate identifier '#foo'.`), so identical
+        // diagnostics collapse: three declarations -> three TS2300.
+        let result = check("class C { #x = 1; get #x() { return 1; } #x() {} }");
+        let ts2300: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.code == 2300)
+            .collect();
+        let summary: Vec<_> = ts2300
+            .iter()
+            .map(|d| (d.args.clone(), d.span.start, d.span.end))
+            .collect();
+        // Every private-name TS2300 carries the `#x` arg (with the `#`), not bare `x`.
+        assert!(
+            ts2300.iter().all(|d| d.args == vec!["#x".to_string()]),
+            "expected all private-name TS2300 args to be `#x`, got {summary:?}",
+        );
+        // No duplicated (code, span) pair survives dedup — the latent extra is closed.
+        let mut spans: Vec<_> = ts2300.iter().map(|d| (d.span.start, d.span.end)).collect();
+        let n = spans.len();
+        spans.sort_unstable();
+        spans.dedup();
+        assert_eq!(
+            spans.len(),
+            n,
+            "a duplicated (code, span) private-name TS2300 remains: {summary:?}",
+        );
+        assert_eq!(
+            n, 3,
+            "expected three deduped private-name TS2300: {summary:?}"
+        );
+    }
+
+    #[test]
     fn nested_type_literal_method_property_conflict_binds() {
         // A nested type literal's method-vs-property conflict is bind-time; it was
         // missed at depth >= 1 because a property signature's own type annotation
