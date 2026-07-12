@@ -245,19 +245,27 @@ async fn validate_fixture(fixture: &CompileFixture) -> FixtureReport {
             fresh
         }
         Err(e) => {
-            errors.push(format!("oracle compile failed: {e} (hint: {})", e.hint()));
+            let hint = e.hint();
+            if hint.is_empty() {
+                errors.push(format!("oracle compile failed: {e}"));
+            } else {
+                errors.push(format!("oracle compile failed: {e} (hint: {hint})"));
+            }
             false
         }
     };
 
     // (b) Ours — reported, not gating, until codegen lands.
-    // TODO: when M1 lands, a "mismatch"/"error" here becomes a gating failure
-    // and "unimplemented" becomes one too (every fixture must compile).
+    // TODO: flip to gating once compile() produces output — "mismatch"/"error"
+    // become gating failures, and so does "unimplemented" (every fixture must
+    // compile).
     let ours_status = match compile(&input, &CompileOptions::default()) {
         Ok(ours) => match canonicalize_js(&ours.js) {
             Ok(canonical) if canonical == expected_js => "parity",
             Ok(_) => {
-                errors.push("ours differs from expected (non-gating until M1)".to_string());
+                errors.push(
+                    "ours differs from expected (non-gating until codegen lands)".to_string(),
+                );
                 "mismatch"
             }
             Err(e) => {

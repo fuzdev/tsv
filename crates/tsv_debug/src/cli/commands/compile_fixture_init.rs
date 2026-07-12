@@ -65,7 +65,7 @@ impl CompileFixtureInitCommand {
                 Ok(f) => f,
                 Err(e) => {
                     eprintln!("Error: prettier formatting failed: {e}");
-                    eprintln!("Hint: {}", e.hint());
+                    print_hint(&e);
                     return Err(CliError::Failed);
                 }
             };
@@ -83,7 +83,7 @@ impl CompileFixtureInitCommand {
             Ok(o) => o,
             Err(e) => {
                 eprintln!("Error: oracle compile failed: {e}");
-                eprintln!("Hint: {}", e.hint());
+                print_hint(&e);
                 eprintln!("({INPUT_FILE} was written; fix the component and re-run)");
                 return Err(CliError::Failed);
             }
@@ -129,6 +129,15 @@ impl CompileFixtureInitCommand {
 
         println!("\nCompile fixture initialized: {}", self.dir);
         Ok(())
+    }
+}
+
+/// Print a Deno error's hint on its own line, suppressed when the error carries
+/// none (an empty `Hint:` line is noise).
+fn print_hint(e: &deno::DenoError) {
+    let hint = e.hint();
+    if !hint.is_empty() {
+        eprintln!("Hint: {hint}");
     }
 }
 

@@ -177,4 +177,6 @@ fn is_auditable(path: &Path) -> bool {
         || name.ends_with(".js")
         || name.ends_with(".mts")
         || name.ends_with(".cts")
+        || name.ends_with(".mjs")
+        || name.ends_with(".cjs")
 }

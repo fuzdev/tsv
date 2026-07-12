@@ -188,7 +188,7 @@ deno task conformance:audit          # doc/fixture integrity: divergence fixture
 deno task conformance:audit:compiler # compile-fixture divergence integrity: any _compiled_divergence fixture must be cataloged in docs/conformance_svelte_compiler.md + carry a back-linking README — the catalog is expected to stay EMPTY (gated in `deno task check`); see Debug Tooling
 deno task canonicalize:audit         # canonicalize_js idempotence + output validity over tests/fixtures + tests/fixtures_compile (pure Rust; gated in `deno task check`) — point the command at real corpora on demand; see Debug Tooling
 deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
-deno task compile:fixtures:validate  # validate compile fixtures: oracle freshness + expected idempotence (gating), ours parity (reported; flips to gating at M1)
+deno task compile:fixtures:validate  # validate compile fixtures: oracle freshness + expected idempotence (gating), ours parity (reported; flips to gating once codegen lands)
 deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
 deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
 deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
@@ -722,7 +722,7 @@ cargo run -p tsv_debug compile_fixture_init tests/fixtures_compile/feature/case 
 # compile_fixtures_validate - validate compile fixtures. Per fixture: (a) oracle freshness —
 # canonicalize(oracle(input)) must equal the committed expected_server.js (+ css match); (b) ours —
 # tsv_svelte_compile::compile → canonicalize vs expected (today every fixture reports
-# "unimplemented", a distinct expected status; the gate flips when M1 codegen lands); (c) the
+# "unimplemented", a distinct expected status; the gate flips once codegen lands); (c) the
 # committed expected_server.js must be a canonicalize fixed point. Exits non-zero on (a)/(c) only.
 # The pure-Rust slice of the contract (input parses, expected idempotent) also runs sidecar-free in
 # `cargo test --workspace --test compile_fixtures_tests`.
@@ -797,12 +797,13 @@ cargo run -p tsv_debug compile_conformance_audit
 # Also: --json
 
 # canonicalize_audit - canonicalize_js (the compile-parity reprint) at corpus scale: run the
-# canonicalizer twice per TS/JS file (.ts/.js/.mts/.cts, .svelte.ts included) and bucket —
+# canonicalizer twice per TS/JS file (.ts/.js/.mts/.cts/.mjs/.cjs, .svelte.ts included) and bucket —
 # input-rejected (informational: invalid fixtures, script-goal files), NON-IDEMPOTENT (failure),
 # CORRUPT-OUTPUT / unreparseable reprint (failure; the canonicalizer self-validates by reparse).
 # Pure Rust (no Deno). Exits 1 on any failure. Gated in `deno task check` over tests/fixtures +
 # tests/fixtures_compile (fast); point it at real corpora for the full sweep.
-cargo run -p tsv_debug canonicalize_audit                              # the gate scope (tests/fixtures)
+cargo run -p tsv_debug canonicalize_audit                              # default scope (tests/fixtures only)
+cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile  # the check-gate scope
 cargo run -p tsv_debug canonicalize_audit ~/dev/zzz/src ~/dev/gro/src  # real-corpus sweep
 # Also: --json
 ```

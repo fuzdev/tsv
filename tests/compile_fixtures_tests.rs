@@ -79,7 +79,7 @@ fn test_all_compile_fixtures() {
             }
         }
 
-        // TODO(M1): once codegen lands, assert here that
+        // TODO: once compile() produces output, assert here that
         // `canonicalize_js(tsv_svelte_compile::compile(input).js) == expected` —
         // the pure-Rust ours-vs-expected parity gate.
     }
