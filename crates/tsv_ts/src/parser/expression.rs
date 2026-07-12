@@ -6,7 +6,8 @@ use crate::ast::internal::{
     ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression,
     ParenthesizedExpression, RegexLiteral, SequenceExpression, SpreadElement, Statement, Super,
     TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression,
-    TSTypeAssertion, TaggedTemplateExpression, ThisExpression, UnaryExpression, UnaryOperator,
+    TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression, ThisExpression,
+    UnaryExpression, UnaryOperator,
     UpdateExpression, UpdateOperator, YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
@@ -2131,6 +2132,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse member access chains: new Foo.Bar.Baz()
         let mut callee = callee_parsed;
+        // `<T>` in the callee chain belongs to a trailing tagged template
+        // (`new Foo<T>`x``, part of the callee) when a template follows — consumed
+        // in the loop — otherwise it is the `new`'s own (`new Foo<T>()`) and this
+        // holds it for the argument parse below.
+        let mut type_arguments: Option<TSTypeParameterInstantiation<'arena>> = None;
         loop {
             match self.current_kind() {
                 TokenKind::Dot => {
@@ -2201,33 +2207,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     // `new` callee is an ordinary MemberExpression, whose production
                     // includes `MemberExpression TemplateLiteral` — so a trailing tag
                     // before any explicit `(...)` binds to the callee, not the `new`.
-                    let quasi = self.parse_template_literal(true)?;
-                    let quasi_span = quasi.span();
-                    if let Expression::TemplateLiteral(template) = quasi {
-                        let span = Span::new(callee.actual_start, quasi_span.end);
-                        callee = ParsedExpr::with_start_end(
-                            self.arena,
-                            Expression::TaggedTemplateExpression(TaggedTemplateExpression {
-                                tag: callee.expr,
-                                type_arguments: None,
-                                quasi: template,
-                                span,
-                            }),
-                            callee.actual_start,
-                            quasi_span.end_usize(),
-                        );
+                    callee = self.attach_new_callee_tag(callee, None)?;
+                }
+                // `<T>` here is either the tag's type arguments (`new Foo<T>`x``,
+                // where they flatten onto a TaggedTemplateExpression callee — acorn
+                // parity) or the `new`'s own (`new Foo<T>()`). A following template
+                // disambiguates: it consumes them into the tag and the callee chain
+                // continues (`new Foo<T>`x`.bar`); otherwise they are the `new`'s and
+                // the chain ends here.
+                _ if self.check_less_than_in_type() && self.is_type_arguments_start() => {
+                    let ta = self.parse_type_parameter_instantiation()?;
+                    if matches!(
+                        self.current_kind(),
+                        TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead
+                    ) {
+                        callee = self.attach_new_callee_tag(callee, Some(ta))?;
+                    } else {
+                        type_arguments = Some(ta);
+                        break;
                     }
                 }
                 _ => break,
             }
         }
-
-        // Parse optional type arguments: new Map<K, V>()
-        let type_arguments = if self.check_less_than_in_type() && self.is_type_arguments_start() {
-            Some(self.parse_type_parameter_instantiation()?)
-        } else {
-            None
-        };
 
         // Parse optional arguments: new Date() vs new Date. `new`'s argument list is an
         // `Arguments` grouping delimiter, so it shares `parse_call_arguments` (which
@@ -2259,6 +2261,35 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             arguments,
             span: Span::new(start as u32, end),
         }))
+    }
+
+    /// Extend a `new` callee with the tagged template at the current token,
+    /// carrying the tag's `<T>` in `type_arguments` when present (`new Foo<T>`x``).
+    /// The `new`-callee member loop's two tag sites — with and without a preceding
+    /// instantiation — share this so the `TaggedTemplateExpression` construction
+    /// lives in one place. Returns `tag` unchanged if the parsed quasi is not a
+    /// `TemplateLiteral` (unreachable: `parse_template_literal` yields only that).
+    fn attach_new_callee_tag(
+        &mut self,
+        tag: ParsedExpr<'arena>,
+        type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
+        let quasi = self.parse_template_literal(true)?;
+        let quasi_span = quasi.span();
+        let Expression::TemplateLiteral(template) = quasi else {
+            return Ok(tag);
+        };
+        Ok(ParsedExpr::with_start_end(
+            self.arena,
+            Expression::TaggedTemplateExpression(TaggedTemplateExpression {
+                tag: tag.expr,
+                type_arguments,
+                quasi: template,
+                span: Span::new(tag.actual_start, quasi_span.end),
+            }),
+            tag.actual_start,
+            quasi_span.end_usize(),
+        ))
     }
 
     /// Reject a spread element where an `ImportCall` argument (an
