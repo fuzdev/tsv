@@ -569,8 +569,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         let type_name = self.parse_entity_name()?;
 
-        // Check for type arguments: <T, U>
-        let type_arguments = self.parse_optional_type_arguments()?;
+        // Check for type arguments: <T, U>. A line break before `<` ends the type
+        // at `type_name` — the `<` is not consumed as type arguments (see
+        // `parse_optional_type_arguments_same_line`).
+        let type_arguments = self.parse_optional_type_arguments_same_line()?;
 
         let end = type_arguments
             .as_ref()
@@ -663,15 +665,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TSTypeQueryExprName::EntityName(entity_name)
         };
 
-        // Parse optional type arguments: typeof Array<string>.
-        // A line break before `<` ends the query (acorn's tsParseTypeQuery
-        // checks hasPrecedingLineBreak) — `typeof a` ⏎ `<T>(): void` in an
-        // interface is two members, not an instantiation.
-        let type_arguments = if self.check_less_than_in_type() && !self.had_line_terminator {
-            Some(self.parse_type_arguments()?)
-        } else {
-            None
-        };
+        // Parse optional type arguments: typeof Array<string>. A line break
+        // before `<` ends the query — `typeof a` ⏎ `<T>(): void` in an interface
+        // is two members, not an instantiation (see
+        // `parse_optional_type_arguments_same_line`).
+        let type_arguments = self.parse_optional_type_arguments_same_line()?;
 
         let end = type_arguments
             .as_ref()
@@ -717,10 +715,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse a `<T, U>` type-argument list when the next token opens one (`<`),
-    /// else `None` — the optional-type-arguments guard shared by type references,
-    /// expression-with-type-arguments, and `extends`-clause heritage. Callers
-    /// that must additionally guard against ASI (no `<` after a line break) keep
-    /// their own inline check.
+    /// else `None` — the optional-type-arguments guard shared by
+    /// expression-with-type-arguments, `import(...)` types, and `extends`-clause
+    /// heritage, which consume type arguments *across* a line break (matching
+    /// acorn). Callers that must instead stop at a line break — type references
+    /// and `typeof` queries — use `parse_optional_type_arguments_same_line`.
     pub(in crate::parser) fn parse_optional_type_arguments(
         &mut self,
     ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
@@ -728,6 +727,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Ok(Some(self.parse_type_arguments()?))
         } else {
             Ok(None)
+        }
+    }
+
+    /// Like `parse_optional_type_arguments`, but a preceding line terminator ends
+    /// the type: a `<` after a line break is NOT consumed as type arguments
+    /// (tsc's `!scanner.hasPrecedingLineBreak()` guard on
+    /// `parseTypeArgumentsOfTypeReference` / `tsParseTypeQuery`). So `B` ⏎ `<T>`
+    /// is the type `B` followed by a separate `<T>`, not `B<T>` — in a type-member
+    /// list this ASI-splits `a: B` ⏎ `<T>(): C` into two members. This mirrors the
+    /// `!had_line_terminator` guard the postfix-`[]` and `extends` sites also apply.
+    pub(in crate::parser) fn parse_optional_type_arguments_same_line(
+        &mut self,
+    ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
+        if self.had_line_terminator {
+            Ok(None)
+        } else {
+            self.parse_optional_type_arguments()
         }
     }
 
