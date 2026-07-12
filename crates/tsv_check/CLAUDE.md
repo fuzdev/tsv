@@ -68,11 +68,18 @@
     (`statement.rs`/`expression.rs`/`types.rs` — additional `impl SoaWalk`
     blocks, split by the AST shape each visitor descends), unchanged in
     responsibility.
-  - `sym.rs` — the container-threaded, functions-first symbol-bind walk:
+  - `sym/` — the container-threaded, functions-first symbol-bind walk:
     `getContainerFlags`, `declareSymbolEx` + the duplicate/conflict cascade
     (TS2451/2300/2567/2528 with per-prior-declaration related info),
     internal-name mangling (incl. private `#` names), the dual local/export
-    collapse (documented at the site; revisited at multi-file).
+    collapse (documented at the site; revisited at multi-file). A
+    directory-module split by concern (unchanged responsibilities): `mod.rs`
+    (the `SymbolBinder` struct, its lifecycle — `new`/`bind_program`/`finish`
+    — the table/symbol/atom primitives both descendants share, and the
+    member-key resolver), `walk.rs` (the bind-descent methods —
+    `visit_statement`/`visit_expression` and everything they call into —
+    plus the functions-first statement-list ordering), and `declare.rs` (the
+    `declareSymbolEx` cascade and the container routing).
   - `symbols.rs` — `Symbol`, `SymbolFlags` + the `*Excludes` conflict-mask
     const tables (ported bit-for-bit from tsgo's `symbolflags.go`), pooled
     declaration lists, `TableId` symbol tables.
