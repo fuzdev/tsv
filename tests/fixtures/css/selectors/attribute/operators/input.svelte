@@ -29,7 +29,7 @@
 		color: orange;
 	}
 
-	/* Unquoted values */
+	/* Exact match, bare attribute selectors */
 	[type='text'] {
 		border: 1px solid black;
 	}
