@@ -187,9 +187,40 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 151,
+	typescript: 144,
 	css: 22,
 };
+// typescript 146→144 (2026-07-12, ../prettier 1dcd0b0, ../svelte 8fb7ceeba, ../kit
+// 1b4adccf7, ../svelte.dev fb5a4e2, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 1.0.11): the catch-block-collapse-ignores-finally fix —
+// Prettier's `block.js` only collapses an empty `catch {}` to one line when the
+// `TryStatement` has no `finally` (`parent.type === "CatchClause" &&
+// !parentParent.finalizer`); when `finally` follows, catch expands to `{\n}`
+// just like `try`/`finally` always do. `build_try_statement_doc` in
+// try_jump.rs now checks `stmt.finalizer.is_some()` instead of always
+// collapsing. Moved two files unknown→match:
+// js/optional-catch-binding/optional_catch_binding.js, js/try/empty.js. A
+// before/after --all path-diff (via a `git worktree` at the pre-both-fixes
+// commit) confirmed exactly seven files moved total across both fixes in this
+// branch (the five from the empty-statement-list pin note above + these two),
+// 0 files ENTERED unknown, SAFETY 0. svelte/css unmoved.
+// typescript 151→146 (2026-07-12, ../prettier 1dcd0b0, ../svelte 8fb7ceeba, ../kit
+// 1b4adccf7, ../svelte.dev fb5a4e2, ../prettier-plugin-svelte 7809486, oracle
+// acorn-typescript 1.0.11): the standalone-EmptyStatement drop fix — Prettier's
+// `printStatementSequence` never prints a bare `;` in ANY statement-list body
+// (Program, BlockStatement, StaticBlock, SwitchCase, TSModuleBlock), dropping it
+// even when it's the body's only content (which then collapses/expands like a
+// genuinely empty body); tsv previously only did this at Program level
+// (`build_statement_list_docs_into` in blocks.rs now skips it — shared by block
+// bodies and namespace/module bodies — plus the switch-case consequent loop in
+// switch.rs, and the two "is this body empty" gates widened to
+// `all(EmptyStatement)` in blocks.rs + type_declarations.rs) — moved five files
+// unknown→match: js/empty-statement/no-newline.js, js/switch/empty_lines.js,
+// js/switch/empty_statement.js, js/switch/empty_switch.js, js/try/try.js. A
+// before/after --all path-diff (via a `git worktree` at the pre-fix commit) confirmed
+// exactly these five moved, 0 files ENTERED unknown, SAFETY 0. svelte/css unmoved
+// (this fix is TS-parser-only; no corpus file exercises the pattern through the
+// Svelte `<script>` embedding path).
 // typescript 173→151 (2026-07-12, ../prettier 1dcd0b0, ../svelte 8fb7ceeba, ../kit
 // 1b4adccf7, ../svelte.dev fb5a4e2, ../prettier-plugin-svelte 7809486, oracle
 // acorn-typescript 1.0.11): the un-triaged divergence backlog shrank. The pinned prettier

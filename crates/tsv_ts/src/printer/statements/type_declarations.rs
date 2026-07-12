@@ -1,7 +1,7 @@
 // Type declaration printing (type aliases, interfaces, enums, namespaces, declare functions)
 // plus shared entity-name helpers
 
-use super::{Printer, build_entity_name_doc, should_hug_union_type};
+use super::{Printer, build_entity_name_doc, is_effectively_empty_body, should_hug_union_type};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword};
@@ -732,9 +732,11 @@ impl<'a> Printer<'a> {
             parts.push(d.hardline());
 
             // Print leading comments with blank line preservation
-            parts.extend(
-                self.build_leading_comments_with_blank_lines(&leading_comments, member_start),
-            );
+            parts.extend(self.build_leading_comments_with_blank_lines(
+                &leading_comments,
+                member_start,
+                false,
+            ));
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
@@ -1168,7 +1170,11 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(d.text(" "));
 
-                if block.body.is_empty() {
+                // Comments attached to a body whose only statements are
+                // dropped `EmptyStatement`s are still picked up by
+                // `build_empty_body_with_comments_doc`, which scans the full
+                // brace range rather than the statement list.
+                if is_effectively_empty_body(block.body) {
                     // Empty namespace body - handle comments inside
                     parts.push(self.build_empty_body_with_comments_doc(block.span));
                 } else {

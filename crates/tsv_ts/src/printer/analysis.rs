@@ -27,6 +27,19 @@ pub(crate) fn skip_identifier_at(bytes: &[u8], pos: usize, end: usize) -> usize 
     i
 }
 
+/// Whether a `{ }`-delimited statement list prints no visible content.
+///
+/// A body containing only standalone `EmptyStatement`s (bare `;`) prints
+/// nothing — Prettier's `printStatementSequence` drops them — so it's treated
+/// the same as a genuinely empty body (comments attached to those statements
+/// are picked up separately, by scanning the full brace range rather than the
+/// statement list). Used by block-statement and namespace/module bodies to
+/// decide between the empty-body and normal rendering paths.
+pub(crate) fn is_effectively_empty_body(body: &[internal::Statement<'_>]) -> bool {
+    body.iter()
+        .all(|s| matches!(s, internal::Statement::EmptyStatement(_)))
+}
+
 /// Check if an expression is a module path call that should use fluid assignment wrapping
 /// (break after `=` if too long, keeping the call together).
 ///
