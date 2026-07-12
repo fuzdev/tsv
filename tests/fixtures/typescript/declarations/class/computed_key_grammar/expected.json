@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 196,
+	"end": 312,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -25,24 +25,40 @@
 					"column": 86
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an assignment key is parenthesized for clarity (like an object computed key)",
+			"start": 185,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 81
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 195,
+		"end": 311,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 186,
+			"end": 302,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 9,
+					"line": 12,
 					"column": 9
 				}
 			},
@@ -50,14 +66,14 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 20,
-					"end": 185,
+					"end": 301,
 					"loc": {
 						"start": {
 							"line": 2,
 							"column": 1
 						},
 						"end": {
-							"line": 8,
+							"line": 11,
 							"column": 2
 						}
 					},
@@ -81,14 +97,14 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 28,
-						"end": 185,
+						"end": 301,
 						"loc": {
 							"start": {
 								"line": 2,
 								"column": 9
 							},
 							"end": {
-								"line": 8,
+								"line": 11,
 								"column": 2
 							}
 						},
@@ -503,6 +519,200 @@
 									},
 									"value": 1,
 									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 267,
+								"end": 281,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 16
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "AssignmentExpression",
+									"start": 269,
+									"end": 274,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 4
+										},
+										"end": {
+											"line": 9,
+											"column": 9
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 269,
+										"end": 270,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 4
+											},
+											"end": {
+												"line": 9,
+												"column": 5
+											}
+										},
+										"name": "x"
+									},
+									"right": {
+										"type": "Literal",
+										"start": 273,
+										"end": 274,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 8
+											},
+											"end": {
+												"line": 9,
+												"column": 9
+											}
+										},
+										"value": 0,
+										"raw": "0"
+									}
+								},
+								"value": {
+									"type": "Literal",
+									"start": 279,
+									"end": 280,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 14
+										},
+										"end": {
+											"line": 9,
+											"column": 15
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " an assignment key is parenthesized for clarity (like an object computed key)",
+										"start": 185,
+										"end": 264
+									}
+								]
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 284,
+								"end": 298,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 16
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "AssignmentExpression",
+									"start": 286,
+									"end": 291,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 4
+										},
+										"end": {
+											"line": 10,
+											"column": 9
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 286,
+										"end": 287,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 4
+											},
+											"end": {
+												"line": 10,
+												"column": 5
+											}
+										},
+										"name": "x"
+									},
+									"right": {
+										"type": "Literal",
+										"start": 290,
+										"end": 291,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 10,
+												"column": 9
+											}
+										},
+										"value": 0,
+										"raw": "0"
+									}
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 293,
+									"end": 298,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 11
+										},
+										"end": {
+											"line": 10,
+											"column": 16
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 296,
+										"end": 298,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 14
+											},
+											"end": {
+												"line": 10,
+												"column": 16
+											}
+										},
+										"body": []
+									}
 								}
 							}
 						]
