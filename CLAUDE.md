@@ -686,6 +686,13 @@ cargo run -p tsv_debug ast_diff --render input.svelte               # render-awa
 # canonical_parse - parse using external parsers (Svelte, acorn+typescript, or our CSS)
 cargo run -p tsv_debug canonical_parse file.svelte
 
+# canonical_compile - compile Svelte with the canonical compiler (runes-only, deterministic oracle)
+cargo run -p tsv_debug canonical_compile file.svelte                      # normalized server JS to stdout
+cargo run -p tsv_debug canonical_compile file.svelte --target client --css  # client JS + delimited CSS
+cargo run -p tsv_debug canonical_compile file.svelte --json              # { js, css, warnings } as JSON
+# Fixed cssHash ('svelte-tsvhash') + constant filename make output byte-identical across runs.
+# Also: --target server|client (default server), --dev, --content <str>, --stdin. Compile errors exit non-zero.
+
 # format_prettier - format using prettier (shows line widths by default; --no-line-widths to hide)
 cargo run -p tsv_debug format_prettier file.svelte
 
