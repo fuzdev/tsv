@@ -479,6 +479,27 @@ fn emit_element<'arena>(
         "svg" | "math" => return Err(unsupported(format!("<{name}> (foreign namespace)"))),
         // Template-level <script>/<style> have special semantics in the oracle.
         "script" | "style" => return Err(unsupported(format!("template-level <{name}>"))),
+        // The oracle compiles every <option> into `$$renderer.option(…)`
+        // closure calls — static markup would be a divergent compile.
+        "option" => {
+            return Err(unsupported(
+                "<option> (oracle emits $$renderer.option closures)",
+            ));
+        }
+        // A populated <select>/<optgroup> gets a `<!>` anchor after its
+        // children in the oracle's output (probe-verified; empty ones emit
+        // statically and match, so only the populated shape refuses).
+        "select" | "optgroup"
+            if element
+                .fragment
+                .nodes
+                .iter()
+                .any(|n| !matches!(n, FragmentNode::Text(t) if t.is_ascii_ws_only)) =>
+        {
+            return Err(unsupported(format!(
+                "<{name}> with children (oracle emits a `<!>` anchor)"
+            )));
+        }
         _ => {}
     }
 

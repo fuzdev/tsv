@@ -26,12 +26,14 @@ project-wide conventions.
     parses the component and runs the server transform. Generated JS prints
     through `format_canonical`, so it is canonical-form by construction
     (`canonicalize_js(output.js)` is a fixed point). Shapes the transform does
-    not cover yet — client generation, dev mode, blocks, directives,
-    script comments, and every rune use other than the rewritten top-level
-    `let … = $props()` declarator (statement position, nested functions, and
-    member-form calls included — `rune_guard.rs` walks every borrowed subtree)
-    — return `CompileError::Unsupported` with a clear description, never
-    guessed output.
+    not cover yet — client generation, dev mode, blocks, directives, script
+    comments, `<option>` / populated `<select>`/`<optgroup>` (the oracle emits
+    closure calls / `<!>` anchors there), and every `$`-prefixed identifier
+    reference or call in a walked value position other than the rewritten
+    top-level `let … = $props()` declarator init (`rune_guard.rs` walks every
+    borrowed subtree; non-computed member/object *names* like `obj.$foo` stay
+    allowed) — return `CompileError::Unsupported` with a clear description,
+    never guessed output.
   - `canonicalize_js(source) -> Result<String, CanonicalizeError>` — the
     canonicalizer (below). Lives here because the compiler's own output
     idempotence checks and the oracle comparison both consume it.
@@ -44,9 +46,12 @@ project-wide conventions.
   zero precedence knowledge — the printer's `needs_parens` handles it.
 - `rune_guard.rs` — the rune refusal walk: an exhaustive traversal of every
   expression-bearing position in the borrowed script statements (and template
-  expressions), refusing any call/`new` whose callee roots in a `$`-prefixed
-  identifier. Exhaustive matches on purpose — new AST variants fail compilation
-  here instead of silently skipping the guard.
+  expressions), refusing any `$`-prefixed identifier reference it reaches —
+  calls report their callee root as a rune; bare references (`let x = $state;`,
+  a future `$store` subscription) refuse as reserved identifiers; name-only
+  positions (non-computed member properties / object keys) are not walked.
+  Exhaustive matches on purpose — new AST variants fail compilation here
+  instead of silently skipping the guard.
 - `transform_server.rs` — the SSR transform: module scaffold
   (`import * as $ from 'svelte/internal/server'` + the exported component
   function), instance-script statements borrowed with the `$props()` declarator

@@ -462,6 +462,57 @@ mod tests {
     }
 
     #[test]
+    fn compile_rejects_bare_rune_reference() {
+        // A bare $-prefixed identifier reference is oracle-rejected input —
+        // refuse instead of compiling a broken passthrough.
+        assert_unsupported(
+            "<script>\n\tlet x = $state;\n</script>\n<p>text</p>",
+            "$state",
+        );
+        assert_unsupported("<p>{$foo}</p>", "$foo");
+    }
+
+    #[test]
+    fn compile_allows_dollar_member_names() {
+        // A `$`-prefixed *name* (non-computed member property) is not a
+        // reference — it must stay compilable.
+        let out = compile(
+            "<script>let { a } = $props();</script>\n<p>{a.$foo}</p>",
+            &CompileOptions::default(),
+        )
+        .unwrap();
+        assert!(out.js.contains("$.escape(a.$foo)"), "got: {}", out.js);
+    }
+
+    #[test]
+    fn compile_rejects_option_and_populated_select() {
+        // The oracle compiles <option> into $$renderer.option closures, and a
+        // populated <select>/<optgroup> gets a `<!>` anchor — static emission
+        // would diverge.
+        assert_unsupported("<option value=\"a\">text</option>", "<option>");
+        assert_unsupported(
+            "<datalist><option value=\"a\">text</option></datalist>",
+            "<option>",
+        );
+        assert_unsupported("<select><p>text</p></select>", "<select> with children");
+        assert_unsupported(
+            "<optgroup><p>text</p></optgroup>",
+            "<optgroup> with children",
+        );
+    }
+
+    #[test]
+    fn compile_allows_empty_select() {
+        // An empty <select> emits statically and matches the oracle.
+        let out = compile("<select name=\"n\"></select>", &CompileOptions::default()).unwrap();
+        assert!(
+            out.js.contains("`<select name=\"n\"></select>`"),
+            "got: {}",
+            out.js
+        );
+    }
+
+    #[test]
     fn compile_collapses_sibling_whitespace() {
         // Inter-sibling whitespace runs (newlines, blank lines) collapse to one
         // space; element-boundary whitespace trims (the oracle's clean_nodes).

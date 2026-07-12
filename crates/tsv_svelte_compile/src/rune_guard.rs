@@ -1,14 +1,17 @@
 //! Rune refusal walk over borrowed script statements.
 //!
 //! The server transform rewrites exactly one rune shape (a top-level
-//! `let … = $props()` declarator init). Every other rune use — statement
-//! position (`$effect(() => {})`), nested functions
-//! (`function f() { let c = $state(0); }`), member-form calls
-//! (`$state.raw([])`, `$props.id()`) — must REFUSE rather than pass through
-//! into runtime-broken JS. This module is that guarantee: an exhaustive walk of
-//! every expression-bearing position, refusing any call or `new` whose callee's
-//! *root identifier* (through member/non-null/instantiation/paren chains) is
-//! `$`-prefixed.
+//! `let … = $props()` declarator init). Every other `$`-prefixed identifier in
+//! a walked value position must REFUSE rather than pass through into
+//! runtime-broken JS — rune calls in statement position (`$effect(() => {})`),
+//! nested functions (`function f() { let c = $state(0); }`), member-form calls
+//! (`$state.raw([])`, `$props.id()`), and bare *references* (`let x = $state;`,
+//! a future `$store` subscription) alike. This module is that guarantee: an
+//! exhaustive walk of every expression-bearing position, refusing any
+//! `$`-prefixed identifier reference it reaches. Calls report the callee root
+//! as a rune for the clearer message; non-computed member property names and
+//! non-computed object keys are *names*, not references, and stay allowed
+//! (`obj.$foo` is fine).
 //!
 //! The matches are exhaustive on purpose — a new `Statement`/`Expression`
 //! variant fails compilation here instead of silently skipping the guard.
@@ -39,21 +42,27 @@ pub(crate) fn refuse_runes_in_expression(
     walk_expression(expr, source)
 }
 
+/// The `$`-prefixed name of a plain identifier, or `None`. Parsed identifiers
+/// are span-identity (`escaped: None`); an interned (escaped) name is synthetic
+/// (`$$renderer`, `$$props`, …) and never refused.
+fn dollar_identifier_name<'s>(
+    id: &tsv_ts::ast::internal::Identifier<'_>,
+    source: &'s str,
+) -> Option<&'s str> {
+    if id.escaped_name.is_some() {
+        return None;
+    }
+    let start = id.span.start as usize;
+    let name = &source[start..start + id.name_len as usize];
+    name.starts_with('$').then_some(name)
+}
+
 /// The `$`-prefixed root-identifier name of a callee, peeled through member
 /// accesses (`$state.raw`), non-null assertions, instantiations, and preserved
 /// parens — `None` when the root is not a plain `$`-identifier.
 fn dollar_callee_root<'s>(callee: &Expression<'_>, source: &'s str) -> Option<&'s str> {
     match callee {
-        Expression::Identifier(id) => {
-            // Parsed identifiers are span-identity (`escaped: None`); an interned
-            // (escaped) name is synthetic and never a rune.
-            if id.escaped_name.is_some() {
-                return None;
-            }
-            let start = id.span.start as usize;
-            let name = &source[start..start + id.name_len as usize];
-            name.starts_with('$').then_some(name)
-        }
+        Expression::Identifier(id) => dollar_identifier_name(id, source),
         Expression::MemberExpression(member) => dollar_callee_root(member.object, source),
         Expression::TSNonNullExpression(non_null) => {
             dollar_callee_root(non_null.expression, source)
@@ -257,9 +266,19 @@ fn walk_expression(expr: &Expression<'_>, source: &str) -> Result<(), CompileErr
             walk_expressions(new_expr.arguments, source)
         }
 
+        // A bare `$`-prefixed identifier reference (`let x = $state;`, a
+        // `$store` subscription) is oracle-rejected input — refuse. Positions
+        // that carry names rather than references (non-computed member
+        // properties / object keys) are never walked, so `obj.$foo` stays fine.
+        Expression::Identifier(id) => match dollar_identifier_name(id, source) {
+            Some(name) => Err(CompileError::Unsupported(format!(
+                "$-prefixed identifier {name}"
+            ))),
+            None => Ok(()),
+        },
+
         // Leaves.
         Expression::Literal(_)
-        | Expression::Identifier(_)
         | Expression::PrivateIdentifier(_)
         | Expression::RegexLiteral(_)
         | Expression::ThisExpression(_)
