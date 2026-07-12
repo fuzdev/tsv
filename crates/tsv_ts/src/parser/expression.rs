@@ -6,9 +6,9 @@ use crate::ast::internal::{
     ImportPhase, JsdocCast, Literal, LiteralValue, MemberExpression, MetaProperty, NewExpression,
     ParenthesizedExpression, RegexLiteral, SequenceExpression, SpreadElement, Statement, Super,
     TSAsExpression, TSInstantiationExpression, TSNonNullExpression, TSSatisfiesExpression,
-    TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression, ThisExpression,
-    UnaryExpression, UnaryOperator,
-    UpdateExpression, UpdateOperator, YieldExpression,
+    TSTypeAssertion, TSTypeParameterInstantiation, TaggedTemplateExpression, TemplateLiteral,
+    ThisExpression, UnaryExpression, UnaryOperator, UpdateExpression, UpdateOperator,
+    YieldExpression,
 };
 use crate::lexer::{KeywordKind, TokenKind};
 use crate::parser::expression_assignable::AssignableContext;
@@ -1173,7 +1173,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::NoSubstitutionTemplate | TokenKind::TemplateHead => {
                     // Tagged template expression: tag`content`
                     let quasi = self.parse_template_literal(true)?;
-                    let quasi_span = quasi.span();
                     if let Expression::TemplateLiteral(template) = quasi {
                         // An optional chain can't be a template tag (per spec): `a?.b`x``
                         // is a syntax error. A parenthesized chain (`(a?.b)`x``) seals the
@@ -1184,7 +1183,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                                 "Optional chaining cannot appear in the tag of tagged template expressions",
                             )));
                         }
-                        let span = Span::new(left.actual_start, quasi_span.end);
                         // When tag is TSInstantiationExpression (e.g., tag<T>), flatten:
                         // TSInstantiationExpression + TaggedTemplate → TaggedTemplate with typeArguments
                         let (tag, type_arguments) = match left.expr {
@@ -1193,16 +1191,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             }
                             other => (other, None),
                         };
-                        left = ParsedExpr::with_start_end(
-                            self.arena,
-                            Expression::TaggedTemplateExpression(TaggedTemplateExpression {
-                                tag,
-                                type_arguments,
-                                quasi: template,
-                                span,
-                            }),
+                        left = self.build_tagged_template(
+                            tag,
                             left.actual_start,
-                            quasi_span.end_usize(),
+                            type_arguments,
+                            template,
                         );
                     }
                 }
@@ -2266,30 +2259,49 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Extend a `new` callee with the tagged template at the current token,
     /// carrying the tag's `<T>` in `type_arguments` when present (`new Foo<T>`x``).
     /// The `new`-callee member loop's two tag sites — with and without a preceding
-    /// instantiation — share this so the `TaggedTemplateExpression` construction
-    /// lives in one place. Returns `tag` unchanged if the parsed quasi is not a
-    /// `TemplateLiteral` (unreachable: `parse_template_literal` yields only that).
+    /// instantiation — share this. Returns `tag` unchanged if the parsed quasi is
+    /// not a `TemplateLiteral` (unreachable: `parse_template_literal` yields only
+    /// that).
     fn attach_new_callee_tag(
         &mut self,
         tag: ParsedExpr<'arena>,
         type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
     ) -> Result<ParsedExpr<'arena>, ParseError> {
         let quasi = self.parse_template_literal(true)?;
-        let quasi_span = quasi.span();
         let Expression::TemplateLiteral(template) = quasi else {
             return Ok(tag);
         };
-        Ok(ParsedExpr::with_start_end(
+        Ok(self.build_tagged_template(tag.expr, tag.actual_start, type_arguments, template))
+    }
+
+    /// Build a `TaggedTemplateExpression` from an already-parsed tag, its optional
+    /// `<T>` type arguments, and the parsed quasi. Shared by `attach_new_callee_tag`
+    /// (the `new`-callee sites) and the ordinary postfix tagged-template arm so the
+    /// node's span math — the semantic span and the paren bounds are both
+    /// `tag_start..quasi.span.end` (a tag has no parens of its own) — lives in one
+    /// place. `tag` is the resolved tag expression and `tag_start` its
+    /// paren-inclusive start; the postfix arm flattens a `tag<T>`
+    /// `TSInstantiationExpression` off the tag first, lifting `<T>` into
+    /// `type_arguments`.
+    fn build_tagged_template(
+        &self,
+        tag: &'arena Expression<'arena>,
+        tag_start: u32,
+        type_arguments: Option<TSTypeParameterInstantiation<'arena>>,
+        quasi: TemplateLiteral<'arena>,
+    ) -> ParsedExpr<'arena> {
+        let end = quasi.span.end;
+        ParsedExpr::with_start_end(
             self.arena,
             Expression::TaggedTemplateExpression(TaggedTemplateExpression {
-                tag: tag.expr,
+                tag,
                 type_arguments,
-                quasi: template,
-                span: Span::new(tag.actual_start, quasi_span.end),
+                quasi,
+                span: Span::new(tag_start, end),
             }),
-            tag.actual_start,
-            quasi_span.end_usize(),
-        ))
+            tag_start,
+            end as usize,
+        )
     }
 
     /// Reject a spread element where an `ImportCall` argument (an
