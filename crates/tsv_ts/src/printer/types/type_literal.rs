@@ -561,6 +561,21 @@ impl<'a> Printer<'a> {
         closing: &'static str,
     ) -> DocId {
         let d = self.d();
+        // Empty object type: keep the braces delimiter-tight (`{}` not `{ }`) and
+        // preserve any interior comment. The members-only alignment path returns an
+        // empty doc for zero members, so the `d.line()` boundary below would render
+        // as a spurious space and the comment would be dropped — mirror the plain
+        // type-literal empty path (`build_empty_type_literal_inline_with_comments_doc`),
+        // threading this path's (possibly prefixed) `opening`/`closing`.
+        if obj.members.is_empty() {
+            return self.build_empty_bracketed_with_comments_doc(
+                obj.span.start,
+                obj.span.end,
+                opening,
+                closing,
+                d.line(),
+            );
+        }
         // Zero-comment whole-construct gate: one existence check over the literal's
         // span; every comment sub-query below is bounded within it.
         let comments_present = self.has_comments_between(obj.span.start, obj.span.end);
