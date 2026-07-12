@@ -385,18 +385,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // The predicate itself starts at the first token after `:`, not at `:`
         let predicate_start = self.current_pos().0 as u32;
 
-        // Check for 'asserts' keyword
-        let asserts = self.eat_contextual_keyword("asserts");
+        // Check for a leading `asserts` assertion-predicate keyword. Eaten only
+        // when an identifier or keyword follows (see `eat_type_predicate_asserts`);
+        // a bare `asserts`, or one heading a regular type (`asserts[]`,
+        // `asserts<T>`, `asserts.Foo`), stays unconsumed and is parsed below as an
+        // ordinary type reference.
+        let asserts = self.eat_type_predicate_asserts();
 
-        // Check if current token is an identifier or `this` (for type predicates and asserts)
-        let param_name = self.try_ident_or_keyword_name().or_else(|| {
-            // `this` keyword is also valid in type predicates: `this is T`, `asserts this`
-            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
-                Some(self.current_raw_ident_name())
-            } else {
-                None
-            }
-        });
+        // The predicate subject is an identifier/keyword name or `this`
+        // (`x is T`, `this is T`, `asserts x`, `asserts this`).
+        let param_name = self
+            .try_ident_or_keyword_name()
+            .or_else(|| self.this_as_name());
         if let Some(param_name) = param_name {
             // Type predicate: `identifier is Type` or `asserts identifier is Type`.
             // The `is` must not be preceded by a line terminator (TS
@@ -452,7 +452,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 });
             }
         } else if asserts {
-            // `asserts` followed by non-identifier
+            // `asserts` committed (a keyword followed it) but the keyword is not a
+            // valid parameter name (`asserts extends …`): reject, as tsc does when
+            // its `parseIdentifier` hits a reserved word. A committed `asserts` is
+            // only reached when an identifier/keyword follows, so any non-keyword
+            // (punctuation/literal) case is instead handled as a plain type below.
             return Err(self.error_expected_after("identifier", "asserts"));
         }
 

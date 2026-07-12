@@ -804,13 +804,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Like `try_binding_name`, but also accepts the `this` keyword as the
     /// TypeScript `this` parameter (`function f(this: T)`, `(this: T) => U`).
     pub(super) fn try_param_name(&self) -> Option<IdentName> {
-        self.try_binding_name().or_else(|| {
-            if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
-                Some(self.current_raw_ident_name())
-            } else {
-                None
-            }
-        })
+        self.try_binding_name().or_else(|| self.this_as_name())
+    }
+
+    /// The `this` keyword used as a name channel — the TypeScript `this`
+    /// parameter (`function f(this: T)`) and the subject of a `this` type
+    /// predicate (`this is T`, `asserts this`). `None` when the current token is
+    /// not `this`; its raw text is verbatim (`this` is never escaped).
+    pub(super) fn this_as_name(&self) -> Option<IdentName> {
+        if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::This)) {
+            Some(self.current_raw_ident_name())
+        } else {
+            None
+        }
     }
 
     /// Name channel for the current token as the `IdentifierName` half of a
@@ -1104,10 +1110,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// the binding parser, matching acorn's rejection of both readings. The
     /// one-past-peek sibling is `peek_followed_by_same_line_binding_word`.
     pub(super) fn peek_is_same_line_binding_word(&mut self) -> bool {
-        matches!(
-            self.peek_kind(),
-            TokenKind::Identifier | TokenKind::Keyword(_)
-        ) && !self.peek_preceded_by_line_terminator()
+        self.peek_is_identifier_or_keyword()
+            && !self.peek_preceded_by_line_terminator()
             && !matches!(self.peek_value(), "in" | "instanceof" | "as" | "satisfies")
     }
 
@@ -1197,6 +1201,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn current_is_identifier_or_keyword(&self) -> bool {
         matches!(
             self.current.kind,
+            TokenKind::Identifier | TokenKind::Keyword(_)
+        )
+    }
+
+    /// Peek sibling of `current_is_identifier_or_keyword`: whether the next token
+    /// is an identifier or any keyword (acorn/tsc `tokenIsIdentifierOrKeyword`).
+    pub(super) fn peek_is_identifier_or_keyword(&mut self) -> bool {
+        matches!(
+            self.peek_kind(),
             TokenKind::Identifier | TokenKind::Keyword(_)
         )
     }
@@ -1446,6 +1459,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[inline]
     pub(super) fn peek_is_contextual_keyword(&mut self, keyword: &str) -> bool {
         matches!(self.peek_kind(), TokenKind::Identifier) && self.peek_value() == keyword
+    }
+
+    /// Eat a leading `asserts` type-predicate keyword, committing only when an
+    /// identifier or keyword follows it. Mirrors tsc's `parseNonArrayType`
+    /// dispatch (`parser.ts`): `asserts` is a type-predicate prefix iff
+    /// `nextTokenIsIdentifierOrKeyword` — otherwise (punctuation/literal: `{`,
+    /// `[`, `<`, `.`, `|`, `&`, `;`, …) it stays an ordinary type name
+    /// (`: asserts`, `: asserts[]`, `: asserts<T>`, `: asserts.Foo`), left
+    /// unconsumed for the caller to parse as a regular type. When a *reserved*
+    /// keyword follows (`asserts extends …`), the prefix commits and the caller
+    /// then rejects it as a missing parameter name — matching tsc, which parses
+    /// the keyword as the asserted identifier and errors.
+    pub(super) fn eat_type_predicate_asserts(&mut self) -> bool {
+        matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "asserts"
+            && self.peek_is_identifier_or_keyword()
+            && self.try_advance()
     }
 
     /// Check if a semicolon can be inserted at the current position (ASI).
