@@ -4,7 +4,9 @@ use super::super::super::internal;
 use super::super::Schema;
 use super::expressions::{ExprFlags, write_expression, write_expression_inner, write_expressions};
 use super::statements::{write_block_statement, write_statement};
-use super::types::{write_index_signature, write_type, write_type_parameter_instantiation};
+use super::types::{
+    write_entity_name, write_index_signature, write_type, write_type_parameter_instantiation,
+};
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_array, write_identifier_plain,
     write_identifier_with_optional, write_name, write_or_null, write_return_type_field,
@@ -554,8 +556,8 @@ pub(super) fn write_type_parameter(
 }
 
 /// Emits a `TSExpressionWithTypeArguments` node (an implements clause): the
-/// `expression` is the heritage entity name rendered as an expression, plus
-/// `typeParameters?`.
+/// `expression` is the heritage entity name (an `Identifier` or a
+/// `TSQualifiedName`, matching `extends`), plus `typeParameters?`.
 fn write_expression_with_type_arguments(
     w: &mut JsonWriter,
     heritage: &internal::TSInterfaceHeritage<'_>,
@@ -563,32 +565,10 @@ fn write_expression_with_type_arguments(
 ) {
     node_header(w, "TSExpressionWithTypeArguments", heritage.span, ctx);
     w.raw(",\"expression\":");
-    write_entity_name_to_expression(w, &heritage.expression, ctx);
+    write_entity_name(w, &heritage.expression, ctx);
     if let Some(ta) = &heritage.type_arguments {
         w.raw(",\"typeParameters\":");
         write_type_parameter_instantiation(w, ta, ctx);
     }
     close_node(w, "TSExpressionWithTypeArguments", heritage.span, ctx);
-}
-
-/// Renders an entity name as an expression: `Foo` emits an `Identifier`
-/// (carrying the binding's `optional` flag), `Foo.Bar` a `MemberExpression`
-/// with `computed:false, optional:false`.
-fn write_entity_name_to_expression(
-    w: &mut JsonWriter,
-    entity: &internal::TSEntityName<'_>,
-    ctx: &Ctx<'_>,
-) {
-    match entity {
-        internal::TSEntityName::Identifier(id) => write_identifier_with_optional(w, id, ctx),
-        internal::TSEntityName::QualifiedName(qn) => {
-            node_header(w, "MemberExpression", qn.span, ctx);
-            w.raw(",\"object\":");
-            write_entity_name_to_expression(w, &qn.left, ctx);
-            w.raw(",\"property\":");
-            write_identifier_with_optional(w, &qn.right, ctx);
-            w.raw(",\"computed\":false,\"optional\":false");
-            close_node(w, "MemberExpression", qn.span, ctx);
-        }
-    }
 }
