@@ -1088,31 +1088,36 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.check(&TokenKind::DotDotDot) {
             let (start, _) = self.current_pos();
             self.advance()?;
-            let mut arg = self.parse_function_type_param()?;
-            let end = arg.span().end;
-            // Relocate the type annotation from the argument onto the `RestElement`
-            // (acorn's shape) — a rest param's annotation lives on the rest element
-            // whether the argument is an identifier (`...a: T[]`) or a destructuring
-            // pattern (`...[a]: T[]`, `...{ a }: T`). Shrink the argument span to
-            // exclude the annotation (its start is the `:`).
-            let type_annotation = match &mut arg {
-                Expression::Identifier(id) => id.type_annotation().cloned().inspect(|ta| {
-                    // Clear the binding extra — a rest param carries no decorators.
-                    id.span = Span::new(id.span.start, ta.span.start);
-                    id.extra = None;
-                }),
-                Expression::ArrayPattern(p) => p.type_annotation.take().inspect(|ta| {
-                    p.span.end = ta.span.start;
-                }),
-                Expression::ObjectPattern(p) => p.type_annotation.take().inspect(|ta| {
-                    p.span.end = ta.span.start;
-                }),
-                _ => None,
+            // A rest argument is a bare binding — an identifier or a destructuring
+            // pattern. Its optional `?` and `: T` bind to the `RestElement` (acorn's
+            // shape), never to the inner binding, so parse them here rather than
+            // through the shared param parser (which attaches them to the binding,
+            // as for a non-rest `([a]?: T) => U`). The `?` is a deferred
+            // grammar-check error (TS1047; see `RestElement`), preserved just as
+            // `parameters.rs` preserves it for a value signature.
+            let argument = if matches!(
+                self.current_kind(),
+                TokenKind::BracketOpen | TokenKind::BraceOpen
+            ) {
+                self.parse_binding_pattern()?
+            } else {
+                let (id_start, id_end) = self.current_pos();
+                let name = self
+                    .try_param_name()
+                    .ok_or_else(|| self.error_expected("parameter name"))?;
+                self.advance()?;
+                Expression::Identifier(Identifier::simple(
+                    name,
+                    Span::new(id_start as u32, id_end as u32),
+                ))
             };
+            let (optional, type_annotation, arg_end) =
+                self.parse_rest_param_tail(argument.span().end)?;
             return Ok(Expression::RestElement(RestElement {
-                argument: self.alloc(arg),
+                argument: self.alloc(argument),
+                optional,
                 type_annotation,
-                span: Span::new(start as u32, end),
+                span: Span::new(start as u32, arg_end),
             }));
         }
 

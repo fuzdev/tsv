@@ -178,6 +178,32 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(pattern)
     }
 
+    /// Parse a rest parameter's trailing optional `?` and `: Type` (in that
+    /// order), after its binding argument — whose natural end is `arg_end` — has
+    /// been parsed. Both bind to the `RestElement`, never to the argument: the `?`
+    /// is invalid TypeScript (TS1047) but a deferred grammar-check tsv preserves
+    /// (see `RestElement`), and a rest param's annotation lives on the rest
+    /// element. Returns `(optional, type_annotation, end)`, `end` being the rest
+    /// element's end offset. Shared by the value-signature rest paths
+    /// (`parse_parameters`) and the function-type rest path (`types.rs`), so a new
+    /// rest-param position picks up the `?` handling by construction.
+    pub(in crate::parser) fn parse_rest_param_tail(
+        &mut self,
+        arg_end: u32,
+    ) -> Result<(bool, Option<TSTypeAnnotation<'arena>>, u32), ParseError> {
+        let optional = self.eat(TokenKind::Question);
+        if self.check(&TokenKind::Colon) {
+            let ta = self.parse_type_annotation()?;
+            let end = ta.span.end;
+            Ok((optional, Some(ta), end))
+        } else if optional {
+            // The `?` is the last token consumed; it ends the rest element.
+            Ok((optional, None, self.prev_token_end() as u32))
+        } else {
+            Ok((optional, None, arg_end))
+        }
+    }
+
     /// Consume the contextual keyword `kw` as a parameter-property modifier iff
     /// the current token is the identifier `kw` and the next token begins a
     /// parameter binding **on the same line** — otherwise `kw` is itself the
@@ -385,42 +411,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // (matching acorn; `parse_destructured_binding` would
                             // wrongly attach it to the pattern).
                             let pattern = self.parse_binding_pattern()?;
-                            let (type_annotation, arg_end) = if self.check(&TokenKind::Colon) {
-                                let ta = self.parse_type_annotation()?;
-                                let end = ta.span.end;
-                                (Some(ta), end)
-                            } else {
-                                (None, pattern.span().end)
-                            };
+                            // A trailing `?`/`: T` binds to the rest element (acorn's
+                            // shape), never to the inner pattern.
+                            let (optional, type_annotation, arg_end) =
+                                self.parse_rest_param_tail(pattern.span().end)?;
                             Expression::RestElement(RestElement {
                                 argument: self.alloc(pattern),
+                                optional,
                                 type_annotation,
                                 span: Span::new(rest_start as u32, arg_end),
                             })
                         } else {
-                            // ...args or ...args: type
+                            // ...args, ...args?, ...args: type, or ...args?: type.
+                            // The argument span stays name-only (`id_start..id_end`);
+                            // any `?`/`: T` binds to the rest element (acorn's shape).
                             let (id_start, id_end) = self.current_pos();
                             let name = self.current_ident_name();
                             self.expect(&TokenKind::Identifier)?;
-
-                            // Check for type annotation: ...args: type
-                            let (type_annotation, arg_end) = if self.check(&TokenKind::Colon) {
-                                let ta = self.parse_type_annotation()?;
-                                let end = ta.span.end;
-                                (Some(ta), end as usize)
-                            } else {
-                                (None, id_end)
-                            };
-
                             let argument = Expression::Identifier(Identifier::simple(
                                 name,
                                 Span::new(id_start as u32, id_end as u32),
                             ));
-
+                            let (optional, type_annotation, arg_end) =
+                                self.parse_rest_param_tail(id_end as u32)?;
                             Expression::RestElement(RestElement {
                                 argument: self.alloc(argument),
+                                optional,
                                 type_annotation,
-                                span: Span::new(rest_start as u32, arg_end as u32),
+                                span: Span::new(rest_start as u32, arg_end),
                             })
                         }
                     }
