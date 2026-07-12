@@ -467,49 +467,15 @@ deno task check
 
 ---
 
-## Safety Check: Character Frequency Approach
+## Safety Check
 
-The safety check uses **character frequency comparison**, run **differentially
-against prettier** (`check_safety_vs_prettier`), to detect data loss:
-
-1. Count all non-formatting characters in source, our output, and prettier's output
-2. Per character, compute how many our output drops/adds vs source, and how many
-   prettier drops/adds vs source
-3. Report only the remainder our output incurs **beyond** prettier:
-   `real = max(0, ours_delta − prettier_delta)`
-
-Prettier is the source of truth, so a normalization prettier also performs
-(redundant leading `|` removal, number normalization, CSS keyword lowercasing) is
-not data loss even though it drops the source character count — the differential
-cancels it. A violation survives only when our output drops/adds a semantic
-character that prettier preserves.
-
-**Excluded characters** (formatting may change these):
-
-- Whitespace: space, tab, newline, carriage return
-- Quotes: `'` `"` `` ` `` (style normalization)
-- Parens: `( )` (optional in arrow params, grouping)
-- Separators: `, ;` (trailing commas, ASI)
-
-**Detected characters** (must be preserved):
-
-- Letters: a-z, A-Z (identifiers, keywords, comments)
-- Digits: 0-9 (numbers)
-- Brackets: `[ ] { } < >` (arrays, objects, generics, JSX)
-- Operators: `+ - * / % = ! & | ^ ~ ? : . @ # $ _` etc.
-
-**Example violation output:** each char shows `real` count with its shared
-context — the first labeled `(ours N, prettier M)`, the rest bare `(N, M)`:
-
-```
-content_lost: 7 beyond prettier — '|'×2 (ours 28, prettier 26), '/'×2 (2, 0), '*'×2 (2, 0), '4'×1 (1, 0)
-```
-
-The `'|'×2 (ours 28, prettier 26)` reads as: of the 28 pipes our output dropped,
-26 are shared with prettier (a normalization, not loss) and only 2 are real. The
-`(2, 0)` entries are fully real — prettier dropped none.
-
+The safety check is a **differential character-frequency comparison against
+prettier** (`check_safety_vs_prettier`): it reports only the semantic-character
+loss/addition our output incurs **beyond** prettier
+(`real = max(0, ours_delta − prettier_delta)`), so shared normalizations cancel.
 Safety violations fail the corpus check immediately — they are never skipped.
+Full algorithm, character sets, and how to read a violation:
+[divergence_detector.md §Safety Checks](./divergence_detector.md#safety-checks).
 
 ---
 
