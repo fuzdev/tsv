@@ -475,18 +475,10 @@ impl<'a> Lexer<'a> {
                 // Trailing decimal: `5.` / `0.` (operator, punctuation, or end),
                 // `5..foo` / `0..toString()` (the next `.` is member access). The
                 // `.` is greedily the decimal point (maximal munch), so consume it.
+                // The boundary check at the end of `scan_number_into` then rejects
+                // an IdentifierStart abutting the `.` (`5.foo` / `10._1` / `5.in`).
                 is_integer = false;
                 self.advance(); // consume '.'
-                // ecma262 12.9.3: the SourceCharacter immediately following a
-                // NumericLiteral must not be an IdentifierStart. After a trailing
-                // `.` that rejects `5.foo` / `10.$a` (identifier) and `10._1` /
-                // `1._5` (a leading `_` in the empty fraction) — read as a member
-                // access before — and keyword-led `5.in` / `5.instanceof`, which
-                // the parser would otherwise accept as `5. in b`. (`5foo` with no
-                // `.` hits the same rule via the parser's number→primary path.)
-                if self.cur_char().is_some_and(is_id_start) {
-                    return Err(lex_err("Identifier directly after number", self.position));
-                }
             }
         }
 
@@ -506,7 +498,11 @@ impl<'a> Lexer<'a> {
 
     /// Scan a numeric literal — decimal, `0x`/`0b`/`0o` radix, float, exponent,
     /// or `BigInt` suffix — writing the `Number` token into `*dst`. `first` is the
-    /// digit at `start` the dispatch already matched. Mirrors the `_into`
+    /// byte at `start` the dispatch matched; it is read only to detect a leading-
+    /// `0` radix prefix, so it is a digit for `5`/`0x…` or `.` for a leading-dot
+    /// fraction (`.5`) — both non-`0`, both routing to `scan_decimal_number`. The
+    /// single number entry point, so the "identifier directly after a number"
+    /// boundary rule (ecma262 12.9.3) lives here once. Mirrors the `_into`
     /// write-through of the other large scanners so the dispatch arm is one
     /// `return`. Errors on a legacy octal literal (`0777`), illegal in strict mode.
     fn scan_number_into(
@@ -570,6 +566,20 @@ impl<'a> Lexer<'a> {
         // matching acorn's "Identifier directly after number".
         if bigint_allowed && self.cur_byte() == Some(b'n') {
             self.advance();
+        }
+
+        // ecma262 12.9.3: "The SourceCharacter immediately following a
+        // NumericLiteral must not be an IdentifierStart or DecimalDigit" — the
+        // spec's own example is that `3in` is an error, not the two tokens `3` and
+        // `in`. Enforcing the IdentifierStart half here (the single number entry)
+        // rejects a number abutting a keyword-operator (`5in` / `1.5in` / `0xffin`
+        // / `5nin` / `.5in`) rather than reading it as `5 in y`; the parser's
+        // number→primary path only catches a following *identifier* (`5foo`), not
+        // an infix keyword. A DecimalDigit can only follow a complete number after
+        // an out-of-range radix digit (`0b12`) or a BigInt suffix (`5n3`), both of
+        // which the parser already rejects as adjacent number tokens.
+        if self.cur_char().is_some_and(is_id_start) {
+            return Err(lex_err("Identifier directly after number", self.position));
         }
 
         *dst = self.make_token(TokenKind::Number, start);
@@ -801,18 +811,12 @@ impl<'a> Lexer<'a> {
                     self.advance(); // consume third .
                     self.make_token(TokenKind::DotDotDot, start)
                 } else if self.byte_ahead(1).is_some_and(|b| b.is_ascii_digit()) {
-                    // Number starting with a decimal point: .5
-                    self.advance(); // consume '.'
-                    self.scan_digits(|c| c.is_ascii_digit())?;
-                    // Check for exponent
-                    if matches!(self.cur_byte(), Some(b'e' | b'E')) {
-                        self.advance();
-                        if matches!(self.cur_byte(), Some(b'+' | b'-')) {
-                            self.advance();
-                        }
-                        self.scan_digits(|c| c.is_ascii_digit())?;
-                    }
-                    self.make_token(TokenKind::Number, start)
+                    // Number starting with a decimal point (`.5`, `.5e3`). Route it
+                    // through the one number entry with `.` as `first` (a non-`0`
+                    // byte → empty integer part → fraction/exponent), so leading-dot
+                    // fractions share `scan_number_into`'s separator/exponent and
+                    // boundary handling instead of a parallel scan that can drift.
+                    return self.scan_number_into(start, b'.', dst);
                 } else {
                     // Single dot: member access operator
                     self.advance();
