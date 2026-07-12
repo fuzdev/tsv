@@ -40,10 +40,10 @@ It's a high-effort project that prioritizes quality.
 
 tsv is derived from:
 
-- Svelte
-- TypeScript
-- Prettier and prettier-plugin-svelte
 - HTML/CSS/JS
+- TypeScript
+- Svelte
+- Prettier and prettier-plugin-svelte
 
 tsv currently supports:
 
